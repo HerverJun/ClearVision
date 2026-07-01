@@ -42,8 +42,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G04A`
-- 当前卡片：`docs/进行中/Studio2/goals/G04A.md`
+- 当前 Goal：`G04B`
+- 当前卡片：`docs/进行中/Studio2/goals/G04B.md`
 - 当前阶段：`Foundation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -81,8 +81,8 @@
 | G02A | Foundation | FrontendV2 构建与发布底座 | DONE | G01 | `docs/进行中/Studio2/goals/G02A.md` | 见 G02A 完成提交与最终报告 |
 | G02B | Foundation | V2 挂载、HostBridge 与现有通信适配 | DONE | G02A | `docs/进行中/Studio2/goals/G02B.md` | 见 G02B 完成提交与最终报告 |
 | G03 | Foundation | Workspace Shell MVP | DONE | G02B | `docs/进行中/Studio2/goals/G03.md` | 见 G03 完成提交与最终报告 |
-| G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | READY | G03 | `docs/进行中/Studio2/goals/G04A.md` |  |
-| G04B | Foundation | V2 单请求工程保存与持久化身份 | LOCKED | G04A | `docs/进行中/Studio2/goals/G04B.md` |  |
+| G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | DONE | G03 | `docs/进行中/Studio2/goals/G04A.md` | 见 G04A 完成提交与最终报告 |
+| G04B | Foundation | V2 单请求工程保存与持久化身份 | READY | G04A | `docs/进行中/Studio2/goals/G04B.md` |  |
 | G05A | Observation | Execution Observation 投影与身份 | LOCKED | G04B | `docs/进行中/Studio2/goals/G05A.md` |  |
 | G05B | Observation | Preview Artifact 生命周期与安全读取 | LOCKED | G05A | `docs/进行中/Studio2/goals/G05B.md` |  |
 | G06 | Observation | 节点预览结果检查器 MVP | LOCKED | G05B | `docs/进行中/Studio2/goals/G06.md` |  |
@@ -155,6 +155,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-01 | G04A | `33c8276332fe6543036d260bfb39f50a815c1c17` | 见 G04A 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，23/23；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 新增 `StudioFlowEditorPort`，V2 只公开 `studio2.flowEditorPort`；补齐 snapshot/select/replace/patch/subscribe/dispose、本地 stale disposition 和最小参数 draft/commit；修复 hosted adapter 旧实例二次 dispose；未执行 G04B、未保存 Project、未改 Agent/Station/Runtime。 |
 | 2026-07-01 | G03 | `b359a35aafc7c37ec24bb4f27f1f4364040495d2` | 见 G03 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，21/21；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；浏览器级 1366×768、1920×1080、2560×1440 screenshot PASS；flag off/on 回归 PASS；WebView2 人工启动 NOT PERFORMED；完整 GitHub CI NOT RUN | 建立 V2 Workspace Shell MVP、Flow/Tool/Review 模式、唯一 hosted FlowCanvas 创建链和 lifecycle 并发 mount 修复；未迁移业务模块；下一项为 G04A。 |
 | 2026-07-01 | G02B | `656645d3a653eee238fe41f1764e1254f8c879a3` | 见 G02B 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；Desktop build PASS；Desktop.Tests build PASS；G02B targeted + Studio2/BuildFromPlan architecture guard PASS，30/30；Release publish PASS；build/publish V2 asset audit PASS；WebView2 人工启动 NOT PERFORMED；完整 CI NOT RUN | 新增 `Studio:WorkspaceV2Enabled` 默认 false；flag off 只导航 `/index.html`，flag on 只导航 `/v2/index.html`；`/v2` 静态资产独立映射输出目录；V2 测试岛复用 legacy httpClient/WebMessageBridge/EventBus/ServiceRegistry，未迁移业务 capability；下一项为 G03。 |
 | 2026-07-01 | G02A follow-up | `d89c7d6e1c6c2b083f780f7957e75d29505a2ef2` | 见 G02A 收口修复提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；clean Debug build + repeat incremental build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，13/13；CI YAML lint/order check PASS；Markdown links/encoding/diff hygiene PASS；完整 CI NOT RUN | 修复 `/v2/` public base、收敛 MSBuild/CI 唯一 production build、调整 HostBridge/AgentRun guard 为长期白名单规则；当前 Goal 仍为 G02B，未执行 G02B。 |

@@ -46,8 +46,7 @@
           {{ shellStore.leftDockCollapsed ? '>' : '<' }}
         </button>
         <div class="studio2-workspace-shell__dock-content">
-          <h2>Tool Dock</h2>
-          <p>Tool capability pending G04A.</p>
+          <FlowEditorPortPanel :model="model" />
         </div>
       </aside>
 
@@ -110,6 +109,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted } from 'vue';
+import FlowEditorPortPanel from '@/components/FlowEditorPortPanel.vue';
 import type { Studio2FoundationIslandViewModel } from '@/foundation/studio2FoundationIsland';
 import {
   DEFAULT_LEFT_DOCK_WIDTH,

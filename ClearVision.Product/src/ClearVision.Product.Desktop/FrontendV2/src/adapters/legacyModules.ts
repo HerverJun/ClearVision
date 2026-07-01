@@ -35,12 +35,37 @@ export interface HostedFlowCanvasViewState {
   readonly connectionCount: number;
 }
 
-export interface HostedFlowCanvasAdapter {
+export interface LegacyFlowCanvasSnapshot {
+  readonly flowRevision: number;
+  readonly selectionRevision: number;
+  readonly selectedNodeId: string | null;
+  readonly flow: unknown;
+  readonly selectedNode: unknown;
+}
+
+export interface LegacyFlowCanvasParameterPatchResult {
+  readonly updated: boolean;
+  readonly reason: 'updated' | 'no_change' | 'node_not_found' | 'parameter_not_found';
+  readonly missingParameters: readonly string[];
+}
+
+export interface LegacyFlowCanvasAdapter {
   resize(): unknown;
   render(): unknown;
   dispose(): void;
   getViewState(): HostedFlowCanvasViewState;
+  getSnapshot(): LegacyFlowCanvasSnapshot;
+  replaceFlow(flow: unknown): unknown;
+  selectNode(nodeId: string | null): boolean;
+  patchNodeParameters(
+    nodeId: string,
+    parameterPatch: Readonly<Record<string, unknown>>
+  ): LegacyFlowCanvasParameterPatchResult;
+  subscribeStructure(listener: (payload: unknown) => void): () => void;
+  subscribeSelection(listener: (payload: unknown) => void): () => void;
 }
+
+export type HostedFlowCanvasAdapter = LegacyFlowCanvasAdapter;
 
 export interface LegacyFlowCanvasAdapterModule {
   createHostedFlowCanvasAdapter(

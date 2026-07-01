@@ -7,6 +7,26 @@ import FlowCanvas from './flowCanvas.js';
 
 const hostedAdapters = new Map();
 
+function deepClone(value) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+    }
+
+    return JSON.parse(JSON.stringify(value));
+}
+
+function getParameterName(parameter) {
+    return parameter?.name ?? parameter?.Name ?? '';
+}
+
+function hasOwn(object, key) {
+    return Object.prototype.hasOwnProperty.call(object, key);
+}
+
 class FlowCanvasAdapter {
     constructor(flowCanvas, options = {}) {
         if (!flowCanvas) {
@@ -27,9 +47,40 @@ class FlowCanvasAdapter {
         return this.canvas.serialize();
     }
 
+    getSnapshot() {
+        const flow = deepClone(this.serialize());
+        const selectedNodeId = this.canvas.selectedNode || null;
+        const selectedNode = selectedNodeId ? this.canvas.nodes?.get?.(selectedNodeId) : null;
+        const selectionState = typeof this.canvas.getSelectionState === 'function'
+            ? this.canvas.getSelectionState()
+            : {
+                selectedNodeId,
+                selectedConnectionId: this.canvas.selectedConnection?.id || null,
+                selectionRevision: 0,
+                flowRevision: this.getRevision()
+            };
+
+        return {
+            flowRevision: this.getRevision(),
+            selectionRevision: selectionState.selectionRevision ?? 0,
+            selectedNodeId,
+            flow,
+            selectedNode: deepClone(selectedNode)
+        };
+    }
+
     deserialize(flow) {
         const result = this.canvas.deserialize(flow);
         this.emitFlowChanged('deserialize');
+        return result;
+    }
+
+    replaceFlow(flow) {
+        const result = this.canvas.deserialize(deepClone(flow));
+        this.emitFlowChanged('replaceFlow');
+        if (typeof this.canvas.markSelectionChanged === 'function') {
+            this.canvas.markSelectionChanged('replaceFlow');
+        }
         return result;
     }
 
@@ -48,8 +99,86 @@ class FlowCanvasAdapter {
     }
 
     selectNode(nodeId) {
-        this.canvas.selectedNode = nodeId || null;
+        const nextNodeId = nodeId || null;
+        if (nextNodeId && !this.canvas.nodes?.has?.(nextNodeId)) {
+            return false;
+        }
+
+        this.canvas.selectedNode = nextNodeId;
+        this.canvas.selectedConnection = null;
+        if (typeof this.canvas.markSelectionChanged === 'function') {
+            this.canvas.markSelectionChanged('adapter-selectNode');
+        }
+        if (typeof this.canvas.onNodeSelected === 'function') {
+            this.canvas.onNodeSelected(nextNodeId ? this.canvas.nodes.get(nextNodeId) : null);
+        }
         this.canvas.render();
+        return true;
+    }
+
+    patchNodeParameters(nodeId, parameterPatch = {}) {
+        const node = this.canvas.nodes?.get?.(nodeId);
+        if (!node) {
+            return {
+                updated: false,
+                reason: 'node_not_found',
+                missingParameters: []
+            };
+        }
+
+        const parameters = Array.isArray(node.parameters) ? node.parameters : [];
+        const entries = Object.entries(parameterPatch);
+        const resolvedEntries = [];
+        const missingParameters = [];
+        let changed = false;
+
+        for (const [name, value] of entries) {
+            const parameter = parameters.find(item =>
+                String(getParameterName(item)).toLowerCase() === String(name).toLowerCase());
+            if (!parameter) {
+                missingParameters.push(name);
+                continue;
+            }
+
+            resolvedEntries.push([parameter, value]);
+        }
+
+        if (missingParameters.length > 0) {
+            return {
+                updated: false,
+                reason: 'parameter_not_found',
+                missingParameters
+            };
+        }
+
+        for (const [parameter, value] of resolvedEntries) {
+            const oldValue = parameter.value ?? parameter.Value;
+            if (Object.is(oldValue, value)) {
+                continue;
+            }
+
+            if (hasOwn(parameter, 'value') || !hasOwn(parameter, 'Value')) {
+                parameter.value = deepClone(value);
+            }
+            if (hasOwn(parameter, 'Value')) {
+                parameter.Value = deepClone(value);
+            }
+            changed = true;
+        }
+
+        if (changed) {
+            this.canvas.render();
+            this.markFlowStructureChanged('patchNodeParameters');
+            if (typeof this.canvas.markSelectionChanged === 'function') {
+                this.canvas.markSelectionChanged('patchNodeParameters');
+            }
+        }
+
+        return {
+            updated: changed,
+            reason: changed ? 'updated' : 'no_change',
+            missingParameters: []
+        };
     }
 
     resize() {
@@ -100,9 +229,31 @@ class FlowCanvasAdapter {
         return () => {};
     }
 
+    subscribeStructure(listener) {
+        return this.subscribeStructureState(listener);
+    }
+
     subscribeViewState(listener) {
         if (typeof this.canvas.subscribeViewState === 'function') {
             return this.canvas.subscribeViewState(listener);
+        }
+
+        return () => {};
+    }
+
+    subscribeSelection(listener) {
+        if (typeof this.canvas.subscribeSelectionState === 'function') {
+            return this.canvas.subscribeSelectionState(listener);
+        }
+
+        if (typeof listener === 'function') {
+            listener({
+                selectedNodeId: this.canvas.selectedNode || null,
+                selectedConnectionId: this.canvas.selectedConnection?.id || null,
+                selectionRevision: 0,
+                flowRevision: this.getRevision(),
+                reason: 'initial'
+            });
         }
 
         return () => {};
@@ -164,9 +315,17 @@ function createHostedFlowCanvasAdapter(canvasId, options = {}) {
         ownsCanvas: true
     });
     const disposeAdapter = adapter.dispose.bind(adapter);
+    let hostedDisposed = false;
     adapter.dispose = () => {
+        if (hostedDisposed) {
+            return;
+        }
+
+        hostedDisposed = true;
         disposeAdapter();
-        hostedAdapters.delete(key);
+        if (hostedAdapters.get(key) === adapter) {
+            hostedAdapters.delete(key);
+        }
     };
 
     hostedAdapters.set(key, adapter);

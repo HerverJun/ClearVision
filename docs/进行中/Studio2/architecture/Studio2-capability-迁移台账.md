@@ -24,7 +24,7 @@
 | capability | legacy owner | planned V2 owner | read source | write entry | migration Goal | cutover Goal | deletion Goal | Feature Flag | flag off 行为 | flag on 行为 | rollback | 当前状态 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Workspace Shell | `app.js` + `viewManager` | V2 Workspace Shell root | 现有 DOM view state、Project 投影、Host 注入 API base URL | 只允许切换 view、注册 Shell owned adapter 和维护 UI 布局状态；不写业务 authority | G03 | G03 | G16 | `Studio2.WorkspaceShell` | 旧 `app.js` 是唯一 mounted root | V2 Shell 是唯一 mounted root，旧 Shell 不订阅、不运行 timer；Flow 模式只经 hosted `FlowCanvasAdapter` 创建一个现有 `FlowCanvas` | flag off 恢复旧 Shell | DONE_G03 |
-| Flow Editor | `FlowCanvas` + `FlowEditorInteraction` + `FlowCanvasAdapter` | V2 Flow Editor | `FlowCanvasAdapter.serialize()`、Project flow 投影 | V2 只经 `FlowCanvasAdapter` 修改画布；正式保存经 ProjectSaveCoordinator | G04A | G04B | G16 | `Studio2.FlowEditor` | 旧 Flow Editor 挂载并持有 FlowCanvas | V2 Flow Editor 挂载，旧 Flow Editor release 订阅和 timer | flag off 恢复旧 Flow Editor 与 adapter | LOCKED |
+| Flow Editor | `FlowCanvas` + `FlowEditorInteraction` + `FlowCanvasAdapter` | V2 Flow Editor | `StudioFlowEditorPort` snapshot、Project flow 投影 | V2 只经 `studio2.flowEditorPort` 修改画布；正式保存仍经 ProjectSaveCoordinator | G04A | G04B | G16 | `Studio2.FlowEditor` | 旧 Flow Editor 挂载并持有 FlowCanvas | G04A 已建立 Port、本地 `flowRevision`/`selectionRevision` stale 防护和最小参数 draft/commit 验证；Project 保存未执行 | flag off 恢复旧 Flow Editor 与 adapter | DONE_G04A_PORT |
 | Property Panel | legacy property panel/sidebar | V2 Property Panel | selected node projection、operator metadata、Project schema | editor draft commit 到 FlowCanvasAdapter 或 Project save path | G15.1 | G15.1 | G16 | `Studio2.PropertyPanel` | 旧 Property Panel 是唯一 owner | V2 Property Panel 是唯一 owner，旧 panel 不订阅 selection | flag off 恢复旧 property panel | LOCKED |
 | Preview Panel | `NodePreviewCoordinator`、preview overlay、image viewer | V2 Preview Panel | preview endpoint、artifact URL、current flow/node projection | 不写正式结果；draft request 只走既有 preview API | G15.2 | G15.2 | G16 | `Studio2.PreviewPanel` | 旧 preview panel/overlay 挂载 | V2 Preview Panel 挂载，旧 preview overlay 释放资源 | flag off 恢复旧 preview panel | LOCKED |
 | Global Variables | legacy global variable panel/store | V2 Global Variables editor | Project `globalVariables` schema、Project variable session projection | `ProjectService.UpdateGlobalVariablesAsync()` -> `ProjectSaveCoordinator` | G15.3 | G15.3 | G16 | `Studio2.GlobalVariables` | 旧变量面板是唯一 mounted owner | V2 变量面板是唯一 owner，旧面板不订阅 Project | flag off 恢复旧变量面板 | LOCKED |
@@ -39,7 +39,7 @@
 | Feature Flag | owner | 创建 Goal | runtime 实现 Goal | cutover Goal | 删除 Goal | 默认值 | flag off 必须保证 | flag on 必须保证 | 当前状态 |
 |---|---|---|---|---|---|---|---|---|---|
 | `Studio2.WorkspaceShell` | Workspace Shell | G01 登记 | G03 | G03 | G16 | off | 旧 Shell 唯一 mounted | V2 Shell 唯一 mounted，ServiceRegistry 只注册 Shell owned adapter，不注册 raw canvas | RUNTIME_IMPLEMENTED_G03 |
-| `Studio2.FlowEditor` | Flow Editor | G01 登记 | G04A | G04B | G16 | off | 旧 Flow Editor 持有 FlowCanvas | V2 经 FlowCanvasAdapter 写入 | REGISTERED_ONLY |
+| `Studio2.FlowEditor` | Flow Editor | G01 登记 | G04A | G04B | G16 | off | 旧 Flow Editor 持有 FlowCanvas | V2 经 `StudioFlowEditorPort` 写入，Port 内部包装现有 `FlowCanvasAdapter`；正式保存仍待 G04B | PORT_DONE_G04A |
 | `Studio2.PropertyPanel` | Property Panel | G01 登记 | G15.1 | G15.1 | G16 | off | 旧 Property Panel 订阅 selection | V2 Property Panel 唯一订阅 selection | REGISTERED_ONLY |
 | `Studio2.PreviewPanel` | Preview Panel | G01 登记 | G15.2 | G15.2 | G16 | off | 旧 preview overlay 生效 | V2 Preview 唯一持有 preview 资源 | REGISTERED_ONLY |
 | `Studio2.GlobalVariables` | Global Variables | G01 登记 | G15.3 | G15.3 | G16 | off | 旧变量面板写入后端 | V2 变量面板写入同一后端 | REGISTERED_ONLY |
@@ -55,5 +55,6 @@
 - G02A 只建立 FrontendV2 构建底座和发布资产链路，不挂载 Vue root，不实现 runtime flag。
 - G02A 收口修复固定 Vite base 为 `/v2/`，增加构建后 HTML/manifest 路径校验，消除 CI/MSBuild 重复 production build，并把 HostBridge guard 收敛为唯一 adapter 白名单规则。
 - G02B 只实现宿主级 root 切换、`/v2` 静态映射、启动配置注入、legacy module facade 和无业务测试岛；不迁移 Workspace Shell、Flow、Project、Variables、Inspection、AI 或 Results capability。
-- G03 只实现 Workspace Shell MVP 和 hosted FlowCanvas 载入链。Flow Editor 写入端口、本地 stale 防护、Project 保存和业务面板迁移仍由 G04A 及后续 Goal 执行；真实 WebView2 人工启动本轮未执行。
+- G03 只实现 Workspace Shell MVP 和 hosted FlowCanvas 载入链；真实 WebView2 人工启动未执行。
+- G04A 已将 V2 Flow 写入口收敛为 `StudioFlowEditorPort`，并加入本地 `projectId`、`requestSequence`、`flowRevision`、`selectionRevision` stale 防护。G04A 不保存工程，不创建 Project API client，不改变 `ProjectSaveCoordinator`、Agent apply、Runtime Package 或 Station。
 - 后续 Goal 若选择不同 V2 目录，必须先更新 ADR、台账和 `Studio2ArchitectureGuardTests` 的受控 scope。

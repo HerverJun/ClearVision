@@ -51,6 +51,8 @@ G02B 实现的宿主级启动开关为 `Studio:WorkspaceV2Enabled`，默认 `fal
 
 G03 将 `/v2/index.html` 下的测试岛替换为 Workspace Shell。Shell 只提供顶部 toolbar、左右 dock、中央 workspace、底部 status bar 和 Flow/Tool/Review 模式切换；Tool/Review 仍为占位，不加载 Property、Preview、AI、Results、Project、Inspection 或 GlobalVariables 业务模块。Flow 模式承载现有 `FlowCanvas`，创建链固定为 `FrontendV2` 动态加载 legacy `flowCanvasAdapter.js`，再由 `createHostedFlowCanvasAdapter(canvasId, options)` 在 adapter 内部创建唯一 `FlowCanvas`。V2 不直接 import `flowCanvas.js`、不调用 `new FlowCanvas(...)`、不使用 `adapter.raw`，也不注册 raw canvas 到 `ServiceRegistry`。
 
+G04A 将 V2 Flow 本地编辑写入口收敛为 `StudioFlowEditorPort`。Workspace runtime 私有持有 hosted `FlowCanvasAdapter`，`ServiceRegistry` 只公开 `studio2.flowEditorPort`；V2 组件不得取得 raw `FlowCanvas`、`nodes` Map、可变 node 引用、`adapter.raw` 或 `window.flowCanvas`。Port 的 `flowRevision`、`selectionRevision`、`requestSequence` 仅用于前端本地 stale 防护，不等同后端 `PersistenceRevision`，也不参与正式 Project 保存冲突判定。G04A 不新增 Project 保存 endpoint/client，不修改 `ProjectSaveCoordinator`、`projectManager.saveProject`、Agent apply、Runtime Package 或 Station；G04B 才负责 canonical Project DTO 与持久化身份。
+
 守卫必须防止：
 
 - V2 定义第二套 `EventBus` 或 `ServiceRegistry`；

@@ -24,7 +24,7 @@ import {
 const MOUNT_DISPOSED_ERROR = 'Studio2 foundation mount was disposed before completion.';
 
 export interface Studio2FoundationIslandViewModel {
-  readonly goal: 'G03';
+  readonly goal: 'G04A';
   workspaceV2Enabled: boolean;
   apiBaseUrl: string;
   hostKind: string;
@@ -119,7 +119,7 @@ function createViewModel(
   scope: Studio2LifecycleScope
 ): Studio2FoundationIslandViewModel {
   return reactive<Studio2FoundationIslandViewModel>({
-    goal: 'G03',
+    goal: 'G04A',
     workspaceV2Enabled: startup.workspaceV2Enabled,
     apiBaseUrl: startup.apiBaseUrl,
     hostKind: startup.hostKind,
@@ -188,7 +188,7 @@ async function createFoundationIsland(
     });
 
     const serviceRegistration = {
-      goal: 'G03',
+      goal: 'G04A',
       dispose: () => {
         handle.dispose();
       }

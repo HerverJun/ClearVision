@@ -7,7 +7,7 @@ import type {
 } from '@/adapters/legacyModules';
 import { Studio2LifecycleScope } from '@/foundation/studio2Lifecycle';
 import {
-  FLOW_CANVAS_ADAPTER_SERVICE_KEY,
+  FLOW_EDITOR_PORT_SERVICE_KEY,
   Studio2WorkspaceShellRuntime,
   createWorkspaceShellRuntimeState
 } from '@/workspace/workspaceShellRuntime';
@@ -29,13 +29,37 @@ describe('Studio2WorkspaceShellRuntime', () => {
 
     expect(second).toBe(first);
     expect(fixture.createCount).toBe(1);
-    expect(fixture.registry.get(FLOW_CANVAS_ADAPTER_SERVICE_KEY)).toBe(first);
+    expect(fixture.registry.get(FLOW_EDITOR_PORT_SERVICE_KEY)).toBe(first);
     expect(fixture.state.flowCanvasInstanceCount).toBe(1);
 
     fixture.runtime.dispose();
 
     expect(fixture.disposeCount).toBe(1);
+    expect(fixture.subscriptionDisposeCount).toBe(2);
     expect(fixture.state.flowCanvasStatus).toBe('disposed');
+  });
+
+  it('keeps Port, registry, listeners and adapters bounded across 20 workspace cycles', () => {
+    for (let index = 0; index < 20; index += 1) {
+      const fixture = createRuntimeFixture();
+      const port = fixture.runtime.mountFlowCanvas(`studio2-flow-canvas-${String(index)}`);
+
+      expect(fixture.createCount).toBe(1);
+      expect(fixture.registry.get(FLOW_EDITOR_PORT_SERVICE_KEY)).toBe(port);
+      expect(fixture.structureSubscribeCount).toBe(1);
+      expect(fixture.selectionSubscribeCount).toBe(1);
+      expect(fixture.state.flowCanvasInstanceCount).toBe(1);
+
+      fixture.runtime.dispose();
+      fixture.scope.dispose();
+
+      expect(fixture.disposeCount).toBe(1);
+      expect(fixture.subscriptionDisposeCount).toBe(2);
+      expect(fixture.registry.size).toBe(0);
+      expect(fixture.state.flowCanvasInstanceCount).toBe(0);
+      expect(fixture.state.flowCanvasStatus).toBe('disposed');
+      expect(fixture.state.flowEditorStatus).toBe('disposed');
+    }
   });
 
   it('keeps nodes, edges, selection, scale and offset across Flow Tool Review Flow mode switches', () => {
@@ -88,11 +112,15 @@ describe('Studio2WorkspaceShellRuntime', () => {
 interface RuntimeFixture {
   runtime: Studio2WorkspaceShellRuntime;
   readonly state: ReturnType<typeof createWorkspaceShellRuntimeState>;
+  readonly scope: Studio2LifecycleScope;
   readonly registry: Map<string, unknown>;
   createCount: number;
   resizeCount: number;
   renderCount: number;
   disposeCount: number;
+  structureSubscribeCount: number;
+  selectionSubscribeCount: number;
+  subscriptionDisposeCount: number;
 }
 
 function createRuntimeFixture(options?: { readonly viewState?: HostedFlowCanvasViewState }): RuntimeFixture {
@@ -102,11 +130,15 @@ function createRuntimeFixture(options?: { readonly viewState?: HostedFlowCanvasV
   const fixture: RuntimeFixture = {
     runtime: null as unknown as Studio2WorkspaceShellRuntime,
     state,
+    scope,
     registry,
     createCount: 0,
     resizeCount: 0,
     renderCount: 0,
-    disposeCount: 0
+    disposeCount: 0,
+    structureSubscribeCount: 0,
+    selectionSubscribeCount: 0,
+    subscriptionDisposeCount: 0
   };
   const services: LegacyFrontendServices = {
     httpClient: {
@@ -169,5 +201,41 @@ function createAdapterFixture(
       fixture.disposeCount += 1;
     },
     getViewState: () => resolvedViewState
+    ,
+    getSnapshot: () => ({
+      flowRevision: 1,
+      selectionRevision: 1,
+      selectedNodeId: resolvedViewState.selectedNode,
+      flow: {
+        operators: resolvedViewState.selectedNode
+          ? [{ id: resolvedViewState.selectedNode, type: 'MockNode', parameters: [] }]
+          : [],
+        connections: []
+      },
+      selectedNode: resolvedViewState.selectedNode
+        ? { id: resolvedViewState.selectedNode, type: 'MockNode', title: 'Mock', parameters: [] }
+        : null
+    }),
+    replaceFlow: () => undefined,
+    selectNode: () => true,
+    patchNodeParameters: () => ({
+      updated: true,
+      reason: 'updated',
+      missingParameters: []
+    }),
+    subscribeStructure: (listener) => {
+      fixture.structureSubscribeCount += 1;
+      listener({});
+      return () => {
+        fixture.subscriptionDisposeCount += 1;
+      };
+    },
+    subscribeSelection: (listener) => {
+      fixture.selectionSubscribeCount += 1;
+      listener({});
+      return () => {
+        fixture.subscriptionDisposeCount += 1;
+      };
+    }
   };
 }

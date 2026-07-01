@@ -51,7 +51,9 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"from\s+['""][^'""]*/flowCanvas\.js['""]", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+FlowCanvas\s*\(", relativePath);
             text.Should().NotContain("FlowCanvas.prototype", relativePath);
-            text.Should().NotContain(".raw", relativePath);
+            text.Should().NotMatchRegex(@"\.raw\b", relativePath);
+            text.Should().NotMatchRegex(@"\badapter\s*\.\s*raw\b", relativePath);
+            text.Should().NotMatchRegex(@"\bwindow\s*\.\s*flowCanvas\b", relativePath);
             text.Should().NotMatchRegex(@"\bclass\s+\w*FlowCanvas\w*Adapter\b", relativePath);
         }
     }
@@ -75,18 +77,21 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
-    public void FrontendV2_WorkspaceShell_ShouldUseOneHostedFlowCanvasAdapterRegistration()
+    public void FrontendV2_WorkspaceShell_ShouldExposeOnlyOneFlowEditorPortRegistration()
     {
         var legacyModulesText = File.ReadAllText(Path.Combine(Root, LegacyModulesPath));
         legacyModulesText.Should().Contain("flowCanvasAdapter: '/src/core/canvas/flowCanvasAdapter.js'");
         legacyModulesText.Should().Contain("createHostedFlowCanvasAdapter");
+        legacyModulesText.Should().Contain("LegacyFlowCanvasAdapter");
 
         var workspaceRuntimeText = File.ReadAllText(Path.Combine(Root, WorkspaceShellRuntimePath));
-        workspaceRuntimeText.Should().Contain("FLOW_CANVAS_ADAPTER_SERVICE_KEY");
-        Regex.Matches(workspaceRuntimeText, @"serviceRegistry\.register\(\s*FLOW_CANVAS_ADAPTER_SERVICE_KEY")
-            .Should().ContainSingle("one Workspace lifecycle must register exactly one FlowCanvas adapter.");
+        workspaceRuntimeText.Should().Contain("FLOW_EDITOR_PORT_SERVICE_KEY");
+        workspaceRuntimeText.Should().Contain("createStudioFlowEditorPort");
+        workspaceRuntimeText.Should().NotContain("FLOW_CANVAS_ADAPTER_SERVICE_KEY");
+        Regex.Matches(workspaceRuntimeText, @"serviceRegistry\.register\(\s*FLOW_EDITOR_PORT_SERVICE_KEY")
+            .Should().ContainSingle("one Workspace lifecycle must register exactly one Flow Editor Port.");
         workspaceRuntimeText.Should().NotContain("serviceRegistry.register('flowCanvas'", "V2 must not register a raw FlowCanvas instance.");
-        workspaceRuntimeText.Should().NotContain(".raw", "V2 must not use the legacy raw escape hatch.");
+        workspaceRuntimeText.Should().NotMatchRegex(@"\.raw\b", "V2 must not use the legacy raw escape hatch.");
     }
 
     [Fact]
@@ -100,6 +105,9 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"\bfetch\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bfetch\s*\(\s*['""`](?:https?:\/\/[^'""`]+)?(?:\/api)?\/projects(?:\/|\?|['""`])", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\bsaveProject\s*\(", relativePath);
+            text.Should().NotContain("ProjectSaveCoordinator", relativePath);
+            text.Should().NotContain("PersistenceRevision", relativePath);
             text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
             text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
         }

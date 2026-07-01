@@ -7,13 +7,13 @@ export {
 } from '@/foundation/studio2FoundationIsland';
 
 export interface Studio2FrontendV2BuildInfo {
-  readonly goal: 'G03';
+  readonly goal: 'G04A';
   readonly runtimeMounted: 'controlled-by-host-flag';
   readonly authority: 'none';
 }
 
 export const studio2FrontendV2BuildInfo: Studio2FrontendV2BuildInfo = {
-  goal: 'G03',
+  goal: 'G04A',
   runtimeMounted: 'controlled-by-host-flag',
   authority: 'none'
 };

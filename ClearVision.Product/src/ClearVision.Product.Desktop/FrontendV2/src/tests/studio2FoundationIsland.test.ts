@@ -9,7 +9,7 @@ import type {
   LegacyFrontendServices
 } from '@/adapters/legacyModules';
 import {
-  FLOW_CANVAS_ADAPTER_SERVICE_KEY,
+  FLOW_EDITOR_PORT_SERVICE_KEY,
   WORKSPACE_SHELL_SERVICE_KEY
 } from '@/workspace/workspaceShellRuntime';
 
@@ -58,7 +58,7 @@ describe('mountStudio2FoundationIsland', () => {
     expect(secondHandle).toBe(firstHandle);
     expect(getActiveStudio2FoundationIsland()).toBe(firstHandle);
     expect(created).toBe(1);
-    expect(firstHandle.model.goal).toBe('G03');
+    expect(firstHandle.model.goal).toBe('G04A');
   });
 
   it('disposes a pending mount deterministically without mounting the application', async () => {
@@ -147,12 +147,12 @@ describe('mountStudio2FoundationIsland', () => {
           }
         })
       });
-      const adapter = handle.model.workspaceRuntime.mountFlowCanvas(`studio2-flow-canvas-${String(index)}`);
+      const port = handle.model.workspaceRuntime.mountFlowCanvas(`studio2-flow-canvas-${String(index)}`);
 
       expect(services.messageHandlers.size).toBe(1);
       expect(services.eventHandlers.size).toBe(1);
       expect(services.registry.get(WORKSPACE_SHELL_SERVICE_KEY)).toBeTruthy();
-      expect(services.registry.get(FLOW_CANVAS_ADAPTER_SERVICE_KEY)).toBe(adapter);
+      expect(services.registry.get(FLOW_EDITOR_PORT_SERVICE_KEY)).toBe(port);
       expect(services.adapterCreateCount).toBe(1);
       expect(handle.scope.getTelemetry().abortControllerCount).toBe(1);
 
@@ -283,7 +283,29 @@ function createHostedAdapterFixture(fixture: LegacyServicesFixture): HostedFlowC
       offset: { x: 0, y: 0 },
       nodeCount: 0,
       connectionCount: 0
-    })
+    }),
+    getSnapshot: () => ({
+      flowRevision: 0,
+      selectionRevision: 0,
+      selectedNodeId: null,
+      flow: { operators: [], connections: [] },
+      selectedNode: null
+    }),
+    replaceFlow: () => undefined,
+    selectNode: () => true,
+    patchNodeParameters: () => ({
+      updated: true,
+      reason: 'updated',
+      missingParameters: []
+    }),
+    subscribeStructure: (listener) => {
+      listener({});
+      return () => {};
+    },
+    subscribeSelection: (listener) => {
+      listener({});
+      return () => {};
+    }
   };
 }
 

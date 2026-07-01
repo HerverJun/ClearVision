@@ -72,6 +72,7 @@ class FlowCanvas {
         this.nodes = new Map();
         this.connections = [];
         this.selectedNode = null;
+        this.selectionRevision = 0;
         this.draggedNode = null;
         this.dragOffset = { x: 0, y: 0 };
         this.scale = 1;
@@ -79,6 +80,7 @@ class FlowCanvas {
         this.flowRevision = 0;
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
+        this.selectionStateListeners = new Set();
         this.globalVariableSchema = { sourceBindings: [], targetBindings: [] };
 
         // 画布像素尺寸。
@@ -258,6 +260,7 @@ class FlowCanvas {
         this.selectedConnection = null;
         this.viewStateListeners.clear();
         this.structureStateListeners.clear();
+        this.selectionStateListeners.clear();
         this._particleSprite = null;
 
         if (this.minimapCanvas && this._minimapClickHandler) {
@@ -388,6 +391,8 @@ class FlowCanvas {
         }
         this.connections = remaining;
 
+        const selectionChanged = this.selectedNode === nodeId ||
+            (this.selectedConnection && (this.selectedConnection.source === nodeId || this.selectedConnection.target === nodeId));
         this.nodes.delete(nodeId);
         if (this.selectedNode === nodeId) {
             this.selectedNode = null;
@@ -397,6 +402,9 @@ class FlowCanvas {
         }
         this.invalidate();
         this.markFlowStructureChanged('removeNode');
+        if (selectionChanged) {
+            this.markSelectionChanged('removeNode');
+        }
         return true;
     }
 
@@ -606,6 +614,48 @@ class FlowCanvas {
             reason: 'initial'
         });
         return () => this.structureStateListeners.delete(listener);
+    }
+
+    getSelectionState() {
+        return {
+            selectedNodeId: this.selectedNode || null,
+            selectedConnectionId: this.selectedConnection?.id || null,
+            selectionRevision: this.selectionRevision,
+            flowRevision: this.flowRevision
+        };
+    }
+
+    subscribeSelectionState(listener) {
+        if (typeof listener !== 'function') {
+            return () => {};
+        }
+
+        this.selectionStateListeners.add(listener);
+        listener({
+            ...this.getSelectionState(),
+            reason: 'initial'
+        });
+        return () => this.selectionStateListeners.delete(listener);
+    }
+
+    notifySelectionStateChanged(reason = 'unknown') {
+        const payload = {
+            ...this.getSelectionState(),
+            reason
+        };
+
+        this.selectionStateListeners.forEach(listener => {
+            try {
+                listener(payload);
+            } catch (error) {
+                console.error('[FlowCanvas] Selection state listener failed:', error);
+            }
+        });
+    }
+
+    markSelectionChanged(reason = 'unknown') {
+        this.selectionRevision += 1;
+        this.notifySelectionStateChanged(reason);
     }
 
     notifyViewStateChanged() {
@@ -1352,11 +1402,15 @@ class FlowCanvas {
         }
         this.connections = this.connections.filter(conn => conn.id !== connectionId);
         this._unindexConnection(connection);
+        const selectionChanged = this.selectedConnection && this.selectedConnection.id === connectionId;
         if (this.selectedConnection && this.selectedConnection.id === connectionId) {
             this.selectedConnection = null;
         }
         this.invalidate();
         this.markFlowStructureChanged('removeConnection');
+        if (selectionChanged) {
+            this.markSelectionChanged('removeConnection');
+        }
         return true;
     }
 
@@ -2090,6 +2144,7 @@ class FlowCanvas {
                 if (this.onNodeSelected) {
                     this.onNodeSelected(node);
                 }
+                this.markSelectionChanged('mouse-select-node');
 
                 this.render();
                 return;
@@ -2102,6 +2157,7 @@ class FlowCanvas {
         if (this.onNodeSelected) {
             this.onNodeSelected(null);
         }
+        this.markSelectionChanged('mouse-clear-selection');
 
         this.render();
     }
@@ -2359,6 +2415,7 @@ class FlowCanvas {
         if (connection) {
             this.selectedNode = null;
             this.selectedConnection = connection;
+            this.markSelectionChanged('context-menu-connection');
             if (typeof this.onSelectionDeleteRequested === 'function' && !confirm('确定删除选中的连接吗？')) {
                 return;
             }
@@ -2382,6 +2439,7 @@ class FlowCanvas {
 
         this.selectedNode = clickedNode.id;
         this.selectedConnection = null;
+        this.markSelectionChanged('context-menu-node');
         this.showNodeContextMenu(e.clientX, e.clientY, clickedNode.id);
     }
 
@@ -2522,6 +2580,7 @@ class FlowCanvas {
     }
 
     clear(silent = false) {
+        const hadSelection = Boolean(this.selectedNode || this.selectedConnection);
         this.nodes.clear();
         this.connections = [];
         this._connectionById.clear();
@@ -2534,6 +2593,9 @@ class FlowCanvas {
         this.invalidate();
         if (!silent) {
             this.markFlowStructureChanged('clear');
+        }
+        if (hadSelection) {
+            this.markSelectionChanged('clear');
         }
     }
 
@@ -2587,6 +2649,7 @@ class FlowCanvas {
         this.selectedNode = newNode.id;
         this.invalidate();
         this.markFlowStructureChanged('duplicateNode');
+        this.markSelectionChanged('duplicateNode');
         return newNode;
     }
 

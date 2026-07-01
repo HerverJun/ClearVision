@@ -778,6 +778,87 @@ test('flowCanvasAdapter emitFlowChanged omits flow snapshot', async () => {
   assert.equal('flow' in emitted[0].payload, false, 'payload should not contain a flow snapshot');
 });
 
+test('flowCanvasAdapter snapshots are deep cloned and parameter patches are atomic', async () => {
+  const { FlowCanvasAdapter } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js'
+  );
+
+  let flowRevision = 1;
+  let selectionRevision = 1;
+  let renderCount = 0;
+  const node = {
+    id: 'node-a',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [
+      { name: 'Threshold', displayName: 'Threshold', value: 10, dataType: 'int' },
+      { Name: 'Gain', DisplayName: 'Gain', Value: 2, DataType: 'float' }
+    ]
+  };
+  const mockFlowCanvas = {
+    nodes: new Map([['node-a', node]]),
+    connections: [],
+    selectedNode: 'node-a',
+    selectedConnection: null,
+    serialize() {
+      return { operators: [node], connections: [] };
+    },
+    getFlowRevision() {
+      return flowRevision;
+    },
+    getSelectionState() {
+      return {
+        flowRevision,
+        selectionRevision,
+        selectedNodeId: this.selectedNode,
+        selectedConnectionId: null
+      };
+    },
+    render() {
+      renderCount += 1;
+    },
+    markFlowStructureChanged() {
+      flowRevision += 1;
+    },
+    markSelectionChanged() {
+      selectionRevision += 1;
+    }
+  };
+
+  const adapter = new FlowCanvasAdapter(mockFlowCanvas);
+  const snapshot = adapter.getSnapshot();
+  snapshot.flow.operators[0].parameters[0].value = 999;
+  snapshot.selectedNode.parameters[0].value = 888;
+
+  assert.equal(node.parameters[0].value, 10, 'snapshot mutation should not touch the real node');
+
+  const rejected = adapter.patchNodeParameters('node-a', {
+    Threshold: 20,
+    Missing: 30
+  });
+  assert.deepEqual(rejected, {
+    updated: false,
+    reason: 'parameter_not_found',
+    missingParameters: ['Missing']
+  });
+  assert.equal(node.parameters[0].value, 10, 'rejected patch should not partially mutate existing parameters');
+
+  const accepted = adapter.patchNodeParameters('node-a', {
+    threshold: 21,
+    gain: 3
+  });
+  assert.deepEqual(accepted, {
+    updated: true,
+    reason: 'updated',
+    missingParameters: []
+  });
+  assert.equal(node.parameters[0].value, 21);
+  assert.equal(node.parameters[1].Value, 3);
+  assert.equal(flowRevision, 2);
+  assert.equal(selectionRevision, 2);
+  assert.equal(renderCount, 1);
+});
+
 test('createHostedFlowCanvasAdapter owns one FlowCanvas per canvas id and destroys it on dispose', async () => {
   const { createHostedFlowCanvasAdapter } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js'
@@ -809,6 +890,37 @@ test('createHostedFlowCanvasAdapter owns one FlowCanvas per canvas id and destro
   assert.notEqual(third, first, 'new workspace lifecycle can create a fresh adapter after dispose');
 
   third.dispose();
+});
+
+test('createHostedFlowCanvasAdapter ignores stale dispose from an old hosted instance', async () => {
+  const { createHostedFlowCanvasAdapter } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const first = createHostedFlowCanvasAdapter('studio2-stale-dispose-canvas', {
+    eventBus: { emit() {} }
+  });
+  first.dispose();
+
+  const second = createHostedFlowCanvasAdapter('studio2-stale-dispose-canvas', {
+    eventBus: { emit() {} }
+  });
+  assert.notEqual(second, first, 'disposed hosted instance should allow a new adapter');
+  assert.equal(canvas._events.mousedown.length, 1);
+
+  first.dispose();
+  const third = createHostedFlowCanvasAdapter('studio2-stale-dispose-canvas', {
+    eventBus: { emit() {} }
+  });
+
+  assert.equal(third, second, 'stale dispose from the first instance must not evict the current adapter');
+  assert.equal(canvas._events.mousedown.length, 1, 'stale dispose must not create a second FlowCanvas');
+
+  second.dispose();
 });
 
 // =============================================================================
