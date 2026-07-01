@@ -1,8 +1,8 @@
 # Studio 2.0
 
 > 状态：Foundation 阶段入口
-> 当前完成项：G00
-> 下一执行项：G01
+> 当前完成项：G01
+> 下一执行项：G02A
 > 最近更新：2026-07-01
 
 本目录保存仓库内 Studio 2.0 的正式执行状态、基线证据和全部后续 Goal 执行卡。外部桌面执行包只作为本次安装来源；完成合并后，仓库内 `TODO.md` 与本目录才是持续维护入口。
@@ -13,8 +13,8 @@
 - [`goals/`](goals/) 目录保存全部独立执行卡。
 - 每轮只读取根 `AGENTS.md`、根 `TODO.md` 的必要段落、当前 Goal 对应的一张卡和该卡列出的代码锚点。
 - 禁止一次读取并执行全部卡；禁止跳过前置 Goal。
-- 当前 G00 已完成，下一项为 G01。
-- G01 之后的卡片保持 `LOCKED`，直到前置 Goal 完成并由根 `TODO.md` 明确解锁。
+- 当前 G01 已完成，下一项为 G02A。
+- G02B 之后的卡片保持 `LOCKED`，直到前置 Goal 完成并由根 `TODO.md` 明确解锁。
 - 后续如果执行包与仓库当前代码事实冲突，以仓库当前代码事实和本目录维护状态为准。
 
 ## 当前基线
@@ -25,14 +25,17 @@
 - 执行包审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - 基线报告：[`baseline/G00-基线冻结报告-2026-07-01.md`](baseline/G00-基线冻结报告-2026-07-01.md)
 - 状态权威与恢复边界：[`状态权威与恢复边界.md`](状态权威与恢复边界.md)
+- Studio 2.0 架构边界 ADR：[`architecture/Studio2-架构边界-ADR.md`](architecture/Studio2-架构边界-ADR.md)
+- capability 迁移白名单与 Feature Flag 台账：[`architecture/Studio2-capability-迁移台账.md`](architecture/Studio2-capability-迁移台账.md)
 
 ## Goal 入口
 
 | Goal | 状态 | 说明 |
 | --- | --- | --- |
 | [`G00`](goals/G00.md) | DONE | 归档 Vision Agent 恢复治理阶段，冻结 Studio 2.0 起点。 |
-| [`G01`](goals/G01.md) | READY | 下一轮执行；本轮只安装卡片，没有读取或实施 G01。 |
-| G02A-G16 | LOCKED | 已安装执行卡，等待前置 Goal 解锁。 |
+| [`G01`](goals/G01.md) | DONE | 建立 Studio 2.0 架构 ADR、迁移白名单、Feature Flag 台账和最小架构守卫。 |
+| [`G02A`](goals/G02A.md) | READY | 下一轮执行；本轮未读取或实施 G02A。 |
+| G02B-G16 | LOCKED | 已安装执行卡，等待前置 Goal 解锁。 |
 
 ## 归档入口
 
