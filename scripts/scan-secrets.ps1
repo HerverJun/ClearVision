@@ -11,6 +11,8 @@ $ErrorActionPreference = "Stop"
 
 $maxFileBytes = 5MB
 $utf8Strict = [System.Text.UTF8Encoding]::new($false, $true)
+$script:ByteReadFailureSimulation = @{}
+$script:TextReadFailureSimulation = @{}
 
 $excludedDirectories = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 @(
@@ -128,6 +130,68 @@ function Test-BinaryBytes {
     return $false
 }
 
+function Test-ExceptionChain {
+    param(
+        [System.Exception]$Exception,
+        [type]$Type
+    )
+
+    $current = $Exception
+    while ($null -ne $current) {
+        if ($Type.IsInstanceOfType($current)) {
+            return $true
+        }
+
+        $current = $current.InnerException
+    }
+
+    return $false
+}
+
+function Add-ScanFailure {
+    param(
+        [System.Collections.Generic.List[object]]$Failures,
+        [System.Collections.Generic.HashSet[string]]$FailureKeys,
+        [string]$RelativePath,
+        [string]$Rule
+    )
+
+    $key = "{0}`0{1}" -f $RelativePath, $Rule
+    if ($FailureKeys.Add($key)) {
+        $Failures.Add([pscustomobject]@{
+            Path = $RelativePath
+            Line = 0
+            Rule = $Rule
+        })
+    }
+}
+
+function Test-SimulatedReadFailure {
+    param(
+        [hashtable]$Table,
+        [string]$FullPath
+    )
+
+    $key = [System.IO.Path]::GetFullPath($FullPath)
+    if ($Table.ContainsKey($key)) {
+        throw [System.IO.IOException]::new("Simulated read failure.")
+    }
+}
+
+function Read-FileBytes {
+    param([string]$FullPath)
+
+    Test-SimulatedReadFailure -Table $script:ByteReadFailureSimulation -FullPath $FullPath
+    return ,([System.IO.File]::ReadAllBytes($FullPath))
+}
+
+function Read-FileTextStrict {
+    param([string]$FullPath)
+
+    Test-SimulatedReadFailure -Table $script:TextReadFailureSimulation -FullPath $FullPath
+    return [System.IO.File]::ReadAllText($FullPath, $utf8Strict)
+}
+
 function Get-GitPathList {
     param(
         [string]$RepoRoot,
@@ -164,7 +228,9 @@ function Get-GitPathList {
 function Test-ShouldScanFile {
     param(
         [string]$RepoRoot,
-        [string]$RelativePath
+        [string]$RelativePath,
+        [System.Collections.Generic.List[object]]$ScanFailures,
+        [System.Collections.Generic.HashSet[string]]$ScanFailureKeys
     )
 
     if (Test-ExcludedPath -RelativePath $RelativePath) {
@@ -176,12 +242,24 @@ function Test-ShouldScanFile {
         return $false
     }
 
-    $file = Get-Item -LiteralPath $fullPath
+    try {
+        $file = Get-Item -LiteralPath $fullPath
+    } catch {
+        Add-ScanFailure -Failures $ScanFailures -FailureKeys $ScanFailureKeys -RelativePath $RelativePath -Rule "File metadata read failed"
+        return $false
+    }
+
     if ($file.Length -gt $maxFileBytes) {
         return $false
     }
 
-    $bytes = [System.IO.File]::ReadAllBytes($fullPath)
+    try {
+        $bytes = Read-FileBytes -FullPath $fullPath
+    } catch {
+        Add-ScanFailure -Failures $ScanFailures -FailureKeys $ScanFailureKeys -RelativePath $RelativePath -Rule "File binary probe failed"
+        return $false
+    }
+
     return -not (Test-BinaryBytes -Bytes $bytes)
 }
 
@@ -271,16 +349,18 @@ function Scan-File {
         [string]$RepoRoot,
         [string]$RelativePath,
         [System.Collections.Generic.List[object]]$Findings,
-        [System.Collections.Generic.HashSet[string]]$FindingKeys
+        [System.Collections.Generic.HashSet[string]]$FindingKeys,
+        [System.Collections.Generic.List[object]]$ScanFailures,
+        [System.Collections.Generic.HashSet[string]]$ScanFailureKeys
     )
 
-    if (-not (Test-ShouldScanFile -RepoRoot $RepoRoot -RelativePath $RelativePath)) {
+    if (-not (Test-ShouldScanFile -RepoRoot $RepoRoot -RelativePath $RelativePath -ScanFailures $ScanFailures -ScanFailureKeys $ScanFailureKeys)) {
         return
     }
 
     $fullPath = Join-Path $RepoRoot $RelativePath
     try {
-        $text = [System.IO.File]::ReadAllText($fullPath, $utf8Strict)
+        $text = Read-FileTextStrict -FullPath $fullPath
         foreach ($rule in $compiledRules) {
             $matches = $rule.Regex.Matches($text)
             if ($matches.Count -eq 0) {
@@ -306,7 +386,12 @@ function Scan-File {
             }
         }
     } catch {
-        return
+        $failureRule = if (Test-ExceptionChain -Exception $_.Exception -Type ([System.Text.DecoderFallbackException])) {
+            "Invalid UTF-8"
+        } else {
+            "File text read failed"
+        }
+        Add-ScanFailure -Failures $ScanFailures -FailureKeys $ScanFailureKeys -RelativePath $RelativePath -Rule $failureRule
     }
 }
 
@@ -390,6 +475,60 @@ function Invoke-SecretScanSelfTest {
         throw "Secret scan self-test failed: redacted placeholder was reported."
     }
 
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("clearvision-secret-scan-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+
+    try {
+        $validPath = Join-Path $tempRoot "valid.txt"
+        Set-Content -LiteralPath $validPath -Value "valid UTF-8 text" -Encoding utf8
+        $validFindings = [System.Collections.Generic.List[object]]::new()
+        $validKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        $validFailures = [System.Collections.Generic.List[object]]::new()
+        $validFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        Scan-File -RepoRoot $tempRoot -RelativePath "valid.txt" -Findings $validFindings -FindingKeys $validKeys -ScanFailures $validFailures -ScanFailureKeys $validFailureKeys
+        if ($validFindings.Count -ne 0 -or $validFailures.Count -ne 0) {
+            throw "Secret scan self-test failed: valid UTF-8 file did not pass."
+        }
+
+        $invalidPath = Join-Path $tempRoot "invalid.txt"
+        [System.IO.File]::WriteAllBytes($invalidPath, [byte[]](0x66, 0x6f, 0x6f, 0xc3, 0x28))
+        $invalidFailures = [System.Collections.Generic.List[object]]::new()
+        $invalidFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        Scan-File -RepoRoot $tempRoot -RelativePath "invalid.txt" -Findings $validFindings -FindingKeys $validKeys -ScanFailures $invalidFailures -ScanFailureKeys $invalidFailureKeys
+        if ($invalidFailures.Count -ne 1 -or $invalidFailures[0].Rule -ne "Invalid UTF-8") {
+            throw "Secret scan self-test failed: invalid UTF-8 was not rejected."
+        }
+
+        $simulatedPath = Join-Path $tempRoot "simulated-read-error.txt"
+        Set-Content -LiteralPath $simulatedPath -Value "read error fixture" -Encoding utf8
+        $script:TextReadFailureSimulation[[System.IO.Path]::GetFullPath($simulatedPath)] = $true
+        $readFailures = [System.Collections.Generic.List[object]]::new()
+        $readFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        Scan-File -RepoRoot $tempRoot -RelativePath "simulated-read-error.txt" -Findings $validFindings -FindingKeys $validKeys -ScanFailures $readFailures -ScanFailureKeys $readFailureKeys
+        if ($readFailures.Count -ne 1 -or $readFailures[0].Rule -ne "File text read failed") {
+            throw "Secret scan self-test failed: text read failure was not fail-closed."
+        }
+
+        $binaryPath = Join-Path $tempRoot "binary.txt"
+        [System.IO.File]::WriteAllBytes($binaryPath, [byte[]](0x00, 0x01, 0x02, 0x03))
+        $binaryFailures = [System.Collections.Generic.List[object]]::new()
+        $binaryFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        Scan-File -RepoRoot $tempRoot -RelativePath "binary.txt" -Findings $validFindings -FindingKeys $validKeys -ScanFailures $binaryFailures -ScanFailureKeys $binaryFailureKeys
+        if ($binaryFailures.Count -ne 0) {
+            throw "Secret scan self-test failed: binary fixture was not skipped cleanly."
+        }
+
+        $fakeSecret = "sk-" + ("B" * 24)
+        $secretOutput = ("fixture.txt:1: {0}" -f $findings[0].Rule)
+        if ($secretOutput.Contains($fakeSecret)) {
+            throw "Secret scan self-test failed: rendered finding leaked secret value."
+        }
+    } finally {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force
+        $script:ByteReadFailureSimulation.Clear()
+        $script:TextReadFailureSimulation.Clear()
+    }
+
     Write-Host "Secret scan self-test passed."
 }
 
@@ -401,21 +540,25 @@ if ($SelfTest) {
 $root = Resolve-RepositoryRoot -CandidatePath $Path
 $findings = [System.Collections.Generic.List[object]]::new()
 $findingKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+$scanFailures = [System.Collections.Generic.List[object]]::new()
+$scanFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 
 $files = Get-GitPathList -RepoRoot $root -IncludeUntrackedFiles:$IncludeUntracked
 foreach ($file in $files) {
-    Scan-File -RepoRoot $root -RelativePath $file -Findings $findings -FindingKeys $findingKeys
+    Scan-File -RepoRoot $root -RelativePath $file -Findings $findings -FindingKeys $findingKeys -ScanFailures $scanFailures -ScanFailureKeys $scanFailureKeys
 }
 
 Scan-DiffAddedLines -RepoRoot $root -Ref $BaseRef -Findings $findings -FindingKeys $findingKeys
 
-if ($findings.Count -gt 0) {
-    Write-Host "Secret scan failed. Potential secret locations:"
+if ($findings.Count -gt 0 -or $scanFailures.Count -gt 0) {
+    Write-Host "Secret scan failed. Potential secret locations and scan errors:"
     foreach ($finding in $findings | Sort-Object Path, Line, Rule) {
         Write-Host ("{0}:{1}: {2}" -f $finding.Path, $finding.Line, $finding.Rule)
     }
-    Write-Host "Full secret values are intentionally not printed."
-    throw "Secret scan failed with $($findings.Count) potential secret(s)."
+    foreach ($failure in $scanFailures | Sort-Object Path, Line, Rule) {
+        Write-Host ("{0}:{1}: {2}" -f $failure.Path, $failure.Line, $failure.Rule)
+    }
+    throw "Secret scan failed with $($findings.Count) potential secret(s) and $($scanFailures.Count) scan error(s)."
 }
 
 $mode = if ($IncludeUntracked) { "tracked and unignored untracked" } else { "tracked" }

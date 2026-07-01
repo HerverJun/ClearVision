@@ -33,6 +33,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve CI Diff Base
+        shell: pwsh
+        run: |
+          $baseRef = & "./scripts/resolve-ci-diff-base.ps1" `
+            -EventName "${{ github.event_name }}" `
+            -RefName "${{ github.ref_name }}" `
+            -BeforeSha "${{ github.event.before }}" `
+            -PullRequestBaseSha "${{ github.event.pull_request.base.sha }}"
+          if ([string]::IsNullOrWhiteSpace($baseRef)) {
+            throw "CI diff base resolver returned empty output."
+          }
+          "CV_DIFF_BASE=$baseRef" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "CI diff base: $baseRef"
+
+      - name: CI Diff Base Self Test
+        shell: pwsh
+        run: '& "./scripts/resolve-ci-diff-base.ps1" -SelfTest'
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -109,10 +127,4 @@ jobs:
 
       - name: Diff Hygiene
         shell: pwsh
-        run: |
-          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
-            "${{ github.event.pull_request.base.sha }}"
-          } else {
-            "origin/main"
-          }
-          & "./scripts/check-diff-hygiene.ps1" -BaseRef $baseRef
+        run: '& "./scripts/check-diff-hygiene.ps1" -BaseRef $env:CV_DIFF_BASE'
