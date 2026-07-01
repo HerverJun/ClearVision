@@ -25,8 +25,11 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"\bnew\s+EventBus\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bclass\s+ServiceRegistry\b", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+ServiceRegistry\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\bclass\s+HttpClient\b", relativePath);
+            text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bfunction\s+createEventBus\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bfunction\s+createServiceRegistry\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\bfunction\s+createHttpClient\s*\(", relativePath);
         }
     }
 
@@ -53,6 +56,7 @@ public sealed class Studio2ArchitectureGuardTests
             var text = File.ReadAllText(file);
             var relativePath = ToRelativePath(file);
 
+            text.Should().NotMatchRegex(@"\bfetch\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bfetch\s*\(\s*['""`](?:https?:\/\/[^'""`]+)?(?:\/api)?\/projects(?:\/|\?|['""`])", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
@@ -63,18 +67,30 @@ public sealed class Studio2ArchitectureGuardTests
     [Fact]
     public void FrontendV2_WebView2Access_ShouldStayBehindTheHostBridgeAdapter()
     {
-        foreach (var file in EnumerateFrontendV2SourceFiles())
-        {
-            var text = File.ReadAllText(file);
-            var relativePath = ToRelativePath(file);
-            if (string.Equals(relativePath, HostBridgeAdapterPath, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
+        var violations = FindDirectWebView2AccessViolations(
+            EnumerateFrontendV2SourceFiles()
+                .Select(file => (RelativePath: ToRelativePath(file), Text: File.ReadAllText(file))));
 
-            text.Should().NotContain("window.chrome.webview", relativePath);
-            text.Should().NotContain("chrome.webview", relativePath);
-        }
+        violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FrontendV2_WebView2AccessGuard_ShouldRejectDirectAccessOutsideAdapter()
+    {
+        var violations = FindDirectWebView2AccessViolations(
+        [
+            (
+                "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/components/BadIsland.ts",
+                "window.chrome.webview.postMessage({ type: 'bad' });"
+            ),
+            (
+                HostBridgeAdapterPath,
+                "window.chrome.webview.postMessage({ type: 'allowed-adapter' });"
+            )
+        ]);
+
+        violations.Should().ContainSingle()
+            .Which.Should().Contain("BadIsland.ts");
     }
 
     [Fact]
@@ -145,6 +161,27 @@ public sealed class Studio2ArchitectureGuardTests
         path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".vue", StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<string> FindDirectWebView2AccessViolations(
+        IEnumerable<(string RelativePath, string Text)> sourceFiles)
+    {
+        var violations = new List<string>();
+        foreach (var (relativePath, text) in sourceFiles)
+        {
+            if (string.Equals(relativePath, HostBridgeAdapterPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (text.Contains("window.chrome.webview", StringComparison.Ordinal) ||
+                text.Contains("chrome.webview", StringComparison.Ordinal))
+            {
+                violations.Add(relativePath);
+            }
+        }
+
+        return violations;
+    }
 
     private static string ToRelativePath(string path) =>
         Path.GetRelativePath(Root, path).Replace('\\', '/');

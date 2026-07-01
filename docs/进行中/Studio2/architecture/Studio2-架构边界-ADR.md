@@ -47,6 +47,8 @@ G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 
 `FrontendV2` 源码必须位于 `wwwroot` 外，构建产物由 Desktop `.csproj` 复制到输出和发布目录的 `wwwroot/v2/`。Vite public base 固定为 `/v2/`，构建后的 `index.html` 不得引用根路径 `/assets/`。G02A 完成后，守卫必须扫描真实 V2 源文件，不得继续以空 scope 通过。后续若选择其他 V2 源目录，必须先更新本 ADR 和 `Studio2ArchitectureGuardTests` 的受控 scope，再添加 V2 代码。
 
+G02B 实现的宿主级启动开关为 `Studio:WorkspaceV2Enabled`，默认 `false`。该开关只决定 WebView2 初始页面：关闭时导航 `/index.html`，打开时导航 `/v2/index.html`。它不是 Project、Flow、Variables、Agent 或任一业务 capability 的 authority，也不得由 localStorage、查询参数或浏览器控制台覆盖。`/v2` 静态资产从输出目录 `AppContext.BaseDirectory/wwwroot/v2` 独立服务，legacy `/` 仍按 `DesktopWebRootResolver` 的 Debug 源码优先规则服务。
+
 守卫必须防止：
 
 - V2 定义第二套 `EventBus` 或 `ServiceRegistry`；
@@ -57,6 +59,8 @@ G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 - V2 在 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/host/hostBridge.ts` 之外直接访问 `window.chrome.webview` 或 `chrome.webview`。
 
 G02B 才允许实现唯一 HostBridge adapter。`HostBridge`、`AgentRun` 或 `agent-run` 名称本身不是违规；违规边界是第二套 AgentRun event store、第二套 run 状态机、第二终态判断，或把 AgentRun 写入 localStorage/indexedDB 作为前端持久化权威。
+
+G02B 的 HostBridge adapter 只包装既有 `webMessageBridge`，typed API 只包装既有 `httpClient`。V2 源码不得 direct `fetch`，不得复制旧 `httpClient`、`EventBus` 或 `ServiceRegistry` 实现；只有 `FrontendV2/src/host/hostBridge.ts` 可作为未来 direct WebView2 access 的唯一白名单位置。
 
 ## 回滚边界
 

@@ -5,11 +5,11 @@ import {
   studio2FrontendV2BuildInfo
 } from '@/foundation/studio2Bootstrap';
 
-describe('Studio2 FrontendV2 G02A build foundation', () => {
-  it('does not mount a runtime root or claim business authority', () => {
+describe('Studio2 FrontendV2 G02B host foundation', () => {
+  it('keeps runtime ownership controlled by the host flag without claiming business authority', () => {
     expect(studio2FrontendV2BuildInfo).toEqual({
-      goal: 'G02A',
-      runtimeMounted: false,
+      goal: 'G02B',
+      runtimeMounted: 'controlled-by-host-flag',
       authority: 'none'
     });
   });

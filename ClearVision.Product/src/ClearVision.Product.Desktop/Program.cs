@@ -255,6 +255,9 @@ static class Program
         builder.Services.AddOptions<AiGenerationOptions>()
             .Bind(builder.Configuration.GetSection(AiGenerationOptions.SectionName))
             .ValidateOnStart();
+        builder.Services.AddOptions<StudioOptions>()
+            .Bind(builder.Configuration.GetSection(StudioOptions.SectionName))
+            .ValidateOnStart();
         var stationIngressOptions = builder.Configuration
             .GetSection(StationIngressOptions.SectionName)
             .Get<StationIngressOptions>()
@@ -338,28 +341,7 @@ static class Program
                 .ConfigureBindings(config.Cameras);
         }
 
-        var wwwrootPath = DesktopWebRootResolver.Resolve();
-        if (Directory.Exists(wwwrootPath))
-        {
-            var provider = new PhysicalFileProvider(wwwrootPath);
-            app.UseDefaultFiles(new DefaultFilesOptions
-            {
-                FileProvider = provider,
-                DefaultFileNames = new List<string> { "index.html" }
-            });
-
-            var staticFileOptions = new StaticFileOptions { FileProvider = provider };
-#if DEBUG
-            staticFileOptions.OnPrepareResponse = context =>
-            {
-                context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
-                context.Context.Response.Headers.Pragma = "no-cache";
-                context.Context.Response.Headers.Expires = "0";
-            };
-#endif
-            app.UseStaticFiles(staticFileOptions);
-            Debug.WriteLine($"静态资源目录: {wwwrootPath}");
-        }
+        UseDesktopStaticAssets(app);
 
         app.UseCors();
         app.UseMiddleware<AuthMiddleware>();
@@ -385,6 +367,54 @@ static class Program
         _host = app;
 
         Debug.WriteLine($"Web服务器已启动: http://localhost:{_webPort}");
+    }
+
+    internal static void UseDesktopStaticAssets(
+        IApplicationBuilder app,
+        string? legacyWebRootPath = null,
+        string? frontendV2WebRootPath = null)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        var resolvedFrontendV2WebRootPath = frontendV2WebRootPath ?? DesktopWebRootResolver.ResolveFrontendV2();
+        if (Directory.Exists(resolvedFrontendV2WebRootPath))
+        {
+            var frontendV2Provider = new PhysicalFileProvider(resolvedFrontendV2WebRootPath);
+            var frontendV2Options = CreateDesktopStaticFileOptions(frontendV2Provider);
+            frontendV2Options.RequestPath = StudioStartupPageResolver.FrontendV2BasePath;
+            app.UseStaticFiles(frontendV2Options);
+            Debug.WriteLine($"Studio 2.0 V2 静态资源目录: {resolvedFrontendV2WebRootPath}");
+        }
+
+        var resolvedLegacyWebRootPath = legacyWebRootPath ?? DesktopWebRootResolver.Resolve();
+        if (!Directory.Exists(resolvedLegacyWebRootPath))
+        {
+            return;
+        }
+
+        var legacyProvider = new PhysicalFileProvider(resolvedLegacyWebRootPath);
+        app.UseDefaultFiles(new DefaultFilesOptions
+        {
+            FileProvider = legacyProvider,
+            DefaultFileNames = new List<string> { "index.html" }
+        });
+
+        app.UseStaticFiles(CreateDesktopStaticFileOptions(legacyProvider));
+        Debug.WriteLine($"静态资源目录: {resolvedLegacyWebRootPath}");
+    }
+
+    private static StaticFileOptions CreateDesktopStaticFileOptions(IFileProvider provider)
+    {
+        var staticFileOptions = new StaticFileOptions { FileProvider = provider };
+#if DEBUG
+        staticFileOptions.OnPrepareResponse = context =>
+        {
+            context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+            context.Context.Response.Headers.Pragma = "no-cache";
+            context.Context.Response.Headers.Expires = "0";
+        };
+#endif
+        return staticFileOptions;
     }
 
     private static void InitializeVisionDatabase(IServiceProvider services)

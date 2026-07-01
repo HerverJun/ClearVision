@@ -4,8 +4,10 @@
 
 using System.Text.Json;
 using System.Windows.Forms;
+using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Triggers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace ClearVision.Product.Desktop;
@@ -37,7 +39,9 @@ public partial class MainForm : Form
         // 创建 WebView2 宿主
         _messageHandler = Program.ServiceProvider?.GetService<Handlers.WebMessageHandler>();
         _triggerInputService = Program.ServiceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
-        _webView2Host = new WebView2Host(_webView, _messageHandler);
+        var studioOptions = Program.ServiceProvider?.GetService<IOptions<StudioOptions>>()?.Value
+            ?? new StudioOptions();
+        _webView2Host = new WebView2Host(_webView, _messageHandler, studioOptions);
 
         // 窗体加载时初始化 WebView2
         Load += MainForm_Load;

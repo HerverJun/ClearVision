@@ -250,15 +250,17 @@ class HttpClient {
     /**
      * 发送 GET 请求
      */
-    async get(url, params = null) {
+    async get(url, params = null, options = {}) {
         let fullUrl = this.buildRequestUrl(url, params);
+        const signal = options?.signal;
 
         console.log(`[HttpClient] GET ${fullUrl}`);
 
         try {
             const response = await fetch(fullUrl, {
                 method: 'GET',
-                headers: this.defaultHeaders
+                headers: this.defaultHeaders,
+                signal
             });
             this.saveSuccessfulPort(fullUrl);
             return this.handleResponse(response);
@@ -271,7 +273,8 @@ class HttpClient {
                     fullUrl = this.buildRequestUrl(url, params, buildLocalApiBaseUrl(discoveredPort));
                     const response = await fetch(fullUrl, {
                         method: 'GET',
-                        headers: this.defaultHeaders
+                        headers: this.defaultHeaders,
+                        signal
                     });
                     this.saveSuccessfulPort(fullUrl);
                     return this.handleResponse(response);
@@ -281,15 +284,17 @@ class HttpClient {
         }
     }
 
-    async getRoot(url, params = null) {
+    async getRoot(url, params = null, options = {}) {
         let fullUrl = this.buildRootRequestUrl(url, params);
+        const signal = options?.signal;
 
         console.log(`[HttpClient] GET ${fullUrl}`);
 
         try {
             const response = await fetch(fullUrl, {
                 method: 'GET',
-                headers: this.defaultHeaders
+                headers: this.defaultHeaders,
+                signal
             });
             this.saveSuccessfulPort(this.buildRequestUrl('/health'));
             return this.handleResponse(response);
@@ -302,7 +307,8 @@ class HttpClient {
                     fullUrl = this.buildRootRequestUrl(url, params, discoveredRootBaseUrl);
                     const response = await fetch(fullUrl, {
                         method: 'GET',
-                        headers: this.defaultHeaders
+                        headers: this.defaultHeaders,
+                        signal
                     });
                     this.saveSuccessfulPort(buildLocalApiBaseUrl(discoveredPort));
                     return this.handleResponse(response);

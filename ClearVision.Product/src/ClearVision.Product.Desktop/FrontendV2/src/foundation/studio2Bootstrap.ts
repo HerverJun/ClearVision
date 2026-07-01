@@ -1,15 +1,20 @@
 import { createPinia, type Pinia } from 'pinia';
 import BuildPlaceholder from '@/components/BuildPlaceholder.vue';
+export {
+  disposeStudio2FoundationIsland,
+  getActiveStudio2FoundationIsland,
+  mountStudio2FoundationIsland
+} from '@/foundation/studio2FoundationIsland';
 
 export interface Studio2FrontendV2BuildInfo {
-  readonly goal: 'G02A';
-  readonly runtimeMounted: false;
+  readonly goal: 'G02B';
+  readonly runtimeMounted: 'controlled-by-host-flag';
   readonly authority: 'none';
 }
 
 export const studio2FrontendV2BuildInfo: Studio2FrontendV2BuildInfo = {
-  goal: 'G02A',
-  runtimeMounted: false,
+  goal: 'G02B',
+  runtimeMounted: 'controlled-by-host-flag',
   authority: 'none'
 };
 

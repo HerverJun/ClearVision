@@ -2,9 +2,11 @@
 // 异步释放资源。
 // 作者：蘅芜君
 
+using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Contracts.Messages;
+using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Handlers;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -17,7 +19,13 @@ namespace ClearVision.Product.Desktop;
 /// </summary>
 public sealed class WebView2Host : IAsyncDisposable
 {
+    private static readonly JsonSerializerOptions StartupScriptJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly WebView2 _webView;
+    private readonly StudioOptions _studioOptions;
     private CoreWebView2Environment? _environment;
     private bool _isInitialized;
     private bool _isDisposed;
@@ -31,6 +39,56 @@ public sealed class WebView2Host : IAsyncDisposable
         }
 
         return new Uri($"http://localhost:{webPort}/index.html");
+    }
+
+    internal static Uri CreateInitialPageUri(int webPort, bool workspaceV2Enabled)
+    {
+        var decision = new StudioStartupPageDecision(
+            workspaceV2Enabled ? StudioStartupPageKind.FrontendV2 : StudioStartupPageKind.Legacy,
+            workspaceV2Enabled,
+            workspaceV2Enabled ? StudioStartupPageResolver.FrontendV2PagePath : StudioStartupPageResolver.LegacyPagePath,
+            RequiredFilePath: null,
+            DiagnosticMessage: null);
+
+        return StudioStartupPageResolver.CreateInitialPageUri(webPort, decision);
+    }
+
+    internal static string BuildStartupInjectionScript(
+        bool workspaceV2Enabled,
+        string apiBaseUrl,
+        string cssVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
+
+        var startup = new
+        {
+            workspaceV2Enabled,
+            apiBaseUrl,
+            hostKind = "desktop-webview2",
+            frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath
+        };
+
+        var startupJson = JsonSerializer.Serialize(startup, StartupScriptJsonOptions);
+        var apiBaseUrlJson = JsonSerializer.Serialize(apiBaseUrl, StartupScriptJsonOptions);
+        var cssVersionJson = JsonSerializer.Serialize(cssVersion, StartupScriptJsonOptions);
+
+        return $$"""
+            (() => {
+                const startup = Object.freeze({{startupJson}});
+                Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
+                    value: startup,
+                    writable: false,
+                    configurable: false,
+                    enumerable: true
+                });
+                window.__API_BASE_URL__ = {{apiBaseUrlJson}};
+                window.__CSS_VERSION__ = {{cssVersionJson}};
+                console.log('[Desktop] API Base URL:', window.__API_BASE_URL__);
+                console.log('[Desktop] CSS Version:', window.__CSS_VERSION__);
+                console.log('[Desktop] Startup:', window.__CLEARVISION_STARTUP__);
+            })();
+        """;
     }
 
     /// <summary>
@@ -58,10 +116,14 @@ public sealed class WebView2Host : IAsyncDisposable
     /// </summary>
     /// <param name="webView">WebView2 控件实例</param>
     /// <param name="messageHandler">Web 消息处理器</param>
-    public WebView2Host(WebView2 webView, WebMessageHandler? messageHandler = null)
+    public WebView2Host(
+        WebView2 webView,
+        WebMessageHandler? messageHandler = null,
+        StudioOptions? studioOptions = null)
     {
         _webView = webView ?? throw new ArgumentNullException(nameof(webView));
         _messageHandler = messageHandler;
+        _studioOptions = studioOptions ?? new StudioOptions();
     }
 
     /// <summary>
@@ -162,12 +224,10 @@ public sealed class WebView2Host : IAsyncDisposable
         var apiPort = Program.GetWebPort();
         var apiBaseUrl = $"http://localhost:{apiPort}/api";
         var cssVersion = GenerateCssVersion();
-        var initScript = $@"
-            window.__API_BASE_URL__ = '{apiBaseUrl}';
-            window.__CSS_VERSION__ = '{cssVersion}';
-            console.log('[Desktop] API Base URL:', window.__API_BASE_URL__);
-            console.log('[Desktop] CSS Version:', window.__CSS_VERSION__);
-        ";
+        var initScript = BuildStartupInjectionScript(
+            _studioOptions.WorkspaceV2Enabled,
+            apiBaseUrl,
+            cssVersion);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] 已注入 API 配置脚本: {apiBaseUrl}");
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] CSS版本号: {cssVersion}");
@@ -315,56 +375,65 @@ public sealed class WebView2Host : IAsyncDisposable
     /// </summary>
     private void LoadInitialPage()
     {
-        var wwwrootPath = DesktopWebRootResolver.Resolve();
-
-        var indexPath = Path.Combine(wwwrootPath, "index.html");
-
-        if (File.Exists(indexPath))
+        var decision = StudioStartupPageResolver.Resolve(_studioOptions);
+        if (decision.IsNavigable)
         {
             // Keep the WebView2 document and API calls on the same localhost
             // origin. In packaged installs, app.local -> localhost can be
             // blocked or misreported as a missing backend.
-            _webView.Source = CreateInitialPageUri(Program.GetWebPort());
+            _webView.Source = StudioStartupPageResolver.CreateInitialPageUri(
+                Program.GetWebPort(),
+                decision);
         }
         else
         {
-            // 如果没有前端文件，显示欢迎页面
-            var welcomeHtml = """
-                <!DOCTYPE html>
-                <html lang="zh-CN">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>ClearVision Product</title>
-                    <style>
-                        body {
-                            font-family: 'Segoe UI', sans-serif;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            height: 100vh;
-                            margin: 0;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                        }
-                        .container {
-                            text-align: center;
-                        }
-                        h1 { font-size: 3rem; margin-bottom: 1rem; }
-                        p { font-size: 1.2rem; opacity: 0.9; }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <h1>🚀 ClearVision Product</h1>
-                        <p>WebView2 已成功初始化</p>
-                        <p>请在 wwwroot 目录中添加您的前端文件</p>
-                    </div>
-                </body>
-                </html>
-                """;
-
-            _webView.CoreWebView2.NavigateToString(welcomeHtml);
+            _webView.CoreWebView2.NavigateToString(BuildStartupDiagnosticHtml(decision));
         }
+    }
+
+    private static string BuildStartupDiagnosticHtml(StudioStartupPageDecision decision)
+    {
+        var title = decision.WorkspaceV2Enabled
+            ? "Studio 2.0 V2 启动失败"
+            : "ClearVision Product";
+        var message = decision.DiagnosticMessage ?? "WebView2 已成功初始化，但未找到前端入口文件。";
+
+        return $$"""
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <title>{{WebUtility.HtmlEncode(title)}}</title>
+                <style>
+                    body {
+                        font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background: #111827;
+                        color: #f9fafb;
+                    }
+                    main {
+                        width: min(720px, calc(100vw - 48px));
+                        border: 1px solid #374151;
+                        border-radius: 8px;
+                        padding: 24px;
+                        background: #1f2937;
+                    }
+                    h1 { font-size: 24px; margin: 0 0 12px; }
+                    p { font-size: 14px; line-height: 1.7; margin: 0; color: #d1d5db; }
+                </style>
+            </head>
+            <body>
+                <main>
+                    <h1>{{WebUtility.HtmlEncode(title)}}</h1>
+                    <p>{{WebUtility.HtmlEncode(message)}}</p>
+                </main>
+            </body>
+            </html>
+            """;
     }
 
     /// <summary>
