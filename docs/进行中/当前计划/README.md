@@ -4,6 +4,8 @@
 
 - [ClearVision-全面提升 TODO（2026-05-09）](./ClearVision-全面提升TODO-2026-05-09.md)
 
+Vision Agent 恢复治理阶段已在 2026-07-01 归档为 Studio 2.0 G00 基线，归档入口为 [`../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md`](../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)。本目录中保留的 `VisionAgent_*` 历史证据页不再作为 active 计划入口。
+
 ## 维护规则
 
 - 同一主题只保留一个 active 计划入口。
