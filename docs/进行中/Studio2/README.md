@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | [`G00`](goals/G00.md) | DONE | 归档 Vision Agent 恢复治理阶段，冻结 Studio 2.0 起点。 |
 | [`G01`](goals/G01.md) | DONE | 建立 Studio 2.0 架构 ADR、迁移白名单、Feature Flag 台账和最小架构守卫。 |
-| [`G02A`](goals/G02A.md) | DONE | 建立 `Desktop/FrontendV2` 构建底座，发布资产进入 `wwwroot/v2/`。 |
+| [`G02A`](goals/G02A.md) | DONE | 建立 `Desktop/FrontendV2` 构建底座，发布资产进入 `wwwroot/v2/`；收口修复固定 `/v2/` base，并消除 CI/MSBuild 重复 production build。 |
 | [`G02B`](goals/G02B.md) | READY | 下一轮执行；本轮未读取或实施 G02B。 |
 | G03-G16 | LOCKED | 已安装执行卡，等待前置 Goal 解锁。 |
 

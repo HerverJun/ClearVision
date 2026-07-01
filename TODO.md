@@ -155,6 +155,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-01 | G02A follow-up | `d89c7d6e1c6c2b083f780f7957e75d29505a2ef2` | 见 G02A 收口修复提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；clean Debug build + repeat incremental build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，13/13；CI YAML lint/order check PASS；Markdown links/encoding/diff hygiene PASS；完整 CI NOT RUN | 修复 `/v2/` public base、收敛 MSBuild/CI 唯一 production build、调整 HostBridge/AgentRun guard 为长期白名单规则；当前 Goal 仍为 G02B，未执行 G02B。 |
 | 2026-07-01 | G02A | `ff9a9430c0eb84e9b9f8e88beac9140c987bd4e8` | 见 G02A 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；Desktop build PASS；Desktop publish PASS；Studio2 + BuildFromPlan architecture guard PASS；发布内容审计 PASS；完整 CI NOT RUN | 建立 `Desktop/FrontendV2` 独立 Vue 3/TypeScript/Vite/Pinia 构建底座，MSBuild/CI 复制发布资产到 `wwwroot/v2/`；下一项为 G02B。 |
 | 2026-07-01 | G01 | `789e9ec643390f5a79c68cfa6c4b401c1a679be3` | 见 G01 完成提交与最终报告 | Desktop.Tests build PASS；Studio2ArchitectureGuardTests + BuildFromPlanArchitectureGuardTests targeted PASS；链接/编码/diff hygiene 待提交前验证；完整 CI NOT RUN | 建立 Studio 2.0 架构 ADR、capability 迁移白名单、Feature Flag 台账和最小自动架构守卫；下一项为 G02A。 |
 | 2026-07-01 | G00 | `58c7569958f3bf8ab627f5c5b76ff0a77cc86914` | `3481d5a35f47bbf1f58c3f042cff6a679e720e0c` | Desktop build PASS；Product/Desktop targeted tests PASS；services regression PASS；UI unit PASS；链接/编码/diff hygiene PASS | Vision Agent 恢复治理阶段归档，Studio 2.0 基线冻结；下一项为 G01。 |

@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json",
     "test:unit": "vitest run --config vitest.config.ts",
-    "build": "vite build"
+    "build": "vite build && npm run validate:assets",
+    "validate:assets": "node scripts/validate-v2-assets.mjs"
   },
   "dependencies": {
     "pinia": "^3.0.3",

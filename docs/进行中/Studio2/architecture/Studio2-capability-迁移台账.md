@@ -15,6 +15,7 @@
 - Project、Flow、GlobalVariables 的正式保存仍经 `ProjectService + ProjectSaveCoordinator`。
 - Pinia、DOM、localStorage 只能作为投影或编辑草稿，不得作为正式业务权威。
 - G02A 的 V2 源码目录为 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/`；发布资产目录为 `wwwroot/v2/`；不得把 Vue/TypeScript/package/node_modules 放入旧 `wwwroot/src`。
+- FrontendV2 production build 的正式入口是 Desktop `.csproj`；CI 只提前执行 `npm ci`、lint、typecheck 和 unit test，后续 `dotnet build/publish` 通过 MSBuild 执行唯一 production build。
 
 ## capability 台账
 
@@ -50,4 +51,5 @@
 
 - G01 只登记 Feature Flag，不实现 runtime flag、配置文件或发布包切换。
 - G02A 只建立 FrontendV2 构建底座和发布资产链路，不挂载 Vue root，不实现 runtime flag。
+- G02A 收口修复固定 Vite base 为 `/v2/`，增加构建后 HTML/manifest 路径校验，消除 CI/MSBuild 重复 production build，并把 HostBridge guard 收敛为唯一 adapter 白名单规则。
 - 后续 Goal 若选择不同 V2 目录，必须先更新 ADR、台账和 `Studio2ArchitectureGuardTests` 的受控 scope。

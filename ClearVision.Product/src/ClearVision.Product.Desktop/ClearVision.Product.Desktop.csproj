@@ -88,29 +88,53 @@
   <PropertyGroup>
     <FrontendV2Root>$(MSBuildThisFileDirectory)FrontendV2\</FrontendV2Root>
     <FrontendV2IntermediateDist>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\FrontendV2\dist</FrontendV2IntermediateDist>
+    <FrontendV2NodeModulesLock>$(FrontendV2Root)node_modules\.package-lock.json</FrontendV2NodeModulesLock>
     <SkipFrontendV2Build Condition="'$(SkipFrontendV2Build)' == ''">false</SkipFrontendV2Build>
+    <SkipFrontendV2Install Condition="'$(SkipFrontendV2Install)' == ''">false</SkipFrontendV2Install>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Remove="FrontendV2\**\*" />
     <None Remove="FrontendV2\**\*" />
+    <FrontendV2PackageInput Include="$(FrontendV2Root)package.json" />
+    <FrontendV2PackageInput Include="$(FrontendV2Root)package-lock.json" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)index.html" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)package.json" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)package-lock.json" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)tsconfig*.json" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)vite.config.ts" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)vitest.config.ts" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)eslint.config.js" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)scripts\**\*" />
+    <FrontendV2BuildInput Include="$(FrontendV2Root)src\**\*" />
   </ItemGroup>
+
+  <Target Name="InstallFrontendV2Dependencies"
+          Condition="Exists('$(FrontendV2Root)package.json') and '$(SkipFrontendV2Build)' != 'true'"
+          Inputs="@(FrontendV2PackageInput)"
+          Outputs="$(FrontendV2NodeModulesLock)">
+    <Error Condition="'$(SkipFrontendV2Install)' == 'true'"
+           Text="SkipFrontendV2Install=true requires up-to-date FrontendV2 node_modules and $(FrontendV2NodeModulesLock). Run npm ci before invoking MSBuild with this property." />
+    <Message Importance="high"
+             Text="Installing FrontendV2 dependencies from $(FrontendV2Root)" />
+    <Exec WorkingDirectory="$(FrontendV2Root)"
+          Command="npm ci" />
+  </Target>
 
   <Target Name="BuildFrontendV2"
           BeforeTargets="BeforeBuild"
-          Condition="Exists('$(FrontendV2Root)package.json')">
+          DependsOnTargets="InstallFrontendV2Dependencies"
+          Condition="Exists('$(FrontendV2Root)package.json')"
+          Inputs="@(FrontendV2BuildInput);$(FrontendV2NodeModulesLock)"
+          Outputs="$(FrontendV2IntermediateDist)\index.html;$(FrontendV2IntermediateDist)\.vite\manifest.json">
+    <Error Condition="'$(SkipFrontendV2Build)' == 'true'"
+           Text="SkipFrontendV2Build=true requires current FrontendV2 assets at $(FrontendV2IntermediateDist). Rebuild assets before using this property." />
     <Message Importance="high"
              Text="Building FrontendV2 assets into $(FrontendV2IntermediateDist)" />
-    <RemoveDir Directories="$(FrontendV2IntermediateDist)"
-               Condition="'$(SkipFrontendV2Build)' != 'true'" />
+    <RemoveDir Directories="$(FrontendV2IntermediateDist)" />
     <Exec WorkingDirectory="$(FrontendV2Root)"
-          Command="npm ci"
-          Condition="'$(SkipFrontendV2Build)' != 'true'" />
-    <Exec WorkingDirectory="$(FrontendV2Root)"
-          Command="npm run build -- --outDir &quot;$(FrontendV2IntermediateDist)&quot; --emptyOutDir"
-          Condition="'$(SkipFrontendV2Build)' != 'true'" />
-    <Error Condition="'$(SkipFrontendV2Build)' == 'true' and !Exists('$(FrontendV2IntermediateDist)\index.html')"
-           Text="SkipFrontendV2Build=true requires existing FrontendV2 assets at $(FrontendV2IntermediateDist)." />
+          Command="npm run build"
+          EnvironmentVariables="VITE_OUT_DIR=$(FrontendV2IntermediateDist)" />
   </Target>
 
   <Target Name="CollectFrontendV2DistAssets"
@@ -140,6 +164,15 @@
     <Copy SourceFiles="@(FrontendV2DistAsset)"
           DestinationFiles="@(FrontendV2DistAsset->'$(PublishDir)wwwroot\v2\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CleanFrontendV2Assets"
+          AfterTargets="Clean">
+    <RemoveDir Directories="$(FrontendV2IntermediateDist)" />
+    <RemoveDir Directories="$(OutDir)wwwroot\v2"
+               Condition="'$(OutDir)' != ''" />
+    <RemoveDir Directories="$(PublishDir)wwwroot\v2"
+               Condition="'$(PublishDir)' != ''" />
   </Target>
 
   <PropertyGroup>

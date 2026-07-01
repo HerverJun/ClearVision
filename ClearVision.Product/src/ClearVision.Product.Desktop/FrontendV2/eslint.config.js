@@ -6,7 +6,9 @@ export default [
   {
     ignores: [
       'eslint.config.js',
+      'scripts/**/*.mjs',
       'node_modules/**',
+      'obj/**',
       '../obj/**',
       'dist/**'
     ]

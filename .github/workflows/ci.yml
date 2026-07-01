@@ -132,10 +132,9 @@ jobs:
           npm run lint
           npm run typecheck
           npm run test:unit
-          npm run build
 
       - name: Build (Debug)
-        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipFrontendV2Install=true
 
       - name: Run Product Tests with Coverage
         shell: pwsh
@@ -569,10 +568,6 @@ jobs:
         working-directory: ${{ env.FRONTEND_V2_DIR }}
         run: npm ci
 
-      - name: Build FrontendV2
-        working-directory: ${{ env.FRONTEND_V2_DIR }}
-        run: npm run build
-
       - name: Get Version
         id: version
         shell: pwsh
@@ -597,6 +592,7 @@ jobs:
             -p:PublishReadyToRun=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
+            -p:SkipFrontendV2Install=true `
             -p:Version=${{ steps.version.outputs.VERSION }} `
             -o "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}"
 

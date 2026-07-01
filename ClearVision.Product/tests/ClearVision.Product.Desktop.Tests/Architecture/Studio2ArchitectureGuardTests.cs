@@ -10,6 +10,8 @@ public sealed class Studio2ArchitectureGuardTests
 
     private const string FrontendV2SourceRoot =
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src";
+    private const string HostBridgeAdapterPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/host/hostBridge.ts";
 
     [Fact]
     public void FrontendV2_ShouldReuseExistingEventBusAndServiceRegistry()
@@ -44,7 +46,7 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
-    public void FrontendV2_ShouldNotCreateProjectOrAgentPersistenceAuthority()
+    public void FrontendV2_ShouldNotCreateProjectFlowVariableOrAgentPersistenceAuthority()
     {
         foreach (var file in EnumerateFrontendV2SourceFiles())
         {
@@ -53,12 +55,45 @@ public sealed class Studio2ArchitectureGuardTests
 
             text.Should().NotMatchRegex(@"\bfetch\s*\(\s*['""`](?:https?:\/\/[^'""`]+)?(?:\/api)?\/projects(?:\/|\?|['""`])", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
-            text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|globalVariables|global-variables|variables)", relativePath);
-            text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|globalVariables|global-variables|variables)", relativePath);
-            text.Should().NotMatchRegex(@"\bAgentRun\b", relativePath);
-            text.Should().NotContain("agent-run", relativePath);
-            text.Should().NotContain("HostBridge", relativePath);
+            text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
+            text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
+        }
+    }
+
+    [Fact]
+    public void FrontendV2_WebView2Access_ShouldStayBehindTheHostBridgeAdapter()
+    {
+        foreach (var file in EnumerateFrontendV2SourceFiles())
+        {
+            var text = File.ReadAllText(file);
+            var relativePath = ToRelativePath(file);
+            if (string.Equals(relativePath, HostBridgeAdapterPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            text.Should().NotContain("window.chrome.webview", relativePath);
             text.Should().NotContain("chrome.webview", relativePath);
+        }
+    }
+
+    [Fact]
+    public void FrontendV2_ShouldNotCreateSecondAgentRunAuthority()
+    {
+        foreach (var file in EnumerateFrontendV2SourceFiles())
+        {
+            var text = File.ReadAllText(file);
+            var relativePath = ToRelativePath(file);
+
+            text.Should().NotMatchRegex(@"\bclass\s+AgentRunEventStore\b", relativePath);
+            text.Should().NotMatchRegex(@"\bnew\s+AgentRunEventStore\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\bfunction\s+createAgentRunEventStore\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\bclass\s+AgentRunStateMachine\b", relativePath);
+            text.Should().NotMatchRegex(@"\bfunction\s+createAgentRunStateMachine\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\b(?:resolve|determine|compute)AgentRunTerminal", relativePath);
+            text.Should().NotMatchRegex(@"\b(?:complete|fail|cancel)AgentRun\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:agent|agent-run|run)", relativePath);
+            text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:agent|agent-run|run)", relativePath);
         }
     }
 

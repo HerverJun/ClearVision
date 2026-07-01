@@ -45,7 +45,7 @@ G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 - `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src`
 - `ClearVision.Product/src/ClearVision.Product.Station`
 
-`FrontendV2` 源码必须位于 `wwwroot` 外，构建产物由 Desktop `.csproj` 复制到输出和发布目录的 `wwwroot/v2/`。G02A 完成后，守卫必须扫描真实 V2 源文件，不得继续以空 scope 通过。后续若选择其他 V2 源目录，必须先更新本 ADR 和 `Studio2ArchitectureGuardTests` 的受控 scope，再添加 V2 代码。
+`FrontendV2` 源码必须位于 `wwwroot` 外，构建产物由 Desktop `.csproj` 复制到输出和发布目录的 `wwwroot/v2/`。Vite public base 固定为 `/v2/`，构建后的 `index.html` 不得引用根路径 `/assets/`。G02A 完成后，守卫必须扫描真实 V2 源文件，不得继续以空 scope 通过。后续若选择其他 V2 源目录，必须先更新本 ADR 和 `Studio2ArchitectureGuardTests` 的受控 scope，再添加 V2 代码。
 
 守卫必须防止：
 
@@ -54,6 +54,9 @@ G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 - V2 通过 direct `fetch` 或第二 client 绕过既有 `httpClient` 建立 Project 保存入口；
 - V2 用 localStorage authority 形态 key 保存 Project、Flow、Agent 或 GlobalVariables；
 - Station 依赖 Vue、Vite、Pinia、FrontendV2、Node 或 Studio 前端目录。
+- V2 在 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/host/hostBridge.ts` 之外直接访问 `window.chrome.webview` 或 `chrome.webview`。
+
+G02B 才允许实现唯一 HostBridge adapter。`HostBridge`、`AgentRun` 或 `agent-run` 名称本身不是违规；违规边界是第二套 AgentRun event store、第二套 run 状态机、第二终态判断，或把 AgentRun 写入 localStorage/indexedDB 作为前端持久化权威。
 
 ## 回滚边界
 

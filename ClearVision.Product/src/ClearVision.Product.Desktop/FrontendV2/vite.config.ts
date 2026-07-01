@@ -8,6 +8,7 @@ const defaultTargetFramework = process.env.TargetFramework ?? process.env.TARGET
 const defaultOutDir = resolve(__dirname, '..', 'obj', defaultConfiguration, defaultTargetFramework, 'FrontendV2', 'dist');
 
 export default defineConfig({
+  base: '/v2/',
   plugins: [vue()],
   resolve: {
     alias: {
