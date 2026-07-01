@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "2026-06-05.vision-agent-parameter-rule-parity.v1",
+  "cases": [
+    {
+      "caseId": "image_camera_requires_camera_id_or_binding",
+      "operatorType": "ImageAcquisition",
+      "parameters": {
+        "SourceType": "Camera",
+        "FilePath": "mock://unused/image-source"
+      },
+      "uiStates": {
+        "FilePath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "CameraId": { "effectiveRequired": true, "effectiveDisabled": false },
+        "CameraBindingId": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": ["CameraBindingId"],
+      "deploymentPrecheckMissingParameters": ["CameraBindingId"]
+    },
+    {
+      "caseId": "image_file_requires_file_path",
+      "operatorType": "ImageAcquisition",
+      "parameters": {
+        "SourceType": "File"
+      },
+      "uiStates": {
+        "FilePath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "CameraId": { "effectiveRequired": false, "effectiveDisabled": true },
+        "CameraBindingId": { "effectiveRequired": false, "effectiveDisabled": true }
+      },
+      "flowValidationMissingParameters": ["FilePath"],
+      "deploymentPrecheckMissingParameters": ["FilePath"]
+    },
+    {
+      "caseId": "template_matching_requires_path_or_id",
+      "operatorType": "TemplateMatching",
+      "parameters": {},
+      "uiStates": {
+        "TemplatePath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "TemplateId": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": ["Template"],
+      "deploymentPrecheckMissingParameters": ["Template"]
+    },
+    {
+      "caseId": "template_matching_accepts_template_id",
+      "operatorType": "TemplateMatching",
+      "parameters": {
+        "TemplateId": "mock-template-catalog-item"
+      },
+      "uiStates": {
+        "TemplatePath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "TemplateId": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "deep_learning_requires_model_source",
+      "operatorType": "DeepLearning",
+      "parameters": {},
+      "uiStates": {
+        "ModelPath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
+        "ModelCatalogPath": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": ["ModelPath"],
+      "deploymentPrecheckMissingParameters": ["ModelPath"]
+    },
+    {
+      "caseId": "deep_learning_accepts_model_id",
+      "operatorType": "DeepLearning",
+      "parameters": {
+        "ModelId": "mock-model-catalog-item"
+      },
+      "uiStates": {
+        "ModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "result_output_accepts_output_channel_id",
+      "operatorType": "ResultOutput",
+      "parameters": {
+        "OutputChannelId": "mock-output-channel"
+      },
+      "uiStates": {
+        "Channel": { "effectiveRequired": false, "effectiveDisabled": true },
+        "OutputChannel": { "effectiveRequired": false, "effectiveDisabled": true },
+        "OutputChannelId": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "result_output_file_requires_file_path_or_output_path",
+      "operatorType": "ResultOutput",
+      "parameters": {
+        "Channel": "file"
+      },
+      "uiStates": {
+        "FilePath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "OutputPath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "PlcAddress": { "effectiveRequired": false, "effectiveDisabled": true },
+        "PLCParameters": { "effectiveRequired": false, "effectiveDisabled": true }
+      },
+      "flowValidationMissingParameters": ["FilePath"],
+      "deploymentPrecheckMissingParameters": ["FilePath"]
+    },
+    {
+      "caseId": "result_output_plc_requires_address_or_parameters",
+      "operatorType": "ResultOutput",
+      "parameters": {
+        "Channel": "plc"
+      },
+      "uiStates": {
+        "FilePath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "OutputPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "PlcAddress": { "effectiveRequired": true, "effectiveDisabled": false },
+        "PLCParameters": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": ["PlcAddress"],
+      "deploymentPrecheckMissingParameters": ["PlcAddress"]
+    },
+    {
+      "caseId": "result_output_plc_accepts_parameters_metadata",
+      "operatorType": "ResultOutput",
+      "parameters": {
+        "Channel": "plc",
+        "PLCParameters": "mock-plc-metadata"
+      },
+      "uiStates": {
+        "PlcAddress": { "effectiveRequired": false, "effectiveDisabled": true },
+        "PLCParameters": { "effectiveRequired": true, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    }
+  ]
+}

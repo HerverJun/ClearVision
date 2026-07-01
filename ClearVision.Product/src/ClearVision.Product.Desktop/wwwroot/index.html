@@ -36,6 +36,7 @@
                     "src/shared/styles/ui-components.css",
                     "src/shared/styles/settings.css",
                     "src/shared/styles/property-panel.css",
+                    "src/shared/styles/global-variables.css",
                     "src/shared/styles/property-panel-enhancements.css",
                     "src/shared/styles/project-view.css",
                     "src/shared/styles/global-enhancements.css",
@@ -722,6 +723,12 @@
                     tabindex="-1"
                 ></div>
                 <aside class="sidebar right" data-sidebar="property">
+                    <div class="panel">
+                        <h3 class="panel-title">全局变量</h3>
+                        <div class="global-variable-panel-host" id="global-variable-panel">
+                            <p class="empty-text">未打开工程</p>
+                        </div>
+                    </div>
                     <div class="panel">
                         <h3 class="panel-title">属性</h3>
                         <div class="property-panel" id="property-panel">

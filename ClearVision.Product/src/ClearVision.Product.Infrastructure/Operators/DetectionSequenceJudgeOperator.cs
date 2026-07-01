@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Detection Sequence Judge",
-    Description = "Sorts detections and compares the resulting label order against an expected sequence.",
-    Category = "AI Inspection",
+    DisplayName = "检测顺序判定",
+    Description = "对检测结果排序，并与期望标签序列进行比对。",
+    Category = "AI 检测",
     IconName = "rule",
     Keywords = new[]
     {
@@ -34,132 +34,132 @@ namespace ClearVision.Product.Infrastructure.Operators;
         "judge"
     },
     Tags = new[] { "experimental", "industrial-remediation", "sequence-judge" })]
-[InputPort("Detections", "Detections", PortDataType.DetectionList, IsRequired = true)]
-[InputPort("SlotPoints", "Slot Points", PortDataType.PointList, IsRequired = false)]
-[InputPort("PerspectiveSrcPoints", "Perspective Source Points", PortDataType.PointList, IsRequired = false)]
-[InputPort("PerspectiveDstPoints", "Perspective Destination Points", PortDataType.PointList, IsRequired = false)]
-[OutputPort("IsMatch", "Is Match", PortDataType.Boolean)]
-[OutputPort("ActualOrder", "Actual Order", PortDataType.Any)]
-[OutputPort("Count", "Count", PortDataType.Integer)]
-[OutputPort("MissingLabels", "Missing Labels", PortDataType.Any)]
-[OutputPort("DuplicateLabels", "Duplicate Labels", PortDataType.Any)]
-[OutputPort("SortedDetections", "Sorted Detections", PortDataType.DetectionList)]
-[OutputPort("Assignment", "Assignment", PortDataType.Any)]
-[OutputPort("UnassignedDetections", "Unassigned Detections", PortDataType.DetectionList)]
-[OutputPort("SlotDistances", "Slot Distances", PortDataType.Any)]
-[OutputPort("RowCount", "Row Count", PortDataType.Integer)]
-[OutputPort("PerspectiveApplied", "Perspective Applied", PortDataType.Boolean)]
-[OutputPort("Diagnostics", "Diagnostics", PortDataType.Any)]
-[OutputPort("Message", "Message", PortDataType.String)]
+[InputPort("Detections", "检测结果", PortDataType.DetectionList, IsRequired = true)]
+[InputPort("SlotPoints", "槽位点", PortDataType.PointList, IsRequired = false)]
+[InputPort("PerspectiveSrcPoints", "透视源点", PortDataType.PointList, IsRequired = false)]
+[InputPort("PerspectiveDstPoints", "透视目标点", PortDataType.PointList, IsRequired = false)]
+[OutputPort("IsMatch", "是否匹配", PortDataType.Boolean)]
+[OutputPort("ActualOrder", "实际顺序", PortDataType.Any)]
+[OutputPort("Count", "数量", PortDataType.Integer)]
+[OutputPort("MissingLabels", "缺失标签", PortDataType.Any)]
+[OutputPort("DuplicateLabels", "重复标签", PortDataType.Any)]
+[OutputPort("SortedDetections", "排序后检测", PortDataType.DetectionList)]
+[OutputPort("Assignment", "分配结果", PortDataType.Any)]
+[OutputPort("UnassignedDetections", "未分配检测", PortDataType.DetectionList)]
+[OutputPort("SlotDistances", "槽位距离", PortDataType.Any)]
+[OutputPort("RowCount", "行数", PortDataType.Integer)]
+[OutputPort("PerspectiveApplied", "已应用透视", PortDataType.Boolean)]
+[OutputPort("Diagnostics", "诊断信息", PortDataType.Any)]
+[OutputPort("Message", "消息", PortDataType.String)]
 [OperatorParam(
     "ExpectedLabels",
-    "Expected Labels",
+    "期望标签序列",
     "string",
-    Description = "Comma-separated expected labels in order.",
+    Description = "按顺序填写的期望标签，使用逗号分隔。",
     DefaultValue = "")]
 [OperatorParam(
     "SortBy",
-    "Sort By",
+    "排序字段",
     "enum",
-    Description = "Field used to sort detections before judging the sequence.",
+    Description = "判定前用于排序检测结果的字段。",
     DefaultValue = "CenterX",
     Options = new[]
     {
-        "CenterX|Center X",
-        "CenterY|Center Y",
-        "TopY|Top Y",
-        "Confidence|Confidence",
-        "Area|Area"
+        "CenterX|中心 X",
+        "CenterY|中心 Y",
+        "TopY|顶部 Y",
+        "Confidence|置信度",
+        "Area|面积"
     })]
 [OperatorParam(
     "Direction",
-    "Direction",
+    "排序方向",
     "enum",
-    Description = "Ordering direction after sorting.",
+    Description = "排序后的方向。",
     DefaultValue = "Ascending",
     Options = new[]
     {
-        "Ascending|Ascending",
-        "Descending|Descending",
-        "LeftToRight|Left To Right",
-        "RightToLeft|Right To Left",
-        "TopToBottom|Top To Bottom",
-        "BottomToTop|Bottom To Top"
+        "Ascending|升序",
+        "Descending|降序",
+        "LeftToRight|从左到右",
+        "RightToLeft|从右到左",
+        "TopToBottom|从上到下",
+        "BottomToTop|从下到上"
     })]
 [OperatorParam(
     "ExpectedCount",
-    "Expected Count",
+    "期望数量",
     "int",
-    Description = "Expected detection count. Use 0 to derive from ExpectedLabels.",
+    Description = "期望检测数量；为 0 时从期望标签序列推导。",
     DefaultValue = 0,
     Min = 0,
     Max = 256)]
 [OperatorParam(
     "MinConfidence",
-    "Min Confidence",
+    "最低置信度",
     "double",
-    Description = "Ignore detections below this confidence before sequence judgment.",
+    Description = "顺序判定前忽略低于该置信度的检测结果。",
     DefaultValue = 0.0,
     Min = 0.0,
     Max = 1.0)]
 [OperatorParam(
     "AllowMissing",
-    "Allow Missing",
+    "允许缺失",
     "bool",
-    Description = "Whether missing expected labels should still be treated as a match.",
+    Description = "期望标签缺失时是否仍判为匹配。",
     DefaultValue = false)]
 [OperatorParam(
     "AllowDuplicate",
-    "Allow Duplicate",
+    "允许重复",
     "bool",
-    Description = "Whether duplicate labels should still be treated as a match.",
+    Description = "标签重复时是否仍判为匹配。",
     DefaultValue = false)]
 [OperatorParam(
     "GroupingMode",
-    "Grouping Mode",
+    "分组模式",
     "enum",
-    Description = "SingleRow keeps legacy sorting, RowCluster groups detections into rows, SlotAssignment assigns detections to expected slot points, Auto prefers slots when provided.",
+    Description = "SingleRow 使用单行排序，RowCluster 按行分组，SlotAssignment 按槽位分配，Auto 优先使用槽位。",
     DefaultValue = "SingleRow",
     Options = new[]
     {
-        "SingleRow|Single Row",
-        "RowCluster|Row Cluster",
-        "SlotAssignment|Slot Assignment",
+        "SingleRow|单行",
+        "RowCluster|行聚类",
+        "SlotAssignment|槽位分配",
         "Auto|Auto"
     })]
 [OperatorParam(
     "ExpectedSlots",
-    "Expected Slots",
+    "期望槽位",
     "string",
-    Description = "JSON array or shorthand x:y;x:y list of expected slot centers.",
+    Description = "期望槽位中心点，支持 JSON 数组或 x:y;x:y 简写。",
     DefaultValue = "")]
 [OperatorParam(
     "RowTolerance",
-    "Row Tolerance",
+    "行容差",
     "double",
-    Description = "Maximum Y delta for row clustering. Use 0 for auto.",
+    Description = "行聚类允许的最大 Y 偏差；0 表示自动。",
     DefaultValue = 0.0,
     Min = 0.0,
     Max = 5000.0)]
 [OperatorParam(
     "SlotTolerance",
-    "Slot Tolerance",
+    "槽位容差",
     "double",
-    Description = "Maximum assignment distance to an expected slot. Use 0 for auto.",
+    Description = "分配到期望槽位的最大距离；0 表示自动。",
     DefaultValue = 0.0,
     Min = 0.0,
     Max = 5000.0)]
 [OperatorParam(
     "PerspectiveSrcPointsJson",
-    "Perspective Source Points JSON",
+    "透视源点 JSON",
     "string",
-    Description = "Optional 4-point JSON array for perspective source points.",
+    Description = "可选的 4 点透视源点 JSON 数组。",
     DefaultValue = "")]
 [OperatorParam(
     "PerspectiveDstPointsJson",
-    "Perspective Destination Points JSON",
+    "透视目标点 JSON",
     "string",
-    Description = "Optional 4-point JSON array for perspective destination points.",
+    Description = "可选的 4 点透视目标点 JSON 数组。",
     DefaultValue = "")]
 public sealed class DetectionSequenceJudgeOperator : OperatorBase
 {

@@ -382,8 +382,8 @@ export class TemplateSelector {
         try {
             await this._applyTemplate(templateId);
         } catch (error) {
-            console.error('[TemplateSelector] 搴旂敤妯℃澘澶辫触:', error);
-            showToast(`搴旂敤妯℃澘澶辫触: ${error.message}`, 'error');
+            console.error('[TemplateSelector] 应用模板失败:', error);
+            showToast(`应用模板失败: ${error.message}`, 'error');
         } finally {
             this._applyingTemplateIds.delete(String(templateId));
             if (!this._isDisposed) {

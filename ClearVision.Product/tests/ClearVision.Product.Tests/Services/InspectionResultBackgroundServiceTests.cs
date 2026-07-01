@@ -102,6 +102,7 @@ public sealed class InspectionResultBackgroundServiceTests
                 await replayService.StartAsync(CancellationToken.None);
                 await WaitUntilAsync(() => replayRepository.AddRangeCallCount >= 3);
                 await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 3);
+                await WaitUntilAsync(() => !File.Exists(Path.Combine(root, "inspection-results.jsonl.tmp")));
                 await replayService.StopAsync(CancellationToken.None);
             }
 

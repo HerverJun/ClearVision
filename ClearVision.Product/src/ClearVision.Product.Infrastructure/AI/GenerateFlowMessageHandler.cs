@@ -4,6 +4,8 @@ using System.Text.Json.Serialization;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -15,6 +17,8 @@ public class GenerateFlowMessageHandler
 {
     private readonly IAiFlowGenerationService _generationService;
     private readonly Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> _logger;
+    private readonly IVisionAgentBuildRunService? _buildRunService;
+    private readonly IAgentRunEventStreamService? _agentRunStreamService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -24,10 +28,14 @@ public class GenerateFlowMessageHandler
 
     public GenerateFlowMessageHandler(
         IAiFlowGenerationService generationService,
-        Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> logger)
+        Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> logger,
+        IVisionAgentBuildRunService? buildRunService = null,
+        IAgentRunEventStreamService? agentRunStreamService = null)
     {
         _generationService = generationService;
         _logger = logger;
+        _buildRunService = buildRunService;
+        _agentRunStreamService = agentRunStreamService;
     }
 
     public async Task<string> HandleAsync(
@@ -41,8 +49,13 @@ public class GenerateFlowMessageHandler
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
+        VisionAgentBuildFromPlanRequest? buildFromPlan = null,
+        bool useVisionAgentGenerateFlow = false,
+        string? agentGenerateFlowMode = null,
+        bool runtimePreviewConsent = false,
         Action<string, string>? onMessage = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? onAgentRunCreated = null)
     {
         _logger.LogInformation("Received AI generate-flow request. Description={Description}", description);
 
@@ -57,39 +70,52 @@ public class GenerateFlowMessageHandler
                     requestId
                 }, _jsonOptions));
 
-            var result = await _generationService.GenerateFlowAsync(
-                new AiFlowGenerationRequest(
-                    Description: description,
-                    AdditionalContext: hint,
-                    SessionId: sessionId,
-                    ExistingFlowJson: existingFlowJson,
-                    Attachments: attachments,
-                    Mode: mode,
-                    DebugPrompt: debugPrompt,
-                    TemplateSelection: templateSelection)
-                {
-                    RequirementMode = requirementMode ?? AiRequirementModes.Strict
-                },
-                progressMsg => onMessage?.Invoke(
-                    "GenerateFlowProgress",
-                    JsonSerializer.Serialize(new
-                    {
-                        message = progressMsg,
-                        phase = InferProgressPhase(progressMsg),
-                        requestId
-                    }, _jsonOptions)),
-                chunk => onMessage?.Invoke(
-                    "GenerateFlowStreamChunk",
-                    JsonSerializer.Serialize(new GenerateFlowStreamChunk
-                    {
-                        ChunkType = chunk.ChunkType,
-                        Content = chunk.Content,
-                        RequestId = requestId
-                    }, _jsonOptions)),
-                cancellationToken,
-                attachmentReport => onMessage?.Invoke(
-                    "GenerateFlowAttachmentReport",
-                    JsonSerializer.Serialize(attachmentReport with { RequestId = requestId }, _jsonOptions)));
+            var generationRequest = new AiFlowGenerationRequest(
+                Description: description,
+                AdditionalContext: hint,
+                SessionId: sessionId,
+                ExistingFlowJson: existingFlowJson,
+                Attachments: attachments,
+                Mode: mode,
+                DebugPrompt: debugPrompt,
+                TemplateSelection: templateSelection)
+            {
+                RequirementMode = requirementMode ?? AiRequirementModes.Strict,
+                UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
+                AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
+                RuntimePreviewConsent = runtimePreviewConsent,
+                BuildFromPlan = buildFromPlan
+            };
+
+            var result = buildFromPlan != null
+                ? await RunBuildFromPlanViaAgentRunAsync(
+                    generationRequest,
+                    requestId,
+                    onMessage,
+                    onAgentRunCreated,
+                    cancellationToken)
+                : await _generationService.GenerateFlowAsync(
+                    generationRequest,
+                    progressMsg => onMessage?.Invoke(
+                        "GenerateFlowProgress",
+                        JsonSerializer.Serialize(new
+                        {
+                            message = progressMsg,
+                            phase = InferProgressPhase(progressMsg),
+                            requestId
+                        }, _jsonOptions)),
+                    chunk => onMessage?.Invoke(
+                        "GenerateFlowStreamChunk",
+                        JsonSerializer.Serialize(new GenerateFlowStreamChunk
+                        {
+                            ChunkType = chunk.ChunkType,
+                            Content = chunk.Content,
+                            RequestId = requestId
+                        }, _jsonOptions)),
+                    cancellationToken,
+                    attachmentReport => onMessage?.Invoke(
+                        "GenerateFlowAttachmentReport",
+                        JsonSerializer.Serialize(attachmentReport with { RequestId = requestId }, _jsonOptions)));
 
             var response = new GenerateFlowResponse
             {
@@ -114,8 +140,19 @@ public class GenerateFlowMessageHandler
                 TemplateCandidates = MapTemplateCandidates(result.TemplateCandidates),
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
+                PendingActions = result.PendingActions,
+                ValidationPreview = result.ValidationPreview,
+                ToolTrace = result.ToolTrace,
+                BuildResult = result.BuildResult,
+                BuildReadiness = result.BuildReadiness,
+                PlanId = ResolveResponsePlanId(result, buildFromPlan),
+                PlanHash = ResolveResponsePlanHash(result, buildFromPlan),
+                WorkflowDiff = result.BuildResult?.WorkflowDiff,
+                ApplyGate = result.BuildResult?.ApplyGate,
+                ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
+                FirstFixRecommendation = result.BuildResult?.FirstFixRecommendation,
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace is AiPromptTrace trace ? trace.Desensitize() : result.PromptTrace,
+                PromptTrace = MapPromptTrace(result.PromptTrace),
                 StageTimeline = MapStageTimeline(result.StageTimeline),
                 PerformanceBudget = BuildPerformanceBudget(result.StageTimeline, result.RetryCount, result.PromptTrace),
                 CompletionStatus = result.CompletionStatus,
@@ -126,6 +163,8 @@ public class GenerateFlowMessageHandler
                 RouterConfidence = result.RouterConfidence,
                 BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
                 NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+                RequirementMaturity = result.RequirementMaturity,
+                DecisionTrace = result.DecisionTrace,
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -160,8 +199,8 @@ public class GenerateFlowMessageHandler
             {
                 Success = false,
                 Status = AiFlowGenerationResult.CompletionStatusTimedOut,
-                ErrorMessage = "AI generation timed out. Please retry.",
-                FailureSummary = "AI generation timed out. Please retry.",
+                ErrorMessage = "AI 生成超时，请稍后重试。",
+                FailureSummary = "AI 生成超时，请稍后重试。",
                 LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>(),
                 SessionId = sessionId,
                 RequestId = requestId
@@ -177,8 +216,8 @@ public class GenerateFlowMessageHandler
             {
                 Success = false,
                 Status = AiFlowGenerationResult.CompletionStatusFailed,
-                ErrorMessage = $"服务内部错误：{ex.Message}",
-                FailureSummary = $"服务内部错误：{ex.Message}",
+                ErrorMessage = "服务内部错误，请查看后端日志。",
+                FailureSummary = "服务内部错误，请查看后端日志。",
                 LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>(),
                 SessionId = sessionId,
                 RequestId = requestId
@@ -186,6 +225,82 @@ public class GenerateFlowMessageHandler
 
             return SerializeResponse(errorResponse, AiFlowGenerationResult.FailureTypeSystemError);
         }
+    }
+
+    private async Task<AiFlowGenerationResult> RunBuildFromPlanViaAgentRunAsync(
+        AiFlowGenerationRequest request,
+        string? requestId,
+        Action<string, string>? onMessage,
+        Action<string>? onAgentRunCreated,
+        CancellationToken cancellationToken)
+    {
+        if (_buildRunService == null || _agentRunStreamService == null)
+        {
+            return BuildAgentRunAdapterMissingResult(request);
+        }
+
+        var createResult = _agentRunStreamService.CreateRun(request.Description, new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            mode = request.Mode.ToWireValue(),
+            useVisionAgentGenerateFlow = true,
+            agentGenerateFlowMode = request.AgentGenerateFlowMode,
+            requestId,
+            sessionId = request.SessionId,
+            planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+            hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
+            metadataOnly = true
+        });
+
+        onAgentRunCreated?.Invoke(createResult.RunId);
+        onMessage?.Invoke(
+            "GenerateFlowAgentRunCreated",
+            JsonSerializer.Serialize(new
+            {
+                runId = createResult.RunId,
+                requestId,
+                events = createResult.Events,
+                metadataOnly = true
+            }, _jsonOptions));
+
+        var runRequest = request with { AgentRunId = createResult.RunId };
+        var command = BuildCommand.FromGenerationRequest(
+            runRequest,
+            createResult.RunId,
+            requestId,
+            BuildCommandTransports.WebMessage,
+            persistResult: false);
+        var result = await _buildRunService.RunAsync(command, cancellationToken);
+        return result.Outcome.Result;
+    }
+
+    private static AiFlowGenerationResult BuildAgentRunAdapterMissingResult(AiFlowGenerationRequest request)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = "BuildFromPlan AgentRun adapter is not available.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = VisionAgentBuildFailureCodes.SystemException,
+                Message = "BuildFromPlan AgentRun adapter is not available.",
+                RepairTarget = "Register IVisionAgentBuildRunService and IAgentRunEventStreamService before accepting BuildFromPlan requests."
+            },
+            PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+            PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+            ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            RequestedMode = request.AgentGenerateFlowMode,
+            EffectiveMode = request.AgentGenerateFlowMode,
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
     }
 
     private static string SerializeResponse(GenerateFlowResponse response, string? failureType)
@@ -214,6 +329,17 @@ public class GenerateFlowMessageHandler
             response.TemplateCandidates,
             response.PendingParameters,
             response.MissingResources,
+            response.PendingActions,
+            response.ValidationPreview,
+            response.ToolTrace,
+            response.BuildResult,
+            response.BuildReadiness,
+            response.PlanId,
+            response.PlanHash,
+            response.WorkflowDiff,
+            response.ApplyGate,
+            response.ToolEvidenceTimeline,
+            response.FirstFixRecommendation,
             response.ManualRetry,
             response.PromptTrace,
             response.StageTimeline,
@@ -226,6 +352,8 @@ public class GenerateFlowMessageHandler
             response.RouterConfidence,
             response.BlockingClarificationFields,
             response.NonBlockingMissingFields,
+            response.RequirementMaturity,
+            response.DecisionTrace,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType
@@ -254,6 +382,33 @@ public class GenerateFlowMessageHandler
         return string.IsNullOrWhiteSpace(fallbackMessage)
             ? null
             : fallbackMessage;
+    }
+
+    private static string? ResolveResponsePlanId(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.PlanId,
+            result.BuildResult?.PlanId,
+            buildFromPlan?.PlanSnapshot?.PlanId,
+            buildFromPlan?.PlanId);
+    }
+
+    private static string? ResolveResponsePlanHash(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.PlanHash,
+            result.BuildResult?.PlanHash,
+            buildFromPlan?.PlanSnapshot?.PlanHash,
+            buildFromPlan?.PlanHash);
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static string InferProgressPhase(string? message)
@@ -379,6 +534,20 @@ public class GenerateFlowMessageHandler
             RepairTarget = manualRetry.RepairTarget,
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
+        };
+    }
+
+    private static object? MapPromptTrace(object? promptTrace)
+    {
+        return promptTrace switch
+        {
+            null => null,
+            AiPromptTrace trace => trace.Desensitize(),
+            _ => new
+            {
+                redactionPass = true,
+                hidden = true
+            }
         };
     }
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.AI.Runtime;
@@ -32,6 +33,16 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
         OperatorFlow flow,
         Guid targetNodeId,
         byte[]? inputImage,
+        CancellationToken ct = default)
+    {
+        return await PreviewWithMetricsAsync(flow, targetNodeId, inputImage, null, ct);
+    }
+
+    public async Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
+        OperatorFlow flow,
+        Guid targetNodeId,
+        byte[]? inputImage,
+        ProjectVariableExecutionContext? projectVariables,
         CancellationToken ct = default)
     {
         var targetOperator = flow.Operators.FirstOrDefault(item => item.Id == targetNodeId);
@@ -75,7 +86,9 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             ? inputImage
             : null;
         var inputData = BuildInputData(externalInputImage);
-        var result = await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, ct);
+        var result = projectVariables == null
+            ? await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, ct)
+            : await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, projectVariables, ct);
 
         if (!result.IntermediateResults.TryGetValue(targetNodeId, out var nodeOutput))
         {

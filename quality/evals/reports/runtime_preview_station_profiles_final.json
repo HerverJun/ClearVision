@@ -1,0 +1,611 @@
+{
+  "schemaVersion": "2026-06-07.runtime-preview-station-profiles.final.v1",
+  "benchmarkId": "runtime_preview_station_profiles_final",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+  },
+  "summary": {
+    "profileCount": 12,
+    "minimumProfiles": 12,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "redactionPass": true,
+    "accepted": true
+  },
+  "profiles": [
+    {
+      "stationProfileId": "sp-release-standard-v14",
+      "stationType": "standard_vision_ipc",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection",
+        "classification"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "metadata-summary",
+        "local-log"
+      ],
+      "maxOperatorCount": 12,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "standard release review approval for medium risk only",
+      "riskPolicy": "low_or_medium_metadata_risk_allowed",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-dl-review-v14",
+      "stationType": "deep_learning_review_ipc",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "AnomalyDetection",
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "DeepLearning",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "OnnxInference",
+        "ResultJudgment",
+        "ResultOutput",
+        "SemanticSegmentation",
+        "ShapeMatching",
+        "SurfaceDefectDetection",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection",
+        "classification",
+        "segmentation",
+        "anomaly"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "metadata-summary"
+      ],
+      "maxOperatorCount": 10,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "deep learning release approval required",
+      "riskPolicy": "medium_model_risk_requires_approval",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-low-ipc-v12",
+      "stationType": "low_spec_ipc",
+      "runtimeVersion": "1.2.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata"
+      ],
+      "maxOperatorCount": 3,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "release blocked when operator count exceeds limit",
+      "riskPolicy": "high_when_capacity_exceeded",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-multi-camera-v14",
+      "stationType": "multi_camera_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection",
+        "classification"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam",
+        "top-cam",
+        "angle-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "metadata-summary",
+        "local-log"
+      ],
+      "maxOperatorCount": 14,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "multi camera metadata review required",
+      "riskPolicy": "medium_when_multiple_camera_bindings",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-output-lite-v14",
+      "stationType": "output_lite_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam"
+      ],
+      "outputChannelKinds": [
+        "local-log"
+      ],
+      "maxOperatorCount": 8,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "output remap required for qa metadata channels",
+      "riskPolicy": "high_when_output_channel_missing",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-detection-only-v14",
+      "stationType": "model_limited_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "DeepLearning",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata"
+      ],
+      "maxOperatorCount": 8,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "model kind approval limited to detection metadata",
+      "riskPolicy": "high_when_model_kind_unsupported",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-legacy-runtime-v12",
+      "stationType": "legacy_runtime_station",
+      "runtimeVersion": "1.2.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "local-log"
+      ],
+      "maxOperatorCount": 6,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "runtime upgrade approval required",
+      "riskPolicy": "high_when_runtime_version_too_low",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-multi-station-v14",
+      "stationType": "multi_station_review",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "DeepLearning",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection",
+        "classification"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam",
+        "top-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "metadata-summary"
+      ],
+      "maxOperatorCount": 16,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "multi station engineer approval required",
+      "riskPolicy": "medium_multi_station_review",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-plc-denied-v14",
+      "stationType": "plc_denied_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ModbusCommunication",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata"
+      ],
+      "maxOperatorCount": 8,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "PLC writes always denied in preview",
+      "riskPolicy": "denied_when_plc_or_station_intent",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-release-approval-v14",
+      "stationType": "release_approval_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "BlobAnalysis",
+        "BlobLabeling",
+        "CaliperTool",
+        "CircleMeasurement",
+        "DeepLearning",
+        "EdgeDetection",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput",
+        "SemanticSegmentation",
+        "ShapeMatching",
+        "SurfaceDefectDetection",
+        "TemplateMatching",
+        "Thresholding"
+      ],
+      "supportedModelKinds": [
+        "detection",
+        "classification",
+        "segmentation"
+      ],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "metadata-summary"
+      ],
+      "maxOperatorCount": 12,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "release approval required for medium and model risk",
+      "riskPolicy": "medium_requires_engineer_approval",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-template-only-v14",
+      "stationType": "template_only_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "ImageAcquisition",
+        "ResultJudgment",
+        "ResultOutput",
+        "ShapeMatching",
+        "TemplateMatching"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata",
+        "local-log"
+      ],
+      "maxOperatorCount": 6,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "template metadata dependency must be closed",
+      "riskPolicy": "high_when_template_missing",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "stationProfileId": "sp-measurement-only-v14",
+      "stationType": "measurement_only_station",
+      "runtimeVersion": "1.4.0",
+      "supportedOperatorTypes": [
+        "CaliperTool",
+        "CircleMeasurement",
+        "GapMeasurement",
+        "ImageAcquisition",
+        "LineMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "supportedModelKinds": [],
+      "cameraBindingSlots": [
+        "line-cam",
+        "side-cam"
+      ],
+      "outputChannelKinds": [
+        "qa-metadata"
+      ],
+      "maxOperatorCount": 10,
+      "plcWriteAllowed": false,
+      "resourcePolicy": {
+        "metadataOnly": true,
+        "realResourceAccessAllowed": false,
+        "imageFileReadAllowed": false,
+        "modelFileLoadAllowed": false,
+        "templateFileReadAllowed": false,
+        "packageDeploymentAllowed": false
+      },
+      "networkPolicy": "redacted",
+      "approvalPolicy": "measurement calibration metadata review required",
+      "riskPolicy": "medium_for_measurement_release",
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

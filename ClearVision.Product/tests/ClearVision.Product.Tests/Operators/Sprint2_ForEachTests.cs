@@ -101,19 +101,6 @@ public class Sprint2_ForEachTests
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>());
-        return;
-
-        // 验证
-        Assert.True(result.IsSuccess);
-        Assert.True(stopwatch.ElapsedMilliseconds < 600, // 增加一些延迟容错
-            $"并行执行时间过长: {stopwatch.ElapsedMilliseconds}ms，期望 < 600ms");
-
-        // 验证每个子图都被执行
-        await _flowExecutorMock.Received(15).ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
-                Arg.Any<Dictionary<string, object>>(),
-                false,
-                Arg.Any<CancellationToken>());
     }
 
     /// <summary>
@@ -208,7 +195,7 @@ public class Sprint2_ForEachTests
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
-            .Returns(async x =>
+            .Returns(_ =>
             {
                 int currentIndex;
                 lock (this)
@@ -219,17 +206,18 @@ public class Sprint2_ForEachTests
                 // 第 3 个（索引 2）失败
                 if (currentIndex == 2)
                 {
-                    return new FlowExecutionResult
+                    return Task.FromResult(new FlowExecutionResult
                     {
                         IsSuccess = false,
                         ErrorMessage = "模拟失败"
-                    };
+                    });
                 }
-                return new FlowExecutionResult
+
+                return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
                     OutputData = new Dictionary<string, object> { { "Result", true } }
-                };
+                });
             });
 
         // 设置子图

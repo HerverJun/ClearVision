@@ -20,6 +20,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public class WebMessageHandlerTests
 {
     [Fact]
@@ -27,51 +28,63 @@ public class WebMessageHandlerTests
     {
         var operatorFactory = new OperatorFactory();
         var projectRepository = Substitute.For<IProjectRepository>();
-        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var flowStorageRoot = Path.Combine(Path.GetTempPath(), "ClearVision.WebMessageHandlerTests", Guid.NewGuid().ToString("N"));
+        var flowStorage = new JsonFileProjectFlowStorage(flowStorageRoot);
         var project = new Project("WebMessage Flow");
 
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        projectRepository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
 
-        await using var serviceProvider = BuildServiceProvider(services =>
+        try
         {
-            services.AddSingleton(projectRepository);
-            services.AddSingleton(flowStorage);
-            services.AddSingleton<IOperatorFactory>(operatorFactory);
-            services.AddScoped<ProjectService>();
-        });
-
-        var handler = CreateHandler(serviceProvider, operatorFactory);
-        var payload = JsonSerializer.Serialize(new UpdateFlowCommand
-        {
-            ProjectId = project.Id,
-            Flow = new FlowData
+            await using var serviceProvider = BuildServiceProvider(services =>
             {
-                Operators =
-                [
-                    new OperatorData
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "ResultOutput",
-                        Type = nameof(OperatorType.ResultOutput),
-                        X = 120,
-                        Y = 80
-                    }
-                ],
-                Connections = []
-            }
-        });
+                services.AddSingleton(projectRepository);
+                services.AddSingleton<IProjectFlowStorage>(flowStorage);
+                services.AddSingleton<IOperatorFactory>(operatorFactory);
+                services.AddScoped<ProjectService>();
+            });
 
-        var response = await handler.HandleAsync(new WebMessage
+            var handler = CreateHandler(serviceProvider, operatorFactory);
+            var payload = JsonSerializer.Serialize(new UpdateFlowCommand
+            {
+                ProjectId = project.Id,
+                Flow = new FlowData
+                {
+                    Operators =
+                    [
+                        new OperatorData
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "ResultOutput",
+                            Type = nameof(OperatorType.ResultOutput),
+                            X = 120,
+                            Y = 80
+                        }
+                    ],
+                    Connections = []
+                }
+            });
+
+            var response = await handler.HandleAsync(new WebMessage
+            {
+                Type = nameof(UpdateFlowCommand),
+                Id = "req-update-flow",
+                Payload = payload
+            });
+
+            response.Success.Should().BeTrue(response.Error);
+            var savedFlow = await flowStorage.LoadFlowJsonAsync(project.Id);
+            savedFlow.Should().Contain("ResultOutput").And.Contain("MainFlow");
+            (await flowStorage.LoadMetadataAsync(project.Id))!.PersistenceRevision.Should().Be(1);
+        }
+        finally
         {
-            Type = nameof(UpdateFlowCommand),
-            Id = "req-update-flow",
-            Payload = payload
-        });
-
-        response.Success.Should().BeTrue();
-        await flowStorage.Received(1).SaveFlowJsonAsync(
-            project.Id,
-            Arg.Is<string>(json => json.Contains("ResultOutput") && json.Contains("MainFlow")));
+            if (Directory.Exists(flowStorageRoot))
+            {
+                Directory.Delete(flowStorageRoot, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -316,6 +329,75 @@ public class WebMessageHandlerTests
         var activeRequests = activeRequestsField.GetValue(handler)!;
         var count = (int)activeRequests.GetType().GetProperty("Count")!.GetValue(activeRequests)!;
         count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task HandleGenerateFlowCommand_MalformedBuildFromPlan_ShouldReturnControlledFailureWithoutGeneration()
+    {
+        var operatorFactory = new OperatorFactory();
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var generationLogger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        await using var serviceProvider = BuildServiceProvider(services =>
+        {
+            services.AddScoped(_ => generationService);
+            services.AddScoped(_ => generationLogger);
+            services.AddScoped<GenerateFlowMessageHandler>();
+        });
+        var handler = CreateHandler(serviceProvider, operatorFactory);
+        const string requestId = "req-malformed-build";
+        const string sessionId = "session-malformed-build";
+        var messageJson = $$"""
+        {
+          "payload": {
+            "description": "start build",
+            "sessionId": "{{sessionId}}",
+            "requestId": "{{requestId}}",
+            "buildFromPlan": {
+              "planId": "plan-malformed",
+              "planSnapshot": { "planId": "plan-malformed" },
+              "confirmedAnswers": [
+                { "field": { "not": "a-string" }, "value": "camera" }
+              ]
+            }
+          }
+        }
+        """;
+        var handleGenerateMethod = typeof(WebMessageHandler)
+            .GetMethod("HandleGenerateFlowCommand", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        await ((Task)handleGenerateMethod.Invoke(handler, [messageJson])!).WaitAsync(TimeSpan.FromSeconds(5));
+
+        await generationService.DidNotReceiveWithAnyArgs().GenerateFlowAsync(
+            Arg.Any<AiFlowGenerationRequest>(),
+            Arg.Any<Action<string>>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>());
+        var queueField = typeof(WebMessageHandler).GetField(
+            "_pendingWebMessages",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var queue = queueField.GetValue(handler).Should().BeOfType<ConcurrentQueue<string>>().Subject;
+        queue.Should().NotBeEmpty();
+        var responseJson = queue.Last();
+        using var document = JsonDocument.Parse(responseJson);
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("requestId").GetString().Should().Be(requestId);
+        root.GetProperty("sessionId").GetString().Should().Be(sessionId);
+        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        root.GetProperty("completionStatus").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        root.GetProperty("failureType").GetString().Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
+        root.GetProperty("interactionState").GetString().Should().Be(AiInteractionStates.Failed);
+        root.GetProperty("clarificationRequired").GetBoolean().Should().BeFalse();
+        root.GetProperty("errorMessage").GetString().Should().Be("BuildFromPlan payload is invalid.");
+        root.GetProperty("failureSummary").GetString().Should().Contain("build_from_plan_payload_invalid");
+        root.GetProperty("firstFixRecommendation").GetString().Should().NotBeNullOrWhiteSpace();
+        responseJson.Should().NotContain("JsonException");
+        responseJson.Should().NotContain("System.Text.Json");
+        responseJson.Should().NotContain(" at ");
+        responseJson.Should().NotContain("C:\\");
+        responseJson.Should().NotContain("$.payload");
+        responseJson.Should().NotContain("not-a-string");
     }
 
     private static WebMessageHandler CreateHandler(ServiceProvider serviceProvider, OperatorFactory operatorFactory)

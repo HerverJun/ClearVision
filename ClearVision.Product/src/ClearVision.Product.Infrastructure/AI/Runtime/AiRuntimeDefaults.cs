@@ -72,7 +72,9 @@ public sealed class AiModelRegistry : IAiModelRegistry
     public AiModelConfig GetActiveModel()
     {
         var allModels = _configStore.GetAll();
-        var active = allModels.FirstOrDefault(x => x.IsActive) ?? allModels.FirstOrDefault();
+        var active = allModels.FirstOrDefault(x => x.IsActive && x.IsEnabled) ??
+                     allModels.FirstOrDefault(x => x.IsEnabled) ??
+                     allModels.FirstOrDefault();
         if (active == null)
             throw new InvalidOperationException("No available AI model configuration.");
 
@@ -140,7 +142,8 @@ public sealed class RoleAwareAiModelSelector : IAiModelSelector
     {
         var allModels = _registry.GetAllModels();
         var candidates = allModels
-            .Where(m => m.RoleBindings != null
+            .Where(m => m.IsEnabled
+                && m.RoleBindings != null
                 && m.RoleBindings.Contains(role, StringComparer.OrdinalIgnoreCase))
             .OrderBy(m => m.Priority ?? 100)
             .ThenByDescending(m => m.IsActive)

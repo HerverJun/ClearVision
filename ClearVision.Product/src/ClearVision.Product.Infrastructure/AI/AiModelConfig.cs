@@ -23,6 +23,14 @@ public class AiModelConfig
     public const string AuthModeHeaderKey = "header_key";
     public const string AuthModeNone = "none";
 
+    public const string RoleGeneration = "generation";
+    public const string RolePlanner = "planner";
+    public const string RoleShadowEval = "vision-agent-shadow-eval";
+    public const string RoleReasoning = "reasoning";
+    public const string RoleFallback = "fallback";
+    public const string RoleValidation = "validation";
+    public const string RoleVision = "vision";
+
     /// <summary>唯一标识</summary>
     public string Id { get; set; } = $"model_{Guid.NewGuid():N}";
 
@@ -30,6 +38,8 @@ public class AiModelConfig
     public string Name { get; set; } = "新建模型";
 
     /// <summary>API 协议："OpenAI" / "OpenAI Compatible" / "Anthropic"</summary>
+    public string? DisplayName { get; set; }
+
     public string Provider { get; set; } = "OpenAI Compatible";
 
     /// <summary>真实 API 密钥（GET 接口不返回此字段）</summary>
@@ -48,6 +58,8 @@ public class AiModelConfig
     public bool IsActive { get; set; }
 
     /// <summary>模型能力声明（可选，未配置时按 Provider/Model 推导）</summary>
+    public bool IsEnabled { get; set; } = true;
+
     public AiModelCapabilities? Capabilities { get; set; }
 
     /// <summary>Protocol identity for provider routing.</summary>
@@ -78,7 +90,21 @@ public class AiModelConfig
     public List<string>? RoleBindings { get; set; }
 
     /// <summary>Priority used by fallback ordering. Smaller number = higher priority.</summary>
+    public string? ModelRole { get; set; }
+
     public int? Priority { get; set; }
+
+    public string? Remark { get; set; }
+
+    public DateTimeOffset? CreatedAt { get; set; }
+
+    public DateTimeOffset? UpdatedAt { get; set; }
+
+    public string? LastTestStatus { get; set; }
+
+    public DateTimeOffset? LastTestAt { get; set; }
+
+    public int? LastTestLatencyMs { get; set; }
 
     public AiModelCapabilities GetEffectiveCapabilities()
     {
@@ -101,8 +127,16 @@ public class AiModelConfig
 
         AuthMode = NormalizeAuthMode(AuthMode, protocol);
         AuthHeaderName = NormalizeAuthHeaderName(AuthHeaderName, AuthMode!, protocol);
-        RoleBindings = NormalizeRoleBindings(RoleBindings);
+        RoleBindings = NormalizeRoleBindings(RoleBindings, ModelRole);
+        ModelRole = NormalizeModelRole(ModelRole, RoleBindings);
         Priority ??= 100;
+        DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName.Trim();
+        Remark = string.IsNullOrWhiteSpace(Remark) ? null : Remark.Trim();
+        LastTestStatus = string.IsNullOrWhiteSpace(LastTestStatus)
+            ? "untested"
+            : LastTestStatus.Trim().ToLowerInvariant();
+        CreatedAt ??= DateTimeOffset.UtcNow;
+        UpdatedAt ??= CreatedAt;
 
         ExtraHeaders = NormalizeStringMap(ExtraHeaders);
         ExtraQuery = NormalizeStringMap(ExtraQuery);
@@ -229,22 +263,52 @@ public class AiModelConfig
         return normalizedProtocol == ProtocolAzureOpenAi ? "api-key" : "x-api-key";
     }
 
-    private static List<string> NormalizeRoleBindings(IEnumerable<string>? roleBindings)
+    public static string NormalizeRoleName(string? role)
     {
-        if (roleBindings == null)
-            return new List<string> { "generation" };
+        if (string.IsNullOrWhiteSpace(role))
+            return RoleGeneration;
 
-        var normalized = roleBindings
+        var normalized = role.Trim().ToLowerInvariant().Replace("_", "-");
+        return normalized switch
+        {
+            "shadow-eval" => RoleShadowEval,
+            "shadoweval" => RoleShadowEval,
+            "vision-agent-shadow" => RoleShadowEval,
+            RoleShadowEval => RoleShadowEval,
+            RolePlanner => RolePlanner,
+            RoleReasoning => RoleReasoning,
+            RoleFallback => RoleFallback,
+            RoleValidation => RoleValidation,
+            RoleVision => RoleVision,
+            _ => RoleGeneration
+        };
+    }
+
+    public static List<string> NormalizeRoleBindings(IEnumerable<string>? roleBindings, string? modelRole = null)
+    {
+        var source = roleBindings == null
+            ? new[] { modelRole }
+            : roleBindings.Concat(new[] { modelRole });
+
+        var normalized = source
             .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x.Trim().ToLowerInvariant())
-            .Where(x => x is "generation" or "reasoning" or "fallback" or "validation" or "vision")
+            .Select(NormalizeRoleName)
+            .Where(x => x is RoleGeneration or RolePlanner or RoleShadowEval or RoleReasoning or RoleFallback or RoleValidation or RoleVision)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         if (normalized.Count == 0)
-            normalized.Add("generation");
+            normalized.Add(RoleGeneration);
 
         return normalized;
+    }
+
+    private static string NormalizeModelRole(string? modelRole, IReadOnlyList<string>? roleBindings)
+    {
+        if (!string.IsNullOrWhiteSpace(modelRole))
+            return NormalizeRoleName(modelRole);
+
+        return roleBindings?.FirstOrDefault() ?? RoleGeneration;
     }
 
     private static Dictionary<string, string>? NormalizeStringMap(Dictionary<string, string>? map)

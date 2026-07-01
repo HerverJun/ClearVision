@@ -21,12 +21,48 @@ public record AiFlowGenerationRequest(
 )
 {
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+
+    public bool UseVisionAgentGenerateFlow { get; init; }
+
+    public string AgentGenerateFlowMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
+
+    public bool RuntimePreviewConsent { get; init; }
+
+    public string? AgentRunId { get; init; }
+
+    public VisionAgentBuildFromPlanRequest? BuildFromPlan { get; init; }
+}
+
+public sealed record RuntimePreviewConsent(
+    bool Granted,
+    string Scope = RuntimePreviewConsentScopes.SingleRequest);
+
+public static class RuntimePreviewConsentScopes
+{
+    public const string SingleRequest = "single_request";
 }
 
 public static class AiRequirementModes
 {
     public const string Draft = "draft";
     public const string Strict = "strict";
+}
+
+public static class AiAgentGenerateFlowModes
+{
+    public const string Scripted = "scripted";
+    public const string Planner = "planner";
+    public const string ToolLoop = "tool_loop";
+
+    public static string Normalize(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            Planner => Planner,
+            ToolLoop => ToolLoop,
+            _ => Scripted
+        };
+    }
 }
 
 public enum GenerateFlowMode
@@ -181,6 +217,40 @@ public class AiFlowGenerationResult
     /// </summary>
     public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
 
+    public List<VisionAgentGlobalVariableDraft> GlobalVariableDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableSourceBindingDraft> GlobalVariableSourceBindingDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableTargetBindingDraft> GlobalVariableTargetBindingDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableDiagnostic> GlobalVariableDiagnostics { get; set; } = new();
+
+    public List<object> PendingActions { get; set; } = new();
+
+    public object? ValidationPreview { get; set; }
+
+    public List<object> ToolTrace { get; set; } = new();
+
+    public string PlanId { get; set; } = string.Empty;
+
+    public string PlanHash { get; set; } = string.Empty;
+
+    public string ContractVersion { get; set; } = string.Empty;
+
+    public string AnswerSetFingerprint { get; set; } = string.Empty;
+
+    public string RequestedMode { get; set; } = AiAgentGenerateFlowModes.Scripted;
+
+    public string EffectiveMode { get; set; } = AiAgentGenerateFlowModes.Scripted;
+
+    public bool ToolLoopEntered { get; set; }
+
+    public string FallbackReason { get; set; } = string.Empty;
+
+    public VisionAgentBuildResult? BuildResult { get; set; }
+
+    public VisionAgentBuildReadinessSnapshot? BuildReadiness { get; set; }
+
     /// <summary>
     /// 本次失败的结构化摘要（成功时为空）
     /// </summary>
@@ -218,6 +288,16 @@ public class AiFlowGenerationResult
     public string RouterConfidence { get; set; } = AiRouterConfidence.Low;
     public List<string> BlockingClarificationFields { get; set; } = new();
     public List<string> NonBlockingMissingFields { get; set; } = new();
+    public AiRequirementMaturityResult? RequirementMaturity { get; set; }
+    public AiDecisionTrace? DecisionTrace { get; set; }
+    public AiPersistenceWarning? PersistenceWarning { get; set; }
+}
+
+public class AiPersistenceWarning
+{
+    public string Code { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public object? PersistenceStatus { get; set; }
 }
 
 public static class AiTurnIntents

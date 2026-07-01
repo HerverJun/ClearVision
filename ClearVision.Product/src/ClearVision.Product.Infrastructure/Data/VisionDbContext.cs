@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,9 +74,13 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.Version).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.PersistenceRevision).IsRequired().HasDefaultValue(0L);
             entity.Property(e => e.GlobalSettings).HasConversion(
                 v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
                 v => System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new Dictionary<string, string>());
+            entity.Property(e => e.GlobalVariables).HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, ProjectVariableJson.Options),
+                v => System.Text.Json.JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(v, ProjectVariableJson.Options) ?? new ProjectGlobalVariableSchema());
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.LastOpenedAt);
 

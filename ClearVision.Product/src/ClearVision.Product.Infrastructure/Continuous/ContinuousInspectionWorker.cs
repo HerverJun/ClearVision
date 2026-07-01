@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using System.Text.Json;
+using System.Threading.Channels;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Diagnostics;
 using ClearVision.Product.Infrastructure.Replay;
@@ -21,6 +22,15 @@ public sealed class ContinuousInspectionWorker
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan CameraStreamRestartDelay = TimeSpan.FromMilliseconds(500);
     private readonly ILogger _logger;
+
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
 
     public ContinuousInspectionWorker(ILogger logger)
     {
@@ -41,7 +51,10 @@ public sealed class ContinuousInspectionWorker
         IInspectionEventBus eventBus,
         CancellationToken cancellationToken,
         Func<ContinuousInspectionMode>? resolveCurrentMode = null,
-        IImageCacheRepository? imageCacheRepository = null)
+        IImageCacheRepository? imageCacheRepository = null,
+        IProjectVariableSession? projectVariableSession = null,
+        ProjectVariableBindingIndex? projectVariableBindingIndex = null,
+        ProjectVariableCommitHandler? projectVariableCommitHandler = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
@@ -151,10 +164,23 @@ public sealed class ContinuousInspectionWorker
                                 var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
                                     candidate,
                                     item.TrackId,
-                                    (envelope, ct) => flowExecution.ExecuteFlowAsync(
-                                        flow,
-                                        new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
-                                        cancellationToken: ct)));
+                                    (envelope, ct) =>
+                                    {
+                                        var inputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
+                                        if (projectVariableSession == null || projectVariableBindingIndex == null)
+                                        {
+                                            return flowExecution.ExecuteFlowAsync(flow, inputs, cancellationToken: ct);
+                                        }
+
+                                        var isPreview = mode != ContinuousInspectionMode.Primary;
+                                        var context = new ProjectVariableExecutionContext(
+                                            projectVariableSession,
+                                            projectVariableBindingIndex,
+                                            Guid.NewGuid(),
+                                            isPreview,
+                                            isPreview ? null : projectVariableCommitHandler);
+                                        return flowExecution.ExecuteFlowAsync(flow, inputs, context, cancellationToken: ct);
+                                    }));
                                 if (scheduled)
                                 {
                                     metrics.RecordInferenceScheduled();
@@ -167,7 +193,7 @@ public sealed class ContinuousInspectionWorker
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            _logger.LogError(ex, "[ContinuousInspection] Pipeline frame collection and scheduling failed. CameraId={CameraId}, TrackId={TrackId}", cameraId, item.TrackId);
+                            _logger.LogError(ex, "[ContinuousInspection] Pipeline frame collection and scheduling failed. CameraId={CameraId}, TrackId={TrackId}", SanitizeLogValue(cameraId), SanitizeLogValue(item.TrackId));
                         }
                     }
                 }
@@ -186,7 +212,7 @@ public sealed class ContinuousInspectionWorker
                     {
                         _logger.LogInformation(
                             "[ContinuousInspection] Loop stopped by configuration change. CameraId={CameraId}, PreviousMode={PreviousMode}, CurrentMode={CurrentMode}",
-                            cameraId,
+                            SanitizeLogValue(cameraId),
                             mode,
                             currentMode);
                         return;
@@ -228,7 +254,7 @@ public sealed class ContinuousInspectionWorker
                 _logger.LogWarning(
                     ex,
                     "[ContinuousInspection] Shared camera stream faulted; releasing lease and restarting. CameraId={CameraId}, Mode={Mode}",
-                    cameraId,
+                    SanitizeLogValue(cameraId),
                     mode);
             }
             finally
@@ -250,7 +276,7 @@ public sealed class ContinuousInspectionWorker
                     : "[ContinuousInspection] Loop stopped. CameraId={CameraId}, Mode={Mode}, Frames={Frames}, Signals={Signals}, Tracks={Tracks}, Scheduled={Scheduled}, Completed={Completed}, Decisions={Decisions}, AvgLatencyMs={AvgLatencyMs:F1}";
                 _logger.LogInformation(
                     logMessage,
-                    cameraId,
+                    SanitizeLogValue(cameraId),
                     mode,
                     snapshot.FramesReceived,
                     snapshot.ArrivalSignals,

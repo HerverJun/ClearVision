@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -57,6 +58,14 @@ public sealed class RuntimePackageLoader
                     ResolveOptionalFieldPath(normalizedRoot, manifest.FieldExtensions.DefaultSiteProfile, "field/station-profile.default.json"),
                     cancellationToken)
                 ?? CreateEmptyDefaultSiteProfile(manifest);
+            var globalVariables = await ReadJsonAsync<ProjectGlobalVariableSchema>(
+                    ResolveOptionalFieldPath(normalizedRoot, manifest.FieldExtensions.GlobalVariables, "field/global-variables.json"),
+                    cancellationToken)
+                ?? new ProjectGlobalVariableSchema();
+            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, flow.ToEntity());
+            parameterSchema = NormalizeParameterSchema(parameterSchema, manifest);
+            defaultSiteProfile = NormalizeDefaultSiteProfile(defaultSiteProfile, manifest);
+            RuntimeProjectVariableConflictValidator.ThrowIfAnySiteProfileConflicts(globalVariables, parameterSchema, flow);
 
             var package = new RuntimePackage
             {
@@ -66,8 +75,9 @@ public sealed class RuntimePackageLoader
                 FlowBytes = flowBytes,
                 RuntimeProfile = runtimeProfile,
                 ValidationReport = validationReport,
-                ParameterSchema = NormalizeParameterSchema(parameterSchema, manifest),
-                DefaultSiteProfile = NormalizeDefaultSiteProfile(defaultSiteProfile, manifest)
+                ParameterSchema = parameterSchema,
+                DefaultSiteProfile = defaultSiteProfile,
+                GlobalVariables = globalVariables
             };
 
             var validation = await _validator.ValidateAsync(package, cancellationToken);

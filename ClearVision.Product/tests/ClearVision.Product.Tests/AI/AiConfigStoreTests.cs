@@ -192,7 +192,7 @@ public class AiConfigStoreTests : IDisposable
         var secondModel = new AiModelConfig { Id = "test2", IsActive = false };
         store.Add(secondModel);
 
-        Assert.True(store.GetById(defaultModel.Id).IsActive);
+        Assert.True(store.GetById(defaultModel.Id)!.IsActive);
 
         // Act
         store.Delete(defaultModel.Id);
@@ -256,9 +256,9 @@ public class AiConfigStoreTests : IDisposable
         store.SetActive("B");
 
         // Assert
-        Assert.False(store.GetById(defaultModel.Id).IsActive);
-        Assert.False(store.GetById("A").IsActive);
-        Assert.True(store.GetById("B").IsActive);
+        Assert.False(store.GetById(defaultModel.Id)!.IsActive);
+        Assert.False(store.GetById("A")!.IsActive);
+        Assert.True(store.GetById("B")!.IsActive);
     }
 
     [Fact]
@@ -268,13 +268,13 @@ public class AiConfigStoreTests : IDisposable
         var model = new AiModelConfig { Id = "test3", ApiKey = "RealSecretKey" };
         store.Add(model);
 
-        var updateReq = new AiModelConfig { ApiKey = null, Name = "Updated Name" };
+        var updateReq = new AiModelConfig { ApiKey = null!, Name = "Updated Name" };
 
         // Act
         var updated = store.Update("test3", updateReq);
 
         // Assert
-        Assert.Equal("Updated Name", updated.Name);
+        Assert.Equal("Updated Name", updated!.Name);
         Assert.Equal("RealSecretKey", updated.ApiKey); // Old key preserved
     }
 
@@ -291,7 +291,7 @@ public class AiConfigStoreTests : IDisposable
         var updated = store.Update("test4", updateReq);
 
         // Assert
-        Assert.Equal("RealSecretKey", updated.ApiKey); // Old key preserved
+        Assert.Equal("RealSecretKey", updated!.ApiKey); // Old key preserved
     }
 
     [Fact]
@@ -520,5 +520,99 @@ public class AiConfigStoreTests : IDisposable
         var persistedJson = File.ReadAllText(_testModelsFile);
         Assert.DoesNotContain("TestKey", persistedJson);
         Assert.DoesNotContain("custom-key", persistedJson);
+    }
+
+    [Fact]
+    public void Update_WithExplicitReplaceAndClearApiKey_ShouldApplyKeyOperation()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "key-model",
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "old-secret"
+        });
+
+        var replaced = store.Update("key-model", new AiModelConfig
+        {
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "new-secret"
+        }, AiApiKeyUpdateMode.Replace);
+
+        Assert.Equal("new-secret", replaced!.ApiKey);
+
+        var cleared = store.Update("key-model", new AiModelConfig
+        {
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini"
+        }, AiApiKeyUpdateMode.Clear);
+
+        Assert.Equal(string.Empty, cleared!.ApiKey);
+        Assert.DoesNotContain("new-secret", File.ReadAllText(_testModelsFile));
+    }
+
+    [Fact]
+    public void SetDefaultForRole_ShouldBindPlannerRoleAndEnableModel()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "planner-model",
+            Name = "Planner Model",
+            Provider = "OpenAI Compatible",
+            Model = "planner",
+            IsEnabled = false,
+            RoleBindings = new List<string> { AiModelConfig.RoleGeneration },
+            Priority = 50
+        });
+
+        var ok = store.SetDefaultForRole("planner-model", AiModelConfig.RolePlanner);
+
+        Assert.True(ok);
+        var updated = store.GetById("planner-model")!;
+        Assert.True(updated.IsEnabled);
+        Assert.Contains(AiModelConfig.RolePlanner, updated.RoleBindings!);
+        Assert.Equal(AiModelConfig.RolePlanner, updated.ModelRole);
+        Assert.Equal(1, updated.Priority);
+    }
+
+    [Fact]
+    public void Add_ProductizedFields_ShouldPersistAndHydrate()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "product-model",
+            Name = "Product Model",
+            DisplayName = "Workbench Planner",
+            Provider = "OpenAI Compatible",
+            Model = "planner",
+            ModelRole = AiModelConfig.RoleShadowEval,
+            RoleBindings = new List<string> { AiModelConfig.RoleShadowEval },
+            Remark = "offline shadow only",
+            Priority = 7,
+            IsEnabled = true,
+            LastTestStatus = "ok",
+            LastTestAt = DateTimeOffset.UtcNow,
+            LastTestLatencyMs = 42
+        });
+
+        var reloaded = CreateStore().GetById("product-model")!;
+
+        Assert.Equal("Workbench Planner", reloaded.DisplayName);
+        Assert.Equal(AiModelConfig.RoleShadowEval, reloaded.ModelRole);
+        Assert.Contains(AiModelConfig.RoleShadowEval, reloaded.RoleBindings!);
+        Assert.Equal("offline shadow only", reloaded.Remark);
+        Assert.Equal(7, reloaded.Priority);
+        Assert.True(reloaded.IsEnabled);
+        Assert.Equal("ok", reloaded.LastTestStatus);
+        Assert.Equal(42, reloaded.LastTestLatencyMs);
+        Assert.NotNull(reloaded.CreatedAt);
+        Assert.NotNull(reloaded.UpdatedAt);
     }
 }

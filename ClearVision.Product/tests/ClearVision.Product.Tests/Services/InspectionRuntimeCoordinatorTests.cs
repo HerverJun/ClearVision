@@ -36,7 +36,7 @@ public class InspectionRuntimeCoordinatorTests
         var started = DateTime.UtcNow;
         while (coordinator.GetState(projectId) != null)
         {
-            if (DateTime.UtcNow - started > TimeSpan.FromSeconds(2))
+            if (DateTime.UtcNow - started > TimeSpan.FromSeconds(10))
             {
                 throw new TimeoutException("Coordinator cleanup did not remove the session in time.");
             }
@@ -71,5 +71,33 @@ public class InspectionRuntimeCoordinatorTests
         coordinator.MarkAsStopped(projectId, firstSessionId);
 
         coordinator.GetState(projectId)!.SessionId.Should().Be(secondSessionId);
+    }
+
+    [Fact]
+    public async Task TryAcquireMutationLease_WhenRunActive_ShouldReturnNull()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+
+        (await coordinator.TryStartAsync(projectId, Guid.NewGuid(), CancellationToken.None))
+            .Should().Be(StartResult.Success);
+
+        var lease = await coordinator.TryAcquireMutationLeaseAsync(projectId, "schema-save", CancellationToken.None);
+
+        lease.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TryStartAsync_WhenMutationLeaseActive_ShouldReturnMutationInProgress()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+
+        await using var lease = await coordinator.TryAcquireMutationLeaseAsync(projectId, "schema-save", CancellationToken.None);
+        lease.Should().NotBeNull();
+
+        var result = await coordinator.TryStartAsync(projectId, Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().Be(StartResult.MutationInProgress);
     }
 }

@@ -44,13 +44,37 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve CI Diff Base
+        shell: pwsh
+        run: |
+          $baseRef = & "./scripts/resolve-ci-diff-base.ps1" `
+            -EventName "${{ github.event_name }}" `
+            -RefName "${{ github.ref_name }}" `
+            -BeforeSha "${{ github.event.before }}" `
+            -PullRequestBaseSha "${{ github.event.pull_request.base.sha }}"
+          if ([string]::IsNullOrWhiteSpace($baseRef)) {
+            throw "CI diff base resolver returned empty output."
+          }
+          "CV_DIFF_BASE=$baseRef" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "CI diff base: $baseRef"
+
+      - name: CI Gate Self Tests
+        shell: pwsh
+        run: |
+          & "./scripts/resolve-ci-diff-base.ps1" -SelfTest
+          & "./scripts/scan-secrets.ps1" -SelfTest
+
       - name: Secret Scan
         shell: pwsh
-        run: '& "./scripts/scan-secrets.ps1"'
+        run: '& "./scripts/scan-secrets.ps1" -BaseRef $env:CV_DIFF_BASE'
 
       - name: Text Encoding Scan
         shell: pwsh
-        run: '& "./scripts/check-text-encoding.ps1"'
+        run: '& "./scripts/check-text-encoding.ps1" -BaseRef $env:CV_DIFF_BASE'
+
+      - name: Diff Hygiene
+        shell: pwsh
+        run: '& "./scripts/check-diff-hygiene.ps1" -BaseRef $env:CV_DIFF_BASE'
 
       - name: Quality Report Size Scan
         shell: pwsh
@@ -236,6 +260,7 @@ jobs:
             throw "Could not determine OperatorLibrary VersionPrefix."
           }
           $env:OPERATOR_PACKAGE_VERSION = "$versionPrefix-ci.${{ github.run_number }}.${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path "${{ env.OPERATOR_PACKAGE_DIR }}" | Out-Null
           dotnet pack ${{ env.OPERATOR_PROJECT }} `
             --configuration Release `
             --no-build `
@@ -306,6 +331,97 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      - name: Run Vision Agent Quality Suite
+        shell: pwsh
+        run: python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suite --run
+
+      - name: Generate Real LLM Shadow Eval Sample
+        shell: pwsh
+        run: |
+          dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --output quality/evals/reports/real_llm_planner_shadow_eval.json --report quality/evals/reports/real_llm_planner_shadow_eval.md
+          dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --case-set holdout --output quality/evals/reports/real_llm_planner_shadow_eval.holdout.json --report quality/evals/reports/real_llm_planner_shadow_eval.holdout.md
+
+      - name: Assert Vision Agent Artifact Reports
+        shell: pwsh
+        run: python quality/tools/assert_vision_agent_report_artifacts.py --require-non-local-workflow-run --scan-source-files --write-manifest quality/evals/reports/vision_agent_quality_artifact_manifest.json --write-report quality/evals/reports/vision_agent_quality_artifact_manifest.md
+
+      - name: Upload Vision Agent Quality Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vision-agent-quality-suite
+          path: |
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.json
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.md
+            quality/evals/reports/planner_autonomy_benchmark.json
+            quality/evals/reports/planner_autonomy_benchmark.md
+            quality/evals/reports/runtime_preview_scenario_corpus.json
+            quality/evals/reports/runtime_preview_scenario_corpus.md
+            quality/evals/reports/runtime_preview_redacted_flow_corpus.json
+            quality/evals/reports/runtime_preview_redacted_flow_corpus.md
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.json
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.md
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_final.json
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_final.md
+            quality/evals/reports/runtime_preview_scenario_evidence.json
+            quality/evals/reports/runtime_preview_scenario_evidence.md
+            quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json
+            quality/evals/reports/runtime_preview_deploy_readiness_report.sample.md
+            quality/evals/reports/runtime_preview_package_readiness_report.sample.json
+            quality/evals/reports/runtime_preview_package_readiness_report.sample.md
+            quality/evals/reports/runtime_preview_package_readiness_final.json
+            quality/evals/reports/runtime_preview_package_readiness_final.md
+            quality/evals/reports/runtime_package_manifest_dry_run.sample.json
+            quality/evals/reports/runtime_package_manifest_dry_run.sample.md
+            quality/evals/reports/runtime_package_manifest_dry_run_final.json
+            quality/evals/reports/runtime_package_manifest_dry_run_final.md
+            quality/evals/reports/runtime_preview_station_profiles_sample.json
+            quality/evals/reports/runtime_preview_station_profiles_sample.md
+            quality/evals/reports/runtime_preview_station_profiles_final.json
+            quality/evals/reports/runtime_preview_station_profiles_final.md
+            quality/evals/reports/runtime_preview_operator_contract_registry.json
+            quality/evals/reports/runtime_preview_operator_contract_registry.md
+            quality/evals/reports/runtime_preview_operator_contract_registry_final.json
+            quality/evals/reports/runtime_preview_operator_contract_registry_final.md
+            quality/evals/reports/runtime_preview_operator_contract_coverage.json
+            quality/evals/reports/runtime_preview_operator_contract_coverage.md
+            quality/evals/reports/runtime_preview_operator_contract_validation_sample.json
+            quality/evals/reports/runtime_preview_operator_contract_validation_sample.md
+            quality/evals/reports/runtime_preview_operator_contract_validation_final.json
+            quality/evals/reports/runtime_preview_operator_contract_validation_final.md
+            quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.json
+            quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.md
+            quality/evals/reports/runtime_preview_station_compatibility_final.json
+            quality/evals/reports/runtime_preview_station_compatibility_final.md
+            quality/evals/reports/runtime_preview_pre_release_review_report.sample.json
+            quality/evals/reports/runtime_preview_pre_release_review_report.sample.md
+            quality/evals/reports/runtime_preview_pre_release_review_final.json
+            quality/evals/reports/runtime_preview_pre_release_review_final.md
+            quality/evals/reports/runtime_preview_release_decision_matrix.json
+            quality/evals/reports/runtime_preview_release_decision_matrix.md
+            quality/evals/reports/runtime_preview_governance_audit_sample.json
+            quality/evals/reports/runtime_preview_governance_audit_sample.md
+            quality/evals/reports/runtime_preview_governance_export_sample.json
+            quality/evals/reports/runtime_preview_governance_export_sample.md
+            quality/evals/reports/runtime_preview_governance_export_final.json
+            quality/evals/reports/runtime_preview_governance_export_final.md
+            quality/evals/reports/runtime_preview_agent_explanation_benchmark.json
+            quality/evals/reports/runtime_preview_agent_explanation_benchmark.md
+            quality/evals/reports/runtime_preview_agent_explanation_v3.json
+            quality/evals/reports/runtime_preview_agent_explanation_v3.md
+            quality/evals/reports/runtime_preview_agent_explanation_final.json
+            quality/evals/reports/runtime_preview_agent_explanation_final.md
+            quality/evals/reports/runtime_preview_report_readability_gate.json
+            quality/evals/reports/runtime_preview_report_readability_gate.md
+            quality/evals/reports/real_llm_planner_shadow_eval.json
+            quality/evals/reports/real_llm_planner_shadow_eval.md
+            quality/evals/reports/real_llm_planner_shadow_eval.holdout.json
+            quality/evals/reports/real_llm_planner_shadow_eval.holdout.md
+            quality/evals/reports/vision_agent_quality_artifact_manifest.json
+            quality/evals/reports/vision_agent_quality_artifact_manifest.md
+            test_results/agent_engineering_harness/**/*.trx
+            test_results/agent_engineering_harness/agent_ui_contract_output.txt
+
       - name: Run UI Tests
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
@@ -330,6 +446,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -360,6 +478,7 @@ jobs:
             throw "Could not determine OperatorLibrary VersionPrefix."
           }
           $packageVersion = "$versionPrefix-industrial.${{ github.run_number }}.${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path $env:OPERATOR_PACKAGE_DIR | Out-Null
           dotnet pack $env:OPERATOR_PROJECT `
             --configuration Release `
             --no-build `
@@ -403,6 +522,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -495,6 +616,22 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve CI Diff Base
+        shell: pwsh
+        run: |
+          $baseRef = & "./scripts/resolve-ci-diff-base.ps1" `
+            -EventName "${{ github.event_name }}" `
+            -RefName "${{ github.ref_name }}" `
+            -BeforeSha "${{ github.event.before }}" `
+            -PullRequestBaseSha "${{ github.event.pull_request.base.sha }}"
+          if ([string]::IsNullOrWhiteSpace($baseRef)) {
+            throw "CI diff base resolver returned empty output."
+          }
+          "CV_DIFF_BASE=$baseRef" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "CI diff base: $baseRef"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -517,6 +654,10 @@ jobs:
 
       - name: Check Code Format
         run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity diagnostic
+
+      - name: Diff Hygiene
+        shell: pwsh
+        run: '& "./scripts/check-diff-hygiene.ps1" -BaseRef $env:CV_DIFF_BASE'
 
       - name: Run Static Analysis
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -warnaserror

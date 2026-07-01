@@ -1,5 +1,5 @@
-using ClearVision.Product.Core.DTOs;
 using System.Text.RegularExpressions;
+using ClearVision.Product.Core.DTOs;
 
 namespace ClearVision.Product.Infrastructure.AI;
 

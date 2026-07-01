@@ -83,7 +83,7 @@ test('formatPreviewOutputValue truncates long strings without losing the full ti
 
 test('buildPreviewSummaryItems skips image-like payloads and keeps structured summaries compact', () => {
   const items = buildPreviewSummaryItems({
-    PreviewImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==',
+    PreviewImage: 'data:image/png;base64,<redacted-image-payload>',
     Detections: { detections: [{}, {}] },
     Meta: { station: 'S1', mode: 'Auto' }
   }, {

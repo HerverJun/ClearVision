@@ -12,6 +12,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
@@ -38,6 +39,8 @@ public class InspectionService : IInspectionService
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IInspectionImagePersistenceService? _imagePersistenceService;
+    private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
+    private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -57,7 +60,9 @@ public class InspectionService : IInspectionService
         IAnalysisDataBuilder analysisDataBuilder,
         IProjectFlowStorage flowStorage,
         ILogger<InspectionService> logger,
-        IInspectionImagePersistenceService? imagePersistenceService = null)
+        IInspectionImagePersistenceService? imagePersistenceService = null,
+        ProjectVariableSessionRegistry? projectVariableSessions = null,
+        ProjectSaveCoordinator? projectSaveCoordinator = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -72,6 +77,8 @@ public class InspectionService : IInspectionService
         _analysisDataBuilder = analysisDataBuilder;
         _flowStorage = flowStorage;
         _imagePersistenceService = imagePersistenceService;
+        _projectVariableSessions = projectVariableSessions;
+        _projectSaveCoordinator = projectSaveCoordinator;
         _logger = logger;
     }
 
@@ -158,7 +165,9 @@ public class InspectionService : IInspectionService
 
     public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow)
     {
-        return await ExecuteSingleCoreAsync(projectId, imageData, flow);
+        return await ExecuteSingleWithCoordinatorAsync(
+            projectId,
+            () => ExecuteSingleCoreAsync(projectId, imageData, flow));
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
         if (flow != null)
@@ -272,7 +281,9 @@ public class InspectionService : IInspectionService
 
     public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId, OperatorFlow? flow)
     {
-        return await ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow);
+        return await ExecuteSingleWithCoordinatorAsync(
+            projectId,
+            () => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow));
     }
 
     #endregion
@@ -288,7 +299,7 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
-        var actualFlow = await ResolveExecutionFlowAsync(projectId, flow: null);
+        var (actualFlow, _) = await ResolveExecutionFlowAsync(projectId, flow: null);
         await StartRealtimeInspectionFlowAsync(projectId, actualFlow, cameraId, cancellationToken, onResultReady);
     }
 
@@ -321,6 +332,10 @@ public class InspectionService : IInspectionService
             case StartResult.AlreadyRunning:
                 _logger.LogWarning("[InspectionService] 实时检测已在运行: {ProjectId}", projectId);
                 throw new InvalidOperationException("实时检测已在运行");
+
+            case StartResult.MutationInProgress:
+                _logger.LogWarning("[InspectionService] 项目正在配置变更，无法启动: {ProjectId}", projectId);
+                throw new InvalidOperationException("项目正在配置变更，请稍后重试");
 
             case StartResult.ShutdownInProgress:
                 _logger.LogWarning("[InspectionService] 系统正在关机，无法启动: {ProjectId}", projectId);
@@ -437,9 +452,38 @@ public class InspectionService : IInspectionService
 
     #region 辅助方法
 
+    private async Task<InspectionResult> ExecuteSingleWithCoordinatorAsync(
+        Guid projectId,
+        Func<Task<InspectionResult>> executeAsync)
+    {
+        var sessionId = Guid.NewGuid();
+        var startResult = await _coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        if (startResult != StartResult.Success)
+        {
+            throw new InvalidOperationException(startResult is StartResult.AlreadyRunning or StartResult.MutationInProgress
+                ? "Project is currently running."
+                : "Runtime coordinator is shutting down.");
+        }
+
+        try
+        {
+            _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
+            return await executeAsync();
+        }
+        catch (Exception ex)
+        {
+            _coordinator.MarkAsFaulted(projectId, sessionId, ex.Message);
+            throw;
+        }
+        finally
+        {
+            _coordinator.MarkAsStopped(projectId, sessionId);
+        }
+    }
+
     private async Task<InspectionResult> ExecuteSingleCoreAsync(Guid projectId, byte[]? imageData, OperatorFlow? flow)
     {
-        var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
+        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(projectId, flow);
         var result = new InspectionResult(projectId);
 
         try
@@ -450,7 +494,11 @@ public class InspectionService : IInspectionService
                 executionInputs["Image"] = imageData;
             }
 
-            var flowResult = await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs);
+            var projectVariables = CreateProjectVariableContext(projectId, actualFlow, globalVariables);
+            var flowResult = projectVariables == null
+                ? await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs)
+                : await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs, projectVariables);
+
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 
@@ -532,7 +580,7 @@ public class InspectionService : IInspectionService
         ImageDto? imageDto = null;
         try
         {
-            var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
+            var (actualFlow, _) = await ResolveExecutionFlowAsync(projectId, flow);
             if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))
             {
                 _logger.LogInformation(
@@ -575,38 +623,81 @@ public class InspectionService : IInspectionService
         }
     }
 
-    private async Task<OperatorFlow> ResolveExecutionFlowAsync(Guid projectId, OperatorFlow? flow)
+    private async Task<(OperatorFlow Flow, ProjectGlobalVariableSchema? GlobalVariables)> ResolveExecutionFlowAsync(
+        Guid projectId,
+        OperatorFlow? flow)
     {
-        if (HasExecutableFlow(flow))
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
         {
-            _logger.LogInformation(
-                "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
-                flow!.Operators.Count);
-            return flow;
+            if (HasExecutableFlow(flow))
+            {
+                _logger.LogInformation(
+                    "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
+                    flow!.Operators.Count);
+                return (flow, null);
+            }
+
+            var project = await _projectRepository.GetWithFlowAsync(projectId);
+            if (project == null)
+            {
+                throw new ProjectNotFoundException(projectId);
+            }
+
+            var fileFlow = await LoadFlowFromStorageAsync(projectId);
+            if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
+            {
+                return (project.Flow, project.GlobalVariables);
+            }
+
+            if (HasExecutableFlow(fileFlow))
+            {
+                _logger.LogWarning(
+                    "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
+                    projectId,
+                    fileFlow!.Operators.Count);
+                return (fileFlow!, project.GlobalVariables);
+            }
+
+            throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
+        }
+    }
+
+    private ProjectVariableExecutionContext? CreateProjectVariableContext(
+        Guid projectId,
+        OperatorFlow flow,
+        ProjectGlobalVariableSchema? schema)
+    {
+        var hasSchema = schema != null &&
+            (schema.Variables.Count > 0 || schema.SourceBindings.Count > 0 || schema.TargetBindings.Count > 0);
+        var hasFlowSemantics = ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(
+            flow,
+            schema ?? new ProjectGlobalVariableSchema());
+        if (!hasSchema && !hasFlowSemantics)
+        {
+            return null;
         }
 
-        var project = await _projectRepository.GetWithFlowAsync(projectId);
-        if (project == null)
+        if (_projectVariableSessions == null)
         {
-            throw new ProjectNotFoundException(projectId);
+            throw new InvalidOperationException(
+                "GV040: project global variable formal execution requires ProjectVariableSessionRegistry.");
         }
 
-        var fileFlow = await LoadFlowFromStorageAsync(projectId);
-        if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
-        {
-            return project.Flow;
-        }
-
-        if (HasExecutableFlow(fileFlow))
-        {
-            _logger.LogWarning(
-                "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
-                projectId,
-                fileFlow!.Operators.Count);
-            return fileFlow!;
-        }
-
-        throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
+        schema ??= new ProjectGlobalVariableSchema();
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(schema, flow);
+        var registry = _projectVariableSessions;
+        var session = registry.GetOrCreate(projectId, schema);
+        return new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: (workingSession, expectedVersions) =>
+                registry.TryCommitAndPersist(projectId, workingSession, expectedVersions, out _, out var error)
+                    ? ProjectVariableCommitResult.Success()
+                    : ProjectVariableCommitResult.Failure(error));
     }
 
     private async Task<OperatorFlow?> LoadFlowFromStorageAsync(Guid projectId)

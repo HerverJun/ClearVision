@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,8 @@ public class ProjectService
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IOperatorFactory _operatorFactory;
     private readonly ILogger<ProjectService>? _logger;
+    private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
+    private readonly ProjectSaveCoordinator _saveCoordinator;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -42,11 +45,24 @@ public class ProjectService
         IProjectFlowStorage flowStorage,
         IOperatorFactory operatorFactory,
         ILogger<ProjectService>? logger)
+        : this(projectRepository, flowStorage, operatorFactory, logger, null)
+    {
+    }
+
+    public ProjectService(
+        IProjectRepository projectRepository,
+        IProjectFlowStorage flowStorage,
+        IOperatorFactory operatorFactory,
+        ILogger<ProjectService>? logger,
+        ProjectVariableSessionRegistry? projectVariableSessions,
+        ProjectSaveCoordinator? saveCoordinator = null)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
         _operatorFactory = operatorFactory;
         _logger = logger;
+        _projectVariableSessions = projectVariableSessions;
+        _saveCoordinator = saveCoordinator ?? new ProjectSaveCoordinator(projectRepository, flowStorage, projectVariableSessions);
     }
 
     /// <summary>
@@ -55,6 +71,9 @@ public class ProjectService
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request)
     {
         var project = new Project(request.Name, request.Description);
+        var globalVariables = request.GlobalVariables ?? new ProjectGlobalVariableSchema();
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, request.Flow?.ToEntity());
+        project.UpdateGlobalVariables(globalVariables);
         await _projectRepository.AddAsync(project);
 
         // 如果创建时带有流程（通常是空的，但为了完整性）
@@ -71,6 +90,12 @@ public class ProjectService
     /// 获取工程
     /// </summary>
     public async Task<ProjectDto?> GetByIdAsync(Guid id)
+    {
+        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
+        return await GetByIdUnderProjectAccessAsync(id);
+    }
+
+    public async Task<ProjectDto?> GetByIdUnderProjectAccessAsync(Guid id)
     {
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
@@ -105,8 +130,9 @@ public class ProjectService
 
             if (migrated)
             {
-                var json = JsonSerializer.Serialize(dto.Flow, _jsonOptions);
-                await _flowStorage.SaveFlowJsonAsync(id, json);
+                _logger?.LogInformation(
+                    "Project {ProjectId} flow DTO was migrated in memory; migration will persist on next explicit save.",
+                    id);
             }
         }
 
@@ -146,7 +172,7 @@ public class ProjectService
         var projects = await _projectRepository.GetAllAsync();
         // GetAll 通常不返回详细的 Flow 内容以优化性能，或者我们可以选择加载
         // 这里暂时保持原样，仅返回轻量级列表
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
     }
 
     /// <summary>
@@ -154,23 +180,47 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
-
-        project.UpdateInfo(request.Name, request.Description);
-
-        // 如果有流程数据，更新到文件
-        if (request.Flow != null)
+        Project project;
+        ProjectGlobalVariableSchema previousGlobalVariables;
+        string? previousFlowJson;
+        OperatorFlowDto? nextFlow;
+        long expectedRevision;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
         {
-            MigrateFlowDto(request.Flow);
-            EnrichFlowDtoWithMetadata(request.Flow);
-            var json = JsonSerializer.Serialize(request.Flow, _jsonOptions);
-            await _flowStorage.SaveFlowJsonAsync(id, json);
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+            expectedRevision = project.PersistenceRevision;
+            previousGlobalVariables = CloneSchema(project.GlobalVariables);
+            previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
+            nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
         }
 
-        await _projectRepository.UpdateAsync(project);
-        return MapToDto(project);
+        var nextSchema = request.GlobalVariables ?? previousGlobalVariables;
+        var flowChanged = request.Flow != null;
+        if (nextFlow != null)
+        {
+            flowChanged |= MigrateFlowDto(nextFlow);
+            EnrichFlowDtoWithMetadata(nextFlow);
+            flowChanged |= NormalizeProjectVariableOperatorNames(nextFlow, nextSchema);
+        }
+
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
+        var nextFlowJson = flowChanged && nextFlow != null ? JsonSerializer.Serialize(nextFlow, _jsonOptions) : null;
+
+        var saveResult = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+            project,
+            expectedRevision,
+            request.Name,
+            request.Description,
+            previousGlobalVariables,
+            nextSchema,
+            previousFlowJson,
+            nextFlow,
+            nextFlowJson));
+
+        var dto = MapToDto(saveResult.Project);
+        dto.Flow = nextFlow;
+        return dto;
     }
 
     /// <summary>
@@ -179,9 +229,12 @@ public class ProjectService
     public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
         // 1. 验证工程存在
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        Project project;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+        }
 
         // 2. 构造流程DTO
         var flowDto = new OperatorFlowDto
@@ -190,13 +243,12 @@ public class ProjectService
             Operators = request.Operators,
             Connections = request.Connections
         };
-
-        MigrateFlowDto(flowDto);
-        EnrichFlowDtoWithMetadata(flowDto);
-
-        // 3. 序列化并保存到文件
-        var json = JsonSerializer.Serialize(flowDto, _jsonOptions);
-        await _flowStorage.SaveFlowJsonAsync(id, json);
+        await UpdateAsync(id, new UpdateProjectRequest
+        {
+            Name = project.Name,
+            Description = project.Description,
+            Flow = flowDto
+        });
 
         // 4. 更新工程修改时间 (可选，但推荐)
         // project.LastModified = DateTime.UtcNow; // 如果 Project 有这个字段
@@ -283,8 +335,8 @@ public class ProjectService
             // 【修复】修正参数顺序：sourceOperatorId, sourcePortId, targetOperatorId, targetPortId
             var connection = new OperatorConnection(
                 connDto.SourceOperatorId,
-                connDto.SourcePortId,        // ✅ 修正：第2个参数应该是 SourcePortId
-                connDto.TargetOperatorId,    // ✅ 修正：第3个参数应该是 TargetOperatorId
+                connDto.SourcePortId,        // 修正：第2个参数应该是 SourcePortId
+                connDto.TargetOperatorId,    // 修正：第3个参数应该是 TargetOperatorId
                 connDto.TargetPortId
             );
 
@@ -305,12 +357,13 @@ public class ProjectService
     /// </summary>
     public async Task DeleteAsync(Guid id)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
+        var project = await _projectRepository.GetByIdAsync(id)
+            ?? throw new ProjectNotFoundException(id);
 
         project.MarkAsDeleted();
         await _projectRepository.UpdateAsync(project);
+        _projectVariableSessions?.Delete(id);
     }
 
     /// <summary>
@@ -319,7 +372,7 @@ public class ProjectService
     public async Task<IEnumerable<ProjectDto>> SearchAsync(string keyword)
     {
         var projects = await _projectRepository.SearchAsync(keyword);
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
     }
 
     /// <summary>
@@ -328,7 +381,83 @@ public class ProjectService
     public async Task<IEnumerable<ProjectDto>> GetRecentlyOpenedAsync(int count = 10)
     {
         var projects = await _projectRepository.GetRecentlyOpenedAsync(count);
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
+    }
+
+    public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
+    {
+        Project project;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+        }
+
+        var updated = await UpdateAsync(id, new UpdateProjectRequest
+        {
+            Name = project.Name,
+            Description = project.Description,
+            GlobalVariables = schema
+        });
+        return updated.GlobalVariables;
+    }
+
+    private static ProjectGlobalVariableSchema CloneSchema(ProjectGlobalVariableSchema schema)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(schema, _jsonOptions);
+        return JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(bytes, _jsonOptions) ?? new ProjectGlobalVariableSchema();
+    }
+
+    private async Task<IReadOnlyList<ProjectDto>> MapProjectListWithAccessAsync(IEnumerable<Project> candidates)
+    {
+        var result = new List<ProjectDto>();
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                await using var access = await _saveCoordinator.AcquireProjectAccessAsync(candidate.Id);
+                var current = await _projectRepository.GetByIdFreshAsync(candidate.Id);
+                if (current != null)
+                {
+                    result.Add(MapToDto(current));
+                }
+            }
+            catch (InvalidOperationException ex) when (IsProjectRecoveryRequired(ex))
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "Skipping project {ProjectId} in project list because save recovery is required.",
+                    candidate.Id);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool IsProjectRecoveryRequired(InvalidOperationException ex) =>
+        ex.Message.StartsWith("PSV001:", StringComparison.Ordinal);
+
+    private async Task<OperatorFlowDto?> LoadStoredFlowDtoAsync(Guid projectId)
+    {
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(projectId);
+        if (string.IsNullOrWhiteSpace(flowJson))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
+    }
+
+    private async Task<OperatorFlow?> LoadStoredFlowEntityAsync(Guid projectId)
+    {
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(projectId);
+        if (string.IsNullOrWhiteSpace(flowJson))
+        {
+            return null;
+        }
+
+        var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
+        return flowDto?.ToEntity();
     }
 
     private ProjectDto MapToDto(Project project)
@@ -339,10 +468,12 @@ public class ProjectService
             Name = project.Name,
             Description = project.Description,
             Version = project.Version,
+            PersistenceRevision = project.PersistenceRevision,
             CreatedAt = project.CreatedAt,
             ModifiedAt = project.ModifiedAt,
             LastOpenedAt = project.LastOpenedAt,
             GlobalSettings = project.GlobalSettings,
+            GlobalVariables = project.GlobalVariables,
             // 修复：添加 Flow 字段映射
             Flow = project.Flow != null ? MapFlowToDto(project.Flow) : null
         };
@@ -475,6 +606,122 @@ public class ProjectService
         return changed;
     }
 
+    private static bool NormalizeProjectVariableOperatorNames(
+        OperatorFlowDto flowDto,
+        ProjectGlobalVariableSchema schema)
+    {
+        var variablesById = schema.Variables
+            .Where(variable => variable.Id != Guid.Empty)
+            .GroupBy(variable => variable.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var variablesByName = schema.Variables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+            .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        if (variablesById.Count == 0)
+        {
+            return false;
+        }
+
+        var changed = false;
+        foreach (var opDto in flowDto.Operators)
+        {
+            if (opDto.Type is not (OperatorType.VariableRead or OperatorType.VariableWrite or OperatorType.VariableIncrement))
+            {
+                continue;
+            }
+
+            if (!string.Equals(GetParameterString(opDto, "Scope"), "Project", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var variableIdParameter = GetParameter(opDto, "VariableId");
+            var variableNameParameter = GetParameter(opDto, "VariableName");
+            ProjectGlobalVariableDefinition? definition = null;
+            var variableIdText = variableIdParameter?.Value?.ToString();
+            var hasParsedVariableId = Guid.TryParse(variableIdText, out var variableId);
+            if (hasParsedVariableId)
+            {
+                variablesById.TryGetValue(variableId, out definition);
+            }
+
+            var variableNameText = variableNameParameter?.Value?.ToString();
+            ProjectGlobalVariableDefinition? definitionByName = null;
+            if (!string.IsNullOrWhiteSpace(variableNameText))
+            {
+                variablesByName.TryGetValue(variableNameText, out definitionByName);
+            }
+
+            if (definition != null &&
+                definitionByName != null &&
+                definition.Id != definitionByName.Id)
+            {
+                continue;
+            }
+
+            if (definition == null && !hasParsedVariableId)
+            {
+                if (definitionByName == null)
+                {
+                    continue;
+                }
+
+                definition = definitionByName;
+            }
+
+            if (definition == null)
+            {
+                continue;
+            }
+
+            variableIdParameter ??= AddParameter(opDto, "VariableId");
+            var currentId = variableIdParameter.Value?.ToString();
+            var nextId = definition.Id.ToString("D");
+            if (!string.Equals(currentId, nextId, StringComparison.OrdinalIgnoreCase))
+            {
+                variableIdParameter.Value = nextId;
+                changed = true;
+            }
+
+            variableNameParameter ??= AddParameter(opDto, "VariableName");
+            var currentName = variableNameParameter.Value?.ToString();
+            if (string.Equals(currentName, definition.Name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            variableNameParameter.Value = definition.Name;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static ParameterDto AddParameter(OperatorDto opDto, string name)
+    {
+        var parameter = new ParameterDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            DisplayName = name,
+            DataType = "string"
+        };
+        opDto.Parameters.Add(parameter);
+        return parameter;
+    }
+
+    private static ParameterDto? GetParameter(OperatorDto opDto, string name)
+    {
+        return opDto.Parameters.FirstOrDefault(parameter =>
+            string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? GetParameterString(OperatorDto opDto, string name)
+    {
+        return GetParameter(opDto, name)?.Value?.ToString();
+    }
+
     private static bool NormalizePorts(List<PortDto> ports, List<PortDefinition> metadataPorts, PortDirection direction)
     {
         if (metadataPorts.Count == 0)
@@ -604,19 +851,19 @@ public class ProjectService
                 changed = true;
             }
 
-            if (!Equals(parameter.DefaultValue, definition.DefaultValue))
+            if (!ParameterMetadataValueEquals(parameter.DefaultValue, definition.DefaultValue))
             {
                 parameter.DefaultValue = definition.DefaultValue;
                 changed = true;
             }
 
-            if (!Equals(parameter.MinValue, definition.MinValue))
+            if (!ParameterMetadataValueEquals(parameter.MinValue, definition.MinValue))
             {
                 parameter.MinValue = definition.MinValue;
                 changed = true;
             }
 
-            if (!Equals(parameter.MaxValue, definition.MaxValue))
+            if (!ParameterMetadataValueEquals(parameter.MaxValue, definition.MaxValue))
             {
                 parameter.MaxValue = definition.MaxValue;
                 changed = true;
@@ -636,5 +883,20 @@ public class ProjectService
         }
 
         return changed;
+    }
+
+    private static bool ParameterMetadataValueEquals(object? current, object? expected)
+    {
+        if (current == null || expected == null)
+        {
+            return current == null && expected == null;
+        }
+
+        if (Equals(current, expected))
+        {
+            return true;
+        }
+
+        return JsonSerializer.Serialize(current, _jsonOptions) == JsonSerializer.Serialize(expected, _jsonOptions);
     }
 }

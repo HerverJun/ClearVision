@@ -1,0 +1,23 @@
+using ClearVision.Product.Core.Entities;
+
+namespace ClearVision.Product.Core.AI.Tools;
+
+public sealed record VisionAgentToolContext
+{
+    public string UserDescription { get; init; } = string.Empty;
+    public string? AdditionalContext { get; init; }
+    public string? SessionId { get; init; }
+    public string? AgentRunId { get; init; }
+    public string? ExistingFlowJson { get; init; }
+    public bool DebugTrace { get; init; }
+    public bool RuntimePreviewConsent { get; init; }
+    public RuntimePreviewPilotConfig RuntimePreviewPilot { get; init; } = new();
+    public int MaxToolResultChars { get; init; } = 12_000;
+
+    public IReadOnlySet<VisionAgentToolPermission> AllowedPermissions { get; init; } =
+        new HashSet<VisionAgentToolPermission>
+        {
+            VisionAgentToolPermission.ReadOnly,
+            VisionAgentToolPermission.Simulation
+        };
+}

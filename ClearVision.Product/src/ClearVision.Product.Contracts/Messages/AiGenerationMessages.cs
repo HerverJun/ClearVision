@@ -60,6 +60,10 @@ public record GenerateFlowRequestPayload
     /// </summary>
     public GenerateFlowTemplateSelection? TemplateSelection { get; init; }
 
+    public bool? UseVisionAgentGenerateFlow { get; init; }
+
+    public string? AgentGenerateFlowMode { get; init; }
+
     public List<string>? Attachments { get; init; }
 }
 
@@ -90,6 +94,17 @@ public record GenerateFlowResponse
     public List<GenerateFlowTemplateCandidate> TemplateCandidates { get; init; } = new();
     public List<GenerateFlowPendingParameter> PendingParameters { get; init; } = new();
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
+    public List<object> PendingActions { get; init; } = new();
+    public object? ValidationPreview { get; init; }
+    public List<object> ToolTrace { get; init; } = new();
+    public object? BuildResult { get; init; }
+    public object? BuildReadiness { get; init; }
+    public string? PlanId { get; init; }
+    public string? PlanHash { get; init; }
+    public object? WorkflowDiff { get; init; }
+    public object? ApplyGate { get; init; }
+    public object? ToolEvidenceTimeline { get; init; }
+    public string? FirstFixRecommendation { get; init; }
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
     public List<GenerateFlowStageDiagnostic>? StageTimeline { get; init; }
@@ -102,6 +117,8 @@ public record GenerateFlowResponse
     public string? RouterConfidence { get; init; }
     public List<string> BlockingClarificationFields { get; init; } = new();
     public List<string> NonBlockingMissingFields { get; init; } = new();
+    public object? RequirementMaturity { get; init; }
+    public object? DecisionTrace { get; init; }
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }

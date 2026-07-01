@@ -1,6 +1,6 @@
 // FlowExecutionService.cs
 // 流程执行服务实现
-// 浣滆€咃細铇呰姕鍚?
+// 负责流程调度、调试缓存和图像生命周期管理。
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -12,6 +12,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Logging;
@@ -70,13 +71,24 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         OperatorType.StereoCalibration,
         OperatorType.HandEyeCalibration
     ];
+
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _executionCancellations = new();
     private readonly IVariableContext _variableContext;
+    private readonly IProjectVariableExecutionContextAccessor _projectVariableContextAccessor;
 
-    // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?- Key: (DebugSessionId, OperatorId)
+    // Encoding cleanup: previous comment text was unreadable.
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), string> _debugCacheFingerprints = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), long> _debugCacheEntrySizes = new();
@@ -452,6 +464,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         IEnumerable<IOperatorExecutor> executors,
         ILogger<FlowExecutionService> logger,
         IVariableContext variableContext,
+        IProjectVariableExecutionContextAccessor? projectVariableContextAccessor = null,
         long? debugCacheMaxBytes = null,
         int? debugCacheMaxEntries = null,
         long? debugCacheMaxEntryBytes = null)
@@ -459,6 +472,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _executors = executors.ToDictionary(e => e.OperatorType);
         _logger = logger;
         _variableContext = variableContext;
+        _projectVariableContextAccessor = projectVariableContextAccessor ?? new ProjectVariableExecutionContextAccessor();
         _debugCacheMaxBytes = Math.Max(0, debugCacheMaxBytes ?? DefaultDebugCacheMaxBytes);
         _debugCacheMaxEntries = Math.Max(0, debugCacheMaxEntries ?? DefaultDebugCacheMaxEntries);
         _debugCacheMaxEntryBytes = Math.Min(
@@ -492,34 +506,36 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
+        var projectVariableContext = _projectVariableContextAccessor.Current;
         using var variableScope = _variableContext.BeginScope(new VariableContextScope(
             flow.Id,
-            Guid.NewGuid(),
+            projectVariableContext?.RunId ?? Guid.NewGuid(),
             enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
 
-        // 銆愮涓変紭鍏堢骇銆戦€掑寰幆璁℃暟鍣?
+        // Encoding cleanup: previous comment text was unreadable.
         _variableContext.IncrementCycleCount();
-        _logger.LogDebug("[FlowExecution] 寰幆璁℃暟: {CycleCount}", _variableContext.CycleCount);
+        _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
 
         // Each ExecuteFlowAsync call owns its own FlowExecutionResult instance.
         var result = new FlowExecutionResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         ConcurrentDictionary<Guid, Dictionary<string, object>>? operatorOutputs = null;
 
-        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
+        // 创建链接的 CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
         try
         {
-            // Sprint 1 Task 1.1: 棰勫垎鏋愭墖鍑哄害锛屼负 ImageWrapper 寮曠敤璁℃暟鍋氬噯澶?
+            // Encoding cleanup: previous comment text was unreadable.
             var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
-            var executionOrder = plan.ExecutionOrder;
+            var executionOrder = CreateProjectVariableExecutionOrder(plan, projectVariableContext);
+            var executionLayers = CreateProjectVariableExecutionLayers(plan, projectVariableContext, executionOrder);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 鍒濆鍖栨墽琛岀姸鎬?
+            // 初始化执行状态
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -529,10 +545,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?- 浣跨敤 ConcurrentDictionary 鏀寔骞惰鎵ц
+            // 存储每个算子的输出 - 使用 ConcurrentDictionary 支持并行执行
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 璁剧疆鍒濆杈撳叆鏁版嵁
+            // 设置初始输入数据
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
@@ -542,18 +558,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (enableParallel && executionOrder.Count > 1)
             {
                 // 并行执行模式
-                await ExecuteFlowParallelAsync(plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
+                await ExecuteFlowParallelAsync(plan, executionOrder, executionLayers, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
             else
             {
                 // 顺序执行模式
-                await ExecuteFlowSequentialAsync(flow, plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
+                await ExecuteFlowSequentialAsync(flow, plan, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
 
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
+            // Check whether execution was canceled.
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -603,7 +619,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
         finally
         {
-            // 娓呯悊 CancellationTokenSource
+            // 清理 CancellationTokenSource
             if (_executionCancellations.TryRemove(flow.Id, out var removedCts))
             {
                 removedCts.Dispose();
@@ -623,23 +639,93 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
+    public async Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        var authoritativeSession = projectVariables.Session;
+        var requiresAuthoritativeCommit = ProjectGlobalVariableFlowValidator.HasProjectVariableWriteCapability(
+            flow,
+            authoritativeSession.Schema);
+        if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
+            projectVariables.CommitHandler == null)
+        {
+            return CreateProjectVariableCommitCapabilityFailureResult();
+        }
+
+        var expectedVersions = authoritativeSession.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var workingSession = authoritativeSession.CreateSnapshotClone();
+        var effectiveContext = new ProjectVariableExecutionContext(
+            workingSession,
+            projectVariables.BindingIndex,
+            projectVariables.RunId,
+            projectVariables.IsPreview);
+
+        using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
+        var result = await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+        if (!projectVariables.IsPreview && requiresAuthoritativeCommit && result.IsSuccess && !result.WasShortCircuited)
+        {
+            var commitResult = CommitProjectVariableChanges(projectVariables, authoritativeSession, workingSession, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = commitResult.Error;
+            }
+        }
+
+        return result;
+    }
+
+    private static FlowExecutionResult CreateProjectVariableCommitCapabilityFailureResult() => new()
+    {
+        IsSuccess = false,
+        ErrorMessage = "GV040: project global variable formal writes require a persistence-capable commit handler before execution."
+    };
+
+    private static ProjectVariableCommitResult CommitProjectVariableChanges(
+        ProjectVariableExecutionContext projectVariables,
+        IProjectVariableSession authoritativeSession,
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        if (projectVariables.CommitHandler != null)
+        {
+            try
+            {
+                return projectVariables.CommitHandler(workingSession, expectedVersions);
+            }
+            catch (Exception ex)
+            {
+                return ProjectVariableCommitResult.Failure($"GV030: project global variable commit failed: {ex.Message}");
+            }
+        }
+
+        return ProjectVariableCommitResult.Failure(
+            "GV040: project global variable formal writes require a persistence-capable commit handler before execution.");
+    }
+
     /// <summary>
     /// 顺序执行流程
     /// </summary>
     private async Task ExecuteFlowSequentialAsync(
         OperatorFlow flow,
         FlowExecutionPlan plan,
+        IReadOnlyList<Operator> executionOrder,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
         FlowInputPreparationIndex inputPreparationIndex)
     {
-        var executionOrder = plan.ExecutionOrder;
         int completedCount = 0;
         foreach (var op in executionOrder)
         {
-            // 妫€鏌ュ彇娑?
+            // Check cancellation before the next operator.
             if (cancellationToken.IsCancellationRequested)
             {
                 break;
@@ -667,12 +753,25 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 continue;
             }
 
-            // 鏇存柊褰撳墠鎵ц鐘舵€?
+            // 更新当前执行状态
             status.CurrentOperatorId = op.Id;
             status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-            // 鍑嗗杈撳叆鏁版嵁
+            // 准备输入数据
             var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+            if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+            {
+                result.OperatorResults.Add(new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = targetBindingError
+                });
+                result.IsSuccess = false;
+                result.ErrorMessage = $"算子 '{op.Name}' 执行失败: {targetBindingError}";
+                break;
+            }
 
             // 执行算子
             var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, cancellationToken);
@@ -690,6 +789,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             // Sprint 1 Task 1.1: 应用扇出引用计数
             ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+            if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+            {
+                result.OperatorResults.Add(new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = sourceBindingError
+                });
+                result.IsSuccess = false;
+                result.ErrorMessage = $"算子 '{op.Name}' 执行失败: {sourceBindingError}";
+                break;
+            }
 
             completedCount++;
 
@@ -703,11 +815,175 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
+    private static List<Operator> CreateProjectVariableExecutionOrder(
+        FlowExecutionPlan plan,
+        ProjectVariableExecutionContext? projectVariables)
+    {
+        var baseOrder = plan.ExecutionOrder;
+        if (projectVariables == null ||
+            !ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(plan.Flow, projectVariables.Session.Schema))
+        {
+            return baseOrder.ToList();
+        }
+
+        var schema = projectVariables.Session.Schema;
+        if (!ProjectGlobalVariableFlowValidator.TryBuildExecutionOrder(
+            plan.Flow,
+            schema,
+            baseOrder,
+            out var ordered,
+            out var diagnosticChain))
+        {
+            throw new InvalidOperationException($"GV024: {diagnosticChain}");
+        }
+
+        return ordered;
+    }
+
+    private static List<List<Operator>> CreateProjectVariableExecutionLayers(
+        FlowExecutionPlan plan,
+        ProjectVariableExecutionContext? projectVariables,
+        IReadOnlyList<Operator> executionOrder)
+    {
+        return projectVariables == null ||
+            !ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(plan.Flow, projectVariables.Session.Schema)
+            ? plan.ExecutionLayers
+            : BuildExecutionLayers(executionOrder, plan.Flow, projectVariables.Session.Schema);
+    }
+
+    private bool TryApplyProjectVariableTargetBindings(
+        Operator op,
+        Dictionary<string, object> inputs,
+        out string? error)
+    {
+        error = null;
+        var context = _projectVariableContextAccessor.Current;
+        if (context == null)
+        {
+            return true;
+        }
+
+        foreach (var binding in context.BindingIndex.GetTargets(op.Id))
+        {
+            if (!context.Session.TryGetDefinition(binding.VariableId, out var definition))
+            {
+                error = $"GV008: project global variable '{binding.VariableId}' does not exist.";
+                return false;
+            }
+
+            if (!context.Session.TryGetValue(binding.VariableId, out var value))
+            {
+                error = $"GV021: project global variable '{definition.Name}' has no current value.";
+                return false;
+            }
+
+            var parameter = op.Parameters.FirstOrDefault(item => item.Id == binding.ParameterId);
+            if (parameter == null)
+            {
+                error = $"GV011: target parameter '{binding.ParameterId}' does not exist on operator '{op.Name}'.";
+                return false;
+            }
+
+            var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, ProjectVariableValueConverter.ToObject(value));
+            if (!ProjectVariableValueTransform.TryConvertForParameter(
+                    value,
+                    definition.ValueType,
+                    parameter.DataType,
+                    binding.ConversionMode,
+                    binding.Expression,
+                    expressionVariables,
+                    out var converted,
+                    out var convertError))
+            {
+                error = $"GV022: project global variable '{definition.Name}' cannot be applied to parameter '{parameter.Name}' ({parameter.DataType}): {convertError}";
+                return false;
+            }
+
+            inputs[parameter.Name] = converted!;
+        }
+
+        return true;
+    }
+
+    private bool TryCommitProjectVariableSourceBindings(
+        Operator op,
+        IReadOnlyDictionary<string, object> outputs,
+        out string? error)
+    {
+        error = null;
+        var context = _projectVariableContextAccessor.Current;
+        if (context == null)
+        {
+            return true;
+        }
+
+        foreach (var binding in context.BindingIndex.GetSources(op.Id))
+        {
+            if (!context.Session.TryGetDefinition(binding.VariableId, out var definition))
+            {
+                error = $"GV008: project global variable '{binding.VariableId}' does not exist.";
+                return false;
+            }
+
+            var port = op.OutputPorts.FirstOrDefault(item => item.Id == binding.OutputPortId);
+            if (port == null)
+            {
+                error = $"GV010: source output port '{binding.OutputPortId}' does not exist on operator '{op.Name}'.";
+                return false;
+            }
+
+            if (!outputs.TryGetValue(port.Name, out var value) &&
+                !string.IsNullOrWhiteSpace(binding.OutputPortName))
+            {
+                outputs.TryGetValue(binding.OutputPortName, out value);
+            }
+
+            if (value == null)
+            {
+                error = $"GV023: source output '{port.Name}' did not produce a value for project global variable '{definition.Name}'.";
+                return false;
+            }
+
+            try
+            {
+                var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, value);
+                if (!ProjectVariableValueTransform.TryConvertToVariableValue(
+                        value,
+                        definition.ValueType,
+                        binding.ConversionMode,
+                        binding.Expression,
+                        expressionVariables,
+                        out var converted,
+                        out var convertError))
+                {
+                    error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition.Name}': {convertError}";
+                    return false;
+                }
+
+                context.Session.SetValue(
+                    binding.VariableId,
+                    converted,
+                    ProjectVariableUpdatedBy.OperatorOutput,
+                    context.RunId,
+                    op.Id);
+            }
+            catch (Exception ex)
+            {
+                error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition.Name}': {ex.Message}";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>
-    /// 骞惰鎵ц娴佺▼ - 鎸夊眰绾у苟琛屾墽琛屾棤渚濊禆鐨勭畻瀛?
+    /// 并行执行流程 - 按层级并行执行无依赖的算子
     /// </summary>
     private async Task ExecuteFlowParallelAsync(
         FlowExecutionPlan plan,
+        IReadOnlyList<Operator> executionOrder,
+        IReadOnlyList<List<Operator>> executionLayers,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
@@ -715,8 +991,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         FlowInputPreparationIndex inputPreparationIndex)
     {
         // 构建执行层级（哪些算子可以并行执行）
-        var executionOrder = plan.ExecutionOrder;
-        var executionLayers = plan.ExecutionLayers;
         var completedOperators = new HashSet<Guid>();
         var failed = false;
 
@@ -725,14 +999,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (failed || cancellationToken.IsCancellationRequested)
                 break;
 
-            // 鏇存柊鐘舵€?
+            // 更新状态
             status.CurrentOperatorId = layer.First().Id;
             status.ProgressPercentage = (double)completedOperators.Count / executionOrder.Count * 100;
 
             using var layerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             OperatorExecutionResult? primaryLayerFailure = null;
 
-            // 骞惰鎵ц褰撳墠灞傜殑鎵€鏈夌畻瀛?
+            // Encoding cleanup: previous comment text was unreadable.
             var layerTasks = layer.Select(op => ExecuteParallelLayerOperatorAsync(
                 plan,
                 op,
@@ -746,7 +1020,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var layerResults = await Task.WhenAll(layerTasks);
             result.OperatorResults.AddRange(layerResults);
 
-            // 妫€鏌ユ槸鍚︽湁澶辫触鐨勭畻瀛?
+            // Stop parallel execution when any operator failed.
             if (layerResults.Any(r => !r.IsSuccess))
             {
                 failed = true;
@@ -809,6 +1083,24 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
 
         var inputs = PrepareOperatorInputs(plan.Flow, op, operatorOutputs, inputPreparationIndex);
+        if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+        {
+            var targetBindingResult = new OperatorExecutionResult
+            {
+                OperatorId = op.Id,
+                OperatorName = op.Name,
+                IsSuccess = false,
+                ErrorMessage = targetBindingError
+            };
+
+            if (!cancellationToken.IsCancellationRequested && signalLayerFailure(targetBindingResult))
+            {
+                await CancelLayerAsync(layerCts);
+            }
+
+            return targetBindingResult;
+        }
+
         var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, layerCts.Token);
 
         if (opResult.IsSuccess)
@@ -817,6 +1109,23 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             operatorOutputs[op.Id] = outputs;
 
             ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+            if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+            {
+                var sourceBindingResult = new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = sourceBindingError
+                };
+
+                if (!cancellationToken.IsCancellationRequested && signalLayerFailure(sourceBindingResult))
+                {
+                    await CancelLayerAsync(layerCts);
+                }
+
+                return sourceBindingResult;
+            }
 
             if (opResult.ShortCircuitedFlow)
             {
@@ -916,11 +1225,95 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return layers;
     }
 
-    // 榛樿绠楀瓙鎵ц瓒呮椂鏃堕棿锛?0绉掞級
+    private static List<List<Operator>> BuildExecutionLayers(
+        IReadOnlyList<Operator> executionOrder,
+        OperatorFlow flow,
+        ProjectGlobalVariableSchema schema)
+    {
+        var operatorIds = executionOrder.Select(op => op.Id).ToHashSet();
+        var operatorsById = executionOrder.ToDictionary(op => op.Id);
+        var outgoing = executionOrder.ToDictionary(op => op.Id, _ => new HashSet<Guid>());
+        var inDegree = executionOrder.ToDictionary(op => op.Id, _ => 0);
+
+        void AddDependency(Guid sourceOperatorId, Guid targetOperatorId)
+        {
+            if (sourceOperatorId == targetOperatorId ||
+                !operatorIds.Contains(sourceOperatorId) ||
+                !operatorIds.Contains(targetOperatorId))
+            {
+                return;
+            }
+
+            if (outgoing[sourceOperatorId].Add(targetOperatorId))
+            {
+                inDegree[targetOperatorId]++;
+            }
+        }
+
+        foreach (var connection in flow.Connections)
+        {
+            AddDependency(connection.SourceOperatorId, connection.TargetOperatorId);
+        }
+
+        foreach (var edge in ProjectGlobalVariableFlowValidator.BuildDependencyEdges(flow, schema, executionOrder))
+        {
+            AddDependency(edge.SourceOperatorId, edge.TargetOperatorId);
+        }
+
+        var scheduled = new HashSet<Guid>();
+        var layers = new List<List<Operator>>();
+        var currentLayer = executionOrder
+            .Where(op => inDegree[op.Id] == 0)
+            .ToList();
+        if (currentLayer.Count == 0)
+        {
+            throw new InvalidOperationException("GV024: Project global variable bindings create an execution cycle.");
+        }
+
+        while (currentLayer.Count > 0)
+        {
+            layers.Add(currentLayer);
+            foreach (var op in currentLayer)
+            {
+                scheduled.Add(op.Id);
+            }
+
+            var nextLayer = new List<Operator>();
+            foreach (var op in currentLayer)
+            {
+                foreach (var targetOperatorId in outgoing[op.Id])
+                {
+                    inDegree[targetOperatorId]--;
+                    if (inDegree[targetOperatorId] == 0 &&
+                        !scheduled.Contains(targetOperatorId) &&
+                        operatorsById.TryGetValue(targetOperatorId, out var nextOperator))
+                    {
+                        nextLayer.Add(nextOperator);
+                    }
+                }
+            }
+
+            if (nextLayer.Count == 0)
+            {
+                break;
+            }
+
+            currentLayer = nextLayer;
+        }
+
+        if (scheduled.Count != executionOrder.Count)
+        {
+            throw new InvalidOperationException("GV024: Project global variable bindings create an execution cycle.");
+        }
+
+        return layers;
+    }
+
+    // Encoding cleanup: previous comment text was unreadable.
     private const int DefaultOperatorTimeoutMs = 30000;
 
     /// <summary>
-    /// 鍐呴儴鎵ц鍗曚釜绠楀瓙锛堝甫瓒呮椂淇濇姢锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private async Task<OperatorExecutionResult> ExecuteOperatorInternalAsync(
         Operator op,
@@ -933,11 +1326,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         try
         {
-            // 涓虹畻瀛愭墽琛屾坊鍔犲叏灞€瓒呮椂淇濇姢
+            // 为算子执行添加全局超时保护
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
-            // O1.3: 浼犻€?CancellationToken 缁欑畻瀛愭墽琛屽櫒锛屾敮鎸佸彇娑堟搷浣?
+            // Encoding cleanup: previous comment text was unreadable.
             var opResult = await executor.ExecuteAsync(op, inputs, timeoutCts.Token);
             opStopwatch.Stop();
 
@@ -973,7 +1366,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 op.MarkExecutionFailed(opResult.ErrorMessage ?? "未知错误");
                 _logger.LogOperatorExecution(op.Id, op.Name, opStopwatch.ElapsedMilliseconds, false);
                 _logger.LogError("算子执行失败: {OperatorName} ({OperatorId}), 错误: {ErrorMessage}",
-                    op.Name, op.Id, opResult.ErrorMessage);
+                    SanitizeLogValue(op.Name), SanitizeLogValue(op.Id), SanitizeLogValue(opResult.ErrorMessage));
 
                 return new OperatorExecutionResult
                 {
@@ -989,7 +1382,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed($"Operator timed out ({DefaultOperatorTimeoutMs / 1000}s)");
-            _logger.LogError("算子执行超时: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogError("算子执行超时: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return new OperatorExecutionResult
             {
@@ -1004,7 +1397,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed("Operator execution was canceled.");
-            _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return CreateCanceledOperatorResult(op, opStopwatch.ElapsedMilliseconds);
         }
@@ -1012,7 +1405,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed(ex.Message);
-            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return new OperatorExecutionResult
             {
@@ -1049,17 +1442,17 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     {
         var result = new FlowValidationResult();
 
-        // 妫€鏌ユ槸鍚︽湁绠楀瓙
+        // Validate that the flow contains operators.
         if (flow.Operators.Count == 0)
         {
-            result.Errors.Add("流程中没有任何算子");
+            result.Errors.Add("\u6d41\u7a0b\u4e2d\u6ca1\u6709\u4efb\u4f55\u7b97\u5b50");
             return result;
         }
 
         var hasInputOperator = false;
         var hasOutputOperator = false;
 
-        // 楠岃瘉姣忎釜绠楀瓙鐨勫弬鏁?
+        // 验证每个算子的参数
         foreach (var op in flow.Operators)
         {
             hasInputOperator |= op.Type == OperatorType.ImageAcquisition;
@@ -1125,7 +1518,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
             catch (ObjectDisposedException)
             {
-                // 蹇界暐宸查噴鏀剧殑瀵硅薄寮傚父
+                // Encoding cleanup: previous comment text was unreadable.
             }
         }
 
@@ -1139,8 +1532,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 瑙勮寖鍖栨祦绋嬭緭鍑猴紝閬垮厤灏?OpenCvSharp.Mat 绛夐潪 JSON 瀹夊叏瀵硅薄鐩存帴鏆撮湶鍒颁笂灞傘€?
-    /// 鍥惧儚绫诲瀷浼氳蹇収鍖栦负 byte[]锛屽洜姝や笂灞備笉鑳藉亣璁剧粨鏋滀粛鐒舵槸 live Mat銆?
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private Dictionary<string, object> ConvertImageWrappersToBytes(Dictionary<string, object>? outputData)
     {
@@ -1379,8 +1772,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region Sprint 1 Task 1.1: 扇出预分析与引用计数管理
 
     /// <summary>
-    /// 棰勫垎鏋?DAG 涓瘡涓緭鍑虹鍙ｇ殑鎵囧嚭搴︼紙涓嬫父杩炴帴鏁帮級銆?
-    /// 鐢ㄤ簬鍐冲畾 ImageWrapper 鐨勫紩鐢ㄨ鏁板垵濮嬪€笺€?
+    // Encoding cleanup: previous comment text was unreadable.
+    /// 用于决定 ImageWrapper 的引用计数初始值。
     /// </summary>
     private static Dictionary<(Guid OperatorId, Guid PortId), int> AnalyzeFanOutDegrees(
         IReadOnlyCollection<OperatorConnection> connections)
@@ -1404,8 +1797,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 鏍规嵁鎵囧嚭搴︿负绠楀瓙杈撳嚭鐨?ImageWrapper 璁剧疆寮曠敤璁℃暟銆?
-    /// 鎵囧嚭搴︿负 N 鏃讹紝AddRef (N-1) 娆★紝浣挎€诲紩鐢ㄨ鏁颁负 N銆?
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private void ApplyFanOutRefCounts(
         Operator op,
@@ -1429,14 +1822,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 ? fanOutDegrees.GetValueOrDefault((op.Id, port.Id), 1)
                 : 1;
 
-            // 寮曠敤璁℃暟鍒濆涓?1锛屾瘡澶氫竴涓笅娓告秷璐硅€?AddRef 涓€娆?
+            // Encoding cleanup: previous comment text was unreadable.
             for (int i = 1; i < fanOut; i++)
             {
                 img.AddRef();
             }
 
             _logger.LogDebug("[FlowExecution] Set ref count: Operator={OperatorName}, Port={PortName}, FanOut={FanOut}, RefCount={RefCount}",
-                op.Name, portName, fanOut, img.RefCount);
+                SanitizeLogValue(op.Name), SanitizeLogValue(portName), fanOut, img.RefCount);
         }
     }
 
@@ -1506,8 +1899,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         inputPreparationIndex ??= BuildFlowInputPreparationIndex(flow);
 
-        // 1. 銆愬熀纭€娉ㄥ叆銆戦鍏堝皢绠楀瓙鑷韩鐨勫弬鏁板悎骞跺埌杈撳叆涓綔涓洪粯璁ゅ€笺€?
-        // 杩欑‘淇濅簡濡傛灉娌℃湁澶栭儴杩炵嚎锛岀畻瀛愪緷鐒惰兘鎷垮埌 UI 灞炴€ч潰鏉胯缃殑鍙傛暟锛堜緥濡?filePath锛夈€?
+        // Encoding cleanup: previous comment text was unreadable.
+        // Encoding cleanup: previous comment text was unreadable.
         foreach (var param in op.Parameters)
         {
             if (param.Value != null)
@@ -1516,7 +1909,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        // 鏌ユ壘杩炴帴鍒拌绠楀瓙鐨勬墍鏈夎繛绾?
+        // Encoding cleanup: previous comment text was unreadable.
         var incomingConnections = inputPreparationIndex.GetIncomingConnections(op.Id);
 
         // 如果没有输入连接，尝试从初始输入数据获取 (Guid.Empty)
@@ -1540,19 +1933,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 if (operatorOutputs.TryGetValue(connection.SourceOperatorId, out var sourceOutputs))
                 {
-                    // 銆愭潯浠跺垎鏀矾鐢变慨澶嶃€戞鏌ユ簮绠楀瓙鏄惁涓烘潯浠跺垎鏀畻瀛?
+                    // Encoding cleanup: previous comment text was unreadable.
                     var sourceOperator = inputPreparationIndex.GetSourceOperator(connection.SourceOperatorId);
 
                     if (sourceOperator?.Type == OperatorType.ConditionalBranch)
                     {
-                        // 瀵逛簬鏉′欢鍒嗘敮绠楀瓙锛屽彧浼犻€掍笌杩炴帴绔彛鍚嶇О鍖归厤鐨勬暟鎹?
-                        // 鑾峰彇婧愮鍙ｅ悕绉帮紙True / False锛?
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
                         if (sourcePort != null)
                         {
                             var portName = sourcePort.Name;
                             var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
-                            // 妫€鏌ヨ緭鍑烘暟鎹腑鏄惁鏈夊搴旂鍙ｇ殑鏁版嵁涓斾笉涓簄ull
+                            // Forward source output data only when the source port produced a non-null value.
                             if (sourceOutputs.TryGetValue(portName, out var portData) && portData != null)
                             {
                                 if (targetPort != null)
@@ -1564,7 +1957,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     inputs[portName] = portData;
                                 }
-                                // 鍚屾椂浼犻€掑垽鏂粨鏋滅瓑閫氱敤淇℃伅
+                                // Encoding cleanup: previous comment text was unreadable.
                                 if (sourceOutputs.TryGetValue("Result", out var result))
                                     inputs["ConditionResult"] = result;
                                 if (sourceOutputs.TryGetValue("Condition", out var condition))
@@ -1572,15 +1965,15 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 if (sourceOutputs.TryGetValue("ActualValue", out var actualValue))
                                     inputs["ActualValue"] = actualValue;
                             }
-                            // 濡傛灉绔彛鏁版嵁涓?null锛岃鏄庢潯浠跺垎鏀蛋鐨勬槸鍙︿竴鍒嗘敮锛屼笉浼犻€掍换浣曟暟鎹?
+                            // Encoding cleanup: previous comment text was unreadable.
                         }
                     }
                     else
                     {
-                        // 鏅€氱畻瀛愶細鎵ц澧炲己鐨勭鍙ｆ槧灏勯€昏緫
+                        // Encoding cleanup: previous comment text was unreadable.
 
-                        // 灏濊瘯鑾峰彇杩炵嚎涓ょ鐨勭鍙ｅ畾涔?
-                        // 娉ㄦ剰锛歋ourceOperator 鍙兘涓嶅湪褰撳墠涓婁笅鏂囷紙铏界劧涓嶅お鍙兘锛夛紝浣嗘垜浠闃插尽鎬х紪绋?
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         Port? sourcePort = null;
                         Port? targetPort = null;
                         if (sourceOperator != null)
@@ -1591,19 +1984,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                             // 【Bug 4 修复】基于端口名称的精确映射
                             if (sourcePort != null && targetPort != null)
                             {
-                                // 灏濊瘯浠庢簮杈撳嚭涓幏鍙栦笌婧愮鍙ｅ悕鍖归厤鐨勬暟鎹?
+                                // Encoding cleanup: previous comment text was unreadable.
                                 if (sourceOutputs.TryGetValue(sourcePort.Name, out var data))
                                 {
-                                    // 灏嗘暟鎹槧灏勫埌鐩爣绔彛
+                                    // Encoding cleanup: previous comment text was unreadable.
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
                                 }
                             }
                         }
 
-                        // 銆愬吋瀹规€у厹搴曘€?
-                        // 濡傛灉娌℃湁閫氳繃绔彛鎴愬姛鏄犲皠锛堝彲鑳芥槸鏃х増鏁版嵁銆佺鍙ｅ悕鏈畾涔夈€佹垨鏃ㄥ湪浼犻€掗殣寮忔暟鎹級
-                        // 鎴栬€呬负浜嗗悜鍚庡吋瀹癸紙闃叉鏌愪簺鏈蛋绔彛瀹氫箟鐨勯殣寮忔暟鎹涪澶憋紝閬垮厤 ResultOutput 鎵€闇€鐨勯澶栦俊鎭己澶憋級
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         // 我们依然执行全量合并，但跳过已存在的键（避免覆盖精确映射的结果）
                         foreach (var kvp in sourceOutputs)
                         {
@@ -1616,9 +2009,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     _logger.LogDebug(
                                         "[FlowExecution] Skip implicit fallback key '{Key}' from {SourceOperator} to {TargetOperator} to avoid hidden ImageWrapper propagation.",
-                                        kvp.Key,
-                                        sourceOperator?.Name ?? connection.SourceOperatorId.ToString(),
-                                        op.Name);
+                                        SanitizeLogValue(kvp.Key),
+                                        SanitizeLogValue(sourceOperator?.Name ?? connection.SourceOperatorId.ToString()),
+                                        SanitizeLogValue(op.Name));
                                     continue;
                                 }
 
@@ -1721,8 +2114,60 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region 调试功能实现
 
     /// <summary>
-    /// 璋冭瘯鎵ц娴佺▼ - 鏀寔鏂偣鍜屽崟姝ユ墽琛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
+    public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
+        OperatorFlow flow,
+        DebugOptions options,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        CancellationToken cancellationToken = default)
+    {
+        var authoritativeSession = projectVariables.Session;
+        var requiresAuthoritativeCommit = ProjectGlobalVariableFlowValidator.HasProjectVariableWriteCapability(
+            flow,
+            authoritativeSession.Schema);
+        if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
+            projectVariables.CommitHandler == null)
+        {
+            return new FlowDebugExecutionResult
+            {
+                DebugSessionId = options.DebugSessionId,
+                IsSuccess = false,
+                ErrorMessage = "GV040: project global variable formal writes require a persistence-capable commit handler before execution."
+            };
+        }
+
+        var expectedVersions = authoritativeSession.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var workingSession = authoritativeSession.CreateSnapshotClone();
+        var effectiveContext = new ProjectVariableExecutionContext(
+            workingSession,
+            projectVariables.BindingIndex,
+            projectVariables.RunId,
+            projectVariables.IsPreview);
+
+        using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
+        var result = await ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
+        if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
+            result.IsSuccess &&
+            !result.WasShortCircuited &&
+            !result.BreakpointHit &&
+            !result.PausedOperatorId.HasValue)
+        {
+            var commitResult = CommitProjectVariableChanges(projectVariables, authoritativeSession, workingSession, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = commitResult.Error;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
         OperatorFlow flow,
         DebugOptions options,
@@ -1741,7 +2186,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _debugOptions[options.DebugSessionId] = options;
         TouchDebugSession(options.DebugSessionId);
 
-        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
+        // 创建链接的 CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
@@ -1749,10 +2194,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             // 获取执行顺序（拓扑排序）
             var plan = GetFlowExecutionPlan(flow);
-            var executionOrder = plan.ExecutionOrder;
+            var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 鍒濆鍖栨墽琛岀姸鎬?
+            // 初始化执行状态
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -1762,39 +2207,39 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?
+            // 存储每个算子的输出
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 璁剧疆鍒濆杈撳叆鏁版嵁
+            // 设置初始输入数据
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
-            // 椤哄簭鎵ц锛堣皟璇曟ā寮忎笉鏀寔骞惰锛?
+            // Encoding cleanup: previous comment text was unreadable.
             int completedCount = 0;
             Guid? pausedOperatorId = null;
 
             foreach (var op in executionOrder)
             {
-                // 妫€鏌ュ彇娑?
+                // Check cancellation before the next operator.
                 if (cts.Token.IsCancellationRequested)
                 {
                     break;
                 }
 
-                // 妫€鏌ユ槸鍚﹀懡涓柇鐐?
+                // Check whether this operator is a breakpoint.
                 if (options.Breakpoints.Contains(op.Id))
                 {
                     pausedOperatorId = op.Id;
                     result.BreakpointHit = true;
                     result.PausedOperatorId = pausedOperatorId;
-                    _logger.LogInformation("[调试] 命中断点: {OperatorName} ({OperatorId})", op.Name, op.Id);
+                    _logger.LogInformation("[调试] 命中断点: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
                     if (options.StepMode)
                     {
-                        // 鍗曟妯″紡锛氭殏鍋滄墽琛?
+                        // Encoding cleanup: previous comment text was unreadable.
                         break;
                     }
                 }
@@ -1836,21 +2281,46 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     continue;
                 }
 
-                // 鏇存柊褰撳墠鎵ц鐘舵€?
+                // 更新当前执行状态
                 status.CurrentOperatorId = op.Id;
                 status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-                // 鍑嗗杈撳叆鏁版嵁
+                // 准备输入数据
                 var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+                if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+                {
+                    var debugResult = new OperatorDebugResult
+                    {
+                        OperatorId = op.Id,
+                        OperatorName = op.Name,
+                        IsSuccess = false,
+                        ErrorMessage = targetBindingError,
+                        ExecutionOrder = completedCount,
+                        IsBreakpoint = options.Breakpoints.Contains(op.Id),
+                        InputSnapshot = CloneNormalizedDictionary(ConvertImageWrappersToBytes(inputs))
+                    };
+                    result.DebugOperatorResults.Add(debugResult);
+                    result.OperatorResults.Add(debugResult);
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Operator '{op.Name}' project variable target binding failed: {targetBindingError}";
+                    break;
+                }
+
                 var normalizedInputSnapshot = ConvertImageWrappersToBytes(inputs);
                 var cacheKey = (options.DebugSessionId, op.Id);
+                var cacheEnabledForOperator = options.EnableIntermediateCache &&
+                    CanUseDebugIntermediateCache(op, _projectVariableContextAccessor.Current);
                 string? cacheFingerprint = null;
-                if (options.EnableIntermediateCache)
+                if (cacheEnabledForOperator)
                 {
                     cacheFingerprint = CreateDebugCacheFingerprint(op, normalizedInputSnapshot);
                 }
+                else if (options.EnableIntermediateCache)
+                {
+                    RemoveDebugCacheEntry(cacheKey);
+                }
 
-                if (options.EnableIntermediateCache &&
+                if (cacheEnabledForOperator &&
                     _debugCache.TryGetValue(cacheKey, out var cachedOutputs) &&
                     _debugCacheFingerprints.TryGetValue(cacheKey, out var cachedFingerprint) &&
                     string.Equals(cachedFingerprint, cacheFingerprint, StringComparison.Ordinal))
@@ -1877,13 +2347,22 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     result.OperatorResults.Add(cachedDebugResult);
                     result.IntermediateResults[op.Id] = CloneNormalizedDictionary(cachedCopy);
                     TouchDebugSession(options.DebugSessionId);
+                    if (!TryCommitProjectVariableSourceBindings(op, cachedCopy, out var cachedSourceBindingError))
+                    {
+                        cachedDebugResult.IsSuccess = false;
+                        cachedDebugResult.ErrorMessage = cachedSourceBindingError;
+                        result.IsSuccess = false;
+                        result.ErrorMessage = $"Operator '{op.Name}' project variable source binding failed: {cachedSourceBindingError}";
+                        break;
+                    }
+
                     completedCount++;
 
                     if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Value)
                     {
                         pausedOperatorId = op.Id;
                         result.PausedOperatorId = pausedOperatorId;
-                        _logger.LogInformation("[璋冭瘯] 澶嶇敤缂撳瓨骞跺仠鍦ㄦ柇鐐圭畻瀛? {OperatorName} ({OperatorId})", op.Name, op.Id);
+                        _logger.LogInformation("[Debug] Reused cached output and paused at breakpoint operator {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
                         break;
                     }
 
@@ -1914,6 +2393,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                 result.DebugOperatorResults.Add(debugOpResult);
                 result.OperatorResults.Add(debugOpResult);
+                result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
 
                 if (!opResult.IsSuccess)
                 {
@@ -1922,16 +2402,23 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     break;
                 }
 
-                // 淇濆瓨杈撳嚭
+                // 保存输出
                 var outputs = opResult.OutputData ?? new Dictionary<string, object>();
                 operatorOutputs[op.Id] = outputs;
                 ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+                if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+                {
+                    debugOpResult.IsSuccess = false;
+                    debugOpResult.ErrorMessage = sourceBindingError;
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Operator '{op.Name}' project variable source binding failed: {sourceBindingError}";
+                    break;
+                }
 
-                // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?
-                if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
+                // Encoding cleanup: previous comment text was unreadable.
+                if (cacheEnabledForOperator && normalizedOutputData.Count > 0)
                 {
                     SetDebugCacheEntry(cacheKey, normalizedOutputData, cacheFingerprint!);
-                    result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
                     TouchDebugSession(options.DebugSessionId);
                 }
 
@@ -1948,7 +2435,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 {
                     pausedOperatorId = op.Id;
                     result.PausedOperatorId = pausedOperatorId;
-                    _logger.LogInformation("[Debug] Reached breakpoint operator: {OperatorName} ({OperatorId}), stopping execution.", op.Name, op.Id);
+                    _logger.LogInformation("[Debug] Reached breakpoint operator: {OperatorName} ({OperatorId}), stopping execution.", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
                     break;
                 }
             }
@@ -1956,7 +2443,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
+            // Check whether execution was canceled.
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -2040,7 +2527,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     public Task ClearDebugCacheAsync(Guid debugSessionId)
     {
-        // 娓呴櫎璇ヤ細璇濈殑鎵€鏈夌紦瀛?
+        // Encoding cleanup: previous comment text was unreadable.
         lock (_debugCacheEvictionGate)
         {
             var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();
@@ -2103,6 +2590,39 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             TrimDebugCacheUnderLock(cacheKey);
         }
+    }
+
+    private void RemoveDebugCacheEntry((Guid DebugSessionId, Guid OperatorId) cacheKey)
+    {
+        lock (_debugCacheEvictionGate)
+        {
+            RemoveDebugCacheEntryUnderLock(cacheKey);
+        }
+    }
+
+    private static bool CanUseDebugIntermediateCache(Operator op, ProjectVariableExecutionContext? context)
+    {
+        if (context == null)
+        {
+            return true;
+        }
+
+        return op.Type switch
+        {
+            OperatorType.VariableRead or OperatorType.VariableWrite or OperatorType.VariableIncrement
+                => !IsProjectVariableScope(op),
+            _ => true
+        };
+    }
+
+    private static bool IsProjectVariableScope(Operator op)
+    {
+        var scope = op.Parameters
+            .FirstOrDefault(parameter => string.Equals(parameter.Name, "Scope", StringComparison.OrdinalIgnoreCase))
+            ?.GetValue()
+            ?.ToString();
+
+        return string.Equals(scope, "Project", StringComparison.OrdinalIgnoreCase);
     }
 
     private void TrimDebugCacheUnderLock((Guid DebugSessionId, Guid OperatorId) protectedKey)

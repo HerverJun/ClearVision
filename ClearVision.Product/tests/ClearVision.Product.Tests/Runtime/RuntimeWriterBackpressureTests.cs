@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public sealed class RuntimeWriterBackpressureTests
 {
     [Fact]

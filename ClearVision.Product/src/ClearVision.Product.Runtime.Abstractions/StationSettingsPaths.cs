@@ -4,6 +4,7 @@ public static class StationSettingsPaths
 {
     public const string StudioAppDataDirectoryName = "ClearVisionStudio";
     public const string StationAppDataDirectoryName = "ClearVisionStation";
+    public const string ProjectVariableStatesDirectoryName = "ProjectVariableStates";
     public const string StudioCommunicationFileName = "station-communication.json";
     public const string StationSyncSettingsFileName = "station-sync-settings.json";
     public const string StationSyncSettingsAppliedMarkerFileName = "station-sync-settings.applied";
@@ -30,6 +31,14 @@ public static class StationSettingsPaths
             ResolveLocalAppDataRoot(localAppDataRoot),
             StationAppDataDirectoryName,
             StationSyncSettingsAppliedMarkerFileName);
+    }
+
+    public static string GetStationProjectVariableStatesPath(string? localAppDataRoot = null)
+    {
+        return Path.Combine(
+            ResolveLocalAppDataRoot(localAppDataRoot),
+            StationAppDataDirectoryName,
+            ProjectVariableStatesDirectoryName);
     }
 
     private static string ResolveLocalAppDataRoot(string? localAppDataRoot)

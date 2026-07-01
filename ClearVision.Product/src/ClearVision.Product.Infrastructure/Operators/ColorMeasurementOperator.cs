@@ -199,26 +199,39 @@ public class ColorMeasurementOperator : OperatorBase
 
     private Dictionary<string, object> MeasureLabDeltaE(Operator @operator, Dictionary<string, object>? inputs, Mat roiMat)
     {
-        var labStats = ComputeLabStatistics(roiMat);
+        var deltaEMethod = GetStringParam(@operator, "DeltaEMethod", "CIEDE2000");
+        LabStatistics labStats;
+        DeltaEStatistics deltaEStats;
+        CieLab referenceValue;
+        object? referenceObj = null;
+        var hasReferenceInput = inputs?.TryGetValue("ReferenceColor", out referenceObj) == true;
+        if (hasReferenceInput &&
+            TryReadCompleteReferenceLab(referenceObj, out referenceValue))
+        {
+            (labStats, deltaEStats) = ComputeLabAndDeltaEStatistics(roiMat, referenceValue, deltaEMethod);
+        }
+        else
+        {
+            labStats = ComputeLabStatistics(roiMat);
+            var refL = GetDoubleParam(@operator, "RefL", labStats.Mean.L);
+            var refA = GetDoubleParam(@operator, "RefA", labStats.Mean.A);
+            var refB = GetDoubleParam(@operator, "RefB", labStats.Mean.B);
+            if (referenceObj != null)
+            {
+                TryOverrideReferenceLab(referenceObj, ref refL, ref refA, ref refB);
+            }
+
+            referenceValue = new CieLab(refL, refA, refB);
+            deltaEStats = ComputeDeltaEStatistics(roiMat, referenceValue, deltaEMethod);
+        }
+
         var lValue = labStats.Mean.L;
         var aValue = labStats.Mean.A;
         var bValue = labStats.Mean.B;
-
-        var refL = GetDoubleParam(@operator, "RefL", lValue);
-        var refA = GetDoubleParam(@operator, "RefA", aValue);
-        var refB = GetDoubleParam(@operator, "RefB", bValue);
-        if (inputs != null && inputs.TryGetValue("ReferenceColor", out var referenceObj))
-        {
-            TryOverrideReferenceLab(referenceObj, ref refL, ref refA, ref refB);
-        }
-
         var labValue = new CieLab(lValue, aValue, bValue);
-        var referenceValue = new CieLab(refL, refA, refB);
-        var deltaEMethod = GetStringParam(@operator, "DeltaEMethod", "CIEDE2000");
         var deltaE = deltaEMethod.Equals("CIE76", StringComparison.OrdinalIgnoreCase)
             ? ColorDifference.DeltaE76(labValue, referenceValue)
             : ColorDifference.DeltaE00(labValue, referenceValue);
-        var deltaEStats = ComputeDeltaEStatistics(roiMat, referenceValue, deltaEMethod);
         var deltaEStdDev = deltaEStats.SampleCount > 0 ? deltaEStats.StdDev : 0.0;
         var deltaEStdError = deltaEStats.SampleCount > 0 ? deltaEStats.StdError : 0.0;
 
@@ -226,7 +239,7 @@ public class ColorMeasurementOperator : OperatorBase
         {
             { "LabMean", new Dictionary<string, object> { { "L", lValue }, { "A", aValue }, { "B", bValue } } },
             { "LabStdDev", new Dictionary<string, object> { { "L", labStats.StdDev.L }, { "A", labStats.StdDev.A }, { "B", labStats.StdDev.B } } },
-            { "ReferenceLab", new Dictionary<string, object> { { "L", refL }, { "A", refA }, { "B", refB } } },
+            { "ReferenceLab", new Dictionary<string, object> { { "L", referenceValue.L }, { "A", referenceValue.A }, { "B", referenceValue.B } } },
             { "DeltaE", deltaE },
             { "DeltaEStdDev", deltaEStdDev },
             { "DeltaEStdError", deltaEStdError },
@@ -374,6 +387,46 @@ public class ColorMeasurementOperator : OperatorBase
         }
     }
 
+    private static bool TryReadCompleteReferenceLab(object? referenceObj, out CieLab reference)
+    {
+        reference = default;
+        if (referenceObj == null)
+        {
+            return false;
+        }
+
+        if (referenceObj is double[] doubles && doubles.Length >= 3)
+        {
+            reference = new CieLab(doubles[0], doubles[1], doubles[2]);
+            return true;
+        }
+
+        if (referenceObj is float[] floats && floats.Length >= 3)
+        {
+            reference = new CieLab(floats[0], floats[1], floats[2]);
+            return true;
+        }
+
+        if (referenceObj is IDictionary<string, object> dict &&
+            TryGetDouble(dict, "L", out var l) &&
+            TryGetDouble(dict, "A", out var a) &&
+            TryGetDouble(dict, "B", out var b))
+        {
+            reference = new CieLab(l, a, b);
+            return true;
+        }
+
+        if (referenceObj is IDictionary legacy)
+        {
+            var normalized = legacy.Cast<DictionaryEntry>()
+                .Where(entry => entry.Key != null)
+                .ToDictionary(entry => entry.Key!.ToString() ?? string.Empty, entry => entry.Value ?? 0.0, StringComparer.OrdinalIgnoreCase);
+            return TryReadCompleteReferenceLab(normalized, out reference);
+        }
+
+        return false;
+    }
+
     private static bool TryGetDouble(IDictionary<string, object> dict, string key, out double value)
     {
         value = 0;
@@ -459,6 +512,91 @@ public class ColorMeasurementOperator : OperatorBase
             Math.Sqrt(Math.Max(0.0, (sumB2 / count) - (mean.B * mean.B))));
 
         return new LabStatistics(mean, stdDev, count);
+    }
+
+    private static (LabStatistics Lab, DeltaEStatistics DeltaE) ComputeLabAndDeltaEStatistics(
+        Mat roiMat,
+        CieLab reference,
+        string deltaEMethod)
+    {
+        var totalPixels = roiMat.Rows * roiMat.Cols;
+        var stride = Math.Max(1, totalPixels / MaxDeltaEStatisticsSamples);
+        var indexer = roiMat.GetGenericIndexer<Vec3b>();
+        var labCache = new Dictionary<int, CieLab>(capacity: 256);
+        var useCie76 = deltaEMethod.Equals("CIE76", StringComparison.OrdinalIgnoreCase);
+        var count = 0;
+        var sumL = 0.0;
+        var sumA = 0.0;
+        var sumB = 0.0;
+        var sumL2 = 0.0;
+        var sumA2 = 0.0;
+        var sumB2 = 0.0;
+        var ordinal = 0;
+        var nextSampleOrdinal = 0;
+        var sampleCount = 0;
+        var deltaMean = 0.0;
+        var deltaM2 = 0.0;
+
+        for (var y = 0; y < roiMat.Rows; y++)
+        {
+            for (var x = 0; x < roiMat.Cols; x++)
+            {
+                var pixel = indexer[y, x];
+                var lab = GetCachedLab(pixel, labCache);
+                count++;
+                sumL += lab.L;
+                sumA += lab.A;
+                sumB += lab.B;
+                sumL2 += lab.L * lab.L;
+                sumA2 += lab.A * lab.A;
+                sumB2 += lab.B * lab.B;
+
+                if (ordinal++ != nextSampleOrdinal)
+                {
+                    continue;
+                }
+
+                nextSampleOrdinal += stride;
+                var deltaE = useCie76
+                    ? ColorDifference.DeltaE76(lab, reference)
+                    : ColorDifference.DeltaE00(lab, reference);
+                sampleCount++;
+                var delta = deltaE - deltaMean;
+                deltaMean += delta / sampleCount;
+                deltaM2 += delta * (deltaE - deltaMean);
+            }
+        }
+
+        if (count == 0)
+        {
+            return (
+                new LabStatistics(new CieLab(0.0, 0.0, 0.0), new CieLab(0.0, 0.0, 0.0), 0),
+                new DeltaEStatistics(0, 0.0, 0.0, 0.0));
+        }
+
+        var mean = new CieLab(
+            sumL / count,
+            sumA / count,
+            sumB / count);
+        var stdDev = new CieLab(
+            Math.Sqrt(Math.Max(0.0, (sumL2 / count) - (mean.L * mean.L))),
+            Math.Sqrt(Math.Max(0.0, (sumA2 / count) - (mean.A * mean.A))),
+            Math.Sqrt(Math.Max(0.0, (sumB2 / count) - (mean.B * mean.B))));
+
+        if (sampleCount == 0)
+        {
+            return (new LabStatistics(mean, stdDev, count), new DeltaEStatistics(0, 0.0, 0.0, 0.0));
+        }
+
+        var deltaVariance = Math.Max(0.0, deltaM2 / sampleCount);
+        var deltaStdDev = Math.Sqrt(deltaVariance);
+        return (
+            new LabStatistics(mean, stdDev, count),
+            new DeltaEStatistics(
+                sampleCount,
+                deltaMean,
+                deltaStdDev,
+                MeasurementStatisticsHelper.ComputeStandardError(deltaStdDev, sampleCount)));
     }
 
     private static DeltaEStatistics ComputeDeltaEStatistics(Mat roiMat, CieLab reference, string deltaEMethod)

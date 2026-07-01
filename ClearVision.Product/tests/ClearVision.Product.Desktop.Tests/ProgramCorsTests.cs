@@ -30,6 +30,143 @@ public class ProgramCorsTests
     }
 
     [Fact]
+    public void BuildSingleInstanceMutexName_ShouldBeStableForSameUserData()
+    {
+        var first = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator",
+            @"C:\Data\ClearVision\settings.json",
+            @"C:\Program Files\ClearVision");
+        var second = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator",
+            @"C:\Data\ClearVision\settings.json",
+            @"C:\Program Files\ClearVision");
+
+        second.Should().Be(first);
+        first.Should().StartWith("Global\\ClearVision.Desktop.StoreLease.");
+        first.Should().NotContain("DOMAIN");
+        first.Should().NotContain("Data");
+        first.Should().NotContain("Program Files");
+    }
+
+    [Fact]
+    public void BuildSingleInstanceMutexName_ShouldBeIsolatedByDataOnly()
+    {
+        var baseline = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator-a",
+            @"C:\Data\A\settings.json",
+            @"C:\Install\A");
+
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-b", @"C:\Data\A\settings.json", @"C:\Install\A")
+            .Should().Be(baseline);
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\B\settings.json", @"C:\Install\A")
+            .Should().NotBe(baseline);
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\A\settings.json", @"C:\Install\B")
+            .Should().Be(baseline);
+    }
+
+    [Fact]
+    public void BuildStoreLeaseMutexName_ShouldMatchForSameStorePathAcrossWindowsUsers()
+    {
+        var first = Program.BuildStoreLeaseMutexName(
+            "conversation",
+            @"C:\Shared\ClearVision\conversation_sessions.json",
+            "DOMAIN\\operator-a");
+        var second = Program.BuildStoreLeaseMutexName(
+            "conversation",
+            @"C:\Shared\ClearVision\conversation_sessions.json",
+            "DOMAIN\\operator-b");
+
+        second.Should().Be(first);
+    }
+
+    [Fact]
+    public void BuildStoreLeaseMutexName_ShouldConflictWhenAnyStorePathOverlaps()
+    {
+        var conversation = Program.BuildStoreLeaseMutexName(
+            "conversation",
+            @"C:\Data\ClearVision\store.json",
+            "DOMAIN\\operator");
+        var agentRun = Program.BuildStoreLeaseMutexName(
+            "agent-run",
+            @"C:\Data\ClearVision\store.json",
+            "DOMAIN\\operator");
+        var independent = Program.BuildStoreLeaseMutexName(
+            "agent-run",
+            @"C:\Data\ClearVision\agent-runs",
+            "DOMAIN\\operator");
+
+        agentRun.Should().Be(conversation);
+        independent.Should().NotBe(conversation);
+    }
+
+    [Fact]
+    public void TryAcquireStoreLeaseMutexes_ShouldBlockWhenAnyStorePathOverlaps()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clearvision-store-lease-test-" + Guid.NewGuid().ToString("N"));
+        var conversationA = Path.Combine(root, "conversation-a.json");
+        var agentRunA = Path.Combine(root, "agent-run-a");
+        var conversationB = Path.Combine(root, "conversation-b.json");
+        var agentRunB = Path.Combine(root, "agent-run-b");
+
+        Program.TryAcquireStoreLeaseMutexes([conversationA, agentRunA], out var first).Should().BeTrue();
+        try
+        {
+            Program.TryAcquireStoreLeaseMutexes([conversationA, agentRunB], out var sameConversation).Should().BeFalse();
+            sameConversation.Should().BeEmpty();
+
+            Program.TryAcquireStoreLeaseMutexes([conversationB, agentRunA], out var sameAgentRun).Should().BeFalse();
+            sameAgentRun.Should().BeEmpty();
+
+            Program.TryAcquireStoreLeaseMutexes([conversationB, agentRunB], out var independent).Should().BeTrue();
+            Program.ReleaseStoreLeaseMutexes(independent);
+        }
+        finally
+        {
+            Program.ReleaseStoreLeaseMutexes(first);
+        }
+    }
+
+    [Fact]
+    public void TryAcquireStoreLeaseMutexes_ShouldBlockSecondInstanceWithSameStorePaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clearvision-store-lease-same-test-" + Guid.NewGuid().ToString("N"));
+        var conversation = Path.Combine(root, "conversation.json");
+        var agentRun = Path.Combine(root, "agent-runs");
+
+        Program.TryAcquireStoreLeaseMutexes([conversation, agentRun], out var first).Should().BeTrue();
+        try
+        {
+            Program.TryAcquireStoreLeaseMutexes([conversation, agentRun], out var second).Should().BeFalse();
+            second.Should().BeEmpty();
+        }
+        finally
+        {
+            Program.ReleaseStoreLeaseMutexes(first);
+        }
+    }
+
+    [Fact]
+    public void TryAcquireStoreLeaseMutexes_ShouldAllowSecondInstanceWhenBothStorePathsDiffer()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clearvision-store-lease-different-test-" + Guid.NewGuid().ToString("N"));
+        var conversationA = Path.Combine(root, "conversation-a.json");
+        var agentRunA = Path.Combine(root, "agent-run-a");
+        var conversationB = Path.Combine(root, "conversation-b.json");
+        var agentRunB = Path.Combine(root, "agent-run-b");
+
+        Program.TryAcquireStoreLeaseMutexes([conversationA, agentRunA], out var first).Should().BeTrue();
+        try
+        {
+            Program.TryAcquireStoreLeaseMutexes([conversationB, agentRunB], out var second).Should().BeTrue();
+            Program.ReleaseStoreLeaseMutexes(second);
+        }
+        finally
+        {
+            Program.ReleaseStoreLeaseMutexes(first);
+        }
+    }
+
+    [Fact]
     public async Task CorsPreflight_ShouldAllowAuthAndSseHeaders_ForKnownLocalOrigins()
     {
         await using var host = await CorsTestHost.CreateAsync();

@@ -30,6 +30,131 @@ export function installAiTab(SettingsView) {
             this._aiReasoningSupportRequestId += 1;
         }
         ,
+        isRuntimePreviewPilotDeveloperUiEnabled() {
+            try {
+                return String(localStorage.getItem('cv_ai_agent_dev_ui') || '').toLowerCase() === 'true';
+            } catch {
+                return false;
+            }
+        }
+        ,
+        sanitizeRuntimePreviewPilotValue(value) {
+            const text = String(value ?? '');
+            if (!text) return '';
+            if (/base64|data:image|authorization|bearer|x-api-key|api[_-]?key|token=/i.test(text)) {
+                return '<redacted>';
+            }
+            if (/https?:\/\/|(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/\S*)?/i.test(text)) {
+                return '<redacted>';
+            }
+            if (/[A-Za-z]:\\|\\\\|\/[^/\s]+\/|\.\./.test(text)) {
+                return '<redacted>';
+            }
+            return this.escapeHtml(text);
+        }
+        ,
+        normalizeRuntimePreviewPilotConfig(payload) {
+            const source = payload?.config || payload || {};
+            const list = value => Array.isArray(value) ? value.map(item => String(item || '').trim()).filter(Boolean) : [];
+            return {
+                enabled: source.enabled === true,
+                mode: 'metadata_only',
+                allowedCameraBindingIds: list(source.allowedCameraBindingIds),
+                allowedModelIds: list(source.allowedModelIds),
+                allowedTemplateIds: list(source.allowedTemplateIds),
+                allowedFlowIds: list(source.allowedFlowIds),
+                allowedResourceRoots: list(source.allowedResourceRoots),
+                maxPreviewArtifacts: Number.isFinite(Number(source.maxPreviewArtifacts)) ? Number(source.maxPreviewArtifacts) : 8,
+                maxMetadataBytes: Number.isFinite(Number(source.maxMetadataBytes)) ? Number(source.maxMetadataBytes) : 16384,
+                fallbackToOffline: source.fallbackToOffline !== false,
+                denyExternalPath: true,
+                denyImageBytes: true
+            };
+        }
+        ,
+        async loadRuntimePreviewPilotState() {
+            if (!this.isRuntimePreviewPilotDeveloperUiEnabled()) {
+                return;
+            }
+
+            try {
+                const [configResult, catalog, sessionsResult] = await Promise.all([
+                    settingsApi.loadRuntimePreviewPilotConfig(),
+                    settingsApi.loadRuntimePreviewPilotCatalog(),
+                    settingsApi.listRuntimePreviewPilotSessions()
+                ]);
+                this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(configResult);
+                this.runtimePreviewPilotCatalog = catalog || { items: [] };
+                this.runtimePreviewPilotSessions = sessionsResult?.sessions || [];
+            } catch {
+                this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig({});
+                this.runtimePreviewPilotCatalog = { items: [] };
+                this.runtimePreviewPilotSessions = [];
+            }
+        }
+        ,
+        getRuntimePreviewPilotSelectedSessionId(aiTab) {
+            return (aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId || '').trim();
+        }
+        ,
+        getRuntimePreviewPilotCatalogSelections(aiTab) {
+            const selected = {
+                allowedCameraBindingIds: [],
+                allowedModelIds: [],
+                allowedTemplateIds: [],
+                allowedFlowIds: [],
+                allowedResourceRoots: []
+            };
+            const mapType = resourceType => {
+                const type = String(resourceType || '').toLowerCase();
+                if (type.includes('camera')) return 'allowedCameraBindingIds';
+                if (type.includes('model')) return 'allowedModelIds';
+                if (type.includes('template')) return 'allowedTemplateIds';
+                if (type.includes('flow')) return 'allowedFlowIds';
+                if (type.includes('root')) return 'allowedResourceRoots';
+                return null;
+            };
+
+            aiTab.querySelectorAll('[data-rp-catalog-allowlist="true"]:checked').forEach(input => {
+                const key = mapType(input.dataset.resourceType);
+                const id = String(input.dataset.resourceId || '').trim();
+                if (key && id && !selected[key].includes(id)) {
+                    selected[key].push(id);
+                }
+            });
+            return selected;
+        }
+        ,
+        buildRuntimePreviewPilotConfigDiff(beforeConfig, afterConfig) {
+            const fields = [
+                'allowedCameraBindingIds',
+                'allowedModelIds',
+                'allowedTemplateIds',
+                'allowedFlowIds',
+                'allowedResourceRoots'
+            ];
+            const before = this.normalizeRuntimePreviewPilotConfig(beforeConfig || {});
+            const after = this.normalizeRuntimePreviewPilotConfig(afterConfig || {});
+            return fields
+                .map(field => ({
+                    field,
+                    before: before[field] || [],
+                    after: after[field] || []
+                }))
+                .filter(item => item.before.join('|') !== item.after.join('|'));
+        }
+        ,
+        applyRuntimePreviewPilotCatalogAllowlist(aiTab) {
+            const before = this.normalizeRuntimePreviewPilotConfig(this.runtimePreviewPilotConfig || {});
+            const selected = this.getRuntimePreviewPilotCatalogSelections(aiTab);
+            const draft = {
+                ...this.readRuntimePreviewPilotConfigDraft(aiTab),
+                ...selected
+            };
+            this.runtimePreviewPilotConfigDiff = this.buildRuntimePreviewPilotConfigDiff(before, draft);
+            this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(draft);
+        }
+        ,
         getAiPerformanceModelLabel() {
             const active = this.aiModels.find(m => m.id === this.activeAiModelId)
                 || this.aiModels.find(m => m.isActive)
@@ -168,7 +293,15 @@ export function installAiTab(SettingsView) {
                             model: '',
                             baseUrl: '',
                             apiKey: '',
+                            apiKeyOperation: 'new',
+                            protocol: 'openai_compatible',
                             wireApi: 'chat_completions',
+                            authMode: 'bearer',
+                            roleBindings: ['generation'],
+                            modelRole: 'generation',
+                            priority: 100,
+                            isEnabled: true,
+                            remark: '',
                             timeoutMs: 120000
                         });
                         await this.loadAiModels();
@@ -217,6 +350,26 @@ export function installAiTab(SettingsView) {
                     } catch (err) {
                         showToast('切换激活失败: ' + err.message, 'error');
                     }
+                } else if (btn.dataset.action === 'default-planner') {
+                    const id = btn.dataset.id;
+                    try {
+                        await settingsApi.setDefaultPlannerAiModel(id);
+                        await this.loadAiModels({ preserveEditingId: true });
+                        this.refreshAiTableAndForm();
+                        showToast('Default planner model updated.', 'success');
+                    } catch (err) {
+                        showToast('Default planner update failed: ' + err.message, 'error');
+                    }
+                } else if (btn.dataset.action === 'default-shadow-eval') {
+                    const id = btn.dataset.id;
+                    try {
+                        await settingsApi.setDefaultShadowEvalAiModel(id);
+                        await this.loadAiModels({ preserveEditingId: true });
+                        this.refreshAiTableAndForm();
+                        showToast('Shadow eval model updated.', 'success');
+                    } catch (err) {
+                        showToast('Shadow eval model update failed: ' + err.message, 'error');
+                    }
                 } else if (btn.id === 'btn-ai-test') {
                     const modelId = this.editingAiModelId;
                     if (!modelId) return;
@@ -229,12 +382,15 @@ export function installAiTab(SettingsView) {
                         // 先保存当前表单到后端，再测试（确保用的是最新配置）
                         await this._saveCurrentForm();
                         const result = await settingsApi.testAiModel(modelId);
-                        if (result.success) {
-                            if (resultEl) { resultEl.textContent = '✅ ' + result.message; resultEl.style.color = '#4caf50'; }
-                            showToast('AI 测试连接成功', 'success');
+                        const ok = result.connectionOk ?? result.success;
+                        const message = result.sanitizedMessage || result.message || result.errorCode || "";
+                        const latency = Number.isFinite(Number(result.latencyMs)) ? ` (${result.latencyMs} ms)` : "";
+                        if (ok) {
+                            if (resultEl) { resultEl.textContent = "OK " + message + latency; resultEl.style.color = "#4caf50"; }
+                            showToast("AI connection test succeeded", "success");
                         } else {
-                            if (resultEl) { resultEl.textContent = '❌ ' + result.message; resultEl.style.color = 'var(--cinnabar)'; }
-                            showToast('AI 连接失败: ' + result.message, 'error');
+                            if (resultEl) { resultEl.textContent = `${result.errorCode || "failed"}: ${message}${latency}`; resultEl.style.color = "var(--cinnabar)"; }
+                            showToast("AI connection test failed: " + message, "error");
                         }
                     } catch (err) {
                         if (resultEl) { resultEl.textContent = '❌ 请求失败: ' + err.message; resultEl.style.color = 'var(--cinnabar)'; }
@@ -255,6 +411,133 @@ export function installAiTab(SettingsView) {
                     } catch(err) {
                         showToast('保存失败: ' + err.message, 'error');
                     }
+                } else if (btn.id === 'btn-runtime-preview-pilot-refresh') {
+                    await this.loadRuntimePreviewPilotState();
+                    this.refreshRuntimePreviewPilotPanel();
+                } else if (btn.id === 'btn-runtime-preview-pilot-save') {
+                    try {
+                        const payload = this.readRuntimePreviewPilotConfigDraft(aiTab);
+                        this.runtimePreviewPilotConfigDiff = this.buildRuntimePreviewPilotConfigDiff(this.runtimePreviewPilotConfig || {}, payload);
+                        const confirmed = typeof window?.confirm === 'function'
+                            ? window.confirm('Save metadata-only RuntimePreview Pilot allowlist changes?')
+                            : true;
+                        if (!confirmed) return;
+                        const result = await settingsApi.saveRuntimePreviewPilotConfig(payload);
+                        this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(result);
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                        showToast('RuntimePreview Pilot config saved.', 'success');
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot config failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-apply-catalog-allowlist') {
+                    try {
+                        this.applyRuntimePreviewPilotCatalogAllowlist(aiTab);
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot catalog allowlist failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-readiness') {
+                    try {
+                        const payload = this.buildRuntimePreviewPilotSessionPayload(aiTab);
+                        const result = await settingsApi.checkRuntimePreviewPilotReadiness(payload);
+                        this.runtimePreviewPilotReadiness = result?.readiness || result;
+                        this.runtimePreviewPilotCatalog = result?.catalog || this.runtimePreviewPilotCatalog;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot readiness failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-create-session') {
+                    try {
+                        const result = await settingsApi.createRuntimePreviewPilotSession(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotSelectedSessionId = result?.session?.sessionId || null;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot session create failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-simulate') {
+                    try {
+                        const result = await settingsApi.simulateRuntimePreviewPilotSession(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotSessionReport = result?.report || null;
+                        this.runtimePreviewPilotSelectedSessionId = result?.session?.sessionId || result?.report?.sessionId || null;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot simulation failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-load-report') {
+                    try {
+                        const sessionId = aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId;
+                        if (!sessionId) return;
+                        const result = await settingsApi.loadRuntimePreviewPilotSessionReport(sessionId);
+                        this.runtimePreviewPilotSessionReport = result?.report || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot report failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-replay-session') {
+                    try {
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
+                        if (!sessionId) return;
+                        const result = await settingsApi.replayRuntimePreviewPilotSession(sessionId);
+                        this.runtimePreviewPilotReplay = result?.replay || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot replay failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-export-report') {
+                    try {
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
+                        if (!sessionId) return;
+                        const result = await settingsApi.exportRuntimePreviewPilotSessionReport(sessionId);
+                        this.runtimePreviewPilotExport = result?.export || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot export failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-deploy-readiness') {
+                    try {
+                        const result = await settingsApi.generateRuntimePreviewDeployReadiness(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotDeployReadinessReport = result?.deployReadinessReport || null;
+                        this.runtimePreviewPilotSessionReport = result?.deployReadinessReport?.simulationReport || this.runtimePreviewPilotSessionReport;
+                        this.runtimePreviewPilotSelectedSessionId = result?.deployReadinessReport?.sessionId || result?.session?.sessionId || this.runtimePreviewPilotSelectedSessionId;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot deploy readiness failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-scenario-evidence') {
+                    try {
+                        this.runtimePreviewPilotScenarioEvidence = await settingsApi.loadRuntimePreviewScenarioEvidence();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot scenario evidence failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-cleanup') {
+                    try {
+                        const retentionDays = Number(aiTab.querySelector('#cfg-rp-retention-days')?.value || 30);
+                        const maxSessions = Number(aiTab.querySelector('#cfg-rp-max-sessions')?.value || 200);
+                        const result = await settingsApi.cleanupRuntimePreviewPilotRetention({ retentionDays, maxSessions });
+                        this.runtimePreviewPilotRetentionCleanup = result?.cleanup || result;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot cleanup failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-cancel-session') {
+                    try {
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
+                        if (!sessionId) return;
+                        await settingsApi.cancelRuntimePreviewPilotSession(sessionId);
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot cancel failed: ' + err.message, 'error');
+                    }
                 }
             });
 
@@ -264,19 +547,26 @@ export function installAiTab(SettingsView) {
 
                 const fieldMap = {
                     'cfg-ai-name': 'name',
+                    'cfg-ai-display-name': 'displayName',
                     'cfg-ai-provider': 'provider',
+                    'cfg-ai-protocol': 'protocol',
                     'cfg-ai-wireapi': 'wireApi',
+                    'cfg-ai-authmode': 'authMode',
                     'cfg-ai-model': 'model',
                     'cfg-ai-baseurl': 'baseUrl',
                     'cfg-ai-apikey': 'apiKey',
+                    'cfg-ai-apikey-clear': 'apiKey.clear',
                     'cfg-ai-timeout': 'timeoutMs',
+                    'cfg-ai-priority': 'priority',
+                    'cfg-ai-enabled': 'isEnabled',
+                    'cfg-ai-remark': 'remark',
                     'cfg-ai-reasoning-mode': 'reasoning.mode',
                     'cfg-ai-reasoning-effort': 'reasoning.effort'
                 };
                 const field = fieldMap[el.id];
                 if (!field) return;
 
-                this._pendingFormEdits[field] = el.value;
+                this._pendingFormEdits[field] = el.type === 'checkbox' ? el.checked : el.value;
                 if (el.id === 'cfg-ai-name') {
                     const m = this.aiModels.find(x => x.id === this.editingAiModelId);
                     if (m) {
@@ -285,7 +575,7 @@ export function installAiTab(SettingsView) {
                     }
                 }
 
-                if (['cfg-ai-provider', 'cfg-ai-model', 'cfg-ai-baseurl'].includes(el.id)) {
+                if (['cfg-ai-provider', 'cfg-ai-protocol', 'cfg-ai-model', 'cfg-ai-baseurl'].includes(el.id)) {
                     this.scheduleAiReasoningSupportPreview();
                 }
 
@@ -300,6 +590,9 @@ export function installAiTab(SettingsView) {
             this.setTrackedTimeout(() => {
                 this.refreshAiTableAndForm();
                 this.syncAiReasoningUiState();
+                if (this.isRuntimePreviewPilotDeveloperUiEnabled()) {
+                    this.loadRuntimePreviewPilotState().then(() => this.refreshRuntimePreviewPilotPanel()).catch(() => {});
+                }
             }, 0);
         }
         ,
@@ -325,7 +618,14 @@ export function installAiTab(SettingsView) {
 
             const currentTimeout = parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10);
             const normalizedTimeout = Number.isFinite(currentTimeout) ? currentTimeout : 120000;
+            const currentPriority = parseInt(aiTab.querySelector('#cfg-ai-priority')?.value || '100', 10);
+            const normalizedPriority = Number.isFinite(currentPriority) ? currentPriority : 100;
             const pendingApiKey = aiTab.querySelector('#cfg-ai-apikey')?.value || '';
+            const clearApiKey = aiTab.querySelector('#cfg-ai-apikey-clear')?.checked === true;
+            const currentRoles = this.normalizeAiRoleBindings(model.roleBindings, model.modelRole).join(',');
+            const draftRoles = Array.from(aiTab.querySelectorAll('[data-ai-role]:checked'))
+                .map(item => item.dataset.aiRole)
+                .join(',');
             const currentReasoning = this.normalizeAiReasoning(model.reasoning);
             const draftReasoning = this.normalizeAiReasoning({
                 mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || currentReasoning.mode,
@@ -333,22 +633,34 @@ export function installAiTab(SettingsView) {
             });
 
             return (aiTab.querySelector('#cfg-ai-name')?.value || '') !== (model.name || '')
+                || (aiTab.querySelector('#cfg-ai-display-name')?.value || '') !== (model.displayName || '')
                 || (aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible') !== (model.provider || 'OpenAI Compatible')
+                || this.normalizeAiProtocol(aiTab.querySelector('#cfg-ai-protocol')?.value, model.provider) !== this.normalizeAiProtocol(model.protocol, model.provider)
                 || this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value) !== this.normalizeAiWireApi(model.wireApi)
+                || this.normalizeAiAuthMode(aiTab.querySelector('#cfg-ai-authmode')?.value, model.protocol) !== this.normalizeAiAuthMode(model.authMode, model.protocol)
                 || (aiTab.querySelector('#cfg-ai-model')?.value || '') !== (model.model || '')
                 || (aiTab.querySelector('#cfg-ai-baseurl')?.value || '') !== (model.baseUrl || '')
                 || normalizedTimeout !== (model.timeoutMs ?? 120000)
+                || normalizedPriority !== (model.priority ?? 100)
+                || (aiTab.querySelector('#cfg-ai-enabled')?.checked !== (model.isEnabled !== false))
+                || (aiTab.querySelector('#cfg-ai-remark')?.value || '') !== (model.remark || '')
+                || draftRoles !== currentRoles
                 || draftReasoning.mode !== currentReasoning.mode
                 || draftReasoning.effort !== currentReasoning.effort
+                || clearApiKey
                 || pendingApiKey.trim().length > 0;
         }
         ,
         clearAiSecretInputs() {
             const apiKeyInput = this.container?.querySelector('#cfg-ai-apikey');
+            const clearApiKeyInput = this.container?.querySelector('#cfg-ai-apikey-clear');
             const toggleButton = this.container?.querySelector('#btn-toggle-apikey');
             if (apiKeyInput) {
                 apiKeyInput.value = '';
                 apiKeyInput.type = 'password';
+            }
+            if (clearApiKeyInput) {
+                clearApiKeyInput.checked = false;
             }
             if (toggleButton) {
                 toggleButton.textContent = '👁';
@@ -365,17 +677,37 @@ export function installAiTab(SettingsView) {
             const aiTab = this.container.querySelector('[data-section="ai"]');
             if (!aiTab) return;
 
+            const model = this.aiModels.find(x => x.id === modelId);
+            const apiKeyValue = aiTab.querySelector("#cfg-ai-apikey")?.value || "";
+            const clearApiKey = aiTab.querySelector("#cfg-ai-apikey-clear")?.checked === true;
+            const apiKeyOperation = clearApiKey
+                ? "clear"
+                : (apiKeyValue.trim().length > 0 ? (model?.hasApiKey ? "replace" : "new") : "keep");
+            const provider = aiTab.querySelector("#cfg-ai-provider")?.value || "OpenAI Compatible";
+            const protocol = this.normalizeAiProtocol(aiTab.querySelector("#cfg-ai-protocol")?.value, provider);
+            const roleBindings = this.normalizeAiRoleBindings(
+                Array.from(aiTab.querySelectorAll("[data-ai-role]:checked")).map(item => item.dataset.aiRole));
+
             const payload = {
-                name: aiTab.querySelector('#cfg-ai-name')?.value || '',
-                provider: aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible',
-                wireApi: this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value),
-                model: aiTab.querySelector('#cfg-ai-model')?.value || '',
-                baseUrl: aiTab.querySelector('#cfg-ai-baseurl')?.value || '',
-                apiKey: aiTab.querySelector('#cfg-ai-apikey')?.value || '', // 空 → 后端保留原值
-                timeoutMs: parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10),
+                name: aiTab.querySelector("#cfg-ai-name")?.value || "",
+                displayName: aiTab.querySelector("#cfg-ai-display-name")?.value || "",
+                provider,
+                protocol,
+                wireApi: this.normalizeAiWireApi(aiTab.querySelector("#cfg-ai-wireapi")?.value),
+                authMode: this.normalizeAiAuthMode(aiTab.querySelector("#cfg-ai-authmode")?.value, protocol),
+                model: aiTab.querySelector("#cfg-ai-model")?.value || "",
+                baseUrl: aiTab.querySelector("#cfg-ai-baseurl")?.value || "",
+                apiKey: apiKeyOperation === "replace" || apiKeyOperation === "new" ? apiKeyValue : "",
+                apiKeyOperation,
+                timeoutMs: parseInt(aiTab.querySelector("#cfg-ai-timeout")?.value || "120000", 10),
+                roleBindings,
+                modelRole: roleBindings[0] || "generation",
+                isEnabled: aiTab.querySelector("#cfg-ai-enabled")?.checked !== false,
+                priority: parseInt(aiTab.querySelector("#cfg-ai-priority")?.value || "100", 10),
+                remark: aiTab.querySelector("#cfg-ai-remark")?.value || "",
                 reasoning: {
-                    mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || 'auto',
-                    effort: aiTab.querySelector('#cfg-ai-reasoning-effort')?.value || 'medium'
+                    mode: aiTab.querySelector("#cfg-ai-reasoning-mode")?.value || "auto",
+                    effort: aiTab.querySelector("#cfg-ai-reasoning-effort")?.value || "medium"
                 }
             };
 
@@ -398,6 +730,11 @@ export function installAiTab(SettingsView) {
                 const provider = String(m.provider || '');
                 const providerHtml = this.escapeHtml(provider || '-');
                 const model = this.escapeHtml(m.model || '-');
+                const roles = this.normalizeAiRoleBindings(m.roleBindings, m.modelRole);
+                const roleHtml = roles.map(role => `<span class="type-badge" style="margin-right:4px;">${this.escapeHtml(role)}</span>`).join('');
+                const enabledHtml = m.isEnabled === false
+                    ? '<span class="type-badge" style="background:#fff7ed;color:#c2410c;">Disabled</span>'
+                    : '<span class="type-badge" style="background:#ecfdf5;color:#047857;">Enabled</span>';
                 const badgeBg = provider.includes('Anthropic') ? '#fce7f3' : (provider.includes('OpenAI API') ? '#e0e7ff' : '#f3f4f6');
                 const badgeColor = provider.includes('Anthropic') ? '#db2777' : (provider.includes('OpenAI API') ? '#4338ca' : '#475569');
 
@@ -406,6 +743,7 @@ export function installAiTab(SettingsView) {
                         <td class="font-bold">${name}</td>
                         <td><span class="type-badge" style="background:${badgeBg}; color:${badgeColor};">${providerHtml}</span></td>
                         <td class="font-mono">${model}</td>
+                        <td>${roleHtml}${enabledHtml}</td>
                         <td>
                             ${m.isActive
                                 ? '<span class="settings-status-badge status-connected" style="background:#ecfdf5; padding:2px 8px;"><span class="status-dot"></span> 已启用</span>'
@@ -415,6 +753,8 @@ export function installAiTab(SettingsView) {
                             <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑">
                                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
                             </button>
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-planner" data-id="${id}">Planner</button>
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-shadow-eval" data-id="${id}">Shadow</button>
                             <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" style="color:var(--cinnabar);">
                                 <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
@@ -447,13 +787,26 @@ export function installAiTab(SettingsView) {
             const baseUrlValue = this.escapeHtml(m.baseUrl || '');
             const apiKeyPlaceholderValue = this.escapeHtml(apiKeyPlaceholder);
             const timeoutValue = Number.isFinite(Number(m.timeoutMs)) ? Number(m.timeoutMs) : 120000;
+            const displayNameValue = this.escapeHtml(m.displayName || '');
+            const protocol = this.normalizeAiProtocol(m.protocol, m.provider);
+            const authMode = this.normalizeAiAuthMode(m.authMode, protocol);
+            const roles = this.normalizeAiRoleBindings(m.roleBindings, m.modelRole);
+            const priorityValue = Number.isFinite(Number(m.priority)) ? Number(m.priority) : 100;
+            const remarkValue = this.escapeHtml(m.remark || '');
+            const lastTestStatus = this.escapeHtml(m.lastTestStatus || 'untested');
+            const lastTestAt = this.escapeHtml(m.lastTestAt || '-');
+            const lastTestLatency = Number.isFinite(Number(m.lastTestLatencyMs)) ? `${m.lastTestLatencyMs} ms` : '-';
 
             formContainer.innerHTML = `
                 <div style="display:flex; gap:16px; margin-bottom:16px;">
                      <div class="settings-fieldset" style="flex:1;">
-                         <label>模型昵称</label>
-                         <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="本地别名">
-                      </div>
+                         <label>Model Name</label>
+                         <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="Local alias">
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
+                         <label>Display Name</label>
+                         <input type="text" class="cv-input" id="cfg-ai-display-name" value="${displayNameValue}" placeholder="Workbench label">
+                     </div>
                      <div class="settings-fieldset" style="flex:1;">
                          <label>API 协议</label>
                          <select class="cv-input" id="cfg-ai-provider">
@@ -463,10 +816,27 @@ export function installAiTab(SettingsView) {
                          </select>
                      </div>
                      <div class="settings-fieldset" style="flex:1;">
+                         <label>Protocol</label>
+                         <select class="cv-input" id="cfg-ai-protocol">
+                             <option value="openai_compatible" ${protocol === "openai_compatible" ? "selected" : ""}>OpenAI Compatible</option>
+                             <option value="anthropic" ${protocol === "anthropic" ? "selected" : ""}>Anthropic</option>
+                             <option value="azure_openai" ${protocol === "azure_openai" ? "selected" : ""}>Azure OpenAI</option>
+                             <option value="ollama_native" ${protocol === "ollama_native" ? "selected" : ""}>Ollama Native</option>
+                         </select>
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
                          <label>API 接口</label>
                          <select class="cv-input" id="cfg-ai-wireapi">
                              <option value="chat_completions" ${wireApi === 'chat_completions' ? 'selected' : ''}>Chat Completions</option>
                              <option value="responses" ${wireApi === 'responses' ? 'selected' : ''}>Responses</option>
+                         </select>
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
+                         <label>Auth Mode</label>
+                         <select class="cv-input" id="cfg-ai-authmode">
+                             <option value="bearer" ${authMode === "bearer" ? "selected" : ""}>Bearer</option>
+                             <option value="header_key" ${authMode === "header_key" ? "selected" : ""}>Header Key</option>
+                             <option value="none" ${authMode === "none" ? "selected" : ""}>None</option>
                          </select>
                      </div>
                      <div class="settings-fieldset" style="flex:1;">
@@ -488,12 +858,43 @@ export function installAiTab(SettingsView) {
                               <input type="password" class="cv-input" id="cfg-ai-apikey" value="" placeholder="${apiKeyPlaceholderValue}" style="padding-right:36px; font-family:monospace;">
                              <button class="icon-action-btn" id="btn-toggle-apikey" style="position:absolute; right:10px; top:50%; transform:translateY(-50%);">👁</button>
                          </div>
+                              <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:#64748b;">
+                                  <input type="checkbox" id="cfg-ai-apikey-clear"> Clear saved key
+                              </label>
                      </div>
                       <div class="settings-fieldset" style="flex:1;">
                           <label>请求超时 (ms)</label>
                           <input type="number" class="cv-input" id="cfg-ai-timeout" value="${timeoutValue}">
                       </div>
                   </div>
+                   <div style="display:flex; gap:16px; margin-top:16px; align-items:flex-start;">
+                       <div class="settings-fieldset" style="flex:2;">
+                           <label>Model Roles</label>
+                           <div style="display:flex; flex-wrap:wrap; gap:8px; padding:8px 0;">
+                               <label><input type="checkbox" data-ai-role="generation" ${roles.includes("generation") ? "checked" : ""}> generation</label>
+                               <label><input type="checkbox" data-ai-role="planner" ${roles.includes("planner") ? "checked" : ""}> planner</label>
+                               <label><input type="checkbox" data-ai-role="vision-agent-shadow-eval" ${roles.includes("vision-agent-shadow-eval") ? "checked" : ""}> shadow eval</label>
+                           </div>
+                           <div hidden data-ai-shadow-eval-entry="hidden">Shadow eval execution entry is developer-hidden by default.</div>
+                       </div>
+                       <div class="settings-fieldset" style="flex:1;">
+                           <label>Priority</label>
+                           <input type="number" class="cv-input" id="cfg-ai-priority" value="${priorityValue}" min="1" max="10000">
+                       </div>
+                       <div class="settings-fieldset" style="flex:1;">
+                           <label>Enabled</label>
+                           <label style="display:flex; align-items:center; gap:8px; height:38px;"><input type="checkbox" id="cfg-ai-enabled" ${m.isEnabled === false ? "" : "checked"}> Enabled</label>
+                       </div>
+                   </div>
+                   <div class="settings-fieldset" style="margin-top:16px;">
+                       <label>Remark</label>
+                       <textarea class="cv-input" id="cfg-ai-remark" rows="2">${remarkValue}</textarea>
+                   </div>
+                   <div style="margin-top:12px; font-size:12px; color:#64748b; display:flex; gap:16px; flex-wrap:wrap;">
+                       <span>Last test: <strong>${lastTestStatus}</strong></span>
+                       <span>At: ${lastTestAt}</span>
+                       <span>Latency: ${lastTestLatency}</span>
+                   </div>
                   <details class="settings-fieldset" style="margin-top:16px; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; background:#fafcff;" open>
                       <summary style="cursor:pointer; font-weight:700; color:#1e293b;">推理 / Thinking</summary>
                       <div style="display:flex; gap:16px; margin-top:14px;">
@@ -527,8 +928,280 @@ export function installAiTab(SettingsView) {
                       <button class="cv-btn settings-btn-danger" id="btn-ai-save">💾 保存并应用该模型集</button>
                  </div>
                   <div id="ai-test-result" style="margin-top:10px; text-align:right; font-size:13px; font-weight:500;"></div>
-             `;
+            `;
             this.syncAiReasoningUiState();
+        }
+        ,
+        readRuntimePreviewPilotConfigDraft(aiTab) {
+            const readList = selector => (aiTab.querySelector(selector)?.value || '')
+                .split(',')
+                .map(item => item.trim())
+                .filter(Boolean);
+            return {
+                enabled: aiTab.querySelector('#cfg-rp-enabled')?.checked === true,
+                mode: 'metadata_only',
+                allowedCameraBindingIds: readList('#cfg-rp-allow-cameras'),
+                allowedModelIds: readList('#cfg-rp-allow-models'),
+                allowedTemplateIds: readList('#cfg-rp-allow-templates'),
+                allowedFlowIds: readList('#cfg-rp-allow-flows'),
+                allowedResourceRoots: readList('#cfg-rp-allow-roots'),
+                maxPreviewArtifacts: Number(aiTab.querySelector('#cfg-rp-max-artifacts')?.value || 8),
+                maxMetadataBytes: Number(aiTab.querySelector('#cfg-rp-max-metadata')?.value || 16384),
+                fallbackToOffline: aiTab.querySelector('#cfg-rp-fallback')?.checked !== false,
+                denyExternalPath: true,
+                denyImageBytes: true
+            };
+        }
+        ,
+        buildRuntimePreviewPilotSessionPayload(aiTab) {
+            const cameraBindingId = (aiTab.querySelector('#cfg-rp-allow-cameras')?.value || '')
+                .split(',')[0]?.trim() || '<pending-camera-binding>';
+            return {
+                config: this.readRuntimePreviewPilotConfigDraft(aiTab),
+                toolName: 'runtime_preview_metadata',
+                runtimePreviewConsent: true,
+                arguments: {
+                    flow: {
+                        operators: [
+                            {
+                                tempId: 'op_cam',
+                                operatorType: 'ImageAcquisition',
+                                parameters: {
+                                    SourceType: 'Camera',
+                                    CameraBindingId: cameraBindingId
+                                }
+                            }
+                        ],
+                        connections: []
+                    }
+                }
+            };
+        }
+        ,
+        renderRuntimePreviewPilotPanel() {
+            const developerEnabled = this.isRuntimePreviewPilotDeveloperUiEnabled();
+            const config = this.normalizeRuntimePreviewPilotConfig(this.runtimePreviewPilotConfig || {});
+            const catalogItems = Array.isArray(this.runtimePreviewPilotCatalog?.items) ? this.runtimePreviewPilotCatalog.items : [];
+            const readiness = this.runtimePreviewPilotReadiness || null;
+            const sessions = Array.isArray(this.runtimePreviewPilotSessions) ? this.runtimePreviewPilotSessions : [];
+            const report = this.runtimePreviewPilotSessionReport || null;
+            const replay = this.runtimePreviewPilotReplay || null;
+            const reportExport = this.runtimePreviewPilotExport || null;
+            const deployReadiness = this.runtimePreviewPilotDeployReadinessReport || null;
+            const scenarioEvidence = this.runtimePreviewPilotScenarioEvidence || null;
+            const cleanup = this.runtimePreviewPilotRetentionCleanup || null;
+            const configDiff = Array.isArray(this.runtimePreviewPilotConfigDiff) ? this.runtimePreviewPilotConfigDiff : [];
+            const listValue = value => this.escapeHtml((value || []).join(', '));
+            const isCatalogChecked = item => {
+                const type = String(item.resourceType || '').toLowerCase();
+                const id = String(item.id || '').trim();
+                if (!id) return false;
+                if (type.includes('camera')) return config.allowedCameraBindingIds.includes(id);
+                if (type.includes('model')) return config.allowedModelIds.includes(id);
+                if (type.includes('template')) return config.allowedTemplateIds.includes(id);
+                if (type.includes('flow')) return config.allowedFlowIds.includes(id);
+                if (type.includes('root')) return config.allowedResourceRoots.includes(id);
+                return false;
+            };
+            const catalogHtml = catalogItems.length
+                ? catalogItems.slice(0, 16).map(item => `
+                    <tr>
+                        <td><input type="checkbox" data-rp-catalog-allowlist="true" data-resource-type="${this.sanitizeRuntimePreviewPilotValue(item.resourceType)}" data-resource-id="${this.sanitizeRuntimePreviewPilotValue(item.id)}" ${isCatalogChecked(item) ? 'checked' : ''} ${item.safeForPilot ? '' : 'disabled'}></td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.resourceType)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.id)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.displayName)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.source)}</td>
+                        <td>${item.safeForPilot ? 'safe' : 'blocked'}</td>
+                        <td>${item.redacted ? '&lt;redacted&gt;' : 'no'}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="7" style="color:#64748b;">No catalog loaded.</td></tr>';
+            const readinessHtml = readiness
+                ? `
+                    <div data-rp-readiness-status="${this.sanitizeRuntimePreviewPilotValue(readiness.status)}" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; font-size:12px;">
+                        <span>Status: <strong>${this.sanitizeRuntimePreviewPilotValue(readiness.status)}</strong></span>
+                        <span>Can run: <strong>${readiness.canRunMetadataPilot ? 'true' : 'false'}</strong></span>
+                        <span>Draft editable: <strong>${readiness.workflowDraftAllowed !== false ? 'true' : 'false'}</strong></span>
+                    </div>
+                    <pre style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:180px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                        blockingIssues: readiness.blockingIssues || [],
+                        missingResources: readiness.missingResources || [],
+                        pendingActions: readiness.pendingActions || [],
+                        resourceTrace: readiness.resourceTrace || {},
+                        fallback: readiness.fallback || {},
+                        allowlistCoverage: readiness.allowlistCoverage || {}
+                    }, null, 2))}</pre>
+                `
+                : '<div style="font-size:12px; color:#64748b;">Readiness has not been run.</div>';
+            const sessionRows = sessions.length
+                ? sessions.slice(0, 10).map(session => `
+                    <tr>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.sessionId)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.status)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.readinessStatus)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.permissionStatus)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.reportId || '')}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="5" style="color:#64748b;">No RuntimePreview sessions.</td></tr>';
+            const diffHtml = configDiff.length
+                ? `<pre data-rp-allowlist-diff="true" style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:120px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(configDiff, null, 2))}</pre>`
+                : '<div data-rp-allowlist-diff="true" style="font-size:12px; color:#64748b;">No catalog allowlist diff.</div>';
+            const reportHtml = report
+                ? `
+                    <div data-rp-report-preview="true" style="font-size:12px;">
+                        <div>Report: <strong>${this.sanitizeRuntimePreviewPilotValue(report.reportId)}</strong></div>
+                        <div>Preview ready: <strong>${report.previewReady ? 'true' : 'false'}</strong></div>
+                        <div>Real resources touched: <strong>${report.realResourcesTouched ? 'true' : 'false'}</strong></div>
+                    </div>
+                    <pre data-rp-audit-timeline="true" style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:160px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                        simulatedTimeline: report.simulation?.timeline || [],
+                        auditTimeline: report.auditEvents || [],
+                        permissionDecision: report.permissionDecision || {},
+                        resourceHandles: report.resourceHandles || []
+                    }, null, 2))}</pre>
+                `
+                : '<div style="font-size:12px; color:#64748b;">No report selected.</div>';
+            const replayHtml = replay
+                ? `<pre data-rp-session-replay="true" style="white-space:pre-wrap; font-size:11px; max-height:140px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    sessionId: replay.sessionId,
+                    reportId: replay.reportId,
+                    previewReady: replay.previewReady,
+                    timeline: replay.timeline || [],
+                    auditEvents: replay.auditEvents || [],
+                    realResourcesTouched: replay.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-session-replay="true" style="font-size:12px; color:#64748b;">No replay loaded.</div>';
+            const exportHtml = reportExport
+                ? `<pre data-rp-report-export-payload="true" style="white-space:pre-wrap; font-size:11px; max-height:120px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    fileName: reportExport.fileName,
+                    exportedAtUtc: reportExport.exportedAtUtc,
+                    metadataOnly: reportExport.metadataOnly,
+                    realResourcesTouched: reportExport.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-report-export-payload="true" style="font-size:12px; color:#64748b;">No report export loaded.</div>';
+            const deployReadinessHtml = deployReadiness
+                ? `<pre data-rp-deploy-readiness-report="true" style="white-space:pre-wrap; font-size:11px; max-height:160px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reportId: deployReadiness.reportId,
+                    sessionId: deployReadiness.sessionId,
+                    previewReady: deployReadiness.previewReady,
+                    readyForDeployment: deployReadiness.readyForDeployment,
+                    deploymentBlocked: deployReadiness.deploymentBlocked,
+                    packageCreated: deployReadiness.packageCreated,
+                    deploymentExecuted: deployReadiness.deploymentExecuted,
+                    realResourcesTouched: deployReadiness.realResourcesTouched,
+                    pendingActions: deployReadiness.pendingActions || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-deploy-readiness-report="true" style="font-size:12px; color:#64748b;">No deploy readiness report generated.</div>';
+            const scenarioEvidenceHtml = scenarioEvidence
+                ? `<pre data-rp-scenario-evidence="true" style="white-space:pre-wrap; font-size:11px; max-height:180px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    caseCount: scenarioEvidence.caseCount,
+                    passedCaseCount: scenarioEvidence.passedCaseCount,
+                    accepted: scenarioEvidence.accepted,
+                    realResourcesTouched: scenarioEvidence.realResourcesTouched,
+                    cases: scenarioEvidence.cases || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-scenario-evidence="true" style="font-size:12px; color:#64748b;">Scenario evidence has not been loaded.</div>';
+            const cleanupHtml = cleanup
+                ? `<pre data-rp-retention-cleanup="true" style="white-space:pre-wrap; font-size:11px; max-height:100px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(cleanup, null, 2))}</pre>`
+                : '<div data-rp-retention-cleanup="true" style="font-size:12px; color:#64748b;">No retention cleanup result.</div>';
+
+            return `
+                <details class="settings-modern-card" data-runtime-preview-pilot-admin="hidden" ${developerEnabled ? '' : 'hidden'}>
+                    <summary class="settings-card-header" style="cursor:pointer;">
+                        <span>RuntimePreview Pilot Console v1.1</span>
+                        <span class="settings-status-badge ${config.enabled ? 'status-connected' : 'status-disconnected'}" style="margin-left:auto;">
+                            <span class="status-dot"></span> ${config.enabled ? 'enabled' : 'disabled'}
+                        </span>
+                    </summary>
+                    <div class="settings-card-body" id="runtime-preview-pilot-panel">
+                        <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;">
+                            <label class="settings-fieldset"><span>Enabled</span><input type="checkbox" id="cfg-rp-enabled" ${config.enabled ? 'checked' : ''}></label>
+                            <label class="settings-fieldset"><span>Mode</span><input class="cv-input" value="metadata_only" disabled></label>
+                            <label class="settings-fieldset"><span>Fallback offline</span><input type="checkbox" id="cfg-rp-fallback" ${config.fallbackToOffline ? 'checked' : ''}></label>
+                            <label class="settings-fieldset"><span>Max artifacts</span><input class="cv-input" type="number" id="cfg-rp-max-artifacts" value="${config.maxPreviewArtifacts}" min="1" max="50"></label>
+                            <label class="settings-fieldset"><span>Max metadata bytes</span><input class="cv-input" type="number" id="cfg-rp-max-metadata" value="${config.maxMetadataBytes}" min="1" max="524288"></label>
+                            <div class="settings-fieldset"><span>Safety</span><div style="font-size:12px;">metadata_only, denyExternalPath=true, denyImageBytes=true</div></div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px;">
+                            <label class="settings-fieldset"><span>Camera allowlist</span><input class="cv-input" id="cfg-rp-allow-cameras" value="${listValue(config.allowedCameraBindingIds)}"></label>
+                            <label class="settings-fieldset"><span>Model allowlist</span><input class="cv-input" id="cfg-rp-allow-models" value="${listValue(config.allowedModelIds)}"></label>
+                            <label class="settings-fieldset"><span>Template allowlist</span><input class="cv-input" id="cfg-rp-allow-templates" value="${listValue(config.allowedTemplateIds)}"></label>
+                            <label class="settings-fieldset"><span>Flow allowlist</span><input class="cv-input" id="cfg-rp-allow-flows" value="${listValue(config.allowedFlowIds)}"></label>
+                            <label class="settings-fieldset"><span>Resource root allowlist</span><input class="cv-input" id="cfg-rp-allow-roots" value="${listValue(config.allowedResourceRoots)}"></label>
+                        </div>
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-refresh">Refresh catalog</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-apply-catalog-allowlist">Apply catalog allowlist</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-readiness">Run readiness</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-create-session">Create metadata session</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-simulate">Simulate metadata session</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-deploy-readiness">Deploy readiness report</button>
+                            <button class="cv-btn settings-btn-danger" id="btn-runtime-preview-pilot-save">Save pilot config</button>
+                        </div>
+                        ${diffHtml}
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+                            <h4 style="margin:0 0 8px;">Catalog</h4>
+                            <table class="settings-modern-table" data-rp-catalog-table="true">
+                                <thead><tr><th>Allow</th><th>Type</th><th>ID</th><th>Name</th><th>Source</th><th>Safe</th><th>Redacted</th></tr></thead>
+                                <tbody>${catalogHtml}</tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+                            <h4 style="margin:0 0 8px;">Readiness</h4>
+                            ${readinessHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-session-console="true">
+                            <h4 style="margin:0 0 8px;">Session Console</h4>
+                            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                <input class="cv-input" id="cfg-rp-session-id" placeholder="sessionId for replay/report/export/cancel" value="${this.sanitizeRuntimePreviewPilotValue(this.runtimePreviewPilotSelectedSessionId || '')}">
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-report">Load report</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-replay-session">Replay session</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-export-report">Export report</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-cancel-session">Cancel session</button>
+                            </div>
+                            <table class="settings-modern-table" data-rp-session-list="true">
+                                <thead><tr><th>Session</th><th>Status</th><th>Readiness</th><th>Permission</th><th>Report</th></tr></thead>
+                                <tbody>${sessionRows}</tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-report-export="true">
+                            <h4 style="margin:0 0 8px;">Audit timeline & report preview</h4>
+                            ${reportHtml}
+                            ${replayHtml}
+                            ${exportHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-deploy-readiness="true">
+                            <h4 style="margin:0 0 8px;">Deploy readiness report</h4>
+                            ${deployReadinessHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-scenario-evidence-panel="true">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <h4 style="margin:0 0 8px;">Scenario evidence</h4>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-scenario-evidence">Load scenario evidence</button>
+                            </div>
+                            ${scenarioEvidenceHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-retention-panel="true">
+                            <h4 style="margin:0 0 8px;">Retention cleanup</h4>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <input class="cv-input" type="number" id="cfg-rp-retention-days" value="30" min="1" max="365" style="max-width:120px;">
+                                <input class="cv-input" type="number" id="cfg-rp-max-sessions" value="200" min="1" max="5000" style="max-width:120px;">
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-cleanup">Run cleanup</button>
+                            </div>
+                            ${cleanupHtml}
+                        </div>
+                    </div>
+                </details>
+            `;
+        }
+        ,
+        refreshRuntimePreviewPilotPanel() {
+            const panel = this.container?.querySelector('[data-runtime-preview-pilot-admin]');
+            if (!panel) return;
+            const replacement = document.createElement('div');
+            replacement.innerHTML = this.renderRuntimePreviewPilotPanel();
+            panel.replaceWith(replacement.firstElementChild);
         }
         ,
         renderAiTab() {
@@ -539,7 +1212,6 @@ export function installAiTab(SettingsView) {
                     <p>集成深度学习本地模型与云端大语言模型 API 配置。</p>
                 </div>
                 ${this.renderScopeNotice('ai')}
-
                 <!-- Block 1: Model Tab & List -->
                 <div class="settings-modern-card">
                     <div class="settings-card-header" style="background:white; border-bottom:1px solid #e2e8f0; padding:0; display:flex;">
@@ -562,6 +1234,7 @@ export function installAiTab(SettingsView) {
                                     <th>名称</th>
                                     <th>协议</th>
                                     <th>模型标识</th>
+                                    <th>Roles</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>

@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,6 +17,7 @@ using NSubstitute.Core;
 
 namespace ClearVision.Product.Tests.Services;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class InspectionServiceRealtimeTests
 {
     [Fact]

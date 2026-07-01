@@ -16,6 +16,7 @@ public class CameraFrameStreamCoordinatorTests
         var cameraManager = Substitute.For<ICameraManager>();
         var camera = Substitute.For<IIndustrialCamera>();
         camera.IsConnected.Returns(true);
+        camera.IsAcquiring.Returns(true);
         camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.SetPixelFormatAsync(Arg.Any<CameraPixelFormat>()).Returns(Task.CompletedTask);

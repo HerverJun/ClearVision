@@ -12,6 +12,7 @@ import { buildSseHeaders, parseSseFrame } from './inspectionSseClient.mjs';
 
 // 检测状态
 const [getInspectionState, setInspectionState, subscribeInspectionState] = createSignal({
+    projectId: null,
     isRunning: false,
     isRealtime: false,
     progress: 0,
@@ -40,6 +41,11 @@ const LIGHTWEIGHT_RESULT_OBJECT_FIELD_LIMIT = 48;
 const LIGHTWEIGHT_RESULT_STRING_LIMIT = 512;
 const LIGHTWEIGHT_RESULT_MAX_DEPTH = 3;
 const LIGHTWEIGHT_RESULT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+const LOCKED_RUNTIME_STATES_FOR_SNAPSHOT = new Set(['starting', 'running', 'stopping']);
+
+function readProjectId(payload, fallback = null) {
+    return payload?.projectId ?? payload?.ProjectId ?? fallback ?? null;
+}
 
 function getInlineResultImageBase64(result) {
     if (!result || typeof result !== 'object') {
@@ -628,11 +634,7 @@ class InspectionController {
         switch (eventName) {
             case 'initialState':
                 debugInspectionLog('[InspectionController] SSE 初始状态:', payload);
-                setInspectionState({
-                    ...getInspectionState(),
-                    isRealtime: payload.status === 'Running' || payload.status === 'Starting',
-                    status: payload.status === 'Running' ? 'running' : 'idle'
-                });
+                this.applyRuntimeStateSnapshot(payload);
                 break;
             case 'stateChanged':
                 debugInspectionLog('[InspectionController] SSE 状态变更:', payload);
@@ -678,18 +680,9 @@ class InspectionController {
      * 【架构修复 v2】处理状态变更
      */
     handleStateChanged(data) {
-        const statusMap = {
-            'Starting': 'running',
-            'Running': 'running',
-            'Stopping': 'running',
-            'Stopped': 'idle',
-            'Faulted': 'error'
-        };
-
-        setInspectionState({
-            ...getInspectionState(),
-            isRealtime: data.newState === 'Running' || data.newState === 'Starting',
-            status: statusMap[data.newState] || 'idle'
+        this.applyRuntimeStateSnapshot({
+            ...data,
+            status: data.status ?? data.Status ?? data.newState ?? data.NewState
         });
 
         if (data.newState === 'Faulted') {
@@ -750,6 +743,7 @@ class InspectionController {
 
         setInspectionState({
             ...getInspectionState(),
+            projectId: this.projectId,
             isRunning: true,
             progress: 0,
             status: 'running'
@@ -867,8 +861,15 @@ class InspectionController {
      * 停止实时检测
      */
     async stopRealtime() {
+        const stoppedProjectId = this.projectId;
         try {
-            await httpClient.post('/inspection/realtime/stop', { projectId: this.projectId });
+            await httpClient.post('/inspection/realtime/stop', { projectId: stoppedProjectId });
+            this.applyRuntimeStateSnapshot({
+                projectId: stoppedProjectId,
+                status: 'Stopped',
+                isBusy: false,
+                stoppedAt: new Date().toISOString()
+            });
             
             if (this.abortController) {
                 this.abortController.abort();
@@ -998,11 +999,21 @@ class InspectionController {
      * 【Phase 3】生成调试会话ID
      */
     generateSessionId() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        const cryptoRef = globalThis.crypto;
+        if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {
+            return cryptoRef.randomUUID();
+        }
+
+        if (cryptoRef && typeof cryptoRef.getRandomValues === 'function') {
+            const bytes = new Uint8Array(16);
+            cryptoRef.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        }
+
+        throw new Error('Secure random generator is not available.');
     }
 
     /**
@@ -1014,7 +1025,9 @@ class InspectionController {
 
         setInspectionState({
             ...getInspectionState(),
+            projectId: normalizedResult.projectId ?? this.projectId,
             isRunning: false,
+            isRealtime: false,
             progress: 100,
             status: normalizedResult.status === 'Error' ? 'error' : 'completed'
         });
@@ -1044,6 +1057,7 @@ class InspectionController {
     handleInspectionError(error) {
         setInspectionState({
             ...getInspectionState(),
+            projectId: this.projectId,
             isRunning: false,
             isRealtime: false,
             status: 'error'
@@ -1158,6 +1172,19 @@ class InspectionController {
         return getInspectionState();
     }
 
+    async fetchRuntimeState(projectId = this.projectId) {
+        if (!projectId) {
+            return this.normalizeRuntimeStateSnapshot(null, projectId);
+        }
+
+        const payload = await httpClient.get(`/inspection/realtime/${projectId}/state`);
+        return this.normalizeRuntimeStateSnapshot(payload, projectId);
+    }
+
+    subscribeState(callback) {
+        return subscribeInspectionState(callback);
+    }
+
     /**
      * 获取最新结果
      */
@@ -1185,6 +1212,53 @@ class InspectionController {
      */
     isRealtime() {
         return getInspectionState().isRealtime;
+    }
+
+    normalizeRuntimeState(status) {
+        const normalized = String(status || '').trim().toLowerCase();
+        switch (normalized) {
+            case 'starting':
+                return 'starting';
+            case 'running':
+                return 'running';
+            case 'stopping':
+                return 'stopping';
+            case 'completed':
+                return 'completed';
+            case 'faulted':
+            case 'error':
+                return 'error';
+            case 'stopped':
+            case 'idle':
+            case '':
+                return 'idle';
+            default:
+                return normalized;
+        }
+    }
+
+    applyRuntimeStateSnapshot(payload) {
+        const snapshot = this.normalizeRuntimeStateSnapshot(payload, readProjectId(payload, this.projectId));
+        setInspectionState({
+            ...getInspectionState(),
+            ...snapshot
+        });
+        return snapshot;
+    }
+
+    normalizeRuntimeStateSnapshot(payload, projectId = null) {
+        const status = this.normalizeRuntimeState(payload?.status ?? payload?.Status ?? 'Idle');
+        const isBusy = Boolean(payload?.isBusy ?? payload?.IsBusy ?? LOCKED_RUNTIME_STATES_FOR_SNAPSHOT.has(status));
+        return {
+            projectId: readProjectId(payload, projectId),
+            status,
+            isBusy,
+            isRunning: isBusy,
+            isRealtime: isBusy,
+            sessionId: payload?.sessionId ?? payload?.SessionId ?? null,
+            startedAt: payload?.startedAt ?? payload?.StartedAt ?? null,
+            stoppedAt: payload?.stoppedAt ?? payload?.StoppedAt ?? null
+        };
     }
 
     normalizeResultPayload(result) {

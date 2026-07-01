@@ -32,8 +32,13 @@ jobs:
         with:
           languages: csharp,javascript-typescript
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Restore Dependencies
+        shell: pwsh
+        run: dotnet restore ClearVision.Product/ClearVision.Product.sln --locked-mode
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

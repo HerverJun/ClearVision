@@ -17,6 +17,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Metrics;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,15 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 {
     private const string TraceabilityFieldName = "Traceability";
     private static readonly JsonSerializerOptions FlowHashJsonOptions = new() { WriteIndented = false };
+
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IInspectionRuntimeCoordinator _coordinator;
@@ -358,6 +368,31 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
             var streamCoordinator = scope.ServiceProvider.GetService<ICameraFrameStreamCoordinator>();
             var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
+            var projectVariableSessions = scope.ServiceProvider.GetService<ProjectVariableSessionRegistry>();
+            var projectSaveCoordinator = scope.ServiceProvider.GetService<ProjectSaveCoordinator>();
+            ProjectGlobalVariableSchema globalVariables;
+            IProjectVariableSession? projectVariableSession;
+            ProjectVariableBindingIndex? projectVariableBindingIndex;
+            var access = projectSaveCoordinator == null
+                ? null
+                : await projectSaveCoordinator.AcquireProjectAccessAsync(projectId, ct);
+            await using (access)
+            {
+                var project = await projectRepository.GetByIdAsync(projectId);
+                globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
+                if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        "GV040: project global variable formal execution requires ProjectVariableSessionRegistry.");
+                }
+
+                projectVariableSession = globalVariables.Variables.Count == 0
+                    ? null
+                    : projectVariableSessions?.GetOrCreate(projectId, globalVariables);
+                projectVariableBindingIndex = projectVariableSession == null
+                    ? null
+                    : ProjectVariableBindingIndex.Build(globalVariables);
+            }
 
             // 创建日志上下文
             // Create the logging / correlation scope for this run.
@@ -391,6 +426,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     imageAcquisition,
                     resultChannelWriter,
                     configurationService,
+                    projectVariableSessions,
+                    projectVariableSession,
+                    projectVariableBindingIndex,
                     ct);
 
                 logger.LogInformation("[InspectionWorker] 检测循环结束");
@@ -434,6 +472,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         IConfigurationService? configurationService,
+        ProjectVariableSessionRegistry? projectVariableSessions,
+        IProjectVariableSession? projectVariableSession,
+        ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
     {
         if (continuousInspectionMode == ContinuousInspectionMode.Primary)
@@ -462,7 +503,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     _eventBus,
                     ct,
                     () => ResolveContinuousInspectionMode(flow, cameraId),
-                    _imageCacheRepository);
+                    _imageCacheRepository,
+                    projectVariableSession,
+                    projectVariableBindingIndex,
+                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions));
                 return;
             }
         }
@@ -491,9 +535,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         blockingSoftwareTriggerExecution,
                         flowExecution,
                         imageAcquisition,
-                        resultChannelWriter,
-                        configurationService,
-                        ct);
+                    resultChannelWriter,
+                    configurationService,
+                    projectVariableSessions,
+                    projectVariableSession,
+                    projectVariableBindingIndex,
+                    ct);
                     return;
                 }
 
@@ -515,6 +562,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         streamCoordinator,
                         flowExecution,
                         imageAcquisition,
+                        projectVariableSessions,
+                        projectVariableSession,
+                        projectVariableBindingIndex,
                         ct);
 
                     // 保存结果(异步非阻塞)
@@ -656,7 +706,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[InspectionWorker] Failed to release idle camera stream after realtime loop stopped. CameraId={CameraId}", releaseCameraId);
+            _logger.LogWarning(ex, "[InspectionWorker] Failed to release idle camera stream after realtime loop stopped. CameraId={CameraId}", SanitizeLogValue(releaseCameraId));
         }
     }
 
@@ -884,6 +934,21 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         return ImageAcquisitionFlowAnalyzer.TryResolveCameraId(flow, cameraId, out resolvedCameraId);
     }
 
+    private static ProjectVariableCommitHandler? CreateProjectVariableCommitHandler(
+        Guid projectId,
+        ProjectVariableSessionRegistry? projectVariableSessions)
+    {
+        if (projectVariableSessions == null)
+        {
+            return null;
+        }
+
+        return (workingSession, expectedVersions) =>
+            projectVariableSessions.TryCommitAndPersist(projectId, workingSession, expectedVersions, out _, out var error)
+                ? ProjectVariableCommitResult.Success()
+                : ProjectVariableCommitResult.Failure(error);
+    }
+
     private async Task<InspectionResult> ExecuteCycleAsync(
         Guid projectId,
         Guid sessionId,
@@ -893,6 +958,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         ICameraFrameStreamCoordinator? streamCoordinator,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
+        ProjectVariableSessionRegistry? projectVariableSessions,
+        IProjectVariableSession? projectVariableSession,
+        ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
     {
         var result = new InspectionResult(projectId);
@@ -953,7 +1021,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             // 执行流程
-            var flowResult = await flowExecution.ExecuteFlowAsync(flow, inputData, cancellationToken: ct);
+            var flowResult = projectVariableSession == null || projectVariableBindingIndex == null
+                ? await flowExecution.ExecuteFlowAsync(flow, inputData, cancellationToken: ct)
+                : await flowExecution.ExecuteFlowAsync(
+                    flow,
+                    inputData,
+                    new ProjectVariableExecutionContext(
+                        projectVariableSession,
+                        projectVariableBindingIndex,
+                        Guid.NewGuid(),
+                        commitHandler: CreateProjectVariableCommitHandler(projectId, projectVariableSessions)),
+                    cancellationToken: ct);
+
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 
@@ -1043,6 +1122,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     streamCoordinator,
                     flowExecution,
                     status,
+                    projectVariableSession,
+                    projectVariableBindingIndex,
                     ct);
             }
 
@@ -1099,6 +1180,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         ICameraFrameStreamCoordinator streamCoordinator,
         IFlowExecutionService flowExecution,
         InspectionStatus baselineStatus,
+        IProjectVariableSession? projectVariableSession,
+        ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
     {
         try
@@ -1110,10 +1193,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
             var started = DateTime.UtcNow;
             var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(resolvedCameraId, ct);
-            var shadowResult = await flowExecution.ExecuteFlowAsync(
-                flow,
-                new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
-                cancellationToken: ct);
+            var shadowInputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
+            var shadowResult = projectVariableSession == null || projectVariableBindingIndex == null
+                ? await flowExecution.ExecuteFlowAsync(flow, shadowInputs, cancellationToken: ct)
+                : await flowExecution.ExecuteFlowAsync(
+                    flow,
+                    shadowInputs,
+                    new ProjectVariableExecutionContext(
+                        projectVariableSession,
+                        projectVariableBindingIndex,
+                        Guid.NewGuid(),
+                        isPreview: true),
+                    cancellationToken: ct);
             var shadowOutput = shadowResult.OutputData ?? new Dictionary<string, object>();
             var shadowEvaluation = shadowResult.IsSuccess
                 ? DetermineStatusFromFlowOutput(shadowOutput)

@@ -22,6 +22,11 @@ public interface IInspectionRuntimeCoordinator
     Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct);
 
     /// <summary>
+    /// 尝试获取项目级配置变更租约。成功后调用方必须释放租约。
+    /// </summary>
+    Task<ProjectMutationLease?> TryAcquireMutationLeaseAsync(Guid projectId, string reason, CancellationToken ct);
+
+    /// <summary>
     /// 尝试停止实时检测会话
     /// </summary>
     /// <param name="projectId">项目ID</param>
@@ -84,7 +89,33 @@ public enum StartResult
 {
     Success,
     AlreadyRunning,
+    MutationInProgress,
     ShutdownInProgress
+}
+
+public sealed class ProjectMutationLease : IAsyncDisposable
+{
+    private readonly Func<ValueTask> _releaseAsync;
+    private int _disposed;
+
+    public ProjectMutationLease(Guid projectId, string reason, Func<ValueTask> releaseAsync)
+    {
+        ProjectId = projectId;
+        Reason = reason;
+        _releaseAsync = releaseAsync ?? throw new ArgumentNullException(nameof(releaseAsync));
+    }
+
+    public Guid ProjectId { get; }
+
+    public string Reason { get; }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            await _releaseAsync();
+        }
+    }
 }
 
 /// <summary>

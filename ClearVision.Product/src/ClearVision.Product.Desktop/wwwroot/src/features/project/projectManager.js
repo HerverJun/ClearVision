@@ -5,6 +5,7 @@
 
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
+import { saveGlobalVariableSchema } from '../global-variables/globalVariableStore.js';
 
 // 工程状态
 const [getCurrentProject, setCurrentProject, subscribeProject] = createSignal(null);
@@ -16,6 +17,7 @@ class ProjectManager {
         this.currentProject = null;
         this.unsavedChanges = false;
         this.openProjectRequestId = 0;
+        this.savedGlobalVariablesSignature = '';
     }
 
     invalidateOpenProjectRequests() {
@@ -123,6 +125,7 @@ class ProjectManager {
             });
             
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             this.updateStatusBar(project);
@@ -145,6 +148,7 @@ class ProjectManager {
             const project = await httpClient.post(endpoint);
 
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             this.updateStatusBar(project);
@@ -189,6 +193,7 @@ class ProjectManager {
             }
             
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             
@@ -208,39 +213,50 @@ class ProjectManager {
      */
     async saveProject(projectData = null) {
         if (!this.currentProject) {
-            throw new Error('没有打开的工程');
+            throw new Error('No project is open.');
         }
 
         const targetProjectId = this.currentProject.id;
         const data = projectData || this.currentProject;
-        
+        const flow = data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null;
+        const globalVariables = data.globalVariables || data.GlobalVariables || this.currentProject.globalVariables || this.currentProject.GlobalVariables;
+        const globalVariablesChanged = this.haveGlobalVariablesChanged(globalVariables);
+
         try {
-            // 更新工程基本信息
-            await httpClient.put(`/projects/${targetProjectId}`, {
+            const updatePayload = {
                 name: data.name,
                 description: data.description
-            });
+            };
+            if (globalVariablesChanged) {
+                updatePayload.globalVariables = globalVariables;
+            }
 
-            // 保存流程
-            if (data.flow) {
-                await httpClient.put(`/projects/${targetProjectId}/flow`, data.flow);
+            const saved = await httpClient.put(`/projects/${targetProjectId}`, updatePayload);
+            if (flow) {
+                await httpClient.put(`/projects/${targetProjectId}/flow`, toUpdateFlowRequest(flow));
             }
 
             if (!this.currentProject || this.currentProject.id !== targetProjectId) {
                 return true;
             }
 
-            this.currentProject.name = data.name ?? this.currentProject.name;
-            this.currentProject.description = data.description ?? this.currentProject.description;
-            if (data.flow) {
-                this.currentProject.flow = data.flow;
+            const savedProject = isProjectPayload(saved) ? saved : {};
+            Object.assign(this.currentProject, savedProject);
+            this.currentProject.name = savedProject.name ?? savedProject.Name ?? data.name ?? this.currentProject.name;
+            this.currentProject.description = savedProject.description ?? savedProject.Description ?? data.description ?? this.currentProject.description;
+            this.currentProject.flow = savedProject.flow || savedProject.Flow || flow || this.currentProject.flow;
+            const savedGlobalVariables = savedProject.globalVariables || savedProject.GlobalVariables || globalVariables || this.currentProject.globalVariables;
+            if (savedGlobalVariables) {
+                this.currentProject.globalVariables = savedGlobalVariables;
             }
+            setCurrentProject(this.currentProject);
             this.currentProject.modifiedAt = new Date().toISOString();
             this.unsavedChanges = false;
+            this.rememberGlobalVariableBaseline(this.currentProject);
             this.rememberProjectInCaches(this.currentProject);
             this.updateStatusBar(this.currentProject);
             this.updateTitle();
-            
+
             console.log('[ProjectManager] 工程保存成功:', targetProjectId);
             return true;
         } catch (error) {
@@ -248,7 +264,6 @@ class ProjectManager {
             throw error;
         }
     }
-
     /**
      * 删除工程
      */
@@ -280,13 +295,14 @@ class ProjectManager {
         const { promptToSave = true } = options;
         this.invalidateOpenProjectRequests();
         if (this.unsavedChanges && promptToSave) {
-            const confirm = window.confirm('工程有未保存的更改，是否保存？');
+            const confirm = window.confirm('Project has unsaved changes. Save now?');
             if (confirm) {
                 await this.saveProject();
             }
         }
 
         this.currentProject = null;
+        this.savedGlobalVariablesSignature = '';
         setCurrentProject(null);
         this.unsavedChanges = false;
         this.updateStatusBar(null);
@@ -321,6 +337,43 @@ class ProjectManager {
         this.updateTitle();
     }
 
+    updateGlobalVariables(globalVariables) {
+        if (!this.currentProject) return;
+
+        this.currentProject.globalVariables = globalVariables || {
+            schemaVersion: '1.0',
+            variables: [],
+            sourceBindings: [],
+            targetBindings: []
+        };
+        this.unsavedChanges = true;
+        this.updateTitle();
+        setCurrentProject(this.currentProject);
+    }
+
+    async saveGlobalVariables(globalVariables = null) {
+        if (!this.currentProject) {
+            throw new Error('No project is open.');
+        }
+
+        const schema = globalVariables || this.currentProject.globalVariables || {
+            schemaVersion: '1.0',
+            variables: [],
+            sourceBindings: [],
+            targetBindings: []
+        };
+        const saved = await saveGlobalVariableSchema(this.currentProject.id, schema);
+        this.currentProject = {
+            ...this.currentProject,
+            globalVariables: saved
+        };
+        this.rememberGlobalVariableBaseline(this.currentProject);
+        setCurrentProject(this.currentProject);
+        this.unsavedChanges = false;
+        this.rememberProjectInCaches(this.currentProject);
+        this.updateTitle();
+        return saved;
+    }
     /**
      * 检查是否有未保存的更改
      */
@@ -335,6 +388,15 @@ class ProjectManager {
         return this.currentProject;
     }
 
+    rememberGlobalVariableBaseline(project = this.currentProject) {
+        this.savedGlobalVariablesSignature = getGlobalVariablesSignature(project?.globalVariables || project?.GlobalVariables);
+    }
+
+    haveGlobalVariablesChanged(globalVariables) {
+        const signature = getGlobalVariablesSignature(globalVariables);
+        return Boolean(signature) && signature !== this.savedGlobalVariablesSignature;
+    }
+
     /**
      * 更新状态栏
      */
@@ -343,7 +405,7 @@ class ProjectManager {
         const versionEl = document.getElementById('version');
         
         if (projectNameEl) {
-            projectNameEl.textContent = project ? project.name : '未命名工程';
+            projectNameEl.textContent = project ? project.name : 'Untitled Project';
         }
         
         if (versionEl && project) {
@@ -356,7 +418,7 @@ class ProjectManager {
      */
     updateTitle() {
         const unsavedMark = this.unsavedChanges ? ' *' : '';
-        const projectName = this.currentProject ? this.currentProject.name : '未命名';
+        const projectName = this.currentProject ? this.currentProject.name : 'Untitled';
         document.title = `${projectName}${unsavedMark} - ClearVision`;
     }
 
@@ -407,7 +469,7 @@ class ProjectManager {
             
             // 创建新工程
             const project = await this.createProject(
-                projectData.name || '导入的工程',
+                projectData.name || 'Imported Project',
                 projectData.description || ''
             );
 
@@ -423,6 +485,40 @@ class ProjectManager {
             throw error;
         }
     }
+}
+
+function toUpdateFlowRequest(flow) {
+    return {
+        operators: Array.isArray(flow?.operators) ? flow.operators : (flow?.Operators || []),
+        connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || [])
+    };
+}
+
+function getGlobalVariablesSignature(globalVariables) {
+    if (!globalVariables) {
+        return '';
+    }
+
+    return JSON.stringify(globalVariables);
+}
+
+function isProjectPayload(value) {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    return Boolean(
+        value.id ||
+        value.Id ||
+        value.name ||
+        value.Name ||
+        Object.prototype.hasOwnProperty.call(value, 'description') ||
+        Object.prototype.hasOwnProperty.call(value, 'Description') ||
+        value.flow ||
+        value.Flow ||
+        value.globalVariables ||
+        value.GlobalVariables
+    );
 }
 
 // 创建单例

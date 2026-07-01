@@ -380,6 +380,48 @@ test('duplicate result ids do not republish images or callbacks', (t) => {
   assert.equal(inspectionController.getLastResultImageBase64(), 'FIRST_IMAGE');
 });
 
+test('stopRealtime publishes stopped state for the current project when terminal SSE is missing', async (t) => {
+  const originalPost = httpClient.post;
+  const originalProjectId = inspectionController.projectId;
+  const originalAbortController = inspectionController.abortController;
+  const originalEventSource = inspectionController.eventSource;
+  const states = [];
+  const unsubscribe = inspectionController.subscribeState(state => states.push(state));
+  let postedBody = null;
+  let aborted = false;
+
+  t.after(() => {
+    unsubscribe();
+    httpClient.post = originalPost;
+    inspectionController.projectId = originalProjectId;
+    inspectionController.abortController = originalAbortController;
+    inspectionController.eventSource = originalEventSource;
+  });
+
+  httpClient.post = async (url, body) => {
+    assert.equal(url, '/inspection/realtime/stop');
+    postedBody = body;
+    return {};
+  };
+  inspectionController.setProject('project-stop-terminal');
+  inspectionController.abortController = { abort() { aborted = true; } };
+  inspectionController.applyRuntimeStateSnapshot({
+    projectId: 'project-stop-terminal',
+    status: 'Running',
+    isBusy: true
+  });
+
+  await inspectionController.stopRealtime();
+
+  const lastState = states.at(-1);
+  assert.deepEqual(postedBody, { projectId: 'project-stop-terminal' });
+  assert.equal(aborted, true);
+  assert.equal(lastState.projectId, 'project-stop-terminal');
+  assert.equal(lastState.status, 'idle');
+  assert.equal(lastState.isRunning, false);
+  assert.equal(lastState.isRealtime, false);
+});
+
 test('recent completed result dedupe keys are hard bounded for high-frequency streams', (t) => {
   const originalMaxEntries = inspectionController.resultDedupeMaxEntries;
   const originalWindowMs = inspectionController.resultDedupeWindowMs;

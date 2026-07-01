@@ -41,6 +41,8 @@ public sealed class RuntimeFieldExtensions
     public string? RuntimeParameters { get; set; }
 
     public string? DefaultSiteProfile { get; set; }
+
+    public string? GlobalVariables { get; set; }
 }
 
 public enum RuntimeParameterValueType
@@ -289,6 +291,10 @@ public sealed class RuntimeNormalizedResult
     public DateTimeOffset CompletedAtUtc { get; set; }
 
     public Dictionary<string, object?> PrimaryOutputs { get; set; } = [];
+
+    public string? GlobalVariableSchemaHash { get; set; }
+
+    public Dictionary<string, object?> PublicGlobalVariables { get; set; } = [];
 
     [JsonIgnore]
     public byte[]? OutputImageBytes { get; set; }

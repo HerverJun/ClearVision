@@ -28,7 +28,13 @@ public sealed class JsonFileProjectFlowStorage : IProjectFlowStorage
 
     public async Task SaveFlowJsonAsync(Guid projectId, string flowJson)
     {
+        await SaveFlowJsonAsync(projectId, flowJson, persistenceRevision: 0);
+    }
+
+    public async Task SaveFlowJsonAsync(Guid projectId, string flowJson, long persistenceRevision)
+    {
         ArgumentNullException.ThrowIfNull(flowJson);
+        ArgumentOutOfRangeException.ThrowIfNegative(persistenceRevision);
         ValidateJson(flowJson);
 
         await _gate.WaitAsync();
@@ -46,7 +52,7 @@ public sealed class JsonFileProjectFlowStorage : IProjectFlowStorage
             }
 
             File.Move(tempPath, filePath, overwrite: true);
-            await WriteMetadataAsync(projectId, flowJson);
+            await WriteMetadataAsync(projectId, flowJson, persistenceRevision);
         }
         finally
         {
@@ -92,12 +98,61 @@ public sealed class JsonFileProjectFlowStorage : IProjectFlowStorage
         }
     }
 
-    private async Task WriteMetadataAsync(Guid projectId, string flowJson)
+    public async Task DeleteFlowJsonAsync(Guid projectId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            File.Delete(GetFilePath(projectId));
+            File.Delete(GetLastGoodPath(projectId));
+            File.Delete(GetMetadataPath(projectId));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            var metadataPath = GetMetadataPath(projectId);
+            if (!File.Exists(metadataPath))
+            {
+                return null;
+            }
+
+            var json = await File.ReadAllTextAsync(metadataPath, Encoding.UTF8);
+            var metadata = JsonSerializer.Deserialize<ProjectFlowStorageMetadataFile>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (metadata == null)
+            {
+                return null;
+            }
+
+            return new ProjectFlowStorageMetadata(
+                metadata.SchemaVersion,
+                metadata.ProjectId,
+                metadata.PersistenceRevision,
+                metadata.FlowHash ?? string.Empty,
+                metadata.SavedAtUtc);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task WriteMetadataAsync(Guid projectId, string flowJson, long persistenceRevision)
     {
         var metadata = new
         {
             schemaVersion = 1,
             projectId,
+            persistenceRevision,
             flowHash = ComputeSha256(flowJson),
             savedAtUtc = DateTimeOffset.UtcNow
         };
@@ -142,5 +197,18 @@ public sealed class JsonFileProjectFlowStorage : IProjectFlowStorage
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private sealed class ProjectFlowStorageMetadataFile
+    {
+        public int SchemaVersion { get; init; }
+
+        public Guid ProjectId { get; init; }
+
+        public long PersistenceRevision { get; init; }
+
+        public string? FlowHash { get; init; }
+
+        public DateTimeOffset SavedAtUtc { get; init; }
     }
 }

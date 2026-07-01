@@ -1,3 +1,4 @@
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.DependencyInjection;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Runtime;
@@ -32,6 +33,8 @@ internal static class Program
                 services.AddSingleton<RuntimePackageValidator>();
                 services.AddSingleton<RuntimePackageLoader>();
                 services.AddSingleton<RuntimeResultNormalizer>();
+                services.AddSingleton<IProjectVariableStateStore>(_ => new JsonFileProjectVariableStateStore(
+                    StationSettingsPaths.GetStationProjectVariableStatesPath()));
                 services.AddSingleton<RuntimeHost>();
                 services.AddSingleton<IConfigurationService, JsonConfigurationService>();
                 services.AddSingleton<StationHardwareSettingsService>();

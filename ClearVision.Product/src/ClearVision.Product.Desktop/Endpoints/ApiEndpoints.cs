@@ -10,6 +10,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Handlers;
@@ -24,6 +25,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Desktop.Endpoints;
@@ -33,6 +35,8 @@ namespace ClearVision.Product.Desktop.Endpoints;
 /// </summary>
 public static class ApiEndpoints
 {
+    private static readonly JsonSerializerOptions OptionalRequestJsonOptions = new(JsonSerializerDefaults.Web);
+
     public static IEndpointRouteBuilder MapVisionApiEndpoints(this IEndpointRouteBuilder app)
     {
         // 健康检查
@@ -86,6 +90,23 @@ public static class ApiEndpoints
         public bool RegisterForStationDeployment { get; set; } = true;
     }
 
+    public sealed class ProjectVariableValueWriteRequest
+    {
+        public object? Value { get; set; }
+
+        public long? ExpectedVersion { get; set; }
+    }
+
+    public sealed class ProjectVariableResetRequest
+    {
+        public long? ExpectedVersion { get; set; }
+    }
+
+    public sealed class ProjectVariableResetAllRequest
+    {
+        public Dictionary<Guid, long>? ExpectedVersions { get; set; }
+    }
+
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
     {
         // 获取工程列表
@@ -112,8 +133,15 @@ public static class ApiEndpoints
         // 获取工程详情
         app.MapGet("/api/projects/{id:guid}", async (Guid id, ProjectService service) =>
         {
-            var project = await service.GetByIdAsync(id);
-            return project != null ? Results.Ok(project) : Results.NotFound();
+            try
+            {
+                var project = await service.GetByIdAsync(id);
+                return project != null ? Results.Ok(project) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
         });
 
         // 创建工程
@@ -131,8 +159,21 @@ public static class ApiEndpoints
         });
 
         // 更新工程
-        app.MapPut("/api/projects/{id:guid}", async (Guid id, UpdateProjectRequest request, ProjectService service) =>
+        app.MapPut("/api/projects/{id:guid}", async (
+            Guid id,
+            UpdateProjectRequest request,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            var requiresMutationLease = request.Flow != null || request.GlobalVariables != null;
+            await using var mutationLease = requiresMutationLease
+                ? await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-update", CancellationToken.None)
+                : null;
+            if (requiresMutationLease && mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
             try
             {
                 var project = await service.UpdateAsync(id, request);
@@ -140,13 +181,22 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
         // 删除工程
-        app.MapDelete("/api/projects/{id:guid}", async (Guid id, ProjectService service) =>
+        app.MapDelete("/api/projects/{id:guid}", async (
+            Guid id,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-delete", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
             try
             {
                 await service.DeleteAsync(id);
@@ -154,13 +204,23 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
         // 更新流程
-        app.MapPut("/api/projects/{id:guid}/flow", async (Guid id, UpdateFlowRequest request, ProjectService service) =>
+        app.MapPut("/api/projects/{id:guid}/flow", async (
+            Guid id,
+            UpdateFlowRequest request,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "flow-update", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
             try
             {
                 // 使用 ProjectService 处理更新，它现在使用文件存储
@@ -172,7 +232,239 @@ public static class ApiEndpoints
             catch (Exception ex)
             {
                 // 日志已由全局异常中间件记录
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapGet("/api/projects/{id:guid}/global-variables", async (
+            Guid id,
+            ProjectService service,
+            IServiceProvider serviceProvider) =>
+        {
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                return project != null ? Results.Ok(project.GlobalVariables) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapPut("/api/projects/{id:guid}/global-variables", async (
+            Guid id,
+            ProjectGlobalVariableSchema schema,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+        {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-schema-update", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
+            try
+            {
+                var saved = await service.UpdateGlobalVariablesAsync(id, schema);
+                return Results.Ok(saved);
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapGet("/api/projects/{id:guid}/global-variable-values", async (
+            Guid id,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions,
+            IServiceProvider serviceProvider) =>
+        {
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
+
+                var session = sessions.GetOrCreate(project);
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapPut("/api/projects/{id:guid}/global-variable-values/{variableId:guid}", async (
+            Guid id,
+            Guid variableId,
+            ProjectVariableValueWriteRequest request,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider) =>
+        {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-manual-write", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
+
+                var session = sessions.GetOrCreate(project);
+                if (!session.TryGetDefinition(variableId, out var definition))
+                {
+                    return Results.NotFound(new { Error = "Variable not found." });
+                }
+
+                if (!definition.ManualWriteAllowed)
+                {
+                    return Results.BadRequest(new { Code = "GV030", Error = "Manual write is not allowed for this variable." });
+                }
+
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual),
+                        request.ExpectedVersion.HasValue
+                            ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
+                            : null,
+                        out var updatedSession,
+                        out var error))
+                {
+                    return ToProjectVariableMutationFailure(error);
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapPost("/api/projects/{id:guid}/global-variable-values/reset", async (
+            Guid id,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider,
+            HttpContext context) =>
+        {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-all", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
+
+                var blockedVariable = project.GlobalVariables.Variables.FirstOrDefault(variable => !variable.ManualWriteAllowed);
+                if (blockedVariable != null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Code = "GV030",
+                        Error = "Manual reset is not allowed for one or more variables.",
+                        blockedVariable.Id,
+                        blockedVariable.Name
+                    });
+                }
+
+                var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetAllRequest>(context);
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.ResetAll(ProjectVariableUpdatedBy.Reset),
+                        request?.ExpectedVersions?.Count > 0 ? request.ExpectedVersions : null,
+                        out var updatedSession,
+                        out var error))
+                {
+                    return ToProjectVariableMutationFailure(error);
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
+        });
+
+        app.MapPost("/api/projects/{id:guid}/global-variable-values/{variableId:guid}/reset", async (
+            Guid id,
+            Guid variableId,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider,
+            HttpContext context) =>
+        {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-one", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
+
+                var session = sessions.GetOrCreate(project);
+                if (!session.TryGetDefinition(variableId, out var definition))
+                {
+                    return Results.NotFound(new { Error = "Variable not found." });
+                }
+
+                if (!definition.ManualWriteAllowed)
+                {
+                    return Results.BadRequest(new { Code = "GV030", Error = "Manual reset is not allowed for this variable." });
+                }
+
+                var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetRequest>(context);
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset),
+                        request?.ExpectedVersion.HasValue == true
+                            ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
+                            : null,
+                        out var updatedSession,
+                        out var error))
+                {
+                    return ToProjectVariableMutationFailure(error);
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
             }
         });
 
@@ -182,6 +474,7 @@ public static class ApiEndpoints
             ProjectService service,
             RuntimePackageExporter exporter,
             StationPackageStore packageStore,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -190,6 +483,12 @@ public static class ApiEndpoints
                 if (!IsAdmin(context))
                 {
                     return Results.Json(new { Error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "runtime-package-export", cancellationToken);
+                if (mutationLease == null)
+                {
+                    return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
                 }
 
                 var project = await service.GetByIdAsync(id);
@@ -242,7 +541,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
     }
@@ -279,6 +578,15 @@ public static class ApiEndpoints
                     var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                if (TryParseStableError(ex.Message, out var code, out var message))
+                {
+                    return Results.BadRequest(new { Code = code, Error = message });
+                }
+
+                return Results.Conflict(new { Code = "GV031", Error = ex.Message });
             }
             catch (Exception ex)
             {
@@ -383,6 +691,11 @@ public static class ApiEndpoints
             }
             catch (InvalidOperationException ex)
             {
+                if (TryParseStableError(ex.Message, out var code, out var message))
+                {
+                    return Results.BadRequest(new { Code = code, Error = message });
+                }
+
                 return Results.Conflict(new { Error = ex.Message });
             }
             catch (Exception ex)
@@ -410,6 +723,122 @@ public static class ApiEndpoints
                 return Results.BadRequest(new { Error = ex.Message });
             }
         });
+    }
+
+    private static object ToProjectVariableValueDtos(
+        ProjectGlobalVariableSchema schema,
+        IProjectVariableSession session)
+    {
+        var definitionsById = schema.Variables.ToDictionary(variable => variable.Id);
+        return session.GetSnapshots().Select(snapshot =>
+        {
+            definitionsById.TryGetValue(snapshot.VariableId, out var definition);
+            return new
+            {
+                snapshot.VariableId,
+                Name = definition?.Name ?? string.Empty,
+                DisplayName = definition?.DisplayName ?? definition?.Name ?? string.Empty,
+                ValueType = definition?.ValueType.ToString() ?? string.Empty,
+                Value = ToProjectVariableApiValue(definition, snapshot.Value),
+                snapshot.Version,
+                snapshot.UpdatedAtUtc,
+                UpdatedBy = snapshot.UpdatedBy.ToString(),
+                snapshot.RunId,
+                snapshot.OperatorId,
+                ManualWriteAllowed = definition?.ManualWriteAllowed ?? false,
+                IncludeInResultMetadata = definition?.IncludeInResultMetadata ?? false
+            };
+        }).ToList();
+    }
+
+    private static object? ToProjectVariableApiValue(
+        ProjectGlobalVariableDefinition? definition,
+        System.Text.Json.JsonElement value)
+    {
+        if (definition?.ValueType == ProjectGlobalVariableValueType.Int64)
+        {
+            return value.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Number when value.TryGetInt64(out var longValue) => longValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                System.Text.Json.JsonValueKind.String => value.GetString(),
+                _ => ProjectVariableValueConverter.ToObject(value)?.ToString()
+            };
+        }
+
+        return ProjectVariableValueConverter.ToObject(value);
+    }
+
+    private static IResult ToBadRequest(Exception ex)
+    {
+        return TryParseStableError(ex.Message, out var code, out var message)
+            ? Results.BadRequest(new { Code = code, Error = message })
+            : Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static IResult ToProjectVariableMutationFailure(string? error)
+    {
+        if (TryParseStableError(error, out var code, out var message))
+        {
+            return code == "GV025"
+                ? Results.Conflict(new { Code = code, Error = message })
+                : Results.BadRequest(new { Code = code, Error = message });
+        }
+
+        return Results.BadRequest(new { Code = "GV032", Error = error });
+    }
+
+    private static async ValueTask<ProjectAccessLease?> AcquireProjectAccessAsync(
+        IServiceProvider serviceProvider,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var coordinator = serviceProvider.GetService<ProjectSaveCoordinator>();
+        return coordinator == null
+            ? null
+            : await coordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
+    }
+
+    private static async ValueTask<T?> ReadOptionalJsonBodyAsync<T>(HttpContext context)
+        where T : class
+    {
+        using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<T>(body, OptionalRequestJsonOptions);
+    }
+
+    private static bool TryParseStableError(string? message, out string code, out string error)
+    {
+        code = string.Empty;
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var separatorIndex = message.IndexOf(':', StringComparison.Ordinal);
+        var candidateCode = separatorIndex > 0 ? message[..separatorIndex] : message;
+        if (!candidateCode.StartsWith("GV", StringComparison.OrdinalIgnoreCase) &&
+            !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        code = candidateCode;
+        error = separatorIndex >= 0
+            ? message[(separatorIndex + 1)..].TrimStart()
+            : message;
+        return true;
+    }
+
+    private static bool IsProjectRuntimeBusy(Guid projectId, IInspectionRuntimeCoordinator runtimeCoordinator)
+    {
+        var state = runtimeCoordinator.GetState(projectId);
+        return state?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping;
     }
 
     private static void MapOperatorEndpoints(IEndpointRouteBuilder app)

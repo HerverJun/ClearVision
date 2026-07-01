@@ -13,10 +13,13 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -40,6 +43,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
+    private readonly AgentGenerateFlowOptions _agentGenerateFlowOptions;
+    private readonly IVisionAgentGenerateFlowService? _agentGenerateFlowService;
+    private readonly IVisionAgentBuildRunService? _buildRunService;
+    private readonly IAgentRunEventStreamService? _agentRunStreamService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -66,7 +73,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
-        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
+        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger,
+        IOptions<AgentGenerateFlowOptions>? agentGenerateFlowOptions = null,
+        IVisionAgentGenerateFlowService? agentGenerateFlowService = null,
+        IVisionAgentBuildRunService? buildRunService = null,
+        IAgentRunEventStreamService? agentRunStreamService = null)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -84,6 +95,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
         _logger = logger;
+        _agentGenerateFlowOptions = agentGenerateFlowOptions?.Value ?? new AgentGenerateFlowOptions();
+        _agentGenerateFlowService = agentGenerateFlowService;
+        _buildRunService = buildRunService;
+        _agentRunStreamService = agentRunStreamService;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -101,6 +116,61 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
             progressMessages.Add(message);
             onProgress?.Invoke(message);
+        }
+
+        if (request.BuildFromPlan != null)
+        {
+            return await GenerateFlowFromPlanAsync(request, ReportProgress, cancellationToken);
+        }
+
+        if (ShouldRunAgentGenerateFlow(request))
+        {
+            try
+            {
+                ReportProgress("视觉智能体受控构建模式已启用。");
+                if (_agentGenerateFlowService == null)
+                {
+                    throw new InvalidOperationException("视觉智能体 GenerateFlow 服务未注册。");
+                }
+
+                var agentResult = await _agentGenerateFlowService.GenerateFlowAsync(request, cancellationToken);
+                if (agentResult.Success || !_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
+                {
+                    TryPersistAgentGenerateFlowResult(request, agentResult, progressMessages);
+                    return agentResult;
+                }
+
+                _logger.LogWarning(
+                    "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow. Error={Error}",
+                    agentResult.ErrorMessage);
+                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
+            }
+            catch (Exception ex) when (_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
+            {
+                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow.");
+                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed with controlled error mode.");
+                return new AiFlowGenerationResult
+                {
+                    Success = false,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+                    ErrorMessage = $"Vision Agent GenerateFlow 失败：{ex.Message}",
+                    FailureSummary = new AiFailureSummary
+                    {
+                        Category = "vision_agent",
+                        Code = "controlled_agent_generate_flow_failed",
+                        Message = $"Vision Agent GenerateFlow 失败：{ex.Message}",
+                        RepairTarget = "请切换旧版 GenerateFlow，或稍后重试。"
+                    },
+                    InteractionState = AiInteractionStates.Failed,
+                    TurnIntent = AiTurnIntents.NewFlow,
+                    RouterConfidence = AiRouterConfidence.Low
+                };
+            }
         }
 
         var pipeline = new AiGenerationPipelineContext();
@@ -591,7 +661,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         ClarificationRequired = requirementBrief.ClarificationRequired
                     };
 
-                    _conversationalFlowService.RecordAssistantResponse(
+                    var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
                         conversationContext.SessionId,
                         assistantReply,
                         JsonSerializer.Serialize(generatedFlow, _jsonOptions),
@@ -624,7 +694,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
                         RouterConfidence = turnRoute.Confidence,
                         BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+                        PersistenceWarning = persistenceWarning
                     };
                 }
 
@@ -668,7 +739,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     : AiFlowGenerationResult.CompletionStatusTimedOut;
                 var errorMessage = wasUserCancelled
                     ? "用户已取消本次生成。"
-                    : "AI generation timed out. Please retry.";
+                    : "AI 生成超时，请稍后重试。";
                 var cancelledValidation = new AiValidationResult();
                 cancelledValidation.AddError(
                     errorMessage,
@@ -856,6 +927,195 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters;
     }
 
+    private bool ShouldRunAgentGenerateFlow(AiFlowGenerationRequest request)
+    {
+        return _agentGenerateFlowOptions.Enabled &&
+               request.UseVisionAgentGenerateFlow;
+    }
+
+    private async Task<AiFlowGenerationResult> GenerateFlowFromPlanAsync(
+        AiFlowGenerationRequest request,
+        Action<string> reportProgress,
+        CancellationToken cancellationToken)
+    {
+        if (_buildRunService == null || _agentRunStreamService == null)
+        {
+            return new AiFlowGenerationResult
+            {
+                Success = false,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+                ErrorMessage = "Vision Agent Build run service is not registered.",
+                FailureSummary = new AiFailureSummary
+                {
+                    Category = "vision_agent_build_from_plan",
+                    Code = VisionAgentBuildFailureCodes.BuildOrchestratorNotRegistered,
+                    Message = "Vision Agent Build run service is not registered.",
+                    RepairTarget = "Register IVisionAgentBuildRunService and IAgentRunEventStreamService before starting BuildFromPlan."
+                },
+                InteractionState = AiInteractionStates.Failed,
+                TurnIntent = AiTurnIntents.NewFlow,
+                RouterConfidence = AiRouterConfidence.High
+            };
+        }
+
+        reportProgress("Vision Agent BuildFromPlan request is using the canonical AgentRun run service.");
+        var runId = request.AgentRunId?.Trim();
+        if (string.IsNullOrWhiteSpace(runId) || _agentRunStreamService.Replay(runId) == null)
+        {
+            var createResult = _agentRunStreamService.CreateRun(
+                request.Description,
+                new
+                {
+                    runKind = VisionAgentRunKindResolver.Build,
+                    mode = request.Mode.ToWireValue(),
+                    useVisionAgentGenerateFlow = true,
+                    agentGenerateFlowMode = request.AgentGenerateFlowMode,
+                    transport = BuildCommandTransports.Internal,
+                    sessionId = request.SessionId,
+                    planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+                    planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                    hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
+                    metadataOnly = true
+                });
+            runId = createResult.RunId;
+        }
+
+        var runRequest = string.Equals(request.AgentRunId, runId, StringComparison.OrdinalIgnoreCase)
+            ? request
+            : request with { AgentRunId = runId };
+        var runResult = await _buildRunService.RunAsync(
+            BuildCommand.FromGenerationRequest(
+                runRequest,
+                runId,
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            cancellationToken);
+
+        return runResult.Outcome.Result;
+    }
+    private AiPersistenceWarning? PersistAgentGenerateFlowResult(
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        IReadOnlyList<string> progressMessages)
+    {
+        var session = _conversationalFlowService.GetOrCreateSession(request.SessionId);
+        result.SessionId = session.SessionId;
+
+        var assistantMessage = result.Success
+            ? result.AiExplanation ?? "视觉智能体已完成仅元数据流程草稿构建。"
+            : result.ErrorMessage ?? result.FailureSummary?.Message ?? "视觉智能体运行失败。";
+        var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, _jsonOptions);
+        var buildResult = result.BuildResult;
+        var payload = new ConversationTurnPayload
+        {
+            Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
+            Status = result.CompletionStatus,
+            InteractionState = result.InteractionState,
+            TurnIntent = result.TurnIntent,
+            RouterConfidence = result.RouterConfidence,
+            Reply = result.Success ? assistantMessage : null,
+            Reasoning = null,
+            Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
+            ClarificationRequired = result.ClarificationRequired,
+            RequirementBrief = result.RequirementBrief,
+            BuildResult = buildResult,
+            WorkflowDiff = buildResult?.WorkflowDiff,
+            ApplyGate = buildResult?.ApplyGate,
+            ToolEvidenceTimeline = buildResult?.ToolEvidenceTimeline,
+            FirstFixRecommendation = buildResult?.FirstFixRecommendation,
+            BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+            Failure = result.Success || result.FailureSummary == null
+                ? null
+                : new ConversationTurnFailurePayload
+                {
+                    Summary = assistantMessage,
+                    FailureSummary = CloneFailureSummary(result.FailureSummary),
+                    Diagnostics = result.LastAttemptDiagnostics.Select(CloneAttemptDiagnostic).ToList()
+                }
+        };
+
+        return RecordAssistantResponseWithPersistenceWarning(
+            session.SessionId,
+            assistantMessage,
+            flowJson,
+            flowJson,
+            payload);
+    }
+
+    private void TryPersistAgentGenerateFlowResult(
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        IReadOnlyList<string> progressMessages)
+    {
+        try
+        {
+            var persistenceWarning = PersistAgentGenerateFlowResult(request, result, progressMessages);
+            result.PersistenceWarning ??= persistenceWarning;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Vision Agent GenerateFlow result persistence failed; returning agent result without legacy fallback.");
+            result.PersistenceWarning ??= new AiPersistenceWarning
+            {
+                Code = "session_persistence_failed",
+                Message = "结果已生成，但本次会话尚未成功保存。"
+            };
+        }
+    }
+
+    private AiPersistenceWarning? RecordAssistantResponseWithPersistenceWarning(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null)
+    {
+        var writeResult = _conversationalFlowService.RecordAssistantResponseWithPersistence(
+            sessionId,
+            assistantMessage,
+            latestFlowJson,
+            latestCanvasFlowJson,
+            payload);
+        if (writeResult?.Success == true)
+        {
+            return null;
+        }
+
+        var status = writeResult?.PersistenceStatus ?? new ConversationPersistenceStatus
+        {
+            PrimaryStoreSaved = false,
+            RecoveryBackupSaved = false,
+            ErrorCode = "session_persistence_failed",
+            PublicMessage = "结果已生成，但本次会话尚未成功保存。"
+        };
+        _logger.LogWarning(
+            "Vision Agent assistant response persistence failed. SessionId={SessionId}, ErrorCode={ErrorCode}, PrimaryStoreSaved={PrimaryStoreSaved}, RecoveryBackupSaved={RecoveryBackupSaved}",
+            sessionId,
+            status.ErrorCode,
+            status.PrimaryStoreSaved,
+            status.RecoveryBackupSaved);
+
+        return BuildPersistenceWarning(status);
+    }
+
+    private static AiPersistenceWarning BuildPersistenceWarning(ConversationPersistenceStatus status)
+    {
+        return new AiPersistenceWarning
+        {
+            Code = string.IsNullOrWhiteSpace(status.ErrorCode)
+                ? "session_persistence_failed"
+                : status.ErrorCode,
+            Message = string.IsNullOrWhiteSpace(status.PublicMessage)
+                ? "结果已生成，但本次会话尚未成功保存。"
+                : status.PublicMessage,
+            PersistenceStatus = status
+        };
+    }
+
     private static GenerateFlowMode ResolveEffectiveMode(
         AiTurnRoute route,
         GenerateFlowMode fallbackMode,
@@ -935,7 +1195,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             ClarificationRequired = false
         };
 
-        _conversationalFlowService.RecordAssistantResponse(
+        var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             reply,
             null,
@@ -950,7 +1210,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TurnIntent = turnRoute.TurnIntent,
             InteractionState = turnRoute.InteractionState,
             RouterConfidence = turnRoute.Confidence,
-            StageTimeline = stageTimeline.ToList()
+            StageTimeline = stageTimeline.ToList(),
+            PersistenceWarning = persistenceWarning
         };
     }
 
@@ -3157,7 +3418,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             RequirementBrief = requirementBrief
         };
 
-        _conversationalFlowService.RecordAssistantResponse(
+        var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             summary,
             null,
@@ -3186,7 +3447,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             InteractionState = AiInteractionStates.Clarifying,
             RouterConfidence = turnRoute.Confidence,
             BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+            PersistenceWarning = persistenceWarning
         };
     }
 
@@ -3639,7 +3901,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             summary.AppendLine(TrimRetryOutput(lastRawResponse));
         }
 
-        _conversationalFlowService.RecordAssistantResponse(
+        RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             summary.ToString().Trim(),
             null,
@@ -3662,6 +3924,19 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TargetTempId = source.TargetTempId,
             TargetPortName = source.TargetPortName,
             RepairHint = source.RepairHint
+        };
+    }
+
+    private static AiFailureSummary CloneFailureSummary(AiFailureSummary source)
+    {
+        return new AiFailureSummary
+        {
+            Category = source.Category,
+            Code = source.Code,
+            Message = source.Message,
+            RepairTarget = source.RepairTarget,
+            RetryCount = source.RetryCount,
+            LastOutputSummary = source.LastOutputSummary
         };
     }
 
@@ -3846,5 +4121,3 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return (int)(cjkCount * 1.5 + nonCjkCount * 0.25);
     }
 }
-
-

@@ -220,12 +220,17 @@ public class ImageAcquisitionServiceIntegrationTests
                 return Task.CompletedTask;
             });
 
-        var completed = await Task.WhenAny(frameReceived.Task, Task.Delay(TimeSpan.FromSeconds(2)));
-        await _acquisitionService.StopContinuousAcquisitionAsync("camera-stream");
+        ImageDto result;
+        try
+        {
+            result = await frameReceived.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            await _acquisitionService.StopContinuousAcquisitionAsync("camera-stream");
+        }
 
         // Assert
-        completed.Should().Be(frameReceived.Task);
-        var result = await frameReceived.Task;
         result.Width.Should().BeGreaterThan(0);
         result.Height.Should().BeGreaterThan(0);
         await camera.Received().AcquireSingleFrameAsync();

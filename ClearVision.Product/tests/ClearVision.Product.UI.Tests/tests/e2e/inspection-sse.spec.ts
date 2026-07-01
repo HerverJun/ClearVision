@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 async function openModuleHost(page) {
-  await page.route('**/api/auth/setup-status', async route => {
+  await page.route('**/module-host.html', async route => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ requiresInitialAdminSetup: false }),
+      contentType: 'text/html',
+      body: '<!doctype html><html><head><meta charset="utf-8"><title>Module Host</title></head><body></body></html>',
     });
   });
 
-  await page.goto('/login.html');
+  await page.goto('/module-host.html');
 }
 
 test('inspection SSE stores event ids and sends Last-Event-ID on reconnect', async ({ page }) => {

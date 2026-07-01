@@ -1,5 +1,5 @@
 using System.Reflection;
-using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Desktop.Inspection;
@@ -64,7 +64,7 @@ public class InspectionRealtimeEventMapperTests
 
     private static InspectionResultEvent CreateInspectionResultEventWithAnalysisData()
     {
-        var evt = (InspectionResultEvent)FormatterServices.GetUninitializedObject(typeof(InspectionResultEvent));
+        var evt = (InspectionResultEvent)RuntimeHelpers.GetUninitializedObject(typeof(InspectionResultEvent));
         SetProperty(evt, nameof(InspectionResultEvent.ProjectId), Guid.NewGuid());
         SetProperty(evt, nameof(InspectionResultEvent.SessionId), Guid.NewGuid());
         SetProperty(evt, nameof(InspectionResultEvent.ResultId), Guid.NewGuid());

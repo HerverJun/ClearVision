@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -34,20 +35,46 @@ public sealed class RuntimeHost : IAsyncDisposable
     private int _sessionNgCount;
     private int _sessionErrorCount;
     private int _pendingCount;
-    private RuntimeResultRecordWriter? _resultWriter;
-    private RuntimeImageWriter? _imageWriter;
+    private IRuntimeResultRecordWriter? _resultWriter;
+    private IRuntimeImageWriter? _imageWriter;
+    private IProjectVariableSession? _projectVariableSession;
+    private readonly IProjectVariableStateStore? _projectVariableStateStore;
+    private string? _projectVariableStateScopeId;
+    private readonly Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>> _writerFactory;
+    private readonly Func<string, RuntimeProfile, IRuntimeResultRecordWriter> _resultWriterFactory;
+    private readonly Func<string, RuntimeProfile, IRuntimeImageWriter> _imageWriterFactory;
     private int _disposeStarted;
 
     public RuntimeHost(
         IFlowExecutionService flowExecutionService,
         RuntimePackageLoader packageLoader,
         RuntimeResultNormalizer resultNormalizer,
-        ILogger<RuntimeHost> logger)
+        ILogger<RuntimeHost> logger,
+        IProjectVariableStateStore? projectVariableStateStore = null)
+        : this(flowExecutionService, packageLoader, resultNormalizer, logger, null, projectVariableStateStore)
+    {
+    }
+
+    internal RuntimeHost(
+        IFlowExecutionService flowExecutionService,
+        RuntimePackageLoader packageLoader,
+        RuntimeResultNormalizer resultNormalizer,
+        ILogger<RuntimeHost> logger,
+        Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>>? writerFactory,
+        IProjectVariableStateStore? projectVariableStateStore = null,
+        Func<string, RuntimeProfile, IRuntimeResultRecordWriter>? resultWriterFactory = null,
+        Func<string, RuntimeProfile, IRuntimeImageWriter>? imageWriterFactory = null)
     {
         _flowExecutionService = flowExecutionService;
         _packageLoader = packageLoader;
         _resultNormalizer = resultNormalizer;
         _logger = logger;
+        _resultWriterFactory = resultWriterFactory ?? ((dataRoot, profile) =>
+            new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger));
+        _imageWriterFactory = imageWriterFactory ?? ((dataRoot, profile) =>
+            new RuntimeImageWriter(dataRoot, profile, _logger));
+        _writerFactory = writerFactory ?? CreateWritersAsync;
+        _projectVariableStateStore = projectVariableStateStore;
     }
 
     public event Action<RuntimeHostSnapshot>? SnapshotChanged;
@@ -86,28 +113,164 @@ public sealed class RuntimeHost : IAsyncDisposable
         };
     }
 
-    public async Task<RuntimePackage> LoadPackageAsync(string packageRoot, CancellationToken cancellationToken = default)
+    public IReadOnlyList<ProjectVariableValueSnapshot> GetProjectVariableSnapshots()
     {
-        var package = await _packageLoader.LoadAsync(packageRoot, cancellationToken);
+        return _projectVariableSession?.GetSnapshots() ?? [];
+    }
 
+    public async Task<ProjectVariableValueSnapshot> SetProjectVariableValueAsync(
+        Guid variableId,
+        object? value,
+        CancellationToken cancellationToken = default)
+    {
+        return await SetProjectVariableValueAsync(variableId, value, expectedVersion: null, cancellationToken);
+    }
+
+    public async Task<ProjectVariableValueSnapshot> SetProjectVariableValueAsync(
+        Guid variableId,
+        object? value,
+        long? expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
         await _stateGate.WaitAsync(cancellationToken);
         try
         {
+            EnsurePackageLoaded();
             EnsureNotRunning();
-            _loadedPackage = package;
-            lock (_profileGate)
+            var session = _projectVariableSession ?? throw new RuntimePackageException("Project variable session is not initialized.");
+            if (!session.TryGetDefinition(variableId, out var definition))
             {
-                _activeSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
+                throw new RuntimePackageException($"Project global variable '{variableId}' does not exist.");
             }
 
-            ResetSessionCounters();
-            await RecreateWritersAsync(package.RuntimeProfile);
-            _state = RuntimeHostState.Loaded;
+            if (!definition.ManualWriteAllowed)
+            {
+                throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station writes.");
+            }
+
+            var expectedVersions = CaptureProjectVariableVersions(session, variableId, expectedVersion);
+            using var candidate = session.CreateSnapshotClone();
+            var snapshot = candidate.SetValue(variableId, value, ProjectVariableUpdatedBy.StationManual);
+            var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                throw new RuntimePackageException(commitResult.Error ?? "Project global variable state could not be persisted.");
+            }
+
+            EmitLog($"Station updated project global variable '{definition.Name}'.");
+            return snapshot;
         }
         finally
         {
             _stateGate.Release();
         }
+    }
+
+    public async Task<ProjectVariableValueSnapshot> ResetProjectVariableAsync(
+        Guid variableId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ResetProjectVariableAsync(variableId, expectedVersion: null, cancellationToken);
+    }
+
+    public async Task<ProjectVariableValueSnapshot> ResetProjectVariableAsync(
+        Guid variableId,
+        long? expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        await _stateGate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsurePackageLoaded();
+            EnsureNotRunning();
+            var session = _projectVariableSession ?? throw new RuntimePackageException("Project variable session is not initialized.");
+            if (!session.TryGetDefinition(variableId, out var definition))
+            {
+                throw new RuntimePackageException($"Project global variable '{variableId}' does not exist.");
+            }
+
+            if (!definition.ManualWriteAllowed)
+            {
+                throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station resets.");
+            }
+
+            var expectedVersions = CaptureProjectVariableVersions(session, variableId, expectedVersion);
+            using var candidate = session.CreateSnapshotClone();
+            var snapshot = candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset);
+            var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                throw new RuntimePackageException(commitResult.Error ?? "Project global variable state could not be persisted.");
+            }
+
+            EmitLog($"Station reset project global variable '{definition.Name}' to its initial value.");
+            return snapshot;
+        }
+        finally
+        {
+            _stateGate.Release();
+        }
+    }
+
+    public async Task<RuntimePackage> LoadPackageAsync(string packageRoot, CancellationToken cancellationToken = default)
+    {
+        var package = await _packageLoader.LoadAsync(packageRoot, cancellationToken);
+        var stateScopeId = BuildRuntimeProjectVariableStateScopeId(package);
+        var persistedSnapshots = _projectVariableStateStore?.Load(stateScopeId, package.GlobalVariables) ?? [];
+        var projectVariableSession = new ProjectVariableSession(package.GlobalVariables, persistedSnapshots);
+        var nextSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
+        RuntimePreparedWriters? preparedWriters = null;
+        IProjectVariableSession? oldProjectVariableSession = null;
+        IRuntimeResultRecordWriter? oldResultWriter = null;
+        IRuntimeImageWriter? oldImageWriter = null;
+
+        try
+        {
+            preparedWriters = await _writerFactory(package.RuntimeProfile);
+
+            await _stateGate.WaitAsync(cancellationToken);
+            try
+            {
+                EnsureNotRunning();
+
+                oldProjectVariableSession = _projectVariableSession;
+                oldResultWriter = _resultWriter;
+                oldImageWriter = _imageWriter;
+
+                _loadedPackage = package;
+                _projectVariableSession = projectVariableSession;
+                _projectVariableStateScopeId = stateScopeId;
+                projectVariableSession = null;
+                _resultWriter = preparedWriters.ResultWriter;
+                _imageWriter = preparedWriters.ImageWriter;
+                preparedWriters = null;
+                lock (_profileGate)
+                {
+                    _activeSiteProfile = nextSiteProfile;
+                }
+
+                ResetSessionCounters();
+                _state = RuntimeHostState.Loaded;
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
+        }
+        catch
+        {
+            projectVariableSession?.Dispose();
+            if (preparedWriters != null)
+            {
+                await DisposePreparedWritersAfterPrepareFailureAsync(preparedWriters);
+            }
+
+            throw;
+        }
+
+        DisposeOldProjectVariableSession(oldProjectVariableSession);
+        await DisposeOldWriterAfterCommitAsync(oldResultWriter, "runtime result record writer");
+        await DisposeOldWriterAfterCommitAsync(oldImageWriter, "runtime image writer");
 
         EmitSnapshot();
         EmitLog($"已加载运行包：{package.Manifest.PackageName}（{package.Manifest.FlowHash}）");
@@ -180,7 +343,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             _stopTimeoutPending = false;
             _activeRunCts = runCts;
             _state = RuntimeHostState.Running;
-            backgroundRunTask = ExecuteSingleCoreAsync(imagePath, runCts.Token);
+            backgroundRunTask = Task.Run(
+                () => ExecuteSingleCoreAsync(imagePath, runCts.Token),
+                CancellationToken.None);
             _backgroundRunTask = backgroundRunTask;
         }
         finally
@@ -376,6 +541,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             await imageWriter.DisposeAsync();
         }
 
+        _projectVariableSession?.Dispose();
+        _projectVariableSession = null;
+
         var activeRunCts = _activeRunCts;
         _activeRunCts = null;
         activeRunCts?.Dispose();
@@ -463,6 +631,12 @@ public sealed class RuntimeHost : IAsyncDisposable
             var applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
             var flow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
             _currentFlowId = flow.Id;
+            var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
+            var variableContext = new ProjectVariableExecutionContext(
+                variableSession,
+                ProjectVariableBindingIndex.Build(package.GlobalVariables),
+                Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid(),
+                commitHandler: CommitLoadedProjectVariableSession);
 
             var validation = _flowExecutionService.ValidateFlow(flow);
             if (!validation.IsValid)
@@ -486,7 +660,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             var flowResult = await _flowExecutionService.ExecuteFlowAsync(
                 flow,
                 BuildFlowInputData(sourceImageBytes),
+                variableContext,
                 cancellationToken: timeoutCts.Token);
+            var resultVariableSession = _projectVariableSession ?? variableSession;
 
             var normalizedResult = _resultNormalizer.Normalize(
                 package,
@@ -498,6 +674,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 startedAt,
                 DateTimeOffset.UtcNow,
                 timeoutCts.IsCancellationRequested);
+            AttachPublicGlobalVariables(normalizedResult, package.GlobalVariables, resultVariableSession);
 
             await PersistResultAsync(normalizedResult, cancellationToken);
             return normalizedResult;
@@ -535,6 +712,32 @@ public sealed class RuntimeHost : IAsyncDisposable
             _currentFlowId = null;
             _currentRunId = null;
             EmitSnapshot();
+        }
+    }
+
+    private static void AttachPublicGlobalVariables(
+        RuntimeNormalizedResult result,
+        ProjectGlobalVariableSchema schema,
+        IProjectVariableSession session)
+    {
+        result.GlobalVariableSchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
+
+        var publicVariables = schema.Variables
+            .Where(variable => variable.IncludeInResultMetadata)
+            .ToDictionary(variable => variable.Id);
+        if (publicVariables.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var snapshot in session.GetSnapshots())
+        {
+            if (!publicVariables.TryGetValue(snapshot.VariableId, out var definition))
+            {
+                continue;
+            }
+
+            result.PublicGlobalVariables[definition.Name] = ProjectVariableValueConverter.ToObject(snapshot.Value);
         }
     }
 
@@ -643,26 +846,164 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private async Task RecreateWritersAsync(RuntimeProfile profile)
+    private async ValueTask<RuntimePreparedWriters> CreateWritersAsync(RuntimeProfile profile)
     {
-        var resultWriter = _resultWriter;
-        _resultWriter = null;
-        if (resultWriter != null)
-        {
-            await resultWriter.DisposeAsync();
-        }
-
-        var imageWriter = _imageWriter;
-        _imageWriter = null;
-        if (imageWriter != null)
-        {
-            await imageWriter.DisposeAsync();
-        }
-
         var dataRoot = RuntimePathGuard.GetDefaultStationDataRoot();
         Directory.CreateDirectory(dataRoot);
-        _resultWriter = new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger);
-        _imageWriter = new RuntimeImageWriter(dataRoot, profile, _logger);
+        IRuntimeResultRecordWriter? resultWriter = null;
+
+        try
+        {
+            resultWriter = _resultWriterFactory(dataRoot, profile);
+            var imageWriter = _imageWriterFactory(dataRoot, profile);
+            return new RuntimePreparedWriters(resultWriter, imageWriter);
+        }
+        catch
+        {
+            if (resultWriter != null)
+            {
+                await DisposePreparedWriterAfterCreateFailureAsync(resultWriter, "runtime result record writer");
+            }
+
+            throw;
+        }
+    }
+
+    private async ValueTask DisposePreparedWriterAfterCreateFailureAsync(IAsyncDisposable writer, string resourceName)
+    {
+        try
+        {
+            await writer.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose prepared {ResourceName} after writer creation failed.", resourceName);
+        }
+    }
+
+    private async ValueTask DisposePreparedWritersAfterPrepareFailureAsync(RuntimePreparedWriters preparedWriters)
+    {
+        try
+        {
+            await preparedWriters.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose prepared runtime writers after package load prepare failed.");
+        }
+    }
+
+    private void DisposeOldProjectVariableSession(IProjectVariableSession? session)
+    {
+        if (session == null)
+        {
+            return;
+        }
+
+        try
+        {
+            session.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose old project variable session after runtime package commit.");
+        }
+    }
+
+    private ProjectVariableCommitResult CommitLoadedProjectVariableSession(
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        _stateGate.Wait();
+        try
+        {
+            return CommitLoadedProjectVariableSessionNoLock(workingSession, expectedVersions);
+        }
+        finally
+        {
+            _stateGate.Release();
+        }
+    }
+
+    private ProjectVariableCommitResult CommitLoadedProjectVariableSessionNoLock(
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        var authoritative = _projectVariableSession;
+        if (authoritative == null)
+        {
+            return ProjectVariableCommitResult.Failure("GV025: project global variable session is not initialized.");
+        }
+
+        var authoritativeHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(authoritative.Schema);
+        var workingHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(workingSession.Schema);
+        if (!string.Equals(authoritativeHash, workingHash, StringComparison.Ordinal))
+        {
+            return ProjectVariableCommitResult.Failure("GV025: project global variable schema changed before this run could commit.");
+        }
+
+        using var candidate = authoritative.CreateSnapshotClone();
+        if (!candidate.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+        {
+            return ProjectVariableCommitResult.Failure(commitError);
+        }
+
+        try
+        {
+            PersistLoadedProjectVariableSession(candidate);
+            _projectVariableSession = candidate.CreateSnapshotClone();
+            return ProjectVariableCommitResult.Success();
+        }
+        catch (Exception ex)
+        {
+            return ProjectVariableCommitResult.Failure($"GV030: project global variable state could not be persisted: {ex.Message}");
+        }
+    }
+
+    private static IReadOnlyDictionary<Guid, long> CaptureProjectVariableVersions(
+        IProjectVariableSession session,
+        Guid? callerVariableId = null,
+        long? callerExpectedVersion = null)
+    {
+        var versions = session.GetSnapshots().ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        if (callerVariableId.HasValue && callerExpectedVersion.HasValue)
+        {
+            versions[callerVariableId.Value] = callerExpectedVersion.Value;
+        }
+
+        return versions;
+    }
+
+    private void PersistLoadedProjectVariableSession(IProjectVariableSession session)
+    {
+        if (_projectVariableStateStore == null || string.IsNullOrWhiteSpace(_projectVariableStateScopeId))
+        {
+            return;
+        }
+
+        _projectVariableStateStore.Save(_projectVariableStateScopeId, session.Schema, session.GetSnapshots());
+    }
+
+    private static string BuildRuntimeProjectVariableStateScopeId(RuntimePackage package)
+    {
+        return $"runtime:{package.Manifest.PackageId}";
+    }
+
+    private async ValueTask DisposeOldWriterAfterCommitAsync(IAsyncDisposable? writer, string resourceName)
+    {
+        if (writer == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await writer.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose old {ResourceName} after runtime package commit.", resourceName);
+        }
     }
 
     private static string BuildImageId(string imagePath)
@@ -1068,6 +1409,65 @@ public sealed class RuntimeResultNormalizer
     }
 }
 
+internal interface IRuntimeResultRecordWriter : IAsyncDisposable
+{
+    int DroppedCount { get; }
+
+    ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken);
+}
+
+internal interface IRuntimeImageWriter : IAsyncDisposable
+{
+    int DroppedCount { get; }
+
+    bool ShouldPersist(RuntimeNormalizedResult result);
+
+    string PlanPath(RuntimeNormalizedResult result);
+
+    ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken);
+}
+
+internal sealed class RuntimePreparedWriters : IAsyncDisposable
+{
+    public RuntimePreparedWriters(IRuntimeResultRecordWriter resultWriter, IRuntimeImageWriter imageWriter)
+    {
+        ResultWriter = resultWriter;
+        ImageWriter = imageWriter;
+    }
+
+    public IRuntimeResultRecordWriter ResultWriter { get; }
+
+    public IRuntimeImageWriter ImageWriter { get; }
+
+    public async ValueTask DisposeAsync()
+    {
+        Exception? firstException = null;
+
+        try
+        {
+            await ResultWriter.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            firstException = ex;
+        }
+
+        try
+        {
+            await ImageWriter.DisposeAsync();
+        }
+        catch (Exception ex) when (firstException == null)
+        {
+            firstException = ex;
+        }
+
+        if (firstException != null)
+        {
+            throw firstException;
+        }
+    }
+}
+
 internal static class RuntimeResultSnapshot
 {
     public static RuntimeNormalizedResult Create(RuntimeNormalizedResult source, bool includeImageBytes)
@@ -1090,6 +1490,8 @@ internal static class RuntimeResultSnapshot
             StartedAtUtc = source.StartedAtUtc,
             CompletedAtUtc = source.CompletedAtUtc,
             PrimaryOutputs = ClonePrimaryOutputs(source.PrimaryOutputs),
+            GlobalVariableSchemaHash = source.GlobalVariableSchemaHash,
+            PublicGlobalVariables = ClonePrimaryOutputs(source.PublicGlobalVariables),
             OutputImageBytes = includeImageBytes ? source.OutputImageBytes?.ToArray() : null,
             SourceImageBytes = includeImageBytes ? source.SourceImageBytes?.ToArray() : null
         };
@@ -1121,7 +1523,7 @@ internal static class RuntimeResultSnapshot
     }
 }
 
-internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
+internal sealed class RuntimeResultRecordWriter : IRuntimeResultRecordWriter
 {
     private readonly Channel<RuntimeNormalizedResult> _channel;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -1237,7 +1639,7 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
         }
         finally
         {
-            await _disposeCts.CancelAsync();
+            _disposeCts.Cancel();
             _disposeCts.Dispose();
         }
     }
@@ -1281,7 +1683,7 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
     }
 }
 
-internal sealed class RuntimeImageWriter : IAsyncDisposable
+internal sealed class RuntimeImageWriter : IRuntimeImageWriter
 {
     private readonly Channel<RuntimeNormalizedResult> _channel;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -1433,7 +1835,7 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
         }
         finally
         {
-            await _disposeCts.CancelAsync();
+            _disposeCts.Cancel();
             _disposeCts.Dispose();
         }
     }

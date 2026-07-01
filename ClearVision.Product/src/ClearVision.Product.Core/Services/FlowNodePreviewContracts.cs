@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.ProjectVariables;
 
 namespace ClearVision.Product.Core.Services;
 
@@ -14,6 +15,13 @@ public interface IFlowNodePreviewService
         OperatorFlow flow,
         Guid targetNodeId,
         byte[]? inputImage,
+        CancellationToken ct = default);
+
+    Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
+        OperatorFlow flow,
+        Guid targetNodeId,
+        byte[]? inputImage,
+        ProjectVariableExecutionContext? projectVariables,
         CancellationToken ct = default);
 }
 

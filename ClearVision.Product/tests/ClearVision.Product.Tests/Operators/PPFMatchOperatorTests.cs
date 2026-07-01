@@ -5,6 +5,7 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.PointCloud;
 using ClearVision.Product.Infrastructure.PointCloud.Matching;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -15,6 +16,7 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 
 namespace ClearVision.Product.Tests.Operators;
 
+[Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class PPFMatchOperatorTests
 {
     [Fact]

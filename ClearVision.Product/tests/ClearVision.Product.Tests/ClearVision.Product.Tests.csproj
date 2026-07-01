@@ -22,7 +22,7 @@
     <!-- 鏂█搴?-->
     <PackageReference Include="FluentAssertions" />
     
-    <!-- E2E 娴嬭瘯 (Playwright) -->
+    <!-- E2E 测试 (Playwright) -->
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Microsoft.Playwright.NUnit" />
     <PackageReference Include="DotNet.Testcontainers" />

@@ -59,6 +59,8 @@ run.log
 *.dll
 *.exe
 *.pdb
+*.nupkg
+*.snupkg
 *.aar
 *.dylib
 *.so
@@ -80,6 +82,9 @@ TestResults/
 coverage/
 artifacts/
 publish/
+**/nupkg/
+**/packages/
+!**/packages.lock.json
 
 # Local build snapshots / ad hoc verification output
 /ClearVision.Product/build_check/
@@ -119,6 +124,8 @@ docs/templates/temp.md
 test_zxing.cs
 tools/virtual-plc/modbus/.venv/
 tools/virtual-plc/modbus/.vendor/
+/.codex_tmp/
+/.tmp/
 /.tmp/localdeform-debug/
 /.tmp/dotnet-cli-home/
 /.tmp/dotnet-install.ps1
@@ -148,3 +155,6 @@ __pycache__/
 /quality/production_datasets/
 /quality/field_datasets/
 .claude/settings.local.json
+pyinstxtractor.py
+.tmp/inspect_pyc.py
+.tmp/inspection_report.txt

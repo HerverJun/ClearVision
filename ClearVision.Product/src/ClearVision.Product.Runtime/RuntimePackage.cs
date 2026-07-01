@@ -1,4 +1,5 @@
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Runtime.Abstractions;
 
 namespace ClearVision.Product.Runtime;
@@ -20,6 +21,8 @@ public sealed class RuntimePackage
     public required RuntimeParameterSchema ParameterSchema { get; init; }
 
     public required RuntimeSiteProfile DefaultSiteProfile { get; init; }
+
+    public required ProjectGlobalVariableSchema GlobalVariables { get; init; }
 
     public string PackageFilePath => Path.Combine(RootPath, "package.json");
 

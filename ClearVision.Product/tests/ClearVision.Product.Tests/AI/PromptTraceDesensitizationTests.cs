@@ -1,3 +1,5 @@
+using System.Text.Json;
+using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
 
@@ -10,14 +12,14 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            SystemPrompt = "Load model from C:\\Users\\John\\models\\yolo.onnx and C:\\Data\\images\\test.bmp"
+            UsedReferenceFlowSummary = "Load model from C:\\Users\\John\\models\\yolo.onnx and C:\\Data\\images\\test.bmp"
         };
 
         var result = trace.Desensitize();
 
-        result.SystemPrompt.Should().Contain("<local-path>");
-        result.SystemPrompt.Should().NotContain("C:\\Users\\John");
-        result.SystemPrompt.Should().NotContain("C:\\Data\\images");
+        result.UsedReferenceFlowSummary.Should().Contain("<local-path>");
+        result.UsedReferenceFlowSummary.Should().NotContain("C:\\Users\\John");
+        result.UsedReferenceFlowSummary.Should().NotContain("C:\\Data\\images");
     }
 
     [Fact]
@@ -25,14 +27,14 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            UserPrompt = "Use /home/user/models/best.pt and /Users/admin/data/label.txt"
+            UsedReferenceFlowSummary = "Use /home/user/models/best.pt and /Users/admin/data/label.txt"
         };
 
         var result = trace.Desensitize();
 
-        result.UserPrompt.Should().Contain("<local-path>");
-        result.UserPrompt.Should().NotContain("/home/user/models");
-        result.UserPrompt.Should().NotContain("/Users/admin/data");
+        result.UsedReferenceFlowSummary.Should().Contain("<local-path>");
+        result.UsedReferenceFlowSummary.Should().NotContain("/home/user/models");
+        result.UsedReferenceFlowSummary.Should().NotContain("/Users/admin/data");
     }
 
     [Fact]
@@ -40,15 +42,15 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            SystemPrompt = "Key is " + "sk-" + "abc123def456ghi789jkl012mno345pqr678stu" +
-                           " and xai-abc123def456ghi789jkl012mno345pqr678stu"
+            UsedReferenceFlowSummary = "Key is " + "sk-" + "abc123def456ghi789jkl012mno345pqr678stu" +
+                                       " and xai-abc123def456ghi789jkl012mno345pqr678stu"
         };
 
         var result = trace.Desensitize();
 
-        result.SystemPrompt.Should().Contain("***API_KEY***");
-        result.SystemPrompt.Should().NotContain("sk-abc123");
-        result.SystemPrompt.Should().NotContain("xai-abc123");
+        result.UsedReferenceFlowSummary.Should().Contain("***API_KEY***");
+        result.UsedReferenceFlowSummary.Should().NotContain("sk-abc123");
+        result.UsedReferenceFlowSummary.Should().NotContain("xai-abc123");
     }
 
     [Fact]
@@ -56,13 +58,13 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            UserPrompt = "Token: " + "ghp_" + "abcdefghijklmnopqrstuvwxyz123456"
+            UsedReferenceFlowSummary = "Token: " + "ghp_" + "abcdefghijklmnopqrstuvwxyz123456"
         };
 
         var result = trace.Desensitize();
 
-        result.UserPrompt.Should().Contain("***API_KEY***");
-        result.UserPrompt.Should().NotContain("ghp_");
+        result.UsedReferenceFlowSummary.Should().Contain("***API_KEY***");
+        result.UsedReferenceFlowSummary.Should().NotContain("ghp_");
     }
 
     [Fact]
@@ -70,15 +72,15 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            SystemPrompt = "Connect to 192.168.1.100:8080 or 10.0.0.1 or 172.16.0.5"
+            UsedReferenceFlowSummary = "Connect to 192.168.1.100:8080 or 10.0.0.1 or 172.16.0.5"
         };
 
         var result = trace.Desensitize();
 
-        result.SystemPrompt.Should().Contain("<internal-ip>");
-        result.SystemPrompt.Should().NotContain("192.168.1.100");
-        result.SystemPrompt.Should().NotContain("10.0.0.1");
-        result.SystemPrompt.Should().NotContain("172.16.0.5");
+        result.UsedReferenceFlowSummary.Should().Contain("<internal-ip>");
+        result.UsedReferenceFlowSummary.Should().NotContain("192.168.1.100");
+        result.UsedReferenceFlowSummary.Should().NotContain("10.0.0.1");
+        result.UsedReferenceFlowSummary.Should().NotContain("172.16.0.5");
     }
 
     [Fact]
@@ -86,13 +88,13 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            UserPrompt = "API at myserver.local:3000 and db.local"
+            UsedReferenceFlowSummary = "API at myserver.local:3000 and db.local"
         };
 
         var result = trace.Desensitize();
 
-        result.UserPrompt.Should().Contain("<internal-host>");
-        result.UserPrompt.Should().NotContain("myserver.local");
+        result.UsedReferenceFlowSummary.Should().Contain("<internal-host>");
+        result.UsedReferenceFlowSummary.Should().NotContain("myserver.local");
     }
 
     [Fact]
@@ -105,12 +107,51 @@ public sealed class PromptTraceDesensitizationTests
 
         var result = trace.Desensitize();
 
-        result.BaseUrl.Should().Contain("key=***");
+        result.BaseUrl.Should().Be("[hidden]");
         result.BaseUrl.Should().NotContain("sk-secret123");
     }
 
     [Fact]
-    public void Desensitize_PreservesNonSensitiveContent()
+    public void Desensitize_HidesAttachmentReportPathsAndNames()
+    {
+        var trace = new AiPromptTrace
+        {
+            AttachmentReport = new GenerateFlowAttachmentReport
+            {
+                Sent =
+                [
+                    new GenerateFlowAttachmentSentItem
+                    {
+                        Path = @"C:\factory\parts\scratch.png",
+                        Name = "scratch.png"
+                    }
+                ],
+                Skipped =
+                [
+                    new GenerateFlowAttachmentSkippedItem
+                    {
+                        Path = "/home/operator/parts/live.png",
+                        Name = "live.png",
+                        Reason = "too_large"
+                    }
+                ]
+            }
+        };
+
+        var result = trace.Desensitize();
+        var json = JsonSerializer.Serialize(result.AttachmentReport);
+
+        json.Should().Contain("sentCount");
+        json.Should().Contain("skippedCount");
+        json.Should().Contain("too_large");
+        json.Should().NotContain(@"C:\factory");
+        json.Should().NotContain("/home/operator");
+        json.Should().NotContain("scratch.png");
+        json.Should().NotContain("live.png");
+    }
+
+    [Fact]
+    public void Desensitize_PreservesNonSensitiveMetadataAndHidesPromptBodies()
     {
         var trace = new AiPromptTrace
         {
@@ -118,7 +159,8 @@ public sealed class PromptTraceDesensitizationTests
             Provider = "OpenAI Compatible",
             Model = "gpt-4o",
             SystemPrompt = "You are a helpful assistant for industrial vision.",
-            UserPrompt = "Generate a flow for defect detection."
+            UserPrompt = "Generate a flow for defect detection.",
+            UsedReferenceFlowSummary = "Reference flow summary"
         };
 
         var result = trace.Desensitize();
@@ -126,8 +168,9 @@ public sealed class PromptTraceDesensitizationTests
         result.Mode.Should().Be("new");
         result.Provider.Should().Be("OpenAI Compatible");
         result.Model.Should().Be("gpt-4o");
-        result.SystemPrompt.Should().Contain("industrial vision");
-        result.UserPrompt.Should().Contain("defect detection");
+        result.SystemPrompt.Should().Be("[hidden]");
+        result.UserPrompt.Should().Be("[hidden]");
+        result.UsedReferenceFlowSummary.Should().Be("Reference flow summary");
     }
 
     [Fact]
@@ -158,7 +201,7 @@ public sealed class PromptTraceDesensitizationTests
         {
             BaseUrl = null,
             SystemPrompt = string.Empty,
-            UserPrompt = null,
+            UserPrompt = null!,
             UsedReferenceFlowSummary = string.Empty
         };
 
@@ -166,7 +209,7 @@ public sealed class PromptTraceDesensitizationTests
 
         result.BaseUrl.Should().BeNull();
         result.SystemPrompt.Should().BeEmpty();
-        result.UserPrompt.Should().BeNull();
+        result.UserPrompt.Should().BeEmpty();
         result.UsedReferenceFlowSummary.Should().BeEmpty();
     }
 
@@ -175,13 +218,13 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            SystemPrompt = "API at 8.8.8.8 and 1.1.1.1"
+            UsedReferenceFlowSummary = "API at 8.8.8.8 and 1.1.1.1"
         };
 
         var result = trace.Desensitize();
 
         // Public IPs should NOT be masked
-        result.SystemPrompt.Should().Contain("8.8.8.8");
-        result.SystemPrompt.Should().Contain("1.1.1.1");
+        result.UsedReferenceFlowSummary.Should().Contain("8.8.8.8");
+        result.UsedReferenceFlowSummary.Should().Contain("1.1.1.1");
     }
 }

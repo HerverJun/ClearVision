@@ -1,19 +1,24 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using OpenCvSharp;
 using DetectionResultValue = ClearVision.Product.Core.ValueObjects.DetectionResult;
@@ -115,6 +120,288 @@ public class PreviewNodeEndpointsTests
             .GetValue();
 
         ReadIntValue(thresholdParameter).Should().Be(180);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithProjectVariables_ShouldPropagateSourceToTargetInPreviewClone()
+    {
+        var variableId = Guid.NewGuid();
+        var unrelatedVariableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var unrelatedPortId = Guid.NewGuid();
+        var targetInputPortId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var source = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Source",
+            OperatorType.Thresholding,
+            outputPorts:
+            [
+                new PortDto
+                {
+                    Id = sourcePortId,
+                    Name = "Count",
+                    DataType = PortDataType.Integer,
+                    Direction = PortDirection.Output
+                }
+            ]);
+        var unrelated = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Unrelated",
+            OperatorType.Thresholding,
+            outputPorts:
+            [
+                new PortDto
+                {
+                    Id = unrelatedPortId,
+                    Name = "Count",
+                    DataType = PortDataType.Integer,
+                    Direction = PortDirection.Output
+                }
+            ]);
+        var target = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Target",
+            OperatorType.ResultJudgment,
+            inputPorts:
+            [
+                new PortDto
+                {
+                    Id = targetInputPortId,
+                    Name = "Image",
+                    DataType = PortDataType.Image,
+                    Direction = PortDirection.Input
+                }
+            ],
+            parameters: new Dictionary<string, object> { ["ExpectedCount"] = 0 });
+        target.Parameters.Single().Id = targetParameterId;
+
+        var schema = CreatePreviewVariableSchema(variableId, 0L);
+        schema.Variables.Add(new ProjectGlobalVariableDefinition
+        {
+            Id = unrelatedVariableId,
+            Name = "stats.unrelated",
+            DisplayName = "Unrelated",
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(0L),
+            ManualWriteAllowed = true
+        });
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Count"
+        });
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = unrelatedVariableId,
+            OperatorId = unrelated.Id,
+            OutputPortId = unrelatedPortId,
+            OperatorName = unrelated.Name,
+            OutputPortName = "Count"
+        });
+        schema.TargetBindings.Add(new ProjectGlobalVariableTargetBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = target.Id,
+            ParameterId = targetParameterId,
+            OperatorName = target.Name,
+            ParameterName = "ExpectedCount"
+        });
+        var project = new Project("preview-project");
+        project.UpdateGlobalVariables(schema);
+        var registry = new ProjectVariableSessionRegistry();
+        var formalSession = registry.GetOrCreate(project.Id, schema);
+        formalSession.SetValue(variableId, 2L, ProjectVariableUpdatedBy.StudioManual);
+
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ExecuteAsync(Arg.Any<Operator>(), Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Count"] = 7L
+            })));
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+
+        var targetExecutor = Substitute.For<IOperatorExecutor>();
+        targetExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        targetExecutor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Is<Dictionary<string, object>>(inputs => Convert.ToInt64(inputs["ExpectedCount"]) == 7L),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Seen"] = 7L
+            })));
+        targetExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            registry,
+            [sourceExecutor, targetExecutor]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = target.Id,
+            FlowData = CreateUpdateFlowRequest(
+                source,
+                unrelated,
+                target,
+                CreateConnection(source.Id, sourcePortId, target.Id, targetInputPortId))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        document.RootElement.GetProperty("outputData").GetProperty("Seen").GetInt64().Should().Be(7L);
+        formalSession.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(2L);
+        formal.Version.Should().Be(1);
+        formal.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StudioManual);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithVariableIncrement_ShouldUseCurrentFormalSnapshotAndNotCommit()
+    {
+        var variableId = Guid.NewGuid();
+        var increment = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Increment",
+            OperatorType.VariableIncrement,
+            parameters: new Dictionary<string, object>
+            {
+                ["Scope"] = "Project",
+                ["VariableId"] = variableId.ToString(),
+                ["VariableName"] = "stats.count",
+                ["Delta"] = 5
+            });
+
+        var schema = CreatePreviewVariableSchema(variableId, 1L);
+        var project = new Project("preview-increment");
+        project.UpdateGlobalVariables(schema);
+        var registry = new ProjectVariableSessionRegistry();
+        var formalSession = registry.GetOrCreate(project.Id, schema);
+        formalSession.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            registry,
+            [
+                new VariableIncrementOperator(
+                    NullLogger<VariableIncrementOperator>.Instance,
+                    new VariableContext(),
+                    accessor)
+            ],
+            accessor);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = increment.Id,
+            FlowData = CreateUpdateFlowRequest(increment)
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("outputData").GetProperty("NewValue").GetInt64().Should().Be(9L);
+        formalSession.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+        formal.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StudioManual);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithVariableReadAndSameDebugSession_ShouldReturnFreshProjectVariableValue()
+    {
+        var variableId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var read = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Read",
+            OperatorType.VariableRead,
+            parameters: new Dictionary<string, object>
+            {
+                ["Scope"] = "Project",
+                ["VariableId"] = variableId.ToString(),
+                ["VariableName"] = "stats.count",
+                ["DefaultValue"] = "0",
+                ["DataType"] = "Int"
+            });
+
+        var schema = CreatePreviewVariableSchema(variableId, 1L);
+        var project = new Project("preview-read-cache");
+        project.UpdateGlobalVariables(schema);
+        var registry = new ProjectVariableSessionRegistry();
+        var formalSession = registry.GetOrCreate(project.Id, schema);
+        formalSession.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var readExecutor = new CountingOperatorExecutor(new VariableReadOperator(
+            NullLogger<VariableReadOperator>.Instance,
+            new VariableContext(),
+            accessor));
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            registry,
+            [readExecutor],
+            accessor);
+
+        var first = await PostPreviewReadAsync(host, project.Id, read, debugSessionId);
+        formalSession.SetValue(variableId, 10L, ProjectVariableUpdatedBy.StudioManual);
+        var second = await PostPreviewReadAsync(host, project.Id, read, debugSessionId);
+
+        first.GetProperty("success").GetBoolean().Should().BeTrue(first.ToString());
+        second.GetProperty("success").GetBoolean().Should().BeTrue(second.ToString());
+        first.GetProperty("outputData").GetProperty("Value").GetInt64().Should().Be(4L);
+        second.GetProperty("outputData").GetProperty("Value").GetInt64().Should().Be(10L);
+        readExecutor.ExecuteCount.Should().Be(2, "Project-scope VariableRead must not reuse PreviewNode debug cache");
+        formalSession.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(10L);
+        formal.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StudioManual);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WhenProjectHasNoGlobalVariables_ShouldUseExistingExecutionPath()
+    {
+        var project = new Project("no-global-variables");
+        var targetNodeId = Guid.NewGuid();
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(Task.FromResult(new FlowDebugExecutionResult
+                    {
+                        IsSuccess = true,
+                        IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                        {
+                            [targetNodeId] = new() { ["Value"] = 3L }
+                        }
+                    }));
+            },
+            projectRepository => projectRepository.GetByIdAsync(project.Id).Returns(project));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(CreateOperatorDto(targetNodeId, "Target", OperatorType.ResultJudgment))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -436,7 +723,7 @@ public class PreviewNodeEndpointsTests
             TargetNodeId = targetNodeId,
             InputImageBase64 = Convert.ToBase64String(new byte[] { 9, 9, 9 }),
             FlowData = CreateUpdateFlowRequest(
-                CreateOperatorDto(targetNodeId, "鍥惧儚閲囬泦", OperatorType.ImageAcquisition, outputPorts: [targetOutput]))
+                CreateOperatorDto(targetNodeId, "图像采集", OperatorType.ImageAcquisition, outputPorts: [targetOutput]))
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
@@ -491,8 +778,9 @@ public class PreviewNodeEndpointsTests
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         capturedInput.Should().NotBeNull();
-        capturedInput!.Should().ContainKey("Image");
-        ((byte[])capturedInput["Image"]).Should().Equal(new byte[] { 7, 8, 9 });
+        var input = capturedInput!;
+        input.Should().ContainKey("Image");
+        ((byte[])input["Image"]).Should().Equal(new byte[] { 7, 8, 9 });
     }
 
     [Fact]
@@ -1123,6 +1411,44 @@ public class PreviewNodeEndpointsTests
         return flow;
     }
 
+    private static ProjectGlobalVariableSchema CreatePreviewVariableSchema(Guid variableId, long initialValue)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.count",
+                    DisplayName = "Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = true
+                }
+            ]
+        };
+    }
+
+    private static async Task<JsonElement> PostPreviewReadAsync(
+        PreviewNodeTestHost host,
+        Guid projectId,
+        OperatorDto read,
+        Guid debugSessionId)
+    {
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = read.Id,
+            DebugSessionId = debugSessionId,
+            FlowData = CreateUpdateFlowRequest(read)
+        });
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        return document.RootElement.Clone();
+    }
+
     private static OperatorDto CreateOperatorDto(
         Guid id,
         string name,
@@ -1238,6 +1564,7 @@ public class PreviewNodeEndpointsTests
             var flowExecution = Substitute.For<IFlowExecutionService>();
             var projectRepository = Substitute.For<IProjectRepository>();
             var flowStorage = Substitute.For<IProjectFlowStorage>();
+            var registry = new ProjectVariableSessionRegistry();
             configureFlowExecution(flowExecution);
             configureProjectRepository?.Invoke(projectRepository);
             configureFlowStorage?.Invoke(flowStorage);
@@ -1245,6 +1572,41 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddSingleton(flowExecution);
             builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton(flowStorage);
+            builder.Services.AddSingleton(registry);
+
+            var app = builder.Build();
+            app.MapPreviewNodeEndpoints();
+            await app.StartAsync();
+
+            return new PreviewNodeTestHost(app, app.GetTestClient());
+        }
+
+        public static async Task<PreviewNodeTestHost> CreateWithRealFlowExecutionAsync(
+            Project project,
+            ProjectVariableSessionRegistry registry,
+            IEnumerable<IOperatorExecutor> executors,
+            ProjectVariableExecutionContextAccessor? accessor = null)
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+
+            builder.WebHost.UseTestServer();
+            accessor ??= new ProjectVariableExecutionContextAccessor();
+            var flowExecution = new FlowExecutionService(
+                executors,
+                NullLogger<FlowExecutionService>.Instance,
+                new VariableContext(),
+                accessor);
+            var projectRepository = Substitute.For<IProjectRepository>();
+            projectRepository.GetByIdAsync(project.Id).Returns(project);
+            var flowStorage = Substitute.For<IProjectFlowStorage>();
+
+            builder.Services.AddSingleton<IFlowExecutionService>(flowExecution);
+            builder.Services.AddSingleton(projectRepository);
+            builder.Services.AddSingleton(flowStorage);
+            builder.Services.AddSingleton(registry);
 
             var app = builder.Build();
             app.MapPreviewNodeEndpoints();
@@ -1258,6 +1620,34 @@ public class PreviewNodeEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class CountingOperatorExecutor : IOperatorExecutor
+    {
+        private readonly IOperatorExecutor _inner;
+
+        public CountingOperatorExecutor(IOperatorExecutor inner)
+        {
+            _inner = inner;
+        }
+
+        public OperatorType OperatorType => _inner.OperatorType;
+
+        public int ExecuteCount { get; private set; }
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            ExecuteCount++;
+            return _inner.ExecuteAsync(@operator, inputs, cancellationToken);
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            return _inner.ValidateParameters(@operator);
         }
     }
 }

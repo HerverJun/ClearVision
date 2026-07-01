@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,15 @@ public sealed class RuntimePackageExporter
         "password",
         "credential"
     ];
+
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
 
     private static readonly HashSet<string> FileLikeParameterTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -94,8 +104,16 @@ public sealed class RuntimePackageExporter
                 "缺失资源：\n• " + string.Join("\n• ", missingResources));
         }
 
-        var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
         var targetRoot = RuntimePathGuard.ResolveControlledExportRoot(request.TargetRootDirectory);
+        var globalVariableValidationErrors = FindGlobalVariableValidationErrors(project.GlobalVariables, flow).ToList();
+        if (globalVariableValidationErrors.Count > 0)
+        {
+            throw new RuntimePackageException(
+                "Export blocked: project global variable validation failed.\n- " +
+                string.Join("\n- ", globalVariableValidationErrors));
+        }
+
+        var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
 
         var safeProjectName = RuntimePathGuard.SanitizeFileName(project.Name, "runtime-package");
         var packageRoot = Path.Combine(targetRoot, $"{safeProjectName}-{packageId}");
@@ -130,10 +148,15 @@ public sealed class RuntimePackageExporter
                 ResultMappingProfile = "field/result-mapping-profile.json",
                 ModelAssets = "field/model-assets.json",
                 RuntimeParameters = "field/runtime-parameters.json",
-                DefaultSiteProfile = "field/station-profile.default.json"
+                DefaultSiteProfile = "field/station-profile.default.json",
+                GlobalVariables = "field/global-variables.json"
             }
         };
         var parameterSchema = BuildRuntimeParameterSchema(packageId, flowHash, packagedFlow);
+        RuntimeProjectVariableConflictValidator.ThrowIfAnySiteProfileConflicts(
+            project.GlobalVariables,
+            parameterSchema,
+            packagedFlow);
         var defaultSiteProfile = new RuntimeSiteProfile
         {
             ProfileId = "package-default",
@@ -175,6 +198,7 @@ public sealed class RuntimePackageExporter
             bundledAssets,
             parameterSchema,
             defaultSiteProfile,
+            project.GlobalVariables,
             cancellationToken);
 
         var readmePath = Path.Combine(packageRoot, "README.runtime.md");
@@ -182,9 +206,9 @@ public sealed class RuntimePackageExporter
 
         _logger.LogInformation(
             "Exported runtime package {PackageId} for project {ProjectId} to {PackageRoot}",
-            manifest.PackageId,
-            project.Id,
-            packageRoot);
+            SanitizeLogValue(manifest.PackageId),
+            SanitizeLogValue(project.Id),
+            SanitizeLogValue(packageRoot));
 
         return new RuntimePackageExportResult
         {
@@ -781,6 +805,27 @@ public sealed class RuntimePackageExporter
         return errors;
     }
 
+    private static IEnumerable<string> FindGlobalVariableValidationErrors(
+        ProjectGlobalVariableSchema? globalVariables,
+        OperatorFlowDto flow)
+    {
+        OperatorFlow entityFlow;
+        try
+        {
+            entityFlow = flow.ToEntity();
+        }
+        catch (Exception ex)
+        {
+            return [$"Flow: {ex.Message}"];
+        }
+
+        return ProjectGlobalVariableSchemaValidator
+            .Validate(globalVariables, entityFlow)
+            .Where(diagnostic => diagnostic.Severity == ProjectGlobalVariableDiagnosticSeverity.Error)
+            .Select(diagnostic => $"{diagnostic.Code}: {diagnostic.Message}")
+            .ToList();
+    }
+
     private static IEnumerable<string> FindMissingResources(OperatorFlowDto flow)
     {
         foreach (var op in flow.Operators)
@@ -963,6 +1008,7 @@ public sealed class RuntimePackageExporter
         IReadOnlyList<RuntimeBundledAsset> bundledAssets,
         RuntimeParameterSchema parameterSchema,
         RuntimeSiteProfile defaultSiteProfile,
+        ProjectGlobalVariableSchema globalVariables,
         CancellationToken cancellationToken)
     {
         var fieldRoot = Path.Combine(packageRoot, "field");
@@ -992,7 +1038,8 @@ public sealed class RuntimePackageExporter
                 Assets = bundledAssets.ToList()
             },
             ["runtime-parameters.json"] = parameterSchema,
-            ["station-profile.default.json"] = defaultSiteProfile
+            ["station-profile.default.json"] = defaultSiteProfile,
+            ["global-variables.json"] = globalVariables
         };
 
         foreach (var (fileName, payload) in drafts)

@@ -32,7 +32,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
             (await UserVersionAsync(connection)).Should().Be(VisionDatabaseMaintenance.CurrentSqliteSchemaVersion);
         }
@@ -66,7 +66,7 @@ public sealed class VisionDatabaseInitializerTests
             await using var connection = new SqliteConnection($"Data Source={dbPath}");
             await connection.OpenAsync();
 
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
             (await ScalarStringAsync(connection, """SELECT "PackageKind" FROM "StationPackageRecords" WHERE "PackageId" = 'pkg-upgrade';"""))
                 .Should()
@@ -109,7 +109,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await ColumnExistsAsync(connection, "InspectionResults", "AnalysisDataJson")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationResultSummaries")).Should().BeTrue();
@@ -146,7 +146,7 @@ public sealed class VisionDatabaseInitializerTests
             await using var connection = new SqliteConnection($"Data Source={dbPath}");
             await connection.OpenAsync();
 
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await TableExistsAsync(connection, "StationAlarmEvents")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationAlarmEvents_StationId_IsActive")).Should().BeTrue();
             (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
@@ -232,7 +232,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationPackageRecords")).Should().BeTrue();
         }
@@ -315,7 +315,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await TableExistsAsync(connection, "Projects")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
         }
@@ -485,6 +485,15 @@ public sealed class VisionDatabaseInitializerTests
         command.CommandText = """SELECT COUNT(1) FROM "__EFMigrationsHistory";""";
         var result = await command.ExecuteScalarAsync();
         return Convert.ToInt32(result);
+    }
+
+    private static int CurrentMigrationCount()
+    {
+        var options = new DbContextOptionsBuilder<VisionDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        using var dbContext = new VisionDbContext(options);
+        return dbContext.Database.GetMigrations().Count();
     }
 
     private static async Task<int> UserVersionAsync(SqliteConnection connection)

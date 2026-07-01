@@ -234,7 +234,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
             {
                 Cv2.PutText(
                     resultImage,
-                    metrics.FailureReason,
+                    ToOpenCvOverlayText(metrics.FailureReason),
                     new Point(10, 60),
                     HersheyFonts.HersheySimplex,
                     0.5,
@@ -342,7 +342,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
         FeatureMatchCandidateProfile candidateProfile)
     {
         var output = input.Clone();
-        Cv2.PutText(output, $"NG: {reason}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
+        Cv2.PutText(output, $"NG: {ToOpenCvOverlayText(reason)}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
         Cv2.PutText(output, $"Score: {inliers}/{totalMatches}", new Point(10, 60), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
 
         var outputData = new Dictionary<string, object>

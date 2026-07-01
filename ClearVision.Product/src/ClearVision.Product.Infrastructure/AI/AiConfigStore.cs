@@ -29,6 +29,14 @@ public class AiConfigStore
         PropertyNameCaseInsensitive = true
     };
 
+    private static string SanitizeLogValue(string? value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     public AiConfigStore(IOptions<AiGenerationOptions> initialOptions, Microsoft.Extensions.Logging.ILogger<AiConfigStore> logger)
         : this(initialOptions, logger, AppContext.BaseDirectory)
     {
@@ -75,7 +83,9 @@ public class AiConfigStore
     {
         lock (_lock)
         {
-            var active = _models.FirstOrDefault(x => x.IsActive) ?? _models.FirstOrDefault();
+            var active = _models.FirstOrDefault(x => x.IsActive && x.IsEnabled) ??
+                         _models.FirstOrDefault(x => x.IsEnabled) ??
+                         _models.FirstOrDefault();
             if (active == null)
                 throw new InvalidOperationException("没有可用的 AI 模型配置");
 
@@ -97,11 +107,8 @@ public class AiConfigStore
                 throw new InvalidOperationException($"AI model id already exists: {model.Id}");
             }
 
-            if (model.Reasoning == null)
-                model.NormalizeAdvancedFields();
-
+            StampNewModel(model);
             model.ValidateReasoningConfiguration();
-            model.NormalizeAdvancedFields();
             model.Capabilities = (model.Capabilities?.Clone() ?? AiModelCapabilities.Infer(model.Provider, model.Model)).Normalize();
 
             if (_models.Count == 0)
@@ -111,7 +118,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", model.Name, model.Id);
+        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(model.Name), SanitizeLogValue(model.Id));
         return model;
     }
 
@@ -120,6 +127,11 @@ public class AiConfigStore
     /// </summary>
     public AiModelConfig? Update(string id, AiModelConfig updated)
     {
+        return Update(id, updated, AiApiKeyUpdateMode.Keep);
+    }
+
+    public AiModelConfig? Update(string id, AiModelConfig updated, AiApiKeyUpdateMode apiKeyUpdateMode)
+    {
         lock (_lock)
         {
             var index = _models.FindIndex(x => x.Id == id);
@@ -127,14 +139,15 @@ public class AiConfigStore
                 return null;
 
             var candidate = CloneModel(_models[index]);
-            ApplyUpdatedValues(candidate, updated);
+            ApplyUpdatedValues(candidate, updated, apiKeyUpdateMode);
+            candidate.UpdatedAt = DateTimeOffset.UtcNow;
             candidate.ValidateReasoningConfiguration();
             candidate.NormalizeAdvancedFields();
             _models[index] = candidate;
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", updated.Name ?? string.Empty, id);
+        _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", SanitizeLogValue(updated.Name), SanitizeLogValue(id));
         return GetById(id);
     }
 
@@ -156,7 +169,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", id);
+        _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", SanitizeLogValue(id));
         return true;
     }
 
@@ -170,11 +183,78 @@ public class AiConfigStore
 
             foreach (var model in _models)
                 model.IsActive = model.Id == id;
+            target.IsEnabled = true;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", id);
+        _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", SanitizeLogValue(id));
         return true;
+    }
+
+    public bool SetDefaultForRole(string id, string role)
+    {
+        var normalizedRole = AiModelConfig.NormalizeRoleName(role);
+        lock (_lock)
+        {
+            var target = _models.FirstOrDefault(x => x.Id == id);
+            if (target == null)
+                return false;
+
+            foreach (var model in _models)
+            {
+                model.RoleBindings = AiModelConfig
+                    .NormalizeRoleBindings(model.RoleBindings)
+                    .Where(item => !string.Equals(item, normalizedRole, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (model.RoleBindings.Count == 0)
+                {
+                    model.RoleBindings.Add(AiModelConfig.RoleGeneration);
+                }
+
+                model.ModelRole = model.RoleBindings.FirstOrDefault() ?? AiModelConfig.RoleGeneration;
+                model.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            target.RoleBindings = AiModelConfig.NormalizeRoleBindings(target.RoleBindings);
+            if (!target.RoleBindings.Contains(normalizedRole, StringComparer.OrdinalIgnoreCase))
+            {
+                target.RoleBindings.Insert(0, normalizedRole);
+            }
+
+            target.ModelRole = normalizedRole;
+            target.Priority = Math.Min(target.Priority ?? 100, 1);
+            target.IsEnabled = true;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
+            target.NormalizeAdvancedFields();
+        }
+
+        Save();
+        _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", SanitizeLogValue(normalizedRole), SanitizeLogValue(id));
+        return true;
+    }
+
+    public AiModelConfig? UpdateTestStatus(
+        string id,
+        string status,
+        DateTimeOffset testedAt,
+        int? latencyMs)
+    {
+        lock (_lock)
+        {
+            var model = _models.FirstOrDefault(x => x.Id == id);
+            if (model == null)
+                return null;
+
+            model.LastTestStatus = string.IsNullOrWhiteSpace(status) ? "untested" : status.Trim().ToLowerInvariant();
+            model.LastTestAt = testedAt;
+            model.LastTestLatencyMs = latencyMs;
+            model.UpdatedAt = DateTimeOffset.UtcNow;
+            model.NormalizeAdvancedFields();
+        }
+
+        Save();
+        return GetById(id);
     }
 
     public List<AiModelConfig> ResetToDefaults()
@@ -262,6 +342,7 @@ public class AiConfigStore
                     {
                         Id = "model_migrated",
                         Name = "系统默认模型",
+                        DisplayName = "Legacy default model",
                         Provider = legacy.Provider,
                         Protocol = AiModelConfig.NormalizeProtocol(null, legacy.Provider),
                         WireApi = AiModelConfig.NormalizeWireApi(legacy.WireApi),
@@ -270,11 +351,13 @@ public class AiConfigStore
                         Model = legacy.Model,
                         BaseUrl = legacy.BaseUrl,
                         TimeoutMs = legacy.TimeoutSeconds * 1000,
-                        RoleBindings = new List<string> { "generation" },
+                        RoleBindings = new List<string> { AiModelConfig.RoleGeneration, AiModelConfig.RolePlanner },
+                        ModelRole = AiModelConfig.RoleGeneration,
                         Priority = 100,
                         Capabilities = AiModelCapabilities.Infer(legacy.Provider, legacy.Model),
                         Reasoning = new AiReasoningSettings(),
-                        IsActive = true
+                        IsActive = true,
+                        IsEnabled = true
                     };
                     migrated.NormalizeAdvancedFields();
 
@@ -333,6 +416,17 @@ public class AiConfigStore
         {
             model.NormalizeAdvancedFields();
         }
+    }
+
+    private static void StampNewModel(AiModelConfig model)
+    {
+        var now = DateTimeOffset.UtcNow;
+        model.CreatedAt ??= now;
+        model.UpdatedAt = now;
+        model.LastTestStatus = string.IsNullOrWhiteSpace(model.LastTestStatus)
+            ? "untested"
+            : model.LastTestStatus.Trim().ToLowerInvariant();
+        model.NormalizeAdvancedFields();
     }
 
     private void Save()
@@ -406,6 +500,7 @@ public class AiConfigStore
         {
             Id = "model_default",
             Name = "系统默认模型",
+            DisplayName = "System default model",
             Provider = fallback.Provider,
             Protocol = AiModelConfig.NormalizeProtocol(null, fallback.Provider),
             WireApi = AiModelConfig.NormalizeWireApi(fallback.WireApi),
@@ -414,11 +509,13 @@ public class AiConfigStore
             Model = fallback.Model,
             BaseUrl = fallback.BaseUrl,
             TimeoutMs = Math.Max(1, fallback.TimeoutSeconds) * 1000,
-            RoleBindings = new List<string> { "generation" },
+            RoleBindings = new List<string> { AiModelConfig.RoleGeneration, AiModelConfig.RolePlanner },
+            ModelRole = AiModelConfig.RoleGeneration,
             Priority = 100,
             Capabilities = AiModelCapabilities.Infer(fallback.Provider, fallback.Model),
             Reasoning = new AiReasoningSettings(),
-            IsActive = true
+            IsActive = true,
+            IsEnabled = true
         };
         defaultModel.NormalizeAdvancedFields();
 
@@ -436,6 +533,7 @@ public class AiConfigStore
     {
         Id = model.Id,
         Name = model.Name,
+        DisplayName = model.DisplayName,
         Provider = model.Provider,
         ApiKey = model.ApiKey,
         Model = model.Model,
@@ -449,18 +547,30 @@ public class AiConfigStore
         ExtraQuery = CloneStringDictionary(model.ExtraQuery),
         ExtraBody = CloneJsonDictionary(model.ExtraBody),
         RoleBindings = model.RoleBindings == null ? null : new List<string>(model.RoleBindings),
+        ModelRole = model.ModelRole,
         Priority = model.Priority,
+        Remark = model.Remark,
+        CreatedAt = model.CreatedAt,
+        UpdatedAt = model.UpdatedAt,
+        LastTestStatus = model.LastTestStatus,
+        LastTestAt = model.LastTestAt,
+        LastTestLatencyMs = model.LastTestLatencyMs,
         Capabilities = model.Capabilities?.Clone(),
         Reasoning = model.Reasoning?.Clone(),
-        IsActive = model.IsActive
+        IsActive = model.IsActive,
+        IsEnabled = model.IsEnabled
     };
 
-    private static void ApplyUpdatedValues(AiModelConfig candidate, AiModelConfig updated)
+    private static void ApplyUpdatedValues(
+        AiModelConfig candidate,
+        AiModelConfig updated,
+        AiApiKeyUpdateMode apiKeyUpdateMode)
     {
         var providerChanged = !string.IsNullOrWhiteSpace(updated.Provider) &&
             !string.Equals(updated.Provider, candidate.Provider, StringComparison.Ordinal);
 
         candidate.Name = updated.Name ?? candidate.Name;
+        candidate.DisplayName = updated.DisplayName ?? candidate.DisplayName;
         candidate.Provider = updated.Provider ?? candidate.Provider;
         candidate.Model = updated.Model ?? candidate.Model;
         candidate.BaseUrl = updated.BaseUrl;
@@ -471,6 +581,9 @@ public class AiConfigStore
         candidate.AuthHeaderName = updated.AuthHeaderName ??
             (providerChanged || updated.Protocol != null || updated.AuthMode != null ? null : candidate.AuthHeaderName);
         candidate.Priority = updated.Priority ?? candidate.Priority;
+        candidate.ModelRole = updated.ModelRole ?? candidate.ModelRole;
+        candidate.Remark = updated.Remark;
+        candidate.IsEnabled = updated.IsEnabled;
 
         if (updated.ExtraHeaders != null)
             candidate.ExtraHeaders = CloneStringDictionary(updated.ExtraHeaders);
@@ -494,9 +607,22 @@ public class AiConfigStore
             candidate.Reasoning = updated.Reasoning.Clone().Normalize();
         }
 
-        if (!string.IsNullOrEmpty(updated.ApiKey))
+        switch (apiKeyUpdateMode)
         {
-            candidate.ApiKey = updated.ApiKey;
+            case AiApiKeyUpdateMode.Replace:
+                candidate.ApiKey = updated.ApiKey ?? string.Empty;
+                break;
+            case AiApiKeyUpdateMode.Clear:
+                candidate.ApiKey = string.Empty;
+                break;
+            case AiApiKeyUpdateMode.Keep:
+            default:
+                if (!string.IsNullOrEmpty(updated.ApiKey))
+                {
+                    candidate.ApiKey = updated.ApiKey;
+                }
+
+                break;
         }
     }
 

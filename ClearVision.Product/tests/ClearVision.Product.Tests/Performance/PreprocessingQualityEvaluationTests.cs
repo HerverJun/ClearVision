@@ -37,8 +37,8 @@ public class PreprocessingQualityEvaluationTests
         var op = new Operator("median", OperatorType.MedianBlur, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("KernelSize", 3, "int"));
 
-        using var clean = Cv2.ImRead(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite.png"), ImreadModes.Grayscale);
-        using var noisy = Cv2.ImRead(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite_saltpepper.png"), ImreadModes.Grayscale);
+        using var clean = PreprocessingTestSupport.ReadImage(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite.png"), ImreadModes.Grayscale);
+        using var noisy = PreprocessingTestSupport.ReadImage(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite_saltpepper.png"), ImreadModes.Grayscale);
         using var input = new ImageWrapper(noisy.Clone());
 
         var result = await executor.ExecuteAsync(op, TestHelpers.CreateImageInputs(input));
@@ -66,7 +66,7 @@ public class PreprocessingQualityEvaluationTests
         op.AddParameter(TestHelpers.CreateParameter("FrameCount", 5, "int"));
         op.AddParameter(TestHelpers.CreateParameter("Mode", "Mean", "string"));
 
-        using var clean = Cv2.ImRead(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite.png"), ImreadModes.Grayscale);
+        using var clean = PreprocessingTestSupport.ReadImage(PreprocessingTestSupport.ResolveTestDataPath("shapes_composite.png"), ImreadModes.Grayscale);
 
         Mat? firstNoisy = null;
         ImageWrapper? finalOutput = null;
@@ -193,7 +193,7 @@ public class PreprocessingQualityEvaluationTests
 
     private static Mat LoadRealSample()
     {
-        return Cv2.ImRead(
+        return PreprocessingTestSupport.ReadImage(
             PreprocessingTestSupport.ResolveWorkspacePath("线序检测", "unnamed.jpg"),
             ImreadModes.Color);
     }

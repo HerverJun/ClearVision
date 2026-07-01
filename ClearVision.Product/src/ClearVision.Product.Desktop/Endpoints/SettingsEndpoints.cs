@@ -4,10 +4,13 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Continuous;
 using ClearVision.Product.Core.Entities;
@@ -16,6 +19,7 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -227,29 +231,7 @@ public static class SettingsEndpoints
         app.MapGet("/api/ai/models", (AiConfigStore configStore) =>
         {
             var models = configStore.GetAll();
-            var result = models.Select(m => new
-            {
-                m.Id,
-                m.Name,
-                m.Provider,
-                hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey), // 前端用此判断是否已配置密钥
-                m.Model,
-                baseUrl = m.BaseUrl ?? "",
-                m.TimeoutMs,
-                m.IsActive,
-                m.Protocol,
-                m.WireApi,
-                m.AuthMode,
-                m.AuthHeaderName,
-                m.ExtraHeaders,
-                m.ExtraQuery,
-                m.ExtraBody,
-                m.RoleBindings,
-                m.Priority,
-                m.Capabilities,
-                m.Reasoning,
-                ReasoningSupport = m.GetReasoningSupport()
-            });
+            var result = models.Select(ToAiModelResponse);
             return Results.Ok(result);
         });
 
@@ -277,6 +259,7 @@ public static class SettingsEndpoints
                 {
                     Id = $"model_{Guid.NewGuid():N}",
                     Name = request.Name ?? "新建模型",
+                    DisplayName = request.DisplayName,
                     Provider = request.Provider ?? AiModelConfig.GetLegacyProviderByProtocol(request.Protocol),
                     ApiKey = request.ApiKey ?? "",
                     Model = request.Model ?? string.Empty,
@@ -290,8 +273,11 @@ public static class SettingsEndpoints
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
                     RoleBindings = CloneStringList(request.RoleBindings),
+                    ModelRole = request.ModelRole,
                     Priority = request.Priority,
+                    Remark = request.Remark,
                     IsActive = false,
+                    IsEnabled = request.IsEnabled ?? true,
                     Capabilities = request.Capabilities?.Clone(),
                     Reasoning = request.Reasoning?.Clone()
                 };
@@ -317,6 +303,7 @@ public static class SettingsEndpoints
                 var updated = new AiModelConfig
                 {
                     Name = request.Name!,
+                    DisplayName = request.DisplayName,
                     Provider = request.Provider!,
                     ApiKey = request.ApiKey ?? "", // 空字符串 → 保留原值（由 AiConfigStore.Update 处理）
                     Model = request.Model ?? string.Empty,
@@ -330,11 +317,14 @@ public static class SettingsEndpoints
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
                     RoleBindings = CloneStringList(request.RoleBindings),
+                    ModelRole = request.ModelRole,
                     Priority = request.Priority,
+                    Remark = request.Remark,
+                    IsEnabled = request.IsEnabled ?? true,
                     Capabilities = request.Capabilities?.Clone(),
                     Reasoning = request.Reasoning?.Clone()
                 };
-                var result = configStore.Update(id, updated);
+                var result = configStore.Update(id, updated, ResolveApiKeyUpdateMode(request.ApiKeyOperation, request.ApiKey));
                 if (result == null)
                     return Results.NotFound(new { Error = $"模型 {id} 不存在" });
 
@@ -382,6 +372,32 @@ public static class SettingsEndpoints
         });
 
         // 测试指定模型的连接（使用该模型的真实 Key，不影响全局 active 状态）
+        app.MapPost("/api/ai/models/{id}/default-planner", (string id, AiConfigStore configStore, HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
+            return ok
+                ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
+                : Results.NotFound(new { Error = $"Model {id} not found." });
+        });
+
+        app.MapPost("/api/ai/models/{id}/default-shadow-eval", (string id, AiConfigStore configStore, HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
+            return ok
+                ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
+                : Results.NotFound(new { Error = $"Model {id} not found." });
+        });
+
         app.MapPost("/api/ai/models/{id}/test", async (string id, AiConfigStore configStore, AiApiClient apiClient, HttpContext context) =>
         {
             if (!IsAdmin(context))
@@ -389,38 +405,969 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            try
+            var model = configStore.GetById(id);
+            if (model == null)
             {
-                var model = configStore.GetById(id);
-                if (model == null)
-                    return Results.NotFound(new { Success = false, Message = $"模型 {id} 不存在" });
-
-                var authMode = AiModelConfig.NormalizeAuthMode(model.AuthMode, model.Protocol ?? model.Provider);
-                if (authMode != AiModelConfig.AuthModeNone && string.IsNullOrEmpty(model.ApiKey))
-                    return Results.Ok(new { Success = false, Message = "连接失败: 未配置 API Key" });
-
-                var options = model.ToGenerationOptions();
-                var response = await apiClient.StreamCompleteAsync(
-                    "You are a connection health-check assistant. Respond only with valid JSON.",
-                    new List<ChatMessage> { new("user", "Reply with a JSON object exactly: {\"ok\": true}") },
-                    _ => { },
-                    options,
-                    CancellationToken.None);
-
-                if (!IsSuccessfulAiHealthCheck(response.Content))
-                    return Results.Ok(new { Success = false, Message = "连接失败: AI 返回内容不是预期的 JSON health-check 响应" });
-
-                return Results.Ok(new { Success = true, Message = "连接成功" });
+                return Results.NotFound(BuildAiModelConnectionResult(
+                    connectionOk: false,
+                    statusCode: null,
+                    errorCode: "model_config_not_found",
+                    latencyMs: 0,
+                    sanitizedMessage: $"Model config {id} not found.",
+                    provider: string.Empty,
+                    modelName: string.Empty,
+                    protocol: string.Empty,
+                    wireApi: string.Empty));
             }
-            catch (Exception ex)
-            {
-                return Results.Ok(new { Success = false, Message = $"连接失败: {ex.Message}" });
-            }
+
+            var testResult = await TestAiModelConnectionAsync(model, apiClient, context.RequestAborted);
+            configStore.UpdateTestStatus(
+                id,
+                testResult.ConnectionOk ? "ok" : "failed",
+                DateTimeOffset.UtcNow,
+                testResult.LatencyMs);
+            return Results.Ok(testResult);
         });
 
+        // AI model connection tests only call the configured LLM endpoint and do not touch RuntimePreview, Station, camera, PLC, or deployment.
         // ==================== 相机管理 API ====================
 
         // 搜索在线相机设备
+        app.MapGet("/api/settings/runtime-preview-pilot/config", async (IConfigurationService configService) =>
+        {
+            var config = await configService.LoadAsync();
+            var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
+            return Results.Ok(new
+            {
+                config = pilot,
+                validation = RuntimePreviewPilotConfigValidator.Validate(pilot),
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPut("/api/settings/runtime-preview-pilot/config", async (
+            RuntimePreviewPilotConfig request,
+            IConfigurationService configService,
+            HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var failures = RuntimePreviewPilotConfigValidator.Validate(request);
+            if (failures.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "RuntimePreview Pilot config validation failed.",
+                    failures
+                });
+            }
+
+            var normalized = request.CloneNormalized();
+            var config = await configService.LoadAsync();
+            config.Runtime ??= new RuntimeConfig();
+            config.Runtime.RuntimePreviewPilot = normalized;
+            await configService.SaveAsync(config);
+            return Results.Ok(new
+            {
+                message = "RuntimePreview Pilot config saved.",
+                config = normalized,
+                validation = Array.Empty<string>(),
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/catalog", async (
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPilotResourceCatalog catalogBuilder) =>
+        {
+            var config = await configService.LoadAsync();
+            var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
+            var catalog = catalogBuilder.Build(pilot, config, aiConfigStore);
+            return Results.Ok(catalog);
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/readiness", async (
+            RuntimePreviewPilotReadinessEndpointRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPilotResourceCatalog catalogBuilder,
+            [FromServices] RuntimePreviewPilotReadinessGate readinessGate,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var pilot = request.Config ?? appConfig.Runtime.RuntimePreviewPilot.CloneNormalized();
+            var failures = RuntimePreviewPilotConfigValidator.Validate(pilot);
+            if (failures.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "RuntimePreview Pilot config validation failed.",
+                    failures
+                });
+            }
+
+            pilot.Normalize();
+            var toolName = string.IsNullOrWhiteSpace(request.ToolName)
+                ? ClearVision.Product.Infrastructure.AI.Agent.RuntimePreviewPermissionGate.ReplayToolName
+                : request.ToolName.Trim();
+            var workflowDraft = ExtractRuntimePreviewWorkflowDraft(request);
+            var arguments = BuildRuntimePreviewReadinessArguments(request, workflowDraft);
+            var catalog = catalogBuilder.Build(pilot, appConfig, aiConfigStore, workflowDraft);
+            var context = new ClearVision.Product.Core.AI.Tools.VisionAgentToolContext
+            {
+                RuntimePreviewConsent = true,
+                RuntimePreviewPilot = pilot,
+                AllowedPermissions = new HashSet<ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission>
+                {
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.ReadOnly,
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.Simulation,
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.RuntimePreview
+                }
+            };
+            var result = readinessGate.Evaluate(pilot, catalog, toolName, arguments, context);
+            return Results.Ok(new
+            {
+                readiness = result,
+                catalog,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions", (
+            [FromServices] RuntimePreviewSessionStore sessionStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-sessions",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                sessions = sessionStore.List(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions", async (
+            RuntimePreviewSessionCreateRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-create",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var session = harness.CreateMetadataSession(request, appConfig, aiConfigStore);
+            return Results.Ok(new
+            {
+                session,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/simulate", async (
+            RuntimePreviewSessionCreateRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-sessions-simulate",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = harness.RunEndToEnd(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext));
+            return Results.Ok(new
+            {
+                session = report.Session,
+                report,
+                auditEvents = report.AuditEvents,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report", (
+            string sessionId,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-report",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var report = reportArchive.GetBySessionId(sessionId);
+            return report == null
+                ? Results.NotFound(new { error = "RuntimePreview session report was not found." })
+                : Results.Ok(new
+                {
+                    report,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/{sessionId}/cancel", (
+            string sessionId,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-cancel",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var session = harness.Cancel(sessionId);
+            return session == null
+                ? Results.NotFound(new { error = "RuntimePreview session was not found." })
+                : Results.Ok(new
+                {
+                    session,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/replay", (
+            string sessionId,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-replay",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var replay = harness.Replay(sessionId);
+            return replay == null
+                ? Results.NotFound(new { error = "RuntimePreview session replay was not found." })
+                : Results.Ok(new
+                {
+                    replay,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report/export", (
+            string sessionId,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-report-export",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var report = reportArchive.GetBySessionId(sessionId);
+            return report == null
+                ? Results.NotFound(new { error = "RuntimePreview session report export was not found." })
+                : Results.Ok(new
+                {
+                    export = new
+                    {
+                        fileName = $"{report.ReportId}.metadata-only.json",
+                        exportedAtUtc = DateTimeOffset.UtcNow,
+                        report,
+                        metadataOnly = true,
+                        realResourcesTouched = false
+                    },
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/deploy-readiness", async (
+            RuntimePreviewDeployReadinessRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewDeployReadinessService deployReadinessService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-deploy-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await deployReadinessService.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                deployReadinessReport = report,
+                session = report.SimulationReport?.Session,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/package-readiness", async (
+            RuntimePreviewPackageReadinessRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-package-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await packageReadinessBridge.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                packageReadinessReport = report,
+                manifestDryRunReport = string.IsNullOrWhiteSpace(report.ManifestDryRunReportId)
+                    ? null
+                    : reportArchive.GetManifestDryRunReport(report.ManifestDryRunReportId),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/manifest-dry-run", async (
+            RuntimePackageManifestDryRunRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-manifest-dry-run",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var packageReport = await packageReadinessBridge.GenerateAsync(
+                new RuntimePreviewPackageReadinessRequest
+                {
+                    Config = request.Config,
+                    ToolName = request.ToolName,
+                    Arguments = request.Arguments,
+                    WorkflowDraft = request.WorkflowDraft,
+                    RuntimePreviewConsent = request.RuntimePreviewConsent,
+                    RequireReplay = request.RequireReplay
+                },
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            var manifestReport = string.IsNullOrWhiteSpace(packageReport.ManifestDryRunReportId)
+                ? null
+                : reportArchive.GetManifestDryRunReport(packageReport.ManifestDryRunReportId);
+            return Results.Ok(new
+            {
+                packageReadinessReport = packageReport,
+                manifestDryRunReportId = packageReport.ManifestDryRunReportId,
+                manifestDryRunReport = manifestReport,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                packageCreated = false,
+                deploymentExecuted = false,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/pre-release-review", async (
+            RuntimePreviewPreReleaseReviewRequest request,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPreReleaseReviewService preReleaseReviewService,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-pre-release-review",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await preReleaseReviewService.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                preReleaseReviewReport = report,
+                packageReadinessReport = string.IsNullOrWhiteSpace(report.PackageReadinessReportId)
+                    ? null
+                    : reportArchive.GetPackageReadinessReport(report.PackageReadinessReportId),
+                manifestDryRunReport = string.IsNullOrWhiteSpace(report.ManifestId)
+                    ? null
+                    : reportArchive.GetManifestDryRunReport(report.ManifestId),
+                stationCompatibilityReport = string.IsNullOrWhiteSpace(report.StationCompatibilityReportId)
+                    ? null
+                    : reportArchive.GetStationCompatibilityReport(report.StationCompatibilityReportId),
+                operatorContractValidationReport = string.IsNullOrWhiteSpace(report.OperatorContractValidationReportId)
+                    ? null
+                    : reportArchive.GetOperatorContractValidationReport(report.OperatorContractValidationReportId),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                packageCreated = false,
+                deploymentExecuted = false,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/retention/cleanup", (
+            RuntimePreviewRetentionCleanupEndpointRequest request,
+            [FromServices] RuntimePreviewGovernanceMaintenanceService maintenanceService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-retention-cleanup",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var cleanup = maintenanceService.Cleanup(request.RetentionDays, request.MaxSessions);
+            return Results.Ok(new
+            {
+                cleanup,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/station-profiles", (
+            [FromServices] RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-station-profiles",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                stationProfiles = stationProfileCatalog.BuildProfiles(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/operator-contract-registry", (
+            [FromServices] RuntimePreviewOperatorContractRegistry operatorContractRegistry,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-operator-contract-registry",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                operatorContractRegistry = operatorContractRegistry.BuildRegistry(),
+                operatorContractCoverageReport = operatorContractRegistry.BuildCoverageReport(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/scenario-evidence", async (
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewScenarioEvidenceService scenarioEvidenceService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-scenario-evidence",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var evidence = await scenarioEvidenceService.RunAsync(appConfig, aiConfigStore, cancellationToken);
+            return Results.Ok(new
+            {
+                evidence,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/scenario-corpus", (
+            [FromServices] RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-scenario-corpus",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = scenarioCorpusService.BuildCorpus();
+            return Results.Ok(new
+            {
+                corpus,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/redacted-flow-corpus", (
+            [FromServices] RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-redacted-flow-corpus",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = redactedFlowCorpusService.BuildCorpus();
+            return Results.Ok(new
+            {
+                corpus,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", (
+            [FromServices] RuntimePreviewAgentExplanationService explanationService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-agent-explanation-benchmark",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var benchmark = explanationService.Run();
+            return Results.Ok(new
+            {
+                benchmark,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/index", (
+            [FromServices] RuntimePreviewGovernanceStore governanceStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-index",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                index = governanceStore.BuildIndexSummary(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/export", (
+            [FromServices] RuntimePreviewGovernanceStore governanceStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-export",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                export = governanceStore.ExportManifest(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/lookup", (
+            string? sessionId,
+            string? reportId,
+            string? caseId,
+            string? manifestId,
+            string? reviewId,
+            string? stationProfileId,
+            string? operatorType,
+            [FromServices] RuntimePreviewSessionStore sessionStore,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            [FromServices] RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            [FromServices] RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            [FromServices] RuntimePreviewOperatorContractRegistry operatorContractRegistry,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-lookup",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = scenarioCorpusService.BuildCorpus();
+            var normalizedSessionId = string.IsNullOrWhiteSpace(sessionId) ? string.Empty : sessionId.Trim();
+            var normalizedReportId = string.IsNullOrWhiteSpace(reportId) ? string.Empty : reportId.Trim();
+            var normalizedCaseId = string.IsNullOrWhiteSpace(caseId) ? string.Empty : caseId.Trim();
+            var normalizedManifestId = string.IsNullOrWhiteSpace(manifestId) ? string.Empty : manifestId.Trim();
+            var normalizedReviewId = string.IsNullOrWhiteSpace(reviewId) ? string.Empty : reviewId.Trim();
+            var normalizedStationProfileId = string.IsNullOrWhiteSpace(stationProfileId) ? string.Empty : stationProfileId.Trim();
+            var normalizedOperatorType = string.IsNullOrWhiteSpace(operatorType) ? string.Empty : operatorType.Trim();
+            var redactedCorpus = redactedFlowCorpusService.BuildCorpus();
+            var stationProfiles = stationProfileCatalog.BuildProfiles();
+            var registry = operatorContractRegistry.BuildRegistry();
+            var coverage = operatorContractRegistry.BuildCoverageReport();
+            var result = new
+            {
+                session = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : sessionStore.Get(normalizedSessionId),
+                sessionReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetBySessionId(normalizedSessionId),
+                deployReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetDeployReadinessReportBySessionId(normalizedSessionId),
+                packageReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPackageReadinessReportBySessionId(normalizedSessionId),
+                manifestDryRunReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetManifestDryRunReportBySessionId(normalizedSessionId),
+                stationCompatibilityReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetStationCompatibilityReportBySessionId(normalizedSessionId),
+                operatorContractValidationReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetOperatorContractValidationReportBySessionId(normalizedSessionId),
+                preReleaseReviewReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPreReleaseReviewReportBySessionId(normalizedSessionId),
+                report = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.Get(normalizedReportId),
+                deployReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetDeployReadinessReport(normalizedReportId),
+                packageReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetPackageReadinessReport(normalizedReportId),
+                manifestReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetManifestDryRunReportByReportId(normalizedReportId),
+                manifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetManifestDryRunReport(normalizedManifestId),
+                preReleaseReview = string.IsNullOrWhiteSpace(normalizedReviewId) ? null : reportArchive.GetPreReleaseReviewReport(normalizedReviewId),
+                releaseReviewDecision = string.IsNullOrWhiteSpace(normalizedReviewId) ? null : reportArchive.GetReleaseReviewDecision(normalizedReviewId),
+                preReleaseReviewByManifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetPreReleaseReviewReportByManifestId(normalizedManifestId),
+                releaseReviewDecisionByReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetReleaseReviewDecision(normalizedReportId),
+                stationProfile = string.IsNullOrWhiteSpace(normalizedStationProfileId)
+                    ? null
+                    : stationProfiles.Profiles.FirstOrDefault(item => string.Equals(item.StationProfileId, normalizedStationProfileId, StringComparison.OrdinalIgnoreCase)),
+                stationProfileReports = string.IsNullOrWhiteSpace(normalizedStationProfileId)
+                    ? Array.Empty<RuntimePreviewStationCompatibilityReport>()
+                    : reportArchive.GetStationCompatibilityReportsByStationProfileId(normalizedStationProfileId),
+                operatorContract = string.IsNullOrWhiteSpace(normalizedOperatorType)
+                    ? null
+                    : registry.Contracts.FirstOrDefault(item => string.Equals(item.OperatorType, normalizedOperatorType, StringComparison.OrdinalIgnoreCase)),
+                operatorContractCoverageReport = coverage,
+                operatorContractValidationReportsByOperator = string.IsNullOrWhiteSpace(normalizedOperatorType)
+                    ? Array.Empty<RuntimePreviewOperatorContractValidationReport>()
+                    : reportArchive.ListOperatorContractValidationReports()
+                        .Where(item => item.ContractResults.Any(resultItem => string.Equals(resultItem.OperatorType, normalizedOperatorType, StringComparison.OrdinalIgnoreCase)))
+                        .ToArray(),
+                corpusCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? null
+                    : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),
+                redactedFlowCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? null
+                    : redactedCorpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),
+                preReleaseReviewsByCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? Array.Empty<RuntimePreviewPreReleaseReviewReport>()
+                    : reportArchive.GetPreReleaseReviewReportsByCaseId(normalizedCaseId)
+            };
+            return Results.Ok(new
+            {
+                lookup = result,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
         app.MapGet("/api/cameras/discover", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
         {
             var devices = await cameraManager.EnumerateCamerasAsync();
@@ -842,6 +1789,12 @@ public static class SettingsEndpoints
                string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 
+    private static bool IsDeveloperUiRequested(HttpContext context)
+    {
+        return context.Request.Headers.TryGetValue("X-CV-Developer-UI", out var value) &&
+               value.Any(item => string.Equals(item, "true", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static bool IsSuccessfulAiHealthCheck(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -861,16 +1814,220 @@ public static class SettingsEndpoints
         }
     }
 
+    private static async Task<AiModelTestConnectionResult> TestAiModelConnectionAsync(
+        AiModelConfig model,
+        AiApiClient apiClient,
+        CancellationToken cancellationToken)
+    {
+        var protocol = AiModelConfig.NormalizeProtocol(model.Protocol, model.Provider);
+        var wireApi = AiModelConfig.NormalizeWireApi(model.WireApi);
+        var authMode = AiModelConfig.NormalizeAuthMode(model.AuthMode, protocol);
+        var timeoutMs = Math.Clamp(model.TimeoutMs <= 0 ? 120_000 : model.TimeoutMs, 1_000, 300_000);
+
+        if (authMode != AiModelConfig.AuthModeNone && string.IsNullOrWhiteSpace(model.ApiKey))
+        {
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "missing_api_key",
+                0,
+                "API key is required for this auth mode.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.BaseUrl) &&
+            !Uri.TryCreate(model.BaseUrl, UriKind.Absolute, out _))
+        {
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "base_url_error",
+                0,
+                "BaseUrl is not a valid absolute URL.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+            var options = model.ToGenerationOptions();
+            options.MaxRetries = 0;
+            options.MaxTokens = 32;
+            options.Temperature = 0;
+
+            var response = await apiClient.StreamCompleteAsync(
+                "You are a connection health-check assistant. Respond only with valid JSON.",
+                new List<ChatMessage> { new("user", "Reply with a JSON object exactly: {\"ok\": true}") },
+                _ => { },
+                options,
+                timeoutCts.Token);
+
+            stopwatch.Stop();
+            if (!IsSuccessfulAiHealthCheck(response.Content))
+            {
+                return BuildAiModelConnectionResult(
+                    false,
+                    null,
+                    "bad_response",
+                    Elapsed(stopwatch),
+                    "AI response did not match the expected JSON health-check shape; 不是预期的 JSON health-check 响应.",
+                    model.Provider,
+                    model.Model,
+                    protocol,
+                    wireApi);
+            }
+
+            return BuildAiModelConnectionResult(
+                true,
+                200,
+                "ok",
+                Elapsed(stopwatch),
+                "Connection succeeded.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (HttpRequestException ex)
+        {
+            stopwatch.Stop();
+            var statusCode = ex.StatusCode.HasValue ? (int?)ex.StatusCode.Value : null;
+            return BuildAiModelConnectionResult(
+                false,
+                statusCode,
+                ClassifyHttpConnectionError(statusCode),
+                Elapsed(stopwatch),
+                AiSecretSanitizer.RedactException(ex),
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
+        {
+            stopwatch.Stop();
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "timeout",
+                Elapsed(stopwatch),
+                "Connection test timed out.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                ClassifyNonHttpConnectionError(ex),
+                Elapsed(stopwatch),
+                AiSecretSanitizer.RedactException(ex),
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+    }
+
+    private static AiModelTestConnectionResult BuildAiModelConnectionResult(
+        bool connectionOk,
+        int? statusCode,
+        string errorCode,
+        int latencyMs,
+        string sanitizedMessage,
+        string provider,
+        string modelName,
+        string protocol,
+        string wireApi)
+    {
+        var safeMessage = AiSecretSanitizer.Redact(sanitizedMessage);
+        return new AiModelTestConnectionResult
+        {
+            ConnectionOk = connectionOk,
+            Success = connectionOk,
+            StatusCode = statusCode,
+            ErrorCode = errorCode,
+            LatencyMs = latencyMs,
+            SanitizedMessage = safeMessage,
+            Message = safeMessage,
+            Provider = provider,
+            ModelName = modelName,
+            Protocol = protocol,
+            WireApi = wireApi
+        };
+    }
+
+    private static string ClassifyHttpConnectionError(int? statusCode)
+    {
+        return statusCode switch
+        {
+            401 or 403 => "auth_failed",
+            404 => "model_not_found",
+            >= 500 => "provider_error",
+            _ => "http_error"
+        };
+    }
+
+    private static string ClassifyNonHttpConnectionError(Exception exception)
+    {
+        var message = exception.Message;
+        if (exception is UriFormatException ||
+            message.Contains("url", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("uri", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("baseurl", StringComparison.OrdinalIgnoreCase))
+        {
+            return "base_url_error";
+        }
+
+        return "response_format_error";
+    }
+
+    private static int Elapsed(Stopwatch stopwatch)
+    {
+        return (int)Math.Clamp(stopwatch.ElapsedMilliseconds, 0, int.MaxValue);
+    }
+
+    private static AiApiKeyUpdateMode ResolveApiKeyUpdateMode(string? apiKeyOperation, string? apiKey)
+    {
+        var normalized = string.IsNullOrWhiteSpace(apiKeyOperation)
+            ? (string.IsNullOrWhiteSpace(apiKey) ? "keep" : "replace")
+            : apiKeyOperation.Trim().ToLowerInvariant().Replace("_", "-");
+
+        return normalized switch
+        {
+            "clear" => AiApiKeyUpdateMode.Clear,
+            "replace" => AiApiKeyUpdateMode.Replace,
+            "new" => AiApiKeyUpdateMode.Replace,
+            "keep" => AiApiKeyUpdateMode.Keep,
+            _ => string.IsNullOrWhiteSpace(apiKey) ? AiApiKeyUpdateMode.Keep : AiApiKeyUpdateMode.Replace
+        };
+    }
+
     private static object ToAiModelResponse(AiModelConfig m) => new
     {
         m.Id,
         m.Name,
+        m.DisplayName,
         m.Provider,
         hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey),
+        apiKeyMasked = AiSecretSanitizer.MaskApiKey(!string.IsNullOrWhiteSpace(m.ApiKey)),
         m.Model,
         baseUrl = m.BaseUrl ?? "",
         m.TimeoutMs,
         m.IsActive,
+        m.IsEnabled,
         m.Protocol,
         m.WireApi,
         m.AuthMode,
@@ -879,7 +2036,14 @@ public static class SettingsEndpoints
         m.ExtraQuery,
         m.ExtraBody,
         m.RoleBindings,
+        m.ModelRole,
         m.Priority,
+        m.Remark,
+        m.CreatedAt,
+        m.UpdatedAt,
+        m.LastTestStatus,
+        m.LastTestAt,
+        m.LastTestLatencyMs,
         m.Capabilities,
         m.Reasoning,
         ReasoningSupport = m.GetReasoningSupport()
@@ -1528,14 +2692,73 @@ public static class SettingsEndpoints
 
         return new List<string>(source);
     }
+
+    private static JsonElement? ExtractRuntimePreviewWorkflowDraft(RuntimePreviewPilotReadinessEndpointRequest request)
+    {
+        if (request.WorkflowDraft is { ValueKind: JsonValueKind.Object } workflowDraft)
+        {
+            return workflowDraft.Clone();
+        }
+
+        if (request.Arguments is { ValueKind: JsonValueKind.Object } arguments)
+        {
+            foreach (var propertyName in new[] { "flow", "workflowDraft", "existingFlowJson" })
+            {
+                if (arguments.TryGetProperty(propertyName, out var value) &&
+                    value.ValueKind == JsonValueKind.Object)
+                {
+                    return value.Clone();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static JsonElement BuildRuntimePreviewReadinessArguments(
+        RuntimePreviewPilotReadinessEndpointRequest request,
+        JsonElement? workflowDraft)
+    {
+        if (request.Arguments is { ValueKind: JsonValueKind.Object } arguments)
+        {
+            return arguments.Clone();
+        }
+
+        if (workflowDraft is { ValueKind: JsonValueKind.Object } flow)
+        {
+            return JsonSerializer.SerializeToElement(new
+            {
+                flow
+            });
+        }
+
+        return JsonSerializer.SerializeToElement(new { });
+    }
+
+    private sealed class AiModelTestConnectionResult
+    {
+        public bool ConnectionOk { get; init; }
+        public bool Success { get; init; }
+        public int? StatusCode { get; init; }
+        public string ErrorCode { get; init; } = string.Empty;
+        public int LatencyMs { get; init; }
+        public string SanitizedMessage { get; init; } = string.Empty;
+        public string Message { get; init; } = string.Empty;
+        public string Provider { get; init; } = string.Empty;
+        public string ModelName { get; init; } = string.Empty;
+        public string Protocol { get; init; } = string.Empty;
+        public string WireApi { get; init; } = string.Empty;
+    }
 }
 
 /// <summary>创建模型请求</summary>
 public class AiModelCreateRequest
 {
     public string? Name { get; set; }
+    public string? DisplayName { get; set; }
     public string? Provider { get; set; }
     public string? ApiKey { get; set; }
+    public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
@@ -1548,7 +2771,10 @@ public class AiModelCreateRequest
     public Dictionary<string, JsonElement>? ExtraBody { get; set; }
     public AiReasoningSettings? Reasoning { get; set; }
     public List<string>? RoleBindings { get; set; }
+    public string? ModelRole { get; set; }
     public int? Priority { get; set; }
+    public bool? IsEnabled { get; set; }
+    public string? Remark { get; set; }
     public AiModelCapabilities? Capabilities { get; set; }
 }
 
@@ -1556,8 +2782,10 @@ public class AiModelCreateRequest
 public class AiModelUpdateRequest
 {
     public string? Name { get; set; }
+    public string? DisplayName { get; set; }
     public string? Provider { get; set; }
     public string? ApiKey { get; set; }
+    public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
@@ -1570,7 +2798,10 @@ public class AiModelUpdateRequest
     public Dictionary<string, JsonElement>? ExtraBody { get; set; }
     public AiReasoningSettings? Reasoning { get; set; }
     public List<string>? RoleBindings { get; set; }
+    public string? ModelRole { get; set; }
     public int? Priority { get; set; }
+    public bool? IsEnabled { get; set; }
+    public string? Remark { get; set; }
     public AiModelCapabilities? Capabilities { get; set; }
 }
 
@@ -1583,6 +2814,21 @@ public class AiReasoningSupportRequest
 }
 
 /// <summary>软触发抓图请求</summary>
+public class RuntimePreviewPilotReadinessEndpointRequest
+{
+    public RuntimePreviewPilotConfig? Config { get; set; }
+    public string? ToolName { get; set; }
+    public JsonElement? Arguments { get; set; }
+    public JsonElement? WorkflowDraft { get; set; }
+}
+
+public class RuntimePreviewRetentionCleanupEndpointRequest
+{
+    public int RetentionDays { get; set; } = 30;
+
+    public int MaxSessions { get; set; } = 200;
+}
+
 public class CameraSoftTriggerCaptureRequest
 {
     public string CameraBindingId { get; set; } = string.Empty;

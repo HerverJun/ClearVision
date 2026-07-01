@@ -3,8 +3,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ConversationSessionDeleteStatus = ClearVision.Product.Infrastructure.AI.ConversationSessionDeleteStatus;
 using ConversationSessionSummary = ClearVision.Product.Infrastructure.AI.ConversationSessionSummary;
 using IConversationalFlowService = ClearVision.Product.Infrastructure.AI.IConversationalFlowService;
+using MicrosoftLogger = Microsoft.Extensions.Logging.ILogger<ClearVision.Product.Desktop.Handlers.AiSessionMessageHandler>;
 
 namespace ClearVision.Product.Desktop.Handlers;
 
@@ -12,12 +14,12 @@ internal sealed class AiSessionMessageHandler
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IWebMessageClient _client;
-    private readonly ILogger<AiSessionMessageHandler> _logger;
+    private readonly MicrosoftLogger _logger;
 
     public AiSessionMessageHandler(
         IServiceScopeFactory scopeFactory,
         IWebMessageClient client,
-        ILogger<AiSessionMessageHandler> logger)
+        MicrosoftLogger logger)
     {
         _scopeFactory = scopeFactory;
         _client = client;
@@ -54,14 +56,18 @@ internal sealed class AiSessionMessageHandler
 
     public Task HandleGetAsync(string messageJson)
     {
+        var request = AiSessionRequestEnvelope.Empty;
         try
         {
-            var sessionId = ExtractSessionId(messageJson);
-            if (string.IsNullOrWhiteSpace(sessionId))
+            request = ExtractSessionRequest(messageJson);
+            if (string.IsNullOrWhiteSpace(request.SessionId))
             {
                 _client.SendProgressMessage("GetAiSessionResult", new
                 {
                     success = false,
+                    sessionId = request.SessionId,
+                    requestId = request.RequestId,
+                    navigationEpoch = request.NavigationEpoch,
                     errorMessage = "sessionId is required."
                 });
                 return Task.CompletedTask;
@@ -69,12 +75,14 @@ internal sealed class AiSessionMessageHandler
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var session = service.GetSession(sessionId);
+            var session = service.GetSession(request.SessionId);
 
             _client.SendProgressMessage("GetAiSessionResult", new
             {
                 success = session != null,
-                sessionId,
+                sessionId = request.SessionId,
+                requestId = request.RequestId,
+                navigationEpoch = request.NavigationEpoch,
                 session,
                 errorMessage = session == null ? "Session not found." : null
             });
@@ -85,6 +93,9 @@ internal sealed class AiSessionMessageHandler
             _client.SendProgressMessage("GetAiSessionResult", new
             {
                 success = false,
+                sessionId = request.SessionId,
+                requestId = request.RequestId,
+                navigationEpoch = request.NavigationEpoch,
                 errorMessage = ex.Message
             });
         }
@@ -109,13 +120,21 @@ internal sealed class AiSessionMessageHandler
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var deleted = service.DeleteSession(sessionId);
+            var deleteResult = service.DeleteSessionWithResult(sessionId);
+            var deleted = deleteResult.Status == ConversationSessionDeleteStatus.Deleted;
+            var errorMessage = deleteResult.Status switch
+            {
+                ConversationSessionDeleteStatus.Deleted => null,
+                ConversationSessionDeleteStatus.PersistenceFailed => deleteResult.PersistenceStatus.PublicMessage,
+                _ => "Session not found."
+            };
 
             _client.SendProgressMessage("DeleteAiSessionResult", new
             {
                 success = deleted,
                 sessionId,
-                errorMessage = deleted ? null : "Session not found."
+                persistenceStatus = deleteResult.PersistenceStatus,
+                errorMessage
             });
         }
         catch (Exception ex)
@@ -133,21 +152,54 @@ internal sealed class AiSessionMessageHandler
 
     private static string? ExtractSessionId(string messageJson)
     {
+        return ExtractSessionRequest(messageJson).SessionId;
+    }
+
+    private static AiSessionRequestEnvelope ExtractSessionRequest(string messageJson)
+    {
         using var doc = JsonDocument.Parse(messageJson);
-        if (doc.RootElement.TryGetProperty("payload", out var payload) &&
-            payload.ValueKind == JsonValueKind.Object &&
-            (payload.TryGetProperty("sessionId", out var payloadSessionId) ||
-             payload.TryGetProperty("SessionId", out payloadSessionId)))
+        var root = doc.RootElement;
+        var source = root;
+        if (root.TryGetProperty("payload", out var payload) &&
+            payload.ValueKind == JsonValueKind.Object)
         {
-            return payloadSessionId.GetString();
+            source = payload;
         }
 
-        if (doc.RootElement.TryGetProperty("sessionId", out var sessionId) ||
-            doc.RootElement.TryGetProperty("SessionId", out sessionId))
+        return new AiSessionRequestEnvelope(
+            ReadString(source, "sessionId", "SessionId"),
+            ReadString(source, "requestId", "RequestId"),
+            ReadLong(source, "navigationEpoch", "NavigationEpoch"));
+    }
+
+    private static string? ReadString(JsonElement element, string camelName, string pascalName)
+    {
+        if (element.TryGetProperty(camelName, out var camel) ||
+            element.TryGetProperty(pascalName, out camel))
         {
-            return sessionId.GetString();
+            return camel.GetString();
         }
 
         return null;
+    }
+
+    private static long ReadLong(JsonElement element, string camelName, string pascalName)
+    {
+        if ((element.TryGetProperty(camelName, out var value) ||
+             element.TryGetProperty(pascalName, out value)) &&
+            value.TryGetInt64(out var number))
+        {
+            return number;
+        }
+
+        return 0;
+    }
+
+    private sealed record AiSessionRequestEnvelope(
+        string? SessionId,
+        string? RequestId,
+        long NavigationEpoch)
+    {
+        public static AiSessionRequestEnvelope Empty { get; } = new(null, null, 0);
     }
 }

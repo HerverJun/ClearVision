@@ -27,6 +27,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
     // 单一状态锁，避免 project lock 字典长期累积并让生命周期边界更直观。
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private readonly ConcurrentDictionary<(Guid ProjectId, Guid SessionId), Task> _cleanupTasks = new();
+    private readonly HashSet<Guid> _mutationLeases = [];
 
     // 关机标志
     private volatile bool _isShuttingDown = false;
@@ -76,6 +77,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                 CleanupSessionCore(projectId, existing.SessionId);
             }
 
+            if (_mutationLeases.Contains(projectId))
+            {
+                _logger.LogWarning("[Coordinator] 项目 {ProjectId} 正在配置变更中，拒绝启动运行。", projectId);
+                return StartResult.MutationInProgress;
+            }
+
             // 创建新的取消令牌源（与 HTTP 请求 token 无关）
             var cts = new CancellationTokenSource();
             _ctsMap[projectId] = cts;
@@ -98,6 +105,41 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             RaiseStateChanged(projectId, sessionId, RuntimeStatus.Starting, RuntimeStatus.Stopped);
 
             return StartResult.Success;
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
+    }
+
+    public async Task<ProjectMutationLease?> TryAcquireMutationLeaseAsync(Guid projectId, string reason, CancellationToken ct)
+    {
+        if (_isShuttingDown)
+        {
+            return null;
+        }
+
+        await _stateLock.WaitAsync(ct);
+        try
+        {
+            if (_isShuttingDown)
+            {
+                return null;
+            }
+
+            if (_mutationLeases.Contains(projectId))
+            {
+                return null;
+            }
+
+            if (_sessions.TryGetValue(projectId, out var existing) &&
+                existing.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
+            {
+                return null;
+            }
+
+            _mutationLeases.Add(projectId);
+            return new ProjectMutationLease(projectId, reason, () => ReleaseMutationLeaseAsync(projectId));
         }
         finally
         {
@@ -420,6 +462,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
             _ctsMap.Clear();
             _sessions.Clear();
+            _mutationLeases.Clear();
         }
         finally
         {
@@ -435,6 +478,19 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             _logger.LogDebug(ex, "[Coordinator] 等待清理任务结束时异常");
         }
 
+    }
+
+    private async ValueTask ReleaseMutationLeaseAsync(Guid projectId)
+    {
+        await _stateLock.WaitAsync();
+        try
+        {
+            _mutationLeases.Remove(projectId);
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 }
 

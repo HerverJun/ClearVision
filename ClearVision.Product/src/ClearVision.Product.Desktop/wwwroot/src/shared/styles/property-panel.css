@@ -69,7 +69,7 @@
     color: var(--text-color);
     font-size: var(--font-size-md);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -78,13 +78,21 @@
 .property-type {
     font-size: var(--font-size-xs);
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    text-transform: none;
+    letter-spacing: 0;
     font-weight: 500;
 }
 
 .form-group {
     margin-bottom: 10px;
+}
+
+.form-group.is-rule-disabled {
+    opacity: 0.72;
+}
+
+.form-group.is-rule-disabled.hidden {
+    display: none;
 }
 
 .form-label {
@@ -113,7 +121,7 @@
     transition: all var(--duration-fast) var(--ease-ink);
     box-shadow: var(--shadow-sm), var(--shadow-inset);
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
 }
 
 .form-input:focus,
@@ -226,6 +234,11 @@
     font-style: italic;
     line-height: 1.4;
     opacity: 0.7;
+}
+
+.parameter-rule-hint {
+    color: #f4cf6b;
+    opacity: 1;
 }
 
 /* Checkbox in property panel */

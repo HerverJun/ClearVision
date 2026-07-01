@@ -252,7 +252,7 @@ test('AiPanel runtime next action guides apply, review, and manual retry states'
       pendingCount: 2,
       hasFlow: true
     }),
-    '下一步：补齐 2 组待确认参数，再执行统一确认。'
+    '下一步：补齐 2 组待确认参数，再确认人工参数。'
   );
 
   assert.equal(
@@ -270,8 +270,52 @@ test('AiPanel runtime next action guides apply, review, and manual retry states'
       interactionState: 'completed',
       hasFlow: true
     }),
-    '下一步：确认方案后应用到流程草稿，或继续输入微调需求。'
+    '下一步：确认方案后应用到画布，或继续输入微调需求。'
   );
+});
+
+test('AiPanel runtime infers terminal states when interactionState is missing', async () => {
+  installDom();
+  const { AiPanel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  );
+
+  const cases = [
+    {
+      payload: { success: false, status: 'cancelled', failureType: 'user_cancelled', turnIntent: 'new_flow' },
+      className: /is-cancelled/,
+      label: /已取消/
+    },
+    {
+      payload: { success: false, status: 'timed_out', failureType: 'timeout', turnIntent: 'new_flow' },
+      className: /is-timed_out/,
+      label: /请求超时/
+    },
+    {
+      payload: { success: false, status: 'failed', failureType: 'system_error', turnIntent: 'new_flow' },
+      className: /is-failed/,
+      label: /失败/
+    },
+    {
+      payload: { success: false, status: 'manual_retry_required', turnIntent: 'manual_retry_repair', manualRetry: { required: true } },
+      className: /is-manual_retry/,
+      label: /修复中/
+    }
+  ];
+
+  for (const item of cases) {
+    const runtime = createFakeElement();
+    const panel = Object.create(AiPanel.prototype);
+    panel.container = createContainer({ '#ai-agent-runtime': runtime });
+    panel._lastAgentRuntime = null;
+
+    panel._renderAgentRuntime(item.payload);
+
+    assert.equal(runtime.hidden, false);
+    assert.match(runtime.className, item.className);
+    assert.match(runtime.innerHTML, item.label);
+    assert.doesNotMatch(runtime.innerHTML, /生成中/);
+  }
 });
 
 test('AiPanel request mode inference separates explicit new flow from current-flow edits', async () => {
@@ -312,7 +356,8 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   );
 
   const input = createFakeElement();
-  const sendButton = createFakeElement();
+  const planSendButton = createFakeElement();
+  const briefSendButton = createFakeElement();
   const sceneButton = createFakeElement();
   sceneButton.setAttribute('data-clarification-field', 'scene');
   sceneButton.setAttribute('data-clarification-value', '外观缺陷');
@@ -323,11 +368,11 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   const panel = Object.create(AiPanel.prototype);
   panel.container = createContainer(
     {
-      '#ai-input': input,
-      '#ai-btn-send-clarification': sendButton
+      '#ai-input': input
     },
     {
-      '[data-clarification-field][data-clarification-value]': [sceneButton, objectButton]
+      '[data-clarification-field][data-clarification-value]': [sceneButton, objectButton],
+      '[data-brief-action="send-clarification"]': [planSendButton, briefSendButton]
     }
   );
   panel.isGenerating = false;
@@ -338,8 +383,10 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   panel._handleClarificationOptionSelection(sceneButton);
 
   assert.match(input.value, /澄清回答：\n场景类型：外观缺陷/);
-  assert.equal(sendButton.disabled, false);
-  assert.equal(sendButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(planSendButton.disabled, false);
+  assert.equal(briefSendButton.disabled, false);
+  assert.equal(planSendButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(briefSendButton.getAttribute('aria-disabled'), 'false');
   assert.equal(sceneButton.getAttribute('aria-pressed'), 'true');
 
   panel._handleClarificationOptionSelection(objectButton);
@@ -375,17 +422,27 @@ test('AiPanel apply button is disabled until a generated flow is available', asy
 
   panel._updateApplyButtonState();
 
+  assert.equal(button.disabled, true);
+  assert.equal(button.getAttribute('aria-disabled'), 'true');
+  assert.match(button.innerHTML, /暂无可应用方案/);
+
+  panel.currentResult = { flow: { operators: [{ id: 'op_1', type: 'ImageAcquisition' }], connections: [] } };
+  panel.currentResultVersion = 2;
+  panel.appliedResultVersion = 0;
+
+  panel._updateApplyButtonState();
+
   assert.equal(button.disabled, false);
   assert.equal(button.getAttribute('aria-disabled'), 'false');
-  assert.match(button.innerHTML, /应用到当前流程草稿/);
+  assert.match(button.innerHTML, /应用到画布/);
 
-  panel.appliedResultVersion = 1;
+  panel.appliedResultVersion = 2;
 
   panel._updateApplyButtonState();
 
   assert.equal(button.disabled, true);
   assert.equal(button.getAttribute('aria-disabled'), 'true');
-  assert.match(button.innerHTML, /已应用到流程草稿/);
+  assert.match(button.innerHTML, /已应用到画布/);
 });
 
 test('AiPanel apply preview risk summary includes unresolved launch items and connection diffs', async () => {

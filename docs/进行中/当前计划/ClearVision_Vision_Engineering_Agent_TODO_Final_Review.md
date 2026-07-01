@@ -106,7 +106,7 @@ Agent 调用 dryrun_flow
 在交给 Codex 或其他编码 Agent 执行前，必须把以下约束视为硬门禁：
 
 ```text
-[ ] 实施前先读取当前 .sln、.csproj、目录结构和现有 namespace，按仓库当前真实命名创建文件；当前目标命名为 ClearVision.Product.*，不得重新创建 Acme.Product.* 路径。
+[ ] 实施前先读取当前 .sln、.csproj、目录结构和现有 namespace，按仓库当前真实命名创建文件；当前目标命名为 ClearVision.Product.*，不得重新创建 legacy non-ClearVision product namespace 路径。
 [ ] 不引入 CMD / PowerShell / shell / 任意系统命令执行能力。
 [ ] Agent Tool Loop 首选 OpenAI / Anthropic 原生 tools / tool_calls；自定义 JSON tool_call/final_flow 仅作为不支持 tools 的 fallback。
 [ ] ToolDescriptor 可缓存；ToolExecutor / ToolRegistry / Tool 实例必须使用 Scoped 或 Transient，严禁 Singleton 捕获硬件、配置、运行时等 Scoped 服务。
@@ -1717,7 +1717,7 @@ Scope:
 - Do NOT add CMD, PowerShell, shell, arbitrary filesystem, or OS-level permissions.
 - Only expose ClearVision internal capabilities as Agent Tools.
 - Preserve existing GenerateFlow behavior behind fallback / feature flags.
-- Use current repository naming exactly as it exists now under ClearVision.Product.*. Do not recreate Acme.Product paths.
+- Use current repository naming exactly as it exists now under ClearVision.Product.*. Do not recreate legacy non-ClearVision product namespace paths.
 - Add PromptMode: legacy_full_prompt, hybrid, agent_tools.
 - Prefer native provider tool calling for OpenAI / Anthropic; keep JSON tool_call/final_flow only as fallback.
 - Reduce long prompt injection by moving operator catalog, operator knowledge slices, template skeletons, current flow inspection, validation, DryRun, camera bindings, and deployment precheck into tools.

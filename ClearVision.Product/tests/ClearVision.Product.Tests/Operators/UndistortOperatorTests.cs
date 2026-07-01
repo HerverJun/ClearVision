@@ -68,13 +68,14 @@ public class UndistortOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
 
         result.IsSuccess.Should().BeTrue();
-        result.OutputData["RuntimeQualityGatePassed"].Should().Be(true);
-        result.OutputData["RuntimeQualityGateStatus"].Should().Be("pass");
-        result.OutputData["RuntimeDriftRisk"].Should().Be("low");
-        result.OutputData["RuntimeQualityMonitoringMode"].Should().Be("heuristic-baseline-only");
-        result.OutputData["CalibrationMeanError"].Should().Be(0.11);
-        result.OutputData["CalibrationMaxError"].Should().Be(0.23);
-        ((string[])result.OutputData["RuntimeQualitySignals"])
+        var outputData = result.OutputData!;
+        outputData["RuntimeQualityGatePassed"].Should().Be(true);
+        outputData["RuntimeQualityGateStatus"].Should().Be("pass");
+        outputData["RuntimeDriftRisk"].Should().Be("low");
+        outputData["RuntimeQualityMonitoringMode"].Should().Be("heuristic-baseline-only");
+        outputData["CalibrationMeanError"].Should().Be(0.11);
+        outputData["CalibrationMaxError"].Should().Be(0.23);
+        ((string[])outputData["RuntimeQualitySignals"])
             .Should()
             .Contain(signal => signal.Contains("comfortably inside runtime monitoring thresholds.", StringComparison.Ordinal));
     }
@@ -90,10 +91,11 @@ public class UndistortOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
 
         result.IsSuccess.Should().BeTrue();
-        result.OutputData["RuntimeQualityGatePassed"].Should().Be(true);
-        result.OutputData["RuntimeQualityGateStatus"].Should().Be("warning");
-        result.OutputData["RuntimeDriftRisk"].Should().Be("moderate");
-        ((string[])result.OutputData["RuntimeQualitySignals"])
+        var outputData = result.OutputData!;
+        outputData["RuntimeQualityGatePassed"].Should().Be(true);
+        outputData["RuntimeQualityGateStatus"].Should().Be("warning");
+        outputData["RuntimeDriftRisk"].Should().Be("moderate");
+        ((string[])outputData["RuntimeQualitySignals"])
             .Should()
             .Contain(signal => signal.Contains("warning threshold", StringComparison.Ordinal));
     }

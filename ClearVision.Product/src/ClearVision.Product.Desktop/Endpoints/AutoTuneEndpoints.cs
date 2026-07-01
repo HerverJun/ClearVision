@@ -261,7 +261,7 @@ public static class AutoTuneEndpoints
         .WithDescription("仅对 wire-sequence-terminal 场景执行白名单参数自动调参");
 
         // POST /api/autotune/suggest - 获取参数建议（快速建议，不调参）
-        group.MapPost("/suggest", async (
+        group.MapPost("/suggest", (
             ParameterSuggestionRequest request,
             IPreviewMetricsAnalyzer metricsAnalyzer,
             ILogger<AutoTuneService> logger,

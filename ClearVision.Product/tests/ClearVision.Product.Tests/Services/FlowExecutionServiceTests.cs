@@ -49,6 +49,7 @@ public class FlowExecutionServiceTests
         var flow = new OperatorFlow("TestFlow");
         var op = new Operator(Guid.NewGuid(), "LongRunningOp", OperatorType.Thresholding, 0, 0);
         flow.AddOperator(op);
+        var executorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Note: Executor properties are configured in constructor
         _executor.ExecuteAsync(
@@ -58,7 +59,8 @@ public class FlowExecutionServiceTests
             .Returns(async x =>
             {
                 var ct = x.Arg<CancellationToken>();
-                await Task.Delay(500, ct); // Simulate work longer than cancellation delay
+                executorStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
                 return OperatorExecutionOutput.Success(new Dictionary<string, object>(), 500);
             });
 
@@ -68,8 +70,7 @@ public class FlowExecutionServiceTests
         // Start the task but don't await it immediately
         var task = _sut.ExecuteFlowAsync(flow, cancellationToken: cts.Token);
 
-        // Cancel quickly (before the 500ms delay finishes)
-        await Task.Delay(100);
+        await executorStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         cts.Cancel();
 
         // Await the task, expecting it to complete (possibly with failure)

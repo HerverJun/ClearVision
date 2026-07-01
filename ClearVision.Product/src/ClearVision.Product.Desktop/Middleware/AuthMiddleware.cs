@@ -2,14 +2,15 @@
 // 用户会话信息（简化版）
 // 作者：蘅芜君
 
+using System.Security.Claims;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Desktop.Station;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 
 namespace ClearVision.Product.Desktop.Middleware;
 
@@ -58,6 +59,12 @@ public class AuthMiddleware
 
         // 检查是否是白名单路径
         if (IsWhitelisted(path))
+        {
+            await _next(context);
+            return;
+        }
+
+        if (TryAuthorizeAgentRunEventStream(context, path))
         {
             await _next(context);
             return;
@@ -144,6 +151,27 @@ public class AuthMiddleware
     {
         return path.StartsWith("/api/station-packages/", StringComparison.OrdinalIgnoreCase) &&
                path.EndsWith("/download", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryAuthorizeAgentRunEventStream(HttpContext context, string path)
+    {
+        const string prefix = "/api/ai/agent-runs/";
+        const string suffix = "/events";
+        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+            !path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var runId = path[prefix.Length..^suffix.Length].Trim('/');
+        var token = context.Request.Query["streamToken"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        var streamService = context.RequestServices.GetService<IAgentRunEventStreamService>();
+        return streamService?.ValidateStreamToken(runId, token, consume: false).Authorized == true;
     }
 
     /// <summary>

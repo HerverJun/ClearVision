@@ -1,6 +1,6 @@
 /**
- * 涓诲簲鐢ㄥ叆鍙?- S4-006: 绔埌绔泦鎴?
- * Sprint 4: 鍓嶅悗绔泦鎴愪笌鐢ㄦ埛浣撻獙闂幆
+ * 主应用入口 - S4-006: 端到端集成
+ * Sprint 4: 前后端集成与用户体验闭环
  */
 
 import { Dialog } from './shared/components/dialog.js';
@@ -60,7 +60,7 @@ window.addEventListener('unhandledrejection', function(event) {
 debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}...`);
 
 // ============================================
-// 璁よ瘉妫€鏌?- 鏈櫥褰曞垯璺宠浆
+// Auth session bootstrap
 // ============================================
 import { bootstrapAuthSession, logout } from './features/auth/auth.js';
 
@@ -91,7 +91,7 @@ import projectManager, {
     subscribeProject
 } from './features/project/projectManager.js';
 
-// 鍏ㄥ眬鐘舵€?
+// 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
 const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = createSignal(null);
 const [getOperatorLibrary, setOperatorLibrary, subscribeOperatorLibrary] = createSignal([]);
@@ -106,7 +106,7 @@ function trackedSubscribe(subscribeFn, callback) {
     return unsubscribe;
 }
 
-// 缁勪欢瀹炰緥
+// Encoding cleanup: previous comment text was unreadable.
 let imageViewer = null;
 let operatorLibraryPanel = null;
 let flowCanvas = null;
@@ -120,6 +120,7 @@ let resultPanel = null;
 let inspectionPanel = null;
 let stationMonitorView = null;
 let aiPanel = null;
+let globalVariablePanel = null;
 let viewManager = null;
 let toolbarCommandDisposer = null;
 let aiGenerationController = null;
@@ -136,6 +137,7 @@ let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
 let inspectionPanelModulePromise = null;
 let stationMonitorModulePromise = null;
+let globalVariablePanelModulePromise = null;
 let resultPanelAnalyticsRefreshTimer = null;
 let resultPanelAnalyticsRefreshProjectId = null;
 const RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS = 5000;
@@ -177,7 +179,7 @@ function isInspectionActiveForBackgroundWork() {
 }
 let aiPanelModulePromise = null;
 
-// 鏈満鑽夌澶囦唤瀹氭椂鍣?
+// Encoding cleanup: previous comment text was unreadable.
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
 const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
@@ -253,6 +255,14 @@ function loadStationMonitorModule() {
     }
 
     return stationMonitorModulePromise;
+}
+
+function loadGlobalVariablePanelModule() {
+    if (!globalVariablePanelModulePromise) {
+        globalVariablePanelModulePromise = import('./features/global-variables/globalVariablePanel.js');
+    }
+
+    return globalVariablePanelModulePromise;
 }
 
 function loadInspectionPanelModule() {
@@ -1023,6 +1033,18 @@ function initializePropertySidebarController() {
     });
 }
 
+async function initializeGlobalVariablePanel() {
+    const container = document.getElementById('global-variable-panel');
+    if (!container) {
+        return;
+    }
+
+    const module = await loadGlobalVariablePanelModule();
+    globalVariablePanel = new module.default('global-variable-panel');
+    serviceRegistry.register('globalVariablePanel', globalVariablePanel);
+    await globalVariablePanel.setProject(getCurrentProject());
+}
+
 async function loadInspectionHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1601,11 +1623,18 @@ async function initializeApp() {
     initializeInspectionController();
     initializePropertyPanel();
     initializePropertySidebarController();
+    await initializeGlobalVariablePanel();
     initializeTheme();
     initializeToolbar();
     startStatusBarUpdates();
     initializeStudioPerformanceGuards();
     trackedSubscribe(subscribeProject, (project) => {
+        if (globalVariablePanel) {
+            void globalVariablePanel.setProject(project).catch(error => {
+                handleFeatureLoadError('全局变量', error);
+            });
+        }
+
         window.setTimeout(() => {
             void handleProjectChange(project).catch(error => {
                 handleFeatureLoadError('工程切换', error);
@@ -1646,6 +1675,7 @@ async function bootstrapApp() {
 async function handleProjectChange(project) {
     eventBus.emit('project:changed', { project });
     if (!project?.id) {
+        flowCanvas?.setGlobalVariableSchema?.(null);
         inspectionController.setProject(null);
         inspectionPanel?.setProjectContext?.(null);
         resultPanel?.setProjectContext?.(null);
@@ -1655,6 +1685,7 @@ async function handleProjectChange(project) {
 
     inspectionController.setProject(project.id);
     inspectionPanel?.setProjectContext?.(project.id);
+    flowCanvas?.setGlobalVariableSchema?.(project.globalVariables || project.GlobalVariables);
 
     if (flowCanvas) {
         withProjectFlowSyncSuppressed(() => {
@@ -1778,18 +1809,18 @@ function startAutoSave() {
 }
 
 /**
- * 銆愰樁娈礏-B4銆戝仠姝㈡湰鏈鸿崏绋垮浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        debugLogger.debug('[LocalDraftBackup] 鏈満鑽夌澶囦唤宸插仠姝?');
+        debugLogger.debug('[LocalDraftBackup] Local draft backup event.');
     }
 }
 
 /**
- * 銆愰樁娈礏-B4銆戠珛鍗虫墽琛屾湰鏈鸿崏绋垮浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 async function triggerAutoSave() {
     const project = getCurrentProject();
@@ -2078,7 +2109,7 @@ function showProjectExportDialog() {
 }
 
 /**
- * 銆愪慨澶嶃€戞牴鎹畻瀛愮被鍨嬫煡鎵剧畻瀛愬簱涓殑瀹氫箟鏁版嵁
+ * Encoding cleanup: previous comment text was unreadable.
  * @param {string} type - 算子类型
  * @returns {Object|null} 算子定义数据
  */
@@ -2089,16 +2120,16 @@ function findOperatorDefinition(type) {
 }
 
 /**
- * 銆愪慨澶嶃€戝悎骞跺弬鏁板畾涔変笌鍙傛暟鍊?
- * @param {Array} defParams - 绠楀瓙搴撲腑鐨勫弬鏁板畾涔夛紙鍩哄噯锛?
- * @param {Array} nodeParams - 鐢诲竷鑺傜偣淇濆瓨鐨勫弬鏁板€?
- * @returns {Array} 鍚堝苟鍚庣殑鍙傛暟鍒楄〃
+ * Encoding cleanup: previous comment text was unreadable.
+ * Encoding cleanup: previous comment text was unreadable.
+ * @param {Array} nodeParams - 画布节点保存的参数值
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function mergeParameters(defParams, nodeParams) {
     if (!defParams || defParams.length === 0) return nodeParams || [];
     
     return defParams.map(defP => {
-        // [淇] 涓嶅尯鍒嗗ぇ灏忓啓鍖归厤锛岃В鍐冲墠绔?(camelCase) 涓庡悗绔?(PascalCase) 鐨勫樊寮?
+        // Encoding cleanup: previous comment text was unreadable.
         const nodeP = (nodeParams || []).find(np => 
             (np.name && defP.name && np.name.toLowerCase() === defP.name.toLowerCase()) ||
             (np.Name && defP.name && np.Name.toLowerCase() === defP.name.toLowerCase())
@@ -2106,7 +2137,7 @@ function mergeParameters(defParams, nodeParams) {
         
         const mergedParam = { 
             ...defP,
-            // 浼樺厛浣跨敤鑺傜偣淇濆瓨鐨勫€?(Value 鎴?value)
+            // 优先使用节点保存的值(Value 或 value)
             value: nodeP !== undefined ? (nodeP.value ?? nodeP.Value ?? nodeP.defaultValue ?? nodeP.DefaultValue) : defP.defaultValue
         };
         
@@ -2116,7 +2147,7 @@ function mergeParameters(defParams, nodeParams) {
 
 /**
  * 【阶段B-B5】从JSON文件导入工程
- * @param {File} file - 鐢ㄦ埛閫夋嫨鐨勬枃浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 async function importProjectFromJson(file) {
     if (!file) return;
@@ -2125,32 +2156,32 @@ async function importProjectFromJson(file) {
         const content = await file.text();
         const importData = JSON.parse(content);
         
-        // 楠岃瘉鏂囦欢鏍煎紡
+        // 验证文件格式
         if (!importData.project || !importData.project.flow) {
             throw new Error('无效的工程文件格式');
         }
         
-        // 纭瀵煎叆
+        // 确认导入
         const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n如果当前工程有未保存的更改，系统会先询问是否保存。`);
         if (!confirmed) return;
         
-        // 閫氳繃 projectManager 鍒涘缓鏂板伐绋嬶紙鐢卞悗绔敓鎴?ID锛?
+        // Encoding cleanup: previous comment text was unreadable.
         const importName = (importData.project.name || '未命名') + ' (导入)';
         const importDesc = importData.project.description || '';
         const project = await projectManager.createProject(importName, importDesc);
         
-        // 鍔犺浇娴佺▼鍒扮敾甯?
+        // 加载流程到画布
         if (flowCanvas && importData.project.flow) {
             withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(importData.project.flow));
-            // 灏嗘祦绋嬫暟鎹繚瀛樺埌鍚庣
+            // Refresh project flow after import.
             projectManager.updateFlow(flowCanvas.serialize());
             await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
         }
         
-        // 璁剧疆妫€娴嬫帶鍒跺櫒鐨勫伐绋?
+        // Bind the inspection controller to the current project.
         inspectionController.setProject(project.id);
         
-        // 鍒囨崲鍒版祦绋嬭鍥?
+        // Switch back to the flow editor.
         switchView('flow');
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -2160,7 +2191,7 @@ async function importProjectFromJson(file) {
         showToast('工程导入成功', 'success');
         debugLogger.debug('[Import] 工程已导入', project.name);
         
-        // 鍒锋柊宸ョ▼鍒楄〃
+        // Encoding cleanup: previous comment text was unreadable.
         if (projectView) {
             projectView.refresh();
         }
@@ -2193,11 +2224,11 @@ window.exportRuntimePackage = exportRuntimePackage;
 window.showProjectExportDialog = showProjectExportDialog;
 
 // ==========================================================================
-// 闃舵浜旓細鐘舵€佹爮鏇存柊鍔熻兘
+// 阶段五：状态栏更新功能
 // ==========================================================================
 
 /**
- * 鏇存柊鐘舵€佹爮鎸囨爣
+ * 更新状态栏指标
  */
 function updateStatusBar() {
     if (window.performance?.memory) {
@@ -2208,7 +2239,7 @@ function updateStatusBar() {
 }
 
 /**
- * FPS 璁℃暟鍣?
+ * FPS 计数器
  */
 let fpsCounter = {
     frames: 0,
@@ -2264,7 +2295,7 @@ function updateFPS() {
     }
 }
 
-// 鍚姩鐘舵€佹爮鏇存柊
+// Encoding cleanup: previous comment text was unreadable.
 function startStatusBarUpdates() {
     if (statusBarStarted) {
         return;
@@ -2289,11 +2320,11 @@ function startStatusBarUpdates() {
 }
 
 // ==========================================================================
-// 闃舵浜旓細瑙嗗浘鍒囨崲杩囨浮鍔ㄧ敾
+// Encoding cleanup: previous comment text was unreadable.
 // ==========================================================================
 
 /**
- * 鍒囨崲瑙嗗浘锛堝甫杩囨浮鍔ㄧ敾锛?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function switchViewWithTransition(view) {
     const views = ['flow', 'inspection', 'results', 'project'];
@@ -2301,20 +2332,20 @@ function switchViewWithTransition(view) {
     
     if (currentView === view) return;
     
-    // 鑾峰彇褰撳墠鏄剧ず鐨勮鍥惧鍣?
+    // 获取当前显示的视图容器
     const currentContainer = document.getElementById(`${currentView}-view`) || 
                             document.getElementById(`${currentView}-editor`) ||
                             document.getElementById('flow-editor');
     
     if (currentContainer) {
-        // 娣诲姞閫€鍑哄姩鐢?
+        // Encoding cleanup: previous comment text was unreadable.
         currentContainer.classList.add('view-exit');
         
         setTimeout(() => {
             currentContainer.classList.remove('view-exit');
             currentContainer.classList.add('hidden');
             
-            // 鏄剧ず鏂拌鍥?
+    // 显示新视图
             switchView(view);
             
             const newContainer = document.getElementById(`${view}-view`) || 
@@ -2331,17 +2362,17 @@ function switchViewWithTransition(view) {
             }
         }, 300);
     } else {
-        // 鏃犲姩鐢荤洿鎺ュ垏鎹?
+        // 无动画直接切换
         switchView(view);
     }
 }
 
 // ==========================================================================
-// 闃舵浜旓細鍔犺浇楠ㄦ灦灞?
+// 阶段五：加载骨架层
 // ==========================================================================
 
 /**
- * 鏄剧ず鍔犺浇楠ㄦ灦灞?
+ * 显示加载骨架层
  */
 function showLoadingScreen() {
     if (document.getElementById('loading-screen')) {
@@ -2360,7 +2391,7 @@ function showLoadingScreen() {
 }
 
 /**
- * 闅愯棌鍔犺浇楠ㄦ灦灞?
+ * 隐藏加载骨架层
  */
 function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
@@ -2371,11 +2402,11 @@ function hideLoadingScreen() {
 }
 
 // ==========================================================================
-// 闃舵浜旓細娆㈣繋/寮曞椤?
+// 阶段五：欢迎/引导页
 // ==========================================================================
 
 /**
- * 鏄剧ず娆㈣繋椤?
+ * 显示欢迎页
  */
 function showWelcomeScreen() {
     // 检查是否首次运行

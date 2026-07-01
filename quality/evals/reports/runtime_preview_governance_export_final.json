@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "2026-06-07.runtime-preview-governance-export.final.v1",
+  "benchmarkId": "runtime_preview_governance_export_final",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+  },
+  "summary": {
+    "storageVersion": "jsonl.v4",
+    "recordTypes": [
+      "session",
+      "audit",
+      "session_report",
+      "deploy_readiness_report",
+      "package_readiness_report",
+      "manifest_dry_run_report",
+      "station_compatibility_report",
+      "operator_contract_validation_report",
+      "pre_release_review_report",
+      "release_review_decision",
+      "station_profile_snapshot",
+      "operator_contract_registry_snapshot",
+      "contract_coverage_report",
+      "final_governance_export"
+    ],
+    "sessionCount": 60,
+    "auditEventCount": 600,
+    "sessionReportCount": 60,
+    "deployReadinessReportCount": 60,
+    "packageReadinessReportCount": 60,
+    "manifestDryRunReportCount": 60,
+    "stationCompatibilityReportCount": 60,
+    "operatorContractValidationReportCount": 60,
+    "preReleaseReviewReportCount": 60,
+    "releaseReviewDecisionCount": 60,
+    "stationProfileSnapshotCount": 12,
+    "operatorContractRegistrySnapshotCount": 1,
+    "operatorContractCoverageReportCount": 1,
+    "finalGovernanceExportCount": 1,
+    "corruptLineCount": 1,
+    "corruptionRecovered": true,
+    "redactionPass": true,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "exportManifest": {
+    "exportId": "rp_export_sample",
+    "storageMode": "jsonl",
+    "storageVersion": "jsonl.v4",
+    "retentionPolicy": "default_30_days_200_sessions",
+    "lookupKeys": [
+      "sessionId",
+      "reportId",
+      "caseId",
+      "manifestId",
+      "reviewId",
+      "stationProfileId",
+      "operatorType"
+    ],
+    "exportScope": "metadata-only final governance export",
+    "redactionPolicy": "all station, PLC, package, image, model, template, and network details are redacted"
+  },
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

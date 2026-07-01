@@ -1,9 +1,9 @@
+using System.Reflection;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Infrastructure.Events;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using System.Reflection;
 
 namespace ClearVision.Product.Tests.Events;
 

@@ -221,6 +221,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GlobalVariables")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
@@ -234,6 +238,11 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("PersistenceRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L);
 
                     b.Property<string>("Version")
                         .IsRequired()

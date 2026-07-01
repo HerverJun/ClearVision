@@ -263,7 +263,9 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
         var replayed = new List<InspectionResult>(_batchSize);
         var tempPath = _spoolFilePath + ".tmp";
         var remainingCount = 0;
+        var replayCompleted = false;
 
+        try
         {
             await using var remainingStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             await using var remainingWriter = new StreamWriter(remainingStream, new UTF8Encoding(false));
@@ -309,6 +311,14 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             }
 
             await remainingWriter.FlushAsync(cancellationToken);
+            replayCompleted = true;
+        }
+        finally
+        {
+            if (!replayCompleted)
+            {
+                TryDeleteTempSpool(tempPath);
+            }
         }
 
         File.Move(tempPath, _spoolFilePath, overwrite: true);
@@ -316,6 +326,21 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             "Inspection result spool replay completed. Remaining={Remaining}, DeadLetter={DeadLetter}",
             remainingCount,
             Volatile.Read(ref _deadLetterResultCount));
+    }
+
+    private void TryDeleteTempSpool(string tempPath)
+    {
+        try
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete partial inspection result spool temp file: {TempPath}", tempPath);
+        }
     }
 
     private async Task AppendSpoolAsync(IEnumerable<InspectionResult> results, string path, CancellationToken cancellationToken)

@@ -13,8 +13,8 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Desktop.Tests;
 
-    public sealed class StationCommunicationEndpointsTests
-    {
+public sealed class StationCommunicationEndpointsTests
+{
     [Fact]
     public async Task GetSettings_ShouldRejectNonAdminUser()
     {

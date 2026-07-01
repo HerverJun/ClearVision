@@ -20,6 +20,7 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Extensions;
 using ClearVision.Product.Desktop.Inspection;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
         WriteIndented = false,
         Converters = { new JsonStringEnumConverter() }
     };
@@ -155,6 +157,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         // 【架构修复 v2】订阅事件总线
         InitializeEventSubscriptions();
+        if (Volatile.Read(ref _pendingWebMessageCount) > 0)
+        {
+            SchedulePendingWebMessageDrain(webViewControl);
+        }
     }
 
     /// <summary>
@@ -345,6 +351,36 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
+            VisionAgentBuildFromPlanRequest? buildFromPlan;
+            try
+            {
+                buildFromPlan = TryGetBuildFromPlan(payload);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Invalid BuildFromPlan payload received from WebView2.");
+                var response = new GenerateFlowResponse
+                {
+                    Success = false,
+                    Status = AiFlowGenerationResult.CompletionStatusFailed,
+                    ErrorMessage = "BuildFromPlan payload is invalid.",
+                    FailureSummary = "build_from_plan_payload_invalid: BuildFromPlan payload is invalid.",
+                    SessionId = sessionId,
+                    RequestId = requestId,
+                    ClarificationRequired = false,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    InteractionState = AiInteractionStates.Failed,
+                    FirstFixRecommendation = "请回到左侧 Plan 工作台重新确认计划后再开始构建。"
+                };
+                PostWebMessageJson(SerializeGenerateFlowResponse(
+                    response,
+                    AiFlowGenerationResult.FailureTypeSystemError));
+                return;
+            }
+            var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
+            var agentGenerateFlowMode = TryGetMessageString(payload, "agentGenerateFlowMode")
+                ?? TryGetMessageString(doc.RootElement, "agentGenerateFlowMode");
+            var runtimePreviewConsent = TryGetBoolean(payload, "runtimePreviewConsent") ?? false;
             var existingFlowJson = TryGetExistingFlowJson(payload);
             var attachments = payload.TryGetProperty("attachments", out var attachmentElement) &&
                               attachmentElement.ValueKind == JsonValueKind.Array
@@ -358,7 +394,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
             using var scope = _scopeFactory.CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<ClearVision.Product.Infrastructure.AI.GenerateFlowMessageHandler>();
-            activeRequest = RegisterGenerateFlowRequest(requestId, sessionId);
+            var registeredRequest = RegisterGenerateFlowRequest(requestId, sessionId);
+            activeRequest = registeredRequest;
 
             // 在后台线程执行 AI 生成，避免 WebView2/UI 线程被流式解析和回调压满。
             var resultJson = await Task.Run(() => handler.HandleAsync(
@@ -372,13 +409,21 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 attachments,
                 requirementMode,
                 templateSelection,
+                buildFromPlan,
+                useVisionAgentGenerateFlow,
+                agentGenerateFlowMode,
+                runtimePreviewConsent,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。
                     var progressJson = $"{{\"messageType\":{JsonSerializer.Serialize(type)},\"payload\":{payload}}}";
                     PostWebMessageJson(progressJson);
                 },
-                cancellationToken: activeRequest.CancellationTokenSource.Token));
+                cancellationToken: registeredRequest.CancellationTokenSource.Token,
+                onAgentRunCreated: runId =>
+                {
+                    registeredRequest.AgentRunId = runId;
+                }));
 
             // 发回前端（原始 JSON）
             PostWebMessageJson(resultJson);
@@ -410,7 +455,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var errorResponse = new GenerateFlowResponse
             {
                 Success = false,
-                ErrorMessage = $"系统错误：{ex.Message}"
+                Status = AiFlowGenerationResult.CompletionStatusFailed,
+                ErrorMessage = "系统错误，请查看后端日志。",
+                FailureSummary = "系统错误，请查看后端日志。",
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed
             };
 
             var json = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
@@ -427,6 +475,27 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 UnregisterGenerateFlowRequest(activeRequest);
             }
         }
+    }
+
+    private static string SerializeGenerateFlowResponse(
+        GenerateFlowResponse response,
+        string? failureType)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            response.Type,
+            response.Success,
+            response.Status,
+            response.ErrorMessage,
+            response.FailureSummary,
+            response.ClarificationRequired,
+            response.SessionId,
+            response.RequestId,
+            response.FirstFixRecommendation,
+            response.CompletionStatus,
+            response.InteractionState,
+            FailureType = failureType
+        }, _jsonOptions);
     }
 
     private static AiTemplateSelectionInfo? TryGetTemplateSelection(JsonElement payload)
@@ -478,6 +547,30 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             JsonValueKind.Object or JsonValueKind.Array => flowElement.GetRawText(),
             _ => null
         };
+    }
+
+    private static T? TryGetPayloadObject<T>(JsonElement payload, string propertyName)
+        where T : class
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!payload.TryGetProperty(propertyName, out var property))
+        {
+            var pascalCase = char.ToUpperInvariant(propertyName[0]) + propertyName[1..];
+            if (!payload.TryGetProperty(pascalCase, out property))
+                return null;
+        }
+
+        if (property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        return property.Deserialize<T>(_jsonOptions);
+    }
+
+    private static VisionAgentBuildFromPlanRequest? TryGetBuildFromPlan(JsonElement payload)
+    {
+        return TryGetPayloadObject<VisionAgentBuildFromPlanRequest>(payload, "buildFromPlan");
     }
 
     /// <summary>
@@ -594,6 +687,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 activeRequest.CancellationTokenSource.Cancel();
             }
 
+            CancelAgentRunForGenerateFlow(activeRequest);
+
             _logger.LogInformation(
                 "已取消 AI 生成请求。RequestId={RequestId}, SessionId={SessionId}",
                 activeRequest.RequestId,
@@ -627,6 +722,29 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 RequestId = null,
                 ErrorMessage = ex.Message
             }, _jsonOptions));
+        }
+    }
+
+    private void CancelAgentRunForGenerateFlow(ActiveGenerateFlowRequest activeRequest)
+    {
+        if (string.IsNullOrWhiteSpace(activeRequest.AgentRunId))
+        {
+            return;
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var streamService = scope.ServiceProvider.GetService<IAgentRunEventStreamService>();
+            streamService?.Cancel(activeRequest.AgentRunId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to cancel AgentRun for GenerateFlow WebMessage request. RunId={RunId}, RequestId={RequestId}",
+                activeRequest.AgentRunId,
+                activeRequest.RequestId);
         }
     }
 
@@ -834,8 +952,16 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     {
         var webViewControl = _webViewControl;
         var webView = _webView;
-        if (webViewControl == null || webView == null || webViewControl.IsDisposed)
+        if (webViewControl == null || webView == null)
+        {
+            TryEnqueuePendingWebMessage(json);
             return;
+        }
+
+        if (webViewControl.IsDisposed)
+        {
+            return;
+        }
 
         if (webViewControl.InvokeRequired)
         {
@@ -978,6 +1104,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 {
                     activeRequest.CancellationTokenSource.Cancel();
                 }
+
+                CancelAgentRunForGenerateFlow(activeRequest);
             }
             catch (Exception ex)
             {
@@ -1064,6 +1192,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         public string RequestId { get; }
 
         public string? SessionId { get; }
+
+        public string? AgentRunId { get; set; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
 

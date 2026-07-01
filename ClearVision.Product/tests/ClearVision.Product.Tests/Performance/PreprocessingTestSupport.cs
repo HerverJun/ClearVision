@@ -44,6 +44,12 @@ internal static class PreprocessingTestSupport
         return candidate;
     }
 
+    public static Mat ReadImage(string path, ImreadModes mode)
+    {
+        var bytes = File.ReadAllBytes(path);
+        return Cv2.ImDecode(bytes, mode);
+    }
+
     public static string EnsureReportDirectory(string? reportDirectoryEnvName = null)
     {
         var path = !string.IsNullOrWhiteSpace(reportDirectoryEnvName)

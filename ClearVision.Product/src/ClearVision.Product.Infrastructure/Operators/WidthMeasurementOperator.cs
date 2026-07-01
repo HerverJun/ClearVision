@@ -94,12 +94,10 @@ public class WidthMeasurementOperator : OperatorBase
             }
         }
 
-        using var gray = new Mat();
-        if (src.Channels() == 1)
-        {
-            src.CopyTo(gray);
-        }
-        else
+        using var gray = src.Channels() == 1
+            ? new Mat(src, new Rect(0, 0, src.Width, src.Height))
+            : new Mat();
+        if (src.Channels() != 1)
         {
             Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
         }
@@ -483,7 +481,7 @@ public class WidthMeasurementOperator : OperatorBase
             return false;
         }
 
-        var sampleCount = Math.Max((int)Math.Ceiling(segmentLength * 8.0), 48);
+        var sampleCount = Math.Max((int)Math.Ceiling(segmentLength * 4.0), 48);
         var profile = IndustrialCaliperKernel.SampleBandProfile(
             gray,
             new Point2d(start.X, start.Y),
