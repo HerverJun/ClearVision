@@ -13,7 +13,7 @@ if (startup.workspaceV2Enabled) {
     startup,
     container
   }).catch((error: unknown) => {
-    console.error('[Studio2] Foundation island failed to mount:', error);
+    console.error('[Studio2] Workspace shell failed to mount:', error);
     container.textContent = error instanceof Error ? error.message : String(error);
   });
 } else {

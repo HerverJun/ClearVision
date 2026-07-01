@@ -3,6 +3,10 @@
  *
  * The canvas engine stays untouched; feature modules depend on this smaller API.
  */
+import FlowCanvas from './flowCanvas.js';
+
+const hostedAdapters = new Map();
+
 class FlowCanvasAdapter {
     constructor(flowCanvas, options = {}) {
         if (!flowCanvas) {
@@ -11,6 +15,8 @@ class FlowCanvasAdapter {
 
         this.canvas = flowCanvas;
         this.eventBus = options.eventBus || null;
+        this.ownsCanvas = options.ownsCanvas === true;
+        this.disposed = false;
     }
 
     get raw() {
@@ -52,6 +58,31 @@ class FlowCanvasAdapter {
 
     render() {
         return this.canvas.render();
+    }
+
+    getViewState() {
+        return {
+            selectedNode: this.canvas.selectedNode || null,
+            selectedConnection: this.canvas.selectedConnection?.id || null,
+            scale: Number.isFinite(this.canvas.scale) ? this.canvas.scale : 1,
+            offset: {
+                x: Number.isFinite(this.canvas.offset?.x) ? this.canvas.offset.x : 0,
+                y: Number.isFinite(this.canvas.offset?.y) ? this.canvas.offset.y : 0
+            },
+            nodeCount: this.canvas.nodes?.size || 0,
+            connectionCount: Array.isArray(this.canvas.connections) ? this.canvas.connections.length : 0
+        };
+    }
+
+    dispose() {
+        if (this.disposed) {
+            return;
+        }
+
+        this.disposed = true;
+        if (this.ownsCanvas && typeof this.canvas.destroy === 'function') {
+            this.canvas.destroy();
+        }
     }
 
     markFlowStructureChanged(reason = 'adapter') {
@@ -111,5 +142,36 @@ function createFlowCanvasAdapter(flowCanvas, options = {}) {
     return new FlowCanvasAdapter(flowCanvas, options);
 }
 
-export { FlowCanvasAdapter, createFlowCanvasAdapter };
+function createHostedFlowCanvasAdapter(canvasId, options = {}) {
+    if (typeof canvasId !== 'string' || !canvasId.trim()) {
+        throw new Error('Hosted FlowCanvas requires a canvas element id.');
+    }
+
+    const key = canvasId.trim();
+    const existing = hostedAdapters.get(key);
+    if (existing) {
+        return existing;
+    }
+
+    const canvasElement = document.getElementById(key);
+    if (!canvasElement) {
+        throw new Error(`Hosted FlowCanvas canvas not found: ${key}`);
+    }
+
+    const flowCanvas = new FlowCanvas(key);
+    const adapter = new FlowCanvasAdapter(flowCanvas, {
+        ...options,
+        ownsCanvas: true
+    });
+    const disposeAdapter = adapter.dispose.bind(adapter);
+    adapter.dispose = () => {
+        disposeAdapter();
+        hostedAdapters.delete(key);
+    };
+
+    hostedAdapters.set(key, adapter);
+    return adapter;
+}
+
+export { FlowCanvasAdapter, createFlowCanvasAdapter, createHostedFlowCanvasAdapter };
 export default FlowCanvasAdapter;

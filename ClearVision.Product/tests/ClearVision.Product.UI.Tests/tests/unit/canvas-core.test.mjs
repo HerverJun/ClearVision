@@ -778,6 +778,39 @@ test('flowCanvasAdapter emitFlowChanged omits flow snapshot', async () => {
   assert.equal('flow' in emitted[0].payload, false, 'payload should not contain a flow snapshot');
 });
 
+test('createHostedFlowCanvasAdapter owns one FlowCanvas per canvas id and destroys it on dispose', async () => {
+  const { createHostedFlowCanvasAdapter } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const first = createHostedFlowCanvasAdapter('studio2-hosted-canvas', {
+    eventBus: { emit() {} }
+  });
+  const second = createHostedFlowCanvasAdapter('studio2-hosted-canvas', {
+    eventBus: { emit() {} }
+  });
+
+  assert.equal(second, first, 'same canvas id should reuse the hosted adapter');
+  assert.equal(first.getViewState().scale, 1);
+  assert.equal(canvas._events.mousedown.length, 1);
+
+  first.dispose();
+
+  assert.equal(canvas._events.mousedown.length, 0, 'dispose should call FlowCanvas.destroy');
+
+  const third = createHostedFlowCanvasAdapter('studio2-hosted-canvas', {
+    eventBus: { emit() {} }
+  });
+
+  assert.notEqual(third, first, 'new workspace lifecycle can create a fresh adapter after dispose');
+
+  third.dispose();
+});
+
 // =============================================================================
 // ImageCanvas blob URL cleanup
 // =============================================================================

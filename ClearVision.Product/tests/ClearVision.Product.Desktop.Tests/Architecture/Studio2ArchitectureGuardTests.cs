@@ -12,6 +12,12 @@ public sealed class Studio2ArchitectureGuardTests
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src";
     private const string HostBridgeAdapterPath =
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/host/hostBridge.ts";
+    private const string LegacyFlowCanvasAdapterPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js";
+    private const string WorkspaceShellRuntimePath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/workspace/workspaceShellRuntime.ts";
+    private const string LegacyModulesPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/adapters/legacyModules.ts";
 
     [Fact]
     public void FrontendV2_ShouldReuseExistingEventBusAndServiceRegistry()
@@ -45,7 +51,42 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"from\s+['""][^'""]*/flowCanvas\.js['""]", relativePath);
             text.Should().NotMatchRegex(@"\bnew\s+FlowCanvas\s*\(", relativePath);
             text.Should().NotContain("FlowCanvas.prototype", relativePath);
+            text.Should().NotContain(".raw", relativePath);
+            text.Should().NotMatchRegex(@"\bclass\s+\w*FlowCanvas\w*Adapter\b", relativePath);
         }
+    }
+
+    [Fact]
+    public void LegacyFlowCanvasAdapter_ShouldBeTheOnlyPlaceThatCreatesHostedFlowCanvas()
+    {
+        var legacyAdapterText = File.ReadAllText(Path.Combine(Root, LegacyFlowCanvasAdapterPath));
+        legacyAdapterText.Should().Contain("createHostedFlowCanvasAdapter");
+        Regex.Matches(legacyAdapterText, @"\bnew\s+FlowCanvas\s*\(")
+            .Should().ContainSingle("only the legacy FlowCanvasAdapter hosted factory may create FlowCanvas for V2.");
+
+        foreach (var file in EnumerateFrontendV2SourceFiles())
+        {
+            var text = File.ReadAllText(file);
+            var relativePath = ToRelativePath(file);
+
+            text.Should().NotContain("flowCanvas.js", relativePath);
+            text.Should().NotMatchRegex(@"\bnew\s+FlowCanvas\s*\(", relativePath);
+        }
+    }
+
+    [Fact]
+    public void FrontendV2_WorkspaceShell_ShouldUseOneHostedFlowCanvasAdapterRegistration()
+    {
+        var legacyModulesText = File.ReadAllText(Path.Combine(Root, LegacyModulesPath));
+        legacyModulesText.Should().Contain("flowCanvasAdapter: '/src/core/canvas/flowCanvasAdapter.js'");
+        legacyModulesText.Should().Contain("createHostedFlowCanvasAdapter");
+
+        var workspaceRuntimeText = File.ReadAllText(Path.Combine(Root, WorkspaceShellRuntimePath));
+        workspaceRuntimeText.Should().Contain("FLOW_CANVAS_ADAPTER_SERVICE_KEY");
+        Regex.Matches(workspaceRuntimeText, @"serviceRegistry\.register\(\s*FLOW_CANVAS_ADAPTER_SERVICE_KEY")
+            .Should().ContainSingle("one Workspace lifecycle must register exactly one FlowCanvas adapter.");
+        workspaceRuntimeText.Should().NotContain("serviceRegistry.register('flowCanvas'", "V2 must not register a raw FlowCanvas instance.");
+        workspaceRuntimeText.Should().NotContain(".raw", "V2 must not use the legacy raw escape hatch.");
     }
 
     [Fact]

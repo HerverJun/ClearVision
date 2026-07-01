@@ -21,6 +21,8 @@ export interface RegistryRegistration {
   unregister(): void;
 }
 
+export type PendingRequestCancel = () => void;
+
 export class Studio2LifecycleScope {
   private mountedApp: MountedStudio2App | null = null;
   private readonly listeners = new Set<() => void>();
@@ -29,8 +31,12 @@ export class Studio2LifecycleScope {
   private readonly abortControllers = new Set<AbortController>();
   private readonly registryRegistrations = new Set<RegistryRegistration>();
   private readonly blobUrls = new Map<string, (url: string) => void>();
-  private readonly pendingRequests = new Set<Promise<unknown>>();
+  private readonly pendingRequests = new Map<Promise<unknown>, PendingRequestCancel | undefined>();
   private disposed = false;
+
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
 
   mountApp(factory: () => MountedStudio2App): MountedStudio2App {
     if (this.mountedApp) {
@@ -113,16 +119,17 @@ export class Studio2LifecycleScope {
     return url;
   }
 
-  trackPendingRequest<T>(request: Promise<T>): Promise<T> {
+  trackPendingRequest<T>(request: Promise<T>, cancel?: PendingRequestCancel): Promise<T> {
     const tracked = request.finally(() => {
       this.pendingRequests.delete(tracked);
     });
 
     if (this.disposed) {
+      cancel?.();
       return tracked;
     }
 
-    this.pendingRequests.add(tracked);
+    this.pendingRequests.set(tracked, cancel);
     return tracked;
   }
 
@@ -179,6 +186,9 @@ export class Studio2LifecycleScope {
     }
     this.blobUrls.clear();
 
+    for (const cancel of [...this.pendingRequests.values()]) {
+      cancel?.();
+    }
     this.pendingRequests.clear();
   }
 }

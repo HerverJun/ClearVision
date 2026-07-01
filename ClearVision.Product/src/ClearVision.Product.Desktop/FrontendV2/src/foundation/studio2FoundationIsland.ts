@@ -1,6 +1,6 @@
-import { createApp, reactive } from 'vue';
+import { createApp, markRaw, reactive } from 'vue';
 import { createPinia } from 'pinia';
-import FoundationIsland from '@/components/FoundationIsland.vue';
+import WorkspaceShell from '@/components/WorkspaceShell.vue';
 import type { ClearVisionStartupConfig } from '@/startup/startupConfig';
 import {
   loadLegacyFrontendServices,
@@ -9,15 +9,22 @@ import {
 import { createHealthApi } from '@/api/healthApi';
 import { createHostBridge } from '@/host/hostBridge';
 import {
+  createWorkspaceShellRuntimeState,
+  Studio2WorkspaceShellRuntime,
+  WORKSPACE_SHELL_SERVICE_KEY,
+  type Studio2WorkspaceShellRuntimeHandle,
+  type Studio2WorkspaceShellRuntimeState
+} from '@/workspace/workspaceShellRuntime';
+import {
   Studio2LifecycleScope,
   type MountedStudio2App,
   type Studio2LifecycleTelemetry
 } from '@/foundation/studio2Lifecycle';
 
-const SERVICE_KEY = 'studio2.foundationIsland';
+const MOUNT_DISPOSED_ERROR = 'Studio2 foundation mount was disposed before completion.';
 
 export interface Studio2FoundationIslandViewModel {
-  readonly goal: 'G02B';
+  readonly goal: 'G03';
   workspaceV2Enabled: boolean;
   apiBaseUrl: string;
   hostKind: string;
@@ -29,6 +36,9 @@ export interface Studio2FoundationIslandViewModel {
   healthStatus: 'pending' | 'healthy' | 'cancelled' | 'error' | 'not-requested';
   healthDetail: string;
   lifecycle: Studio2LifecycleTelemetry;
+  workspaceState: Studio2WorkspaceShellRuntimeState;
+  workspaceRuntime: Studio2WorkspaceShellRuntimeHandle;
+  refreshLifecycle(): void;
 }
 
 export interface Studio2FoundationIslandHandle {
@@ -45,37 +55,71 @@ export interface Studio2FoundationIslandOptions {
 }
 
 let activeHandle: Studio2FoundationIslandHandle | null = null;
-let activeMountPromise: Promise<Studio2FoundationIslandHandle> | null = null;
+let activeMount: ActiveMountState | null = null;
 
-export async function mountStudio2FoundationIsland(
+interface ActiveMountState {
+  disposeRequested: boolean;
+  promise: Promise<Studio2FoundationIslandHandle>;
+}
+
+export function mountStudio2FoundationIsland(
   options: Studio2FoundationIslandOptions
 ): Promise<Studio2FoundationIslandHandle> {
   if (activeHandle) {
-    return activeHandle;
+    return Promise.resolve(activeHandle);
   }
 
-  if (activeMountPromise) {
-    return activeMountPromise;
+  if (activeMount) {
+    return activeMount.promise;
   }
 
-  activeMountPromise = createFoundationIsland(options).finally(() => {
-    activeMountPromise = null;
-  });
+  const mountState = {
+    disposeRequested: false,
+    promise: Promise.resolve(null as unknown as Studio2FoundationIslandHandle)
+  };
+  mountState.promise = createFoundationIsland(options, mountState)
+    .then((handle) => {
+      if (mountState.disposeRequested || handle.scope.isDisposed) {
+        handle.dispose();
+        throw new Error(MOUNT_DISPOSED_ERROR);
+      }
 
-  return activeMountPromise;
+      activeHandle = handle;
+      return handle;
+    })
+    .finally(() => {
+      if (activeMount === mountState) {
+        activeMount = null;
+      }
+    });
+  activeMount = mountState;
+
+  return mountState.promise;
 }
 
 export function disposeStudio2FoundationIsland(): void {
-  activeHandle?.dispose();
+  if (activeHandle) {
+    activeHandle.dispose();
+    return;
+  }
+
+  if (activeMount) {
+    activeMount.disposeRequested = true;
+  }
 }
 
 export function getActiveStudio2FoundationIsland(): Studio2FoundationIslandHandle | null {
   return activeHandle;
 }
 
-function createViewModel(startup: ClearVisionStartupConfig): Studio2FoundationIslandViewModel {
+function createViewModel(
+  startup: ClearVisionStartupConfig,
+  workspaceRuntime: Studio2WorkspaceShellRuntimeHandle,
+  workspaceState: Studio2WorkspaceShellRuntimeState,
+  scope: Studio2LifecycleScope
+): Studio2FoundationIslandViewModel {
   return reactive<Studio2FoundationIslandViewModel>({
-    goal: 'G02B',
+    goal: 'G03',
     workspaceV2Enabled: startup.workspaceV2Enabled,
     apiBaseUrl: startup.apiBaseUrl,
     hostKind: startup.hostKind,
@@ -86,17 +130,27 @@ function createViewModel(startup: ClearVisionStartupConfig): Studio2FoundationIs
     serviceRegistryStatus: 'pending',
     healthStatus: 'pending',
     healthDetail: 'checking',
-    lifecycle: emptyTelemetry()
+    lifecycle: emptyTelemetry(),
+    workspaceState,
+    workspaceRuntime: markRaw(workspaceRuntime),
+    refreshLifecycle() {
+      this.lifecycle = scope.getTelemetry();
+    }
   });
 }
 
 async function createFoundationIsland(
-  options: Studio2FoundationIslandOptions
+  options: Studio2FoundationIslandOptions,
+  mountState: ActiveMountState
 ): Promise<Studio2FoundationIslandHandle> {
   const scope = new Studio2LifecycleScope();
-  const model = createViewModel(options.startup);
+  const services = await (options.loadServices ?? loadLegacyFrontendServices)();
+  throwIfMountDisposed(scope, mountState);
+  const workspaceState = reactive(createWorkspaceShellRuntimeState());
+  const workspaceRuntime = new Studio2WorkspaceShellRuntime(services, scope, workspaceState);
+  const model = createViewModel(options.startup, workspaceRuntime, workspaceState, scope);
   const createApplication = options.createApplication ?? ((viewModel) => {
-    const app = createApp(FoundationIsland, { model: viewModel });
+    const app = createApp(WorkspaceShell, { model: viewModel });
     app.use(createPinia());
     app.mount(options.container);
     return {
@@ -110,6 +164,7 @@ async function createFoundationIsland(
     model,
     scope,
     dispose() {
+      workspaceRuntime.dispose();
       scope.dispose();
       model.lifecycle = scope.getTelemetry();
       if (activeHandle === handle) {
@@ -118,10 +173,7 @@ async function createFoundationIsland(
     }
   };
 
-  activeHandle = handle;
-
   try {
-    const services = await (options.loadServices ?? loadLegacyFrontendServices)();
     model.httpClientStatus = 'ready';
     model.eventBusStatus = 'ready';
     model.serviceRegistryStatus = 'ready';
@@ -136,15 +188,15 @@ async function createFoundationIsland(
     });
 
     const serviceRegistration = {
-      goal: 'G02B',
+      goal: 'G03',
       dispose: () => {
         handle.dispose();
       }
     };
-    services.serviceRegistry.register(SERVICE_KEY, serviceRegistration);
+    services.serviceRegistry.register(WORKSPACE_SHELL_SERVICE_KEY, serviceRegistration);
     scope.trackRegistryRegistration({
       unregister() {
-        services.serviceRegistry.unregister(SERVICE_KEY, serviceRegistration);
+        services.serviceRegistry.unregister(WORKSPACE_SHELL_SERVICE_KEY, serviceRegistration);
       }
     });
 
@@ -170,8 +222,11 @@ async function createFoundationIsland(
         model.healthStatus = 'error';
         model.healthDetail = error instanceof Error ? error.message : String(error);
       });
-    void scope.trackPendingRequest(healthRequest);
+    void scope.trackPendingRequest(healthRequest, () => {
+      healthController.abort();
+    });
 
+    throwIfMountDisposed(scope, mountState);
     scope.mountApp(() => createApplication(model));
     model.lifecycle = scope.getTelemetry();
     return handle;
@@ -185,6 +240,15 @@ async function createFoundationIsland(
     model.healthDetail = error instanceof Error ? error.message : String(error);
     throw error;
   }
+}
+
+function throwIfMountDisposed(scope: Studio2LifecycleScope, mountState: ActiveMountState): void {
+  if (!mountState.disposeRequested && !scope.isDisposed) {
+    return;
+  }
+
+  scope.dispose();
+  throw new Error(MOUNT_DISPOSED_ERROR);
 }
 
 function emptyTelemetry(): Studio2LifecycleTelemetry {

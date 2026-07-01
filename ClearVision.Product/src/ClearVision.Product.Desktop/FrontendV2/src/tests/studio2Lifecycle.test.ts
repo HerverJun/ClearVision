@@ -88,4 +88,21 @@ describe('Studio2LifecycleScope', () => {
       });
     }
   });
+
+  it('cancels pending requests only through explicit callbacks', () => {
+    const scope = new Studio2LifecycleScope();
+    let cancelCount = 0;
+
+    void scope.trackPendingRequest(new Promise(() => {}), () => {
+      cancelCount += 1;
+    });
+
+    expect(scope.getTelemetry().pendingRequestCount).toBe(1);
+
+    scope.dispose();
+    scope.dispose();
+
+    expect(cancelCount).toBe(1);
+    expect(scope.getTelemetry().pendingRequestCount).toBe(0);
+  });
 });

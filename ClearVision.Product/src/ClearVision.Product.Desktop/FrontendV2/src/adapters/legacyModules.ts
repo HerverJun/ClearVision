@@ -23,11 +23,38 @@ export interface LegacyServiceRegistry {
   unregister(key: string, expectedService?: unknown): boolean;
 }
 
+export interface HostedFlowCanvasViewState {
+  readonly selectedNode: string | null;
+  readonly selectedConnection: string | null;
+  readonly scale: number;
+  readonly offset: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly nodeCount: number;
+  readonly connectionCount: number;
+}
+
+export interface HostedFlowCanvasAdapter {
+  resize(): unknown;
+  render(): unknown;
+  dispose(): void;
+  getViewState(): HostedFlowCanvasViewState;
+}
+
+export interface LegacyFlowCanvasAdapterModule {
+  createHostedFlowCanvasAdapter(
+    canvasId: string,
+    options?: { readonly eventBus?: LegacyEventBus }
+  ): HostedFlowCanvasAdapter;
+}
+
 export interface LegacyFrontendServices {
   readonly httpClient: LegacyHttpClient;
   readonly webMessageBridge: LegacyWebMessageBridge;
   readonly eventBus: LegacyEventBus;
   readonly serviceRegistry: LegacyServiceRegistry;
+  readonly flowCanvasAdapterModule: LegacyFlowCanvasAdapterModule;
 }
 
 type DefaultModule<T> = {
@@ -38,21 +65,30 @@ const legacyModulePaths = {
   httpClient: '/src/core/messaging/httpClient.js',
   webMessageBridge: '/src/core/messaging/webMessageBridge.js',
   eventBus: '/src/core/app/eventBus.js',
-  serviceRegistry: '/src/core/app/serviceRegistry.js'
+  serviceRegistry: '/src/core/app/serviceRegistry.js',
+  flowCanvasAdapter: '/src/core/canvas/flowCanvasAdapter.js'
 } as const;
 
 export async function loadLegacyFrontendServices(): Promise<LegacyFrontendServices> {
-  const [httpClientModule, webMessageBridgeModule, eventBusModule, serviceRegistryModule] = await Promise.all([
+  const [
+    httpClientModule,
+    webMessageBridgeModule,
+    eventBusModule,
+    serviceRegistryModule,
+    flowCanvasAdapterModule
+  ] = await Promise.all([
     import(/* @vite-ignore */ legacyModulePaths.httpClient) as Promise<DefaultModule<LegacyHttpClient>>,
     import(/* @vite-ignore */ legacyModulePaths.webMessageBridge) as Promise<DefaultModule<LegacyWebMessageBridge>>,
     import(/* @vite-ignore */ legacyModulePaths.eventBus) as Promise<DefaultModule<LegacyEventBus>>,
-    import(/* @vite-ignore */ legacyModulePaths.serviceRegistry) as Promise<DefaultModule<LegacyServiceRegistry>>
+    import(/* @vite-ignore */ legacyModulePaths.serviceRegistry) as Promise<DefaultModule<LegacyServiceRegistry>>,
+    import(/* @vite-ignore */ legacyModulePaths.flowCanvasAdapter) as Promise<LegacyFlowCanvasAdapterModule>
   ]);
 
   return {
     httpClient: httpClientModule.default,
     webMessageBridge: webMessageBridgeModule.default,
     eventBus: eventBusModule.default,
-    serviceRegistry: serviceRegistryModule.default
+    serviceRegistry: serviceRegistryModule.default,
+    flowCanvasAdapterModule
   };
 }

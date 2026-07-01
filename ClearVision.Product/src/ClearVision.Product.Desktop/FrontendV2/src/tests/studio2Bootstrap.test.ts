@@ -5,10 +5,10 @@ import {
   studio2FrontendV2BuildInfo
 } from '@/foundation/studio2Bootstrap';
 
-describe('Studio2 FrontendV2 G02B host foundation', () => {
+describe('Studio2 FrontendV2 G03 workspace shell', () => {
   it('keeps runtime ownership controlled by the host flag without claiming business authority', () => {
     expect(studio2FrontendV2BuildInfo).toEqual({
-      goal: 'G02B',
+      goal: 'G03',
       runtimeMounted: 'controlled-by-host-flag',
       authority: 'none'
     });

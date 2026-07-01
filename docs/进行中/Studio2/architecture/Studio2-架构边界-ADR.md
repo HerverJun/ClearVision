@@ -49,10 +49,13 @@ G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 
 G02B 实现的宿主级启动开关为 `Studio:WorkspaceV2Enabled`，默认 `false`。该开关只决定 WebView2 初始页面：关闭时导航 `/index.html`，打开时导航 `/v2/index.html`。它不是 Project、Flow、Variables、Agent 或任一业务 capability 的 authority，也不得由 localStorage、查询参数或浏览器控制台覆盖。`/v2` 静态资产从输出目录 `AppContext.BaseDirectory/wwwroot/v2` 独立服务，legacy `/` 仍按 `DesktopWebRootResolver` 的 Debug 源码优先规则服务。
 
+G03 将 `/v2/index.html` 下的测试岛替换为 Workspace Shell。Shell 只提供顶部 toolbar、左右 dock、中央 workspace、底部 status bar 和 Flow/Tool/Review 模式切换；Tool/Review 仍为占位，不加载 Property、Preview、AI、Results、Project、Inspection 或 GlobalVariables 业务模块。Flow 模式承载现有 `FlowCanvas`，创建链固定为 `FrontendV2` 动态加载 legacy `flowCanvasAdapter.js`，再由 `createHostedFlowCanvasAdapter(canvasId, options)` 在 adapter 内部创建唯一 `FlowCanvas`。V2 不直接 import `flowCanvas.js`、不调用 `new FlowCanvas(...)`、不使用 `adapter.raw`，也不注册 raw canvas 到 `ServiceRegistry`。
+
 守卫必须防止：
 
 - V2 定义第二套 `EventBus` 或 `ServiceRegistry`；
 - V2 直接导入或实例化 raw `FlowCanvas` 作为业务写入口；
+- V2 在 legacy `flowCanvasAdapter.js` 之外创建第二个 FlowCanvas facade、使用 `adapter.raw`，或为同一 Workspace 生命周期注册多个 FlowCanvas adapter；
 - V2 通过 direct `fetch` 或第二 client 绕过既有 `httpClient` 建立 Project 保存入口；
 - V2 用 localStorage authority 形态 key 保存 Project、Flow、Agent 或 GlobalVariables；
 - Station 依赖 Vue、Vite、Pinia、FrontendV2、Node 或 Studio 前端目录。
