@@ -1540,13 +1540,18 @@ class PropertyPanel {
 
     handleRoiRectChanged(values, phase) {
         this._applyValuesToForm(values);
+
+        if (phase !== 'commit') {
+            return;
+        }
+
         this.updateCurrentOperatorParams(values);
 
         if (this.onChangeCallback) {
             this.onChangeCallback(values);
         }
 
-        if (phase === 'commit' && this.previewPanel) {
+        if (this.previewPanel) {
             this.previewPanel.scheduleAutoPreview({
                 debounceMs: 250,
                 force: true

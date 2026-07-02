@@ -195,6 +195,68 @@ async function dispatchRoiDrag(
   });
 }
 
+async function dispatchRoiDragWithoutMouseUp(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number }
+) {
+  await page.evaluate(({ startPoint, endPoint }) => {
+    const panel = (window as any).propertyPanel?.roiEditorPanel;
+    const canvas = document.querySelector<HTMLCanvasElement>('.roi-editor-canvas');
+    if (!panel?.imageCanvas || !canvas) {
+      throw new Error('ROI editor canvas not ready');
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const toClient = (point: { x: number; y: number }) => ({
+      clientX: rect.left + panel.imageCanvas.offset.x + point.x * panel.imageCanvas.scale,
+      clientY: rect.top + panel.imageCanvas.offset.y + point.y * panel.imageCanvas.scale
+    });
+    const start = toClient(startPoint);
+    const end = toClient(endPoint);
+
+    canvas.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+      buttons: 1,
+      ...start
+    }));
+
+    for (let step = 1; step <= 6; step += 1) {
+      const progress = step / 6;
+      canvas.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true,
+        button: 0,
+        buttons: 1,
+        clientX: start.clientX + (end.clientX - start.clientX) * progress,
+        clientY: start.clientY + (end.clientY - start.clientY) * progress
+      }));
+    }
+  }, {
+    startPoint: from,
+    endPoint: to
+  });
+}
+
+async function dispatchRoiMouseUp(page: Page, point: { x: number; y: number }) {
+  await page.evaluate((targetPoint) => {
+    const panel = (window as any).propertyPanel?.roiEditorPanel;
+    const canvas = document.querySelector<HTMLCanvasElement>('.roi-editor-canvas');
+    if (!panel?.imageCanvas || !canvas) {
+      throw new Error('ROI editor canvas not ready');
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true,
+      button: 0,
+      buttons: 0,
+      clientX: rect.left + panel.imageCanvas.offset.x + targetPoint.x * panel.imageCanvas.scale,
+      clientY: rect.top + panel.imageCanvas.offset.y + targetPoint.y * panel.imageCanvas.scale
+    }));
+  }, point);
+}
+
 async function getCanvasPointForImagePoint(page: Page, point: { x: number; y: number }) {
   return page.evaluate((targetPoint) => {
     const panel = (window as any).propertyPanel?.roiEditorPanel;
@@ -368,6 +430,131 @@ test.describe('ROI Editor', () => {
     expect(roiState.params.width).toBe(24);
     expect(roiState.params.height).toBe(26);
     expect(roiState.overlay).toEqual({ x: 18, y: 20, width: 24, height: 26 });
+  });
+
+  test('pointer movement stays local draft until mouseup commit', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+
+    await page.evaluate(() => {
+      const canvas = (window as any).flowCanvas;
+      const original = canvas.markFlowStructureChanged?.bind(canvas);
+      (window as any).__roiParameterChangeCount = 0;
+      canvas.markFlowStructureChanged = (reason: string) => {
+        if (reason === 'parameter-change') {
+          (window as any).__roiParameterChangeCount += 1;
+        }
+        return original?.(reason);
+      };
+    });
+
+    await dispatchRoiDragWithoutMouseUp(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    await page.waitForTimeout(100);
+
+    let draftState = await page.evaluate(() => {
+      const node = (window as any).flowCanvas.nodes.get((window as any).__e2eRoiNodeId);
+      const readNodeParam = (name: string) => Number(node.parameters.find((param: any) => param.name === name)?.value);
+      const readInput = (name: string) => Number((document.querySelector<HTMLInputElement>(`#param-${name}`))?.value);
+      return {
+        changeCount: (window as any).__roiParameterChangeCount,
+        nodeX: readNodeParam('X'),
+        nodeY: readNodeParam('Y'),
+        formX: readInput('X'),
+        formY: readInput('Y')
+      };
+    });
+
+    expect(draftState).toEqual({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 18,
+      formY: 20
+    });
+
+    await dispatchRoiMouseUp(page, { x: 24, y: 26 });
+    await page.waitForTimeout(100);
+
+    draftState = await page.evaluate(() => {
+      const node = (window as any).flowCanvas.nodes.get((window as any).__e2eRoiNodeId);
+      const readNodeParam = (name: string) => Number(node.parameters.find((param: any) => param.name === name)?.value);
+      const readInput = (name: string) => Number((document.querySelector<HTMLInputElement>(`#param-${name}`))?.value);
+      return {
+        changeCount: (window as any).__roiParameterChangeCount,
+        nodeX: readNodeParam('X'),
+        nodeY: readNodeParam('Y'),
+        formX: readInput('X'),
+        formY: readInput('Y')
+      };
+    });
+
+    expect(draftState).toEqual({
+      changeCount: 1,
+      nodeX: 18,
+      nodeY: 20,
+      formX: 18,
+      formY: 20
+    });
+  });
+
+  test('keyboard nudge undo redo and escape cancel remain local to the ROI draft session', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+
+    await page.locator('.roi-editor-canvas').focus();
+    await page.keyboard.press('ArrowRight');
+    let roiState = await getRoiState(page);
+    expect(roiState.params.x).toBe(11);
+    expect(roiState.overlay?.x).toBe(11);
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Z' : 'Control+Z');
+    roiState = await getRoiState(page);
+    expect(roiState.params.x).toBe(10);
+    expect(roiState.overlay?.x).toBe(10);
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Y' : 'Control+Y');
+    roiState = await getRoiState(page);
+    expect(roiState.params.x).toBe(11);
+    expect(roiState.overlay?.x).toBe(11);
+
+    await dispatchRoiDragWithoutMouseUp(page, { x: 17, y: 18 }, { x: 30, y: 32 });
+    roiState = await getRoiState(page);
+    expect(roiState.params.x).toBe(24);
+    expect(roiState.params.y).toBe(26);
+
+    await page.keyboard.press('Escape');
+    roiState = await getRoiState(page);
+    expect(roiState.params.x).toBe(11);
+    expect(roiState.params.y).toBe(12);
+    expect(roiState.overlay).toEqual({ x: 11, y: 12, width: 12, height: 14 });
   });
 
   test('manual parameter edits sync overlay and right-button pan does not mutate ROI', async ({ page }) => {

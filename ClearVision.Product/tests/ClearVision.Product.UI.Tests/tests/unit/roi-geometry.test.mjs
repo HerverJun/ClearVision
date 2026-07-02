@@ -3,13 +3,25 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_RECT_PARAM_KEYS,
   REGION_RECT_PARAM_KEYS,
+  cancelRectangleDraft,
   clampRectToBounds,
+  commitRectangleDraft,
+  createRectangleDraftSession,
+  hitTestRectHandle,
+  hitTestRectangle,
+  imageToScreenPoint,
+  imageToScreenRect,
+  nudgeRect,
   normalizeRectFromPoints,
   rectFromParams,
   rectToParams,
+  redoRectangleDraft,
   resizeRectByHandle,
+  screenToImageRect,
   screenToImagePoint,
-  translateRect
+  translateRect,
+  undoRectangleDraft,
+  validateRectangleGeometry
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiGeometry.mjs';
 import { getOperatorRoiConfig } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiEditorSupport.mjs';
 import RoiEditorPanel from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiEditorPanel.js';
@@ -39,6 +51,37 @@ test('screenToImagePoint converts viewport coordinates back to image space', () 
   );
 });
 
+test('image and screen coordinate conversion round-trips points and rectangles with DPI scale', () => {
+  const viewport = { scale: 1.5, offset: { x: 12, y: 9 } };
+  const imagePoint = { x: 32, y: 24 };
+  const screenPoint = imageToScreenPoint(imagePoint, viewport);
+
+  assert.deepEqual(screenPoint, { x: 60, y: 45 });
+  assert.deepEqual(screenToImagePoint(screenPoint, viewport), imagePoint);
+
+  const imageRect = { x: 10, y: 12, width: 20, height: 8 };
+  const screenRect = imageToScreenRect(imageRect, viewport);
+  assert.deepEqual(screenRect, { x: 27, y: 27, width: 30, height: 12 });
+  assert.deepEqual(screenToImageRect(screenRect, viewport), imageRect);
+});
+
+test('validateRectangleGeometry rejects non-finite and degenerate rectangles', () => {
+  assert.deepEqual(
+    validateRectangleGeometry({ x: 4, y: 5, width: 12, height: 8 }, { width: 64, height: 64 }),
+    { valid: true, errors: [] }
+  );
+
+  const invalid = validateRectangleGeometry(
+    { x: Number.NaN, y: 5, width: 0, height: Number.POSITIVE_INFINITY },
+    { width: 64, height: 64 }
+  );
+
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.includes('non-finite'));
+  assert.ok(invalid.errors.includes('width'));
+  assert.ok(invalid.errors.includes('height'));
+});
+
 test('resizeRectByHandle updates size from south-east handle', () => {
   assert.deepEqual(
     resizeRectByHandle(
@@ -52,6 +95,21 @@ test('resizeRectByHandle updates size from south-east handle', () => {
   );
 });
 
+test('hit testing finds rectangle body and DPI-aware resize handles', () => {
+  const rect = { x: 10, y: 10, width: 20, height: 16 };
+
+  assert.equal(hitTestRectangle({ x: 15, y: 15 }, rect), true);
+  assert.equal(hitTestRectangle({ x: 4, y: 15 }, rect), false);
+  assert.equal(
+    hitTestRectHandle({ x: 32, y: 28 }, rect, { scale: 2, offset: { x: 0, y: 0 } }, 10),
+    'se'
+  );
+  assert.equal(
+    hitTestRectHandle({ x: 31, y: 18 }, rect, { scale: 2, offset: { x: 0, y: 0 } }, 10),
+    'e'
+  );
+});
+
 test('translateRect keeps moved rectangle within bounds', () => {
   assert.deepEqual(
     translateRect(
@@ -62,6 +120,45 @@ test('translateRect keeps moved rectangle within bounds', () => {
     ),
     { x: 80, y: 85, width: 20, height: 15 }
   );
+});
+
+test('nudgeRect clamps keyboard movement inside image bounds', () => {
+  assert.deepEqual(
+    nudgeRect(
+      { x: 1, y: 1, width: 10, height: 10 },
+      { x: -5, y: -3 },
+      { width: 64, height: 64 }
+    ),
+    { x: 0, y: 0, width: 10, height: 10 }
+  );
+});
+
+test('rectangle draft history supports local undo redo and cancel', () => {
+  let session = createRectangleDraftSession(
+    { x: 4, y: 5, width: 12, height: 8 },
+    { width: 64, height: 64 }
+  );
+
+  session = commitRectangleDraft(session, { x: 10, y: 5, width: 12, height: 8 }, {
+    previousRect: session.current
+  });
+  session = commitRectangleDraft(session, { x: 14, y: 9, width: 12, height: 8 }, {
+    previousRect: session.current
+  });
+
+  assert.deepEqual(session.current, { x: 14, y: 9, width: 12, height: 8 });
+  assert.equal(session.past.length, 2);
+
+  session = undoRectangleDraft(session);
+  assert.deepEqual(session.current, { x: 10, y: 5, width: 12, height: 8 });
+
+  session = redoRectangleDraft(session);
+  assert.deepEqual(session.current, { x: 14, y: 9, width: 12, height: 8 });
+
+  session = cancelRectangleDraft(session);
+  assert.deepEqual(session.current, { x: 4, y: 5, width: 12, height: 8 });
+  assert.equal(session.past.length, 0);
+  assert.equal(session.future.length, 0);
 });
 
 test('rectFromParams supports BoxFilter region parameter names', () => {

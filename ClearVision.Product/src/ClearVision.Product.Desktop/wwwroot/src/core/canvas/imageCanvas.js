@@ -1,11 +1,20 @@
 import {
+    cancelRectangleDraft,
     clampRectToBounds,
+    commitRectangleDraft,
+    createRectangleDraftSession,
     getRectHandlePoints,
+    hitTestRectHandle,
+    hitTestRectangle,
     normalizeRectFromPoints,
+    nudgeRect,
+    redoRectangleDraft,
     resizeRectByHandle,
     roundRect,
     screenToImagePoint,
-    translateRect
+    setRectangleDraftCurrent,
+    translateRect,
+    undoRectangleDraft
 } from '../../features/flow-editor/roiGeometry.mjs';
 
 function createLegacyOverlayId() {
@@ -102,6 +111,7 @@ class ImageCanvas {
         this.minimumOverlaySize = options.minimumOverlaySize || 1;
         this.activeHandle = null;
         this.interactionState = null;
+        this.roiDraftState = null;
 
         // 【关键修复】记录是否有待处理的重置视图（当画布尺寸为0时）
         this._pendingResetView = false;
@@ -131,6 +141,7 @@ class ImageCanvas {
         this._wheelHandler = this.handleWheel.bind(this);
         this._dblClickHandler = this.handleDoubleClick.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
+        this._keyDownHandler = this.handleKeyDown.bind(this);
 
         this.initialize();
     }
@@ -159,6 +170,10 @@ class ImageCanvas {
         this.canvas.addEventListener('wheel', this._wheelHandler);
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
+        if (this.interactionMode === 'roi-rect' && !this.canvas.hasAttribute?.('tabindex')) {
+            this.canvas.tabIndex = 0;
+        }
+        this.canvas.addEventListener('keydown', this._keyDownHandler);
 
         // 启动渲染循环（由脏标记驱动）
         this.invalidate();
@@ -194,6 +209,7 @@ class ImageCanvas {
         this.canvas.removeEventListener('wheel', this._wheelHandler);
         this.canvas.removeEventListener('dblclick', this._dblClickHandler);
         this.canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+        this.canvas.removeEventListener('keydown', this._keyDownHandler);
 
         // 释放旧的 Blob URL
         this._revokeImageUrl();
@@ -211,6 +227,7 @@ class ImageCanvas {
         this.activeOverlayId = null;
         this.interactionState = null;
         this.activeHandle = null;
+        this.roiDraftState = null;
     }
 
     /**
@@ -474,6 +491,9 @@ class ImageCanvas {
         this.enableRightButtonPan = this.interactionMode === 'roi-rect';
         this.interactionState = null;
         this.activeHandle = null;
+        if (this.interactionMode === 'roi-rect' && !this.canvas.hasAttribute?.('tabindex')) {
+            this.canvas.tabIndex = 0;
+        }
     }
 
     setOverlayChangedCallback(callback) {
@@ -497,6 +517,9 @@ class ImageCanvas {
         if (existing) {
             Object.assign(existing, normalized, overlayStyle);
             this.selectedOverlay = existing.id;
+            if (options.resetDraft !== false) {
+                this.resetRectangleDraft(normalized);
+            }
             this.invalidate();
             return existing;
         }
@@ -505,6 +528,9 @@ class ImageCanvas {
         overlay.editable = true;
         this.activeOverlayId = overlay.id;
         this.selectedOverlay = overlay.id;
+        if (options.resetDraft !== false) {
+            this.resetRectangleDraft(normalized);
+        }
         this.invalidate();
         return overlay;
     }
@@ -517,6 +543,7 @@ class ImageCanvas {
         this.removeOverlay(this.activeOverlayId);
         this.activeOverlayId = null;
         this.activeHandle = null;
+        this.roiDraftState = null;
     }
 
     fitToWindow() {
@@ -822,6 +849,14 @@ class ImageCanvas {
         this.isDragging = false;
     }
 
+    handleKeyDown(e) {
+        if (this.interactionMode !== 'roi-rect') {
+            return;
+        }
+
+        this.handleRoiKeyDown(e);
+    }
+
     /**
      * 处理滚轮缩放
      */
@@ -923,6 +958,42 @@ class ImageCanvas {
         }, this.minimumOverlaySize);
     }
 
+    getImageBounds() {
+        return {
+            width: this.image?.width || 1,
+            height: this.image?.height || 1
+        };
+    }
+
+    resetRectangleDraft(rect) {
+        this.roiDraftState = createRectangleDraftSession(rect, this.getImageBounds(), {
+            minSize: this.minimumOverlaySize
+        });
+    }
+
+    updateEditableOverlayRect(overlay, rect, phase = 'dragging') {
+        const nextRect = this.clampRectToImage(rect);
+        Object.assign(overlay, nextRect);
+        if (this.roiDraftState) {
+            this.roiDraftState = setRectangleDraftCurrent(this.roiDraftState, nextRect);
+        }
+        this.invalidate();
+        this.emitOverlayChanged(overlay, phase);
+        return nextRect;
+    }
+
+    commitEditableOverlayRect(overlay, previousRect = null) {
+        const nextRect = this.clampRectToImage(overlay);
+        Object.assign(overlay, nextRect);
+        if (!this.roiDraftState) {
+            this.resetRectangleDraft(nextRect);
+        }
+        this.roiDraftState = commitRectangleDraft(this.roiDraftState, nextRect, { previousRect });
+        this.invalidate();
+        this.emitOverlayChanged(overlay, 'commit');
+        return nextRect;
+    }
+
     drawResizeHandles(overlay) {
         const handles = getRectHandlePoints(overlay);
         const radius = this.handleSize / this.scale / 2;
@@ -942,17 +1013,16 @@ class ImageCanvas {
             return null;
         }
 
-        const handles = getRectHandlePoints(overlay);
-        const tolerance = this.handleSize / this.scale;
-
-        return Object.entries(handles).find(([, point]) =>
-            Math.abs(imagePoint.x - point.x) <= tolerance &&
-            Math.abs(imagePoint.y - point.y) <= tolerance)?.[0] || null;
+        return hitTestRectHandle(imagePoint, overlay, { scale: this.scale, offset: this.offset }, this.handleSize);
     }
 
     hitTestOverlay(imagePoint, overlay) {
         if (!overlay) {
             return false;
+        }
+
+        if (overlay.type === 'rectangle') {
+            return hitTestRectangle(imagePoint, this.getOverlayBounds(overlay));
         }
 
         const bounds = this.getOverlayBounds(overlay);
@@ -1030,9 +1100,132 @@ class ImageCanvas {
         }), phase);
     }
 
+    cancelActiveRoiInteraction() {
+        const interaction = this.interactionState;
+        if (!interaction) {
+            return false;
+        }
+
+        this.interactionState = null;
+        if (interaction.type === 'pan') {
+            this.invalidate();
+            return true;
+        }
+
+        const overlay = this.overlays.find(item => item.id === interaction.overlayId);
+        if (!overlay) {
+            this.invalidate();
+            return true;
+        }
+
+        if (interaction.createdOverlay && !interaction.originalRect) {
+            this.removeOverlay(overlay.id);
+            this.activeOverlayId = null;
+            this.selectedOverlay = null;
+            this.roiDraftState = cancelRectangleDraft(this.roiDraftState);
+            return true;
+        }
+
+        const fallbackRect = interaction.originalRect || this.roiDraftState?.initial;
+        if (fallbackRect) {
+            Object.assign(overlay, this.clampRectToImage(fallbackRect));
+            this.roiDraftState = setRectangleDraftCurrent(
+                this.roiDraftState || createRectangleDraftSession(overlay, this.getImageBounds(), {
+                    minSize: this.minimumOverlaySize
+                }),
+                overlay
+            );
+            this.invalidate();
+            this.emitOverlayChanged(overlay, 'cancel');
+        }
+
+        return true;
+    }
+
+    applyRoiDraftHistory(nextDraftState) {
+        if (!nextDraftState || !nextDraftState.current) {
+            return false;
+        }
+
+        const overlay = this.getPrimaryEditableOverlay();
+        if (!overlay) {
+            return false;
+        }
+
+        this.roiDraftState = nextDraftState;
+        Object.assign(overlay, this.roiDraftState.current);
+        this.invalidate();
+        this.emitOverlayChanged(overlay, 'commit');
+        return true;
+    }
+
+    handleRoiKeyDown(e) {
+        const overlay = this.getPrimaryEditableOverlay();
+        if (!overlay) {
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            if (this.cancelActiveRoiInteraction()) {
+                e.preventDefault?.();
+            }
+            return;
+        }
+
+        const isUndo = (e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'z' && !e.shiftKey;
+        const isRedo = ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'y') ||
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && String(e.key).toLowerCase() === 'z');
+
+        if (isUndo) {
+            if (this.applyRoiDraftHistory(undoRectangleDraft(this.roiDraftState))) {
+                e.preventDefault?.();
+            }
+            return;
+        }
+
+        if (isRedo) {
+            if (this.applyRoiDraftHistory(redoRectangleDraft(this.roiDraftState))) {
+                e.preventDefault?.();
+            }
+            return;
+        }
+
+        const deltas = {
+            ArrowLeft: { x: -1, y: 0 },
+            ArrowRight: { x: 1, y: 0 },
+            ArrowUp: { x: 0, y: -1 },
+            ArrowDown: { x: 0, y: 1 }
+        };
+        const delta = deltas[e.key];
+        if (!delta) {
+            return;
+        }
+
+        const step = e.shiftKey ? 10 : 1;
+        const previousRect = { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height };
+        const nextRect = nudgeRect(overlay, {
+            x: delta.x * step,
+            y: delta.y * step
+        }, this.getImageBounds(), this.minimumOverlaySize);
+        Object.assign(overlay, nextRect);
+        if (!this.roiDraftState) {
+            this.resetRectangleDraft(previousRect);
+        }
+        this.roiDraftState = commitRectangleDraft(this.roiDraftState, nextRect, { previousRect });
+        this.invalidate();
+        this.emitOverlayChanged(overlay, 'commit');
+        e.preventDefault?.();
+    }
+
     handleRoiMouseDown(e) {
         if (!this.image) {
             return;
+        }
+
+        try {
+            this.canvas.focus?.({ preventScroll: true });
+        } catch {
+            this.canvas.focus?.();
         }
 
         if (e.button === 2) {
@@ -1081,17 +1274,22 @@ class ImageCanvas {
             return;
         }
 
+        const originalRect = overlay
+            ? { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height }
+            : null;
         const nextOverlay = this.setEditableRectangle({
             x: imagePoint.x,
             y: imagePoint.y,
             width: this.minimumOverlaySize,
             height: this.minimumOverlaySize
-        });
+        }, { resetDraft: !overlay });
         this.activeHandle = null;
         this.interactionState = {
             type: 'draw',
             overlayId: nextOverlay.id,
-            startPoint: imagePoint
+            startPoint: imagePoint,
+            originalRect,
+            createdOverlay: !overlay
         };
     }
 
@@ -1142,9 +1340,7 @@ class ImageCanvas {
             return;
         }
 
-        Object.assign(overlay, nextRect);
-        this.invalidate();
-        this.emitOverlayChanged(overlay, 'dragging');
+        this.updateEditableOverlayRect(overlay, nextRect, 'dragging');
     }
 
     handleRoiMouseUp() {
@@ -1162,7 +1358,7 @@ class ImageCanvas {
 
         const overlay = this.overlays.find(item => item.id === interaction.overlayId);
         if (overlay) {
-            this.emitOverlayChanged(overlay, 'commit');
+            this.commitEditableOverlayRect(overlay, interaction.originalRect);
         }
     }
 }
