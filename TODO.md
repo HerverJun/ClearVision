@@ -1,5 +1,13 @@
 # ClearVision Studio 2.0 开发 TODO
 
+<!-- DOC_AUDIT_STATUS_START -->
+## 文档审计状态（自动更新）
+- 审计日期：2026-07-02
+- 完成状态：未完成
+- 任务统计：总计 0，已完成 0，未完成 0，待办关键词命中 5
+- 判定依据：检测到待办关键词（TODO/待办/未完成/TBD/FIXME/WIP）
+<!-- DOC_AUDIT_STATUS_END -->
+
 > 文档版本：V1.1（仓库安装回填版）
 > 审计日期：2026-07-01
 > 目标仓库：`HerverJun/ClearVision`
@@ -155,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G05A follow-up | `18cd539cccca3b3ec7d570768661fc88ce9a8ec1` | 见 G05A follow-up 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，59 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05A Observation fail-soft：未知对象不再调用 `ToString()`、任意 public getter 或任意自定义 enumerable；`Detail` 使用最终 UTF-8 byte 硬上限；legacy outputData 和 metrics 输入均有界；endpoint adversarial 场景保持 HTTP 200 且普通 `Score`/`Seen` 可读；当前 Goal 仍为 G05B，未执行 G05B。 |
 | 2026-07-02 | G05A | `ef676b193f6f955db56ac79c4fc13190916d92cb` | 见 G05A 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，54 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；文本编码 PASS；diff hygiene PASS；文档审计执行但生成性副作用未提交；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 `ExecutionObservationEnvelopeV1` 与 Desktop 边界 `ExecutionObservationProjector`，preview success/failure additive 返回 Observation；旧 outputData 安全降级且 detection metrics 兼容；NodePreviewCoordinator 发送 sequence/flowRevision 并在 Observation identity mismatch 时丢弃响应；未执行 G05B、未实现 Artifact Store/ResultPath parser/Inspector UI。 |
 | 2026-07-02 | G04B follow-up | `7e089a17cbaf4862cb0ea63839131563feae8120` | 见 G04B follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/43 unit tests；`studioProjectPersistencePort.test.ts` PASS，11 tests；Project persistence/concurrency + Repository + ProjectService + ProjectSaveCoordinator targeted PASS，39 tests；ProjectGlobalVariableEndpoints + Studio2/BuildFromPlan Architecture Guard targeted PASS，43 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口保存时 EF tracked stale revision：新增 `IProjectRepository.GetByIdForUpdateAsync`，`ProjectSaveCoordinator` 的 expected revision、commit-intent apply 和 recovery apply 均使用数据库当前 tracked 实体；补齐双 DbContext/双 service scope 竞争测试；`StudioProjectPersistencePort` open intent 在发请求前生效，旧响应不污染 snapshot，save 响应校验 `saved.id`；未执行 G05A。 |
 | 2026-07-02 | G04B | `b4936ce22f380b00b5ff9e211c95219b10863b46` | 见 G04B 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/40 unit tests；ProjectService + ProjectSaveCoordinator targeted PASS，29 tests；ProjectGlobalVariableEndpoints + Studio2ArchitectureGuard targeted PASS，36 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 建立 `StudioProjectPersistencePort` 与 `studio2.projectPersistencePort`，V2 单次调用既有 `PUT /api/projects/{id}` 提交 metadata/Flow/GlobalVariables；后端使用 `ExpectedPersistenceRevision`/`PersistenceRevision` 与 `ProjectSaveCoordinator` 判定并发，`PSV011` 映射 409；旧 Project 页面、`projectManager.saveProject()`、`/flow` 兼容入口保留；未执行 G05A。 |

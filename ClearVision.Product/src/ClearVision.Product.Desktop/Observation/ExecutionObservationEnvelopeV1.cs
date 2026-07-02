@@ -29,7 +29,7 @@ public sealed class ExecutionObservationEnvelopeV1
     public ExecutionObservationLimitsV1 Limits { get; init; } = new();
 
     [JsonPropertyOrder(8)]
-    public bool Truncated { get; init; }
+    public bool Truncated { get; set; }
 }
 
 public sealed class ExecutionObservationIdentityV1
@@ -110,7 +110,7 @@ public sealed class ExecutionObservationDetailNodeV1
     public List<ExecutionObservationDetailNodeV1> Children { get; init; } = new();
 
     [JsonPropertyOrder(4)]
-    public bool Truncated { get; init; }
+    public bool Truncated { get; set; }
 
     [JsonPropertyOrder(5)]
     public string PathHint { get; init; } = "$";

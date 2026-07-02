@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Desktop.Observation;
@@ -107,8 +108,48 @@ public sealed class ExecutionObservationProjectorTests
             ["Unsafe"] = new ThrowingGetterDto()
         });
 
-        FindNode(observation.Detail, "Explodes")!.Kind.Should().Be("propertyError");
-        observation.Diagnostics.Should().Contain(item => item.Code == "getter-error");
+        FindNode(observation.Detail, "Unsafe")!.Kind.Should().Be("objectDescriptor");
+        observation.Diagnostics.Should().NotContain(item => item.Code == "getter-error");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldNotCallUnknownToStringGetterOrEnumerable()
+    {
+        var throwingEnumerable = new ThrowingEnumerable();
+        var infiniteEnumerable = new CountingInfiniteEnumerable();
+        var observation = CreateObservation(new Dictionary<string, object>
+        {
+            ["ThrowingToString"] = new ThrowingToStringValue(),
+            ["ThrowingGetter"] = new ThrowingGetterDto(),
+            ["ThrowingEnumerable"] = throwingEnumerable,
+            ["InfiniteEnumerable"] = infiniteEnumerable
+        });
+
+        FindNode(observation.Detail, "ThrowingToString")!.Kind.Should().Be("objectDescriptor");
+        FindNode(observation.Detail, "ThrowingGetter")!.Kind.Should().Be("objectDescriptor");
+        FindNode(observation.Detail, "ThrowingEnumerable")!.Kind.Should().Be("unsupportedEnumerable");
+        FindNode(observation.Detail, "InfiniteEnumerable")!.Kind.Should().Be("unsupportedEnumerable");
+        throwingEnumerable.GetEnumeratorCallCount.Should().Be(0);
+        infiniteEnumerable.MoveNextCount.Should().Be(0);
+        observation.Diagnostics.Should().Contain(item => item.Code == "unsupported-enumerable");
+        observation.Diagnostics.Should().NotContain(item => item.Code == "getter-error");
+
+        var legacy = ExecutionObservationProjector.BuildLegacyOutputData(
+            new Dictionary<string, object>
+            {
+                ["ThrowingToString"] = new ThrowingToStringValue(),
+                ["ThrowingGetter"] = new ThrowingGetterDto(),
+                ["ThrowingEnumerable"] = throwingEnumerable,
+                ["InfiniteEnumerable"] = infiniteEnumerable
+            },
+            _ => false);
+
+        ((Dictionary<string, object?>)legacy["ThrowingToString"])["kind"].Should().Be("object");
+        ((Dictionary<string, object?>)legacy["ThrowingGetter"])["kind"].Should().Be("object");
+        ((Dictionary<string, object?>)legacy["ThrowingEnumerable"])["kind"].Should().Be("unsupportedEnumerable");
+        ((Dictionary<string, object?>)legacy["InfiniteEnumerable"])["kind"].Should().Be("unsupportedEnumerable");
+        throwingEnumerable.GetEnumeratorCallCount.Should().Be(0);
+        infiniteEnumerable.MoveNextCount.Should().Be(0);
     }
 
     [Fact]
@@ -163,6 +204,9 @@ public sealed class ExecutionObservationProjectorTests
         observation.Diagnostics.Should().Contain(item =>
             item.Code == "node-limit" || item.Code == "byte-budget");
         observation.Truncated.Should().BeTrue();
+        JsonSerializer.SerializeToUtf8Bytes(observation.Detail, CamelCaseJson).Length
+            .Should().BeLessThanOrEqualTo(ExecutionObservationProjector.MaxDetailBytes);
+        observation.Diagnostics.Count(item => item.Code == "byte-budget").Should().BeLessThanOrEqualTo(1);
     }
 
     [Fact]
@@ -202,6 +246,22 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldClipLongKeysAndMakeTruncatedPathsNonAddressable()
+    {
+        var longKey = new string('K', 2_000);
+        var observation = CreateObservation(new Dictionary<string, object>
+        {
+            [longKey] = 42
+        });
+
+        var node = observation.Detail.Children.Should().ContainSingle().Subject;
+        node.Name.Should().EndWith("...");
+        node.Addressable.Should().BeFalse();
+        node.PathHint.Length.Should().BeLessThan(520);
+        observation.Diagnostics.Should().Contain(item => item.Code == "path-limit");
+    }
+
+    [Fact]
     public void BuildLegacyOutputData_ShouldKeepSafeFieldsAndDowngradeUnsafeValues()
     {
         using var mat = new Mat(1, 1, MatType.CV_8UC1, Scalar.All(255));
@@ -229,6 +289,24 @@ public sealed class ExecutionObservationProjectorTests
         legacy["Loop"].Should().BeAssignableTo<Dictionary<string, object?>>();
         legacy["Matrix"].Should().BeAssignableTo<Dictionary<string, object?>>();
         legacy["BadNumber"].Should().BeAssignableTo<Dictionary<string, object?>>();
+    }
+
+    [Fact]
+    public void BuildLegacyOutputData_ShouldApplyTopLevelAndJsonByteLimits()
+    {
+        var output = Enumerable.Range(0, 10_000)
+            .ToDictionary(
+                index => $"Field{index:D05}",
+                _ => (object)new string('x', ExecutionObservationProjector.MaxStringChars * 4),
+                StringComparer.OrdinalIgnoreCase);
+        output[new string('K', 4_000)] = new string('y', ExecutionObservationProjector.MaxStringChars * 8);
+
+        var legacy = ExecutionObservationProjector.BuildLegacyOutputData(output, _ => false);
+        var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(legacy, CamelCaseJson);
+
+        legacy.Should().ContainKey("__truncated");
+        legacy.Count.Should().BeLessThanOrEqualTo(ExecutionObservationProjector.MaxObjectFields + 1);
+        jsonBytes.Length.Should().BeLessThanOrEqualTo(ExecutionObservationProjector.MaxLegacyOutputBytes);
     }
 
     private static ExecutionObservationEnvelopeV1 CreateObservation(IReadOnlyDictionary<string, object> outputData)
@@ -272,5 +350,35 @@ public sealed class ExecutionObservationProjectorTests
         public int Safe => 1;
 
         public int Explodes => throw new InvalidOperationException("getter failed");
+    }
+
+    private sealed class ThrowingToStringValue
+    {
+        public override string ToString() => throw new InvalidOperationException("ToString failed");
+    }
+
+    private sealed class ThrowingEnumerable : IEnumerable
+    {
+        public int GetEnumeratorCallCount { get; private set; }
+
+        public IEnumerator GetEnumerator()
+        {
+            GetEnumeratorCallCount++;
+            throw new InvalidOperationException("enumeration failed");
+        }
+    }
+
+    private sealed class CountingInfiniteEnumerable : IEnumerable
+    {
+        public int MoveNextCount { get; private set; }
+
+        public IEnumerator GetEnumerator()
+        {
+            while (true)
+            {
+                MoveNextCount++;
+                yield return MoveNextCount;
+            }
+        }
     }
 }

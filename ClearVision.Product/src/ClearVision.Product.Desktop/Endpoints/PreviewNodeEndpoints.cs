@@ -33,6 +33,34 @@ public static class PreviewNodeEndpoints
     private const int MinPreviewTimeoutMs = 1_000;
     private const int MaxPreviewTimeoutMs = 120_000;
     private const int MaxPreviewImageBytes = 8 * 1024 * 1024;
+    private const int MaxMetricsItems = 64;
+    private const int MaxMetricsStringChars = 1024;
+
+    private static readonly string[] MetricsCountKeys =
+    [
+        "BlobCount", "blobCount", "DefectCount", "defectCount", "DetectionCount", "detectionCount", "ObjectCount", "objectCount"
+    ];
+
+    private static readonly string[] MetricsCollectionKeys =
+    [
+        "SortedDetections", "sortedDetections", "DetectionList", "detectionList", "Detections", "detections",
+        "Objects", "objects", "Defects", "defects", "Blobs", "blobs"
+    ];
+
+    private static readonly string[] MetricsStringListKeys =
+    [
+        "ExpectedLabels", "ExpectedOrder", "ActualOrder", "SortedLabels", "MissingLabels", "DuplicateLabels"
+    ];
+
+    private static readonly string[] MetricsNumericConfigKeys =
+    [
+        "ConfiguredMinConfidence", "RequiredMinConfidence", "MinRequiredConfidence", "ExpectedCount", "TargetCount"
+    ];
+
+    private static readonly HashSet<string> MetricsDetectionFieldKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Label", "ClassName", "Confidence", "Score", "X", "Left", "Y", "Top", "Width", "Height", "Area"
+    };
 
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -195,7 +223,8 @@ public static class PreviewNodeEndpoints
                 var outputImageBase64 = outputImageBytes != null
                     ? Convert.ToBase64String(outputImageBytes)
                     : null;
-                var metrics = BuildPreviewMetrics(BuildMetricsOutputData(nodeOutput), outputImageBytes, result.ErrorMessage);
+                var metricsInput = BuildMetricsOutputData(nodeOutput);
+                var metrics = BuildPreviewMetrics(metricsInput.OutputData, outputImageBytes, result.ErrorMessage, metricsInput.Diagnostics);
 
                 logger.LogInformation(
                     "[PreviewNode] 预览完成: Project={ProjectId}, Node={NodeId}, Success={Success}",
@@ -431,19 +460,339 @@ public static class PreviewNodeEndpoints
         return ExecutionObservationProjector.BuildLegacyOutputData(nodeOutput, IsInternalPreviewImageKey);
     }
 
-    private static Dictionary<string, object> BuildMetricsOutputData(Dictionary<string, object> nodeOutput)
+    private static BoundedMetricsInput BuildMetricsOutputData(Dictionary<string, object> nodeOutput)
     {
         var response = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in nodeOutput)
+        var diagnostics = new List<string>();
+
+        foreach (var key in MetricsCountKeys.Concat(MetricsNumericConfigKeys))
         {
-            if (!IsInternalPreviewImageKey(key))
+            string? diagnostic = null;
+            if (nodeOutput.TryGetValue(key, out var value) &&
+                TryBuildMetricsScalar(value, out var boundedValue, out diagnostic))
             {
-                response[key] = value;
+                response[key] = boundedValue!;
+            }
+            else if (diagnostic != null)
+            {
+                diagnostics.Add(diagnostic);
             }
         }
 
-        return response;
+        foreach (var key in MetricsStringListKeys)
+        {
+            string? diagnostic = null;
+            if (nodeOutput.TryGetValue(key, out var value) &&
+                TryBuildMetricsStringList(value, out var boundedValue, out diagnostic))
+            {
+                response[key] = boundedValue;
+            }
+            else if (diagnostic != null)
+            {
+                diagnostics.Add(diagnostic);
+            }
+        }
+
+        foreach (var key in MetricsCollectionKeys)
+        {
+            string? diagnostic = null;
+            if (nodeOutput.TryGetValue(key, out var value) &&
+                TryBuildMetricsCollection(value, out var boundedValue, out diagnostic))
+            {
+                response[key] = boundedValue!;
+            }
+            else if (diagnostic != null)
+            {
+                diagnostics.Add(diagnostic);
+            }
+        }
+
+        return new BoundedMetricsInput(response, diagnostics.Distinct(StringComparer.Ordinal).Take(MaxMetricsItems).ToList());
     }
+
+    private static bool TryBuildMetricsScalar(object? value, out object? boundedValue, out string? diagnostic)
+    {
+        diagnostic = null;
+        boundedValue = value switch
+        {
+            null => null,
+            int or long or decimal => value,
+            float floatValue when float.IsFinite(floatValue) => floatValue,
+            double doubleValue when double.IsFinite(doubleValue) => doubleValue,
+            string text => ClipMetricsString(text),
+            JsonElement element when element.ValueKind is JsonValueKind.Number or JsonValueKind.String => element.Clone(),
+            _ => null
+        };
+
+        if (boundedValue != null || value == null)
+        {
+            return true;
+        }
+
+        diagnostic = "PreviewMetricsUnsupportedScalar";
+        return false;
+    }
+
+    private static bool TryBuildMetricsStringList(object? value, out object boundedValue, out string? diagnostic)
+    {
+        diagnostic = null;
+        boundedValue = new List<string>();
+        switch (value)
+        {
+            case null:
+                return true;
+            case string text:
+                boundedValue = ClipMetricsString(text);
+                return true;
+            case string[] array:
+                boundedValue = array
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Take(MaxMetricsItems)
+                    .Select(ClipMetricsString)
+                    .ToList();
+                return true;
+            case List<string> list:
+                boundedValue = list
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Take(MaxMetricsItems)
+                    .Select(ClipMetricsString)
+                    .ToList();
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.Array:
+                boundedValue = element
+                    .EnumerateArray()
+                    .Take(MaxMetricsItems)
+                    .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.GetRawText())
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Select(item => ClipMetricsString(item!))
+                    .ToList();
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.String:
+                boundedValue = ClipMetricsString(element.GetString() ?? string.Empty);
+                return true;
+            default:
+                diagnostic = "PreviewMetricsUnsupportedStringList";
+                return false;
+        }
+    }
+
+    private static bool TryBuildMetricsCollection(object? value, out object? boundedValue, out string? diagnostic)
+    {
+        diagnostic = null;
+        boundedValue = null;
+        switch (value)
+        {
+            case null:
+                boundedValue = new List<object?>();
+                return true;
+            case DetectionList detectionList:
+                boundedValue = new DetectionList((detectionList.Detections ?? new List<ClearVision.Product.Core.ValueObjects.DetectionResult>())
+                    .Take(MaxMetricsItems)
+                    .Select(CloneDetection));
+                if ((detectionList.Detections?.Count ?? 0) > MaxMetricsItems)
+                {
+                    diagnostic = "PreviewMetricsCollectionTruncated";
+                }
+                return true;
+            case ClearVision.Product.Core.ValueObjects.DetectionResult[] detections:
+                boundedValue = detections.Take(MaxMetricsItems).Select(CloneDetection).ToList();
+                if (detections.Length > MaxMetricsItems)
+                {
+                    diagnostic = "PreviewMetricsCollectionTruncated";
+                }
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.Array:
+                boundedValue = BuildMetricsItemsFromJsonArray(element, out diagnostic);
+                return true;
+            case IDictionary dictionary:
+                if (TryBuildMetricsDictionary(dictionary, out var item))
+                {
+                    boundedValue = new List<object?> { item };
+                    return true;
+                }
+
+                diagnostic = "PreviewMetricsUnsupportedDictionary";
+                return false;
+            default:
+                if (TryBuildMetricsKnownIndexedCollection(value, out boundedValue, out diagnostic))
+                {
+                    return true;
+                }
+
+                if (value is IEnumerable and not string)
+                {
+                    diagnostic = "PreviewMetricsUnsupportedEnumerable";
+                    return false;
+                }
+
+                diagnostic = "PreviewMetricsUnsupportedCollection";
+                return false;
+        }
+    }
+
+    private static bool TryBuildMetricsKnownIndexedCollection(
+        object value,
+        out object boundedValue,
+        out string? diagnostic)
+    {
+        diagnostic = null;
+        boundedValue = new List<object?>();
+        int total;
+        Func<int, object?> readItem;
+        if (value is Array array && array.Rank == 1)
+        {
+            total = array.Length;
+            readItem = index => array.GetValue(index);
+        }
+        else if (IsKnownGenericList(value.GetType()) && value is IList list)
+        {
+            total = list.Count;
+            readItem = index => list[index];
+        }
+        else
+        {
+            return false;
+        }
+
+        var result = new List<object?>();
+        for (var index = 0; index < Math.Min(total, MaxMetricsItems); index++)
+        {
+            if (TryBuildMetricsItem(readItem(index), out var item))
+            {
+                result.Add(item);
+            }
+        }
+
+        if (total > MaxMetricsItems)
+        {
+            diagnostic = "PreviewMetricsCollectionTruncated";
+        }
+
+        boundedValue = result;
+        return true;
+    }
+
+    private static List<object?> BuildMetricsItemsFromJsonArray(JsonElement element, out string? diagnostic)
+    {
+        var result = new List<object?>();
+        var count = element.GetArrayLength();
+        foreach (var item in element.EnumerateArray().Take(MaxMetricsItems))
+        {
+            if (TryBuildMetricsItem(item, out var boundedItem))
+            {
+                result.Add(boundedItem);
+            }
+        }
+
+        diagnostic = count > MaxMetricsItems ? "PreviewMetricsCollectionTruncated" : null;
+        return result;
+    }
+
+    private static bool TryBuildMetricsItem(object? value, out object? item)
+    {
+        switch (value)
+        {
+            case ClearVision.Product.Core.ValueObjects.DetectionResult detection:
+                item = CloneDetection(detection);
+                return true;
+            case IDictionary dictionary:
+                return TryBuildMetricsDictionary(dictionary, out item);
+            case JsonElement element when element.ValueKind == JsonValueKind.Object:
+                return TryBuildMetricsDictionary(element, out item);
+            default:
+                item = null;
+                return false;
+        }
+    }
+
+    private static bool TryBuildMetricsDictionary(IDictionary dictionary, out object? item)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            if (entry.Key is not string key || !MetricsDetectionFieldKeys.Contains(key))
+            {
+                continue;
+            }
+
+            if (TryBuildMetricsFieldValue(entry.Value, out var value))
+            {
+                result[key] = value;
+            }
+        }
+
+        item = result;
+        return result.Count > 0;
+    }
+
+    private static bool TryBuildMetricsDictionary(JsonElement element, out object? item)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!MetricsDetectionFieldKeys.Contains(property.Name))
+            {
+                continue;
+            }
+
+            if (TryBuildMetricsFieldValue(property.Value, out var value))
+            {
+                result[property.Name] = value;
+            }
+        }
+
+        item = result;
+        return result.Count > 0;
+    }
+
+    private static bool TryBuildMetricsFieldValue(object? value, out object? boundedValue)
+    {
+        switch (value)
+        {
+            case null:
+                boundedValue = null;
+                return true;
+            case string text:
+                boundedValue = ClipMetricsString(text);
+                return true;
+            case int or long or decimal:
+                boundedValue = value;
+                return true;
+            case float floatValue when float.IsFinite(floatValue):
+                boundedValue = floatValue;
+                return true;
+            case double doubleValue when double.IsFinite(doubleValue):
+                boundedValue = doubleValue;
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.Number:
+                boundedValue = element.Clone();
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.String:
+                boundedValue = ClipMetricsString(element.GetString() ?? string.Empty);
+                return true;
+            default:
+                boundedValue = null;
+                return false;
+        }
+    }
+
+    private static ClearVision.Product.Core.ValueObjects.DetectionResult CloneDetection(
+        ClearVision.Product.Core.ValueObjects.DetectionResult detection)
+    {
+        return new ClearVision.Product.Core.ValueObjects.DetectionResult(
+            detection.Label,
+            detection.Confidence,
+            detection.X,
+            detection.Y,
+            detection.Width,
+            detection.Height);
+    }
+
+    private static bool IsKnownGenericList(Type type) =>
+        type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>);
+
+    private static string ClipMetricsString(string value) =>
+        value.Length <= MaxMetricsStringChars ? value : value[..MaxMetricsStringChars] + "...";
 
     private static bool IsInternalPreviewImageKey(string key)
     {
@@ -756,7 +1105,8 @@ public static class PreviewNodeEndpoints
     private static PreviewFeedbackMetrics BuildPreviewMetrics(
         Dictionary<string, object> outputData,
         byte[]? outputImageBytes,
-        string? errorMessage)
+        string? errorMessage,
+        IReadOnlyList<string> inputDiagnostics)
     {
         try
         {
@@ -787,7 +1137,7 @@ public static class PreviewNodeEndpoints
                 MinConfidence = detectionSummary.MinConfidence,
                 MissingLabels = detectionSummary.MissingLabels.Count > 0 ? detectionSummary.MissingLabels : null,
                 DuplicateLabels = detectionSummary.DuplicateLabels.Count > 0 ? detectionSummary.DuplicateLabels : null,
-                Diagnostics = CreateDetectionDiagnostics(detectionSummary),
+                Diagnostics = CreateDetectionDiagnostics(detectionSummary, inputDiagnostics),
                 BinaryRatio = ComputeBinaryRatio(outputImageBytes),
                 ErrorMessage = errorMessage
             };
@@ -799,7 +1149,10 @@ public static class PreviewNodeEndpoints
                 BlobCount = 0,
                 BinaryRatio = ComputeBinaryRatio(outputImageBytes),
                 ErrorMessage = errorMessage,
-                Diagnostics = new List<string> { $"PreviewMetricsUnavailable: {ex.GetBaseException().Message}" }
+                Diagnostics = inputDiagnostics
+                    .Concat(new[] { $"PreviewMetricsUnavailable: {ex.GetBaseException().Message}" })
+                    .Take(MaxMetricsItems)
+                    .ToList()
             };
         }
     }
@@ -872,11 +1225,21 @@ public static class PreviewNodeEndpoints
             yield break;
         }
 
-        if (value is IEnumerable enumerable && value is not string)
+        if (value is Array array && array.Rank == 1)
         {
-            foreach (var item in enumerable)
+            for (var index = 0; index < Math.Min(array.Length, MaxMetricsItems); index++)
             {
-                yield return item;
+                yield return array.GetValue(index);
+            }
+
+            yield break;
+        }
+
+        if (IsKnownGenericList(value.GetType()) && value is IList list)
+        {
+            for (var index = 0; index < Math.Min(list.Count, MaxMetricsItems); index++)
+            {
+                yield return list[index];
             }
         }
     }
@@ -975,6 +1338,12 @@ public static class PreviewNodeEndpoints
 
     private static bool TryGetCollectionCount(object? value, out int count)
     {
+        if (value == null)
+        {
+            count = 0;
+            return false;
+        }
+
         if (value is DetectionList detectionList)
         {
             count = detectionList.Count;
@@ -987,15 +1356,15 @@ public static class PreviewNodeEndpoints
             return true;
         }
 
-        if (value is ICollection collection)
+        if (value is Array array && array.Rank == 1)
         {
-            count = collection.Count;
+            count = Math.Min(array.Length, MaxMetricsItems);
             return true;
         }
 
-        if (value is IEnumerable enumerable && value is not string)
+        if (IsKnownGenericList(value.GetType()) && value is IList list)
         {
-            count = enumerable.Cast<object?>().Count();
+            count = Math.Min(list.Count, MaxMetricsItems);
             return true;
         }
 
@@ -1003,14 +1372,17 @@ public static class PreviewNodeEndpoints
         return false;
     }
 
-    private static List<string>? CreateDetectionDiagnostics(DetectionOutputSummary detectionSummary)
+    private static List<string>? CreateDetectionDiagnostics(
+        DetectionOutputSummary detectionSummary,
+        IReadOnlyList<string> inputDiagnostics)
     {
+        var diagnostics = new List<string>();
+        diagnostics.AddRange(inputDiagnostics);
         if (!detectionSummary.HasDetectionSemantics)
         {
-            return null;
+            return diagnostics.Count > 0 ? diagnostics : null;
         }
 
-        var diagnostics = new List<string>();
         var expectedCount = detectionSummary.ExpectedCount ?? detectionSummary.ExpectedLabels.Count;
 
         if (detectionSummary.MissingLabels.Count > 0)
@@ -1040,8 +1412,14 @@ public static class PreviewNodeEndpoints
             diagnostics.Add(PreviewDiagnosticTags.OrderMismatch);
         }
 
-        return diagnostics.Count > 0 ? diagnostics : null;
+        return diagnostics.Count > 0
+            ? diagnostics.Distinct(StringComparer.Ordinal).Take(MaxMetricsItems).ToList()
+            : null;
     }
+
+    private sealed record BoundedMetricsInput(
+        Dictionary<string, object> OutputData,
+        List<string> Diagnostics);
 
     private static double ComputeBinaryRatio(byte[]? outputImageBytes)
     {

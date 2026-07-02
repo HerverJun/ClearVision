@@ -294,6 +294,29 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void ExecutionObservation_ShouldAvoidGenericReflectionAndUnboundedMetricsEnumeration()
+    {
+        var projectorPath = Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/ExecutionObservationProjector.cs"
+                .Replace('/', Path.DirectorySeparatorChar));
+        var endpointPath = Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs"
+                .Replace('/', Path.DirectorySeparatorChar));
+
+        var projector = File.ReadAllText(projectorPath);
+        projector.Should().NotContain("System.Reflection", "G05A observation projection must not enumerate arbitrary public getters.");
+        projector.Should().NotContain("BindingFlags", "G05A observation projection must not enumerate arbitrary public getters.");
+        projector.Should().NotContain("GetProperties(", "G05A observation projection must use explicit known adapters, not generic reflection.");
+
+        var endpoint = File.ReadAllText(endpointPath);
+        endpoint.Should().NotContain("Cast<object?>().Count()", "G05A metrics must not count unknown custom IEnumerable values.");
+        endpoint.Should().NotContain("PreviewArtifactStore", "G05A follow-up must not start G05B artifact lifecycle work.");
+        endpoint.Should().NotContain("artifactId", "G05A follow-up must not introduce artifact read identifiers.");
+    }
+
+    [Fact]
     public void Station_ShouldNotDependOnVueNodeOrStudioFrontend()
     {
         var stationRoot = Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Station");

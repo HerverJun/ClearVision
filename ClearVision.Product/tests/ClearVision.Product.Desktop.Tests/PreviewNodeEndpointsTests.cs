@@ -1,4 +1,7 @@
+using System.Collections;
+using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
@@ -10,6 +13,7 @@ using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Endpoints;
+using ClearVision.Product.Desktop.Observation;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -341,12 +345,107 @@ public class PreviewNodeEndpointsTests
         using var document = JsonDocument.Parse(payload);
         var outputData = document.RootElement.GetProperty("outputData");
         outputData.GetProperty("Score").GetDouble().Should().BeApproximately(0.95d, 0.001d);
-        outputData.GetProperty("Unsafe").GetProperty("Explodes").GetProperty("kind").GetString().Should().Be("propertyError");
+        outputData.GetProperty("Unsafe").GetProperty("kind").GetString().Should().Be("object");
         outputData.GetProperty("Loop").GetProperty("Self").GetProperty("kind").GetString().Should().Be("circular");
         outputData.GetProperty("Matrix").GetProperty("kind").GetString().Should().Be("matrix");
         outputData.GetProperty("BadNumber").GetProperty("kind").GetString().Should().Be("nonFiniteNumber");
         document.RootElement.GetProperty("observation").GetProperty("diagnostics").EnumerateArray()
-            .Should().Contain(item => item.GetProperty("code").GetString() == "getter-error");
+            .Should().NotContain(item => item.GetProperty("code").GetString() == "getter-error");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldFailSoftForAdversarialObservationValues()
+    {
+        var targetNodeId = Guid.NewGuid();
+        var nodeOutput = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Score"] = 0.95d,
+            ["Seen"] = 7L,
+            ["ThrowingToString"] = new ThrowingToStringPreviewValue(),
+            ["ThrowingGetter"] = new UnsafePreviewValue(),
+            ["ThrowingEnumerable"] = new ThrowingEnumerable(),
+            ["Objects"] = new CountingInfiniteEnumerable(),
+            [new string('K', 3_000)] = new string('x', 20_000),
+            ["Nan"] = double.NaN,
+            ["Infinity"] = float.PositiveInfinity,
+            ["Bytes"] = new byte[] { 1, 2, 3, 4 }
+        };
+        using var mat = new Mat(1, 1, MatType.CV_8UC1, Scalar.All(255));
+        using var wrapper = new ImageWrapper(new Mat(1, 1, MatType.CV_8UC1, Scalar.All(128)));
+        nodeOutput["Matrix"] = mat;
+        nodeOutput["Wrapper"] = wrapper;
+        for (var index = 0; index < 10_000; index++)
+        {
+            nodeOutput[$"ZField{index:D05}"] = new string('z', 8_000);
+        }
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 5,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = nodeOutput
+                    },
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Adversarial",
+                            IsSuccess = true,
+                            ExecutionOrder = 0
+                        }
+                    ]
+                }));
+        });
+
+        var stopwatch = Stopwatch.StartNew();
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Adversarial", OperatorType.Thresholding))
+        });
+        stopwatch.Stop();
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+        ((CountingInfiniteEnumerable)nodeOutput["Objects"]).MoveNextCount.Should().Be(0);
+        ((ThrowingEnumerable)nodeOutput["ThrowingEnumerable"]).GetEnumeratorCallCount.Should().Be(0);
+
+        using var document = JsonDocument.Parse(payload);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("Score").GetDouble().Should().BeApproximately(0.95d, 0.001d);
+        outputData.GetProperty("Seen").GetInt64().Should().Be(7L);
+        outputData.GetProperty("ThrowingToString").GetProperty("kind").GetString().Should().Be("object");
+        outputData.GetProperty("ThrowingGetter").GetProperty("kind").GetString().Should().Be("object");
+        outputData.GetProperty("ThrowingEnumerable").GetProperty("kind").GetString().Should().Be("unsupportedEnumerable");
+        outputData.GetProperty("Objects").GetProperty("kind").GetString().Should().Be("unsupportedEnumerable");
+        outputData.GetProperty("Matrix").GetProperty("kind").GetString().Should().Be("matrix");
+        outputData.GetProperty("Wrapper").GetProperty("kind").GetString().Should().Be("image");
+        outputData.GetProperty("Bytes").GetProperty("kind").GetString().Should().Be("binary");
+        outputData.GetProperty("Nan").GetProperty("kind").GetString().Should().Be("nonFiniteNumber");
+        outputData.GetProperty("Infinity").GetProperty("kind").GetString().Should().Be("nonFiniteNumber");
+
+        document.RootElement.GetProperty("metrics").GetProperty("diagnostics").EnumerateArray()
+            .Select(item => item.GetString())
+            .Should().Contain("PreviewMetricsUnsupportedEnumerable");
+        var observation = document.RootElement.GetProperty("observation");
+        Encoding.UTF8.GetByteCount(observation.GetProperty("detail").GetRawText())
+            .Should().BeLessThanOrEqualTo(ExecutionObservationProjector.MaxDetailBytes);
+        observation.GetProperty("diagnostics").EnumerateArray()
+            .Select(item => item.GetProperty("code").GetString())
+            .Should().NotContain("getter-error");
     }
 
     [Fact]
@@ -1831,6 +1930,36 @@ public class PreviewNodeEndpointsTests
         public int Safe => 1;
 
         public int Explodes => throw new InvalidOperationException("getter failed");
+    }
+
+    private sealed class ThrowingToStringPreviewValue
+    {
+        public override string ToString() => throw new InvalidOperationException("ToString failed");
+    }
+
+    private sealed class ThrowingEnumerable : IEnumerable
+    {
+        public int GetEnumeratorCallCount { get; private set; }
+
+        public IEnumerator GetEnumerator()
+        {
+            GetEnumeratorCallCount++;
+            throw new InvalidOperationException("enumeration failed");
+        }
+    }
+
+    private sealed class CountingInfiniteEnumerable : IEnumerable
+    {
+        public int MoveNextCount { get; private set; }
+
+        public IEnumerator GetEnumerator()
+        {
+            while (true)
+            {
+                MoveNextCount++;
+                yield return MoveNextCount;
+            }
+        }
     }
 
     private sealed class PreviewNodeTestHost : IAsyncDisposable
