@@ -8,6 +8,62 @@ import {
     translateRect
 } from '../../features/flow-editor/roiGeometry.mjs';
 
+function createLegacyOverlayId() {
+    return `overlay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function normalizeOverlayNumber(value, fallback = 0) {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function compareOverlayOrder(left, right) {
+    const layerCompare = String(left.layer || '').localeCompare(String(right.layer || ''), 'en', { sensitivity: 'case' });
+    if (layerCompare !== 0) {
+        return layerCompare;
+    }
+
+    const zCompare = normalizeOverlayNumber(left.zOrder) - normalizeOverlayNumber(right.zOrder);
+    if (zCompare !== 0) {
+        return zCompare;
+    }
+
+    return String(left.id || '').localeCompare(String(right.id || ''), 'en', { sensitivity: 'case' });
+}
+
+export function buildOverlayRenderCommands(overlays = []) {
+    return overlays
+        .filter(overlay => overlay?.visible !== false)
+        .slice()
+        .sort(compareOverlayOrder)
+        .map(overlay => ({
+            id: overlay.id,
+            type: overlay.type,
+            layer: overlay.layer || 'default',
+            zOrder: normalizeOverlayNumber(overlay.zOrder),
+            x: normalizeOverlayNumber(overlay.x),
+            y: normalizeOverlayNumber(overlay.y),
+            width: normalizeOverlayNumber(overlay.width),
+            height: normalizeOverlayNumber(overlay.height),
+            radius: normalizeOverlayNumber(overlay.radius, 0),
+            points: Array.isArray(overlay.points)
+                ? overlay.points
+                    .map(point => ({
+                        x: normalizeOverlayNumber(point?.x),
+                        y: normalizeOverlayNumber(point?.y)
+                    }))
+                    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+                : [],
+            color: overlay.color || '#ff0000',
+            lineWidth: normalizeOverlayNumber(overlay.lineWidth, 2),
+            fill: overlay.fill === true,
+            fillColor: overlay.fillColor || 'rgba(255, 0, 0, 0.2)',
+            text: overlay.text || '',
+            fontSize: normalizeOverlayNumber(overlay.fontSize, 14),
+            overlay
+        }));
+}
+
 /**
  * 图像画布渲染器
  * 支持图像显示、缩放、平移、标注
@@ -340,8 +396,11 @@ class ImageCanvas {
      * 添加标注
      */
     addOverlay(type, x, y, width, height, options = {}) {
+        const stableId = typeof options.id === 'string' && options.id.trim()
+            ? options.id.trim()
+            : null;
         const overlay = {
-            id: `overlay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: stableId || createLegacyOverlayId(),
             type, // 'rectangle', 'circle', 'polygon', 'text'
             x, y, width, height,
             color: options.color || '#ff0000',
@@ -349,13 +408,65 @@ class ImageCanvas {
             fill: options.fill || false,
             fillColor: options.fillColor || 'rgba(255, 0, 0, 0.2)',
             text: options.text || '',
-            visible: true,
+            visible: options.visible ?? true,
+            selectable: options.selectable ?? true,
+            readOnly: options.readOnly ?? false,
+            groupId: options.groupId || null,
+            layer: options.layer || 'default',
+            zOrder: normalizeOverlayNumber(options.zOrder),
             ...options
         };
+        overlay.id = stableId || overlay.id || createLegacyOverlayId();
+        overlay.visible = options.visible ?? overlay.visible ?? true;
+        overlay.selectable = options.selectable ?? overlay.selectable ?? true;
+        overlay.readOnly = options.readOnly ?? overlay.readOnly ?? false;
+        overlay.groupId = options.groupId || overlay.groupId || null;
+        overlay.layer = options.layer || overlay.layer || 'default';
+        overlay.zOrder = normalizeOverlayNumber(options.zOrder ?? overlay.zOrder);
         
         this.overlays.push(overlay);
         this.invalidate();
         return overlay;
+    }
+
+    setOverlayGroup(groupId, overlays = []) {
+        if (!groupId) {
+            return [];
+        }
+
+        const selectedOverlay = this.selectedOverlay;
+        this.overlays = this.overlays.filter(overlay => overlay.groupId !== groupId);
+        const added = overlays.map(overlay => this.addOverlay(
+            overlay.type,
+            overlay.x,
+            overlay.y,
+            overlay.width,
+            overlay.height,
+            {
+                ...overlay,
+                groupId
+            }
+        ));
+
+        if (selectedOverlay && !this.overlays.some(overlay => overlay.id === selectedOverlay)) {
+            this.selectedOverlay = null;
+        }
+
+        this.invalidate();
+        return added;
+    }
+
+    clearOverlayGroup(groupId) {
+        if (!groupId) {
+            return;
+        }
+
+        const selectedOverlay = this.selectedOverlay;
+        this.overlays = this.overlays.filter(overlay => overlay.groupId !== groupId);
+        if (selectedOverlay && !this.overlays.some(overlay => overlay.id === selectedOverlay)) {
+            this.selectedOverlay = null;
+        }
+        this.invalidate();
     }
 
     setInteractionMode(mode) {
@@ -459,68 +570,113 @@ class ImageCanvas {
         this.ctx.translate(this.offset.x, this.offset.y);
         this.ctx.scale(this.scale, this.scale);
         
-        this.overlays.forEach(overlay => {
-            if (!overlay.visible) return;
-            
-            this.ctx.strokeStyle = overlay.color;
-            this.ctx.lineWidth = overlay.lineWidth / this.scale; // 保持线宽恒定
-            this.ctx.fillStyle = overlay.fillColor;
-            
-            switch (overlay.type) {
-                case 'rectangle':
-                    this.ctx.beginPath();
-                    this.ctx.rect(overlay.x, overlay.y, overlay.width, overlay.height);
-                    if (overlay.fill) {
-                        this.ctx.fill();
-                    }
-                    this.ctx.stroke();
-                    
-                    // 绘制标签文本
-                    if (overlay.text) {
-                        this.ctx.fillStyle = overlay.color;
-                        this.ctx.font = '14px sans-serif';
-                        this.ctx.textBaseline = 'bottom';
-                        this.ctx.fillText(overlay.text, overlay.x, overlay.y - 2);
-                    }
-                    break;
-                    
-                case 'circle':
-                    this.ctx.beginPath();
-                    this.ctx.arc(
-                        overlay.x + overlay.width / 2,
-                        overlay.y + overlay.height / 2,
-                        Math.min(overlay.width, overlay.height) / 2,
-                        0,
-                        Math.PI * 2
-                    );
-                    if (overlay.fill) {
-                        this.ctx.fill();
-                    }
-                    this.ctx.stroke();
-                    break;
-                    
-                case 'text':
-                    this.ctx.fillStyle = overlay.color;
-                    this.ctx.font = `${overlay.fontSize || 14}px sans-serif`;
-                    this.ctx.fillText(overlay.text, overlay.x, overlay.y);
-                    break;
-            }
-            
-            // 绘制选中高亮
-            if (overlay.id === this.selectedOverlay) {
-                this.ctx.strokeStyle = '#1890ff';
-                this.ctx.lineWidth = 3 / this.scale;
-                this.ctx.setLineDash([5 / this.scale, 5 / this.scale]);
-                this.ctx.strokeRect(overlay.x - 5, overlay.y - 5, overlay.width + 10, overlay.height + 10);
-                this.ctx.setLineDash([]);
-
-                if (this.interactionMode === 'roi-rect' && overlay.type === 'rectangle' && overlay.editable) {
-                    this.drawResizeHandles(overlay);
-                }
+        buildOverlayRenderCommands(this.overlays).forEach(command => {
+            try {
+                this.drawOverlayCommand(command);
+            } catch (error) {
+                command.overlay.visible = false;
             }
         });
         
         this.ctx.restore();
+    }
+
+    drawOverlayCommand(command) {
+        const overlay = command.overlay;
+        this.ctx.strokeStyle = command.color;
+        this.ctx.lineWidth = command.lineWidth / this.scale; // 保持线宽恒定
+        this.ctx.fillStyle = command.fillColor;
+
+        switch (command.type) {
+            case 'rectangle':
+                this.ctx.beginPath();
+                this.ctx.rect(command.x, command.y, command.width, command.height);
+                if (command.fill) {
+                    this.ctx.fill();
+                }
+                this.ctx.stroke();
+
+                if (command.text) {
+                    this.ctx.fillStyle = command.color;
+                    this.ctx.font = '14px sans-serif';
+                    this.ctx.textBaseline = 'bottom';
+                    this.ctx.fillText(command.text, command.x, command.y - 2);
+                }
+                break;
+
+            case 'circle': {
+                const radius = command.radius > 0
+                    ? command.radius
+                    : Math.min(command.width, command.height) / 2;
+                const centerX = command.radius > 0 ? command.x : command.x + command.width / 2;
+                const centerY = command.radius > 0 ? command.y : command.y + command.height / 2;
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                if (command.fill) {
+                    this.ctx.fill();
+                }
+                this.ctx.stroke();
+                break;
+            }
+
+            case 'point': {
+                const radius = command.radius > 0 ? command.radius : 4;
+                this.ctx.beginPath();
+                this.ctx.arc(command.x, command.y, radius, 0, Math.PI * 2);
+                if (command.fill) {
+                    this.ctx.fill();
+                }
+                this.ctx.stroke();
+                break;
+            }
+
+            case 'polyline':
+            case 'polygon':
+                if (command.points.length < 2) {
+                    break;
+                }
+                this.ctx.beginPath();
+                this.ctx.moveTo(command.points[0].x, command.points[0].y);
+                command.points.slice(1).forEach(point => this.ctx.lineTo(point.x, point.y));
+                if (command.type === 'polygon') {
+                    this.ctx.closePath();
+                    if (command.fill) {
+                        this.ctx.fill();
+                    }
+                }
+                this.ctx.stroke();
+                break;
+
+            case 'text':
+                this.ctx.fillStyle = command.color;
+                this.ctx.font = `${command.fontSize}px sans-serif`;
+                this.ctx.fillText(command.text, command.x, command.y);
+                break;
+
+            default:
+                break;
+        }
+
+        if (overlay.id === this.selectedOverlay) {
+            this.drawOverlaySelection(overlay, command);
+        }
+    }
+
+    drawOverlaySelection(overlay, command) {
+        const bounds = this.getOverlayBounds(overlay, command);
+        if (!bounds) {
+            return;
+        }
+
+        this.ctx.strokeStyle = '#1890ff';
+        this.ctx.lineWidth = 3 / this.scale;
+        this.ctx.setLineDash([5 / this.scale, 5 / this.scale]);
+        this.ctx.strokeRect(bounds.x - 5, bounds.y - 5, bounds.width + 10, bounds.height + 10);
+        this.ctx.setLineDash([]);
+
+        if (this.interactionMode === 'roi-rect' && overlay.type === 'rectangle' && overlay.editable) {
+            this.drawResizeHandles(overlay);
+        }
     }
 
     /**
@@ -599,12 +755,15 @@ class ImageCanvas {
         const y = (e.clientY - rect.top - this.offset.y) / this.scale;
         
         // 检查是否点击了标注
-        for (let i = this.overlays.length - 1; i >= 0; i--) {
-            const overlay = this.overlays[i];
-            if (x >= overlay.x && x <= overlay.x + overlay.width &&
-                y >= overlay.y && y <= overlay.y + overlay.height) {
+        const ordered = buildOverlayRenderCommands(this.overlays);
+        for (let i = ordered.length - 1; i >= 0; i--) {
+            const overlay = ordered[i].overlay;
+            if (!this.isOverlayInteractive(overlay)) {
+                continue;
+            }
+            if (this.hitTestOverlay({ x, y }, overlay)) {
                 this.selectedOverlay = overlay.id;
-                this.isDragging = true;
+                this.isDragging = !overlay.readOnly;
                 this.dragStart = { x: x - overlay.x, y: y - overlay.y };
                 this.invalidate();
                 return;
@@ -635,7 +794,7 @@ class ImageCanvas {
             if (this.selectedOverlay) {
                 // 拖拽标注
                 const overlay = this.overlays.find(o => o.id === this.selectedOverlay);
-                if (overlay) {
+                if (overlay && !overlay.readOnly) {
                     overlay.x = x - this.dragStart.x;
                     overlay.y = y - this.dragStart.y;
                 }
@@ -796,10 +955,66 @@ class ImageCanvas {
             return false;
         }
 
-        return imagePoint.x >= overlay.x &&
-            imagePoint.x <= overlay.x + overlay.width &&
-            imagePoint.y >= overlay.y &&
-            imagePoint.y <= overlay.y + overlay.height;
+        const bounds = this.getOverlayBounds(overlay);
+        return Boolean(bounds) &&
+            imagePoint.x >= bounds.x &&
+            imagePoint.x <= bounds.x + bounds.width &&
+            imagePoint.y >= bounds.y &&
+            imagePoint.y <= bounds.y + bounds.height;
+    }
+
+    isOverlayInteractive(overlay) {
+        return overlay?.visible !== false &&
+            overlay?.selectable !== false;
+    }
+
+    getOverlayBounds(overlay, command = null) {
+        if (!overlay) {
+            return null;
+        }
+
+        const type = command?.type || overlay.type;
+        if (type === 'point') {
+            const radius = normalizeOverlayNumber(command?.radius ?? overlay.radius, 4);
+            return {
+                x: normalizeOverlayNumber(command?.x ?? overlay.x) - radius,
+                y: normalizeOverlayNumber(command?.y ?? overlay.y) - radius,
+                width: radius * 2,
+                height: radius * 2
+            };
+        }
+
+        if (type === 'circle' && normalizeOverlayNumber(command?.radius ?? overlay.radius, 0) > 0) {
+            const radius = normalizeOverlayNumber(command?.radius ?? overlay.radius, 0);
+            return {
+                x: normalizeOverlayNumber(command?.x ?? overlay.x) - radius,
+                y: normalizeOverlayNumber(command?.y ?? overlay.y) - radius,
+                width: radius * 2,
+                height: radius * 2
+            };
+        }
+
+        if ((type === 'polyline' || type === 'polygon') && Array.isArray(overlay.points) && overlay.points.length > 0) {
+            const xs = overlay.points.map(point => normalizeOverlayNumber(point?.x));
+            const ys = overlay.points.map(point => normalizeOverlayNumber(point?.y));
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            return {
+                x: minX,
+                y: minY,
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY)
+            };
+        }
+
+        return {
+            x: normalizeOverlayNumber(command?.x ?? overlay.x),
+            y: normalizeOverlayNumber(command?.y ?? overlay.y),
+            width: Math.max(1, normalizeOverlayNumber(command?.width ?? overlay.width)),
+            height: Math.max(1, normalizeOverlayNumber(command?.height ?? overlay.height))
+        };
     }
 
     emitOverlayChanged(overlay, phase) {

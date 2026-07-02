@@ -50,10 +50,10 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G08`
-- 当前卡片：`docs/进行中/Studio2/goals/G08.md`
-- 当前阶段：`Observation`
-- 总状态：`READY`
+- 当前 Goal：`G09A`
+- 当前卡片：`docs/进行中/Studio2/goals/G09A.md`
+- 当前阶段：`Geometry/Spatial`
+- 总状态：`IN_PROGRESS`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
 - G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
@@ -96,8 +96,8 @@
 | G06 | Observation | 节点预览结果检查器 MVP | DONE | G05B | `docs/进行中/Studio2/goals/G06.md` | 见 G06 follow-up 完成提交与最终报告 |
 | G07A | Observation | Canonical ResultPath 解析器 | DONE | G06 | `docs/进行中/Studio2/goals/G07A.md` | 见 G07A follow-up 完成提交与最终报告 |
 | G07B | Observation | 字段级全局变量绑定 V1 | DONE | G07A | `docs/进行中/Studio2/goals/G07B.md` | 见 G07B final follow-up 完成提交与最终报告 |
-| G08 | Observation | Visual Scene V1（只读投影） | READY | G07B | `docs/进行中/Studio2/goals/G08.md` |  |
-| G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | LOCKED | G08 | `docs/进行中/Studio2/goals/G09A.md` |  |
+| G08 | Observation | Visual Scene V1（只读投影） | DONE | G07B | `docs/进行中/Studio2/goals/G08.md` | 见 G08 完成提交与最终报告 |
+| G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | IN_PROGRESS | G08 | `docs/进行中/Studio2/goals/G09A.md` |  |
 | G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | LOCKED | G09A | `docs/进行中/Studio2/goals/G09B.md` |  |
 | G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | LOCKED | G09B | `docs/进行中/Studio2/goals/G09C.md` |  |
 | G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | LOCKED | G09C | `docs/进行中/Studio2/goals/G10A.md` |  |

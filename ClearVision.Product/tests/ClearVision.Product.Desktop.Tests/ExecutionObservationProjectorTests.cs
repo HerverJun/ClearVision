@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Text.Json;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Observation;
@@ -479,9 +480,130 @@ public sealed class ExecutionObservationProjectorTests
         jsonBytes.Length.Should().BeLessThanOrEqualTo(ExecutionObservationProjector.MaxLegacyOutputBytes);
     }
 
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectRoiRectangleVisualSceneFromParameters()
+    {
+        var targetOperator = CreateOperator(OperatorType.RoiManager, [
+            new Parameter(Guid.NewGuid(), "Shape", "Shape", string.Empty, "enum", "Rectangle"),
+            new Parameter(Guid.NewGuid(), "X", "X", string.Empty, "int", 12),
+            new Parameter(Guid.NewGuid(), "Y", "Y", string.Empty, "int", 14),
+            new Parameter(Guid.NewGuid(), "Width", "Width", string.Empty, "int", 80),
+            new Parameter(Guid.NewGuid(), "Height", "Height", string.Empty, "int", 40)
+        ]);
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 640,
+                ["Height"] = 480
+            },
+            targetOperator: targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.SchemaVersion.Should().Be("visual-scene.v1");
+        scene.CoordinateSpace.Should().Be("image.pixel");
+        scene.ImageWidth.Should().Be(640);
+        scene.ImageHeight.Should().Be(480);
+        scene.Primitives.Should().ContainSingle().Which.Should().Match<ExecutionVisualScenePrimitiveV1>(primitive =>
+            primitive.Kind == "rectangle" &&
+            primitive.Layer == "roi" &&
+            primitive.Geometry.X == 12 &&
+            primitive.Geometry.Y == 14 &&
+            primitive.Geometry.Width == 80 &&
+            primitive.Geometry.Height == 40 &&
+            primitive.ResultPath == null);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectCircleSceneWithCanonicalRadiusMapping()
+    {
+        var radiusPortId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Center"] = new Position(50, 60),
+                ["Radius"] = 12.5d,
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = radiusPortId, Name = "Radius" }
+            ],
+            targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        var circle = scene.Primitives.Should().ContainSingle(primitive => primitive.Kind == "circle").Subject;
+        circle.PrimitiveId.Should().Be("circle:primary");
+        circle.Geometry.CenterX.Should().Be(50);
+        circle.Geometry.CenterY.Should().Be(60);
+        circle.Geometry.Radius.Should().Be(12.5d);
+        circle.OutputPortId.Should().Be(radiusPortId);
+        circle.ResultPathVersion.Should().Be(1);
+        circle.ResultPath.Should().Be("$");
+        FindNode(observation.Detail, "Radius")!.OutputPortId.Should().Be(radiusPortId);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectNPointImageSamplesWithoutWorldProjection()
+    {
+        var targetOperator = CreateOperator(OperatorType.NPointCalibration, [
+            new Parameter(
+                Guid.NewGuid(),
+                "PointPairs",
+                "PointPairs",
+                string.Empty,
+                "string",
+                """
+                [
+                  {"ImagePoint":{"X":10,"Y":20},"WorldPoint":{"X":1,"Y":2}},
+                  {"ImageX":30,"ImageY":40,"WorldX":3,"WorldY":4}
+                ]
+                """)
+        ]);
+
+        var observation = CreateObservation(new Dictionary<string, object>(), targetOperator: targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.Primitives.Should().Contain(primitive => primitive.Kind == "polyline");
+        scene.Primitives.Where(primitive => primitive.Kind == "point").Should().HaveCount(2);
+        scene.Primitives.Where(primitive => primitive.Kind == "text").Should().HaveCount(2);
+        scene.Primitives.Should().OnlyContain(primitive =>
+            primitive.ResultPath == null && primitive.OutputPortId == null);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldFailSoftAndTruncateInvalidVisualScenePrimitives()
+    {
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var circles = Enumerable.Range(0, ExecutionVisualSceneProjector.MaxPrimitives + 20)
+            .Select(index => new CircleData(index + 1, index + 2, 5))
+            .ToList();
+        circles.Insert(0, new CircleData(10, 10, -1));
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["CircleDataList"] = circles
+            },
+            targetOperator: targetOperator);
+
+        observation.Outcome.Success.Should().BeTrue();
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.Primitives.Count.Should().Be(ExecutionVisualSceneProjector.MaxPrimitives);
+        scene.Truncated.Should().BeTrue();
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-geometry-invalid");
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-primitive-limit");
+    }
+
     private static ExecutionObservationEnvelopeV1 CreateObservation(
         IReadOnlyDictionary<string, object> outputData,
-        IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts = null)
+        IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts = null,
+        Operator? targetOperator = null)
     {
         return ExecutionObservationProjector.CreatePreviewObservation(new ExecutionObservationPreviewInput
         {
@@ -495,8 +617,20 @@ public sealed class ExecutionObservationProjectorTests
             ExecutedOperatorCount = 1,
             OutputData = outputData,
             OutputPorts = outputPorts ?? [],
+            TargetOperator = targetOperator,
             ObservedAtUtc = DateTimeOffset.Parse("2026-07-02T01:02:03Z")
         });
+    }
+
+    private static Operator CreateOperator(OperatorType type, IEnumerable<Parameter> parameters)
+    {
+        var @operator = new Operator(Guid.Parse("22222222-2222-2222-2222-222222222222"), type.ToString(), type, 0, 0);
+        foreach (var parameter in parameters)
+        {
+            @operator.AddParameter(parameter);
+        }
+
+        return @operator;
     }
 
     private static ExecutionObservationDetailNodeV1? FindNode(ExecutionObservationDetailNodeV1 root, string name)

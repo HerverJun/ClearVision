@@ -1129,6 +1129,7 @@ public static class PreviewNodeEndpoints
         bool? successOverride = null,
         string? errorMessageOverride = null)
     {
+        var targetOperator = flow.Operators.FirstOrDefault(item => item.Id == request.TargetNodeId);
         return ExecutionObservationProjector.CreatePreviewObservation(new ExecutionObservationPreviewInput
         {
             ProjectId = request.ProjectId,
@@ -1144,15 +1145,15 @@ public static class PreviewNodeEndpoints
             FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
             ExecutedOperatorCount = result.DebugOperatorResults.Count,
             OutputData = outputData,
-            OutputPorts = flow.Operators
-                .FirstOrDefault(item => item.Id == request.TargetNodeId)?
+            OutputPorts = targetOperator?
                 .OutputPorts
                 .Select(port => new ExecutionObservationOutputPortV1
                 {
                     Id = port.Id,
                     Name = port.Name
                 })
-                .ToList() ?? []
+                .ToList() ?? [],
+            TargetOperator = targetOperator
         });
     }
 

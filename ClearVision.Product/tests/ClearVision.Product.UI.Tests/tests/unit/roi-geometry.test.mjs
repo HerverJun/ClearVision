@@ -13,6 +13,10 @@ import {
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiGeometry.mjs';
 import { getOperatorRoiConfig } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiEditorSupport.mjs';
 import RoiEditorPanel from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiEditorPanel.js';
+import {
+  ImageCanvas,
+  buildOverlayRenderCommands
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js';
 
 test('normalizeRectFromPoints handles reverse drag direction', () => {
   assert.deepEqual(
@@ -127,4 +131,66 @@ test('refreshFromOperator re-applies ROI state instead of only syncing the old o
   await RoiEditorPanel.prototype.refreshFromOperator.call(panel);
 
   assert.equal(panel.currentConfig.editable, true);
+});
+
+test('ImageCanvas addOverlay accepts stable ids while preserving legacy generated ids', () => {
+  const canvas = {
+    overlays: [],
+    invalidate() {
+      this.invalidated = true;
+    }
+  };
+
+  const stable = ImageCanvas.prototype.addOverlay.call(canvas, 'rectangle', 1, 2, 3, 4, {
+    id: 'scene-rect',
+    groupId: 'scene',
+    readOnly: true,
+    selectable: false,
+    layer: 'roi',
+    zOrder: 5
+  });
+  const legacy = ImageCanvas.prototype.addOverlay.call(canvas, 'circle', 5, 6, 7, 8);
+
+  assert.equal(stable.id, 'scene-rect');
+  assert.equal(stable.groupId, 'scene');
+  assert.equal(stable.readOnly, true);
+  assert.equal(stable.selectable, false);
+  assert.match(legacy.id, /^overlay_/);
+  assert.equal(canvas.invalidated, true);
+});
+
+test('ImageCanvas overlay groups update scene overlays without clearing editable ROI overlays', () => {
+  const canvas = {
+    overlays: [
+      { id: 'editable-roi', type: 'rectangle', editable: true, x: 1, y: 1, width: 10, height: 10 }
+    ],
+    selectedOverlay: 'editable-roi',
+    addOverlay: ImageCanvas.prototype.addOverlay,
+    invalidate() {
+      this.invalidated = true;
+    }
+  };
+
+  const added = ImageCanvas.prototype.setOverlayGroup.call(canvas, 'scene', [
+    { id: 'scene-circle', type: 'circle', x: 20, y: 20, width: 10, height: 10, readOnly: true }
+  ]);
+
+  assert.equal(added.length, 1);
+  assert.ok(canvas.overlays.some(overlay => overlay.id === 'editable-roi'));
+  assert.ok(canvas.overlays.some(overlay => overlay.id === 'scene-circle'));
+  assert.equal(canvas.selectedOverlay, 'editable-roi');
+
+  ImageCanvas.prototype.clearOverlayGroup.call(canvas, 'scene');
+  assert.deepEqual(canvas.overlays.map(overlay => overlay.id), ['editable-roi']);
+});
+
+test('ImageCanvas render commands sort by layer zOrder and stable id', () => {
+  const commands = buildOverlayRenderCommands([
+    { id: 'b', type: 'rectangle', layer: 'scene', zOrder: 2, visible: true, x: 0, y: 0, width: 1, height: 1 },
+    { id: 'roi', type: 'rectangle', layer: 'roi', zOrder: 1, visible: true, x: 0, y: 0, width: 1, height: 1 },
+    { id: 'a', type: 'circle', layer: 'scene', zOrder: 2, visible: true, x: 0, y: 0, width: 1, height: 1 },
+    { id: 'hidden', type: 'point', layer: 'scene', zOrder: 0, visible: false, x: 0, y: 0 }
+  ]);
+
+  assert.deepEqual(commands.map(command => command.id), ['roi', 'a', 'b']);
 });

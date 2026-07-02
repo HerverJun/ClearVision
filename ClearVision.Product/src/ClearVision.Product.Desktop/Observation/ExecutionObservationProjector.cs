@@ -48,6 +48,7 @@ public static class ExecutionObservationProjector
         var detail = ProjectDetailNode(rootValue, PathInfo.Root, null, 0, addressableCandidate: false, context);
         detail = EnforceDetailByteBudget(detail, context);
         var summary = BuildSummary(detail);
+        var visualScene = CreateVisualScene(input);
 
         return new ExecutionObservationEnvelopeV1
         {
@@ -75,8 +76,36 @@ public static class ExecutionObservationProjector
             Detail = detail,
             Diagnostics = context.Diagnostics,
             Limits = new ExecutionObservationLimitsV1(),
-            Truncated = context.Truncated || detail.Truncated
+            Truncated = context.Truncated || detail.Truncated,
+            VisualScene = visualScene
         };
+    }
+
+    private static ExecutionVisualSceneV1 CreateVisualScene(ExecutionObservationPreviewInput input)
+    {
+        try
+        {
+            return ExecutionVisualSceneProjector.Create(new ExecutionVisualSceneInput
+            {
+                TargetOperator = input.TargetOperator,
+                OutputData = input.OutputData,
+                OutputPorts = input.OutputPorts
+            });
+        }
+        catch (Exception ex)
+        {
+            return new ExecutionVisualSceneV1
+            {
+                Diagnostics =
+                [
+                    new ExecutionVisualSceneDiagnosticV1
+                    {
+                        Code = "visual-scene-projector-error",
+                        Message = $"Scene projection failed: {ClipForDisplay(ex.GetBaseException().Message)}"
+                    }
+                ]
+            };
+        }
     }
 
     public static Dictionary<string, object> BuildLegacyOutputData(

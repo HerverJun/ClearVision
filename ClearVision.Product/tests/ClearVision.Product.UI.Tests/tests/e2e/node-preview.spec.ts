@@ -681,6 +681,104 @@ test.describe('Node Preview Inspector flag', () => {
     await expect(page.locator('.gv-manager')).toContainText('$["Score"]');
   });
 
+  test('renders visual scene circle primitive and links it to the Radius field', async ({ page }) => {
+    let outputPortId = '';
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      while (!outputPortId) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      const response: any = buildObservationResponse(request, {
+        kind: 'dictionary',
+        displayValue: '1/1 fields',
+        originalType: 'System.Collections.Generic.Dictionary',
+        pathHint: '$',
+        addressable: false,
+        truncated: false,
+        children: [{
+          kind: 'number',
+          displayValue: '12.5',
+          originalType: 'System.Double',
+          name: 'Radius',
+          pathHint: '$["Radius"]',
+          addressable: true,
+          truncated: false,
+          outputPortId,
+          outputPortName: 'Radius',
+          resultPathVersion: 1,
+          resultPath: '$',
+          bindableVariableTypes: ['Double'],
+          children: [],
+        }],
+      }, []);
+      response.inputImageBase64 = PNG_BASE64;
+      response.observation.visualScene = {
+        schemaVersion: 'visual-scene.v1',
+        coordinateSpace: 'image.pixel',
+        imageWidth: 32,
+        imageHeight: 32,
+        primitives: [{
+          primitiveId: 'circle:primary',
+          kind: 'circle',
+          layer: 'measurement',
+          zOrder: 10,
+          visible: true,
+          selectable: true,
+          label: 'Circle',
+          geometry: {
+            centerX: 16,
+            centerY: 16,
+            radius: 8,
+          },
+          style: {
+            stroke: '#16a34a',
+            fill: 'rgba(22,163,74,0.10)',
+            strokeWidth: 2,
+          },
+          outputPortId,
+          resultPathVersion: 1,
+          resultPath: '$',
+        }],
+        diagnostics: [],
+        truncated: false,
+      };
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
+    });
+
+    const nodeId = await addAndSelectNode(page, {
+      type: 'CircleMeasurement',
+      title: 'Circle Scene Node',
+      outputs: [{ name: 'Radius', type: 'Float' }],
+    });
+    outputPortId = await page.evaluate(selectedNodeId => {
+      const flowCanvas = (window as any).flowCanvas;
+      return flowCanvas.nodes.get(selectedNodeId)?.outputs?.[0]?.id || '';
+    }, nodeId);
+
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Scene' }).click();
+
+    await expect(page.locator('.node-preview-inspector-scene-row', { hasText: 'Circle' })).toBeVisible();
+    await expect(page.locator('.node-preview-inspector-scene-canvas')).toBeVisible();
+    await expect.poll(async () => page.locator('.node-preview-inspector-scene-canvas').evaluate(canvas =>
+      (canvas as HTMLCanvasElement).width > 0 && (canvas as HTMLCanvasElement).height > 0
+    )).toBe(true);
+
+    await page.locator('.node-preview-inspector-scene-row', { hasText: 'Circle' }).locator('button').click();
+    const selection = await page.evaluate(() => (window as any).nodePreviewSelectionStore.getSelection());
+    expect(selection.outputPortId).toBe(outputPortId);
+    expect(selection.resultPathVersion).toBe(1);
+    expect(selection.resultPath).toBe('$');
+    expect(selection.pathHint).toBe('$["Radius"]');
+  });
+
   test('does not save when flowRevision changes while the field variable chooser is open', async ({ page }) => {
     let outputPortId = '';
     let putCount = 0;

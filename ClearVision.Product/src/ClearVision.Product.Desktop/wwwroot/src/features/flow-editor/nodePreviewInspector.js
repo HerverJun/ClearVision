@@ -2,6 +2,7 @@ import {
     getNodePreviewIdentitySignature,
     normalizeNodePreviewIdentity
 } from './nodePreviewSelectionStore.js';
+import ImageCanvas from '../../core/canvas/imageCanvas.js';
 
 const DEFAULT_ROW_LIMIT = 80;
 const ROW_LIMIT_INCREMENT = 80;
@@ -95,6 +96,11 @@ function getObservationLimits(observation) {
 function getObservationDetail(observation) {
     const detail = readOwn(observation, 'detail', 'Detail');
     return detail && typeof detail === 'object' ? detail : null;
+}
+
+function getObservationVisualScene(observation) {
+    const scene = readOwn(observation, 'visualScene', 'VisualScene');
+    return scene && typeof scene === 'object' ? scene : null;
 }
 
 function normalizeArtifactReference(artifact) {
@@ -498,6 +504,74 @@ function getPrimaryImageSource(state, artifact = null) {
     return null;
 }
 
+function normalizeImageSourceForCanvas(source) {
+    if (!source || typeof source !== 'string') {
+        return null;
+    }
+
+    const trimmed = source.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (/^(data:|blob:|https?:|\/)/i.test(trimmed)) {
+        return trimmed;
+    }
+
+    return `data:image/png;base64,${trimmed}`;
+}
+
+function getSceneBaseImageSource(state) {
+    return normalizeImageSourceForCanvas(state?.presenter?.inputImageSrc) ||
+        normalizeImageSourceForCanvas(state?.inputImageBase64) ||
+        normalizeImageSourceForCanvas(state?.outputImageBase64) ||
+        null;
+}
+
+function normalizeScenePrimitive(primitive) {
+    if (!primitive || typeof primitive !== 'object') {
+        return null;
+    }
+
+    const primitiveId = asString(readOwn(primitive, 'primitiveId', 'PrimitiveId')).trim();
+    const kind = asString(readOwn(primitive, 'kind', 'Kind')).trim().toLowerCase();
+    if (!primitiveId || !kind) {
+        return null;
+    }
+
+    const geometry = readOwn(primitive, 'geometry', 'Geometry') || {};
+    const style = readOwn(primitive, 'style', 'Style') || {};
+    const outputPortId = readOwn(primitive, 'outputPortId', 'OutputPortId');
+    const resultPathVersion = readOwn(primitive, 'resultPathVersion', 'ResultPathVersion');
+    const resultPath = readOwn(primitive, 'resultPath', 'ResultPath');
+    return {
+        primitiveId,
+        kind,
+        layer: asString(readOwn(primitive, 'layer', 'Layer'), 'scene'),
+        zOrder: Number(readOwn(primitive, 'zOrder', 'ZOrder') || 0),
+        visible: readOwn(primitive, 'visible', 'Visible') !== false,
+        selectable: readOwn(primitive, 'selectable', 'Selectable') !== false,
+        label: readOwn(primitive, 'label', 'Label') == null ? '' : asString(readOwn(primitive, 'label', 'Label')),
+        geometry,
+        style,
+        outputPortId: outputPortId == null ? null : asString(outputPortId),
+        resultPathVersion: resultPathVersion == null ? null : Number(resultPathVersion),
+        resultPath: resultPath == null ? null : asString(resultPath)
+    };
+}
+
+function normalizeScenePrimitives(scene) {
+    const primitives = readOwn(scene, 'primitives', 'Primitives');
+    return Array.isArray(primitives)
+        ? primitives.map(normalizeScenePrimitive).filter(Boolean)
+        : [];
+}
+
+function normalizeSceneDiagnostics(scene) {
+    const diagnostics = readOwn(scene, 'diagnostics', 'Diagnostics');
+    return Array.isArray(diagnostics) ? diagnostics : [];
+}
+
 function isImageArtifact(artifact) {
     return String(artifact?.contentType || '').toLowerCase().startsWith('image/') ||
         String(artifact?.kind || '').toLowerCase() === 'image';
@@ -602,6 +676,11 @@ export class NodePreviewInspector {
         this.identitySignature = getObservationIdentitySignatureFromState(this.state);
         this.dismissedNodeId = null;
         this.destroyed = false;
+        this.sceneMode = 'scene';
+        this.sceneCanvasId = `node-preview-scene-${Math.random().toString(36).slice(2)}`;
+        this.sceneImageCanvas = null;
+        this.pendingSceneRender = null;
+        this.activeScenePrimitiveId = null;
 
         this.root = createElement('div', 'node-preview-inspector-root');
         this.container?.appendChild(this.root);
@@ -629,6 +708,7 @@ export class NodePreviewInspector {
         this.destroyed = true;
         this.cancelSearch();
         this.cancelArtifactRead();
+        this.destroySceneCanvas();
         this.unsubscribePreview?.();
         this.unsubscribeView?.();
         this.selectionStore?.clear?.();
@@ -650,6 +730,8 @@ export class NodePreviewInspector {
             this.searchQuery = '';
             this.pendingSearchValue = '';
             this.artifactReadState.clear();
+            this.activeScenePrimitiveId = null;
+            this.destroySceneCanvas();
             this.cancelSearch();
             this.cancelArtifactRead();
             this.selectionStore?.clear?.();
@@ -667,6 +749,8 @@ export class NodePreviewInspector {
             return;
         }
 
+        this.destroySceneCanvas();
+        this.pendingSceneRender = null;
         this.root.replaceChildren();
         if (!this.isVisible()) {
             this.root.classList.add('hidden');
@@ -680,6 +764,7 @@ export class NodePreviewInspector {
         card.appendChild(this.renderTabs());
         card.appendChild(this.renderBody());
         this.root.appendChild(card);
+        this.mountSceneCanvasIfNeeded();
         this.updatePosition();
     }
 
@@ -717,6 +802,7 @@ export class NodePreviewInspector {
         [
             ['summary', 'Summary'],
             ['detail', 'Detail'],
+            ['scene', 'Scene'],
             ['artifacts', 'Artifact']
         ].forEach(([tabId, label]) => {
             const button = makeButton('node-preview-inspector-tab', label, () => {
@@ -751,6 +837,8 @@ export class NodePreviewInspector {
 
         if (this.activeTab === 'detail') {
             body.appendChild(this.renderDetail(observation));
+        } else if (this.activeTab === 'scene') {
+            body.appendChild(this.renderScene(observation));
         } else if (this.activeTab === 'artifacts') {
             body.appendChild(this.renderArtifacts());
         } else {
@@ -871,6 +959,237 @@ export class NodePreviewInspector {
         return panel;
     }
 
+    renderScene(observation) {
+        const panel = createElement('div', 'node-preview-inspector-panel scene');
+        const scene = getObservationVisualScene(observation);
+        if (!scene) {
+            panel.appendChild(createElement('div', 'node-preview-inspector-empty-line', '暂无 Scene 投影'));
+            return panel;
+        }
+
+        const primitives = normalizeScenePrimitives(scene);
+        const diagnostics = normalizeSceneDiagnostics(scene);
+        const toolbar = createElement('div', 'node-preview-inspector-scene-toolbar');
+        [
+            ['scene', 'Scene'],
+            ['annotated', 'Annotated PNG']
+        ].forEach(([mode, label]) => {
+            const button = makeButton('node-preview-inspector-action-btn', label, () => {
+                this.sceneMode = mode;
+                this.render();
+            });
+            button.dataset.active = this.sceneMode === mode ? 'true' : 'false';
+            toolbar.appendChild(button);
+        });
+        toolbar.appendChild(createElement('span', 'node-preview-inspector-limit-note', `${primitives.length} primitives`));
+        panel.appendChild(toolbar);
+
+        if (this.sceneMode === 'annotated') {
+            const imageSource = getPrimaryImageSource(this.state);
+            if (imageSource) {
+                const image = createElement('img', 'node-preview-inspector-annotated-image');
+                image.src = imageSource;
+                image.alt = 'Annotated preview';
+                panel.appendChild(image);
+            } else {
+                panel.appendChild(createElement('div', 'node-preview-inspector-empty-line', '暂无标注图像'));
+            }
+        } else {
+            const stage = createElement('div', 'node-preview-inspector-scene-stage');
+            stage.style.height = '280px';
+            stage.style.minHeight = '220px';
+            const canvas = createElement('canvas', 'node-preview-inspector-scene-canvas');
+            canvas.id = this.sceneCanvasId;
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            stage.appendChild(canvas);
+            panel.appendChild(stage);
+            this.pendingSceneRender = {
+                scene,
+                primitives,
+                imageSource: getSceneBaseImageSource(this.state),
+                identitySignature: getObservationIdentitySignatureFromState(this.state)
+            };
+        }
+
+        const list = createElement('div', 'node-preview-inspector-scene-list');
+        if (primitives.length === 0) {
+            list.appendChild(createElement('div', 'node-preview-inspector-empty-line', 'Scene 中没有 primitive'));
+        } else {
+            primitives.slice(0, DEFAULT_ROW_LIMIT).forEach(primitive => {
+                list.appendChild(this.renderScenePrimitiveRow(primitive));
+            });
+            if (primitives.length > DEFAULT_ROW_LIMIT) {
+                list.appendChild(createElement('div', 'node-preview-inspector-limit-note', `仅显示前 ${DEFAULT_ROW_LIMIT} 个 primitive`));
+            }
+        }
+        panel.appendChild(list);
+
+        if (diagnostics.length > 0) {
+            const diagnosticList = createElement('div', 'node-preview-inspector-diagnostics');
+            diagnostics.forEach(item => {
+                const row = createElement('div', 'node-preview-inspector-diagnostic');
+                row.appendChild(createElement('span', 'code', readOwn(item, 'code', 'Code') || 'scene-diagnostic'));
+                row.appendChild(createElement('span', 'message', readOwn(item, 'message', 'Message') || ''));
+                row.appendChild(createElement('span', 'path', readOwn(item, 'primitiveId', 'PrimitiveId') || '-'));
+                diagnosticList.appendChild(row);
+            });
+            panel.appendChild(diagnosticList);
+        }
+
+        return panel;
+    }
+
+    renderScenePrimitiveRow(primitive) {
+        const row = createElement('div', 'node-preview-inspector-scene-row');
+        row.dataset.primitiveId = primitive.primitiveId;
+        row.dataset.active = primitive.primitiveId === this.activeScenePrimitiveId ? 'true' : 'false';
+        const button = makeButton('node-preview-inspector-tree-content', primitive.label || primitive.primitiveId, () => {
+            this.selectScenePrimitive(primitive);
+        });
+        button.appendChild(createElement('span', 'node-preview-inspector-node-kind', primitive.kind));
+        button.appendChild(createElement('span', 'node-preview-inspector-node-path', primitive.resultPath || 'unmapped'));
+        row.appendChild(button);
+        return row;
+    }
+
+    mountSceneCanvasIfNeeded() {
+        const pending = this.pendingSceneRender;
+        if (!pending || this.sceneMode !== 'scene') {
+            return;
+        }
+
+        const canvas = this.root?.querySelector(`#${this.sceneCanvasId}`);
+        if (!canvas) {
+            return;
+        }
+
+        const sceneCanvas = new ImageCanvas(this.sceneCanvasId, { interactionMode: 'legacy' });
+        this.sceneImageCanvas = sceneCanvas;
+        const overlays = pending.primitives
+            .map(primitive => this.scenePrimitiveToOverlay(primitive))
+            .filter(Boolean);
+        const applyOverlays = () => {
+            if (this.destroyed ||
+                this.sceneImageCanvas !== sceneCanvas ||
+                pending.identitySignature !== getObservationIdentitySignatureFromState(this.state)) {
+                sceneCanvas.destroy();
+                return;
+            }
+
+            sceneCanvas.setOverlayGroup('node-preview-scene', overlays);
+            if (this.activeScenePrimitiveId) {
+                sceneCanvas.selectedOverlay = this.activeScenePrimitiveId;
+                sceneCanvas.invalidate();
+            }
+        };
+
+        if (pending.imageSource) {
+            void sceneCanvas.loadImage(pending.imageSource)
+                .then(applyOverlays)
+                .catch(() => {
+                    applyOverlays();
+                });
+        } else {
+            applyOverlays();
+        }
+    }
+
+    destroySceneCanvas() {
+        this.pendingSceneRender = null;
+        this.sceneImageCanvas?.destroy?.();
+        this.sceneImageCanvas = null;
+    }
+
+    scenePrimitiveToOverlay(primitive) {
+        const geometry = primitive.geometry || {};
+        const style = primitive.style || {};
+        const common = {
+            id: primitive.primitiveId,
+            groupId: 'node-preview-scene',
+            layer: primitive.layer,
+            zOrder: primitive.zOrder,
+            visible: primitive.visible,
+            selectable: primitive.selectable,
+            readOnly: true,
+            color: asString(readOwn(style, 'stroke', 'Stroke'), '#16a34a'),
+            fillColor: asString(readOwn(style, 'fill', 'Fill'), 'rgba(22,163,74,0.10)'),
+            lineWidth: Number(readOwn(style, 'strokeWidth', 'StrokeWidth') || 2),
+            fill: Boolean(readOwn(style, 'fill', 'Fill')),
+            text: primitive.label || ''
+        };
+
+        if (primitive.kind === 'rectangle') {
+            return {
+                ...common,
+                type: 'rectangle',
+                x: Number(readOwn(geometry, 'x', 'X') || 0),
+                y: Number(readOwn(geometry, 'y', 'Y') || 0),
+                width: Number(readOwn(geometry, 'width', 'Width') || 0),
+                height: Number(readOwn(geometry, 'height', 'Height') || 0)
+            };
+        }
+
+        if (primitive.kind === 'circle') {
+            const centerX = Number(readOwn(geometry, 'centerX', 'CenterX') || 0);
+            const centerY = Number(readOwn(geometry, 'centerY', 'CenterY') || 0);
+            const radius = Number(readOwn(geometry, 'radius', 'Radius') || 0);
+            return {
+                ...common,
+                type: 'circle',
+                x: centerX,
+                y: centerY,
+                width: radius * 2,
+                height: radius * 2,
+                radius
+            };
+        }
+
+        if (primitive.kind === 'point') {
+            return {
+                ...common,
+                type: 'point',
+                x: Number(readOwn(geometry, 'x', 'X') || 0),
+                y: Number(readOwn(geometry, 'y', 'Y') || 0),
+                radius: Number(readOwn(geometry, 'radius', 'Radius') || 4),
+                fill: true
+            };
+        }
+
+        if (primitive.kind === 'polyline') {
+            const points = readOwn(geometry, 'points', 'Points');
+            return {
+                ...common,
+                type: 'polyline',
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1,
+                points: Array.isArray(points)
+                    ? points.map(point => ({
+                        x: Number(readOwn(point, 'x', 'X') || 0),
+                        y: Number(readOwn(point, 'y', 'Y') || 0)
+                    }))
+                    : []
+            };
+        }
+
+        if (primitive.kind === 'text') {
+            return {
+                ...common,
+                type: 'text',
+                x: Number(readOwn(geometry, 'x', 'X') || 0),
+                y: Number(readOwn(geometry, 'y', 'Y') || 0),
+                width: 1,
+                height: 1,
+                text: asString(readOwn(geometry, 'text', 'Text'), primitive.label || ''),
+                fontSize: Number(readOwn(style, 'fontSize', 'FontSize') || 13)
+            };
+        }
+
+        return null;
+    }
+
     renderDetailRow(row) {
         const rowElement = createElement('div', 'node-preview-inspector-tree-row');
         rowElement.dataset.renderer = row.rendered.renderer;
@@ -939,6 +1258,15 @@ export class NodePreviewInspector {
             return null;
         }
 
+        const scenePrimitive = this.findScenePrimitiveForDescriptor(descriptor);
+        if (scenePrimitive) {
+            this.activeScenePrimitiveId = scenePrimitive.primitiveId;
+            if (this.sceneImageCanvas) {
+                this.sceneImageCanvas.selectedOverlay = scenePrimitive.primitiveId;
+                this.sceneImageCanvas.invalidate();
+            }
+        }
+
         return this.selectionStore?.select?.(descriptor) || descriptor;
     }
 
@@ -1000,6 +1328,71 @@ export class NodePreviewInspector {
         const currentState = this.previewCoordinator?.getState?.() ?? this.state;
         return signature === getObservationIdentitySignatureFromState(currentState) &&
             signature === getObservationIdentitySignatureFromState(this.state);
+    }
+
+    selectScenePrimitive(primitive) {
+        this.activeScenePrimitiveId = primitive?.primitiveId || null;
+        if (this.sceneImageCanvas) {
+            this.sceneImageCanvas.selectedOverlay = this.activeScenePrimitiveId;
+            this.sceneImageCanvas.invalidate();
+        }
+
+        const detailNode = this.findDetailNodeForScenePrimitive(primitive);
+        if (!detailNode) {
+            if (!primitive?.resultPath) {
+                this.selectionStore?.clear?.();
+            }
+            return null;
+        }
+
+        const normalized = normalizeObservationNode(detailNode);
+        const descriptor = this.createSelectionDescriptor({
+            normalized,
+            rendered: nodePreviewRendererRegistry.render(detailNode)
+        });
+        if (!descriptor) {
+            return null;
+        }
+
+        return this.selectionStore?.select?.(descriptor) || descriptor;
+    }
+
+    findScenePrimitiveForDescriptor(descriptor) {
+        if (!descriptor?.outputPortId ||
+            descriptor.resultPathVersion == null ||
+            !descriptor.resultPath) {
+            return null;
+        }
+
+        const scene = getObservationVisualScene(getObservationFromState(this.state));
+        return normalizeScenePrimitives(scene).find(primitive =>
+            primitive.outputPortId === descriptor.outputPortId &&
+            primitive.resultPathVersion === descriptor.resultPathVersion &&
+            primitive.resultPath === descriptor.resultPath) || null;
+    }
+
+    findDetailNodeForScenePrimitive(primitive) {
+        if (!primitive?.outputPortId ||
+            primitive.resultPathVersion == null ||
+            !primitive.resultPath) {
+            return null;
+        }
+
+        const detail = getObservationDetail(getObservationFromState(this.state));
+        const stack = detail ? [detail] : [];
+        while (stack.length > 0) {
+            const node = stack.pop();
+            const normalized = normalizeObservationNode(node);
+            if (normalized.outputPortId === primitive.outputPortId &&
+                normalized.resultPathVersion === primitive.resultPathVersion &&
+                normalized.resultPath === primitive.resultPath) {
+                return node;
+            }
+
+            getNodeChildren(node).forEach(child => stack.push(child));
+        }
+
+        return null;
     }
 
     renderArtifacts() {

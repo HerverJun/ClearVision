@@ -458,6 +458,77 @@ test('NodePreviewInspector disables field binding when coordinator identity beco
   }
 });
 
+test('NodePreviewInspector links detail fields and scene primitives by canonical ResultPath metadata', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const store = createNodePreviewSelectionStore();
+    const radiusNode = node('number', {
+      name: 'Radius',
+      displayValue: '12.5',
+      outputPortId: 'radius-port',
+      outputPortName: 'Radius',
+      resultPathVersion: 1,
+      resultPath: '$',
+      bindableVariableTypes: ['Double']
+    });
+    const scenePrimitive = {
+      primitiveId: 'circle:primary',
+      kind: 'circle',
+      layer: 'measurement',
+      zOrder: 10,
+      visible: true,
+      selectable: true,
+      label: 'Circle',
+      geometry: { centerX: 50, centerY: 60, radius: 12.5 },
+      style: { stroke: '#16a34a', strokeWidth: 2 },
+      outputPortId: 'radius-port',
+      resultPathVersion: 1,
+      resultPath: '$'
+    };
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'CircleMeasurement',
+      title: 'Circle',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [radiusNode]
+        }),
+        visualScene: {
+          schemaVersion: 'visual-scene.v1',
+          coordinateSpace: 'image.pixel',
+          imageWidth: 320,
+          imageHeight: 240,
+          primitives: [scenePrimitive],
+          diagnostics: [],
+          truncated: false
+        }
+      },
+      artifacts: []
+    };
+
+    const { inspector } = createInspectorHarness({ state, selectionStore: store });
+    const row = buildVisibleObservationRows(state.observation.detail, { limit: 5 }).rows[1];
+    const descriptor = inspector.selectDetailRow(row);
+
+    assert.equal(descriptor.resultPath, '$');
+    assert.equal(inspector.activeScenePrimitiveId, 'circle:primary');
+
+    store.clear();
+    inspector.activeScenePrimitiveId = null;
+    const sceneDescriptor = inspector.selectScenePrimitive(scenePrimitive);
+    assert.equal(sceneDescriptor.outputPortId, 'radius-port');
+    assert.equal(store.getSelection().resultPath, '$');
+    assert.equal(inspector.activeScenePrimitiveId, 'circle:primary');
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
 test('NodePreviewInspector does not invoke binding callback for a stale descriptor click', () => {
   const restoreDocument = installFakeDocument();
   try {
