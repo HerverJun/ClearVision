@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T02:22:42.0309360+08:00",
+  "generatedAt": "2026-07-03T02:30:26.7122208+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -5349,6 +5349,12 @@
           "name": "Mask",
           "displayName": "掩膜",
           "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "SpatialContext",
+          "displayName": "空间上下文",
+          "dataType": "Any",
           "isRequired": null
         }
       ],

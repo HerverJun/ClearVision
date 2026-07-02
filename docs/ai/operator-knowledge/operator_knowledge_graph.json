@@ -19104,6 +19104,13 @@
           "DataType": "Image",
           "IsRequired": false,
           "Description": ""
+        },
+        {
+          "Name": "SpatialContext",
+          "DisplayName": "\u7A7A\u95F4\u4E0A\u4E0B\u6587",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
         }
       ],
       "Parameters": [
@@ -37015,6 +37022,15 @@
       "Weight": 1,
       "Metadata": {
         "port": "Image"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "RoiManager",
+      "Target": "Any",
+      "Weight": 1,
+      "Metadata": {
+        "port": "SpatialContext"
       }
     },
     {
