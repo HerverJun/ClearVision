@@ -50,6 +50,7 @@ function createFakeElement(tagName) {
     tagName,
     children: [],
     dataset: {},
+    listeners: {},
     style: {
       setProperty() {}
     },
@@ -67,7 +68,16 @@ function createFakeElement(tagName) {
     remove() {
       this.removed = true;
     },
-    addEventListener() {},
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    },
+    click() {
+      this.listeners.click?.({
+        target: this,
+        preventDefault() {},
+        stopPropagation() {}
+      });
+    },
     setAttribute() {},
     querySelector() {
       return null;
@@ -250,6 +260,11 @@ test('nodePreviewSelectionStore stores complete identity and clears on identity 
     displayValue: '0.98',
     originalType: 'System.Double',
     pathHint: '$["Score"]',
+    outputPortId: 'out-score',
+    outputPortName: 'Score',
+    resultPathVersion: 1,
+    resultPath: '$["Score"]',
+    bindableVariableTypes: ['Double'],
     addressable: false,
     artifact: {
       artifactId: 'artifact-1',
@@ -264,9 +279,36 @@ test('nodePreviewSelectionStore stores complete identity and clears on identity 
 
   assert.equal(selected.identitySignature, getNodePreviewIdentitySignature(identity()));
   assert.equal(selected.addressable, false);
+  assert.equal(selected.outputPortId, 'out-score');
+  assert.equal(selected.resultPathVersion, 1);
+  assert.equal(selected.resultPath, '$["Score"]');
   assert.equal(selected.pathHint, '$["Score"]');
   assert.equal(store.getSelection().artifact.artifactId, 'artifact-1');
 
+  store.clearIfBindingContextChanged({
+    identity: identity(),
+    outputPortId: 'out-score',
+    resultPathVersion: 1,
+    resultPath: '$["Score"]'
+  });
+  assert.notEqual(store.getSelection(), null);
+
+  store.clearIfBindingContextChanged({
+    identity: identity(),
+    outputPortId: 'out-score',
+    resultPathVersion: 1,
+    resultPath: '$["Other"]'
+  });
+  assert.equal(store.getSelection(), null);
+
+  store.select({
+    identity: identity(),
+    outputPortId: 'out-score',
+    resultPathVersion: 1,
+    resultPath: '$["Score"]',
+    displayValue: '0.98',
+    pathHint: '$["Score"]'
+  });
   store.clearIfIdentityChanged(identity({ flowRevision: 12 }));
   assert.equal(store.getSelection(), null);
 
@@ -410,6 +452,66 @@ test('NodePreviewInspector disables field binding when coordinator identity beco
       }
     };
     assert.equal(inspector.canBindGlobalVariable(row), false);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector does not invoke binding callback for a stale descriptor click', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    let currentState;
+    let callbackCount = 0;
+    const store = createNodePreviewSelectionStore();
+    const bindableScalar = node('number', {
+      name: 'Score',
+      outputPortId: 'out-payload',
+      outputPortName: 'Payload',
+      resultPathVersion: 1,
+      resultPath: '$["Score"]',
+      bindableVariableTypes: ['Int64']
+    });
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'Thresholding',
+      title: 'Threshold',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [bindableScalar]
+        })
+      },
+      artifacts: []
+    };
+    currentState = state;
+    const { inspector } = createInspectorHarness({
+      state,
+      selectionStore: store,
+      getState: () => currentState,
+      onBindGlobalVariable: () => {
+        callbackCount += 1;
+      }
+    });
+    const row = buildVisibleObservationRows(state.observation.detail, { limit: 5 }).rows[1];
+    const rowElement = inspector.renderDetailRow(row);
+    const bindButton = rowElement.children.at(-1).children.find(child => String(child.className).includes('bind-global-variable'));
+    assert.ok(bindButton);
+
+    currentState = {
+      ...state,
+      observation: {
+        ...state.observation,
+        identity: identity({ flowRevision: 12 })
+      }
+    };
+    bindButton.click();
+
+    assert.equal(callbackCount, 0);
+    assert.equal(store.getSelection(), null);
     inspector.destroy();
   } finally {
     restoreDocument();

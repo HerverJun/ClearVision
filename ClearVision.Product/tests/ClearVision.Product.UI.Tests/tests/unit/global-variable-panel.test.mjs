@@ -775,6 +775,65 @@ test('source and target bindings use compatible filtering and locate canvas node
   assert.equal(selectedNode, 'op-counter');
 });
 
+test('source binding compatibility distinguishes legacy root, explicit root, nested and invalid ResultPath contracts', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  project.flow.operators[0].outputPorts = [
+    { id: 'out-count', name: '数量', dataType: 'Integer' },
+    { id: 'out-detection', name: '检测结果', dataType: 'DetectionResult' },
+    { id: 'out-image', name: '图像', dataType: 'Image' }
+  ];
+  const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  panel.project = project;
+  panel.schema = project.globalVariables;
+  const variable = project.globalVariables.variables[0];
+
+  panel.schema.sourceBindings = [{
+    id: 'nested-source',
+    variableId: variable.id,
+    operatorId: 'op-counter',
+    outputPortId: 'out-detection',
+    operatorName: '计数算子',
+    outputPortName: '检测结果',
+    resultPathVersion: 1,
+    resultPath: '$["Confidence"]',
+    conversionMode: 'Exact',
+    expression: ''
+  }];
+  assert.deepEqual(panel.getIncompatibleBindings(variable, 'Double'), []);
+  assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding(variable.id)), /\$\[&quot;Confidence&quot;\]/);
+
+  panel.schema.sourceBindings[0] = {
+    ...panel.schema.sourceBindings[0],
+    id: 'explicit-root',
+    resultPath: '$'
+  };
+  assert.deepEqual(panel.getIncompatibleBindings(variable, 'Double'), ['来源 计数算子.检测结果']);
+
+  panel.schema.sourceBindings[0] = {
+    id: 'legacy-root',
+    variableId: variable.id,
+    operatorId: 'op-counter',
+    outputPortId: 'out-image',
+    operatorName: '计数算子',
+    outputPortName: '图像',
+    conversionMode: 'Exact',
+    expression: ''
+  };
+  assert.deepEqual(panel.getIncompatibleBindings(variable, 'Double'), ['来源 计数算子.图像']);
+  assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding(variable.id)), /端口根值/);
+
+  panel.schema.sourceBindings[0] = {
+    ...panel.schema.sourceBindings[0],
+    id: 'partial-result-path',
+    resultPathVersion: 1
+  };
+  assert.deepEqual(panel.getIncompatibleBindings(variable, 'Double'), ['来源 计数算子.图像']);
+  assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding(variable.id)), /无效字段绑定/);
+  assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding(variable.id)), /引用已失效/);
+});
+
 test('preview field binding saves canonical ResultPath through the panel transaction owner', async () => {
   installDom();
   const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
@@ -812,6 +871,28 @@ test('preview field binding saves canonical ResultPath through the panel transac
       syncedSchemas.push(clone(schema));
     }
   });
+  const descriptor = {
+    identity: {
+      projectId: project.id,
+      targetNodeId: 'op-counter',
+      debugSessionId: 'debug-1',
+      clientRequestSequence: 3,
+      flowRevision: 11
+    },
+    addressable: true,
+    kind: 'number',
+    truncated: false,
+    artifact: null,
+    outputPortId: 'out-count',
+    outputPortName: '数量',
+    resultPathVersion: 1,
+    resultPath: '$["Nested"]["Score"]',
+    bindableVariableTypes: ['String', 'Int64', 'Double']
+  };
+  serviceRegistry.register('nodePreviewSelectionStore', {
+    getSelection: () => descriptor,
+    clear() {}
+  });
 
   const panel = new GlobalVariablePanel('global-variables-root', {
     requestChoice: () => 'replace',
@@ -823,20 +904,7 @@ test('preview field binding saves canonical ResultPath through the panel transac
   panel.project = project;
   panel.rebuildBaseline(project.globalVariables);
 
-  const result = await panel.bindPreviewField({
-    identity: {
-      projectId: project.id,
-      targetNodeId: 'op-counter',
-      debugSessionId: 'debug-1',
-      clientRequestSequence: 3,
-      flowRevision: 11
-    },
-    outputPortId: 'out-count',
-    outputPortName: '数量',
-    resultPathVersion: 1,
-    resultPath: '$["Nested"]["Score"]',
-    bindableVariableTypes: ['String', 'Int64', 'Double']
-  });
+  const result = await panel.bindPreviewField(descriptor);
 
   assert.equal(result, true);
   assert.equal(savedBodies.length, 1);
@@ -875,6 +943,10 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
       clientRequestSequence: 3,
       flowRevision: 11
     },
+    addressable: true,
+    kind: 'number',
+    truncated: false,
+    artifact: null,
     outputPortId: 'out-count',
     outputPortName: '数量',
     resultPathVersion: 1,
@@ -882,9 +954,14 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
     bindableVariableTypes: ['Int64']
   };
   const clearedSelections = [];
+  let currentSelection = descriptor;
   serviceRegistry.register('nodePreviewSelectionStore', {
+    getSelection() {
+      return currentSelection;
+    },
     clear() {
       clearedSelections.push(true);
+      currentSelection = null;
     }
   });
   serviceRegistry.register('flowCanvas', {
@@ -892,6 +969,7 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
     serialize: () => project.flow,
     setGlobalVariableSchema() {}
   });
+  projectManager.currentProject = project;
 
   const dirtyPanel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
   dirtyPanel.project = project;
@@ -900,7 +978,9 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
   dirtyPanel.render = () => {};
   assert.equal(await dirtyPanel.bindPreviewField(descriptor), false);
   assert.equal(dirtyPanel.isOpen, true);
+  assert.equal(clearedSelections.length, 1);
 
+  currentSelection = descriptor;
   serviceRegistry.register('flowCanvas', {
     getFlowRevision: () => 12,
     serialize: () => project.flow,
@@ -911,8 +991,9 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
   stalePanel.rebuildBaseline(project.globalVariables);
   stalePanel.render = () => {};
   assert.equal(await stalePanel.bindPreviewField(descriptor), false);
-  assert.equal(clearedSelections.length, 1);
+  assert.equal(clearedSelections.length, 2);
 
+  currentSelection = descriptor;
   serviceRegistry.register('flowCanvas', {
     getFlowRevision: () => 11,
     serialize: () => project.flow,
@@ -941,6 +1022,254 @@ test('preview field binding rejects dirty or stale selections and rolls back fai
   assert.equal(failingPanel.schema.sourceBindings[0].operatorId, 'old-op');
   assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].operatorId, 'old-op');
   assert.match(failingPanel.errorMessage, /save failed/);
+});
+
+test('preview field binding revalidates after delayed variable chooser before sending PUT', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const project = createProject();
+  project.globalVariables.sourceBindings.push({
+    id: 'old-source',
+    variableId: 'var-count',
+    operatorId: 'old-op',
+    outputPortId: 'old-out',
+    operatorName: 'Old',
+    outputPortName: 'OldOut'
+  });
+  const descriptor = createPreviewFieldDescriptor(project);
+  let flowRevision = 11;
+  let putCount = 0;
+  let currentSelection = descriptor;
+  projectManager.currentProject = project;
+  global.fetch = async (url, options = {}) => {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+      putCount += 1;
+      return jsonResponse(JSON.parse(options.body));
+    }
+    if (String(url).includes('/global-variable-values')) {
+      return jsonResponse([]);
+    }
+    return jsonResponse({});
+  };
+  serviceRegistry.register('nodePreviewSelectionStore', {
+    getSelection: () => currentSelection,
+    clear() {
+      currentSelection = null;
+    }
+  });
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => flowRevision,
+    serialize: () => project.flow,
+    setGlobalVariableSchema() {}
+  });
+
+  const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  panel.project = project;
+  panel.rebuildBaseline(project.globalVariables);
+  panel.requestElementChoice = async () => {
+    flowRevision = 12;
+    return { variableId: 'var-count' };
+  };
+  panel.requestChoice = async () => {
+    throw new Error('replacement prompt should not open after stale chooser result');
+  };
+  panel.render = () => {};
+  panel.renderDialog = () => {};
+
+  assert.equal(await panel.bindPreviewField(descriptor), false);
+  assert.equal(putCount, 0);
+  assert.equal(panel.schema.sourceBindings[0].operatorId, 'old-op');
+  assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].operatorId, 'old-op');
+  assert.equal(currentSelection, null);
+  assert.match(panel.errorMessage, /重新预览/);
+});
+
+test('preview field binding drops delayed chooser results after project, flow, runtime or draft changes', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+
+  async function runCase(name, mutate) {
+    const project = createProject();
+    project.globalVariables.sourceBindings.push({
+      id: `old-source-${name}`,
+      variableId: 'var-count',
+      operatorId: 'old-op',
+      outputPortId: 'old-out',
+      operatorName: 'Old',
+      outputPortName: 'OldOut'
+    });
+    const descriptor = createPreviewFieldDescriptor(project);
+    let flow = project.flow;
+    let runtimeState = { projectId: project.id, status: 'idle', isRunning: false };
+    let currentSelection = descriptor;
+    let putCount = 0;
+    projectManager.currentProject = project;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+        putCount += 1;
+        return jsonResponse(JSON.parse(options.body));
+      }
+      if (String(url).includes('/global-variable-values')) {
+        return jsonResponse([]);
+      }
+      return jsonResponse({});
+    };
+    serviceRegistry.register('nodePreviewSelectionStore', {
+      getSelection: () => currentSelection,
+      clear() {
+        currentSelection = null;
+      }
+    });
+    serviceRegistry.register('flowCanvas', {
+      getFlowRevision: () => 11,
+      serialize: () => flow,
+      setGlobalVariableSchema() {}
+    });
+    const panel = new GlobalVariablePanel('global-variables-root', {
+      getRuntimeState: () => runtimeState,
+      showToast() {}
+    });
+    panel.project = project;
+    panel.rebuildBaseline(project.globalVariables);
+    panel.requestElementChoice = async () => {
+      ({ flow = flow, runtimeState = runtimeState } = await mutate({ project, panel, flow, runtimeState }));
+      return { variableId: 'var-count' };
+    };
+    panel.requestChoice = async () => {
+      throw new Error(`replacement prompt should not open for ${name}`);
+    };
+    panel.render = () => {};
+    panel.renderDialog = () => {};
+
+    assert.equal(await panel.bindPreviewField(descriptor), false, name);
+    assert.equal(putCount, 0, name);
+    assert.equal(panel.schema.sourceBindings[0].operatorId, 'old-op', name);
+    assert.equal(project.globalVariables.sourceBindings[0].operatorId, 'old-op', name);
+    assert.equal(currentSelection, null, name);
+  }
+
+  await runCase('project-switch', async ({ project, flow, runtimeState }) => {
+    projectManager.currentProject = { ...project, id: 'other-project' };
+    return { flow, runtimeState };
+  });
+  await runCase('node-delete', async ({ runtimeState }) => ({
+    flow: { operators: [] },
+    runtimeState
+  }));
+  await runCase('port-delete', async ({ flow, runtimeState }) => {
+    const nextFlow = clone(flow);
+    nextFlow.operators[0].outputPorts = [];
+    return { flow: nextFlow, runtimeState };
+  });
+  await runCase('runtime-running', async ({ flow, project }) => ({
+    flow,
+    runtimeState: { projectId: project.id, status: 'running', isRunning: true }
+  }));
+  await runCase('dirty-draft', async ({ panel, flow, runtimeState }) => {
+    panel.dirty = true;
+    return { flow, runtimeState };
+  });
+});
+
+test('preview field binding fails closed when current flowRevision is unavailable or invalid', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const invalidRevisions = [null, Number.NaN, -1, Number.MAX_SAFE_INTEGER + 1];
+
+  for (const invalidRevision of invalidRevisions) {
+    const project = createProject();
+    const descriptor = createPreviewFieldDescriptor(project);
+    let currentSelection = descriptor;
+    let putCount = 0;
+    projectManager.currentProject = project;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+        putCount += 1;
+      }
+      return jsonResponse([]);
+    };
+    serviceRegistry.register('nodePreviewSelectionStore', {
+      getSelection: () => currentSelection,
+      clear() {
+        currentSelection = null;
+      }
+    });
+    serviceRegistry.register('flowCanvas', {
+      getFlowRevision: () => invalidRevision,
+      serialize: () => project.flow,
+      setGlobalVariableSchema() {}
+    });
+    const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+    panel.project = project;
+    panel.rebuildBaseline(project.globalVariables);
+    panel.requestElementChoice = async () => {
+      throw new Error('chooser should not open for invalid flowRevision');
+    };
+    panel.render = () => {};
+
+    assert.equal(await panel.bindPreviewField(descriptor), false, String(invalidRevision));
+    assert.equal(putCount, 0, String(invalidRevision));
+    assert.equal(currentSelection, null, String(invalidRevision));
+    assert.match(panel.errorMessage, /重新预览/);
+  }
+});
+
+test('global variable panel independently rejects ineligible preview field descriptors', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const cases = [
+    ['addressable=false', { addressable: false }],
+    ['truncated=true', { truncated: true }],
+    ['artifact', { artifact: { artifactId: 'artifact-1' } }],
+    ['resource kind', { kind: 'resource' }],
+    ['non-finite kind', { kind: 'nonFiniteNumber' }],
+    ['selection mismatch', {}, selection => ({ ...selection, resultPath: '$["Other"]' })]
+  ];
+
+  for (const [name, overrides, mutateSelection] of cases) {
+    const project = createProject();
+    const descriptor = { ...createPreviewFieldDescriptor(project), ...overrides };
+    const selection = mutateSelection ? mutateSelection(createPreviewFieldDescriptor(project)) : descriptor;
+    let currentSelection = selection;
+    let putCount = 0;
+    projectManager.currentProject = project;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+        putCount += 1;
+      }
+      return jsonResponse([]);
+    };
+    serviceRegistry.register('nodePreviewSelectionStore', {
+      getSelection: () => currentSelection,
+      clear() {
+        currentSelection = null;
+      }
+    });
+    serviceRegistry.register('flowCanvas', {
+      getFlowRevision: () => 11,
+      serialize: () => project.flow,
+      setGlobalVariableSchema() {}
+    });
+    const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+    panel.project = project;
+    panel.rebuildBaseline(project.globalVariables);
+    panel.requestElementChoice = async () => {
+      throw new Error(`chooser should not open for ${name}`);
+    };
+    panel.render = () => {};
+
+    assert.equal(await panel.bindPreviewField(descriptor), false, name);
+    assert.equal(putCount, 0, name);
+    assert.equal(currentSelection, null, name);
+  }
 });
 
 test('running states disable schema and value mutations and 409 refreshes values without success', async () => {
@@ -1076,6 +1405,28 @@ test('global variable UI has no browser prompt, alert or confirm calls and Stati
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function createPreviewFieldDescriptor(project, overrides = {}) {
+  return {
+    identity: {
+      projectId: project.id,
+      targetNodeId: 'op-counter',
+      debugSessionId: 'debug-1',
+      clientRequestSequence: 3,
+      flowRevision: 11
+    },
+    addressable: true,
+    kind: 'number',
+    truncated: false,
+    artifact: null,
+    outputPortId: 'out-count',
+    outputPortName: '数量',
+    resultPathVersion: 1,
+    resultPath: '$["Nested"]["Score"]',
+    bindableVariableTypes: ['String', 'Int64', 'Double'],
+    ...overrides
+  };
 }
 
 function createInteractiveProject({ single = false } = {}) {

@@ -921,6 +921,8 @@ export class NodePreviewInspector {
                 const descriptor = this.selectDetailRow(row);
                 if (descriptor && this.isBindableDescriptorCurrent(descriptor)) {
                     this.onBindGlobalVariable(descriptor);
+                } else {
+                    this.selectionStore?.clear?.();
                 }
             });
             bindButton.dataset.action = 'bind-global-variable';

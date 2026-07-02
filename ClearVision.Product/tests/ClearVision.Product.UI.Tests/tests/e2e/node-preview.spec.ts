@@ -681,6 +681,147 @@ test.describe('Node Preview Inspector flag', () => {
     await expect(page.locator('.gv-manager')).toContainText('$["Score"]');
   });
 
+  test('does not save when flowRevision changes while the field variable chooser is open', async ({ page }) => {
+    let outputPortId = '';
+    let putCount = 0;
+
+    await page.route('**/api/projects/e2e-project/global-variable-values', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '[]',
+      });
+    });
+    await page.route('**/api/projects/e2e-project/global-variables', async route => {
+      if (route.request().method() !== 'PUT') {
+        await route.fallback();
+        return;
+      }
+
+      putCount += 1;
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'PUT should not be sent after stale chooser selection' }),
+      });
+    });
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      while (!outputPortId) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildObservationResponse(request, {
+          kind: 'dictionary',
+          displayValue: '1/1 fields',
+          originalType: 'System.Collections.Generic.Dictionary',
+          pathHint: '$',
+          addressable: false,
+          truncated: false,
+          children: [{
+            kind: 'number',
+            displayValue: '7',
+            originalType: 'System.Int64',
+            name: 'Score',
+            pathHint: '$["Payload"]["Score"]',
+            addressable: true,
+            truncated: false,
+            outputPortId,
+            outputPortName: 'Payload',
+            resultPathVersion: 1,
+            resultPath: '$["Score"]',
+            bindableVariableTypes: ['String', 'Int64', 'Double'],
+            children: [],
+          }],
+        }, [])),
+      });
+    });
+
+    const nodeId = await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Stale Bindable Node',
+      outputs: [{ name: 'Payload', type: 'Object' }],
+    });
+    outputPortId = await page.evaluate(selectedNodeId => {
+      const flowCanvas = (window as any).flowCanvas;
+      return flowCanvas.nodes.get(selectedNodeId)?.outputs?.[0]?.id || '';
+    }, nodeId);
+    await page.evaluate(async ({ outputPortId: portId }) => {
+      const projectModule = await import('/src/features/project/projectManager.js');
+      const serviceRegistry = (await import('/src/core/app/serviceRegistry.js')).default;
+      const flowCanvas = (window as any).flowCanvas;
+      const project = {
+        id: 'e2e-project',
+        name: 'E2E Project',
+        description: '',
+        flow: flowCanvas.serialize(),
+        globalVariables: {
+          schemaVersion: '1.0',
+          variables: [{
+            id: 'var-score',
+            name: 'stats.score',
+            displayName: 'Score Variable',
+            description: '',
+            valueType: 'Int64',
+            initialValue: '0',
+            min: null,
+            max: null,
+            manualWriteAllowed: true,
+            includeInResultMetadata: false,
+            order: 1,
+          }],
+          sourceBindings: [{
+            id: 'old-source',
+            variableId: 'var-score',
+            operatorId: 'old-op',
+            outputPortId: 'old-out',
+            operatorName: 'Old Node',
+            outputPortName: 'Old Output',
+            conversionMode: 'Exact',
+            expression: '',
+          }],
+          targetBindings: [],
+        },
+      };
+      projectModule.default.currentProject = project;
+      flowCanvas.setGlobalVariableSchema(project.globalVariables);
+      await serviceRegistry.get('globalVariablePanel')?.setProject(project);
+      (window as any).__g07bOutputPortId = portId;
+    }, { outputPortId });
+
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Detail' }).click();
+    await expect(page.locator('.node-preview-inspector-row-action.bind-global-variable')).toBeVisible();
+    await page.locator('.node-preview-inspector-row-action.bind-global-variable').click();
+    await expect(page.locator('.gv-choice-overlay')).toContainText('Score Variable');
+
+    await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      flowCanvas.flowRevision += 1;
+    });
+    await page.locator('.gv-source-option', { hasText: 'Score Variable' }).click();
+
+    await expect(page.locator('.cv-toast-message', { hasText: '重新预览' })).toBeVisible();
+    await expect.poll(() => putCount).toBe(0);
+    const sourceState = await page.evaluate(async () => {
+      const projectModule = await import('/src/features/project/projectManager.js');
+      const serviceRegistry = (await import('/src/core/app/serviceRegistry.js')).default;
+      const project = projectModule.default.currentProject;
+      const panel = serviceRegistry.get('globalVariablePanel');
+      return {
+        projectSource: project.globalVariables.sourceBindings[0],
+        panelSource: panel.schema.sourceBindings[0],
+        selection: (window as any).nodePreviewSelectionStore.getSelection(),
+      };
+    });
+    expect(sourceState.projectSource).toMatchObject({ operatorId: 'old-op', outputPortId: 'old-out' });
+    expect(sourceState.panelSource).toMatchObject({ operatorId: 'old-op', outputPortId: 'old-out' });
+    expect(sourceState.selection).toBeNull();
+  });
+
   test('keeps inspector state on the newer node when an older preview resolves late', async ({ page }) => {
     let nodeAId = '';
     let nodeBId = '';

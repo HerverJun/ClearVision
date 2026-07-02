@@ -162,6 +162,22 @@ export function createNodePreviewSelectionStore() {
                 clear();
             }
         },
+        clearIfBindingContextChanged(selection) {
+            const current = getSelection();
+            if (!current) {
+                return;
+            }
+
+            const identity = normalizeNodePreviewIdentity(selection?.identity);
+            const nextSignature = getNodePreviewIdentitySignature(identity);
+            const sameContext = current.identitySignature === nextSignature &&
+                current.outputPortId === normalizeOptionalString(selection?.outputPortId) &&
+                current.resultPathVersion === (selection?.resultPathVersion ?? null) &&
+                current.resultPath === normalizeOptionalString(selection?.resultPath);
+            if (!sameContext) {
+                clear();
+            }
+        },
         destroy() {
             clear();
         }
