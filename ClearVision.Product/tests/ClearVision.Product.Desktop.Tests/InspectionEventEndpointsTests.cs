@@ -136,7 +136,12 @@ public class InspectionEventEndpointsTests
             ProcessedCount = 1
         });
 
-        var eventChunk = await ReadUntilContainsAsync(stream, "event: progressChanged", TimeSpan.FromSeconds(2));
+        var eventChunk = await ReadUntilContainsAllAsync(
+            stream,
+            TimeSpan.FromSeconds(2),
+            "id: 1",
+            "event: progressChanged",
+            "\"processedCount\":1");
         eventChunk.Should().Contain("id: 1");
         eventChunk.Should().Contain("event: progressChanged");
         eventChunk.Should().Contain("\"processedCount\":1");
@@ -167,7 +172,12 @@ public class InspectionEventEndpointsTests
         using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         await using var stream = await response.Content.ReadAsStreamAsync();
 
-        var replayChunk = await ReadUntilContainsAsync(stream, "event: progressChanged", TimeSpan.FromSeconds(2));
+        var replayChunk = await ReadUntilContainsAllAsync(
+            stream,
+            TimeSpan.FromSeconds(2),
+            $"id: {secondSequence}",
+            "event: progressChanged",
+            "\"processedCount\":2");
         replayChunk.Should().Contain($"id: {secondSequence}");
         replayChunk.Should().NotContain($"id: {firstSequence}\n");
         replayChunk.Should().Contain("event: progressChanged");

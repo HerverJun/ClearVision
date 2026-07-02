@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Observation;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -81,7 +82,7 @@ public sealed class ExecutionObservationProjectorTests
         observation.Summary.Select(item => item.Key)
             .Should().Contain(["Mode", "Score", "Seen"]);
         FindNode(observation.Detail, "Score").Should().NotBeNull()
-            .And.Match<ExecutionObservationDetailNodeV1>(node => node!.Kind == "number" && node.Addressable);
+            .And.Match<ExecutionObservationDetailNodeV1>(node => node!.Kind == "number" && !node.Addressable);
         FindNode(observation.Detail, "Mode")!.DisplayValue.Should().Be("Thresholding");
         FindNode(observation.Detail, "Flag")!.DisplayValue.Should().Be("true");
         observation.Diagnostics.Should().BeEmpty();
@@ -331,6 +332,87 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldOnlyAttachMetadataWhenProductionResolverCanResolveProjectedLeaf()
+    {
+        var portId = Guid.NewGuid();
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Detection"] = new DetectionResult("defect", 0.75f, 1, 2, 3, 4)
+            },
+            [new ExecutionObservationOutputPortV1 { Id = portId, Name = "Detection" }]);
+
+        var confidence = FindNode(observation.Detail, "Confidence")!;
+        confidence.DisplayValue.Should().Be("0.75");
+        confidence.Addressable.Should().BeFalse();
+        confidence.OutputPortId.Should().BeNull();
+        confidence.ResultPath.Should().BeNull();
+        observation.Summary.Should().Contain(item => item.Key == "Confidence" && !item.Addressable && item.ResultPath == null);
+        observation.Diagnostics.Should().Contain(item => item.Code == "resultpath-unresolvable");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldKeepNonStringDictionaryKeysDisplayOnly()
+    {
+        var portId = Guid.NewGuid();
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Payload"] = new Dictionary<int, object>
+                {
+                    [1] = 42L
+                }
+            },
+            [new ExecutionObservationOutputPortV1 { Id = portId, Name = "Payload" }]);
+
+        var numericKey = FindNode(observation.Detail, "1")!;
+        numericKey.DisplayValue.Should().Be("42");
+        numericKey.Addressable.Should().BeFalse();
+        numericKey.OutputPortId.Should().BeNull();
+        numericKey.ResultPath.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldAllowStringKeysInMixedDictionaryButRejectFormattedCollisions()
+    {
+        var portId = Guid.NewGuid();
+        var mixed = new Hashtable
+        {
+            ["Name"] = "ok",
+            [1] = 42L
+        };
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Payload"] = mixed
+            },
+            [new ExecutionObservationOutputPortV1 { Id = portId, Name = "Payload" }]);
+
+        var name = FindNode(observation.Detail, "Name")!;
+        name.Addressable.Should().BeTrue();
+        name.OutputPortId.Should().Be(portId);
+        name.ResultPath.Should().Be("$[\"Name\"]");
+        FindNode(observation.Detail, "1")!.Addressable.Should().BeFalse();
+
+        var collision = new Hashtable
+        {
+            ["1"] = "string",
+            [1] = "int"
+        };
+        var collisionObservation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Payload"] = collision
+            },
+            [new ExecutionObservationOutputPortV1 { Id = portId, Name = "Payload" }]);
+
+        var collidingNodes = FindNodes(collisionObservation.Detail, "1").ToList();
+        collidingNodes.Should().HaveCount(2);
+        collidingNodes.Should().OnlyContain(node => !node.Addressable && node.ResultPath == null);
+        collisionObservation.Diagnostics.Should().Contain(item => item.Code == "dictionary-key-collision");
+    }
+
+    [Fact]
     public void CreatePreviewObservation_ShouldClipLongKeysAndMakeTruncatedPathsNonAddressable()
     {
         var longKey = new string('K', 2_000);
@@ -431,6 +513,22 @@ public sealed class ExecutionObservationProjectorTests
         }
 
         return null;
+    }
+
+    private static IEnumerable<ExecutionObservationDetailNodeV1> FindNodes(ExecutionObservationDetailNodeV1 root, string name)
+    {
+        if (string.Equals(root.Name, name, StringComparison.Ordinal))
+        {
+            yield return root;
+        }
+
+        foreach (var child in root.Children)
+        {
+            foreach (var found in FindNodes(child, name))
+            {
+                yield return found;
+            }
+        }
     }
 
     private sealed class ThrowingGetterDto

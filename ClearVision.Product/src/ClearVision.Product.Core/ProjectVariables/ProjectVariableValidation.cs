@@ -250,6 +250,7 @@ public static partial class ProjectGlobalVariableSchemaValidator
         }
 
         if (variable != null &&
+            ShouldValidateSourceBindingRootType(binding, outputPort.DataType) &&
             !ProjectVariableValueTransform.IsCompatibleWithOutputPort(variable.ValueType, outputPort.DataType, binding.ConversionMode))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
@@ -262,6 +263,24 @@ public static partial class ProjectGlobalVariableSchemaValidator
 
         ValidateExpression(binding.Expression, variablesById.Values, binding.VariableId, binding.OperatorId, binding.OutputPortId, null, diagnostics);
     }
+
+    private static bool ShouldValidateSourceBindingRootType(ProjectGlobalVariableSourceBinding binding, PortDataType outputPortType)
+    {
+        if (IsResourceRootPort(outputPortType))
+        {
+            return true;
+        }
+
+        if (!binding.ResultPathVersion.HasValue && binding.ResultPath == null)
+        {
+            return true;
+        }
+
+        return string.Equals(binding.ResultPath, ResultPathV1.Root, StringComparison.Ordinal);
+    }
+
+    private static bool IsResourceRootPort(PortDataType outputPortType) =>
+        outputPortType is PortDataType.Image;
 
     private static void ValidateSourceBindingResultPath(
         ProjectGlobalVariableSourceBinding binding,

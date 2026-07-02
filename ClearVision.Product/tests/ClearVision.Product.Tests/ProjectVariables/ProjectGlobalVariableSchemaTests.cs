@@ -945,6 +945,108 @@ public sealed class ProjectGlobalVariableSchemaTests
         diagnostics.Should().Contain(item => item.Code == expectedCode);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("$")]
+    public void Validate_WhenStructuredRootOutputIsBoundToScalarVariable_ReturnsGv017(string? resultPath)
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Detection", PortDataType.DetectionResult);
+        var flow = new OperatorFlow("structured-root-resultpath-validation");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Detection",
+                    ResultPathVersion = resultPath == null ? null : 1,
+                    ResultPath = resultPath
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item => item.Code == "GV017");
+    }
+
+    [Fact]
+    public void Validate_WhenNestedResultPathUsesStructuredRootOutput_ShouldNotUseRootTypeForGv017()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Detection", PortDataType.DetectionResult);
+        var flow = new OperatorFlow("structured-nested-resultpath-validation");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Detection",
+                    ResultPathVersion = 1,
+                    ResultPath = "$[\"Score\"]"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().NotContain(item => item.Code == "GV017");
+        diagnostics.Should().NotContain(item => item.Code.StartsWith("RP1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_WhenImageRootUsesExplicitNestedResultPath_StillRejectsResourceRoot()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.ImageAcquisition, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Image", PortDataType.Image);
+        var flow = new OperatorFlow("image-nested-resultpath-validation");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Image",
+                    ResultPathVersion = 1,
+                    ResultPath = "$[\"Score\"]"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item => item.Code == "GV017");
+    }
+
     public static IEnumerable<object[]> ExpressionLimitCases()
     {
         yield return

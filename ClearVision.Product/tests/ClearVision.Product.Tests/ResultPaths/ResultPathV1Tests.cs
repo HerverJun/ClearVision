@@ -166,6 +166,14 @@ public sealed class ResultPathV1Tests
         ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][@id=\"A\"]", root, options)
             .Diagnostic!.Code.Should().Be("RP114");
 
+        root["Items"] = new List<StableItem> { new("A", 1L), new("A", 2L), new("B", 3L) };
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][@id=\"B\"]", root, options)
+            .Diagnostic!.Code.Should().Be("RP114");
+
+        root["Items"] = new List<StableItem> { new(new string('I', ResultPathV1.MaxStableIdChars + 1), 1L) };
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][@id=\"A\"]", root, options)
+            .Diagnostic!.Code.Should().Be("RP109");
+
         root["Items"] = new List<StableItem> { new(null, 1L) };
         ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][@id=\"A\"]", root, options)
             .Diagnostic!.Code.Should().Be("RP113");

@@ -622,6 +622,7 @@ public static class ResultPathResolver
             object? match = null;
             var matched = false;
             var scanned = 0;
+            var seenIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in adapter.Enumerate(value!))
             {
                 if (scanned >= ResultPathV1.MaxStableCollectionScanCount)
@@ -637,14 +638,20 @@ public static class ResultPathResolver
                     return false;
                 }
 
+                if (item.StableId.Length > ResultPathV1.MaxStableIdChars)
+                {
+                    diagnostic = new ResultPathDiagnostic("RP109", $"Stable ID exceeds the {ResultPathV1.MaxStableIdChars.ToString(CultureInfo.InvariantCulture)} character limit.", segmentIndex);
+                    return false;
+                }
+
+                if (!seenIds.Add(item.StableId))
+                {
+                    diagnostic = new ResultPathDiagnostic("RP114", "Stable-ID collection contains duplicate IDs.", segmentIndex);
+                    return false;
+                }
+
                 if (string.Equals(item.StableId, stableId, StringComparison.Ordinal))
                 {
-                    if (matched)
-                    {
-                        diagnostic = new ResultPathDiagnostic("RP114", "Stable-ID collection contains duplicate matching IDs.", segmentIndex);
-                        return false;
-                    }
-
                     matched = true;
                     match = item.Value;
                 }

@@ -42,7 +42,7 @@ public static class ExecutionObservationProjector
 
     public static ExecutionObservationEnvelopeV1 CreatePreviewObservation(ExecutionObservationPreviewInput input)
     {
-        var context = new ProjectionContext(input.OutputPorts);
+        var context = new ProjectionContext(input.OutputPorts, input.OutputData);
         var rootValue = input.OutputData ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         var detail = ProjectDetailNode(rootValue, PathInfo.Root, null, 0, addressableCandidate: false, context);
         detail = EnforceDetailByteBudget(detail, context);
@@ -120,7 +120,7 @@ public static class ExecutionObservationProjector
 
         if (value == null)
         {
-            return ScalarNode("null", "null", null, path, safeName, isAddressable);
+            return ScalarNode("null", "null", null, path, safeName, isAddressable, context, null);
         }
 
         if (TryProjectScalar(value, path, safeName, isAddressable, context, out var scalarNode))
@@ -186,20 +186,20 @@ public static class ExecutionObservationProjector
         switch (element.ValueKind)
         {
             case JsonValueKind.Null:
-                return ScalarNode("null", "null", typeof(JsonElement).FullName, path, name, addressableCandidate);
+                return ScalarNode("null", "null", typeof(JsonElement).FullName, path, name, addressableCandidate, context, element);
             case JsonValueKind.True:
             case JsonValueKind.False:
-                return ScalarNode("boolean", element.GetBoolean() ? "true" : "false", typeof(JsonElement).FullName, path, name, addressableCandidate);
+                return ScalarNode("boolean", element.GetBoolean() ? "true" : "false", typeof(JsonElement).FullName, path, name, addressableCandidate, context, element);
             case JsonValueKind.Number:
-                return ScalarNode("number", ClipForDisplay(element.GetRawText()), typeof(JsonElement).FullName, path, name, addressableCandidate);
+                return ScalarNode("number", ClipForDisplay(element.GetRawText()), typeof(JsonElement).FullName, path, name, addressableCandidate, context, element);
             case JsonValueKind.String:
-                return ScalarNode("string", ClipString(element.GetString(), context, path.Value), typeof(JsonElement).FullName, path, name, addressableCandidate);
+                return ScalarNode("string", ClipString(element.GetString(), context, path.Value), typeof(JsonElement).FullName, path, name, addressableCandidate, context, element);
             case JsonValueKind.Object:
                 return ProjectJsonObject(element, path, name, depth, context);
             case JsonValueKind.Array:
                 return ProjectJsonArray(element, path, name, depth, context);
             default:
-                return ScalarNode("unknown", element.ValueKind.ToString(), typeof(JsonElement).FullName, path, name, false);
+                return ScalarNode("unknown", element.ValueKind.ToString(), typeof(JsonElement).FullName, path, name, false, context, element);
         }
     }
 
@@ -290,21 +290,33 @@ public static class ExecutionObservationProjector
         var entries = new List<FieldEntry>();
         foreach (DictionaryEntry entry in dictionary)
         {
-            if (!TryFormatSafeKey(entry.Key, out var key))
+            if (!TryFormatDictionaryKey(entry.Key, out var key, out var isStringKey))
             {
                 context.AddDiagnostic("dictionary-key-unsupported", "Dictionary entry with unsupported key type was omitted.", path.Value);
                 continue;
             }
 
-            var childPath = AppendObjectKey(path, key, context);
-            entries.Add(new FieldEntry(key, ClipKey(key), childPath, entry.Value));
+            entries.Add(new FieldEntry(key, ClipKey(key), path, entry.Value, isStringKey));
+        }
+
+        var collidingKeys = entries
+            .GroupBy(entry => entry.SortKey, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        if (collidingKeys.Count > 0)
+        {
+            context.AddDiagnostic("dictionary-key-collision", "Dictionary contains display key collisions; affected entries are not addressable.", path.Value);
         }
 
         entries.Sort((left, right) => string.Compare(left.SortKey, right.SortKey, StringComparison.Ordinal));
         var children = new List<ExecutionObservationDetailNodeV1>();
         foreach (var entry in entries.Take(MaxObjectFields))
         {
-            children.Add(ProjectDetailNode(entry.Value, entry.Path, entry.Name, depth + 1, true, context));
+            var childPath = entry.CanUseResultPath && !collidingKeys.Contains(entry.SortKey)
+                ? AppendObjectKey(entry.ParentPath, entry.SortKey, context)
+                : AppendDisplayObjectKey(entry.ParentPath, entry.SortKey);
+            children.Add(ProjectDetailNode(entry.Value, childPath, entry.Name, depth + 1, true, context));
         }
 
         var truncated = entries.Count > MaxObjectFields;
@@ -549,73 +561,73 @@ public static class ExecutionObservationProjector
         switch (value)
         {
             case string text:
-                node = ScalarNode("string", ClipString(text, context, path.Value), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("string", ClipString(text, context, path.Value), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case bool boolean:
-                node = ScalarNode("boolean", boolean ? "true" : "false", GetTypeName(value), path, name, addressable);
+                node = ScalarNode("boolean", boolean ? "true" : "false", GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case char character:
-                node = ScalarNode("string", character.ToString(), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("string", character.ToString(), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case Guid guid:
-                node = ScalarNode("guid", guid.ToString("D"), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("guid", guid.ToString("D"), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case DateTime dateTime:
-                node = ScalarNode("dateTime", dateTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("dateTime", dateTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case DateTimeOffset dateTimeOffset:
-                node = ScalarNode("dateTime", dateTimeOffset.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("dateTime", dateTimeOffset.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case TimeSpan timeSpan:
-                node = ScalarNode("duration", timeSpan.ToString("c", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("duration", timeSpan.ToString("c", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case float floatValue when !float.IsFinite(floatValue):
                 context.AddDiagnostic("non-finite-number", $"Non-finite float '{floatValue.ToString("R", CultureInfo.InvariantCulture)}' converted to display text.", path.Value);
-                node = ScalarNode("nonFiniteNumber", floatValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, false);
+                node = ScalarNode("nonFiniteNumber", floatValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, false, context, value);
                 return true;
             case double doubleValue when !double.IsFinite(doubleValue):
                 context.AddDiagnostic("non-finite-number", $"Non-finite double '{doubleValue.ToString("R", CultureInfo.InvariantCulture)}' converted to display text.", path.Value);
-                node = ScalarNode("nonFiniteNumber", doubleValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, false);
+                node = ScalarNode("nonFiniteNumber", doubleValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, false, context, value);
                 return true;
             case sbyte sbyteValue:
-                node = NumberNode(sbyteValue, value, path, name, addressable);
+                node = NumberNode(sbyteValue, value, path, name, addressable, context);
                 return true;
             case byte byteValue:
-                node = NumberNode(byteValue, value, path, name, addressable);
+                node = NumberNode(byteValue, value, path, name, addressable, context);
                 return true;
             case short shortValue:
-                node = NumberNode(shortValue, value, path, name, addressable);
+                node = NumberNode(shortValue, value, path, name, addressable, context);
                 return true;
             case ushort ushortValue:
-                node = NumberNode(ushortValue, value, path, name, addressable);
+                node = NumberNode(ushortValue, value, path, name, addressable, context);
                 return true;
             case int intValue:
-                node = NumberNode(intValue, value, path, name, addressable);
+                node = NumberNode(intValue, value, path, name, addressable, context);
                 return true;
             case uint uintValue:
-                node = NumberNode(uintValue, value, path, name, addressable);
+                node = NumberNode(uintValue, value, path, name, addressable, context);
                 return true;
             case long longValue:
-                node = NumberNode(longValue, value, path, name, addressable);
+                node = NumberNode(longValue, value, path, name, addressable, context);
                 return true;
             case ulong ulongValue:
-                node = NumberNode(ulongValue, value, path, name, addressable);
+                node = NumberNode(ulongValue, value, path, name, addressable, context);
                 return true;
             case float floatValue:
-                node = ScalarNode("number", floatValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("number", floatValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case double doubleValue:
-                node = ScalarNode("number", doubleValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("number", doubleValue.ToString("R", CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
             case decimal decimalValue:
-                node = ScalarNode("number", decimalValue.ToString(CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable);
+                node = ScalarNode("number", decimalValue.ToString(CultureInfo.InvariantCulture), GetTypeName(value), path, name, addressable, context, value);
                 return true;
         }
 
         var type = value.GetType();
         if (type.IsEnum)
         {
-            node = ScalarNode("enum", value.ToString() ?? string.Empty, GetTypeName(value), path, name, addressable);
+            node = ScalarNode("enum", value.ToString() ?? string.Empty, GetTypeName(value), path, name, addressable, context, value);
             return true;
         }
 
@@ -628,9 +640,10 @@ public static class ExecutionObservationProjector
         object original,
         PathInfo path,
         string? name,
-        bool addressable)
+        bool addressable,
+        ProjectionContext context)
         where T : IFormattable =>
-        ScalarNode("number", number.ToString(null, CultureInfo.InvariantCulture), GetTypeName(original), path, name, addressable);
+        ScalarNode("number", number.ToString(null, CultureInfo.InvariantCulture), GetTypeName(original), path, name, addressable, context, original);
 
     private static ExecutionObservationDetailNodeV1 ScalarNode(
         string kind,
@@ -638,10 +651,16 @@ public static class ExecutionObservationProjector
         string? originalType,
         PathInfo path,
         string? name,
-        bool addressable)
+        bool addressable,
+        ProjectionContext context,
+        object? scalarValue)
     {
-        var effectiveAddressable = addressable && path.Value != "$";
-        var binding = effectiveAddressable ? path.ResultPathBinding : null;
+        var effectiveAddressable = addressable && path.Value != "$" && path.ResultPathBinding != null;
+        var binding = effectiveAddressable
+            ? ValidateBindableResultPath(path.ResultPathBinding!, scalarValue, path.Value, context)
+            : null;
+        effectiveAddressable = binding != null;
+        var canonicalPath = binding?.ToCanonicalPath();
         return new ExecutionObservationDetailNodeV1
         {
             Kind = kind,
@@ -653,8 +672,45 @@ public static class ExecutionObservationProjector
             OutputPortId = binding?.OutputPortId,
             OutputPortName = binding?.OutputPortName,
             ResultPathVersion = binding == null ? null : ResultPathV1.Version,
-            ResultPath = binding?.ToCanonicalPath()
+            ResultPath = canonicalPath
         };
+    }
+
+    private static ResultPathBindingInfo? ValidateBindableResultPath(
+        ResultPathBindingInfo binding,
+        object? scalarValue,
+        string pathHint,
+        ProjectionContext context)
+    {
+        var canonicalPath = binding.ToCanonicalPath();
+        var resolved = ResultPathResolver.Resolve(ResultPathV1.Version, canonicalPath, binding.OutputPortRoot);
+        if (resolved.Succeeded && AreEquivalentScalarValues(scalarValue, resolved.Value))
+        {
+            return binding;
+        }
+
+        var message = resolved.Succeeded
+            ? "Canonical ResultPath resolved to a different scalar; metadata omitted."
+            : $"Canonical ResultPath is not resolvable by the production resolver: {resolved.Diagnostic!.Code}.";
+        context.AddDiagnostic("resultpath-unresolvable", message, pathHint);
+        return null;
+    }
+
+    private static bool AreEquivalentScalarValues(object? projectedValue, object? resolvedValue)
+    {
+        if (projectedValue is JsonElement projectedElement)
+        {
+            return resolvedValue is JsonElement resolvedElement &&
+                   projectedElement.ValueKind == resolvedElement.ValueKind &&
+                   string.Equals(projectedElement.GetRawText(), resolvedElement.GetRawText(), StringComparison.Ordinal);
+        }
+
+        if (resolvedValue is JsonElement)
+        {
+            return false;
+        }
+
+        return Equals(projectedValue, resolvedValue);
     }
 
     private static ExecutionObservationDetailNodeV1 ResourceNode(
@@ -676,7 +732,7 @@ public static class ExecutionObservationProjector
             OriginalType = GetTypeName(value),
             Children = descriptor.Metadata
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => ScalarNode("string", pair.Value, typeof(string).FullName, AppendObjectKey(path.WithoutResultPathBinding(), pair.Key, context), pair.Key, true))
+                .Select(pair => ScalarNode("string", pair.Value, typeof(string).FullName, AppendObjectKey(path.WithoutResultPathBinding(), pair.Key, context), pair.Key, true, context, pair.Value))
                 .ToList(),
             Truncated = true,
             PathHint = path.Value,
@@ -934,7 +990,7 @@ public static class ExecutionObservationProjector
         var entries = new List<(string Key, object? Value)>();
         foreach (DictionaryEntry entry in dictionary)
         {
-            if (TryFormatSafeKey(entry.Key, out var key))
+            if (TryFormatDictionaryKey(entry.Key, out var key, out _))
             {
                 entries.Add((key, entry.Value));
             }
@@ -1331,12 +1387,23 @@ public static class ExecutionObservationProjector
             null);
     }
 
-    private static bool TryFormatSafeKey(object? key, out string formatted)
+    private static PathInfo AppendDisplayObjectKey(PathInfo path, string key)
     {
+        var candidate = $"{path.Value}{ResultPathFormatter.FormatObjectKeySegment(key)}";
+        return new PathInfo(
+            candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
+            false,
+            null);
+    }
+
+    private static bool TryFormatDictionaryKey(object? key, out string formatted, out bool isStringKey)
+    {
+        isStringKey = false;
         switch (key)
         {
             case string text:
                 formatted = text;
+                isStringKey = true;
                 return !string.IsNullOrWhiteSpace(formatted);
             case char character:
                 formatted = character.ToString();
@@ -1416,11 +1483,12 @@ public static class ExecutionObservationProjector
         public PathInfo WithoutResultPathBinding() => this with { ResultPathBinding = null };
     }
 
-    private sealed record FieldEntry(string SortKey, string Name, PathInfo Path, object? Value);
+    private sealed record FieldEntry(string SortKey, string Name, PathInfo ParentPath, object? Value, bool CanUseResultPath);
 
     private sealed record ResultPathBindingInfo(
         Guid OutputPortId,
         string OutputPortName,
+        object? OutputPortRoot,
         IReadOnlyList<string> RelativeKeys)
     {
         public ResultPathBindingInfo AppendKey(string key)
@@ -1437,14 +1505,20 @@ public static class ExecutionObservationProjector
         private readonly HashSet<object> _activeReferences = new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<string> _diagnosticKeys = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<ExecutionObservationOutputPortV1>> _outputPortsByName;
+        private readonly Dictionary<string, object?> _outputPortRootsByName;
         private int _nodeCount;
 
-        public ProjectionContext(IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts)
+        public ProjectionContext(
+            IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts,
+            IReadOnlyDictionary<string, object>? outputData)
         {
             _outputPortsByName = (outputPorts ?? [])
                 .Where(port => port.Id != Guid.Empty && !string.IsNullOrWhiteSpace(port.Name))
                 .GroupBy(port => port.Name, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+            _outputPortRootsByName = (outputData ?? new Dictionary<string, object>())
+                .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => (object?)group.First().Value, StringComparer.Ordinal);
         }
 
         public List<ExecutionObservationDiagnosticV1> Diagnostics { get; } = new();
@@ -1466,8 +1540,14 @@ public static class ExecutionObservationProjector
                 return null;
             }
 
+            if (!_outputPortRootsByName.TryGetValue(outputKey, out var outputPortRoot))
+            {
+                AddDiagnostic("resultpath-port-missing", "Observation output key has no runtime output value; canonical ResultPath metadata omitted.", pathHint);
+                return null;
+            }
+
             var port = ports[0];
-            return new ResultPathBindingInfo(port.Id, port.Name, []);
+            return new ResultPathBindingInfo(port.Id, port.Name, outputPortRoot, []);
         }
 
         public bool TryReserveNode(string pathHint)

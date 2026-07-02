@@ -1015,8 +1015,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         ProjectGlobalVariableSourceBinding binding,
         object? outputPortRoot)
     {
-        var version = binding.ResultPathVersion ?? ResultPathV1.Version;
-        var path = binding.ResultPath ?? ResultPathV1.Root;
+        var hasVersion = binding.ResultPathVersion.HasValue;
+        var hasPath = binding.ResultPath != null;
+        if (hasVersion != hasPath)
+        {
+            return new ResultPathResolutionResult(
+                null,
+                null,
+                new ResultPathDiagnostic("RP101", "ResultPathVersion and ResultPath must be provided together."));
+        }
+
+        var version = hasVersion ? binding.ResultPathVersion!.Value : ResultPathV1.Version;
+        var path = hasPath ? binding.ResultPath : ResultPathV1.Root;
         return ResultPathResolver.Resolve(version, path, outputPortRoot);
     }
 

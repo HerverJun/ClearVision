@@ -783,6 +783,112 @@ public sealed class FlowExecutionProjectVariableBindingTests
         snapshot.Version.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(null, "$[\"Score\"]", "RP101")]
+    [InlineData(1, null, "RP101")]
+    [InlineData(2, "$[\"Score\"]", "RP100")]
+    [InlineData(1, "$[\"\\u0053core\"]", "RP107")]
+    public async Task ExecuteFlowAsync_WhenSourceBindingResultPathPairIsInvalid_ShouldFailWithoutSessionWrite(
+        int? resultPathVersion,
+        string? resultPath,
+        string diagnosticCode)
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var flow = new OperatorFlow("resultpath-runtime-pair-fail-closed");
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Payload",
+            ResultPathVersion = resultPathVersion,
+            ResultPath = resultPath,
+            Expression = "value + 1"
+        });
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
+        var sourceExecutor = CreatePayloadSourceExecutor(source, new Dictionary<string, object?>
+        {
+            ["Score"] = 5L
+        });
+        using var service = new FlowExecutionService(
+            [sourceExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain(diagnosticCode);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(4L);
+        snapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenNestedResultPathRequiresUnsupportedStructuredObjectTraversal_ShouldFailWithoutSessionWrite()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Detection", PortDataType.Any);
+        var flow = new OperatorFlow("resultpath-structured-object-fail-closed");
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Detection",
+            ResultPathVersion = 1,
+            ResultPath = "$[\"Confidence\"]"
+        });
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        sourceExecutor.ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Detection"] = new ClearVision.Product.Core.ValueObjects.DetectionResult("defect", 0.75f, 1, 2, 3, 4)
+            })));
+        using var service = new FlowExecutionService(
+            [sourceExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RP110");
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(4L);
+        snapshot.Version.Should().Be(1);
+    }
+
     [Fact]
     public async Task ExecuteFlowAsync_WhenSourceBindingResultPathResolvesResourceLikeValue_ShouldFailWithoutSessionWrite()
     {
