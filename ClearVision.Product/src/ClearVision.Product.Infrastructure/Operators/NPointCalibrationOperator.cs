@@ -745,6 +745,11 @@ public class NPointCalibrationOperator : OperatorBase
                 return false;
             }
 
+            if (IsPointPairDisabled(element))
+            {
+                return false;
+            }
+
             if (TryGetNumberProperty(element, "ImageX", out var imageX) &&
                 TryGetNumberProperty(element, "ImageY", out var imageY) &&
                 TryGetNumberProperty(element, "WorldX", out var worldX) &&
@@ -775,6 +780,11 @@ public class NPointCalibrationOperator : OperatorBase
 
         if (raw is IDictionary<string, object> dict)
         {
+            if (IsPointPairDisabled(dict))
+            {
+                return false;
+            }
+
             if (TryGetDouble(dict, "ImageX", out var imageX) &&
                 TryGetDouble(dict, "ImageY", out var imageY) &&
                 TryGetDouble(dict, "WorldX", out var worldX) &&
@@ -808,6 +818,47 @@ public class NPointCalibrationOperator : OperatorBase
         }
 
         return false;
+    }
+
+    private static bool IsPointPairDisabled(JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!property.Name.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return property.Value.ValueKind switch
+            {
+                JsonValueKind.False => true,
+                JsonValueKind.True => false,
+                JsonValueKind.String => bool.TryParse(property.Value.GetString(), out var enabled) && !enabled,
+                JsonValueKind.Number => property.Value.TryGetDouble(out var number) && Math.Abs(number) <= double.Epsilon,
+                _ => false
+            };
+        }
+
+        return false;
+    }
+
+    private static bool IsPointPairDisabled(IDictionary<string, object> dict)
+    {
+        if (!dict.TryGetValue("Enabled", out var raw) || raw == null)
+        {
+            return false;
+        }
+
+        return raw switch
+        {
+            bool enabled => !enabled,
+            string text => bool.TryParse(text, out var enabled) && !enabled,
+            int number => number == 0,
+            long number => number == 0,
+            double number => Math.Abs(number) <= double.Epsilon,
+            float number => Math.Abs(number) <= float.Epsilon,
+            _ => false
+        };
     }
 
     private static bool TryGetNumberProperty(JsonElement obj, string propertyName, out double value)

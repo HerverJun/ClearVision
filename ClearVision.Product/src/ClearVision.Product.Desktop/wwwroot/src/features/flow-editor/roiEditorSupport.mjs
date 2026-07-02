@@ -1,15 +1,25 @@
 import {
     CIRCLE_PARAM_KEYS,
     DEFAULT_RECT_PARAM_KEYS,
+    POINT_PAIRS_PARAM_KEYS,
+    POLYGON_PARAM_KEYS,
     POLAR_ANNULUS_ARC_PARAM_KEYS,
     REGION_RECT_PARAM_KEYS,
     computeClockwiseAngleSpanDegrees,
     normalizeAnnulusGeometry,
     normalizeAngleDegrees,
     normalizeCircleGeometry,
+    normalizePointSequenceGeometry,
+    normalizePolygonGeometry,
+    parsePointPairs,
+    parsePolygonPoints,
+    pointPairsToParamsJson,
+    polygonToParamsJson,
     rectFromParams,
     rectToParams,
-    validateAnnulusGeometry
+    validateAnnulusGeometry,
+    validatePointSequenceGeometry,
+    validatePolygonGeometry
 } from './roiGeometry.mjs';
 
 function readOperatorValue(operator, name, fallback = '') {
@@ -83,6 +93,26 @@ export function geometryFromParams(values, config, bounds = null) {
         return bounds ? normalizeAnnulusGeometry(annulus, bounds) : annulus;
     }
 
+    if (adapter.kind === 'polygon') {
+        const keys = adapter.paramKeys || POLYGON_PARAM_KEYS;
+        const polygon = parsePolygonPoints(values?.[keys.points]);
+        if (!polygon || !validatePolygonGeometry(polygon, bounds).valid) {
+            return null;
+        }
+
+        return normalizePolygonGeometry(polygon);
+    }
+
+    if (adapter.kind === 'pointSequence') {
+        const keys = adapter.paramKeys || POINT_PAIRS_PARAM_KEYS;
+        const sequence = parsePointPairs(values?.[keys.pointPairs]) || { kind: 'pointSequence', points: [] };
+        if (!validatePointSequenceGeometry(sequence, bounds).valid) {
+            return null;
+        }
+
+        return normalizePointSequenceGeometry(sequence);
+    }
+
     return null;
 }
 
@@ -120,6 +150,20 @@ export function geometryToParams(geometry, config) {
         };
     }
 
+    if (adapter.kind === 'polygon') {
+        const keys = adapter.paramKeys || POLYGON_PARAM_KEYS;
+        return {
+            [keys.points]: polygonToParamsJson(geometry)
+        };
+    }
+
+    if (adapter.kind === 'pointSequence') {
+        const keys = adapter.paramKeys || POINT_PAIRS_PARAM_KEYS;
+        return {
+            [keys.pointPairs]: pointPairsToParamsJson(geometry)
+        };
+    }
+
     return {};
 }
 
@@ -128,10 +172,17 @@ export function getOperatorRoiConfig(operator) {
 
     if (type === 'RoiManager') {
         const shape = String(readOperatorValue(operator, 'Shape', 'Rectangle'));
-        const editable = shape === 'Rectangle' || shape === 'Circle';
+        const polygon = shape === 'Polygon'
+            ? parsePolygonPoints(readOperatorValue(operator, 'PolygonPoints', '[]'))
+            : null;
+        const polygonValidation = polygon ? validatePolygonGeometry(polygon) : { valid: false };
+        const editable = shape === 'Rectangle' || shape === 'Circle' || (shape === 'Polygon' && polygonValidation.valid);
         const geometryAdapter = shape === 'Circle'
             ? { kind: 'circle', paramKeys: CIRCLE_PARAM_KEYS }
-            : { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS };
+            : shape === 'Polygon'
+                ? { kind: 'polygon', paramKeys: POLYGON_PARAM_KEYS }
+                : { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS };
+
         return {
             supported: true,
             editable,
@@ -139,9 +190,13 @@ export function getOperatorRoiConfig(operator) {
             geometryAdapter,
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
             subtitle: shape === 'Circle'
-                ? '拖拽圆形 ROI，自动同步到 CenterX / CenterY / Radius'
-                : '拖拽框选矩形区域，自动同步到 X / Y / Width / Height',
-            readonlyMessage: '图上编辑当前支持矩形和圆形 ROI，多边形仍使用参数输入'
+                ? 'Drag the circle ROI; commit writes CenterX / CenterY / Radius.'
+                : shape === 'Polygon'
+                    ? 'Edit polygon ROI vertices; commit writes the legacy PolygonPoints JSON.'
+                    : 'Drag the rectangle ROI; commit writes X / Y / Width / Height.',
+            readonlyMessage: shape === 'Polygon'
+                ? 'PolygonPoints must be valid legacy JSON with at least three finite, in-bounds, non-self-intersecting vertices.'
+                : 'Image editing supports Rectangle, Circle, and valid Polygon ROI shapes.'
         };
     }
 
@@ -154,8 +209,8 @@ export function getOperatorRoiConfig(operator) {
             shape: 'Rectangle',
             geometryAdapter: { kind: 'rectangle', paramKeys: REGION_RECT_PARAM_KEYS },
             rectParamKeys: REGION_RECT_PARAM_KEYS,
-            subtitle: '拖拽框选矩形区域，自动同步到 RegionX / RegionY / RegionW / RegionH',
-            readonlyMessage: '图上编辑当前仅支持 BoxFilter 的 Region 模式，请先把 FilterMode 切到 Region'
+            subtitle: 'Drag the region rectangle; commit writes RegionX / RegionY / RegionW / RegionH.',
+            readonlyMessage: 'Image editing supports BoxFilter only when FilterMode is Region.'
         };
     }
 
@@ -183,8 +238,24 @@ export function getOperatorRoiConfig(operator) {
             shape,
             geometryAdapter: { kind: 'annulusArc', paramKeys: POLAR_ANNULUS_ARC_PARAM_KEYS },
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-            subtitle: '拖拽圆环/圆弧区域，自动同步到 CenterX / CenterY / InnerRadius / OuterRadius / StartAngle / EndAngle',
-            readonlyMessage: '圆环参数无效：OuterRadius 必须大于 InnerRadius，且半径和角度必须为有限值'
+            subtitle: 'Edit the annulus or arc; commit writes CenterX / CenterY / radii / angles.',
+            readonlyMessage: 'Annulus parameters are invalid: OuterRadius must be greater than InnerRadius and all values must be finite.'
+        };
+    }
+
+    if (type === 'NPointCalibration') {
+        const sequence = parsePointPairs(readOperatorValue(operator, 'PointPairs', '[]')) ||
+            { kind: 'pointSequence', points: [] };
+        const validation = validatePointSequenceGeometry(sequence);
+
+        return {
+            supported: true,
+            editable: validation.valid,
+            shape: 'PointSequence',
+            geometryAdapter: { kind: 'pointSequence', paramKeys: POINT_PAIRS_PARAM_KEYS },
+            rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
+            subtitle: 'Edit calibration image sample points; commit preserves WorldX / WorldY in PointPairs JSON.',
+            readonlyMessage: 'PointPairs must be a parseable legacy JSON array.'
         };
     }
 
@@ -194,7 +265,7 @@ export function getOperatorRoiConfig(operator) {
         shape: 'Rectangle',
         geometryAdapter: { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS },
         rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-        subtitle: '拖拽框选矩形区域，自动同步到 X / Y / Width / Height',
-        readonlyMessage: '当前节点不支持 ROI 图上编辑'
+        subtitle: 'Drag an ROI to update parameters.',
+        readonlyMessage: 'The selected node does not support image editing.'
     };
 }

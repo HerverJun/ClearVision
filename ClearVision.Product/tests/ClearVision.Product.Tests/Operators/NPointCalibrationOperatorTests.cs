@@ -50,6 +50,30 @@ public class NPointCalibrationOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithDisabledPointPairs_ShouldIgnoreDisabledSamples()
+    {
+        var pairsJson = "[" +
+                        "{\"ImageX\":0,\"ImageY\":0,\"WorldX\":0,\"WorldY\":0}," +
+                        "{\"ImageX\":10,\"ImageY\":0,\"WorldX\":20,\"WorldY\":0}," +
+                        "{\"ImageX\":0,\"ImageY\":10,\"WorldX\":0,\"WorldY\":20}," +
+                        "{\"ImageX\":50,\"ImageY\":50,\"WorldX\":999,\"WorldY\":999,\"Enabled\":false}" +
+                        "]";
+
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "CalibrationMode", "Affine" },
+            { "PointPairs", pairsJson },
+            { "MinInlierCount", 3 },
+            { "MinInlierRatio", 1.0 }
+        });
+
+        var result = await _operator.ExecuteAsync(op, null);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["TotalSampleCount"]).Should().Be(3);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithExplicitAcceptanceThresholds_ShouldAllowTighterQualityGate()
     {
         var op = CreateOperator(new Dictionary<string, object>

@@ -150,6 +150,53 @@ async function addAndSelectPolarNode(page: Page, overrides: Record<string, unkno
   }, createPolarParameters(overrides));
 }
 
+function createNPointParameters(overrides: Record<string, unknown> = {}) {
+  const values = {
+    CalibrationMode: 'Affine',
+    PointPairs: JSON.stringify([
+      { ImageX: 10, ImageY: 20, WorldX: 1, WorldY: 2 },
+      { ImageX: 30, ImageY: 20, WorldX: 3, WorldY: 2 },
+      { ImageX: 10, ImageY: 40, WorldX: 1, WorldY: 4 },
+    ]),
+    ...overrides,
+  };
+
+  return [
+    {
+      name: 'CalibrationMode',
+      displayName: 'Calibration Mode',
+      dataType: 'enum',
+      value: values.CalibrationMode,
+      defaultValue: 'Affine',
+      options: ['Affine', 'Perspective'],
+    },
+    { name: 'PointPairs', displayName: 'Point Pairs', dataType: 'string', value: values.PointPairs, defaultValue: values.PointPairs },
+  ];
+}
+
+async function addAndSelectNPointNode(page: Page, overrides: Record<string, unknown> = {}) {
+  return page.evaluate((parameters) => {
+    const flowCanvas = (window as any).flowCanvas;
+    const node = flowCanvas.addNode(
+      'NPointCalibration',
+      180,
+      140,
+      {
+        title: 'NPoint',
+        parameters,
+        inputs: [{ name: 'Image', type: 'Image' }],
+        outputs: [{ name: 'CalibrationData', type: 'String' }],
+        color: '#1890ff',
+      }
+    );
+
+    flowCanvas.selectedNode = node.id;
+    flowCanvas.onNodeSelected?.(node);
+    (window as any).__e2eRoiNodeId = node.id;
+    return node.id;
+  }, createNPointParameters(overrides));
+}
+
 async function waitForRoiEditorReady(page: Page) {
   await expect(page.locator('.roi-editor-panel')).toBeVisible();
   await page.waitForFunction(() => {
@@ -190,9 +237,10 @@ async function dispatchRoiDrag(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number },
-  button: 'left' | 'right' = 'left'
+  button: 'left' | 'right' = 'left',
+  options: { altKey?: boolean } = {}
 ) {
-  await page.evaluate(({ startPoint, endPoint, mouseButton }) => {
+  await page.evaluate(({ startPoint, endPoint, mouseButton, eventOptions }) => {
     const panel = (window as any).propertyPanel?.roiEditorPanel;
     const canvas = document.querySelector<HTMLCanvasElement>('.roi-editor-canvas');
     if (!panel?.imageCanvas || !canvas) {
@@ -213,6 +261,7 @@ async function dispatchRoiDrag(
       bubbles: true,
       button: buttonValue,
       buttons: buttonsValue,
+      altKey: eventOptions.altKey === true,
       ...start
     }));
 
@@ -226,6 +275,7 @@ async function dispatchRoiDrag(
         bubbles: true,
         button: buttonValue,
         buttons: buttonsValue,
+        altKey: eventOptions.altKey === true,
         ...intermediate
       }));
     }
@@ -234,12 +284,14 @@ async function dispatchRoiDrag(
       bubbles: true,
       button: buttonValue,
       buttons: 0,
+      altKey: eventOptions.altKey === true,
       ...end
     }));
   }, {
     startPoint: from,
     endPoint: to,
-    mouseButton: button
+    mouseButton: button,
+    eventOptions: options
   });
 }
 
@@ -297,6 +349,53 @@ async function getPolarState(page: Page) {
             outerRadius: Math.round(overlay.outerRadius ?? overlay.radius),
             startAngle: Math.round(overlay.startAngle),
             spanDegrees: Math.round(overlay.spanDegrees),
+          }
+        : null,
+    };
+  });
+}
+
+async function getPolygonState(page: Page) {
+  return page.evaluate(() => {
+    const panel = (window as any).propertyPanel;
+    const overlay = panel?.roiEditorPanel?.imageCanvas?.getPrimaryEditableOverlay?.();
+    const input = document.querySelector<HTMLInputElement>('#param-PolygonPoints');
+    const params = input ? JSON.parse(input.value) : null;
+
+    return {
+      params,
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            points: (overlay.points || []).map((point: any) => ({
+              x: Math.round(point.x),
+              y: Math.round(point.y),
+            })),
+            selectedPointIndex: overlay.selectedPointIndex ?? null,
+          }
+        : null,
+    };
+  });
+}
+
+async function getPointSequenceState(page: Page) {
+  return page.evaluate(() => {
+    const panel = (window as any).propertyPanel;
+    const overlay = panel?.roiEditorPanel?.imageCanvas?.getPrimaryEditableOverlay?.();
+    const input = document.querySelector<HTMLInputElement>('#param-PointPairs');
+    const params = input ? JSON.parse(input.value) : null;
+
+    return {
+      params,
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            points: (overlay.points || []).map((point: any) => ({
+              x: Math.round(point.x),
+              y: Math.round(point.y),
+              enabled: point.enabled !== false,
+            })),
+            selectedPointIndex: overlay.selectedPointIndex ?? null,
           }
         : null,
     };
@@ -417,7 +516,7 @@ test.describe('ROI Editor', () => {
     await setCurrentProject(page);
   });
 
-  test('shows ROI editor for rectangle and circle then disables it for polygon shapes', async ({ page }) => {
+  test('shows ROI editor for rectangle circle and valid polygon shapes', async ({ page }) => {
     await page.route('**/api/flows/preview-node', async route => {
       await route.fulfill({
         status: 200,
@@ -442,7 +541,7 @@ test.describe('ROI Editor', () => {
     await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
 
     await page.selectOption('#param-Shape', 'Polygon');
-    await expect(page.locator('#roi-editor-readonly')).toBeVisible();
+    await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
   });
 
   test('drawing a new rectangle updates XYWH and triggers one extra preview', async ({ page }) => {
@@ -624,6 +723,101 @@ test.describe('ROI Editor', () => {
     expect(polarState.params.startAngle).toBe(0);
     expect(polarState.params.endAngle).toBe(90);
     expect(polarState.overlay?.spanDegrees).toBe(90);
+  });
+
+  test('polygon ROI vertex drag insert delete undo redo updates PolygonPoints only on commit', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, {
+      Shape: 'Polygon',
+      PolygonPoints: '[[5,5],[55,5],[55,55],[5,55]]',
+    });
+    await waitForRoiEditorReady(page);
+
+    let polygonState = await getPolygonState(page);
+    expect(polygonState.overlay?.type).toBe('polygon');
+    expect(polygonState.params).toEqual([[5, 5], [55, 5], [55, 55], [5, 55]]);
+
+    await dispatchRoiDrag(page, { x: 5, y: 5 }, { x: 8, y: 8 });
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params[0]).toEqual([8, 8]);
+
+    await dispatchRoiDrag(page, { x: 55, y: 30 }, { x: 58, y: 30 }, 'left', { altKey: true });
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params.length).toBe(5);
+    expect(polygonState.params[2]).toEqual([58, 30]);
+
+    await page.locator('.roi-editor-canvas').focus();
+    await page.keyboard.press('Delete');
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params.length).toBe(4);
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Z' : 'Control+Z');
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params.length).toBe(5);
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Y' : 'Control+Y');
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params.length).toBe(4);
+  });
+
+  test('NPoint point sequence drag toggle reorder and delete updates PointPairs draft history', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectNPointNode(page);
+    await waitForRoiEditorReady(page);
+
+    let sequenceState = await getPointSequenceState(page);
+    expect(sequenceState.overlay?.type).toBe('pointSequence');
+    expect(sequenceState.params.length).toBe(3);
+
+    await dispatchRoiDrag(page, { x: 10, y: 20 }, { x: 12, y: 22 });
+    sequenceState = await getPointSequenceState(page);
+    expect(Math.round(sequenceState.params[0].ImageX)).toBe(12);
+    expect(Math.round(sequenceState.params[0].ImageY)).toBe(22);
+    expect(sequenceState.params[0]).toMatchObject({ WorldX: 1, WorldY: 2, Enabled: true });
+
+    await page.locator('.roi-editor-canvas').focus();
+    await page.keyboard.press('Space');
+    sequenceState = await getPointSequenceState(page);
+    expect(Math.round(sequenceState.params[0].ImageX)).toBe(12);
+    expect(Math.round(sequenceState.params[0].ImageY)).toBe(22);
+    expect(sequenceState.params[0]).toMatchObject({ Enabled: false });
+
+    await page.keyboard.press(']');
+    sequenceState = await getPointSequenceState(page);
+    expect(Math.round(sequenceState.params[1].ImageX)).toBe(12);
+    expect(Math.round(sequenceState.params[1].ImageY)).toBe(22);
+    expect(sequenceState.params[1]).toMatchObject({ Enabled: false });
+
+    await page.keyboard.press('Delete');
+    sequenceState = await getPointSequenceState(page);
+    expect(sequenceState.params.length).toBe(2);
+    expect(sequenceState.params.some((item: any) => item.Enabled === false)).toBe(false);
   });
 
   test('pointer movement stays local draft until mouseup commit', async ({ page }) => {

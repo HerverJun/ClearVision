@@ -559,7 +559,8 @@ public sealed class ExecutionObservationProjectorTests
                 """
                 [
                   {"ImagePoint":{"X":10,"Y":20},"WorldPoint":{"X":1,"Y":2}},
-                  {"ImageX":30,"ImageY":40,"WorldX":3,"WorldY":4}
+                  {"ImageX":30,"ImageY":40,"WorldX":3,"WorldY":4},
+                  {"ImageX":50,"ImageY":60,"WorldX":5,"WorldY":6,"Enabled":false}
                 ]
                 """)
         ]);

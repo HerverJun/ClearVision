@@ -3,15 +3,24 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_RECT_PARAM_KEYS,
   CIRCLE_PARAM_KEYS,
+  POINT_PAIRS_PARAM_KEYS,
+  POLYGON_PARAM_KEYS,
   POLAR_ANNULUS_ARC_PARAM_KEYS,
   REGION_RECT_PARAM_KEYS,
+  appendPointSequencePoint,
   cancelRectangleDraft,
   clampRectToBounds,
   commitRectangleDraft,
   computeClockwiseAngleSpanDegrees,
   createRectangleDraftSession,
+  deletePointSequencePoint,
+  deletePolygonVertex,
   angleDegreesFromCenter,
   pointFromAngleDegrees,
+  hitTestPointSequencePoint,
+  hitTestPolygon,
+  hitTestPolygonEdge,
+  hitTestPolygonVertex,
   hitTestRectHandle,
   hitTestRectangle,
   hitTestCircle,
@@ -20,25 +29,40 @@ import {
   hitTestAnnulusHandle,
   imageToScreenPoint,
   imageToScreenRect,
+  insertPolygonVertex,
+  movePointSequencePoint,
+  movePolygonVertex,
   normalizeAngleDegrees,
   normalizeAnnulusGeometry,
   normalizeCircleGeometry,
+  normalizePointSequenceGeometry,
+  normalizePolygonGeometry,
   nudgeRect,
   normalizeRectFromPoints,
+  parsePointPairs,
+  parsePolygonPoints,
+  pointPairsToParamsJson,
+  polygonToParamsJson,
   rectFromParams,
   rectToParams,
   redoRectangleDraft,
+  reorderPointSequencePoint,
   resizeAnnulusByHandle,
   resizeCircleByHandle,
   resizeRectByHandle,
   screenToImageRect,
   screenToImagePoint,
+  togglePointSequencePointEnabled,
   translateAnnulus,
   translateCircle,
+  translatePointSequence,
+  translatePolygon,
   translateRect,
   undoRectangleDraft,
   validateAnnulusGeometry,
   validateCircleGeometry,
+  validatePointSequenceGeometry,
+  validatePolygonGeometry,
   validateRectangleGeometry
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiGeometry.mjs';
 import {
@@ -319,6 +343,157 @@ test('geometry parameter adapters round-trip circle and PolarUnwrap annulus arc 
   assert.equal(invalidPolar.editable, false);
 });
 
+test('polygon geometry validates fail-closed policy and supports vertex edits', () => {
+  const bounds = { width: 64, height: 64 };
+  const polygon = parsePolygonPoints('[[10,10],[30,10],[30,30],[10,30]]');
+
+  assert.deepEqual(normalizePolygonGeometry(polygon), {
+    kind: 'polygon',
+    points: [
+      { x: 10, y: 10 },
+      { x: 30, y: 10 },
+      { x: 30, y: 30 },
+      { x: 10, y: 30 }
+    ]
+  });
+  assert.deepEqual(validatePolygonGeometry(polygon, bounds), { valid: true, errors: [] });
+  assert.equal(hitTestPolygon({ x: 20, y: 20 }, polygon), true);
+  assert.equal(hitTestPolygonVertex({ x: 10, y: 10 }, polygon, { scale: 2 }, 10), 'vertex:0');
+  assert.equal(hitTestPolygonEdge({ x: 20, y: 10 }, polygon, { scale: 2 }, 10), 1);
+
+  const inserted = insertPolygonVertex(polygon, 1, { x: 20, y: 10 }, bounds);
+  assert.equal(inserted.points.length, 5);
+  assert.equal(polygonToParamsJson(inserted), '[[10,10],[20,10],[30,10],[30,30],[10,30]]');
+
+  const moved = movePolygonVertex(polygon, 0, { x: 12, y: 12 }, bounds);
+  assert.deepEqual(moved.points[0], { x: 12, y: 12 });
+
+  const translated = translatePolygon(polygon, { x: 2, y: 3 }, bounds);
+  assert.deepEqual(translated.points[0], { x: 12, y: 13 });
+
+  const deleted = deletePolygonVertex(inserted, 1, bounds);
+  assert.equal(deleted.points.length, 4);
+
+  const selfIntersecting = validatePolygonGeometry({
+    kind: 'polygon',
+    points: [
+      { x: 10, y: 10 },
+      { x: 30, y: 30 },
+      { x: 30, y: 10 },
+      { x: 10, y: 30 }
+    ]
+  }, bounds);
+  assert.equal(selfIntersecting.valid, false);
+  assert.ok(selfIntersecting.errors.includes('selfIntersection'));
+
+  const duplicate = validatePolygonGeometry({
+    kind: 'polygon',
+    points: [
+      { x: 10, y: 10 },
+      { x: 10, y: 10 },
+      { x: 20, y: 20 }
+    ]
+  }, bounds);
+  assert.equal(duplicate.valid, false);
+  assert.ok(duplicate.errors.includes('duplicatePoint'));
+  assert.ok(duplicate.errors.includes('nearZeroEdge'));
+
+  const outOfBounds = validatePolygonGeometry({
+    kind: 'polygon',
+    points: [
+      { x: -1, y: 10 },
+      { x: 30, y: 10 },
+      { x: 30, y: 30 }
+    ]
+  }, bounds);
+  assert.equal(outOfBounds.valid, false);
+  assert.ok(outOfBounds.errors.includes('bounds'));
+});
+
+test('polygon adapter round-trips legacy PolygonPoints JSON and rejects invalid polygons', () => {
+  const config = getOperatorRoiConfig({
+    type: 'RoiManager',
+    parameters: [
+      { name: 'Shape', value: 'Polygon' },
+      { name: 'PolygonPoints', value: '[[10,10],[30,10],[30,30],[10,30]]' }
+    ]
+  });
+
+  assert.equal(config.editable, true);
+  assert.deepEqual(config.geometryAdapter.paramKeys, POLYGON_PARAM_KEYS);
+
+  const geometry = geometryFromParams({
+    PolygonPoints: '[[10,10],[30,10],[30,30],[10,30]]'
+  }, config, { width: 64, height: 64 });
+  assert.equal(geometry.kind, 'polygon');
+  assert.deepEqual(geometryToParams(geometry, config), {
+    PolygonPoints: '[[10,10],[30,10],[30,30],[10,30]]'
+  });
+
+  const invalidConfig = getOperatorRoiConfig({
+    type: 'RoiManager',
+    parameters: [
+      { name: 'Shape', value: 'Polygon' },
+      { name: 'PolygonPoints', value: '[[10,10],[30,30],[30,10],[10,30]]' }
+    ]
+  });
+  assert.equal(invalidConfig.editable, false);
+});
+
+test('point sequence adapter preserves order enabled state and legacy PointPairs payload', () => {
+  const config = getOperatorRoiConfig({
+    type: 'NPointCalibration',
+    parameters: [
+      {
+        name: 'PointPairs',
+        value: JSON.stringify([
+          { ImageX: 10, ImageY: 20, WorldX: 1, WorldY: 2 },
+          { ImagePoint: { X: 30, Y: 40 }, WorldPoint: { X: 3, Y: 4 }, Enabled: false }
+        ])
+      }
+    ]
+  });
+
+  assert.equal(config.editable, true);
+  assert.deepEqual(config.geometryAdapter.paramKeys, POINT_PAIRS_PARAM_KEYS);
+
+  let sequence = geometryFromParams({
+    PointPairs: JSON.stringify([
+      { ImageX: 10, ImageY: 20, WorldX: 1, WorldY: 2 },
+      { ImagePoint: { X: 30, Y: 40 }, WorldPoint: { X: 3, Y: 4 }, Enabled: false }
+    ])
+  }, config, { width: 64, height: 64 });
+
+  assert.deepEqual(sequence, {
+    kind: 'pointSequence',
+    points: [
+      { x: 10, y: 20, worldX: 1, worldY: 2, enabled: true },
+      { x: 30, y: 40, worldX: 3, worldY: 4, enabled: false }
+    ]
+  });
+  assert.deepEqual(validatePointSequenceGeometry(sequence, { width: 64, height: 64 }), { valid: true, errors: [] });
+  assert.equal(hitTestPointSequencePoint({ x: 30, y: 40 }, sequence, { scale: 2 }, 10), 'point:1');
+
+  sequence = movePointSequencePoint(sequence, 0, { x: 12, y: 22 }, { width: 64, height: 64 });
+  sequence = togglePointSequencePointEnabled(sequence, 1);
+  sequence = appendPointSequencePoint(sequence, { x: 50, y: 52 }, { width: 64, height: 64 });
+  sequence = reorderPointSequencePoint(sequence, 2, -1);
+  sequence = deletePointSequencePoint(sequence, 0);
+  sequence = translatePointSequence(sequence, { x: 1, y: -2 }, { width: 64, height: 64 });
+
+  assert.deepEqual(sequence.points.map(point => ({ x: point.x, y: point.y, enabled: point.enabled })), [
+    { x: 51, y: 50, enabled: true },
+    { x: 31, y: 38, enabled: true }
+  ]);
+  assert.equal(
+    pointPairsToParamsJson(sequence),
+    '[{"ImageX":51,"ImageY":50,"WorldX":50,"WorldY":52,"Enabled":true},{"ImageX":31,"ImageY":38,"WorldX":3,"WorldY":4,"Enabled":true}]'
+  );
+  assert.deepEqual(geometryToParams(normalizePointSequenceGeometry(sequence), config), {
+    PointPairs: pointPairsToParamsJson(sequence)
+  });
+});
+
 test('rectFromParams supports BoxFilter region parameter names', () => {
   assert.deepEqual(
     rectFromParams({
@@ -437,6 +612,43 @@ test('ImageCanvas overlay groups update scene overlays without clearing editable
 
   ImageCanvas.prototype.clearOverlayGroup.call(canvas, 'scene');
   assert.deepEqual(canvas.overlays.map(overlay => overlay.id), ['editable-roi']);
+});
+
+test('ImageCanvas point sequence editing remains isolated from scene overlay groups', () => {
+  const canvas = {
+    image: { width: 64, height: 64 },
+    overlays: [
+      { id: 'scene-axis', type: 'polyline', groupId: 'scene', points: [{ x: 0, y: 0 }, { x: 20, y: 0 }], readOnly: true }
+    ],
+    selectedOverlay: null,
+    activeOverlayId: null,
+    minimumOverlaySize: 1,
+    getImageBounds: ImageCanvas.prototype.getImageBounds,
+    getPointsBounds: ImageCanvas.prototype.getPointsBounds,
+    normalizeEditableGeometry: ImageCanvas.prototype.normalizeEditableGeometry,
+    readOverlayGeometry: ImageCanvas.prototype.readOverlayGeometry,
+    resetGeometryDraft: ImageCanvas.prototype.resetGeometryDraft,
+    addOverlay: ImageCanvas.prototype.addOverlay,
+    invalidate() {
+      this.invalidated = true;
+    }
+  };
+
+  ImageCanvas.prototype.setEditableGeometry.call(canvas, {
+    kind: 'pointSequence',
+    points: [
+      { x: 10, y: 10, worldX: 1, worldY: 1, enabled: true },
+      { x: 20, y: 20, worldX: 2, worldY: 2, enabled: false }
+    ]
+  });
+
+  assert.ok(canvas.overlays.some(overlay => overlay.id === 'scene-axis'));
+  const editable = canvas.overlays.find(overlay => overlay.type === 'pointSequence');
+  assert.ok(editable);
+  assert.equal(editable.editable, true);
+  assert.equal(editable.groupId, null);
+  assert.equal(editable.points[1].enabled, false);
+  assert.equal(canvas.roiDraftState.current.points.length, 2);
 });
 
 test('ImageCanvas render commands sort by layer zOrder and stable id', () => {

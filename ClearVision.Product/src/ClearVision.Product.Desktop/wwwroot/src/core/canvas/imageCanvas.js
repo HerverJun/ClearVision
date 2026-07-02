@@ -1,25 +1,45 @@
 import {
+    appendPointSequencePoint,
     clampRectToBounds,
+    deletePointSequencePoint,
+    deletePolygonVertex,
     getAnnulusHandlePoints,
     getCircleHandlePoints,
+    getPointSequenceHandlePoints,
+    getPolygonHandlePoints,
     getRectHandlePoints,
     hitTestAnnulus,
     hitTestAnnulusHandle,
     hitTestCircle,
     hitTestCircleHandle,
+    hitTestPointSequencePoint,
+    hitTestPolygon,
+    hitTestPolygonEdge,
+    hitTestPolygonVertex,
     hitTestRectHandle,
     hitTestRectangle,
+    insertPolygonVertex,
+    movePointSequencePoint,
+    movePolygonVertex,
     normalizeRectFromPoints,
     normalizeAnnulusGeometry,
     normalizeCircleGeometry,
+    normalizePointSequenceGeometry,
+    normalizePolygonGeometry,
     nudgeRect,
+    reorderPointSequencePoint,
     resizeAnnulusByHandle,
     resizeCircleByHandle,
     resizeRectByHandle,
     roundRect,
     screenToImagePoint,
+    togglePointSequencePointEnabled,
     translateAnnulus,
     translateCircle,
+    translatePointSequence,
+    translatePolygon,
+    validatePointSequenceGeometry,
+    validatePolygonGeometry,
 } from '../../features/flow-editor/roiGeometry.mjs';
 
 function createLegacyOverlayId() {
@@ -32,7 +52,11 @@ function normalizeOverlayNumber(value, fallback = 0) {
 }
 
 function cloneGeometry(geometry) {
-    return geometry ? { ...geometry } : null;
+    if (!geometry) {
+        return null;
+    }
+
+    return JSON.parse(JSON.stringify(geometry));
 }
 
 function geometryKey(geometry) {
@@ -40,10 +64,25 @@ function geometryKey(geometry) {
         return '';
     }
 
-    return Object.keys(geometry)
-        .sort()
-        .map(key => `${key}:${Number.isFinite(Number(geometry[key])) ? Number(geometry[key]).toFixed(6) : String(geometry[key])}`)
-        .join('|');
+    const normalize = value => {
+        if (Array.isArray(value)) {
+            return value.map(item => normalize(item));
+        }
+        if (value && typeof value === 'object') {
+            return Object.keys(value)
+                .sort()
+                .reduce((result, key) => {
+                    result[key] = normalize(value[key]);
+                    return result;
+                }, {});
+        }
+        if (Number.isFinite(Number(value))) {
+            return Number(value).toFixed(6);
+        }
+        return value;
+    };
+
+    return JSON.stringify(normalize(geometry));
 }
 
 function sameGeometry(left, right) {
@@ -559,6 +598,27 @@ class ImageCanvas {
             };
         }
 
+        if (kind === 'polygon') {
+            const polygon = normalizePolygonGeometry(geometry);
+            const bounds = this.getPointsBounds(polygon.points);
+            return {
+                ...polygon,
+                type: 'polygon',
+                ...bounds
+            };
+        }
+
+        if (kind === 'pointSequence') {
+            const sequence = normalizePointSequenceGeometry(geometry);
+            const bounds = this.getPointsBounds(sequence.points);
+            return {
+                ...sequence,
+                type: 'pointSequence',
+                ...bounds,
+                fill: false
+            };
+        }
+
         const rect = this.clampRectToImage(roundRect(geometry));
         return {
             kind: 'rectangle',
@@ -582,7 +642,7 @@ class ImageCanvas {
         };
 
         if (existing) {
-            Object.assign(existing, normalized, overlayStyle);
+            Object.assign(existing, overlayStyle, normalized);
             this.selectedOverlay = existing.id;
             if (options.resetDraft !== false) {
                 this.resetGeometryDraft(this.readOverlayGeometry(existing));
@@ -778,6 +838,34 @@ class ImageCanvas {
                     this.ctx.fill();
                 }
                 this.ctx.stroke();
+                break;
+            }
+
+            case 'pointSequence': {
+                const points = Array.isArray(overlay.points) ? overlay.points : [];
+                if (points.length >= 2) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(points[0].x, points[0].y);
+                    points.slice(1).forEach(point => this.ctx.lineTo(point.x, point.y));
+                    this.ctx.strokeStyle = command.color || '#22c55e';
+                    this.ctx.stroke();
+                }
+
+                points.forEach((point, index) => {
+                    const enabled = point.enabled !== false;
+                    const radius = 4;
+                    this.ctx.beginPath();
+                    this.ctx.fillStyle = enabled ? 'rgba(34, 197, 94, 0.85)' : 'rgba(148, 163, 184, 0.45)';
+                    this.ctx.strokeStyle = overlay.selectedPointIndex === index ? '#f59e0b' : (enabled ? '#15803d' : '#64748b');
+                    this.ctx.lineWidth = (overlay.selectedPointIndex === index ? 3 : 2) / this.scale;
+                    this.ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+                    this.ctx.fillStyle = enabled ? '#0f172a' : '#64748b';
+                    this.ctx.font = `${12 / this.scale}px sans-serif`;
+                    this.ctx.textBaseline = 'bottom';
+                    this.ctx.fillText(String(index + 1), point.x + 6, point.y - 5);
+                });
                 break;
             }
 
@@ -1089,6 +1177,30 @@ class ImageCanvas {
         };
     }
 
+    getPointsBounds(points = []) {
+        if (!Array.isArray(points) || points.length === 0) {
+            return {
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1
+            };
+        }
+
+        const xs = points.map(point => normalizeOverlayNumber(point?.x));
+        const ys = points.map(point => normalizeOverlayNumber(point?.y));
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        return {
+            x: minX,
+            y: minY,
+            width: Math.max(1, maxX - minX),
+            height: Math.max(1, maxY - minY)
+        };
+    }
+
     resetGeometryDraft(geometry) {
         const current = cloneGeometry(geometry);
         this.roiDraftState = {
@@ -1184,6 +1296,20 @@ class ImageCanvas {
             };
         }
 
+        if (overlay.type === 'polygon') {
+            return normalizePolygonGeometry({
+                kind: 'polygon',
+                points: overlay.points || []
+            });
+        }
+
+        if (overlay.type === 'pointSequence') {
+            return normalizePointSequenceGeometry({
+                kind: 'pointSequence',
+                points: overlay.points || []
+            });
+        }
+
         return {
             kind: 'rectangle',
             ...roundRect({
@@ -1210,6 +1336,14 @@ class ImageCanvas {
             });
         }
 
+        if (geometry.kind === 'polygon') {
+            return translatePolygon(geometry, delta, this.getImageBounds());
+        }
+
+        if (geometry.kind === 'pointSequence') {
+            return translatePointSequence(geometry, delta, this.getImageBounds());
+        }
+
         return {
             kind: 'rectangle',
             ...nudgeRect(geometry, delta, this.getImageBounds(), this.minimumOverlaySize)
@@ -1229,6 +1363,20 @@ class ImageCanvas {
             return resizeAnnulusByHandle(geometry, handle, imagePoint, this.getImageBounds(), {
                 minRadius: this.minimumOverlaySize
             });
+        }
+
+        if (geometry.kind === 'polygon') {
+            const vertexIndex = this.getHandlePointIndex(handle);
+            return vertexIndex === null
+                ? normalizePolygonGeometry(geometry)
+                : movePolygonVertex(geometry, vertexIndex, imagePoint, this.getImageBounds());
+        }
+
+        if (geometry.kind === 'pointSequence') {
+            const pointIndex = this.getHandlePointIndex(handle);
+            return pointIndex === null
+                ? normalizePointSequenceGeometry(geometry)
+                : movePointSequencePoint(geometry, pointIndex, imagePoint, this.getImageBounds());
         }
 
         return {
@@ -1259,15 +1407,32 @@ class ImageCanvas {
     drawResizeHandles(overlay) {
         const handles = this.getEditableHandlePoints(overlay);
         const radius = this.handleSize / this.scale / 2;
-        Object.values(handles).forEach(point => {
+        Object.entries(handles).forEach(([handle, point]) => {
+            const selectedIndex = this.getHandlePointIndex(handle);
+            const isSelected = selectedIndex !== null && overlay.selectedPointIndex === selectedIndex;
             this.ctx.beginPath();
             this.ctx.fillStyle = '#ffffff';
-            this.ctx.strokeStyle = '#1890ff';
-            this.ctx.lineWidth = 2 / this.scale;
-            this.ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+            this.ctx.strokeStyle = isSelected ? '#f59e0b' : '#1890ff';
+            this.ctx.lineWidth = (isSelected ? 3 : 2) / this.scale;
+            this.ctx.arc(point.x, point.y, isSelected ? radius * 1.2 : radius, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.stroke();
         });
+    }
+
+    getHandlePointIndex(handle) {
+        const match = String(handle || '').match(/^(?:vertex|point):(\d+)$/);
+        if (!match) {
+            return null;
+        }
+
+        const index = Number(match[1]);
+        return Number.isInteger(index) ? index : null;
+    }
+
+    getSelectedPointIndex(overlay) {
+        const index = Number(overlay?.selectedPointIndex);
+        return Number.isInteger(index) && index >= 0 ? index : null;
     }
 
     getEditableHandlePoints(overlay) {
@@ -1281,6 +1446,14 @@ class ImageCanvas {
 
         if (overlay.type === 'annulus' || overlay.type === 'arc') {
             return getAnnulusHandlePoints(this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'polygon') {
+            return getPolygonHandlePoints(this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'pointSequence') {
+            return getPointSequenceHandlePoints(this.readOverlayGeometry(overlay));
         }
 
         return getRectHandlePoints(overlay);
@@ -1297,6 +1470,14 @@ class ImageCanvas {
 
         if (overlay.type === 'annulus' || overlay.type === 'arc') {
             return hitTestAnnulusHandle(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
+        }
+
+        if (overlay.type === 'polygon') {
+            return hitTestPolygonVertex(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
+        }
+
+        if (overlay.type === 'pointSequence') {
+            return hitTestPointSequencePoint(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
         }
 
         return hitTestRectHandle(imagePoint, overlay, { scale: this.scale, offset: this.offset }, this.handleSize);
@@ -1317,6 +1498,14 @@ class ImageCanvas {
 
         if (overlay.type === 'annulus' || overlay.type === 'arc') {
             return hitTestAnnulus(imagePoint, this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'polygon') {
+            return hitTestPolygon(imagePoint, this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'pointSequence') {
+            return Boolean(hitTestPointSequencePoint(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize));
         }
 
         const bounds = this.getOverlayBounds(overlay);
@@ -1368,7 +1557,7 @@ class ImageCanvas {
             };
         }
 
-        if ((type === 'polyline' || type === 'polygon') && Array.isArray(overlay.points) && overlay.points.length > 0) {
+        if ((type === 'polyline' || type === 'polygon' || type === 'pointSequence') && Array.isArray(overlay.points) && overlay.points.length > 0) {
             const xs = overlay.points.map(point => normalizeOverlayNumber(point?.x));
             const ys = overlay.points.map(point => normalizeOverlayNumber(point?.y));
             const minX = Math.min(...xs);
@@ -1459,6 +1648,39 @@ class ImageCanvas {
         return true;
     }
 
+    findNearestPolygonInsertIndex(imagePoint, polygon) {
+        const points = Array.isArray(polygon?.points) ? polygon.points : [];
+        if (points.length < 2) {
+            return null;
+        }
+
+        let bestIndex = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < points.length; index += 1) {
+            const start = points[index];
+            const end = points[(index + 1) % points.length];
+            const ax = Number(start.x);
+            const ay = Number(start.y);
+            const bx = Number(end.x);
+            const by = Number(end.y);
+            const dx = bx - ax;
+            const dy = by - ay;
+            const lengthSquared = dx * dx + dy * dy;
+            const t = lengthSquared <= Number.EPSILON
+                ? 0
+                : Math.max(0, Math.min(1, ((Number(imagePoint.x) - ax) * dx + (Number(imagePoint.y) - ay) * dy) / lengthSquared));
+            const closestX = ax + t * dx;
+            const closestY = ay + t * dy;
+            const distance = Math.hypot(Number(imagePoint.x) - closestX, Number(imagePoint.y) - closestY);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = (index + 1) % points.length;
+            }
+        }
+
+        return bestIndex;
+    }
+
     handleRoiKeyDown(e) {
         const overlay = this.getPrimaryEditableOverlay();
         if (!overlay) {
@@ -1468,6 +1690,7 @@ class ImageCanvas {
         if (e.key === 'Escape') {
             if (this.cancelActiveRoiInteraction()) {
                 e.preventDefault?.();
+                e.stopPropagation?.();
             }
             return;
         }
@@ -1479,6 +1702,7 @@ class ImageCanvas {
         if (isUndo) {
             if (this.applyRoiDraftHistory(this.undoGeometryDraft())) {
                 e.preventDefault?.();
+                e.stopPropagation?.();
             }
             return;
         }
@@ -1486,6 +1710,58 @@ class ImageCanvas {
         if (isRedo) {
             if (this.applyRoiDraftHistory(this.redoGeometryDraft())) {
                 e.preventDefault?.();
+                e.stopPropagation?.();
+            }
+            return;
+        }
+
+        const selectedPointIndex = this.getSelectedPointIndex(overlay);
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPointIndex !== null) {
+            const previousGeometry = this.readOverlayGeometry(overlay);
+            const nextGeometry = overlay.type === 'polygon'
+                ? deletePolygonVertex(previousGeometry, selectedPointIndex, this.getImageBounds())
+                : overlay.type === 'pointSequence'
+                    ? deletePointSequencePoint(previousGeometry, selectedPointIndex)
+                    : null;
+            if (nextGeometry && !sameGeometry(previousGeometry, nextGeometry)) {
+                overlay.selectedPointIndex = Math.min(selectedPointIndex, Math.max(0, (nextGeometry.points?.length || 1) - 1));
+                Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
+                this.commitGeometryDraft(this.readOverlayGeometry(overlay), previousGeometry);
+                this.invalidate();
+                this.emitOverlayChanged(overlay, 'commit');
+                e.preventDefault?.();
+                e.stopPropagation?.();
+            }
+            return;
+        }
+
+        if (overlay.type === 'pointSequence' && selectedPointIndex !== null && e.key === ' ') {
+            const previousGeometry = this.readOverlayGeometry(overlay);
+            const nextGeometry = togglePointSequencePointEnabled(previousGeometry, selectedPointIndex);
+            if (!sameGeometry(previousGeometry, nextGeometry)) {
+                overlay.selectedPointIndex = selectedPointIndex;
+                Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
+                this.commitGeometryDraft(this.readOverlayGeometry(overlay), previousGeometry);
+                this.invalidate();
+                this.emitOverlayChanged(overlay, 'commit');
+                e.preventDefault?.();
+                e.stopPropagation?.();
+            }
+            return;
+        }
+
+        if (overlay.type === 'pointSequence' && selectedPointIndex !== null && (e.key === '[' || e.key === ']')) {
+            const previousGeometry = this.readOverlayGeometry(overlay);
+            const direction = e.key === '[' ? -1 : 1;
+            const nextGeometry = reorderPointSequencePoint(previousGeometry, selectedPointIndex, direction);
+            if (!sameGeometry(previousGeometry, nextGeometry)) {
+                overlay.selectedPointIndex = selectedPointIndex + direction;
+                Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
+                this.commitGeometryDraft(this.readOverlayGeometry(overlay), previousGeometry);
+                this.invalidate();
+                this.emitOverlayChanged(overlay, 'commit');
+                e.preventDefault?.();
+                e.stopPropagation?.();
             }
             return;
         }
@@ -1503,15 +1779,29 @@ class ImageCanvas {
 
         const step = e.shiftKey ? 10 : 1;
         const previousGeometry = this.readOverlayGeometry(overlay);
-        const nextGeometry = this.translateEditableGeometry(previousGeometry, {
-            x: delta.x * step,
-            y: delta.y * step
-        });
+        const nextPoint = selectedPointIndex !== null && previousGeometry.points?.[selectedPointIndex]
+            ? {
+                x: previousGeometry.points[selectedPointIndex].x + delta.x * step,
+                y: previousGeometry.points[selectedPointIndex].y + delta.y * step
+            }
+            : null;
+        const nextGeometry = overlay.type === 'polygon' && selectedPointIndex !== null && nextPoint
+            ? movePolygonVertex(previousGeometry, selectedPointIndex, nextPoint, this.getImageBounds())
+            : overlay.type === 'pointSequence' && selectedPointIndex !== null && nextPoint
+                ? movePointSequencePoint(previousGeometry, selectedPointIndex, nextPoint, this.getImageBounds())
+                : this.translateEditableGeometry(previousGeometry, {
+                    x: delta.x * step,
+                    y: delta.y * step
+                });
         Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
+        if (selectedPointIndex !== null) {
+            overlay.selectedPointIndex = selectedPointIndex;
+        }
         this.commitGeometryDraft(this.readOverlayGeometry(overlay), previousGeometry);
         this.invalidate();
         this.emitOverlayChanged(overlay, 'commit');
         e.preventDefault?.();
+        e.stopPropagation?.();
     }
 
     handleRoiMouseDown(e) {
@@ -1541,13 +1831,19 @@ class ImageCanvas {
 
         const imagePoint = this.getImagePointFromEvent(e);
         const overlay = this.getPrimaryEditableOverlay();
-        const handle = this.hitTestResizeHandle(imagePoint, overlay);
+        const handle = e.altKey && overlay?.type === 'polygon'
+            ? null
+            : this.hitTestResizeHandle(imagePoint, overlay);
 
         if (overlay && handle && handle !== 'center') {
             const originalGeometry = this.readOverlayGeometry(overlay);
             this.selectedOverlay = overlay.id;
             this.activeOverlayId = overlay.id;
             this.activeHandle = handle;
+            const pointIndex = this.getHandlePointIndex(handle);
+            if (pointIndex !== null) {
+                overlay.selectedPointIndex = pointIndex;
+            }
             this.interactionState = {
                 type: 'resize',
                 handle,
@@ -1556,6 +1852,32 @@ class ImageCanvas {
             };
             this.invalidate();
             return;
+        }
+
+        if (overlay?.type === 'polygon') {
+            const currentPolygon = this.readOverlayGeometry(overlay);
+            const insertIndex = e.altKey
+                ? this.findNearestPolygonInsertIndex(imagePoint, currentPolygon)
+                : hitTestPolygonEdge(imagePoint, currentPolygon, { scale: this.scale, offset: this.offset }, this.handleSize);
+            if (insertIndex !== null) {
+                const originalGeometry = currentPolygon;
+                const nextGeometry = insertPolygonVertex(originalGeometry, insertIndex, imagePoint, this.getImageBounds());
+                if (!sameGeometry(originalGeometry, nextGeometry)) {
+                    overlay.selectedPointIndex = insertIndex;
+                    this.updateEditableOverlayGeometry(overlay, nextGeometry, 'dragging');
+                    this.selectedOverlay = overlay.id;
+                    this.activeOverlayId = overlay.id;
+                    this.activeHandle = `vertex:${insertIndex}`;
+                    this.interactionState = {
+                        type: 'resize',
+                        handle: `vertex:${insertIndex}`,
+                        overlayId: overlay.id,
+                        originalGeometry,
+                        baseGeometry: nextGeometry
+                    };
+                    return;
+                }
+            }
         }
 
         if (overlay && this.hitTestOverlay(imagePoint, overlay)) {
@@ -1573,6 +1895,26 @@ class ImageCanvas {
             return;
         }
 
+        if (overlay?.type === 'pointSequence') {
+            const originalGeometry = this.readOverlayGeometry(overlay);
+            const nextGeometry = appendPointSequencePoint(originalGeometry, imagePoint, this.getImageBounds());
+            if (!sameGeometry(originalGeometry, nextGeometry)) {
+                const pointIndex = Math.max(0, nextGeometry.points.length - 1);
+                overlay.selectedPointIndex = pointIndex;
+                this.updateEditableOverlayGeometry(overlay, nextGeometry, 'dragging');
+                this.selectedOverlay = overlay.id;
+                this.activeOverlayId = overlay.id;
+                this.activeHandle = `point:${pointIndex}`;
+                this.interactionState = {
+                    type: 'resize',
+                    handle: `point:${pointIndex}`,
+                    overlayId: overlay.id,
+                    originalGeometry
+                };
+                return;
+            }
+        }
+
         const originalGeometry = overlay ? this.readOverlayGeometry(overlay) : null;
         const drawKind = originalGeometry?.kind || 'rectangle';
         const initialGeometry = drawKind === 'circle'
@@ -1585,6 +1927,8 @@ class ImageCanvas {
                     innerRadius: 0,
                     outerRadius: this.minimumOverlaySize
                 }
+                : drawKind === 'pointSequence'
+                    ? appendPointSequencePoint(originalGeometry || { kind: 'pointSequence', points: [] }, imagePoint, this.getImageBounds())
                 : {
                     kind: 'rectangle',
                     x: imagePoint.x,
@@ -1648,7 +1992,7 @@ class ImageCanvas {
             );
         } else if (this.interactionState.type === 'resize') {
             nextGeometry = this.resizeEditableGeometry(
-                this.interactionState.originalGeometry,
+                this.interactionState.baseGeometry || this.interactionState.originalGeometry,
                 this.interactionState.handle,
                 imagePoint
             );

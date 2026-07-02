@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G09C`
-- 当前卡片：`docs/进行中/Studio2/goals/G09C.md`
+- 当前 Goal：`G10A`
+- 当前卡片：`docs/进行中/Studio2/goals/G10A.md`
 - 当前阶段：`Geometry/Spatial`
 - 总状态：`IN_PROGRESS`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -99,8 +99,8 @@
 | G08 | Observation | Visual Scene V1（只读投影） | DONE | G07B | `docs/进行中/Studio2/goals/G08.md` | 见 G08 完成提交与最终报告 |
 | G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | DONE | G08 | `docs/进行中/Studio2/goals/G09A.md` | 见 G09A 完成提交与最终报告 |
 | G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | DONE | G09A | `docs/进行中/Studio2/goals/G09B.md` | 见 G09B 完成提交与最终报告 |
-| G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | IN_PROGRESS | G09B | `docs/进行中/Studio2/goals/G09C.md` |  |
-| G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | LOCKED | G09C | `docs/进行中/Studio2/goals/G10A.md` |  |
+| G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | DONE | G09B | `docs/进行中/Studio2/goals/G09C.md` | 见 G09C 完成提交与最终报告 |
+| G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | IN_PROGRESS | G09C | `docs/进行中/Studio2/goals/G10A.md` |  |
 | G10B | Geometry/Spatial | RoiManager Crop 空间传播 | LOCKED | G10A | `docs/进行中/Studio2/goals/G10B.md` |  |
 | G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | LOCKED | G10B | `docs/进行中/Studio2/goals/G10C.md` |  |
 | G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | LOCKED | G10C | `docs/进行中/Studio2/goals/G11A.md` |  |
@@ -163,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-03 | G09C | `736b3e98629d8cf948f80b02c9c7f4de661baff7` | 见 G09C 完成提交与最终报告 | UI focused ROI geometry PASS（26 tests）；canvas-core PASS（25 tests）；Playwright ROI editor PASS（10 tests single-worker and 10 tests normal）；UI `test:unit` PASS（605 tests）；`test:preview-smoke` PASS；Product targeted NPoint/RoiManager PASS（15 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（83 tests）；`git diff --check` PASS；process audit PASS（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Polygon/PointSequence 编辑：Polygon fail-closed，PointPairs optional `Enabled=false` additive and ignored by runtime/scene projection，Scene/edit overlay group isolated；当前 Goal 已推进到 G10A，未执行 G10C。 |
 | 2026-07-02 | G07B final follow-up | `de327a5e0f0d48abb79a2791211eea6189ac5737` | 见 G07B final follow-up 完成提交与最终报告 | UI focused `app-infrastructure`/`global-variable-panel` PASS（66 tests）；UI `test:unit` PASS（588 tests）；`test:preview-smoke` PASS；Playwright field-binding focused PASS（2 tests）；Product targeted G07A/G07B PASS（95 tests）；Desktop targeted Observation/Preview/Artifact/Architecture Guard PASS（71 tests）；Product full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish V2 asset audit PASS（0 prohibited files/dirs）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 修复全局变量异步保存跨工程污染：`ProjectManager.saveGlobalVariables` 冻结 targetProjectId，并在迟到响应返回旧工程 schema 时不写入当前工程、signal、cache、baseline 或 dirty 状态；`GlobalVariablePanel.save`/`bindPreviewField` 传入 expectedProjectId，await 后同时确认 panel project 与 ProjectManager 当前工程仍匹配才应用 schema、同步 FlowCanvas、刷新值和显示成功 toast；新增 A->B 延迟保存与字段绑定竞态测试；G08 仅标记 READY，未执行 G08。 |
 | 2026-07-02 | G07B follow-up | `b83fcbeab63941ba1f6f053b441f3ee2b15d8907` | 见 G07B follow-up 完成提交与最终报告 | UI focused global-variable/Inspector/selectionStore unit PASS（57 tests）；Desktop targeted G05A/G05B/G06/G07A/G07B PASS（71 tests）；Product targeted G07A/G07B PASS（95 tests）；Playwright field-binding focused PASS（2 tests）；UI `test:unit` PASS（586 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（11 tests）；Desktop full serial PASS（453 tests）；Product failed performance filters isolated PASS（4 tests）after load-sensitive full run；Product full serial final isolated PASS（3128 passed, 4 skipped）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收紧字段绑定 stale/TOCTOU 防线：`bindPreviewField` 在打开选择器前、选择返回后、替换确认后、保存前统一 `validatePreviewFieldBindingContext`；非法/缺失 flowRevision fail closed；mutation owner 独立验证 addressable/scalar/truncated/artifact/canonical metadata/selectionStore；nested ResultPath 不再用根端口结构类型误判不兼容，legacy 与 explicit root 仍按根类型校验；延迟选择器竞态不发 PUT 且保留旧 SourceBinding；未执行 G08。 |
 | 2026-07-02 | G07B | `295363ecfad05711ecb7d214513a6aa090fd64ed` | 见 G07B 完成提交与最终报告 | UI focused global-variable/Inspector unit PASS（51 tests）；Desktop targeted Observation/Architecture PASS（32 tests）；Product targeted ResultPath/ProjectVariables/FlowExecution PASS（95 tests）；Playwright field-binding focused PASS（1 test）；UI `test:unit` PASS（580 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（10 tests）；`ClearVision.Product.Tests` full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 增加字段级全局变量绑定 V1：SourceBinding 前端 round-trip 保留 optional ResultPath 字段且不迁移 legacy root；Observation 投影后端权威 `bindableVariableTypes`；Inspector 仅对当前 identity 的可绑定 scalar canonical metadata 显示入口并通过注入 callback 出口；GlobalVariablePanel 为唯一 UI mutation owner，经现有 ProjectManager 保存链完成已有变量绑定、替换、取消和失败回滚；未执行 G08。 |

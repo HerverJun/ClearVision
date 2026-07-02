@@ -38,10 +38,20 @@ export const POLAR_ANNULUS_ARC_PARAM_KEYS = {
     endAngle: 'EndAngle'
 };
 
+export const POLYGON_PARAM_KEYS = {
+    points: 'PolygonPoints'
+};
+
+export const POINT_PAIRS_PARAM_KEYS = {
+    pointPairs: 'PointPairs'
+};
+
 export const RECT_DRAFT_HISTORY_LIMIT = 50;
 export const GEOMETRY_ANGLE_UNITS = 'degrees';
 export const GEOMETRY_ANGLE_ZERO_DIRECTION = '+x';
 export const GEOMETRY_ANGLE_DIRECTION = 'clockwise-image-y-down';
+export const POLYGON_MIN_POINTS = 3;
+export const POLYGON_MIN_EDGE_LENGTH = 1;
 
 export function clamp(value, min, max) {
     if (!Number.isFinite(value)) {
@@ -56,6 +66,16 @@ function readNumber(value, fallback = 0) {
     return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
+function roundCoordinate(value, digits = 3) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+        return 0;
+    }
+
+    const scale = 10 ** digits;
+    return Math.round(numberValue * scale) / scale;
+}
+
 function normalizeBounds(bounds, minSize = 1) {
     const minimum = Math.max(1, readNumber(minSize, 1));
     return {
@@ -66,6 +86,147 @@ function normalizeBounds(bounds, minSize = 1) {
 
 export function isFinitePoint(point) {
     return Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.y));
+}
+
+function readPointLike(value) {
+    if (Array.isArray(value) && value.length >= 2) {
+        const x = Number(value[0]);
+        const y = Number(value[1]);
+        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    }
+
+    const x = Number(value?.x ?? value?.X ?? value?.imageX ?? value?.ImageX ?? value?.pixelX ?? value?.PixelX);
+    const y = Number(value?.y ?? value?.Y ?? value?.imageY ?? value?.ImageY ?? value?.pixelY ?? value?.PixelY);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function parseJsonArray(raw) {
+    if (Array.isArray(raw)) {
+        return raw;
+    }
+
+    if (typeof raw !== 'string') {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function getPointSequencePoints(geometry) {
+    return Array.isArray(geometry?.points)
+        ? geometry.points
+            .map(point => {
+                const imagePoint = readPointLike(point);
+                if (!imagePoint) {
+                    return null;
+                }
+
+                return {
+                    x: imagePoint.x,
+                    y: imagePoint.y,
+                    worldX: readNumber(point?.worldX ?? point?.WorldX ?? point?.physicalX ?? point?.PhysicalX, imagePoint.x),
+                    worldY: readNumber(point?.worldY ?? point?.WorldY ?? point?.physicalY ?? point?.PhysicalY, imagePoint.y),
+                    enabled: point?.enabled ?? point?.Enabled ?? true
+                };
+            })
+            .filter(Boolean)
+        : [];
+}
+
+function isPointInBounds(point, bounds) {
+    if (!bounds) {
+        return true;
+    }
+
+    const normalizedBounds = normalizeBounds(bounds);
+    return isFinitePoint(point) &&
+        Number(point.x) >= 0 &&
+        Number(point.y) >= 0 &&
+        Number(point.x) <= normalizedBounds.width &&
+        Number(point.y) <= normalizedBounds.height;
+}
+
+function squaredDistance(left, right) {
+    const dx = Number(left?.x ?? 0) - Number(right?.x ?? 0);
+    const dy = Number(left?.y ?? 0) - Number(right?.y ?? 0);
+    return dx * dx + dy * dy;
+}
+
+function distancePointToSegment(point, start, end) {
+    const px = Number(point?.x ?? 0);
+    const py = Number(point?.y ?? 0);
+    const ax = Number(start?.x ?? 0);
+    const ay = Number(start?.y ?? 0);
+    const bx = Number(end?.x ?? 0);
+    const by = Number(end?.y ?? 0);
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (lengthSquared <= Number.EPSILON) {
+        return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+    }
+
+    const t = clamp(((px - ax) * dx + (py - ay) * dy) / lengthSquared, 0, 1);
+    const closestX = ax + t * dx;
+    const closestY = ay + t * dy;
+    return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2);
+}
+
+function orientation(a, b, c) {
+    const value = (Number(b.y) - Number(a.y)) * (Number(c.x) - Number(b.x)) -
+        (Number(b.x) - Number(a.x)) * (Number(c.y) - Number(b.y));
+    if (Math.abs(value) <= 1e-9) {
+        return 0;
+    }
+    return value > 0 ? 1 : 2;
+}
+
+function onSegment(a, b, c) {
+    return Number(b.x) <= Math.max(Number(a.x), Number(c.x)) + 1e-9 &&
+        Number(b.x) >= Math.min(Number(a.x), Number(c.x)) - 1e-9 &&
+        Number(b.y) <= Math.max(Number(a.y), Number(c.y)) + 1e-9 &&
+        Number(b.y) >= Math.min(Number(a.y), Number(c.y)) - 1e-9;
+}
+
+function segmentsIntersect(a1, a2, b1, b2) {
+    const o1 = orientation(a1, a2, b1);
+    const o2 = orientation(a1, a2, b2);
+    const o3 = orientation(b1, b2, a1);
+    const o4 = orientation(b1, b2, a2);
+
+    if (o1 !== o2 && o3 !== o4) {
+        return true;
+    }
+    if (o1 === 0 && onSegment(a1, b1, a2)) {
+        return true;
+    }
+    if (o2 === 0 && onSegment(a1, b2, a2)) {
+        return true;
+    }
+    if (o3 === 0 && onSegment(b1, a1, b2)) {
+        return true;
+    }
+    return o4 === 0 && onSegment(b1, a2, b2);
+}
+
+function polygonArea(points) {
+    if (!Array.isArray(points) || points.length < 3) {
+        return 0;
+    }
+
+    let area = 0;
+    for (let index = 0; index < points.length; index += 1) {
+        const current = points[index];
+        const next = points[(index + 1) % points.length];
+        area += Number(current.x) * Number(next.y) - Number(next.x) * Number(current.y);
+    }
+    return area / 2;
 }
 
 export function isFiniteRect(rect) {
@@ -269,6 +430,456 @@ export function validateAnnulusGeometry(annulus, bounds = null, options = {}) {
     return {
         valid: errors.length === 0,
         errors
+    };
+}
+
+export function parsePolygonPoints(value) {
+    const rawPoints = parseJsonArray(value);
+    if (!rawPoints) {
+        return null;
+    }
+
+    const points = rawPoints
+        .map(item => readPointLike(item))
+        .filter(Boolean);
+
+    return {
+        kind: 'polygon',
+        points
+    };
+}
+
+export function polygonToParamsJson(polygon) {
+    const points = Array.isArray(polygon?.points) ? polygon.points : [];
+    return JSON.stringify(points.map(point => [
+        Math.round(Number(point.x ?? 0)),
+        Math.round(Number(point.y ?? 0))
+    ]));
+}
+
+export function normalizePolygonGeometry(polygon) {
+    const points = Array.isArray(polygon?.points)
+        ? polygon.points
+            .map(item => readPointLike(item))
+            .filter(Boolean)
+            .map(point => ({
+                x: roundCoordinate(point.x),
+                y: roundCoordinate(point.y)
+            }))
+        : [];
+
+    return {
+        kind: 'polygon',
+        points
+    };
+}
+
+export function validatePolygonGeometry(polygon, bounds = null, options = {}) {
+    const minPoints = Math.max(POLYGON_MIN_POINTS, Math.floor(readNumber(options.minPoints, POLYGON_MIN_POINTS)));
+    const minEdgeLength = Math.max(0, readNumber(options.minEdgeLength, POLYGON_MIN_EDGE_LENGTH));
+    const minEdgeLengthSquared = minEdgeLength * minEdgeLength;
+    const rawPoints = Array.isArray(polygon?.points) ? polygon.points : [];
+    const points = normalizePolygonGeometry(polygon).points;
+    const errors = [];
+
+    if (!Array.isArray(polygon?.points)) {
+        errors.push('points');
+    }
+
+    if (rawPoints.length !== points.length || rawPoints.some(point => readPointLike(point) === null)) {
+        errors.push('non-finite');
+    }
+
+    if (points.length < minPoints) {
+        errors.push('pointCount');
+    }
+
+    if (points.some(point => !isFinitePoint(point))) {
+        errors.push('non-finite');
+    }
+
+    if (bounds && points.some(point => !isPointInBounds(point, bounds))) {
+        errors.push('bounds');
+    }
+
+    for (let index = 0; index < points.length; index += 1) {
+        for (let other = index + 1; other < points.length; other += 1) {
+            if (squaredDistance(points[index], points[other]) <= minEdgeLengthSquared) {
+                errors.push('duplicatePoint');
+                index = points.length;
+                break;
+            }
+        }
+    }
+
+    for (let index = 0; index < points.length; index += 1) {
+        const next = points[(index + 1) % points.length];
+        if (squaredDistance(points[index], next) <= minEdgeLengthSquared) {
+            errors.push('nearZeroEdge');
+            break;
+        }
+    }
+
+    if (Math.abs(polygonArea(points)) <= Math.max(1e-6, minEdgeLengthSquared * 0.5)) {
+        errors.push('area');
+    }
+
+    for (let index = 0; index < points.length; index += 1) {
+        const a1 = points[index];
+        const a2 = points[(index + 1) % points.length];
+        for (let other = index + 1; other < points.length; other += 1) {
+            if (Math.abs(index - other) <= 1 || (index === 0 && other === points.length - 1)) {
+                continue;
+            }
+
+            const b1 = points[other];
+            const b2 = points[(other + 1) % points.length];
+            if (segmentsIntersect(a1, a2, b1, b2)) {
+                errors.push('selfIntersection');
+                index = points.length;
+                break;
+            }
+        }
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: [...new Set(errors)]
+    };
+}
+
+export function getPolygonHandlePoints(polygon) {
+    return normalizePolygonGeometry(polygon).points.reduce((handles, point, index) => {
+        handles[`vertex:${index}`] = point;
+        return handles;
+    }, {});
+}
+
+export function hitTestPolygonVertex(point, polygon, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const points = normalizePolygonGeometry(polygon).points;
+
+    for (let index = 0; index < points.length; index += 1) {
+        if (Math.sqrt(squaredDistance(point, points[index])) <= tolerance) {
+            return `vertex:${index}`;
+        }
+    }
+
+    return null;
+}
+
+export function hitTestPolygonEdge(point, polygon, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const points = normalizePolygonGeometry(polygon).points;
+    if (points.length < 2) {
+        return null;
+    }
+
+    for (let index = 0; index < points.length; index += 1) {
+        const nextIndex = (index + 1) % points.length;
+        if (distancePointToSegment(point, points[index], points[nextIndex]) <= tolerance) {
+            return nextIndex;
+        }
+    }
+
+    return null;
+}
+
+export function hitTestPolygon(point, polygon) {
+    if (!isFinitePoint(point)) {
+        return false;
+    }
+
+    const points = normalizePolygonGeometry(polygon).points;
+    if (points.length < 3) {
+        return false;
+    }
+
+    let inside = false;
+    const x = Number(point.x);
+    const y = Number(point.y);
+    for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
+        const current = points[index];
+        const previousPoint = points[previous];
+        const intersects = ((Number(current.y) > y) !== (Number(previousPoint.y) > y)) &&
+            x < (Number(previousPoint.x) - Number(current.x)) * (y - Number(current.y)) /
+                (Number(previousPoint.y) - Number(current.y)) + Number(current.x);
+        if (intersects) {
+            inside = !inside;
+        }
+    }
+
+    return inside;
+}
+
+export function translatePolygon(polygon, delta, bounds = null) {
+    const points = normalizePolygonGeometry(polygon).points.map(point => ({
+        x: roundCoordinate(point.x + Number(delta?.x ?? 0)),
+        y: roundCoordinate(point.y + Number(delta?.y ?? 0))
+    }));
+    const next = { kind: 'polygon', points };
+    return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
+}
+
+export function movePolygonVertex(polygon, vertexIndex, point, bounds = null) {
+    const points = normalizePolygonGeometry(polygon).points;
+    const index = Number(vertexIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= points.length || !isFinitePoint(point)) {
+        return normalizePolygonGeometry(polygon);
+    }
+
+    const next = {
+        kind: 'polygon',
+        points: points.map((existing, currentIndex) =>
+            currentIndex === index
+                ? { x: roundCoordinate(point.x), y: roundCoordinate(point.y) }
+                : existing)
+    };
+    return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
+}
+
+export function insertPolygonVertex(polygon, insertIndex, point, bounds = null) {
+    const points = normalizePolygonGeometry(polygon).points;
+    const index = Number(insertIndex);
+    if (!Number.isInteger(index) || index < 0 || index > points.length || !isFinitePoint(point)) {
+        return normalizePolygonGeometry(polygon);
+    }
+
+    const next = {
+        kind: 'polygon',
+        points: [
+            ...points.slice(0, index),
+            { x: roundCoordinate(point.x), y: roundCoordinate(point.y) },
+            ...points.slice(index)
+        ]
+    };
+    return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
+}
+
+export function deletePolygonVertex(polygon, vertexIndex, bounds = null) {
+    const points = normalizePolygonGeometry(polygon).points;
+    const index = Number(vertexIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= points.length || points.length <= POLYGON_MIN_POINTS) {
+        return normalizePolygonGeometry(polygon);
+    }
+
+    const next = {
+        kind: 'polygon',
+        points: points.filter((_, currentIndex) => currentIndex !== index)
+    };
+    return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
+}
+
+export function parsePointPairs(value) {
+    const rawPairs = parseJsonArray(value);
+    if (!rawPairs) {
+        return null;
+    }
+
+    const points = rawPairs
+        .map(item => {
+            const imagePoint = readPointLike(item?.ImagePoint ?? item?.imagePoint ?? item);
+            const worldPoint = readPointLike(item?.WorldPoint ?? item?.worldPoint ?? {
+                x: item?.WorldX ?? item?.worldX ?? item?.PhysicalX ?? item?.physicalX,
+                y: item?.WorldY ?? item?.worldY ?? item?.PhysicalY ?? item?.physicalY
+            });
+            if (!imagePoint || !worldPoint) {
+                return null;
+            }
+
+            return {
+                x: imagePoint.x,
+                y: imagePoint.y,
+                worldX: worldPoint.x,
+                worldY: worldPoint.y,
+                enabled: item?.Enabled ?? item?.enabled ?? true
+            };
+        })
+        .filter(Boolean);
+
+    return {
+        kind: 'pointSequence',
+        points
+    };
+}
+
+export function pointPairsToParamsJson(sequence) {
+    const points = getPointSequencePoints(sequence);
+    return JSON.stringify(points.map(point => ({
+        ImageX: roundCoordinate(point.x),
+        ImageY: roundCoordinate(point.y),
+        WorldX: roundCoordinate(point.worldX),
+        WorldY: roundCoordinate(point.worldY),
+        Enabled: point.enabled !== false
+    })));
+}
+
+export function normalizePointSequenceGeometry(sequence) {
+    return {
+        kind: 'pointSequence',
+        points: getPointSequencePoints(sequence).map(point => ({
+            x: roundCoordinate(point.x),
+            y: roundCoordinate(point.y),
+            worldX: roundCoordinate(point.worldX),
+            worldY: roundCoordinate(point.worldY),
+            enabled: point.enabled !== false
+        }))
+    };
+}
+
+export function validatePointSequenceGeometry(sequence, bounds = null) {
+    const rawPoints = Array.isArray(sequence?.points) ? sequence.points : [];
+    const points = normalizePointSequenceGeometry(sequence).points;
+    const errors = [];
+
+    if (!Array.isArray(sequence?.points)) {
+        errors.push('points');
+    }
+
+    if (rawPoints.length !== points.length ||
+        rawPoints.some(point => readPointLike(point) === null) ||
+        points.some(point => !isFinitePoint(point) ||
+        !Number.isFinite(Number(point.worldX)) ||
+        !Number.isFinite(Number(point.worldY)))) {
+        errors.push('non-finite');
+    }
+
+    if (bounds && points.some(point => !isPointInBounds(point, bounds))) {
+        errors.push('bounds');
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: [...new Set(errors)]
+    };
+}
+
+export function getPointSequenceHandlePoints(sequence) {
+    return normalizePointSequenceGeometry(sequence).points.reduce((handles, point, index) => {
+        handles[`point:${index}`] = point;
+        return handles;
+    }, {});
+}
+
+export function hitTestPointSequencePoint(point, sequence, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const points = normalizePointSequenceGeometry(sequence).points;
+
+    for (let index = 0; index < points.length; index += 1) {
+        if (Math.sqrt(squaredDistance(point, points[index])) <= tolerance) {
+            return `point:${index}`;
+        }
+    }
+
+    return null;
+}
+
+export function translatePointSequence(sequence, delta, bounds = null) {
+    const points = normalizePointSequenceGeometry(sequence).points.map(point => ({
+        ...point,
+        x: roundCoordinate(point.x + Number(delta?.x ?? 0)),
+        y: roundCoordinate(point.y + Number(delta?.y ?? 0))
+    }));
+    const next = { kind: 'pointSequence', points };
+    return validatePointSequenceGeometry(next, bounds).valid ? next : normalizePointSequenceGeometry(sequence);
+}
+
+export function movePointSequencePoint(sequence, pointIndex, point, bounds = null) {
+    const points = normalizePointSequenceGeometry(sequence).points;
+    const index = Number(pointIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= points.length || !isFinitePoint(point)) {
+        return normalizePointSequenceGeometry(sequence);
+    }
+
+    const next = {
+        kind: 'pointSequence',
+        points: points.map((existing, currentIndex) =>
+            currentIndex === index
+                ? { ...existing, x: roundCoordinate(point.x), y: roundCoordinate(point.y) }
+                : existing)
+    };
+    return validatePointSequenceGeometry(next, bounds).valid ? next : normalizePointSequenceGeometry(sequence);
+}
+
+export function appendPointSequencePoint(sequence, point, bounds = null) {
+    const points = normalizePointSequenceGeometry(sequence).points;
+    if (!isFinitePoint(point)) {
+        return normalizePointSequenceGeometry(sequence);
+    }
+
+    const next = {
+        kind: 'pointSequence',
+        points: [
+            ...points,
+            {
+                x: roundCoordinate(point.x),
+                y: roundCoordinate(point.y),
+                worldX: roundCoordinate(point.x),
+                worldY: roundCoordinate(point.y),
+                enabled: true
+            }
+        ]
+    };
+    return validatePointSequenceGeometry(next, bounds).valid ? next : normalizePointSequenceGeometry(sequence);
+}
+
+export function deletePointSequencePoint(sequence, pointIndex) {
+    const points = normalizePointSequenceGeometry(sequence).points;
+    const index = Number(pointIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= points.length) {
+        return normalizePointSequenceGeometry(sequence);
+    }
+
+    return {
+        kind: 'pointSequence',
+        points: points.filter((_, currentIndex) => currentIndex !== index)
+    };
+}
+
+export function togglePointSequencePointEnabled(sequence, pointIndex) {
+    const points = normalizePointSequenceGeometry(sequence).points;
+    const index = Number(pointIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= points.length) {
+        return normalizePointSequenceGeometry(sequence);
+    }
+
+    return {
+        kind: 'pointSequence',
+        points: points.map((point, currentIndex) =>
+            currentIndex === index ? { ...point, enabled: point.enabled === false } : point)
+    };
+}
+
+export function reorderPointSequencePoint(sequence, pointIndex, direction) {
+    const points = normalizePointSequenceGeometry(sequence).points;
+    const index = Number(pointIndex);
+    const offset = Number(direction) < 0 ? -1 : 1;
+    const nextIndex = index + offset;
+    if (!Number.isInteger(index) || index < 0 || index >= points.length || nextIndex < 0 || nextIndex >= points.length) {
+        return normalizePointSequenceGeometry(sequence);
+    }
+
+    const nextPoints = [...points];
+    const [moved] = nextPoints.splice(index, 1);
+    nextPoints.splice(nextIndex, 0, moved);
+    return {
+        kind: 'pointSequence',
+        points: nextPoints
     };
 }
 

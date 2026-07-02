@@ -517,7 +517,7 @@ class PropertyPanel {
                     <input type="text" 
                            id="param-${name}" 
                            name="${name}" 
-                           value="${value !== undefined ? value : defaultValue || ''}"
+                           value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}"
                            class="form-input"
                            data-type="string">
                 `;
@@ -574,7 +574,7 @@ class PropertyPanel {
             case 'file':
                 inputHtml = `
                     <div class="file-picker-wrapper">
-                        <input type="text" id="param-${name}" name="${name}" value="${value !== undefined ? value : defaultValue || ''}" class="form-input" readonly data-type="file">
+                        <input type="text" id="param-${name}" name="${name}" value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}" class="form-input" readonly data-type="file">
                         <button type="button" class="btn btn-sm btn-secondary btn-pick-file" data-param="${name}">...</button>
                     </div>
                 `;
@@ -611,7 +611,7 @@ class PropertyPanel {
                     <input type="text" 
                            id="param-${name}" 
                            name="${name}" 
-                           value="${value !== undefined ? value : defaultValue || ''}"
+                           value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}"
                            class="form-input"
                            data-type="${dataType}">
                 `;
