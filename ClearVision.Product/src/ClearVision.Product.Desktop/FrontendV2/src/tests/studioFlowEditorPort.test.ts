@@ -140,6 +140,142 @@ describe('StudioFlowEditorPort', () => {
     expect(getParameterValue(port.getSnapshot(), 'Threshold')).toBe(10);
   });
 
+  it('advances the project max observed sequence even when a high-sequence command fails later validation', () => {
+    const adapter = createLegacyAdapterFixture();
+    const port = createStudioFlowEditorPort(adapter);
+
+    port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: 1,
+      flow: createFlowFixture()
+    });
+    port.selectNode({
+      projectId: 'project-a',
+      requestSequence: 2,
+      nodeId: 'node-a'
+    });
+
+    const staleRevision = port.patchParameters({
+      projectId: 'project-a',
+      requestSequence: 10,
+      expectedFlowRevision: port.getSnapshot().flowRevision - 1,
+      nodeId: 'node-a',
+      parameters: { Threshold: 20 }
+    });
+    const lateLowerSequence = port.patchParameters({
+      projectId: 'project-a',
+      requestSequence: 5,
+      expectedFlowRevision: port.getSnapshot().flowRevision,
+      nodeId: 'node-a',
+      parameters: { Threshold: 21 }
+    });
+
+    expect(staleRevision.disposition).toBe('stale_flow_revision');
+    expect(lateLowerSequence.disposition).toBe('stale_request');
+    expect(getParameterValue(port.getSnapshot(), 'Threshold')).toBe(10);
+  });
+
+  it('keeps request sequence authority isolated by project and ignores project mismatches', () => {
+    const adapter = createLegacyAdapterFixture();
+    const port = createStudioFlowEditorPort(adapter);
+
+    port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: 1,
+      flow: createFlowFixture('project-a')
+    });
+    port.selectNode({
+      projectId: 'project-a',
+      requestSequence: 2,
+      nodeId: 'node-a'
+    });
+
+    const mismatchedProject = port.patchParameters({
+      projectId: 'project-b',
+      requestSequence: 100,
+      expectedFlowRevision: port.getSnapshot().flowRevision,
+      nodeId: 'node-b',
+      parameters: { Threshold: 20 }
+    });
+    const currentProjectAccepted = port.patchParameters({
+      projectId: 'project-a',
+      requestSequence: 3,
+      expectedFlowRevision: port.getSnapshot().flowRevision,
+      expectedSelectionRevision: port.getSnapshot().selectionRevision,
+      nodeId: 'node-a',
+      parameters: { Threshold: 21 }
+    });
+
+    expect(mismatchedProject.disposition).toBe('project_mismatch');
+    expect(currentProjectAccepted.disposition).toBe('accepted');
+    expect(getParameterValue(port.getSnapshot(), 'Threshold')).toBe(21);
+  });
+
+  it('rejects invalid request sequences without advancing the project max observed sequence', () => {
+    const adapter = createLegacyAdapterFixture();
+    const port = createStudioFlowEditorPort(adapter);
+
+    port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: 1,
+      flow: createFlowFixture()
+    });
+    port.selectNode({
+      projectId: 'project-a',
+      requestSequence: 2,
+      nodeId: 'node-a'
+    });
+
+    for (const requestSequence of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.1, Number.MAX_SAFE_INTEGER + 1]) {
+      const result = port.patchParameters({
+        projectId: 'project-a',
+        requestSequence,
+        expectedFlowRevision: port.getSnapshot().flowRevision,
+        nodeId: 'node-a',
+        parameters: { Threshold: 30 }
+      });
+      expect(result.disposition).toBe('stale_request');
+    }
+
+    const accepted = port.patchParameters({
+      projectId: 'project-a',
+      requestSequence: 3,
+      expectedFlowRevision: port.getSnapshot().flowRevision,
+      expectedSelectionRevision: port.getSnapshot().selectionRevision,
+      nodeId: 'node-a',
+      parameters: { Threshold: 31 }
+    });
+
+    expect(accepted.disposition).toBe('accepted');
+    expect(getParameterValue(port.getSnapshot(), 'Threshold')).toBe(31);
+  });
+
+  it('allocates globally monotonic non-duplicate request sequences for multiple callers', () => {
+    const adapter = createLegacyAdapterFixture();
+    const port = createStudioFlowEditorPort(adapter);
+
+    const firstCaller = port.nextRequestSequence('project-a');
+    const secondCaller = port.nextRequestSequence('project-a');
+
+    expect(secondCaller).toBeGreaterThan(firstCaller);
+    expect(new Set([firstCaller, secondCaller]).size).toBe(2);
+
+    port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: secondCaller,
+      flow: createFlowFixture()
+    });
+    const failedHighSequence = port.selectNode({
+      projectId: 'project-a',
+      requestSequence: 10,
+      nodeId: 'missing-node'
+    });
+    const projectBCaller = port.nextRequestSequence('project-b');
+
+    expect(failedHighSequence.disposition).toBe('node_not_found');
+    expect(projectBCaller).toBe(11);
+  });
+
   it('commits node parameter patches and advances the frontend flow revision', () => {
     const adapter = createLegacyAdapterFixture();
     const port = createStudioFlowEditorPort(adapter);

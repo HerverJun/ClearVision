@@ -559,6 +559,100 @@ test('FlowCanvas handleMouseMove skips redraws when hover state does not change'
   }
 });
 
+test('FlowCanvas node drag commits one moveNode revision and adapter snapshot stays consistent', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+  const { FlowCanvasAdapter } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const adapter = new FlowCanvasAdapter(fc);
+  const node = fc.addNode('ImageAcquisition', 20, 20, {
+    id: 'node-a',
+    inputs: [],
+    outputs: []
+  });
+  const structureEvents = [];
+  fc.subscribeStructureState(event => {
+    structureEvents.push(event);
+  });
+  structureEvents.length = 0;
+  const beforeRevision = fc.getFlowRevision();
+
+  fc.handleMouseDown({
+    clientX: node.x + 10,
+    clientY: node.y + 10,
+    button: 0
+  });
+  fc.handleMouseMove({
+    clientX: node.x + 86,
+    clientY: node.y + 53
+  });
+  fc.handleMouseMove({
+    clientX: node.x + 93,
+    clientY: node.y + 61
+  });
+  fc.handleMouseUp();
+
+  const moveEvents = structureEvents.filter(event => event.reason === 'moveNode');
+  const snapshot = adapter.getSnapshot();
+  const serializedNode = snapshot.flow.operators.find(operator => operator.id === 'node-a');
+
+  assert.equal(fc.getFlowRevision(), beforeRevision + 1);
+  assert.equal(moveEvents.length, 1);
+  assert.equal(snapshot.flowRevision, fc.getFlowRevision());
+  assert.ok(serializedNode, 'dragged node should be present in serialized flow');
+  assert.equal(serializedNode.x, node.x);
+  assert.equal(serializedNode.y, node.y);
+  assert.notEqual(node.x, 20);
+  assert.notEqual(node.y, 20);
+
+  fc.destroy();
+});
+
+test('FlowCanvas click without node movement does not advance flow revision', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('ImageAcquisition', 20, 20, {
+    id: 'node-a',
+    inputs: [],
+    outputs: []
+  });
+  const structureEvents = [];
+  fc.subscribeStructureState(event => {
+    structureEvents.push(event);
+  });
+  structureEvents.length = 0;
+  const beforeRevision = fc.getFlowRevision();
+
+  fc.handleMouseDown({
+    clientX: node.x + 10,
+    clientY: node.y + 10,
+    button: 0
+  });
+  fc.handleMouseUp();
+
+  assert.equal(fc.getFlowRevision(), beforeRevision);
+  assert.equal(structureEvents.some(event => event.reason === 'moveNode'), false);
+  assert.equal(node.x, 20);
+  assert.equal(node.y, 20);
+
+  fc.destroy();
+});
+
 test('FlowCanvas expands node height for multi-port operators', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

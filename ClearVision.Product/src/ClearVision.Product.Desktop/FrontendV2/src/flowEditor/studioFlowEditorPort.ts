@@ -70,6 +70,7 @@ export interface FlowEditorCommandResult {
 export type StudioFlowEditorSnapshotListener = (snapshot: StudioFlowEditorSnapshot) => void;
 
 export interface StudioFlowEditorPort {
+  nextRequestSequence(projectId: string): number;
   getSnapshot(): StudioFlowEditorSnapshot;
   replaceFlow(command: ReplaceFlowCommand): FlowEditorCommandResult;
   selectNode(command: SelectNodeCommand): FlowEditorCommandResult;
@@ -85,7 +86,8 @@ export function createStudioFlowEditorPort(adapter: LegacyFlowCanvasAdapter): St
 
 class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
   private projectId: string | null = null;
-  private latestRequestSequence = 0;
+  private readonly maxObservedRequestSequenceByProject = new Map<string, number>();
+  private lastAllocatedRequestSequence = 0;
   private disposed = false;
   private readonly unsubscribers = new Set<() => void>();
 
@@ -97,14 +99,25 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
     return this.buildSnapshot(snapshot);
   }
 
+  nextRequestSequence(projectId: string): number {
+    if (this.disposed) {
+      return this.lastAllocatedRequestSequence + 1;
+    }
+
+    const projectMaxObserved = this.maxObservedRequestSequenceByProject.get(projectId) ?? 0;
+    this.lastAllocatedRequestSequence = Math.max(this.lastAllocatedRequestSequence, projectMaxObserved) + 1;
+    return this.lastAllocatedRequestSequence;
+  }
+
   replaceFlow(command: ReplaceFlowCommand): FlowEditorCommandResult {
     const disposed = this.rejectIfDisposed();
     if (disposed) {
       return disposed;
     }
 
-    if (this.isStaleRequest(command.requestSequence)) {
-      return this.reject('stale_request');
+    const sequenceRejection = this.observeCommandSequence(command.projectId, command.requestSequence);
+    if (sequenceRejection) {
+      return sequenceRejection;
     }
 
     if (
@@ -115,7 +128,6 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
       return this.reject('stale_flow_revision');
     }
 
-    this.latestRequestSequence = command.requestSequence;
     this.projectId = command.projectId;
     this.adapter.replaceFlow(deepClone(command.flow));
     return this.accept();
@@ -131,7 +143,6 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
       return this.reject('node_not_found');
     }
 
-    this.latestRequestSequence = command.requestSequence;
     this.adapter.selectNode(command.nodeId);
     return this.accept();
   }
@@ -167,7 +178,6 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
       return this.reject('parameter_not_found', result.missingParameters);
     }
 
-    this.latestRequestSequence = command.requestSequence;
     return this.accept();
   }
 
@@ -205,15 +215,22 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
       return this.reject('project_mismatch');
     }
 
-    if (this.isStaleRequest(command.requestSequence)) {
+    return this.observeCommandSequence(command.projectId, command.requestSequence);
+  }
+
+  private observeCommandSequence(projectId: string, requestSequence: number): FlowEditorCommandResult | null {
+    if (!isValidRequestSequence(requestSequence)) {
       return this.reject('stale_request');
     }
 
-    return null;
-  }
+    const maxObserved = this.maxObservedRequestSequenceByProject.get(projectId) ?? 0;
+    if (requestSequence <= maxObserved) {
+      return this.reject('stale_request');
+    }
 
-  private isStaleRequest(requestSequence: number): boolean {
-    return !Number.isFinite(requestSequence) || requestSequence <= this.latestRequestSequence;
+    this.maxObservedRequestSequenceByProject.set(projectId, requestSequence);
+    this.lastAllocatedRequestSequence = Math.max(this.lastAllocatedRequestSequence, requestSequence);
+    return null;
   }
 
   private rejectIfDisposed(): FlowEditorCommandResult | null {
@@ -332,6 +349,10 @@ function snapshotContainsNode(snapshot: LegacyFlowCanvasSnapshot, nodeId: string
     : (Array.isArray(flow.Operators) ? flow.Operators : []);
 
   return operators.some((operator) => isRecord(operator) && toSafeString(operator.id ?? operator.Id) === nodeId);
+}
+
+function isValidRequestSequence(requestSequence: number): boolean {
+  return Number.isSafeInteger(requestSequence) && requestSequence > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,9 +1,9 @@
 # Studio 2.0
 
 > 状态：Foundation 阶段入口
-> 当前完成项：G03
+> 当前完成项：G04A（含 2026-07-02 stale/revision 收口）
 > 下一执行项：G04B
-> 最近更新：2026-07-01
+> 最近更新：2026-07-02
 
 本目录保存仓库内 Studio 2.0 的正式执行状态、基线证据和全部后续 Goal 执行卡。外部桌面执行包只作为本次安装来源；完成合并后，仓库内 `TODO.md` 与本目录才是持续维护入口。
 
@@ -37,7 +37,7 @@
 | [`G02A`](goals/G02A.md) | DONE | 建立 `Desktop/FrontendV2` 构建底座，发布资产进入 `wwwroot/v2/`；收口修复固定 `/v2/` base，并消除 CI/MSBuild 重复 production build。 |
 | [`G02B`](goals/G02B.md) | DONE | 建立 `Studio:WorkspaceV2Enabled` 宿主启动切换、`/v2` 输出静态映射和无业务 V2 测试岛。 |
 | [`G03`](goals/G03.md) | DONE | 建立 V2 Workspace Shell MVP、Flow/Tool/Review 模式和唯一 hosted FlowCanvas 创建链。 |
-| [`G04A`](goals/G04A.md) | DONE | 建立 V2 Flow 编辑端口、本地 stale 防护和最小参数 draft/commit 验证。 |
+| [`G04A`](goals/G04A.md) | DONE | 建立 V2 Flow 编辑端口、本地 stale 防护和最小参数 draft/commit 验证；2026-07-02 追加 Port stale、拖拽 revision 和 dirty draft stale 收口。 |
 | [`G04B`](goals/G04B.md) | READY | 下一项；尚未执行。 |
 | G05A-G16 | LOCKED | 已安装执行卡，等待前置 Goal 解锁。 |
 

@@ -46,12 +46,12 @@ test('Studio 2.0 Flow Editor Port commits a real node parameter draft and reject
 
     const replace = port.replaceFlow({
       projectId: 'project-a',
-      requestSequence: 1,
+      requestSequence: port.nextRequestSequence('project-a'),
       flow: createBrowserFlow()
     });
     const select = port.selectNode({
       projectId: 'project-a',
-      requestSequence: 2,
+      requestSequence: port.nextRequestSequence('project-a'),
       nodeId: 'node-a'
     });
 
@@ -122,42 +122,34 @@ test('Studio 2.0 Flow Editor Port commits a real node parameter draft and reject
   expect(getParameterValue(committed, 'node-a', 'Threshold')).toBe(21);
   expect(committed.flowRevision).toBe(initial.snapshot.flowRevision + 1);
 
-  const staleResult = await page.evaluate(async () => {
-    const { default: serviceRegistry } = await import('/src/core/app/serviceRegistry.js');
-    const port = serviceRegistry.get('studio2.flowEditorPort');
-    const sequenceBase = Date.now() + 1000;
+  await thresholdInput.fill('33');
+  await expect(thresholdInput).toHaveValue('33');
+  const beforeDrag = await readPortSnapshot(page);
+  const canvas = page.locator('#studio2-flow-canvas');
+  await expect(canvas).toBeVisible();
+  const canvasBox = await canvas.boundingBox();
+  expect(canvasBox).not.toBeNull();
+  if (!canvasBox) {
+    throw new Error('Studio 2.0 flow canvas did not expose a bounding box.');
+  }
 
-    port.selectNode({
-      projectId: 'project-a',
-      requestSequence: sequenceBase,
-      nodeId: 'node-a'
-    });
-    const draftSnapshot = port.getSnapshot();
-    port.selectNode({
-      projectId: 'project-a',
-      requestSequence: sequenceBase + 1,
-      nodeId: 'node-b'
-    });
-    const staleCommit = port.patchParameters({
-      projectId: 'project-a',
-      requestSequence: sequenceBase + 2,
-      expectedFlowRevision: draftSnapshot.flowRevision,
-      expectedSelectionRevision: draftSnapshot.selectionRevision,
-      nodeId: 'node-a',
-      parameters: {
-        Threshold: 99
-      }
-    });
+  await page.mouse.move(canvasBox.x + 34, canvasBox.y + 38);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + 112, canvasBox.y + 86, { steps: 4 });
+  await page.mouse.up();
 
-    return {
-      staleCommit,
-      snapshot: port.getSnapshot()
-    };
-  });
+  await expect(page.locator('.studio2-flow-port-panel__stale'))
+    .toContainText('流程或选择已变化');
+  await expect(thresholdInput).toHaveValue('33');
+  await page.locator('.studio2-flow-port-panel__actions button[type="submit"]').click();
+  await expect(page.locator('.studio2-flow-port-panel__disposition')).toContainText('stale_flow_revision');
 
-  expect(staleResult.staleCommit.accepted).toBe(false);
-  expect(staleResult.staleCommit.disposition).toBe('stale_selection');
-  expect(getParameterValue(staleResult.snapshot, 'node-a', 'Threshold')).toBe(21);
+  const staleSnapshot = await readPortSnapshot(page);
+  expect(getParameterValue(staleSnapshot, 'node-a', 'Threshold')).toBe(21);
+  expect(staleSnapshot.flowRevision).toBe(beforeDrag.flowRevision + 1);
+
+  await page.locator('.studio2-flow-port-panel__actions button[type="button"]').click();
+  await expect(thresholdInput).toHaveValue('21');
 });
 
 test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', async ({ page }) => {

@@ -18,6 +18,10 @@ public sealed class Studio2ArchitectureGuardTests
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/workspace/workspaceShellRuntime.ts";
     private const string LegacyModulesPath =
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/adapters/legacyModules.ts";
+    private const string FlowEditorPortPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/flowEditor/studioFlowEditorPort.ts";
+    private const string FlowEditorPortPanelPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/components/FlowEditorPortPanel.vue";
 
     [Fact]
     public void FrontendV2_ShouldReuseExistingEventBusAndServiceRegistry()
@@ -92,6 +96,32 @@ public sealed class Studio2ArchitectureGuardTests
             .Should().ContainSingle("one Workspace lifecycle must register exactly one Flow Editor Port.");
         workspaceRuntimeText.Should().NotContain("serviceRegistry.register('flowCanvas'", "V2 must not register a raw FlowCanvas instance.");
         workspaceRuntimeText.Should().NotMatchRegex(@"\.raw\b", "V2 must not use the legacy raw escape hatch.");
+    }
+
+    [Fact]
+    public void FrontendV2_FlowEditorPort_ShouldOwnRequestSequenceAuthority()
+    {
+        var flowEditorPortText = File.ReadAllText(Path.Combine(Root, FlowEditorPortPath));
+        flowEditorPortText.Should().Contain("nextRequestSequence");
+        flowEditorPortText.Should().Contain("maxObservedRequestSequenceByProject");
+
+        var panelText = File.ReadAllText(Path.Combine(Root, FlowEditorPortPanelPath));
+        panelText.Should().Contain("port.nextRequestSequence");
+        panelText.Should().NotContain("Date.now", "Flow editor commands must use the shared port allocator.");
+
+        foreach (var file in EnumerateFrontendV2SourceFiles())
+        {
+            var relativePath = ToRelativePath(file);
+            if (string.Equals(relativePath, FlowEditorPortPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var text = File.ReadAllText(file);
+            text.Should().NotMatchRegex(@"\bDate\.now\s*\(", relativePath);
+            text.Should().NotMatchRegex(@"\blet\s+\w*requestSequence\w*\s*=", relativePath);
+            text.Should().NotMatchRegex(@"\brequestSequence\s*(?:\+\+|\+=)", relativePath);
+        }
     }
 
     [Fact]

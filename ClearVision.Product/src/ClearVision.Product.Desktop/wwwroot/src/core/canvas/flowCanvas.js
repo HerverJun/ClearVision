@@ -75,6 +75,7 @@ class FlowCanvas {
         this.selectionRevision = 0;
         this.draggedNode = null;
         this.dragOffset = { x: 0, y: 0 };
+        this.dragStartNodeState = null;
         this.scale = 1;
         this.offset = { x: 0, y: 0 };
         this.flowRevision = 0;
@@ -257,6 +258,7 @@ class FlowCanvas {
         this._connectionByInputPort.clear();
         this.selectedNode = null;
         this.draggedNode = null;
+        this.dragStartNodeState = null;
         this.selectedConnection = null;
         this.viewStateListeners.clear();
         this.structureStateListeners.clear();
@@ -2138,6 +2140,7 @@ class FlowCanvas {
                 if (e.button === 0) {
                     this.draggedNode = id;
                     this.dragOffset = { x: x - node.x, y: y - node.y };
+                    this.dragStartNodeState = { id, x: node.x, y: node.y };
                 }
 
                 // 触发节点选中回调。
@@ -2252,7 +2255,16 @@ class FlowCanvas {
     }
 
     handleMouseUp() {
+        const draggedNodeId = this.draggedNode;
+        const dragStart = this.dragStartNodeState;
         this.draggedNode = null;
+        this.dragStartNodeState = null;
+        if (draggedNodeId && dragStart?.id === draggedNodeId) {
+            const node = this.nodes.get(draggedNodeId);
+            if (node && (node.x !== dragStart.x || node.y !== dragStart.y)) {
+                this.markFlowStructureChanged('moveNode');
+            }
+        }
         if (!this.isConnecting) {
             this.canvas.style.cursor = 'default';
         }
@@ -2588,6 +2600,7 @@ class FlowCanvas {
         this._connectionByInputPort.clear();
         this.selectedNode = null;
         this.draggedNode = null;
+        this.dragStartNodeState = null;
         this.selectedConnection = null;
         this._markNodesBoundsDirty();
         this.invalidate();
