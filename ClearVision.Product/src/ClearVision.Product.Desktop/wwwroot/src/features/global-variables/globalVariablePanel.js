@@ -727,8 +727,9 @@ export default class GlobalVariablePanel {
 
         return await this.runMutation('save', async () => {
             const projectId = this.project.id;
-            const saved = await projectManager.saveGlobalVariables(nextSchema);
-            if (this.project?.id !== projectId) {
+            const saved = await projectManager.saveGlobalVariables(nextSchema, projectId);
+            const currentProject = projectManager.getCurrentProject?.() || null;
+            if (!sameId(this.project?.id, projectId) || !sameId(currentProject?.id, projectId)) {
                 return false;
             }
             this.applySchema(saved, prepared.selectedVariableId, { rebuildBaseline: true, sync: true });
@@ -931,8 +932,9 @@ export default class GlobalVariablePanel {
             });
 
             const projectId = saveContext.projectId;
-            const saved = await projectManager.saveGlobalVariables(nextSchema);
-            if (!sameId(this.project?.id, projectId)) {
+            const saved = await projectManager.saveGlobalVariables(nextSchema, projectId);
+            const currentProject = projectManager.getCurrentProject?.() || null;
+            if (!sameId(this.project?.id, projectId) || !sameId(currentProject?.id, projectId)) {
                 return false;
             }
 

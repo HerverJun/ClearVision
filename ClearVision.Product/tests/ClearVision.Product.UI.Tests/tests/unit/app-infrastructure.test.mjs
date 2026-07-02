@@ -417,6 +417,7 @@ test('project manager flow save omits unchanged global variables from aggregate 
     httpClient.put = originalPut;
     projectManager.currentProject = null;
     projectManager.savedGlobalVariablesSignature = '';
+    projectManager.forgetProjectFromCaches(project.id);
     setCurrentProject(null);
     if (previousDocument === undefined) {
       delete globalThis.document;
@@ -561,6 +562,106 @@ test('project manager global variable save uses schema endpoint without flow pay
   assert.equal(saved.targetBindings[0].id, 'bind-target');
   assert.equal(getCurrentProject().flow, project.flow);
   assert.equal(getCurrentProject().globalVariables.targetBindings[0].id, 'bind-target');
+  assert.equal(getProjectList().find(item => item.id === project.id).globalVariables.targetBindings[0].id, 'bind-target');
+  assert.equal(projectManager.savedGlobalVariablesSignature, JSON.stringify(saved));
+});
+
+test('project manager drops delayed global variable save application after project switch', async (t) => {
+  const originalPut = httpClient.put;
+  const previousDocument = globalThis.document;
+  const projectA = {
+    id: 'project-save-a',
+    name: 'Project A',
+    flow: { operators: [{ id: 'node-a' }], connections: [] },
+    globalVariables: {
+      schemaVersion: '1.0',
+      variables: [{ id: 'var-a', name: 'a.value', valueType: 'String', initialValue: 'a' }],
+      sourceBindings: [],
+      targetBindings: []
+    }
+  };
+  const projectB = {
+    id: 'project-save-b',
+    name: 'Project B',
+    flow: { operators: [{ id: 'node-b' }], connections: [] },
+    globalVariables: {
+      schemaVersion: '1.0',
+      variables: [{ id: 'var-b', name: 'b.value', valueType: 'String', initialValue: 'b' }],
+      sourceBindings: [],
+      targetBindings: []
+    }
+  };
+  const changedSchemaA = {
+    ...projectA.globalVariables,
+    sourceBindings: [{ id: 'source-a', variableId: 'var-a', operatorId: 'node-a', outputPortId: 'out-a' }]
+  };
+  const savedSchemaA = {
+    ...changedSchemaA,
+    variables: [{ ...changedSchemaA.variables[0], displayName: 'Saved A' }]
+  };
+  const puts = [];
+  let resolvePut;
+
+  t.after(() => {
+    httpClient.put = originalPut;
+    projectManager.currentProject = null;
+    projectManager.unsavedChanges = false;
+    projectManager.savedGlobalVariablesSignature = '';
+    projectManager.forgetProjectFromCaches(projectA.id);
+    projectManager.forgetProjectFromCaches(projectB.id);
+    setCurrentProject(null);
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  });
+
+  globalThis.document = {
+    title: '',
+    getElementById() {
+      return null;
+    }
+  };
+  projectManager.currentProject = projectA;
+  projectManager.unsavedChanges = false;
+  projectManager.rememberGlobalVariableBaseline(projectA);
+  setCurrentProject(projectA);
+  httpClient.put = async (url, body) => {
+    puts.push({ url, body });
+    return new Promise(resolve => {
+      resolvePut = resolve;
+    });
+  };
+
+  const savePromise = projectManager.saveGlobalVariables(changedSchemaA);
+  await Promise.resolve();
+  assert.equal(puts.length, 1);
+  assert.equal(puts[0].url, '/projects/project-save-a/global-variables');
+  assert.equal(puts[0].body.sourceBindings[0].id, 'source-a');
+
+  projectManager.currentProject = projectB;
+  projectManager.unsavedChanges = true;
+  projectManager.rememberGlobalVariableBaseline(projectB);
+  projectManager.rememberProjectInCaches(projectB);
+  setCurrentProject(projectB);
+  resolvePut(savedSchemaA);
+
+  const saved = await savePromise;
+  const cachedProjectB = getProjectList().find(project => project.id === projectB.id);
+
+  assert.equal(saved.variables[0].displayName, 'Saved A');
+  assert.equal(projectManager.currentProject.id, projectB.id);
+  assert.equal(projectManager.currentProject.name, 'Project B');
+  assert.equal(projectManager.currentProject.flow.operators[0].id, 'node-b');
+  assert.equal(projectManager.currentProject.globalVariables.variables[0].id, 'var-b');
+  assert.equal(projectManager.currentProject.globalVariables.sourceBindings.length, 0);
+  assert.equal(projectManager.unsavedChanges, true);
+  assert.equal(getCurrentProject().id, projectB.id);
+  assert.equal(getCurrentProject().globalVariables.variables[0].id, 'var-b');
+  assert.equal(cachedProjectB.globalVariables.variables[0].id, 'var-b');
+  assert.equal(cachedProjectB.globalVariables.sourceBindings.length, 0);
+  assert.equal(projectManager.savedGlobalVariablesSignature, JSON.stringify(projectB.globalVariables));
 });
 
 test('project manager close waits for confirmed save before clearing current project', async (t) => {

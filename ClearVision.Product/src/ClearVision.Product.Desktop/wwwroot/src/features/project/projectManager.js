@@ -351,18 +351,28 @@ class ProjectManager {
         setCurrentProject(this.currentProject);
     }
 
-    async saveGlobalVariables(globalVariables = null) {
+    async saveGlobalVariables(globalVariables = null, expectedProjectId = null) {
         if (!this.currentProject) {
             throw new Error('No project is open.');
         }
 
-        const schema = globalVariables || this.currentProject.globalVariables || {
+        const targetProject = this.currentProject;
+        const targetProjectId = targetProject.id;
+        if (expectedProjectId !== null && expectedProjectId !== undefined && !sameProjectId(expectedProjectId, targetProjectId)) {
+            throw new Error('Global variable save target does not match the current project.');
+        }
+
+        const schema = globalVariables || targetProject.globalVariables || {
             schemaVersion: '1.0',
             variables: [],
             sourceBindings: [],
             targetBindings: []
         };
-        const saved = await saveGlobalVariableSchema(this.currentProject.id, schema);
+        const saved = await saveGlobalVariableSchema(targetProjectId, schema);
+        if (!this.currentProject || !sameProjectId(this.currentProject.id, targetProjectId)) {
+            return saved;
+        }
+
         this.currentProject = {
             ...this.currentProject,
             globalVariables: saved
@@ -500,6 +510,14 @@ function getGlobalVariablesSignature(globalVariables) {
     }
 
     return JSON.stringify(globalVariables);
+}
+
+function sameProjectId(left, right) {
+    if (left === null || left === undefined || right === null || right === undefined) {
+        return false;
+    }
+
+    return String(left).trim().toLowerCase() === String(right).trim().toLowerCase();
 }
 
 function isProjectPayload(value) {

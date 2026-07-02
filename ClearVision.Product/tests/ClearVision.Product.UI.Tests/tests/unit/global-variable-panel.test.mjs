@@ -853,6 +853,7 @@ test('preview field binding saves canonical ResultPath through the panel transac
   projectManager.currentProject = project;
   const savedBodies = [];
   const syncedSchemas = [];
+  const toasts = [];
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       const body = JSON.parse(options.body);
@@ -896,7 +897,9 @@ test('preview field binding saves canonical ResultPath through the panel transac
 
   const panel = new GlobalVariablePanel('global-variables-root', {
     requestChoice: () => 'replace',
-    showToast() {}
+    showToast(message, type) {
+      toasts.push({ message, type });
+    }
   });
   panel.requestElementChoice = async () => ({ variableId: 'var-count' });
   panel.render = () => {};
@@ -918,7 +921,145 @@ test('preview field binding saves canonical ResultPath through the panel transac
   assert.equal(panel.baselineSchema.sourceBindings[0].resultPath, '$["Nested"]["Score"]');
   assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].resultPath, '$["Nested"]["Score"]');
   assert.equal(syncedSchemas.at(-1).sourceBindings[0].resultPath, '$["Nested"]["Score"]');
+  assert.equal(toasts.some(toast => toast.type === 'success' && toast.message.includes('已绑定')), true);
   assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding('var-count')), /\$\[&quot;Nested&quot;\]\[&quot;Score&quot;\]/);
+});
+
+test('preview field binding drops delayed save response after project switch', async (t) => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const projectA = createProject();
+  const projectB = createProject();
+  projectB.id = '22222222-2222-2222-2222-222222222222';
+  projectB.name = 'Project B';
+  projectB.flow.operators[0].id = 'op-b';
+  projectB.globalVariables = {
+    schemaVersion: '1.0',
+    variables: [{
+      id: 'var-b',
+      name: 'b.value',
+      displayName: 'B Value',
+      valueType: 'String',
+      initialValue: 'b',
+      manualWriteAllowed: true,
+      includeInResultMetadata: false,
+      order: 1
+    }],
+    sourceBindings: [{
+      id: 'source-b',
+      variableId: 'var-b',
+      operatorId: 'op-b',
+      outputPortId: 'out-b',
+      operatorName: 'Project B',
+      outputPortName: 'Out B',
+      resultPathVersion: 1,
+      resultPath: '$',
+      conversionMode: 'Exact',
+      expression: ''
+    }],
+    targetBindings: []
+  };
+  const descriptor = createPreviewFieldDescriptor(projectA);
+  const toasts = [];
+  const syncedSchemas = [];
+  let putUrl = '';
+  let putBody = null;
+  let resolvePut;
+  let currentSelection = descriptor;
+  let activeFlow = projectA.flow;
+
+  t.after(() => {
+    projectManager.currentProject = null;
+    projectManager.unsavedChanges = false;
+  });
+
+  projectManager.currentProject = projectA;
+  projectManager.unsavedChanges = false;
+  global.fetch = async (url, options = {}) => {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+      putUrl = String(url);
+      putBody = JSON.parse(options.body);
+      return new Promise(resolve => {
+        resolvePut = (payload = putBody) => resolve(jsonResponse(payload));
+      });
+    }
+    if (String(url).includes('/global-variable-values')) {
+      throw new Error('stale field binding must not refresh values after project switch');
+    }
+    return jsonResponse({});
+  };
+  serviceRegistry.register('nodePreviewSelectionStore', {
+    getSelection: () => currentSelection,
+    clear() {
+      currentSelection = null;
+    }
+  });
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => 11,
+    serialize: () => activeFlow,
+    setGlobalVariableSchema(schema) {
+      syncedSchemas.push(clone(schema));
+    }
+  });
+
+  const panel = new GlobalVariablePanel('global-variables-root', {
+    showToast(message, type) {
+      toasts.push({ message, type });
+    }
+  });
+  panel.requestElementChoice = async () => ({ variableId: 'var-count' });
+  panel.render = () => {};
+  panel.renderDialog = () => {};
+  panel.project = projectA;
+  panel.rebuildBaseline(projectA.globalVariables);
+  let applyCalls = 0;
+  const originalApplySchema = panel.applySchema.bind(panel);
+  panel.applySchema = (...args) => {
+    applyCalls += 1;
+    return originalApplySchema(...args);
+  };
+  let refreshCalls = 0;
+  panel.refreshValues = async () => {
+    refreshCalls += 1;
+    return [];
+  };
+
+  const bindingPromise = panel.bindPreviewField(descriptor);
+  for (let index = 0; index < 10 && !resolvePut; index += 1) {
+    await Promise.resolve();
+  }
+  assert.equal(Boolean(resolvePut), true);
+  assert.match(putUrl, new RegExp(`/projects/${projectA.id}/global-variables$`));
+  assert.equal(putBody.sourceBindings[0].operatorId, 'op-counter');
+
+  projectManager.currentProject = projectB;
+  projectManager.unsavedChanges = true;
+  activeFlow = projectB.flow;
+  panel.project = projectB;
+  panel.rebuildBaseline(projectB.globalVariables);
+  panel.dirty = true;
+  resolvePut({
+    ...putBody,
+    sourceBindings: [{ ...putBody.sourceBindings[0], id: 'saved-a-source' }]
+  });
+
+  const result = await bindingPromise;
+
+  assert.equal(result, false);
+  assert.equal(applyCalls, 0);
+  assert.equal(refreshCalls, 0);
+  assert.equal(syncedSchemas.length, 0);
+  assert.equal(toasts.filter(toast => toast.type === 'success').length, 0);
+  assert.equal(projectManager.currentProject.id, projectB.id);
+  assert.equal(projectManager.currentProject.globalVariables.variables[0].id, 'var-b');
+  assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].id, 'source-b');
+  assert.equal(projectManager.unsavedChanges, true);
+  assert.equal(panel.project.id, projectB.id);
+  assert.equal(panel.schema.variables[0].id, 'var-b');
+  assert.equal(panel.schema.sourceBindings[0].id, 'source-b');
+  assert.equal(panel.dirty, true);
 });
 
 test('preview field binding rejects dirty or stale selections and rolls back failed saves', async () => {
@@ -2208,7 +2349,8 @@ test('browser interaction ignores a delayed reopen endpoint response after switc
     const projectB = createInteractiveProject({ single: true });
     projectB.id = 'project-b-idle';
     await harness.page.evaluate(async nextProject => {
-      await window.__panel.setProject(nextProject);
+      window.__projectManager.currentProject = structuredClone(nextProject);
+      await window.__panel.setProject(window.__projectManager.currentProject);
     }, projectB);
 
     await harness.page.waitForTimeout(400);
@@ -2321,7 +2463,8 @@ test('browser interaction ignores running state from previous project after swit
     const projectB = createInteractiveProject({ single: true });
     projectB.id = 'project-b-idle';
     await harness.page.evaluate(async nextProject => {
-      await window.__panel.setProject(nextProject);
+      window.__projectManager.currentProject = structuredClone(nextProject);
+      await window.__panel.setProject(window.__projectManager.currentProject);
     }, projectB);
 
     const state = await getBrowserPanelState(harness.page);
@@ -2354,7 +2497,8 @@ test('browser interaction cancels runtime state polling on project switch and de
     await harness.page.evaluate(async project => {
       const nextProject = structuredClone(project);
       nextProject.id = 'project-next';
-      await window.__panel.setProject(nextProject);
+      window.__projectManager.currentProject = nextProject;
+      await window.__panel.setProject(window.__projectManager.currentProject);
     }, project);
     await harness.page.waitForTimeout(1800);
     assert.equal(harness.state.runtimeStateCalls, 2);
