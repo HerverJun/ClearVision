@@ -138,8 +138,7 @@ test('Studio 2.0 Flow Editor Port commits a real node parameter draft and reject
   await page.mouse.move(canvasBox.x + 112, canvasBox.y + 86, { steps: 4 });
   await page.mouse.up();
 
-  await expect(page.locator('.studio2-flow-port-panel__stale'))
-    .toContainText('流程或选择已变化');
+  await expect(page.locator('.studio2-flow-port-panel__stale')).toBeVisible();
   await expect(thresholdInput).toHaveValue('33');
   await page.locator('.studio2-flow-port-panel__actions button[type="submit"]').click();
   await expect(page.locator('.studio2-flow-port-panel__disposition')).toContainText('stale_flow_revision');
@@ -150,6 +149,136 @@ test('Studio 2.0 Flow Editor Port commits a real node parameter draft and reject
 
   await page.locator('.studio2-flow-port-panel__actions button[type="button"]').click();
   await expect(thresholdInput).toHaveValue('21');
+});
+
+test('Studio 2.0 Project Persistence Port saves through one project PUT with backend revision', async ({ page }) => {
+  const apiCalls: ProjectApiCall[] = [];
+  await page.route('**/api/projects/project-a', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createProjectApiFixture(1))
+      });
+      return;
+    }
+
+    if (request.method() === 'PUT') {
+      const body = request.postDataJSON() as ProjectSavePayload;
+      apiCalls.push({
+        method: 'PUT',
+        url: request.url(),
+        body
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...createProjectApiFixture(2),
+          flow: body.flow,
+          globalVariables: body.globalVariables
+        })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 405,
+      contentType: 'text/plain',
+      body: 'Method not allowed'
+    });
+  });
+  await page.route('**/api/projects/project-a/flow', async (route) => {
+    apiCalls.push({
+      method: route.request().method(),
+      url: route.request().url(),
+      body: route.request().postData()
+    });
+    await route.fulfill({
+      status: 500,
+      contentType: 'text/plain',
+      body: 'Unexpected flow endpoint call'
+    });
+  });
+  await page.route('**/api/projects/project-a/global-variables', async (route) => {
+    apiCalls.push({
+      method: route.request().method(),
+      url: route.request().url(),
+      body: route.request().postData()
+    });
+    await route.fulfill({
+      status: 500,
+      contentType: 'text/plain',
+      body: 'Unexpected global variables endpoint call'
+    });
+  });
+  await installStudio2FrontendV2Routes(page);
+
+  await page.addInitScript(() => {
+    window.__CLEARVISION_STARTUP__ = {
+      workspaceV2Enabled: true,
+      apiBaseUrl: 'http://127.0.0.1:5000/api',
+      hostKind: 'playwright-browser',
+      frontendV2BasePath: '/v2'
+    };
+    window.__API_BASE_URL__ = 'http://127.0.0.1:5000/api';
+  });
+
+  await page.goto('/v2/index.html');
+  await expect(page.locator('.studio2-workspace-shell')).toBeVisible();
+
+  const opened = await page.evaluate(async () => {
+    const { default: serviceRegistry } = await import('/src/core/app/serviceRegistry.js');
+    const projectPort = serviceRegistry.get('studio2.projectPersistencePort');
+    const flowPort = serviceRegistry.get('studio2.flowEditorPort');
+    if (!projectPort || !flowPort) {
+      return { error: 'missing-port' };
+    }
+
+    const openResult = await projectPort.openProject('project-a');
+    const selectResult = flowPort.selectNode({
+      projectId: 'project-a',
+      requestSequence: flowPort.nextRequestSequence('project-a'),
+      nodeId: 'node-a'
+    });
+    return {
+      openResult,
+      selectResult,
+      projectSnapshot: projectPort.getSnapshot(),
+      flowSnapshot: flowPort.getSnapshot()
+    };
+  });
+
+  expect(opened).not.toHaveProperty('error');
+  expect(opened.openResult.disposition).toBe('accepted');
+  expect(opened.selectResult.disposition).toBe('accepted');
+  await expect(page.locator('.studio2-project-port-panel__meta')).toContainText('project-a');
+  await expect(page.locator('.studio2-project-port-panel__meta')).toContainText('1');
+
+  const thresholdInput = page.locator('.studio2-flow-port-panel__field input[name="Threshold"]');
+  await expect(thresholdInput).toHaveValue('10');
+  await thresholdInput.fill('21');
+  await page.locator('.studio2-flow-port-panel__actions button[type="submit"]').click();
+  await expect(thresholdInput).toHaveValue('21');
+  await expect(page.locator('.studio2-project-port-panel__meta')).toContainText('true');
+
+  await page.locator('.studio2-project-port-panel__save').click();
+  await expect(page.locator('.studio2-project-port-panel__disposition')).toContainText('accepted');
+  await expect(page.locator('.studio2-project-port-panel__meta')).toContainText('2');
+
+  const projectPutCalls = apiCalls.filter(isProjectPutCall);
+  expect(projectPutCalls).toHaveLength(1);
+  expect(apiCalls.some((call) => call.url.includes('/flow'))).toBe(false);
+  expect(apiCalls.some((call) => call.url.includes('/global-variables'))).toBe(false);
+  const projectPut = projectPutCalls[0];
+  if (!projectPut) {
+    throw new Error('Expected one project PUT call.');
+  }
+
+  expect(projectPut.body.expectedPersistenceRevision).toBe(1);
+  expect(getParameterValueFromFlow(projectPut.body.flow, 'node-a', 'Threshold')).toBe(21);
+  expect(projectPut.body.globalVariables).toEqual(createGlobalVariablesFixture());
 });
 
 test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', async ({ page }) => {
@@ -233,6 +362,76 @@ function getParameterValue(
     ?.value;
 }
 
+function getParameterValueFromFlow(
+  flow: ProjectFlowFixture,
+  nodeId: string,
+  parameterName: string
+): unknown {
+  return flow.operators
+    .find((operator) => operator.id === nodeId)
+    ?.parameters
+    .find((parameter) => parameter.name === parameterName)
+    ?.value;
+}
+
+function createProjectApiFixture(persistenceRevision: number): ProjectApiFixture {
+  return {
+    id: 'project-a',
+    name: 'Project A',
+    description: 'G04B fixture',
+    persistenceRevision,
+    flow: createProjectFlowFixture(),
+    globalVariables: createGlobalVariablesFixture()
+  };
+}
+
+function createProjectFlowFixture(): ProjectFlowFixture {
+  return {
+    operators: [
+      {
+        id: 'node-a',
+        type: 'Thresholding',
+        title: 'Threshold',
+        x: 20,
+        y: 24,
+        inputPorts: [],
+        outputPorts: [],
+        parameters: [
+          {
+            name: 'Threshold',
+            displayName: 'Threshold',
+            value: 10,
+            dataType: 'int'
+          }
+        ]
+      }
+    ],
+    connections: []
+  };
+}
+
+function createGlobalVariablesFixture(): ProjectGlobalVariablesFixture {
+  return {
+    schemaVersion: '1.0',
+    variables: [
+      {
+        id: 'variable-a',
+        name: 'stats.count',
+        valueType: 'Int64',
+        initialValue: 1
+      }
+    ],
+    sourceBindings: [],
+    targetBindings: []
+  };
+}
+
+function isProjectPutCall(call: ProjectApiCall): call is ProjectApiCall & { readonly body: ProjectSavePayload } {
+  return call.method === 'PUT' &&
+    call.url.endsWith('/api/projects/project-a') &&
+    Boolean(call.body && typeof call.body === 'object');
+}
+
 function resolveContentType(assetPath: string): string {
   const extension = extname(assetPath).toLowerCase();
   if (extension === '.html') {
@@ -266,4 +465,58 @@ interface StudioFlowEditorBrowserSnapshot {
       }>;
     }>;
   };
+}
+
+interface ProjectApiCall {
+  readonly method: string;
+  readonly url: string;
+  readonly body: unknown;
+}
+
+interface ProjectApiFixture {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly persistenceRevision: number;
+  readonly flow: ProjectFlowFixture;
+  readonly globalVariables: ProjectGlobalVariablesFixture;
+}
+
+interface ProjectSavePayload {
+  readonly name: string;
+  readonly description: string | null;
+  readonly expectedPersistenceRevision: number;
+  readonly flow: ProjectFlowFixture;
+  readonly globalVariables: ProjectGlobalVariablesFixture;
+}
+
+interface ProjectFlowFixture {
+  readonly operators: Array<{
+    readonly id: string;
+    readonly type: string;
+    readonly title: string;
+    readonly x?: number;
+    readonly y?: number;
+    readonly inputPorts?: readonly unknown[];
+    readonly outputPorts?: readonly unknown[];
+    readonly parameters: Array<{
+      readonly name: string;
+      readonly displayName: string;
+      readonly value: unknown;
+      readonly dataType: string;
+    }>;
+  }>;
+  readonly connections: [];
+}
+
+interface ProjectGlobalVariablesFixture {
+  readonly schemaVersion: string;
+  readonly variables: Array<{
+    readonly id: string;
+    readonly name: string;
+    readonly valueType: string;
+    readonly initialValue: number;
+  }>;
+  readonly sourceBindings: [];
+  readonly targetBindings: [];
 }

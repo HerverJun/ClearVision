@@ -47,6 +47,7 @@
         </button>
         <div class="studio2-workspace-shell__dock-content">
           <FlowEditorPortPanel :model="model" />
+          <ProjectPersistencePanel :model="model" />
         </div>
       </aside>
 
@@ -110,6 +111,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted } from 'vue';
 import FlowEditorPortPanel from '@/components/FlowEditorPortPanel.vue';
+import ProjectPersistencePanel from '@/components/ProjectPersistencePanel.vue';
 import type { Studio2FoundationIslandViewModel } from '@/foundation/studio2FoundationIsland';
 import {
   DEFAULT_LEFT_DOCK_WIDTH,

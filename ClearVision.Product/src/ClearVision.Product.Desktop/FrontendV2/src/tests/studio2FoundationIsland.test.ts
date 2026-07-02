@@ -58,7 +58,7 @@ describe('mountStudio2FoundationIsland', () => {
     expect(secondHandle).toBe(firstHandle);
     expect(getActiveStudio2FoundationIsland()).toBe(firstHandle);
     expect(created).toBe(1);
-    expect(firstHandle.model.goal).toBe('G04A');
+    expect(firstHandle.model.goal).toBe('G04B');
   });
 
   it('disposes a pending mount deterministically without mounting the application', async () => {
@@ -201,6 +201,8 @@ function createLegacyServices(): LegacyServicesFixture {
 
   const services: LegacyFrontendServices = {
     httpClient: {
+      get: <T,>() => Promise.resolve({} as T),
+      put: <T,>() => Promise.resolve({} as T),
       getRoot: <T,>(
         _url: string,
         _params?: Record<string, string> | null,

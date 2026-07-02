@@ -42,9 +42,9 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G04B`
-- 当前卡片：`docs/进行中/Studio2/goals/G04B.md`
-- 当前阶段：`Foundation`
+- 当前 Goal：`G05A`
+- 当前卡片：`docs/进行中/Studio2/goals/G05A.md`
+- 当前阶段：`Observation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
@@ -82,8 +82,8 @@
 | G02B | Foundation | V2 挂载、HostBridge 与现有通信适配 | DONE | G02A | `docs/进行中/Studio2/goals/G02B.md` | 见 G02B 完成提交与最终报告 |
 | G03 | Foundation | Workspace Shell MVP | DONE | G02B | `docs/进行中/Studio2/goals/G03.md` | 见 G03 完成提交与最终报告 |
 | G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | DONE | G03 | `docs/进行中/Studio2/goals/G04A.md` | 见 G04A 完成提交与最终报告 |
-| G04B | Foundation | V2 单请求工程保存与持久化身份 | READY | G04A | `docs/进行中/Studio2/goals/G04B.md` |  |
-| G05A | Observation | Execution Observation 投影与身份 | LOCKED | G04B | `docs/进行中/Studio2/goals/G05A.md` |  |
+| G04B | Foundation | V2 单请求工程保存与持久化身份 | DONE | G04A | `docs/进行中/Studio2/goals/G04B.md` | 见 G04B 完成提交与最终报告 |
+| G05A | Observation | Execution Observation 投影与身份 | READY | G04B | `docs/进行中/Studio2/goals/G05A.md` |  |
 | G05B | Observation | Preview Artifact 生命周期与安全读取 | LOCKED | G05A | `docs/进行中/Studio2/goals/G05B.md` |  |
 | G06 | Observation | 节点预览结果检查器 MVP | LOCKED | G05B | `docs/进行中/Studio2/goals/G06.md` |  |
 | G07A | Observation | Canonical ResultPath 解析器 | LOCKED | G06 | `docs/进行中/Studio2/goals/G07A.md` |  |
@@ -155,6 +155,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G04B | `b4936ce22f380b00b5ff9e211c95219b10863b46` | 见 G04B 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/40 unit tests；ProjectService + ProjectSaveCoordinator targeted PASS，29 tests；ProjectGlobalVariableEndpoints + Studio2ArchitectureGuard targeted PASS，36 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 建立 `StudioProjectPersistencePort` 与 `studio2.projectPersistencePort`，V2 单次调用既有 `PUT /api/projects/{id}` 提交 metadata/Flow/GlobalVariables；后端使用 `ExpectedPersistenceRevision`/`PersistenceRevision` 与 `ProjectSaveCoordinator` 判定并发，`PSV011` 映射 409；旧 Project 页面、`projectManager.saveProject()`、`/flow` 兼容入口保留；未执行 G05A。 |
 | 2026-07-02 | G04A follow-up | `59544fa7d6384d06828c8eaa3b3d183de9c96dcd` | 见 G04A follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，25/25；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Studio2 + BuildFromPlan architecture guard PASS，17/17；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口 Flow Editor Port request sequence authority、单一 allocator、节点拖拽 `moveNode` revision 和 dirty draft stale 行为；未执行 G04B、未新增 Project 保存/API/后端持久化身份，当前 Goal 仍为 G04B。 |
 | 2026-07-01 | G04A | `33c8276332fe6543036d260bfb39f50a815c1c17` | 见 G04A 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，23/23；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 新增 `StudioFlowEditorPort`，V2 只公开 `studio2.flowEditorPort`；补齐 snapshot/select/replace/patch/subscribe/dispose、本地 stale disposition 和最小参数 draft/commit；修复 hosted adapter 旧实例二次 dispose；未执行 G04B、未保存 Project、未改 Agent/Station/Runtime。 |
 | 2026-07-01 | G03 | `b359a35aafc7c37ec24bb4f27f1f4364040495d2` | 见 G03 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，21/21；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；浏览器级 1366×768、1920×1080、2560×1440 screenshot PASS；flag off/on 回归 PASS；WebView2 人工启动 NOT PERFORMED；完整 GitHub CI NOT RUN | 建立 V2 Workspace Shell MVP、Flow/Tool/Review 模式、唯一 hosted FlowCanvas 创建链和 lifecycle 并发 mount 修复；未迁移业务模块；下一项为 G04A。 |

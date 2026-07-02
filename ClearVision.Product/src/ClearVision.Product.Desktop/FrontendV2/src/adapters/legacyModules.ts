@@ -1,5 +1,15 @@
 export interface LegacyHttpClient {
   readonly baseUrl?: string;
+  get<T = unknown>(
+    url: string,
+    params?: Record<string, string> | null,
+    options?: { readonly signal?: AbortSignal }
+  ): Promise<T>;
+  put<T = unknown>(
+    url: string,
+    data?: unknown,
+    options?: { readonly signal?: AbortSignal }
+  ): Promise<T>;
   getRoot<T = unknown>(
     url: string,
     params?: Record<string, string> | null,

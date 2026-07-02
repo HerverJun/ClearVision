@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
@@ -499,6 +501,118 @@ public sealed class ProjectGlobalVariableEndpointsTests
         ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
     }
 
+    [Fact]
+    public async Task ProjectPut_WhenExpectedPersistenceRevisionIsStale_ShouldReturnPsv011ConflictWithoutWrite()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        host.Project.SetPersistenceRevision(2);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "renamed",
+                Description = "stale",
+                ExpectedPersistenceRevision = 1
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PSV011");
+        host.Project.Name.Should().Be("demo");
+        host.Project.Description.Should().BeNull();
+        host.Project.PersistenceRevision.Should().Be(2);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+        await host.FlowStorage.DidNotReceive().SaveFlowJsonAsync(host.Project.Id, Arg.Any<string>(), Arg.Any<long>());
+    }
+
+    [Fact]
+    public async Task ProjectPut_WhenFlowAndGlobalVariablesProvided_ShouldPersistThroughSingleProjectSave()
+    {
+        var variableId = Guid.NewGuid();
+        var flowStorage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            flowStorage: flowStorage);
+        var nextSchema = CreateSchema(variableId, 5, manualWriteAllowed: true);
+        var nextFlow = new OperatorFlowDto
+        {
+            Name = "MainFlow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Threshold",
+                    Type = OperatorType.Thresholding,
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Threshold",
+                            DisplayName = "Threshold",
+                            DataType = "int",
+                            Value = 21
+                        }
+                    ]
+                }
+            ],
+            Connections = []
+        };
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "renamed",
+                Description = "changed",
+                ExpectedPersistenceRevision = 0,
+                Flow = nextFlow,
+                GlobalVariables = nextSchema
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadFromJsonAsync<ProjectDto>();
+        body.Should().NotBeNull();
+        body!.PersistenceRevision.Should().Be(1);
+        body.Flow.Should().NotBeNull();
+        host.Project.Name.Should().Be("renamed");
+        host.Project.Description.Should().Be("changed");
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
+        await host.Repository.Received(1).UpdateAsync(host.Project);
+        flowStorage.SaveCount.Should().Be(1);
+        flowStorage.LastPersistenceRevision.Should().Be(1);
+        flowStorage.LastSavedFlowJson.Should().Contain("Threshold");
+    }
+
+    [Fact]
+    public async Task ProjectPut_WhenNothingChanges_ShouldNotIncrementPersistenceRevision()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "demo",
+                Description = null,
+                ExpectedPersistenceRevision = 0
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadFromJsonAsync<ProjectDto>();
+        body.Should().NotBeNull();
+        body!.PersistenceRevision.Should().Be(0);
+        host.Project.PersistenceRevision.Should().Be(0);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+        await host.FlowStorage.DidNotReceive().SaveFlowJsonAsync(host.Project.Id, Arg.Any<string>(), Arg.Any<long>());
+    }
+
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
     {
         return new ProjectGlobalVariableSchema
@@ -528,6 +642,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             Project project,
             ProjectVariableSessionRegistry registry,
             IProjectRepository repository,
+            IProjectFlowStorage flowStorage,
             string? ownedStateStoreRoot)
         {
             _app = app;
@@ -535,6 +650,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             Project = project;
             Registry = registry;
             Repository = repository;
+            FlowStorage = flowStorage;
             Client = app.GetTestClient();
         }
 
@@ -546,11 +662,14 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         public IProjectRepository Repository { get; }
 
+        public IProjectFlowStorage FlowStorage { get; }
+
         public static async Task<ProjectGlobalVariableEndpointHost> CreateAsync(
             ProjectGlobalVariableSchema schema,
             string? storedFlowJson = null,
             RuntimeStatus? status = null,
-            IProjectVariableStateStore? stateStore = null)
+            IProjectVariableStateStore? stateStore = null,
+            IProjectFlowStorage? flowStorage = null)
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
@@ -559,8 +678,15 @@ public sealed class ProjectGlobalVariableEndpointsTests
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
 
-            var storage = Substitute.For<IProjectFlowStorage>();
-            storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(storedFlowJson));
+            var storage = flowStorage ?? Substitute.For<IProjectFlowStorage>();
+            if (flowStorage == null)
+            {
+                storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(storedFlowJson));
+            }
+            else if (!string.IsNullOrWhiteSpace(storedFlowJson))
+            {
+                await storage.SaveFlowJsonAsync(project.Id, storedFlowJson, project.PersistenceRevision);
+            }
 
             var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
             if (status.HasValue)
@@ -619,7 +745,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             });
             MapProjectEndpoints(app);
             await app.StartAsync();
-            return new ProjectGlobalVariableEndpointHost(app, project, registry, repository, ownedStateStoreRoot);
+            return new ProjectGlobalVariableEndpointHost(app, project, registry, repository, storage, ownedStateStoreRoot);
         }
 
         public async ValueTask DisposeAsync()
@@ -655,6 +781,63 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         public void Delete(string scopeId)
         {
+        }
+    }
+
+    private sealed class RecordingProjectFlowStorage : IProjectFlowStorage
+    {
+        private string? _flowJson;
+        private ProjectFlowStorageMetadata? _metadata;
+
+        public string? LastSavedFlowJson { get; private set; }
+
+        public long LastPersistenceRevision { get; private set; }
+
+        public int SaveCount { get; private set; }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson)
+        {
+            Save(projectId, flowJson, 0);
+            return Task.CompletedTask;
+        }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson, long persistenceRevision)
+        {
+            SaveCount += 1;
+            Save(projectId, flowJson, persistenceRevision);
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> LoadFlowJsonAsync(Guid projectId) => Task.FromResult(_flowJson);
+
+        public Task DeleteFlowJsonAsync(Guid projectId)
+        {
+            _flowJson = null;
+            _metadata = null;
+            LastSavedFlowJson = null;
+            LastPersistenceRevision = 0;
+            return Task.CompletedTask;
+        }
+
+        public Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId) => Task.FromResult(_metadata);
+
+        private void Save(Guid projectId, string flowJson, long persistenceRevision)
+        {
+            _flowJson = flowJson;
+            LastSavedFlowJson = flowJson;
+            LastPersistenceRevision = persistenceRevision;
+            _metadata = new ProjectFlowStorageMetadata(
+                1,
+                projectId,
+                persistenceRevision,
+                ComputeSha256(flowJson),
+                DateTimeOffset.UtcNow);
+        }
+
+        private static string ComputeSha256(string value)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
         }
     }
 }

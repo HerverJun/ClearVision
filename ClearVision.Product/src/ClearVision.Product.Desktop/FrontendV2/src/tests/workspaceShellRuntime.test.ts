@@ -8,6 +8,7 @@ import type {
 import { Studio2LifecycleScope } from '@/foundation/studio2Lifecycle';
 import {
   FLOW_EDITOR_PORT_SERVICE_KEY,
+  PROJECT_PERSISTENCE_PORT_SERVICE_KEY,
   Studio2WorkspaceShellRuntime,
   createWorkspaceShellRuntimeState
 } from '@/workspace/workspaceShellRuntime';
@@ -30,13 +31,16 @@ describe('Studio2WorkspaceShellRuntime', () => {
     expect(second).toBe(first);
     expect(fixture.createCount).toBe(1);
     expect(fixture.registry.get(FLOW_EDITOR_PORT_SERVICE_KEY)).toBe(first);
+    expect(fixture.registry.get(PROJECT_PERSISTENCE_PORT_SERVICE_KEY)).toBe(fixture.runtime.getProjectPersistencePort());
     expect(fixture.state.flowCanvasInstanceCount).toBe(1);
+    expect(fixture.state.projectPersistenceStatus).toBe('ready');
 
     fixture.runtime.dispose();
 
     expect(fixture.disposeCount).toBe(1);
-    expect(fixture.subscriptionDisposeCount).toBe(2);
+    expect(fixture.subscriptionDisposeCount).toBe(3);
     expect(fixture.state.flowCanvasStatus).toBe('disposed');
+    expect(fixture.state.projectPersistenceStatus).toBe('disposed');
   });
 
   it('keeps Port, registry, listeners and adapters bounded across 20 workspace cycles', () => {
@@ -46,19 +50,22 @@ describe('Studio2WorkspaceShellRuntime', () => {
 
       expect(fixture.createCount).toBe(1);
       expect(fixture.registry.get(FLOW_EDITOR_PORT_SERVICE_KEY)).toBe(port);
-      expect(fixture.structureSubscribeCount).toBe(1);
+      expect(fixture.registry.get(PROJECT_PERSISTENCE_PORT_SERVICE_KEY)).toBe(fixture.runtime.getProjectPersistencePort());
+      expect(fixture.structureSubscribeCount).toBe(2);
       expect(fixture.selectionSubscribeCount).toBe(1);
       expect(fixture.state.flowCanvasInstanceCount).toBe(1);
+      expect(fixture.state.projectPersistenceStatus).toBe('ready');
 
       fixture.runtime.dispose();
       fixture.scope.dispose();
 
       expect(fixture.disposeCount).toBe(1);
-      expect(fixture.subscriptionDisposeCount).toBe(2);
+      expect(fixture.subscriptionDisposeCount).toBe(3);
       expect(fixture.registry.size).toBe(0);
       expect(fixture.state.flowCanvasInstanceCount).toBe(0);
       expect(fixture.state.flowCanvasStatus).toBe('disposed');
       expect(fixture.state.flowEditorStatus).toBe('disposed');
+      expect(fixture.state.projectPersistenceStatus).toBe('disposed');
     }
   });
 
@@ -142,6 +149,8 @@ function createRuntimeFixture(options?: { readonly viewState?: HostedFlowCanvasV
   };
   const services: LegacyFrontendServices = {
     httpClient: {
+      get: <T,>() => Promise.resolve({} as T),
+      put: <T,>() => Promise.resolve({} as T),
       getRoot: <T,>() => Promise.resolve({} as T)
     },
     webMessageBridge: {

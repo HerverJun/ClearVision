@@ -381,6 +381,37 @@ describe('StudioFlowEditorPort', () => {
     const currentFlow = port.getSnapshot().flow as FlowFixture;
     expect(currentFlow.operators[0]?.id).toBe('node-b');
   });
+
+  it('fences late cross-project replace requests while allowing an explicit newer reopen', () => {
+    const adapter = createLegacyAdapterFixture();
+    const port = createStudioFlowEditorPort(adapter);
+    const projectASequence = port.nextRequestSequence('project-a');
+    const projectBSequence = port.nextRequestSequence('project-b');
+
+    const projectB = port.replaceFlow({
+      projectId: 'project-b',
+      requestSequence: projectBSequence,
+      flow: createFlowFixture('project-b')
+    });
+    const lateProjectA = port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: projectASequence,
+      flow: createFlowFixture('project-a')
+    });
+    const reopenedProjectA = port.replaceFlow({
+      projectId: 'project-a',
+      requestSequence: port.nextRequestSequence('project-a'),
+      flow: createFlowFixture('project-a')
+    });
+
+    expect(projectASequence).toBeLessThan(projectBSequence);
+    expect(projectB.disposition).toBe('accepted');
+    expect(lateProjectA.disposition).toBe('stale_request');
+    expect(reopenedProjectA.disposition).toBe('accepted');
+    expect(reopenedProjectA.snapshot.projectId).toBe('project-a');
+    const currentFlow = port.getSnapshot().flow as FlowFixture;
+    expect(currentFlow.operators[0]?.id).toBe('node-a');
+  });
 });
 
 interface FlowFixture {

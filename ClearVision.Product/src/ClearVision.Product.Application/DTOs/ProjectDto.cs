@@ -85,6 +85,8 @@ public class UpdateProjectRequest
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 
+    public long? ExpectedPersistenceRevision { get; set; }
+
     /// <summary>
     /// 算子流程（可选）
     /// </summary>

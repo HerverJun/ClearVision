@@ -87,6 +87,7 @@ export function createStudioFlowEditorPort(adapter: LegacyFlowCanvasAdapter): St
 class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
   private projectId: string | null = null;
   private readonly maxObservedRequestSequenceByProject = new Map<string, number>();
+  private maxObservedReplaceSequence = 0;
   private lastAllocatedRequestSequence = 0;
   private disposed = false;
   private readonly unsubscribers = new Set<() => void>();
@@ -115,7 +116,7 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
       return disposed;
     }
 
-    const sequenceRejection = this.observeCommandSequence(command.projectId, command.requestSequence);
+    const sequenceRejection = this.observeReplaceSequence(command.projectId, command.requestSequence);
     if (sequenceRejection) {
       return sequenceRejection;
     }
@@ -231,6 +232,19 @@ class StudioFlowEditorPortAdapter implements StudioFlowEditorPort {
     this.maxObservedRequestSequenceByProject.set(projectId, requestSequence);
     this.lastAllocatedRequestSequence = Math.max(this.lastAllocatedRequestSequence, requestSequence);
     return null;
+  }
+
+  private observeReplaceSequence(projectId: string, requestSequence: number): FlowEditorCommandResult | null {
+    if (!isValidRequestSequence(requestSequence)) {
+      return this.reject('stale_request');
+    }
+
+    if (requestSequence <= this.maxObservedReplaceSequence) {
+      return this.reject('stale_request');
+    }
+
+    this.maxObservedReplaceSequence = requestSequence;
+    return this.observeCommandSequence(projectId, requestSequence);
   }
 
   private rejectIfDisposed(): FlowEditorCommandResult | null {

@@ -189,7 +189,7 @@ public class ProjectService
         {
             project = await _projectRepository.GetByIdAsync(id)
                 ?? throw new ProjectNotFoundException(id);
-            expectedRevision = project.PersistenceRevision;
+            expectedRevision = request.ExpectedPersistenceRevision ?? project.PersistenceRevision;
             previousGlobalVariables = CloneSchema(project.GlobalVariables);
             previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
             nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);

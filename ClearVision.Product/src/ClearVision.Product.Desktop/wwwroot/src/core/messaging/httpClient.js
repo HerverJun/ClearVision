@@ -433,14 +433,38 @@ class HttpClient {
         }
     }
 
-    async put(url, data = null) {
-        const fullUrl = this.buildRequestUrl(url);
-        const response = await fetch(fullUrl, {
-            method: 'PUT',
-            headers: this.defaultHeaders,
-            body: data ? JSON.stringify(data) : null
-        });
-        return this.handleResponse(response);
+    async put(url, data = null, options = {}) {
+        let fullUrl = this.buildRequestUrl(url);
+        console.log(`[HttpClient] PUT ${fullUrl}`);
+        const signal = options?.signal;
+
+        try {
+            const response = await fetch(fullUrl, {
+                method: 'PUT',
+                headers: this.defaultHeaders,
+                body: data ? JSON.stringify(data) : null,
+                signal
+            });
+            this.saveSuccessfulPort(fullUrl);
+            return this.handleResponse(response);
+        } catch (error) {
+            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+                const discoveredPort = await this.discoverPort();
+                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
+                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
+                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
+                    const response = await fetch(fullUrl, {
+                        method: 'PUT',
+                        headers: this.defaultHeaders,
+                        body: data ? JSON.stringify(data) : null,
+                        signal
+                    });
+                    this.saveSuccessfulPort(fullUrl);
+                    return this.handleResponse(response);
+                }
+            }
+            throw this.handleNetworkError(error, fullUrl);
+        }
     }
 
     /**

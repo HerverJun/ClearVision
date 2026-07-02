@@ -53,6 +53,8 @@ G03 将 `/v2/index.html` 下的测试岛替换为 Workspace Shell。Shell 只提
 
 G04A 将 V2 Flow 本地编辑写入口收敛为 `StudioFlowEditorPort`。Workspace runtime 私有持有 hosted `FlowCanvasAdapter`，`ServiceRegistry` 只公开 `studio2.flowEditorPort`；V2 组件不得取得 raw `FlowCanvas`、`nodes` Map、可变 node 引用、`adapter.raw` 或 `window.flowCanvas`。Port 的 `flowRevision`、`selectionRevision`、`requestSequence` 仅用于前端本地 stale 防护，不等同后端 `PersistenceRevision`，也不参与正式 Project 保存冲突判定。G04A 不新增 Project 保存 endpoint/client，不修改 `ProjectSaveCoordinator`、`projectManager.saveProject`、Agent apply、Runtime Package 或 Station；G04B 才负责 canonical Project DTO 与持久化身份。
 
+G04B 将 V2 工程保存收敛为 `StudioProjectPersistencePort`，由 Workspace runtime 注册为 `studio2.projectPersistencePort`。该 port 只复用 legacy `httpClient` 调用既有 `PUT /api/projects/{id}`，一次 payload 提交 metadata、Flow 与 GlobalVariables，并把后端返回的 canonical `ProjectDto.PersistenceRevision` 作为保存后的持久化身份。V2 请求新增 `expectedPersistenceRevision` 字段，对应后端 `UpdateProjectRequest.ExpectedPersistenceRevision`；并发冲突由 `ProjectSaveCoordinator` 的 `PSV011` 判定并映射为 HTTP 409。`flowRevision` 仍只表示前端本地草稿版本，不得作为后端持久化并发条件。旧 `projectManager.saveProject()` 及 `/flow`、`/global-variables` 兼容入口暂不迁移，Project 页面正式 owner 仍等待 G15.8；G04B 不新增保存 endpoint、不建立第二套 Project/Flow/Variables authority。
+
 守卫必须防止：
 
 - V2 定义第二套 `EventBus` 或 `ServiceRegistry`；

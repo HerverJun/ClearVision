@@ -5,10 +5,10 @@ import {
   studio2FrontendV2BuildInfo
 } from '@/foundation/studio2Bootstrap';
 
-describe('Studio2 FrontendV2 G04A flow editor port', () => {
+describe('Studio2 FrontendV2 G04B project persistence port', () => {
   it('keeps runtime ownership controlled by the host flag without claiming business authority', () => {
     expect(studio2FrontendV2BuildInfo).toEqual({
-      goal: 'G04A',
+      goal: 'G04B',
       runtimeMounted: 'controlled-by-host-flag',
       authority: 'none'
     });

@@ -181,7 +181,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ToProjectUpdateFailure(ex);
             }
         });
 
@@ -773,6 +773,18 @@ public static class ApiEndpoints
         return TryParseStableError(ex.Message, out var code, out var message)
             ? Results.BadRequest(new { Code = code, Error = message })
             : Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static IResult ToProjectUpdateFailure(Exception ex)
+    {
+        if (TryParseStableError(ex.Message, out var code, out var message))
+        {
+            return string.Equals(code, "PSV011", StringComparison.Ordinal)
+                ? Results.Conflict(new { Code = code, Error = message })
+                : Results.BadRequest(new { Code = code, Error = message });
+        }
+
+        return Results.BadRequest(new { Error = ex.Message });
     }
 
     private static IResult ToProjectVariableMutationFailure(string? error)

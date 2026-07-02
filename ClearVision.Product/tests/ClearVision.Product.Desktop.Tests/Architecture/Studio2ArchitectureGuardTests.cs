@@ -20,6 +20,8 @@ public sealed class Studio2ArchitectureGuardTests
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/adapters/legacyModules.ts";
     private const string FlowEditorPortPath =
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/flowEditor/studioFlowEditorPort.ts";
+    private const string ProjectPersistencePortPath =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/project/studioProjectPersistencePort.ts";
     private const string FlowEditorPortPanelPath =
         "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src/components/FlowEditorPortPanel.vue";
 
@@ -127,7 +129,7 @@ public sealed class Studio2ArchitectureGuardTests
     [Fact]
     public void FrontendV2_ShouldNotCreateProjectFlowVariableOrAgentPersistenceAuthority()
     {
-        foreach (var file in EnumerateFrontendV2SourceFiles())
+        foreach (var file in EnumerateFrontendV2ProductionSourceFiles())
         {
             var text = File.ReadAllText(file);
             var relativePath = ToRelativePath(file);
@@ -137,10 +139,30 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\bsaveProject\s*\(", relativePath);
             text.Should().NotContain("ProjectSaveCoordinator", relativePath);
-            text.Should().NotContain("PersistenceRevision", relativePath);
             text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
             text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|agent-run|globalVariables|global-variables|variables|run)", relativePath);
         }
+    }
+
+    [Fact]
+    public void FrontendV2_ProjectPersistencePort_ShouldUseSingleProjectPutAndBackendRevisionContract()
+    {
+        var projectPortText = File.ReadAllText(Path.Combine(Root, ProjectPersistencePortPath));
+        projectPortText.Should().Contain("httpClient.put");
+        projectPortText.Should().Contain("expectedPersistenceRevision");
+        projectPortText.Should().Contain("persistenceRevision");
+        projectPortText.Should().NotContain("ProjectSaveCoordinator");
+        projectPortText.Should().NotContain("projectManager");
+        projectPortText.Should().NotMatchRegex(@"\bfetch\s*\(");
+        projectPortText.Should().NotMatchRegex(@"['""`][^'""`]*projects[^'""`]*\/flow[^'""`]*['""`]");
+        projectPortText.Should().NotMatchRegex(@"['""`][^'""`]*projects[^'""`]*\/global-variables[^'""`]*['""`]");
+        Regex.Matches(projectPortText, @"httpClient\.put\(")
+            .Should().ContainSingle("G04B V2 persistence must save through the existing single project update endpoint.");
+
+        var workspaceRuntimeText = File.ReadAllText(Path.Combine(Root, WorkspaceShellRuntimePath));
+        workspaceRuntimeText.Should().Contain("PROJECT_PERSISTENCE_PORT_SERVICE_KEY");
+        Regex.Matches(workspaceRuntimeText, @"serviceRegistry\.register\(\s*PROJECT_PERSISTENCE_PORT_SERVICE_KEY")
+            .Should().ContainSingle("one Workspace lifecycle must register exactly one Project Persistence Port.");
     }
 
     [Fact]
@@ -233,6 +255,11 @@ public sealed class Studio2ArchitectureGuardTests
 
         return files;
     }
+
+    private static IReadOnlyList<string> EnumerateFrontendV2ProductionSourceFiles() =>
+        EnumerateFrontendV2SourceFiles()
+            .Where(file => !ToRelativePath(file).Contains("/src/tests/", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
     private static bool IsFrontendSourceFile(string path) =>
         path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||

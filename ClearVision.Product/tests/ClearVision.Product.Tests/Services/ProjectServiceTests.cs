@@ -214,6 +214,57 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_WhenExpectedPersistenceRevisionIsStale_ShouldReturnPsv011WithoutWrite()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var factory = new OperatorFactory();
+        var project = new Project("demo");
+        project.SetPersistenceRevision(2);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, factory);
+
+        var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "renamed",
+            Description = "stale",
+            ExpectedPersistenceRevision = 1
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
+        project.Name.Should().Be("demo");
+        project.Description.Should().BeNull();
+        project.PersistenceRevision.Should().Be(2);
+        storage.SaveCount.Should().Be(0);
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenExpectedPersistenceRevisionOmitted_ShouldUseCurrentRevisionForCompatibility()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var factory = new OperatorFactory();
+        var project = new Project("demo");
+        project.SetPersistenceRevision(2);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, factory);
+
+        var saved = await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "renamed",
+            Description = "compatible"
+        });
+
+        saved.PersistenceRevision.Should().Be(3);
+        project.Name.Should().Be("renamed");
+        project.Description.Should().Be("compatible");
+        await repository.Received(1).UpdateAsync(project);
+    }
+
+    [Fact]
     public async Task UpdateFlowAsync_WhenSchemaUnchanged_ShouldKeepCurrentVariableValueAndVersion()
     {
         var repository = Substitute.For<IProjectRepository>();

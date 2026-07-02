@@ -8,11 +8,17 @@ import {
   type StudioFlowEditorPort,
   type StudioFlowEditorSnapshot
 } from '@/flowEditor/studioFlowEditorPort';
+import {
+  createStudioProjectPersistencePort,
+  type StudioProjectPersistencePort,
+  type StudioProjectPersistenceSnapshot
+} from '@/project/studioProjectPersistencePort';
 import type { Studio2LifecycleScope } from '@/foundation/studio2Lifecycle';
 import type { WorkspaceShellMode } from '@/workspace/workspaceShellStore';
 
 export const WORKSPACE_SHELL_SERVICE_KEY = 'studio2.workspaceShell';
 export const FLOW_EDITOR_PORT_SERVICE_KEY = 'studio2.flowEditorPort';
+export const PROJECT_PERSISTENCE_PORT_SERVICE_KEY = 'studio2.projectPersistencePort';
 
 export interface Studio2WorkspaceShellRuntimeState {
   currentMode: WorkspaceShellMode;
@@ -25,6 +31,8 @@ export interface Studio2WorkspaceShellRuntimeState {
   flowEditorStatus: 'pending' | 'ready' | 'disposed' | 'error';
   flowEditorSnapshot: StudioFlowEditorSnapshot | null;
   lastFlowEditorDisposition: string;
+  projectPersistenceStatus: 'pending' | 'ready' | 'disposed' | 'error';
+  projectPersistenceSnapshot: StudioProjectPersistenceSnapshot;
 }
 
 export function createWorkspaceShellRuntimeState(): Studio2WorkspaceShellRuntimeState {
@@ -38,7 +46,27 @@ export function createWorkspaceShellRuntimeState(): Studio2WorkspaceShellRuntime
     lastError: '',
     flowEditorStatus: 'pending',
     flowEditorSnapshot: null,
-    lastFlowEditorDisposition: ''
+    lastFlowEditorDisposition: '',
+    projectPersistenceStatus: 'pending',
+    projectPersistenceSnapshot: {
+      projectId: null,
+      project: null,
+      name: '',
+      description: null,
+      persistenceRevision: null,
+      globalVariables: {
+        schemaVersion: '1.0',
+        variables: [],
+        sourceBindings: [],
+        targetBindings: []
+      },
+      status: 'empty',
+      loaded: false,
+      saving: false,
+      dirty: false,
+      error: '',
+      lastDisposition: 'idle'
+    }
   };
 }
 
@@ -49,13 +77,16 @@ export interface Studio2WorkspaceShellRuntimeHandle {
   resizeFlowCanvas(reason: string): boolean;
   getFlowCanvasViewState(): HostedFlowCanvasViewState | null;
   getFlowEditorPort(): StudioFlowEditorPort | null;
+  getProjectPersistencePort(): StudioProjectPersistencePort | null;
   dispose(): void;
 }
 
 export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntimeHandle {
   private flowCanvasAdapter: LegacyFlowCanvasAdapter | null = null;
   private flowEditorPort: StudioFlowEditorPort | null = null;
+  private projectPersistencePort: StudioProjectPersistencePort | null = null;
   private readonly flowEditorSubscriptions = new Set<() => void>();
+  private readonly projectPersistenceSubscriptions = new Set<() => void>();
   private flowCanvasId: string | null = null;
   private disposed = false;
 
@@ -84,15 +115,19 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
         eventBus: this.services.eventBus
       });
       const port = createStudioFlowEditorPort(adapter);
+      const projectPersistencePort = createStudioProjectPersistencePort(this.services.httpClient, port);
 
       this.flowCanvasAdapter = adapter;
       this.flowEditorPort = port;
+      this.projectPersistencePort = projectPersistencePort;
       this.flowCanvasId = canvasId;
       this.state.flowCanvasStatus = 'ready';
       this.state.flowEditorStatus = 'ready';
+      this.state.projectPersistenceStatus = 'ready';
       this.state.flowCanvasInstanceCount = 1;
       this.state.lastError = '';
       this.syncFlowEditorSnapshot();
+      this.syncProjectPersistenceSnapshot();
 
       this.services.serviceRegistry.register(FLOW_EDITOR_PORT_SERVICE_KEY, port);
       this.scope.trackRegistryRegistration({
@@ -100,11 +135,20 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
           this.services.serviceRegistry.unregister(FLOW_EDITOR_PORT_SERVICE_KEY, port);
         }
       });
+      this.services.serviceRegistry.register(PROJECT_PERSISTENCE_PORT_SERVICE_KEY, projectPersistencePort);
+      this.scope.trackRegistryRegistration({
+        unregister: () => {
+          this.services.serviceRegistry.unregister(PROJECT_PERSISTENCE_PORT_SERVICE_KEY, projectPersistencePort);
+        }
+      });
       this.trackFlowEditorSubscription(port.subscribeStructure((snapshot) => {
         this.state.flowEditorSnapshot = snapshot;
       }));
       this.trackFlowEditorSubscription(port.subscribeSelection((snapshot) => {
         this.state.flowEditorSnapshot = snapshot;
+      }));
+      this.trackProjectPersistenceSubscription(projectPersistencePort.subscribe((snapshot) => {
+        this.state.projectPersistenceSnapshot = snapshot;
       }));
       this.scope.trackListener(() => {
         this.disposeFlowCanvas();
@@ -115,6 +159,7 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
     } catch (error) {
       this.state.flowCanvasStatus = 'error';
       this.state.flowEditorStatus = 'error';
+      this.state.projectPersistenceStatus = 'error';
       this.state.lastError = error instanceof Error ? error.message : String(error);
       throw error;
     }
@@ -148,6 +193,10 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
     return this.flowEditorPort;
   }
 
+  getProjectPersistencePort(): StudioProjectPersistencePort | null {
+    return this.projectPersistencePort;
+  }
+
   dispose(): void {
     this.disposed = true;
     this.disposeFlowCanvas();
@@ -162,14 +211,21 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
       unsubscribe();
     }
     this.flowEditorSubscriptions.clear();
+    for (const unsubscribe of [...this.projectPersistenceSubscriptions]) {
+      unsubscribe();
+    }
+    this.projectPersistenceSubscriptions.clear();
 
+    this.projectPersistencePort?.dispose();
     this.flowEditorPort?.dispose();
     this.flowCanvasAdapter?.dispose();
+    this.projectPersistencePort = null;
     this.flowEditorPort = null;
     this.flowCanvasAdapter = null;
     this.flowCanvasId = null;
     this.state.flowCanvasStatus = 'disposed';
     this.state.flowEditorStatus = 'disposed';
+    this.state.projectPersistenceStatus = 'disposed';
     this.state.flowEditorSnapshot = null;
     this.state.flowCanvasInstanceCount = 0;
   }
@@ -178,7 +234,15 @@ export class Studio2WorkspaceShellRuntime implements Studio2WorkspaceShellRuntim
     this.state.flowEditorSnapshot = this.flowEditorPort?.getSnapshot() ?? null;
   }
 
+  private syncProjectPersistenceSnapshot(): void {
+    this.state.projectPersistenceSnapshot = this.projectPersistencePort?.getSnapshot() ?? this.state.projectPersistenceSnapshot;
+  }
+
   private trackFlowEditorSubscription(unsubscribe: () => void): void {
     this.flowEditorSubscriptions.add(unsubscribe);
+  }
+
+  private trackProjectPersistenceSubscription(unsubscribe: () => void): void {
+    this.projectPersistenceSubscriptions.add(unsubscribe);
   }
 }
