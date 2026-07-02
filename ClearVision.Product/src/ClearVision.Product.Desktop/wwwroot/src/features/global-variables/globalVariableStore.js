@@ -46,7 +46,7 @@ export function normalizeGlobalVariableDefinition(variable = {}) {
 }
 
 export function normalizeSourceBinding(binding = {}) {
-    return {
+    const normalized = {
         id: binding.id ?? binding.Id ?? '',
         variableId: binding.variableId ?? binding.VariableId ?? '',
         operatorId: binding.operatorId ?? binding.OperatorId ?? '',
@@ -56,6 +56,19 @@ export function normalizeSourceBinding(binding = {}) {
         conversionMode: normalizeConversionMode(binding.conversionMode ?? binding.ConversionMode),
         expression: String(binding.expression ?? binding.Expression ?? '')
     };
+
+    if (hasOwn(binding, 'resultPathVersion') || hasOwn(binding, 'ResultPathVersion')) {
+        normalized.resultPathVersion = hasOwn(binding, 'resultPathVersion')
+            ? binding.resultPathVersion
+            : binding.ResultPathVersion;
+    }
+    if (hasOwn(binding, 'resultPath') || hasOwn(binding, 'ResultPath')) {
+        normalized.resultPath = hasOwn(binding, 'resultPath')
+            ? binding.resultPath
+            : binding.ResultPath;
+    }
+
+    return normalized;
 }
 
 export function normalizeTargetBinding(binding = {}) {
@@ -387,6 +400,10 @@ function normalizeGlobalVariableValue(value = {}) {
 
 function normalizeArray(value) {
     return Array.isArray(value) ? value : [];
+}
+
+function hasOwn(value, key) {
+    return value && Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function coerceNullableNumber(valueType, value) {

@@ -26,6 +26,7 @@ const ALL_TYPES_LABEL = '全部类型';
 const ALL_SOURCES_LABEL = '全部来源';
 const FIXED_SOURCE_LABEL = '固定初始值';
 const OPERATOR_SOURCE_LABEL = '算子输出';
+const ROOT_RESULT_PATH_LABEL = '端口根值';
 const TYPE_FILTERS = [ALL_TYPES_LABEL, ...GLOBAL_VARIABLE_TYPES.map(getTypeLabel)];
 const SOURCE_FILTERS = [ALL_SOURCES_LABEL, FIXED_SOURCE_LABEL, OPERATOR_SOURCE_LABEL];
 const RUNTIME_STATE_POLL_INTERVAL_MS = 1500;
@@ -453,6 +454,7 @@ export default class GlobalVariablePanel {
                 <div>
                     <strong>${escapeHtml(binding.operatorName || binding.operatorId || '未知算子')}</strong>
                     <span>${escapeHtml(binding.outputPortName || binding.outputPortId || '未知输出')}</span>
+                    <small>字段：${escapeHtml(formatSourceBindingResultPath(binding))}</small>
                     ${resolved.valid ? '' : '<em>引用已失效，请重新选择或清除。</em>'}
                 </div>
                 <button type="button" class="btn btn-secondary" data-action="locate" data-operator-id="${escapeHtml(binding.operatorId)}">定位算子</button>
@@ -853,6 +855,154 @@ export default class GlobalVariablePanel {
         }, { conflictRefresh: true });
     }
 
+    async bindPreviewField(descriptor) {
+        const normalized = normalizePreviewFieldDescriptor(descriptor);
+        if (!normalized) {
+            return this.rejectPreviewFieldBinding('预览字段信息不完整，请重新预览后再绑定。');
+        }
+
+        const currentProject = projectManager.getCurrentProject?.() || this.project;
+        if (!currentProject?.id || !sameId(currentProject.id, normalized.identity.projectId) || !sameId(this.project?.id, normalized.identity.projectId)) {
+            return this.rejectPreviewFieldBinding('预览字段来自旧工程，请重新预览后再绑定。', { clearSelection: true });
+        }
+
+        const currentFlowRevision = this.getCurrentFlowRevision();
+        if (currentFlowRevision !== null && currentFlowRevision !== normalized.identity.flowRevision) {
+            return this.rejectPreviewFieldBinding('流程已变化，请重新预览后再绑定。', { clearSelection: true });
+        }
+
+        if (this.isRuntimeLocked()) {
+            this.isOpen = true;
+            this.render();
+            this.toast('工程运行中，变量结构和值不可修改。', 'warning');
+            return false;
+        }
+
+        if (this.dirty) {
+            this.isOpen = true;
+            this.render();
+            this.toast('全局变量存在未保存编辑，请先保存或放弃后再绑定预览字段。', 'warning');
+            return false;
+        }
+
+        if (normalized.resultPathVersion !== 1 || !normalized.resultPath || !normalized.outputPortId || !normalized.outputPortName) {
+            return this.rejectPreviewFieldBinding('预览字段缺少后端 canonical ResultPath 元数据，请重新预览后再绑定。', { clearSelection: true });
+        }
+
+        const output = this.getCurrentFlowOutputs().find(item =>
+            sameId(item.operatorId, normalized.identity.targetNodeId) &&
+            sameId(item.outputPortId, normalized.outputPortId));
+        if (!output) {
+            return this.rejectPreviewFieldBinding('预览字段对应的算子或输出端口已变化，请重新预览。', { clearSelection: true });
+        }
+
+        const compatibleVariables = this.getPreviewFieldCompatibleVariables(normalized, output);
+        if (!compatibleVariables.length) {
+            this.openManager();
+            this.toast('当前没有兼容的全局变量，请先在管理器中创建合适类型。', 'warning');
+            return false;
+        }
+
+        const selectedVariable = await this.choosePreviewFieldVariable(normalized, output, compatibleVariables);
+        if (!selectedVariable) {
+            return false;
+        }
+
+        const existingSource = this.getSourceBinding(selectedVariable.id);
+        if (existingSource) {
+            const choice = await this.requestChoice('替换来源绑定', `变量“${selectedVariable.displayName || selectedVariable.name}”已有来源，将替换为当前预览字段。`, [
+                { value: 'replace', text: '替换' },
+                { value: 'cancel', text: '取消' }
+            ]);
+            if (choice !== 'replace') {
+                return false;
+            }
+        }
+
+        const nextSchema = cloneSchema(this.baselineSchema);
+        nextSchema.sourceBindings = nextSchema.sourceBindings.filter(item => !sameId(item.variableId, selectedVariable.id));
+        nextSchema.sourceBindings.push({
+            id: createUuid(),
+            variableId: selectedVariable.id,
+            operatorId: normalized.identity.targetNodeId,
+            outputPortId: normalized.outputPortId,
+            operatorName: output.operatorName,
+            outputPortName: normalized.outputPortName || output.outputPortName,
+            resultPathVersion: 1,
+            resultPath: normalized.resultPath,
+            conversionMode: 'Exact',
+            expression: ''
+        });
+
+        return await this.runMutation('bind-preview-field', async () => {
+            const projectId = this.project.id;
+            const saved = await projectManager.saveGlobalVariables(nextSchema);
+            if (!sameId(this.project?.id, projectId)) {
+                return false;
+            }
+
+            this.applySchema(saved, selectedVariable.id, { rebuildBaseline: true, sync: true });
+            this.dirty = false;
+            this.isOpen = true;
+            await this.refreshValues({ requestId: this.requestSerial, render: false });
+            this.toast(`已绑定 ${output.operatorName || normalized.identity.targetNodeId}.${normalized.outputPortName || normalized.outputPortId} ${formatResultPathForDisplay(normalized.resultPath)}。`, 'success');
+            this.render();
+            return true;
+        }, { conflictRefresh: true, preserveDraftOnError: true });
+    }
+
+    rejectPreviewFieldBinding(message, { clearSelection = false } = {}) {
+        if (clearSelection) {
+            serviceRegistry.get('nodePreviewSelectionStore')?.clear?.();
+        }
+        this.errorMessage = message;
+        this.toast(message, 'warning');
+        this.render();
+        return false;
+    }
+
+    getPreviewFieldCompatibleVariables(descriptor, output) {
+        const allowedTypes = new Set(descriptor.bindableVariableTypes.map(normalizeValueType));
+        return this.schema.variables.filter(variable => {
+            const variableType = normalizeValueType(variable.valueType);
+            if (!allowedTypes.has(variableType)) {
+                return false;
+            }
+
+            return descriptor.resultPath === '$'
+                ? isVariableCompatibleWithDataType(variableType, output.dataType, 'Exact')
+                : true;
+        });
+    }
+
+    async choosePreviewFieldVariable(descriptor, output, variables) {
+        const body = document.createElement('div');
+        body.className = 'gv-source-picker';
+        const section = document.createElement('section');
+        section.className = 'gv-source-group';
+        section.innerHTML = `<h4>${escapeHtml(output.operatorName || descriptor.identity.targetNodeId)} · ${escapeHtml(output.outputPortName || descriptor.outputPortId)} · ${escapeHtml(formatResultPathForDisplay(descriptor.resultPath))}</h4>`;
+        variables.forEach(variable => {
+            const existing = this.getSourceBinding(variable.id);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'gv-source-option';
+            button.dataset.variableId = variable.id;
+            button.innerHTML = `
+                <span>${escapeHtml(variable.displayName || variable.name)}</span>
+                <small>${escapeHtml(variable.name)} · ${escapeHtml(getTypeLabel(variable.valueType))}${existing ? ' · 将替换现有来源' : ''}</small>
+            `;
+            section.appendChild(button);
+        });
+        body.appendChild(section);
+
+        const selected = await this.requestElementChoice('绑定到全局变量', body);
+        if (!selected?.variableId) {
+            return null;
+        }
+
+        return variables.find(variable => sameId(variable.id, selected.variableId)) || null;
+    }
+
     async openSourceBindingDialog() {
         const variable = this.getSelectedVariable();
         if (!variable || this.isRuntimeLocked()) {
@@ -1223,6 +1373,29 @@ export default class GlobalVariablePanel {
         return normalizeArray(flow?.operators ?? flow?.Operators);
     }
 
+    getCurrentFlowRevision() {
+        const flowCanvas = serviceRegistry.get('flowCanvas');
+        const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+        const value = flowCanvas?.getFlowRevision?.() ?? flowCanvasAdapter?.getFlowRevision?.();
+        if (value === undefined || value === null) {
+            return 0;
+        }
+
+        const revision = Number(value);
+        return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+    }
+
+    getCurrentFlowOperators() {
+        const flowCanvas = serviceRegistry.get('flowCanvas');
+        const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+        const flow = typeof flowCanvas?.serialize === 'function'
+            ? flowCanvas.serialize()
+            : (typeof flowCanvasAdapter?.serialize === 'function'
+                ? flowCanvasAdapter.serialize()
+                : (this.project?.flow || this.project?.Flow));
+        return normalizeArray(flow?.operators ?? flow?.Operators);
+    }
+
     getProjectVariableOperatorKind(operator) {
         const rawType = operator?.type ?? operator?.Type ?? operator?.operatorType ?? operator?.OperatorType;
         const text = String(rawType || '').toLowerCase();
@@ -1307,7 +1480,15 @@ export default class GlobalVariablePanel {
     }
 
     getFlowOutputs() {
-        return this.getFlowOperators().flatMap(operator => {
+        return this.getFlowOutputsFromOperators(this.getFlowOperators());
+    }
+
+    getCurrentFlowOutputs() {
+        return this.getFlowOutputsFromOperators(this.getCurrentFlowOperators());
+    }
+
+    getFlowOutputsFromOperators(operators) {
+        return normalizeArray(operators).flatMap(operator => {
             const outputs = normalizeArray(operator.outputPorts ?? operator.OutputPorts);
             return outputs.map(port => ({
                 operatorId: operator.id || operator.Id,
@@ -1670,7 +1851,8 @@ export default class GlobalVariablePanel {
                 overlay.remove();
                 resolve({
                     operatorId: option.dataset.operatorId,
-                    outputPortId: option.dataset.outputPortId
+                    outputPortId: option.dataset.outputPortId,
+                    variableId: option.dataset.variableId
                 });
             });
         });
@@ -1787,6 +1969,71 @@ function formatDataType(value) {
         default:
             return text;
     }
+}
+
+function formatSourceBindingResultPath(binding) {
+    if (binding?.resultPathVersion === 1 && binding?.resultPath) {
+        return formatResultPathForDisplay(binding.resultPath);
+    }
+
+    return ROOT_RESULT_PATH_LABEL;
+}
+
+function formatResultPathForDisplay(resultPath) {
+    return resultPath === '$' ? ROOT_RESULT_PATH_LABEL : String(resultPath || ROOT_RESULT_PATH_LABEL);
+}
+
+function normalizePreviewFieldDescriptor(descriptor) {
+    if (!descriptor || typeof descriptor !== 'object') {
+        return null;
+    }
+
+    const identity = normalizePreviewFieldIdentity(descriptor.identity);
+    if (!identity) {
+        return null;
+    }
+
+    return {
+        identity,
+        outputPortId: normalizeDescriptorString(descriptor.outputPortId),
+        outputPortName: normalizeDescriptorString(descriptor.outputPortName),
+        resultPathVersion: descriptor.resultPathVersion,
+        resultPath: normalizeDescriptorString(descriptor.resultPath),
+        bindableVariableTypes: normalizeArray(descriptor.bindableVariableTypes)
+            .map(item => String(item || '').trim())
+            .filter(Boolean)
+    };
+}
+
+function normalizePreviewFieldIdentity(identity) {
+    if (!identity || typeof identity !== 'object') {
+        return null;
+    }
+
+    const normalized = {
+        projectId: normalizeDescriptorString(identity.projectId),
+        targetNodeId: normalizeDescriptorString(identity.targetNodeId),
+        debugSessionId: normalizeDescriptorString(identity.debugSessionId),
+        clientRequestSequence: normalizeSafeInteger(identity.clientRequestSequence),
+        flowRevision: normalizeSafeInteger(identity.flowRevision)
+    };
+
+    return normalized.projectId &&
+        normalized.targetNodeId &&
+        normalized.debugSessionId &&
+        normalized.clientRequestSequence !== null &&
+        normalized.flowRevision !== null
+        ? normalized
+        : null;
+}
+
+function normalizeDescriptorString(value) {
+    return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function normalizeSafeInteger(value) {
+    const numberValue = Number(value);
+    return Number.isSafeInteger(numberValue) && numberValue >= 0 ? numberValue : null;
 }
 
 function createUuid() {

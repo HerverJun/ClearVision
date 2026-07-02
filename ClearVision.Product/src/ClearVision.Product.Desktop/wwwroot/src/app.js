@@ -909,7 +909,11 @@ function initializeNodePreviewExperience() {
             if (container) {
                 nodePreviewInspector = new NodePreviewInspector(container, flowCanvas, nodePreviewCoordinator, {
                     selectionStore: nodePreviewSelectionStore,
-                    onOpenImage: openImageViewerFromPreview
+                    onOpenImage: openImageViewerFromPreview,
+                    onBindGlobalVariable: descriptor => {
+                        const panel = globalVariablePanel || serviceRegistry.get('globalVariablePanel');
+                        void panel?.bindPreviewField?.(descriptor);
+                    }
                 });
                 serviceRegistry.register('nodePreviewInspector', nodePreviewInspector);
             }

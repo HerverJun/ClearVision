@@ -406,6 +406,9 @@ public sealed class Studio2ArchitectureGuardTests
 
         inspectorText.Should().NotMatchRegex(@"\bfetch\s*\(", "Inspector must read artifacts through NodePreviewCoordinator.");
         inspectorText.Should().NotContain("httpClient", "Inspector must not import or create a second Artifact client.");
+        inspectorText.Should().NotContain("projectManager", "Inspector must route binding through the composition root and GlobalVariablePanel.");
+        inspectorText.Should().NotContain("globalVariableStore", "Inspector must not become a global-variable schema authority.");
+        inspectorText.Should().NotContain("saveGlobalVariables", "Inspector must not save global-variable schema directly.");
         inspectorText.Should().NotMatchRegex(@"\bblob\s*\.\s*text\s*\(", "Inspector must not decode a full Artifact Blob before bounding it.");
         inspectorText.Should().Contain("MAX_ARTIFACT_TEXT_PREVIEW_BYTES");
         inspectorText.Should().Contain("MAX_ARTIFACT_TEXT_DISPLAY_CHARS");
@@ -418,17 +421,18 @@ public sealed class Studio2ArchitectureGuardTests
         selectionStoreText.Should().NotContain("saveProject");
         selectionStoreText.Should().NotContain("ProjectSave");
         selectionStoreText.Should().NotContain("GlobalVariables");
-        selectionStoreText.Should().NotContain("ResultPath");
 
-        var g06FrontendText = string.Join(
+        var g07FrontendText = string.Join(
             "\n",
             inspectorText,
             selectionStoreText,
             coordinatorText,
             appText);
-        g06FrontendText.Should().NotContain("ResultPathVersion");
-        g06FrontendText.Should().NotMatchRegex(@"class\s+\w*ResultPath\w*Parser\b");
-        g06FrontendText.Should().NotMatchRegex(@"function\s+\w*ResultPath\w*Parser\s*\(");
+        g07FrontendText.Should().Contain("resultPathVersion");
+        g07FrontendText.Should().NotMatchRegex(@"class\s+\w*ResultPath\w*Parser\b");
+        g07FrontendText.Should().NotMatchRegex(@"function\s+\w*ResultPath\w*Parser\s*\(");
+        g07FrontendText.Should().NotContain("ResultPathParser");
+        appText.Should().Contain("bindPreviewField");
 
         var previewEndpointText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs");
         previewEndpointText.Should().NotContain("ResultPathVersion");

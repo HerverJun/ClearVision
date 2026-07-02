@@ -273,18 +273,21 @@ public sealed class ExecutionObservationProjectorTests
         score.OutputPortName.Should().Be("Score");
         score.ResultPathVersion.Should().Be(1);
         score.ResultPath.Should().Be("$");
+        score.BindableVariableTypes.Should().BeEquivalentTo(["String", "Double"]);
 
         var seen = FindNode(observation.Detail, "Seen")!;
         seen.OutputPortId.Should().Be(payloadPortId);
         seen.OutputPortName.Should().Be("Payload");
         seen.ResultPathVersion.Should().Be(1);
         seen.ResultPath.Should().Be("$[\"Nested\"][\"Seen\"]");
+        seen.BindableVariableTypes.Should().BeEquivalentTo(["String", "Int64", "Double"]);
 
         var summarySeen = observation.Summary.Should().Contain(item => item.Key == "Seen").Subject;
         summarySeen.OutputPortId.Should().Be(seen.OutputPortId);
         summarySeen.OutputPortName.Should().Be(seen.OutputPortName);
         summarySeen.ResultPathVersion.Should().Be(seen.ResultPathVersion);
         summarySeen.ResultPath.Should().Be(seen.ResultPath);
+        summarySeen.BindableVariableTypes.Should().BeEquivalentTo(seen.BindableVariableTypes);
     }
 
     [Fact]

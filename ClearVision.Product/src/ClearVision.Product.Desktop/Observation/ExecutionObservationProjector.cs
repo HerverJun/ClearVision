@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text.Json;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ResultPaths;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.PreviewArtifacts;
@@ -661,6 +662,9 @@ public static class ExecutionObservationProjector
             : null;
         effectiveAddressable = binding != null;
         var canonicalPath = binding?.ToCanonicalPath();
+        var bindableVariableTypes = binding == null
+            ? null
+            : GetBindableVariableTypes(scalarValue);
         return new ExecutionObservationDetailNodeV1
         {
             Kind = kind,
@@ -672,8 +676,30 @@ public static class ExecutionObservationProjector
             OutputPortId = binding?.OutputPortId,
             OutputPortName = binding?.OutputPortName,
             ResultPathVersion = binding == null ? null : ResultPathV1.Version,
-            ResultPath = canonicalPath
+            ResultPath = canonicalPath,
+            BindableVariableTypes = bindableVariableTypes == null || bindableVariableTypes.Count == 0 ? null : bindableVariableTypes
         };
+    }
+
+    private static List<string> GetBindableVariableTypes(object? scalarValue)
+    {
+        var result = new List<string>();
+        foreach (var valueType in Enum.GetValues<ProjectGlobalVariableValueType>())
+        {
+            if (ProjectVariableValueTransform.TryConvertToVariableValue(
+                    scalarValue,
+                    valueType,
+                    ProjectVariableConversionMode.Exact,
+                    expression: null,
+                    variables: new Dictionary<string, object?>(),
+                    out _,
+                    out _))
+            {
+                result.Add(valueType.ToString());
+            }
+        }
+
+        return result;
     }
 
     private static ResultPathBindingInfo? ValidateBindableResultPath(
@@ -842,7 +868,8 @@ public static class ExecutionObservationProjector
                     OutputPortId = current.OutputPortId,
                     OutputPortName = current.OutputPortName,
                     ResultPathVersion = current.ResultPathVersion,
-                    ResultPath = current.ResultPath
+                    ResultPath = current.ResultPath,
+                    BindableVariableTypes = current.BindableVariableTypes
                 });
             }
 

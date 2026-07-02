@@ -134,11 +134,20 @@ function normalizeObservationNode(node) {
             addressable: false,
             truncated: false,
             artifact: null,
+            outputPortId: null,
+            outputPortName: null,
+            resultPathVersion: null,
+            resultPath: null,
+            bindableVariableTypes: [],
             childCount: 0
         };
     }
 
     const children = readOwn(node, 'children', 'Children');
+    const outputPortId = readOwn(node, 'outputPortId', 'OutputPortId');
+    const outputPortName = readOwn(node, 'outputPortName', 'OutputPortName');
+    const resultPathVersion = readOwn(node, 'resultPathVersion', 'ResultPathVersion');
+    const resultPath = readOwn(node, 'resultPath', 'ResultPath');
     return {
         kind: asString(readOwn(node, 'kind', 'Kind'), 'unknown'),
         displayValue: readOwn(node, 'displayValue', 'DisplayValue') === undefined
@@ -154,8 +163,21 @@ function normalizeObservationNode(node) {
         addressable: normalizeBool(readOwn(node, 'addressable', 'Addressable')),
         truncated: normalizeBool(readOwn(node, 'truncated', 'Truncated')),
         artifact: normalizeArtifactReference(readOwn(node, 'artifact', 'Artifact')),
+        outputPortId: outputPortId === undefined || outputPortId === null ? null : asString(outputPortId),
+        outputPortName: outputPortName === undefined || outputPortName === null ? null : asString(outputPortName),
+        resultPathVersion: resultPathVersion === undefined || resultPathVersion === null ? null : resultPathVersion,
+        resultPath: resultPath === undefined || resultPath === null ? null : asString(resultPath),
+        bindableVariableTypes: normalizeBindableVariableTypes(readOwn(node, 'bindableVariableTypes', 'BindableVariableTypes')),
         childCount: Array.isArray(children) ? children.length : 0
     };
+}
+
+function normalizeBindableVariableTypes(value) {
+    return Array.isArray(value)
+        ? Array.from(new Set(value
+            .map(item => String(item || '').trim())
+            .filter(Boolean)))
+        : [];
 }
 
 function getNodeChildren(node) {
@@ -206,6 +228,7 @@ const RESOURCE_KIND_KEYS = new Set([
 
 const CONTAINER_KIND_KEYS = new Set(['dictionary', 'object', 'array']);
 const BOUNDED_KIND_KEYS = new Set(['truncated', 'unsupportedenumerable', 'objectdescriptor', 'circular']);
+const NON_BINDABLE_SCALAR_KIND_KEYS = new Set(['nonfinitenumber']);
 
 const rendererDefinitions = [
     {
@@ -565,6 +588,7 @@ export class NodePreviewInspector {
         this.previewCoordinator = previewCoordinator;
         this.selectionStore = options.selectionStore ?? null;
         this.onOpenImage = options.onOpenImage ?? (() => {});
+        this.onBindGlobalVariable = options.onBindGlobalVariable ?? (() => {});
         this.state = this.previewCoordinator?.getState?.() ?? null;
         this.activeTab = 'summary';
         this.expandedKeys = new Set();
@@ -892,27 +916,88 @@ export class NodePreviewInspector {
         actions.appendChild(makeButton('node-preview-inspector-row-action', 'Copy path', () => {
             void copyText(row.normalized.pathHint);
         }));
+        if (this.canBindGlobalVariable(row)) {
+            const bindButton = makeButton('node-preview-inspector-row-action bind-global-variable', '绑定到全局变量', () => {
+                const descriptor = this.selectDetailRow(row);
+                if (descriptor && this.isBindableDescriptorCurrent(descriptor)) {
+                    this.onBindGlobalVariable(descriptor);
+                }
+            });
+            bindButton.dataset.action = 'bind-global-variable';
+            actions.appendChild(bindButton);
+        }
         rowElement.appendChild(actions);
         return rowElement;
     }
 
     selectDetailRow(row) {
+        const descriptor = this.createSelectionDescriptor(row);
+        if (!descriptor) {
+            this.selectionStore?.clear?.();
+            return null;
+        }
+
+        return this.selectionStore?.select?.(descriptor) || descriptor;
+    }
+
+    createSelectionDescriptor(row) {
         const identity = normalizeNodePreviewIdentity(getObservationIdentityFromState(this.state));
         if (!identity) {
-            this.selectionStore?.clear?.();
             return;
         }
 
-        this.selectionStore?.select?.({
+        return {
             identity,
             nodeName: this.state?.title || '',
             nodeKind: this.state?.nodeType || '',
+            outputPortId: row.normalized.outputPortId,
+            outputPortName: row.normalized.outputPortName,
+            resultPathVersion: row.normalized.resultPathVersion,
+            resultPath: row.normalized.resultPath,
+            kind: row.normalized.kind,
             displayValue: row.normalized.displayValue,
             originalType: row.normalized.originalType,
             pathHint: row.normalized.pathHint,
             addressable: row.normalized.addressable,
+            truncated: row.normalized.truncated,
+            bindableVariableTypes: row.normalized.bindableVariableTypes,
             artifact: row.normalized.artifact
-        });
+        };
+    }
+
+    canBindGlobalVariable(row) {
+        const descriptor = this.createSelectionDescriptor(row);
+        return Boolean(descriptor && this.isBindableDescriptorCurrent(descriptor));
+    }
+
+    isBindableDescriptorCurrent(descriptor) {
+        if (!descriptor?.identity || !this.isCurrentObservationIdentity(descriptor.identity)) {
+            return false;
+        }
+
+        const kindKey = normalizeKindKey(descriptor.kind);
+        return SCALAR_KIND_KEYS.has(kindKey) &&
+            !NON_BINDABLE_SCALAR_KIND_KEYS.has(kindKey) &&
+            descriptor.addressable === true &&
+            Boolean(descriptor.outputPortId) &&
+            Boolean(descriptor.outputPortName) &&
+            descriptor.resultPathVersion === 1 &&
+            Boolean(descriptor.resultPath) &&
+            descriptor.truncated !== true &&
+            !descriptor.artifact &&
+            Array.isArray(descriptor.bindableVariableTypes) &&
+            descriptor.bindableVariableTypes.length > 0;
+    }
+
+    isCurrentObservationIdentity(identity) {
+        const signature = getNodePreviewIdentitySignature(identity);
+        if (!signature) {
+            return false;
+        }
+
+        const currentState = this.previewCoordinator?.getState?.() ?? this.state;
+        return signature === getObservationIdentitySignatureFromState(currentState) &&
+            signature === getObservationIdentitySignatureFromState(this.state);
     }
 
     renderArtifacts() {

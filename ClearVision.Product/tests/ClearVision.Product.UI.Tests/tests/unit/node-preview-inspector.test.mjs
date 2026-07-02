@@ -35,6 +35,11 @@ function node(kind, fields = {}) {
     pathHint: fields.pathHint ?? `$["${fields.name ?? kind}"]`,
     addressable: fields.addressable ?? true,
     truncated: fields.truncated ?? false,
+    outputPortId: fields.outputPortId ?? null,
+    outputPortName: fields.outputPortName ?? null,
+    resultPathVersion: fields.resultPathVersion ?? null,
+    resultPath: fields.resultPath ?? null,
+    bindableVariableTypes: fields.bindableVariableTypes ?? [],
     children: fields.children ?? [],
     artifact: fields.artifact ?? null
   };
@@ -109,7 +114,7 @@ function createInspectorHarness(options = {}) {
   };
   const calls = [];
   const coordinator = {
-    getState: () => state,
+    getState: () => options.getState?.() ?? state,
     subscribe: () => () => {},
     readArtifactForCurrentState: async (artifactId, expectedIdentity, readOptions) => {
       calls.push({ artifactId, expectedIdentity, readOptions });
@@ -126,7 +131,10 @@ function createInspectorHarness(options = {}) {
       getNodeScreenRect: () => null
     },
     coordinator,
-    { selectionStore: options.selectionStore ?? null }
+    {
+      selectionStore: options.selectionStore ?? null,
+      onBindGlobalVariable: options.onBindGlobalVariable ?? undefined
+    }
   );
 
   return { inspector, calls, state };
@@ -265,6 +273,147 @@ test('nodePreviewSelectionStore stores complete identity and clears on identity 
   store.select({ identity: identity(), displayValue: 'x', pathHint: '$["x"]' });
   store.clear();
   assert.equal(store.getSelection(), null);
+});
+
+test('NodePreviewInspector exposes global variable binding only for current canonical scalar metadata', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const store = createNodePreviewSelectionStore();
+    const bindableScalar = node('number', {
+      name: 'Score',
+      displayValue: '7',
+      originalType: 'System.Int64',
+      pathHint: '$["Payload"]["Score"]',
+      outputPortId: 'out-payload',
+      outputPortName: 'Payload',
+      resultPathVersion: 1,
+      resultPath: '$["Score"]',
+      bindableVariableTypes: ['String', 'Int64', 'Double']
+    });
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'Thresholding',
+      title: 'Threshold',
+      status: 'success',
+      executionTimeMs: 5,
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [bindableScalar]
+        })
+      },
+      artifacts: []
+    };
+    const { inspector } = createInspectorHarness({ state, selectionStore: store });
+    const row = buildVisibleObservationRows(state.observation.detail, { limit: 5 }).rows[1];
+
+    assert.equal(inspector.canBindGlobalVariable(row), true);
+    const rowElement = inspector.renderDetailRow(row);
+    assert.ok(rowElement.children.at(-1).children.some(child => String(child.className).includes('bind-global-variable')));
+
+    const descriptor = inspector.selectDetailRow(row);
+    assert.equal(descriptor.outputPortId, 'out-payload');
+    assert.equal(descriptor.outputPortName, 'Payload');
+    assert.equal(descriptor.resultPathVersion, 1);
+    assert.equal(descriptor.resultPath, '$["Score"]');
+    assert.deepEqual(descriptor.bindableVariableTypes, ['String', 'Int64', 'Double']);
+    assert.equal(store.getSelection().resultPath, '$["Score"]');
+    assert.equal(store.getSelection().truncated, false);
+
+    const pathHintOnly = buildVisibleObservationRows(node('dictionary', {
+      pathHint: '$',
+      addressable: false,
+      children: [node('number', {
+        name: 'PathHintOnly',
+        pathHint: '$["PathHintOnly"]'
+      })]
+    }), { limit: 5 }).rows[1];
+    assert.equal(inspector.canBindGlobalVariable(pathHintOnly), false);
+
+    const resourceRow = buildVisibleObservationRows(node('dictionary', {
+      pathHint: '$',
+      addressable: false,
+      children: [node('image', {
+        name: 'Image',
+        outputPortId: 'out-image',
+        outputPortName: 'Image',
+        resultPathVersion: 1,
+        resultPath: '$',
+        bindableVariableTypes: ['String']
+      })]
+    }), { limit: 5 }).rows[1];
+    assert.equal(inspector.canBindGlobalVariable(resourceRow), false);
+
+    const truncatedRow = buildVisibleObservationRows(node('dictionary', {
+      pathHint: '$',
+      addressable: false,
+      children: [node('number', {
+        name: 'Truncated',
+        truncated: true,
+        outputPortId: 'out',
+        outputPortName: 'Out',
+        resultPathVersion: 1,
+        resultPath: '$',
+        bindableVariableTypes: ['Int64']
+      })]
+    }), { limit: 5 }).rows[1];
+    assert.equal(inspector.canBindGlobalVariable(truncatedRow), false);
+
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector disables field binding when coordinator identity becomes stale', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    let currentState;
+    const bindableScalar = node('number', {
+      name: 'Score',
+      outputPortId: 'out-payload',
+      outputPortName: 'Payload',
+      resultPathVersion: 1,
+      resultPath: '$["Score"]',
+      bindableVariableTypes: ['Int64']
+    });
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'Thresholding',
+      title: 'Threshold',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [bindableScalar]
+        })
+      },
+      artifacts: []
+    };
+    currentState = state;
+    const { inspector } = createInspectorHarness({
+      state,
+      getState: () => currentState
+    });
+    const row = buildVisibleObservationRows(state.observation.detail, { limit: 5 }).rows[1];
+    assert.equal(inspector.canBindGlobalVariable(row), true);
+
+    currentState = {
+      ...state,
+      observation: {
+        ...state.observation,
+        identity: identity({ flowRevision: 12 })
+      }
+    };
+    assert.equal(inspector.canBindGlobalVariable(row), false);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
 });
 
 test('NodePreviewInspector does not fetch declared-oversized text artifacts', async () => {

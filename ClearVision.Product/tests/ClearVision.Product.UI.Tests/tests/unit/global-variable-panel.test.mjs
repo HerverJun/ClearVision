@@ -395,6 +395,58 @@ test('global variable schema preserves conversion expressions and matches backen
   assert.match(invalidSegment.name, /每段必须以字母开头/);
 });
 
+test('global variable source bindings preserve ResultPath fields without migrating legacy roots', async () => {
+  installDom();
+  const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+
+  const schema = store.normalizeGlobalVariableSchema({
+    variables: [],
+    SourceBindings: [
+      {
+        Id: 'legacy-root',
+        VariableId: 'var-legacy',
+        OperatorId: 'op',
+        OutputPortId: 'out',
+        OperatorName: 'Operator',
+        OutputPortName: 'Root'
+      },
+      {
+        Id: 'pascal-field',
+        VariableId: 'var-field',
+        OperatorId: 'op',
+        OutputPortId: 'out',
+        OperatorName: 'Operator',
+        OutputPortName: 'Payload',
+        ResultPathVersion: 1,
+        ResultPath: '$["Score"]'
+      },
+      {
+        id: 'partial-field',
+        variableId: 'var-partial',
+        operatorId: 'op',
+        outputPortId: 'out',
+        operatorName: 'Operator',
+        outputPortName: 'Payload',
+        resultPathVersion: 2
+      }
+    ]
+  });
+
+  assert.equal(Object.hasOwn(schema.sourceBindings[0], 'resultPathVersion'), false);
+  assert.equal(Object.hasOwn(schema.sourceBindings[0], 'resultPath'), false);
+  assert.equal(schema.sourceBindings[1].resultPathVersion, 1);
+  assert.equal(schema.sourceBindings[1].resultPath, '$["Score"]');
+  assert.equal(schema.sourceBindings[2].resultPathVersion, 2);
+  assert.equal(Object.hasOwn(schema.sourceBindings[2], 'resultPath'), false);
+
+  const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  panel.rebuildBaseline(schema);
+  panel.schema.sourceBindings[1].resultPath = '$["Other"]';
+  panel.updateDirtyState();
+  assert.equal(panel.dirty, true);
+});
+
 test('global variable panel saves edited schema, keeps id and preserves dirty draft after backend failure', async () => {
   installDom();
   const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
@@ -721,6 +773,174 @@ test('source and target bindings use compatible filtering and locate canvas node
   });
   assert.equal(panel.locateOperator('op-counter'), true);
   assert.equal(selectedNode, 'op-counter');
+});
+
+test('preview field binding saves canonical ResultPath through the panel transaction owner', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const project = createProject();
+  project.globalVariables.sourceBindings.push({
+    id: 'old-source',
+    variableId: 'var-count',
+    operatorId: 'old-op',
+    outputPortId: 'old-out',
+    operatorName: 'Old',
+    outputPortName: 'OldOut',
+    resultPathVersion: 1,
+    resultPath: '$["Old"]'
+  });
+  projectManager.currentProject = project;
+  const savedBodies = [];
+  const syncedSchemas = [];
+  global.fetch = async (url, options = {}) => {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+      const body = JSON.parse(options.body);
+      savedBodies.push(body);
+      return jsonResponse(body);
+    }
+    if (String(url).includes('/global-variable-values')) {
+      return jsonResponse([]);
+    }
+    return jsonResponse({});
+  };
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => 11,
+    serialize: () => project.flow,
+    setGlobalVariableSchema(schema) {
+      syncedSchemas.push(clone(schema));
+    }
+  });
+
+  const panel = new GlobalVariablePanel('global-variables-root', {
+    requestChoice: () => 'replace',
+    showToast() {}
+  });
+  panel.requestElementChoice = async () => ({ variableId: 'var-count' });
+  panel.render = () => {};
+  panel.renderDialog = () => {};
+  panel.project = project;
+  panel.rebuildBaseline(project.globalVariables);
+
+  const result = await panel.bindPreviewField({
+    identity: {
+      projectId: project.id,
+      targetNodeId: 'op-counter',
+      debugSessionId: 'debug-1',
+      clientRequestSequence: 3,
+      flowRevision: 11
+    },
+    outputPortId: 'out-count',
+    outputPortName: '数量',
+    resultPathVersion: 1,
+    resultPath: '$["Nested"]["Score"]',
+    bindableVariableTypes: ['String', 'Int64', 'Double']
+  });
+
+  assert.equal(result, true);
+  assert.equal(savedBodies.length, 1);
+  assert.equal(savedBodies[0].sourceBindings.length, 1);
+  assert.equal(savedBodies[0].sourceBindings[0].operatorId, 'op-counter');
+  assert.equal(savedBodies[0].sourceBindings[0].outputPortId, 'out-count');
+  assert.equal(savedBodies[0].sourceBindings[0].resultPathVersion, 1);
+  assert.equal(savedBodies[0].sourceBindings[0].resultPath, '$["Nested"]["Score"]');
+  assert.equal(savedBodies[0].sourceBindings[0].conversionMode, 'Exact');
+  assert.equal(savedBodies[0].sourceBindings[0].expression, '');
+  assert.equal(panel.baselineSchema.sourceBindings[0].resultPath, '$["Nested"]["Score"]');
+  assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].resultPath, '$["Nested"]["Score"]');
+  assert.equal(syncedSchemas.at(-1).sourceBindings[0].resultPath, '$["Nested"]["Score"]');
+  assert.match(panel.renderSourceBindingHtml(panel.getSourceBinding('var-count')), /\$\[&quot;Nested&quot;\]\[&quot;Score&quot;\]/);
+});
+
+test('preview field binding rejects dirty or stale selections and rolls back failed saves', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const serviceRegistry = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js')).default;
+  const project = createProject();
+  project.globalVariables.sourceBindings.push({
+    id: 'old-source',
+    variableId: 'var-count',
+    operatorId: 'old-op',
+    outputPortId: 'old-out',
+    operatorName: 'Old',
+    outputPortName: 'OldOut'
+  });
+  const descriptor = {
+    identity: {
+      projectId: project.id,
+      targetNodeId: 'op-counter',
+      debugSessionId: 'debug-1',
+      clientRequestSequence: 3,
+      flowRevision: 11
+    },
+    outputPortId: 'out-count',
+    outputPortName: '数量',
+    resultPathVersion: 1,
+    resultPath: '$["Nested"]["Score"]',
+    bindableVariableTypes: ['Int64']
+  };
+  const clearedSelections = [];
+  serviceRegistry.register('nodePreviewSelectionStore', {
+    clear() {
+      clearedSelections.push(true);
+    }
+  });
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => 11,
+    serialize: () => project.flow,
+    setGlobalVariableSchema() {}
+  });
+
+  const dirtyPanel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  dirtyPanel.project = project;
+  dirtyPanel.rebuildBaseline(project.globalVariables);
+  dirtyPanel.dirty = true;
+  dirtyPanel.render = () => {};
+  assert.equal(await dirtyPanel.bindPreviewField(descriptor), false);
+  assert.equal(dirtyPanel.isOpen, true);
+
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => 12,
+    serialize: () => project.flow,
+    setGlobalVariableSchema() {}
+  });
+  const stalePanel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  stalePanel.project = project;
+  stalePanel.rebuildBaseline(project.globalVariables);
+  stalePanel.render = () => {};
+  assert.equal(await stalePanel.bindPreviewField(descriptor), false);
+  assert.equal(clearedSelections.length, 1);
+
+  serviceRegistry.register('flowCanvas', {
+    getFlowRevision: () => 11,
+    serialize: () => project.flow,
+    setGlobalVariableSchema() {}
+  });
+  projectManager.currentProject = project;
+  global.fetch = async (url, options = {}) => {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
+      return jsonResponse({ Error: 'save failed' }, 500);
+    }
+    if (String(url).includes('/global-variable-values')) {
+      return jsonResponse([]);
+    }
+    return jsonResponse({});
+  };
+  const failingPanel = new GlobalVariablePanel('global-variables-root', {
+    requestChoice: () => 'replace',
+    showToast() {}
+  });
+  failingPanel.requestElementChoice = async () => ({ variableId: 'var-count' });
+  failingPanel.render = () => {};
+  failingPanel.renderDialog = () => {};
+  failingPanel.project = project;
+  failingPanel.rebuildBaseline(project.globalVariables);
+  assert.equal(await failingPanel.bindPreviewField(descriptor), false);
+  assert.equal(failingPanel.schema.sourceBindings[0].operatorId, 'old-op');
+  assert.equal(projectManager.currentProject.globalVariables.sourceBindings[0].operatorId, 'old-op');
+  assert.match(failingPanel.errorMessage, /save failed/);
 });
 
 test('running states disable schema and value mutations and 409 refreshes values without success', async () => {

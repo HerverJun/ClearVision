@@ -90,6 +90,20 @@ function cloneArtifactMetadata(artifact) {
     };
 }
 
+function normalizeOptionalString(value) {
+    return value === undefined || value === null
+        ? null
+        : String(value);
+}
+
+function normalizeBindableVariableTypes(value) {
+    return Array.isArray(value)
+        ? Array.from(new Set(value
+            .map(item => String(item || '').trim())
+            .filter(Boolean)))
+        : [];
+}
+
 export function createNodePreviewSelectionStore() {
     const [getSelection, setSelection, subscribe] = createSignal(null);
 
@@ -112,6 +126,13 @@ export function createNodePreviewSelectionStore() {
                 identitySignature: getNodePreviewIdentitySignature(identity),
                 nodeName: String(selection?.nodeName ?? ''),
                 nodeKind: String(selection?.nodeKind ?? ''),
+                outputPortId: normalizeOptionalString(selection?.outputPortId),
+                outputPortName: normalizeOptionalString(selection?.outputPortName),
+                resultPathVersion: selection?.resultPathVersion ?? null,
+                resultPath: normalizeOptionalString(selection?.resultPath),
+                kind: selection?.kind === undefined || selection?.kind === null
+                    ? null
+                    : String(selection.kind),
                 displayValue: selection?.displayValue === undefined || selection?.displayValue === null
                     ? ''
                     : String(selection.displayValue),
@@ -122,6 +143,8 @@ export function createNodePreviewSelectionStore() {
                     ? '$'
                     : String(selection.pathHint),
                 addressable: selection?.addressable === true,
+                truncated: selection?.truncated === true,
+                bindableVariableTypes: normalizeBindableVariableTypes(selection?.bindableVariableTypes),
                 artifact: cloneArtifactMetadata(selection?.artifact)
             };
 

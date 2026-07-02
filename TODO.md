@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G07B`
-- 当前卡片：`docs/进行中/Studio2/goals/G07B.md`
+- 当前 Goal：`G08`
+- 当前卡片：`docs/进行中/Studio2/goals/G08.md`
 - 当前阶段：`Observation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -95,8 +95,8 @@
 | G05B | Observation | Preview Artifact 生命周期与安全读取 | DONE | G05A | `docs/进行中/Studio2/goals/G05B.md` | 见 G05B follow-up 完成提交与最终报告 |
 | G06 | Observation | 节点预览结果检查器 MVP | DONE | G05B | `docs/进行中/Studio2/goals/G06.md` | 见 G06 follow-up 完成提交与最终报告 |
 | G07A | Observation | Canonical ResultPath 解析器 | DONE | G06 | `docs/进行中/Studio2/goals/G07A.md` | 见 G07A follow-up 完成提交与最终报告 |
-| G07B | Observation | 字段级全局变量绑定 V1 | READY | G07A | `docs/进行中/Studio2/goals/G07B.md` |  |
-| G08 | Observation | Visual Scene V1（只读投影） | LOCKED | G07B | `docs/进行中/Studio2/goals/G08.md` |  |
+| G07B | Observation | 字段级全局变量绑定 V1 | DONE | G07A | `docs/进行中/Studio2/goals/G07B.md` | 见 G07B 完成提交与最终报告 |
+| G08 | Observation | Visual Scene V1（只读投影） | READY | G07B | `docs/进行中/Studio2/goals/G08.md` |  |
 | G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | LOCKED | G08 | `docs/进行中/Studio2/goals/G09A.md` |  |
 | G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | LOCKED | G09A | `docs/进行中/Studio2/goals/G09B.md` |  |
 | G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | LOCKED | G09B | `docs/进行中/Studio2/goals/G09C.md` |  |
@@ -163,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G07B | `295363ecfad05711ecb7d214513a6aa090fd64ed` | 见 G07B 完成提交与最终报告 | UI focused global-variable/Inspector unit PASS（51 tests）；Desktop targeted Observation/Architecture PASS（32 tests）；Product targeted ResultPath/ProjectVariables/FlowExecution PASS（95 tests）；Playwright field-binding focused PASS（1 test）；UI `test:unit` PASS（580 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（10 tests）；`ClearVision.Product.Tests` full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 增加字段级全局变量绑定 V1：SourceBinding 前端 round-trip 保留 optional ResultPath 字段且不迁移 legacy root；Observation 投影后端权威 `bindableVariableTypes`；Inspector 仅对当前 identity 的可绑定 scalar canonical metadata 显示入口并通过注入 callback 出口；GlobalVariablePanel 为唯一 UI mutation owner，经现有 ProjectManager 保存链完成已有变量绑定、替换、取消和失败回滚；未执行 G08。 |
 | 2026-07-02 | G07A follow-up | `746bbe52c4405b63d474508efd49813f895fad41` | 见 G07A follow-up 完成提交与最终报告 | Product targeted ResultPath/ProjectVariables/FlowExecution PASS（95 tests）；Desktop targeted Observation/Preview/Architecture PASS（60 tests）；Desktop endpoint isolation PASS（37 tests）；`ClearVision.Product.Tests` full PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 修复 Observation canonical metadata 仅在生产 `ResultPathResolver` 可从真实 output-port 根值解析到同一 scalar 时输出；非字符串 dictionary key 与格式化冲突保持只读显示；SourceBinding nested ResultPath schema 不再误用根结构类型产生 `GV017`；运行时 version/path 配对 fail closed；stable-ID 全集合唯一；未执行 G07B。 |
 | 2026-07-02 | G07A | `9244979e3dde5534bf92121c374c34e7e5126f31` | 见 G07A 完成提交与最终报告 | Product directed ResultPath/ProjectVariables/FlowExecution PASS（86 tests）；Desktop directed Observation/Preview/Architecture PASS（57 tests）；`ClearVision.Product.Tests` full PASS（3119 passed, 4 skipped）；Desktop full serial PASS（450 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 Core/shared Canonical ResultPath V1 parser/formatter/resolver；SourceBinding additive nullable `ResultPathVersion`/`ResultPath`，缺失兼容 `$`；FlowExecutionService 在 output port 根值上先解析 ResultPath 再执行 Expression 和变量转换；Observation 为唯一映射到 declared output port 的 scalar leaf 生成 canonical metadata；stable-ID selector 仅通过显式 adapter 支持；未执行 G07B。 |
 | 2026-07-02 | G06 follow-up | `414dc70d7644326140e97e966af976a6f54413bd` | 见 G06 follow-up 完成提交与最终报告 | Desktop targeted serial tests PASS（74 tests）；UI focused Inspector/Coordinator unit PASS（25 tests）；Playwright `node-preview.spec.ts` PASS（9 tests：legacy 6，Inspector 3）；UI `test:unit` PASS（575 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G06 follow-up：`Studio:NodePreviewInspectorEnabled` 决策收敛到 frozen `featureFlags` 单一来源；flag off 不创建 Inspector/selectionStore，flag on 不构造 legacy Overlay；Artifact 文本预览按声明长度和实际 Blob slice 双重上限读取；renderer 改为确定优先级和大小写归一化；补齐快速节点切换 stale、大文本 Artifact、flag mutation 与架构守卫；未执行 G07A。 |

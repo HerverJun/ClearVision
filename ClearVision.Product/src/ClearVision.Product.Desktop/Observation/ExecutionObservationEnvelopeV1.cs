@@ -110,6 +110,10 @@ public sealed class ExecutionObservationSummaryItemV1
     [JsonPropertyOrder(8)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ResultPath { get; init; }
+
+    [JsonPropertyOrder(9)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? BindableVariableTypes { get; init; }
 }
 
 public sealed class ExecutionObservationDetailNodeV1
@@ -157,6 +161,10 @@ public sealed class ExecutionObservationDetailNodeV1
     [JsonPropertyOrder(12)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ResultPath { get; init; }
+
+    [JsonPropertyOrder(13)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? BindableVariableTypes { get; init; }
 }
 
 public sealed class ExecutionObservationDiagnosticV1
