@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "valid": [
+    "$",
+    "$[\"Score\"]",
+    "$[\"A\\\\B\"][\"Quote\\\"Key\"]",
+    "$[\"Line\\nBreak\"]",
+    "$[\"中文\"]",
+    "$[@id=\"stable-id\"]",
+    "$[\"Items\"][@id=\"stable-id\"][\"Score\"]"
+  ],
+  "invalid": [
+    "",
+    "Score",
+    "$.Score",
+    "$[0]",
+    "$[-1]",
+    "$[*]",
+    "$..Score",
+    "$[?(@.Score>0)]",
+    "$[\"Score\"",
+    "$['Score']",
+    "$[\"\\u0053core\"]",
+    "$[@id='stable-id']",
+    "$[@id=\"\"]",
+    "$[\"Items\"][0]"
+  ]
+}

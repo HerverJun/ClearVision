@@ -13,6 +13,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.ResultPaths;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Logging;
@@ -932,24 +933,52 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 return false;
             }
 
-            if (!outputs.TryGetValue(port.Name, out var value) &&
+            var foundPortValue = outputs.TryGetValue(port.Name, out var value);
+            if (!foundPortValue &&
                 !string.IsNullOrWhiteSpace(binding.OutputPortName))
             {
-                outputs.TryGetValue(binding.OutputPortName, out value);
+                foundPortValue = outputs.TryGetValue(binding.OutputPortName, out value);
             }
 
-            if (value == null)
+            if (!foundPortValue)
             {
                 error = $"GV023: source output '{port.Name}' did not produce a value for project global variable '{definition.Name}'.";
+                return false;
+            }
+        }
+
+        var updates = new List<(Guid VariableId, JsonElement Value)>();
+        foreach (var binding in context.BindingIndex.GetSources(op.Id))
+        {
+            context.Session.TryGetDefinition(binding.VariableId, out var definition);
+            var port = op.OutputPorts.First(item => item.Id == binding.OutputPortId);
+            var foundPortValue = outputs.TryGetValue(port.Name, out var value);
+            if (!foundPortValue &&
+                !string.IsNullOrWhiteSpace(binding.OutputPortName))
+            {
+                foundPortValue = outputs.TryGetValue(binding.OutputPortName, out value);
+            }
+
+            if (!foundPortValue)
+            {
+                error = $"GV023: source output '{port.Name}' did not produce a value for project global variable '{definition!.Name}'.";
                 return false;
             }
 
             try
             {
-                var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, value);
+                var resolved = ResolveSourceBindingResultPath(binding, value);
+                if (!resolved.Succeeded)
+                {
+                    error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition!.Name}': {resolved.Diagnostic}";
+                    return false;
+                }
+
+                var resolvedValue = resolved.Value;
+                var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, resolvedValue);
                 if (!ProjectVariableValueTransform.TryConvertToVariableValue(
-                        value,
-                        definition.ValueType,
+                        resolvedValue,
+                        definition!.ValueType,
                         binding.ConversionMode,
                         binding.Expression,
                         expressionVariables,
@@ -960,21 +989,35 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     return false;
                 }
 
-                context.Session.SetValue(
-                    binding.VariableId,
-                    converted,
-                    ProjectVariableUpdatedBy.OperatorOutput,
-                    context.RunId,
-                    op.Id);
+                updates.Add((binding.VariableId, converted));
             }
             catch (Exception ex)
             {
-                error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition.Name}': {ex.Message}";
+                error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition!.Name}': {ex.Message}";
                 return false;
             }
         }
 
+        foreach (var update in updates)
+        {
+            context.Session.SetValue(
+                update.VariableId,
+                update.Value,
+                ProjectVariableUpdatedBy.OperatorOutput,
+                context.RunId,
+                op.Id);
+        }
+
         return true;
+    }
+
+    private static ResultPathResolutionResult ResolveSourceBindingResultPath(
+        ProjectGlobalVariableSourceBinding binding,
+        object? outputPortRoot)
+    {
+        var version = binding.ResultPathVersion ?? ResultPathV1.Version;
+        var path = binding.ResultPath ?? ResultPathV1.Root;
+        return ResultPathResolver.Resolve(version, path, outputPortRoot);
     }
 
     /// <summary>

@@ -1143,7 +1143,16 @@ public static class PreviewNodeEndpoints
             FailedOperatorName = failedOperator?.OperatorName,
             FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
             ExecutedOperatorCount = result.DebugOperatorResults.Count,
-            OutputData = outputData
+            OutputData = outputData,
+            OutputPorts = flow.Operators
+                .FirstOrDefault(item => item.Id == request.TargetNodeId)?
+                .OutputPorts
+                .Select(port => new ExecutionObservationOutputPortV1
+                {
+                    Id = port.Id,
+                    Name = port.Name
+                })
+                .ToList() ?? []
         });
     }
 

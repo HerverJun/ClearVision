@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ResultPaths;
 
 namespace ClearVision.Product.Core.ProjectVariables;
 
@@ -217,6 +218,8 @@ public static partial class ProjectGlobalVariableSchemaValidator
             diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV008", "Source binding references a missing project global variable.", binding.VariableId, binding.OperatorId, binding.OutputPortId));
         }
 
+        ValidateSourceBindingResultPath(binding, diagnostics);
+
         if (operatorsById.Count == 0)
         {
             return;
@@ -258,6 +261,52 @@ public static partial class ProjectGlobalVariableSchemaValidator
         }
 
         ValidateExpression(binding.Expression, variablesById.Values, binding.VariableId, binding.OperatorId, binding.OutputPortId, null, diagnostics);
+    }
+
+    private static void ValidateSourceBindingResultPath(
+        ProjectGlobalVariableSourceBinding binding,
+        List<ProjectGlobalVariableDiagnostic> diagnostics)
+    {
+        var hasVersion = binding.ResultPathVersion.HasValue;
+        var hasPath = binding.ResultPath != null;
+        if (!hasVersion && !hasPath)
+        {
+            return;
+        }
+
+        if (!hasVersion || !hasPath)
+        {
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "RP101",
+                "Source binding ResultPathVersion and ResultPath must be provided together.",
+                binding.VariableId,
+                binding.OperatorId,
+                binding.OutputPortId));
+            return;
+        }
+
+        var parsed = ResultPathParser.Parse(binding.ResultPathVersion!.Value, binding.ResultPath);
+        if (!parsed.Succeeded)
+        {
+            var diagnostic = parsed.Diagnostic!;
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                diagnostic.Code,
+                $"Source binding ResultPath is invalid: {diagnostic.Message}",
+                binding.VariableId,
+                binding.OperatorId,
+                binding.OutputPortId));
+            return;
+        }
+
+        if (!string.Equals(parsed.Path!.CanonicalPath, binding.ResultPath, StringComparison.Ordinal))
+        {
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "RP107",
+                "Source binding ResultPath must be canonical.",
+                binding.VariableId,
+                binding.OperatorId,
+                binding.OutputPortId));
+        }
     }
 
     private static void ValidateTargetBinding(

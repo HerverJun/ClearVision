@@ -43,6 +43,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="TestData\ResultPathV1Conformance.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

@@ -94,6 +94,22 @@ public sealed class ExecutionObservationSummaryItemV1
 
     [JsonPropertyOrder(4)]
     public bool Addressable { get; init; }
+
+    [JsonPropertyOrder(5)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? OutputPortId { get; init; }
+
+    [JsonPropertyOrder(6)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OutputPortName { get; init; }
+
+    [JsonPropertyOrder(7)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ResultPathVersion { get; init; }
+
+    [JsonPropertyOrder(8)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultPath { get; init; }
 }
 
 public sealed class ExecutionObservationDetailNodeV1
@@ -125,6 +141,22 @@ public sealed class ExecutionObservationDetailNodeV1
     [JsonPropertyOrder(8)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PreviewArtifactReferenceV1? Artifact { get; init; }
+
+    [JsonPropertyOrder(9)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? OutputPortId { get; init; }
+
+    [JsonPropertyOrder(10)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OutputPortName { get; init; }
+
+    [JsonPropertyOrder(11)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ResultPathVersion { get; init; }
+
+    [JsonPropertyOrder(12)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultPath { get; init; }
 }
 
 public sealed class ExecutionObservationDiagnosticV1
@@ -175,5 +207,13 @@ public sealed class ExecutionObservationPreviewInput
     public string? FailedOperatorType { get; init; }
     public int ExecutedOperatorCount { get; init; }
     public IReadOnlyDictionary<string, object>? OutputData { get; init; }
+    public IReadOnlyList<ExecutionObservationOutputPortV1> OutputPorts { get; init; } = [];
     public DateTimeOffset? ObservedAtUtc { get; init; }
+}
+
+public sealed class ExecutionObservationOutputPortV1
+{
+    public Guid Id { get; init; }
+
+    public string Name { get; init; } = string.Empty;
 }

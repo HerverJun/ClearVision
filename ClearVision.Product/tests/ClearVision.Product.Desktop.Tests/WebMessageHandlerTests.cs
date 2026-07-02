@@ -33,6 +33,7 @@ public class WebMessageHandlerTests
         var project = new Project("WebMessage Flow");
 
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        projectRepository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         projectRepository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
 
         try

@@ -99,6 +99,12 @@ public sealed class ProjectGlobalVariableSourceBinding
 
     public string OutputPortName { get; set; } = string.Empty;
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ResultPathVersion { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultPath { get; set; }
+
     public ProjectVariableConversionMode ConversionMode { get; set; } = ProjectVariableConversionMode.Exact;
 
     public string? Expression { get; set; }

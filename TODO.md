@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G07A`
-- 当前卡片：`docs/进行中/Studio2/goals/G07A.md`
+- 当前 Goal：`G07B`
+- 当前卡片：`docs/进行中/Studio2/goals/G07B.md`
 - 当前阶段：`Observation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -94,8 +94,8 @@
 | G05A | Observation | Execution Observation 投影与身份 | DONE | G04B | `docs/进行中/Studio2/goals/G05A.md` | 见 G05A 完成提交与最终报告 |
 | G05B | Observation | Preview Artifact 生命周期与安全读取 | DONE | G05A | `docs/进行中/Studio2/goals/G05B.md` | 见 G05B follow-up 完成提交与最终报告 |
 | G06 | Observation | 节点预览结果检查器 MVP | DONE | G05B | `docs/进行中/Studio2/goals/G06.md` | 见 G06 follow-up 完成提交与最终报告 |
-| G07A | Observation | Canonical ResultPath 解析器 | READY | G06 | `docs/进行中/Studio2/goals/G07A.md` |  |
-| G07B | Observation | 字段级全局变量绑定 V1 | LOCKED | G07A | `docs/进行中/Studio2/goals/G07B.md` |  |
+| G07A | Observation | Canonical ResultPath 解析器 | DONE | G06 | `docs/进行中/Studio2/goals/G07A.md` | 见 G07A 完成提交与最终报告 |
+| G07B | Observation | 字段级全局变量绑定 V1 | READY | G07A | `docs/进行中/Studio2/goals/G07B.md` |  |
 | G08 | Observation | Visual Scene V1（只读投影） | LOCKED | G07B | `docs/进行中/Studio2/goals/G08.md` |  |
 | G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | LOCKED | G08 | `docs/进行中/Studio2/goals/G09A.md` |  |
 | G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | LOCKED | G09A | `docs/进行中/Studio2/goals/G09B.md` |  |
@@ -163,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G07A | `9244979e3dde5534bf92121c374c34e7e5126f31` | 见 G07A 完成提交与最终报告 | Product directed ResultPath/ProjectVariables/FlowExecution PASS（86 tests）；Desktop directed Observation/Preview/Architecture PASS（57 tests）；`ClearVision.Product.Tests` full PASS（3119 passed, 4 skipped）；Desktop full serial PASS（450 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 Core/shared Canonical ResultPath V1 parser/formatter/resolver；SourceBinding additive nullable `ResultPathVersion`/`ResultPath`，缺失兼容 `$`；FlowExecutionService 在 output port 根值上先解析 ResultPath 再执行 Expression 和变量转换；Observation 为唯一映射到 declared output port 的 scalar leaf 生成 canonical metadata；stable-ID selector 仅通过显式 adapter 支持；未执行 G07B。 |
 | 2026-07-02 | G06 follow-up | `414dc70d7644326140e97e966af976a6f54413bd` | 见 G06 follow-up 完成提交与最终报告 | Desktop targeted serial tests PASS（74 tests）；UI focused Inspector/Coordinator unit PASS（25 tests）；Playwright `node-preview.spec.ts` PASS（9 tests：legacy 6，Inspector 3）；UI `test:unit` PASS（575 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G06 follow-up：`Studio:NodePreviewInspectorEnabled` 决策收敛到 frozen `featureFlags` 单一来源；flag off 不创建 Inspector/selectionStore，flag on 不构造 legacy Overlay；Artifact 文本预览按声明长度和实际 Blob slice 双重上限读取；renderer 改为确定优先级和大小写归一化；补齐快速节点切换 stale、大文本 Artifact、flag mutation 与架构守卫；未执行 G07A。 |
 | 2026-07-02 | G06 | `52f7c07dfe2842e5ec17649e8b0de203edcaf5ea` | 见 G06 完成提交与最终报告 | UI focused unit PASS（19 tests）；Playwright `node-preview.spec.ts` PASS（6 tests）；Desktop targeted serial tests PASS（73 tests）；UI `test:unit` PASS（569 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口节点预览结果检查器 MVP：新增默认关闭 `Studio:NodePreviewInspectorEnabled` 与 flag ledger；flag on 时仅挂载 `NodePreviewInspector`，legacy overlay 不构造/不订阅/无 timer；Summary/Detail/Artifact、受控 renderer、搜索/copy/分页增量、selectionStore 与 stale artifact 读取均经现有 coordinator；未执行 G07A。 |
 | 2026-07-02 | G05B follow-up | `1c8f1c25194d8e2d169ff710bfa3c604e262bf92` | 见 G05B follow-up 完成提交与最终报告 | Desktop targeted tests PASS，60 tests；FlowExecutionService targeted PASS，13 tests；UI `test:unit` PASS，563 tests；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05B Artifact follow-up：Store public API 不再暴露 pending bytes，commit 使用正式 bytes copy 和 SHA-256；batch 先预检/规划再原子替换 owner、淘汰旧项并插入全部当前批次；取消/异常未 commit batch rollback；前端 artifact URL 与服务端 artifact 释放覆盖 uncached、live camera bypass、cache replacement/eviction、node switch、stale/partial read/destroy；下一项为 G06，未执行 G06。 |

@@ -819,6 +819,132 @@ public sealed class ProjectGlobalVariableSchemaTests
         diagnostics.Should().Contain(item => item.Code == "GV018");
     }
 
+    [Fact]
+    public void SourceBindingJsonRoundTrip_WhenResultPathFieldsAreMissing_ShouldRemainOldShapeAndValidateAsRoot()
+    {
+        var variableId = Guid.NewGuid();
+        var operatorId = Guid.NewGuid();
+        var portId = Guid.NewGuid();
+        var json = $$"""
+        {
+          "schemaVersion": "1.0",
+          "variables": [
+            {
+              "id": "{{variableId}}",
+              "name": "stats.score",
+              "displayName": "Score",
+              "valueType": "Double",
+              "initialValue": 0,
+              "min": null,
+              "max": null,
+              "manualWriteAllowed": true,
+              "includeInResultMetadata": false,
+              "order": 0
+            }
+          ],
+          "sourceBindings": [
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "variableId": "{{variableId}}",
+              "operatorId": "{{operatorId}}",
+              "outputPortId": "{{portId}}",
+              "operatorName": "Source",
+              "outputPortName": "Score",
+              "conversionMode": "Exact",
+              "expression": null
+            }
+          ],
+          "targetBindings": []
+        }
+        """;
+
+        var schema = JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(json, ProjectVariableJson.Options)!;
+        var serialized = JsonSerializer.Serialize(schema, ProjectVariableJson.Options);
+
+        schema.SourceBindings.Single().ResultPathVersion.Should().BeNull();
+        schema.SourceBindings.Single().ResultPath.Should().BeNull();
+        serialized.Should().NotContain("resultPath", because: "missing optional ResultPath fields should not rewrite old project JSON");
+        ProjectGlobalVariableSchemaValidator.Validate(schema).Should().NotContain(item => item.Code.StartsWith("RP1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_WhenSourceBindingUsesCanonicalResultPathAndExpression_ReturnsNoResultPathDiagnostics()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var flow = new OperatorFlow("resultpath-source-binding");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Payload",
+                    ResultPathVersion = 1,
+                    ResultPath = "$[\"Score\"]",
+                    Expression = "value + 1"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().NotContain(item => item.Code.StartsWith("RP1", StringComparison.Ordinal));
+        schema.SourceBindings.Single().Expression.Should().Be("value + 1");
+        schema.SourceBindings.Single().ResultPath.Should().Be("$[\"Score\"]");
+    }
+
+    [Theory]
+    [InlineData(null, "$[\"Score\"]", "RP101")]
+    [InlineData(1, null, "RP101")]
+    [InlineData(2, "$[\"Score\"]", "RP100")]
+    [InlineData(1, "", "RP101")]
+    [InlineData(1, "$.Score", "RP104")]
+    [InlineData(1, "$[\"\\u0053core\"]", "RP107")]
+    public void Validate_WhenSourceBindingResultPathPairIsInvalid_ReturnsVersionedDiagnostic(
+        int? version,
+        string? path,
+        string expectedCode)
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var flow = new OperatorFlow("invalid-resultpath-source-binding");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Payload",
+                    ResultPathVersion = version,
+                    ResultPath = path
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item => item.Code == expectedCode);
+    }
+
     public static IEnumerable<object[]> ExpressionLimitCases()
     {
         yield return

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text.Json;
+using ClearVision.Product.Core.ResultPaths;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
@@ -41,7 +42,7 @@ public static class ExecutionObservationProjector
 
     public static ExecutionObservationEnvelopeV1 CreatePreviewObservation(ExecutionObservationPreviewInput input)
     {
-        var context = new ProjectionContext();
+        var context = new ProjectionContext(input.OutputPorts);
         var rootValue = input.OutputData ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         var detail = ProjectDetailNode(rootValue, PathInfo.Root, null, 0, addressableCandidate: false, context);
         detail = EnforceDetailByteBudget(detail, context);
@@ -637,16 +638,24 @@ public static class ExecutionObservationProjector
         string? originalType,
         PathInfo path,
         string? name,
-        bool addressable) =>
-        new()
+        bool addressable)
+    {
+        var effectiveAddressable = addressable && path.Value != "$";
+        var binding = effectiveAddressable ? path.ResultPathBinding : null;
+        return new ExecutionObservationDetailNodeV1
         {
             Kind = kind,
             DisplayValue = displayValue,
             OriginalType = originalType,
             PathHint = path.Value,
-            Addressable = addressable && path.Value != "$",
-            Name = name
+            Addressable = effectiveAddressable,
+            Name = name,
+            OutputPortId = binding?.OutputPortId,
+            OutputPortName = binding?.OutputPortName,
+            ResultPathVersion = binding == null ? null : ResultPathV1.Version,
+            ResultPath = binding?.ToCanonicalPath()
         };
+    }
 
     private static ExecutionObservationDetailNodeV1 ResourceNode(
         object value,
@@ -667,7 +676,7 @@ public static class ExecutionObservationProjector
             OriginalType = GetTypeName(value),
             Children = descriptor.Metadata
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => ScalarNode("string", pair.Value, typeof(string).FullName, AppendObjectKey(path, pair.Key, context), pair.Key, true))
+                .Select(pair => ScalarNode("string", pair.Value, typeof(string).FullName, AppendObjectKey(path.WithoutResultPathBinding(), pair.Key, context), pair.Key, true))
                 .ToList(),
             Truncated = true,
             PathHint = path.Value,
@@ -773,7 +782,11 @@ public static class ExecutionObservationProjector
                     DisplayValue = current.DisplayValue!,
                     OriginalType = current.OriginalType,
                     PathHint = current.PathHint,
-                    Addressable = current.Addressable
+                    Addressable = current.Addressable,
+                    OutputPortId = current.OutputPortId,
+                    OutputPortName = current.OutputPortName,
+                    ResultPathVersion = current.ResultPathVersion,
+                    ResultPath = current.ResultPath
                 });
             }
 
@@ -1281,17 +1294,32 @@ public static class ExecutionObservationProjector
 
     private static PathInfo AppendObjectKey(PathInfo path, string key, ProjectionContext context)
     {
-        var escaped = EscapePathKey(key);
-        var candidate = $"{path.Value}[\"{escaped}\"]";
-        var addressable = path.Addressable && key.Length <= MaxNameChars && candidate.Length <= MaxPathHintChars;
-        if (!addressable)
+        var candidate = $"{path.Value}{ResultPathFormatter.FormatObjectKeySegment(key)}";
+        var withinPathLimits = key.Length <= MaxNameChars && candidate.Length <= MaxPathHintChars;
+        var addressable = path.Addressable && withinPathLimits;
+        ResultPathBindingInfo? binding = null;
+        if (addressable)
+        {
+            if (path.Value == "$" && path.ResultPathBinding == null && context.HasOutputPorts)
+            {
+                binding = context.CreateOutputPortBinding(key, path.Value);
+                addressable = binding != null;
+            }
+            else
+            {
+                binding = path.ResultPathBinding?.AppendKey(key);
+            }
+        }
+
+        if (path.Addressable && !withinPathLimits)
         {
             context.AddDiagnostic("path-limit", "Object key or path was clipped; node is not addressable.", path.Value);
         }
 
         return new PathInfo(
             candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
-            addressable);
+            addressable,
+            binding);
     }
 
     private static PathInfo AppendArrayIndex(PathInfo path, int index)
@@ -1299,12 +1327,9 @@ public static class ExecutionObservationProjector
         var candidate = $"{path.Value}[{index.ToString(CultureInfo.InvariantCulture)}]";
         return new PathInfo(
             candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
-            path.Addressable && candidate.Length <= MaxPathHintChars);
+            path.Addressable && candidate.Length <= MaxPathHintChars,
+            null);
     }
-
-    private static string EscapePathKey(string key) =>
-        key.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     private static bool TryFormatSafeKey(object? key, out string formatted)
     {
@@ -1384,21 +1409,66 @@ public static class ExecutionObservationProjector
     private static string? GetTypeName(object? value) =>
         value?.GetType().FullName;
 
-    private readonly record struct PathInfo(string Value, bool Addressable)
+    private readonly record struct PathInfo(string Value, bool Addressable, ResultPathBindingInfo? ResultPathBinding)
     {
-        public static PathInfo Root { get; } = new("$", true);
+        public static PathInfo Root { get; } = new("$", true, null);
+
+        public PathInfo WithoutResultPathBinding() => this with { ResultPathBinding = null };
     }
 
     private sealed record FieldEntry(string SortKey, string Name, PathInfo Path, object? Value);
+
+    private sealed record ResultPathBindingInfo(
+        Guid OutputPortId,
+        string OutputPortName,
+        IReadOnlyList<string> RelativeKeys)
+    {
+        public ResultPathBindingInfo AppendKey(string key)
+        {
+            var keys = RelativeKeys.Concat([key]).ToArray();
+            return this with { RelativeKeys = keys };
+        }
+
+        public string ToCanonicalPath() => ResultPathFormatter.FormatObjectPath(RelativeKeys);
+    }
 
     private sealed class ProjectionContext
     {
         private readonly HashSet<object> _activeReferences = new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<string> _diagnosticKeys = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<ExecutionObservationOutputPortV1>> _outputPortsByName;
         private int _nodeCount;
+
+        public ProjectionContext(IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts)
+        {
+            _outputPortsByName = (outputPorts ?? [])
+                .Where(port => port.Id != Guid.Empty && !string.IsNullOrWhiteSpace(port.Name))
+                .GroupBy(port => port.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+        }
 
         public List<ExecutionObservationDiagnosticV1> Diagnostics { get; } = new();
         public bool Truncated { get; private set; }
+
+        public bool HasOutputPorts => _outputPortsByName.Count > 0;
+
+        public ResultPathBindingInfo? CreateOutputPortBinding(string outputKey, string pathHint)
+        {
+            if (!_outputPortsByName.TryGetValue(outputKey, out var ports))
+            {
+                AddDiagnostic("resultpath-port-missing", "Observation output key does not match a declared output port; canonical ResultPath metadata omitted.", pathHint);
+                return null;
+            }
+
+            if (ports.Count != 1)
+            {
+                AddDiagnostic("resultpath-port-ambiguous", "Observation output key matches multiple declared output ports; canonical ResultPath metadata omitted.", pathHint);
+                return null;
+            }
+
+            var port = ports[0];
+            return new ResultPathBindingInfo(port.Id, port.Name, []);
+        }
 
         public bool TryReserveNode(string pathHint)
         {

@@ -584,6 +584,256 @@ public sealed class FlowExecutionProjectVariableBindingTests
         ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(7L);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteFlowAsync_WhenSourceBindingUsesResultPath_ShouldResolveThenApplyExpression(bool enableParallel)
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 10, 0);
+        target.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("resultpath-expression-formal");
+        flow.AddOperator(target);
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Payload",
+            ResultPathVersion = 1,
+            ResultPath = "$[\"Score\"]",
+            Expression = "value + 1"
+        });
+        schema.TargetBindings.Add(new ProjectGlobalVariableTargetBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = target.Id,
+            ParameterId = targetParameterId,
+            OperatorName = target.Name,
+            ParameterName = "ExpectedCount"
+        });
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
+        var sourceExecutor = CreatePayloadSourceExecutor(source, new Dictionary<string, object?>
+        {
+            ["Score"] = 4L
+        });
+        var targetExecutor = Substitute.For<IOperatorExecutor>();
+        targetExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        targetExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        targetExecutor.ExecuteAsync(
+                target,
+                Arg.Is<Dictionary<string, object>>(inputs => Convert.ToInt64(inputs["ExpectedCount"]) == 5L),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Seen"] = 5L
+            })));
+        using var service = new FlowExecutionService(
+            [sourceExecutor, targetExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context, enableParallel);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().ContainKey("Seen");
+        Convert.ToInt64(result.OutputData!["Seen"]).Should().Be(5L);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(5L);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowDebugAsync_WhenPreviewSourceBindingUsesResultPath_ShouldMatchFormalValueWithoutCommitting()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 10, 0);
+        target.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("resultpath-expression-preview");
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Payload",
+            ResultPathVersion = 1,
+            ResultPath = "$[\"Score\"]",
+            Expression = "value + 1"
+        });
+        schema.TargetBindings.Add(new ProjectGlobalVariableTargetBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = target.Id,
+            ParameterId = targetParameterId,
+            OperatorName = target.Name,
+            ParameterName = "ExpectedCount"
+        });
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            isPreview: true);
+        var sourceExecutor = CreatePayloadSourceExecutor(source, new Dictionary<string, object?>
+        {
+            ["Score"] = 4L
+        });
+        var targetExecutor = Substitute.For<IOperatorExecutor>();
+        targetExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        targetExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        targetExecutor.ExecuteAsync(
+                target,
+                Arg.Is<Dictionary<string, object>>(inputs => Convert.ToInt64(inputs["ExpectedCount"]) == 5L),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Seen"] = 5L
+            })));
+        using var service = new FlowExecutionService(
+            [sourceExecutor, targetExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowDebugAsync(
+            flow,
+            new DebugOptions { DebugSessionId = Guid.NewGuid() },
+            null,
+            context);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt64(result.IntermediateResults[target.Id]["Seen"]).Should().Be(5L);
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(0L);
+        formal.Version.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("$[0]", "RP104")]
+    [InlineData("$[\"Missing\"]", "RP111")]
+    public async Task ExecuteFlowAsync_WhenSourceBindingResultPathIsInvalidOrMissing_ShouldFailWithoutSessionWrite(
+        string resultPath,
+        string diagnosticCode)
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var flow = new OperatorFlow("resultpath-fail-closed");
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Payload",
+            ResultPathVersion = 1,
+            ResultPath = resultPath
+        });
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
+        var sourceExecutor = CreatePayloadSourceExecutor(source, new Dictionary<string, object?>
+        {
+            ["Score"] = 5L
+        });
+        using var service = new FlowExecutionService(
+            [sourceExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain(diagnosticCode);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(4L);
+        snapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenSourceBindingResultPathResolvesResourceLikeValue_ShouldFailWithoutSessionWrite()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Payload", PortDataType.Any);
+        var flow = new OperatorFlow("resultpath-resource-fail-closed");
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Payload",
+            ResultPathVersion = 1,
+            ResultPath = "$"
+        });
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        sourceExecutor.ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Payload"] = new Image()
+            })));
+        using var service = new FlowExecutionService(
+            [sourceExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RP119");
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(4L);
+        snapshot.Version.Should().Be(1);
+    }
+
     [Fact]
     public async Task ExecuteFlowAsync_WhenTargetBindingUsesRoundExpression_ShouldApplyIntegerParameter()
     {
@@ -1155,6 +1405,19 @@ public sealed class FlowExecutionProjectVariableBindingTests
         return increment;
     }
 
+    private static IOperatorExecutor CreatePayloadSourceExecutor(Operator source, object? payload)
+    {
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        sourceExecutor.ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Payload"] = payload!
+            })));
+        return sourceExecutor;
+    }
+
     private sealed class CountingExecutor : IOperatorExecutor
     {
         private readonly IOperatorExecutor _inner;
@@ -1181,5 +1444,9 @@ public sealed class FlowExecutionProjectVariableBindingTests
         {
             return _inner.ValidateParameters(@operator);
         }
+    }
+
+    private sealed class Image
+    {
     }
 }
