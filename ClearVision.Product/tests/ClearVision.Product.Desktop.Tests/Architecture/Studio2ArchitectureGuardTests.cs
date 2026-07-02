@@ -215,6 +215,85 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void ExecutionObservation_ShouldRemainDesktopProjectionOnly()
+    {
+        var sourceRoot = Path.Combine(Root, "ClearVision.Product/src");
+        var sourceFiles = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var allowedObservationPaths = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs"
+        };
+
+        foreach (var file in sourceFiles)
+        {
+            var text = File.ReadAllText(file);
+            if (!text.Contains("ExecutionObservation", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var relativePath = ToRelativePath(file);
+            allowedObservationPaths.Any(path => relativePath.StartsWith(path, StringComparison.OrdinalIgnoreCase) ||
+                                                string.Equals(relativePath, path, StringComparison.OrdinalIgnoreCase))
+                .Should().BeTrue($"{relativePath} must not make Observation a Core, EF, RuntimeHost, or Station contract.");
+        }
+
+        var forbiddenRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Core/",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/Data/",
+            "ClearVision.Product/src/ClearVision.Product.Runtime/",
+            "ClearVision.Product/src/ClearVision.Product.Station/"
+        };
+
+        foreach (var relativeRoot in forbiddenRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, relativeRoot.Replace('/', Path.DirectorySeparatorChar));
+            if (!Directory.Exists(absoluteRoot))
+            {
+                continue;
+            }
+
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.cs", SearchOption.AllDirectories))
+            {
+                File.ReadAllText(file).Should().NotContain("ExecutionObservation", ToRelativePath(file));
+            }
+        }
+
+        var previewEndpointFiles = sourceFiles
+            .Select(file => (RelativePath: ToRelativePath(file), Text: File.ReadAllText(file)))
+            .Where(file => file.Text.Contains("/api/flows/preview-node", StringComparison.Ordinal))
+            .ToList();
+        previewEndpointFiles.Should().ContainSingle("G05A must adapt the existing preview endpoint, not add a second one.")
+            .Which.RelativePath.Should().Be("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs");
+        Regex.Matches(previewEndpointFiles[0].Text, "MapPost\\(\\\"/api/flows/preview-node\\\"")
+            .Should().ContainSingle("there must be exactly one preview-node POST endpoint.");
+
+        foreach (var relativePath in allowedObservationPaths)
+        {
+            var absolutePath = Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            var files = File.Exists(absolutePath)
+                ? [absolutePath]
+                : Directory.Exists(absolutePath)
+                    ? Directory.EnumerateFiles(absolutePath, "*.cs", SearchOption.AllDirectories).ToArray()
+                    : [];
+
+            foreach (var file in files)
+            {
+                var text = File.ReadAllText(file);
+                text.Should().NotContain("PreviewArtifactStore", ToRelativePath(file));
+                text.Should().NotContain("artifactId", ToRelativePath(file));
+                text.Should().NotContain("/api/preview-artifacts", ToRelativePath(file));
+            }
+        }
+    }
+
+    [Fact]
     public void Station_ShouldNotDependOnVueNodeOrStudioFrontend()
     {
         var stationRoot = Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Station");

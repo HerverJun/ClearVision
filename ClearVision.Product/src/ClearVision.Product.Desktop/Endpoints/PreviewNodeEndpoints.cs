@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Desktop.Observation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -61,6 +62,12 @@ public static class PreviewNodeEndpoints
                 logger.LogInformation(
                     "[PreviewNode] 请求预览节点: Project={ProjectId}, Node={NodeId}, Session={DebugSessionId}",
                     request.ProjectId, request.TargetNodeId, request.DebugSessionId);
+
+                var identityValidationProblem = ValidateObservationIdentity(request);
+                if (identityValidationProblem != null)
+                {
+                    return identityValidationProblem;
+                }
 
                 if (request.ProjectId != Guid.Empty)
                 {
@@ -188,7 +195,7 @@ public static class PreviewNodeEndpoints
                 var outputImageBase64 = outputImageBytes != null
                     ? Convert.ToBase64String(outputImageBytes)
                     : null;
-                var metrics = BuildPreviewMetrics(sanitizedOutputData, outputImageBytes, result.ErrorMessage);
+                var metrics = BuildPreviewMetrics(BuildMetricsOutputData(nodeOutput), outputImageBytes, result.ErrorMessage);
 
                 logger.LogInformation(
                     "[PreviewNode] 预览完成: Project={ProjectId}, Node={NodeId}, Success={Success}",
@@ -203,6 +210,12 @@ public static class PreviewNodeEndpoints
                 var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
 
                 var failedOperator = FindFailedOperator(result, request.TargetNodeId);
+                var observation = BuildPreviewObservation(
+                    request,
+                    result,
+                    nodeOutput,
+                    flow,
+                    failedOperator);
 
                 return Results.Ok(new PreviewNodeResponse
                 {
@@ -226,7 +239,8 @@ public static class PreviewNodeEndpoints
                         ExecutionOrder = r.ExecutionOrder,
                         ExecutionTimeMs = r.ExecutionTimeMs,
                         IsSuccess = r.IsSuccess
-                    }).ToList()
+                    }).ToList(),
+                    Observation = observation
                 });
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -414,15 +428,18 @@ public static class PreviewNodeEndpoints
 
     private static Dictionary<string, object> BuildResponseOutputData(Dictionary<string, object> nodeOutput)
     {
+        return ExecutionObservationProjector.BuildLegacyOutputData(nodeOutput, IsInternalPreviewImageKey);
+    }
+
+    private static Dictionary<string, object> BuildMetricsOutputData(Dictionary<string, object> nodeOutput)
+    {
         var response = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in nodeOutput)
         {
-            if (IsInternalPreviewImageKey(key))
+            if (!IsInternalPreviewImageKey(key))
             {
-                continue;
+                response[key] = value;
             }
-
-            response[key] = value;
         }
 
         return response;
@@ -600,8 +617,62 @@ public static class PreviewNodeEndpoints
                 ExecutionOrder = r.ExecutionOrder,
                 ExecutionTimeMs = r.ExecutionTimeMs,
                 IsSuccess = r.IsSuccess
-            }).ToList()
+            }).ToList(),
+            Observation = BuildPreviewObservation(
+                request,
+                result,
+                failureOutputData,
+                flow,
+                failedOperator,
+                successOverride: false,
+                errorMessageOverride: failureMessage)
         };
+    }
+
+    private static IResult? ValidateObservationIdentity(PreviewNodeRequest request)
+    {
+        if (!ExecutionObservationProjector.IsIdentityValueInSafeRange(request.ClientRequestSequence))
+        {
+            return Results.Problem(
+                detail: "clientRequestSequence must be a non-negative JavaScript-safe integer.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!ExecutionObservationProjector.IsIdentityValueInSafeRange(request.FlowRevision))
+        {
+            return Results.Problem(
+                detail: "flowRevision must be a non-negative JavaScript-safe integer.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return null;
+    }
+
+    private static ExecutionObservationEnvelopeV1 BuildPreviewObservation(
+        PreviewNodeRequest request,
+        FlowDebugExecutionResult result,
+        IReadOnlyDictionary<string, object>? outputData,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        OperatorDebugResult? failedOperator,
+        bool? successOverride = null,
+        string? errorMessageOverride = null)
+    {
+        return ExecutionObservationProjector.CreatePreviewObservation(new ExecutionObservationPreviewInput
+        {
+            ProjectId = request.ProjectId,
+            TargetNodeId = request.TargetNodeId,
+            DebugSessionId = request.DebugSessionId,
+            ClientRequestSequence = request.ClientRequestSequence,
+            FlowRevision = request.FlowRevision,
+            Success = successOverride ?? result.IsSuccess,
+            ExecutionTimeMs = result.ExecutionTimeMs,
+            ErrorMessage = errorMessageOverride ?? result.ErrorMessage,
+            FailedOperatorId = failedOperator?.OperatorId,
+            FailedOperatorName = failedOperator?.OperatorName,
+            FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
+            ExecutedOperatorCount = result.DebugOperatorResults.Count,
+            OutputData = outputData
+        });
     }
 
     private static byte[]? ResolveInputImageBytes(
@@ -687,37 +758,50 @@ public static class PreviewNodeEndpoints
         byte[]? outputImageBytes,
         string? errorMessage)
     {
-        var detectionSummary = DetectionOutputInspector.Inspect(outputData);
-        var areas = ExtractBlobAreas(outputData);
-        if (areas.Count == 0 && detectionSummary.Detections.Count > 0)
+        try
         {
-            areas = detectionSummary.Detections
-                .Select(detection => (double)detection.Area)
-                .ToList();
-        }
+            var detectionSummary = DetectionOutputInspector.Inspect(outputData);
+            var areas = ExtractBlobAreas(outputData);
+            if (areas.Count == 0 && detectionSummary.Detections.Count > 0)
+            {
+                areas = detectionSummary.Detections
+                    .Select(detection => (double)detection.Area)
+                    .ToList();
+            }
 
-        return new PreviewFeedbackMetrics
+            return new PreviewFeedbackMetrics
+            {
+                BlobCount = ResolveBlobCount(outputData, areas.Count, detectionSummary),
+                AreaStats = areas.Count == 0
+                    ? null
+                    : new PreviewAreaStats
+                    {
+                        Min = areas.Min(),
+                        Max = areas.Max(),
+                        Mean = areas.Average()
+                    },
+                DetectionCount = detectionSummary.HasDetectionSemantics ? detectionSummary.DetectionCount : null,
+                ObjectCount = detectionSummary.DeclaredCount ?? (detectionSummary.HasDetectionSemantics ? detectionSummary.DetectionCount : null),
+                PerClassCount = detectionSummary.PerClassCount.Count > 0 ? detectionSummary.PerClassCount : null,
+                SortedLabels = detectionSummary.ActualOrder.Count > 0 ? detectionSummary.ActualOrder : null,
+                MinConfidence = detectionSummary.MinConfidence,
+                MissingLabels = detectionSummary.MissingLabels.Count > 0 ? detectionSummary.MissingLabels : null,
+                DuplicateLabels = detectionSummary.DuplicateLabels.Count > 0 ? detectionSummary.DuplicateLabels : null,
+                Diagnostics = CreateDetectionDiagnostics(detectionSummary),
+                BinaryRatio = ComputeBinaryRatio(outputImageBytes),
+                ErrorMessage = errorMessage
+            };
+        }
+        catch (Exception ex)
         {
-            BlobCount = ResolveBlobCount(outputData, areas.Count, detectionSummary),
-            AreaStats = areas.Count == 0
-                ? null
-                : new PreviewAreaStats
-                {
-                    Min = areas.Min(),
-                    Max = areas.Max(),
-                    Mean = areas.Average()
-                },
-            DetectionCount = detectionSummary.HasDetectionSemantics ? detectionSummary.DetectionCount : null,
-            ObjectCount = detectionSummary.DeclaredCount ?? (detectionSummary.HasDetectionSemantics ? detectionSummary.DetectionCount : null),
-            PerClassCount = detectionSummary.PerClassCount.Count > 0 ? detectionSummary.PerClassCount : null,
-            SortedLabels = detectionSummary.ActualOrder.Count > 0 ? detectionSummary.ActualOrder : null,
-            MinConfidence = detectionSummary.MinConfidence,
-            MissingLabels = detectionSummary.MissingLabels.Count > 0 ? detectionSummary.MissingLabels : null,
-            DuplicateLabels = detectionSummary.DuplicateLabels.Count > 0 ? detectionSummary.DuplicateLabels : null,
-            Diagnostics = CreateDetectionDiagnostics(detectionSummary),
-            BinaryRatio = ComputeBinaryRatio(outputImageBytes),
-            ErrorMessage = errorMessage
-        };
+            return new PreviewFeedbackMetrics
+            {
+                BlobCount = 0,
+                BinaryRatio = ComputeBinaryRatio(outputImageBytes),
+                ErrorMessage = errorMessage,
+                Diagnostics = new List<string> { $"PreviewMetricsUnavailable: {ex.GetBaseException().Message}" }
+            };
+        }
     }
 
     private static int ResolveBlobCount(
@@ -1032,6 +1116,16 @@ public class PreviewNodeRequest
     public Guid DebugSessionId { get; set; } = Guid.NewGuid();
 
     /// <summary>
+    /// 客户端本地请求序列；服务端仅校验并在 Observation identity 中回显。
+    /// </summary>
+    public long? ClientRequestSequence { get; set; }
+
+    /// <summary>
+    /// 客户端本地 flow revision；不是后端执行版本，服务端仅校验并回显。
+    /// </summary>
+    public long? FlowRevision { get; set; }
+
+    /// <summary>
     /// 流程数据（包含所有算子和连接）
     /// </summary>
     public UpdateFlowRequest? FlowData { get; set; }
@@ -1115,6 +1209,11 @@ public class PreviewNodeResponse
     /// 执行的算子列表（上游子图）
     /// </summary>
     public List<ExecutedOperatorInfo>? ExecutedOperators { get; set; }
+
+    /// <summary>
+    /// G05A 无持久化、只读、可丢弃的执行观察投影。
+    /// </summary>
+    public ExecutionObservationEnvelopeV1? Observation { get; set; }
 }
 
 /// <summary>

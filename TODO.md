@@ -42,8 +42,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G05A`
-- 当前卡片：`docs/进行中/Studio2/goals/G05A.md`
+- 当前 Goal：`G05B`
+- 当前卡片：`docs/进行中/Studio2/goals/G05B.md`
 - 当前阶段：`Observation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -83,8 +83,8 @@
 | G03 | Foundation | Workspace Shell MVP | DONE | G02B | `docs/进行中/Studio2/goals/G03.md` | 见 G03 完成提交与最终报告 |
 | G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | DONE | G03 | `docs/进行中/Studio2/goals/G04A.md` | 见 G04A 完成提交与最终报告 |
 | G04B | Foundation | V2 单请求工程保存与持久化身份 | DONE | G04A | `docs/进行中/Studio2/goals/G04B.md` | 见 G04B 完成提交与最终报告 |
-| G05A | Observation | Execution Observation 投影与身份 | READY | G04B | `docs/进行中/Studio2/goals/G05A.md` |  |
-| G05B | Observation | Preview Artifact 生命周期与安全读取 | LOCKED | G05A | `docs/进行中/Studio2/goals/G05B.md` |  |
+| G05A | Observation | Execution Observation 投影与身份 | DONE | G04B | `docs/进行中/Studio2/goals/G05A.md` | 见 G05A 完成提交与最终报告 |
+| G05B | Observation | Preview Artifact 生命周期与安全读取 | READY | G05A | `docs/进行中/Studio2/goals/G05B.md` |  |
 | G06 | Observation | 节点预览结果检查器 MVP | LOCKED | G05B | `docs/进行中/Studio2/goals/G06.md` |  |
 | G07A | Observation | Canonical ResultPath 解析器 | LOCKED | G06 | `docs/进行中/Studio2/goals/G07A.md` |  |
 | G07B | Observation | 字段级全局变量绑定 V1 | LOCKED | G07A | `docs/进行中/Studio2/goals/G07B.md` |  |
@@ -155,6 +155,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G05A | `ef676b193f6f955db56ac79c4fc13190916d92cb` | 见 G05A 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，54 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；文本编码 PASS；diff hygiene PASS；文档审计执行但生成性副作用未提交；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 `ExecutionObservationEnvelopeV1` 与 Desktop 边界 `ExecutionObservationProjector`，preview success/failure additive 返回 Observation；旧 outputData 安全降级且 detection metrics 兼容；NodePreviewCoordinator 发送 sequence/flowRevision 并在 Observation identity mismatch 时丢弃响应；未执行 G05B、未实现 Artifact Store/ResultPath parser/Inspector UI。 |
 | 2026-07-02 | G04B follow-up | `7e089a17cbaf4862cb0ea63839131563feae8120` | 见 G04B follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/43 unit tests；`studioProjectPersistencePort.test.ts` PASS，11 tests；Project persistence/concurrency + Repository + ProjectService + ProjectSaveCoordinator targeted PASS，39 tests；ProjectGlobalVariableEndpoints + Studio2/BuildFromPlan Architecture Guard targeted PASS，43 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口保存时 EF tracked stale revision：新增 `IProjectRepository.GetByIdForUpdateAsync`，`ProjectSaveCoordinator` 的 expected revision、commit-intent apply 和 recovery apply 均使用数据库当前 tracked 实体；补齐双 DbContext/双 service scope 竞争测试；`StudioProjectPersistencePort` open intent 在发请求前生效，旧响应不污染 snapshot，save 响应校验 `saved.id`；未执行 G05A。 |
 | 2026-07-02 | G04B | `b4936ce22f380b00b5ff9e211c95219b10863b46` | 见 G04B 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/40 unit tests；ProjectService + ProjectSaveCoordinator targeted PASS，29 tests；ProjectGlobalVariableEndpoints + Studio2ArchitectureGuard targeted PASS，36 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 建立 `StudioProjectPersistencePort` 与 `studio2.projectPersistencePort`，V2 单次调用既有 `PUT /api/projects/{id}` 提交 metadata/Flow/GlobalVariables；后端使用 `ExpectedPersistenceRevision`/`PersistenceRevision` 与 `ProjectSaveCoordinator` 判定并发，`PSV011` 映射 409；旧 Project 页面、`projectManager.saveProject()`、`/flow` 兼容入口保留；未执行 G05A。 |
 | 2026-07-02 | G04A follow-up | `59544fa7d6384d06828c8eaa3b3d183de9c96dcd` | 见 G04A follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，25/25；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Studio2 + BuildFromPlan architecture guard PASS，17/17；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口 Flow Editor Port request sequence authority、单一 allocator、节点拖拽 `moveNode` revision 和 dirty draft stale 行为；未执行 G04B、未新增 Project 保存/API/后端持久化身份，当前 Goal 仍为 G04B。 |

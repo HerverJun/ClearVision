@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NodePreviewCoordinator } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
+import {
+  NodePreviewCoordinator,
+  previewObservationMatchesRequest
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
 
 function waitFor(assertion, timeoutMs = 1000) {
   const startedAt = Date.now();
@@ -32,14 +35,18 @@ function createCoordinator(options = {}) {
   let executeCount = 0;
   const coordinator = new NodePreviewCoordinator({
     getProjectId: () => 'project-1',
-    getFlowRevision: () => 1,
+    getFlowRevision: () => options.flowRevision ?? 1,
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
-    previewExecutor: async () => {
+    previewExecutor: async (nodeId, executorOptions) => {
       executeCount += 1;
+      options.onPreviewOptions?.(executorOptions, executeCount, nodeId);
+      if (typeof options.previewExecutor === 'function') {
+        return options.previewExecutor(nodeId, executorOptions, executeCount);
+      }
       if (typeof options.previewResponse === 'function') {
-        return options.previewResponse(executeCount);
+        return options.previewResponse(executeCount, executorOptions, nodeId);
       }
       if (options.previewResponse) {
         return options.previewResponse;
@@ -60,6 +67,47 @@ function createCoordinator(options = {}) {
     coordinator,
     node,
     getExecuteCount: () => executeCount
+  };
+}
+
+function buildObservationIdentity(nodeId, options, overrides = {}) {
+  return {
+    projectId: 'project-1',
+    targetNodeId: nodeId,
+    debugSessionId: options.debugSessionId,
+    clientRequestSequence: options.clientRequestSequence,
+    flowRevision: options.flowRevision,
+    ...overrides
+  };
+}
+
+function buildObservationResponse(nodeId, options, overrides = {}) {
+  return {
+    success: true,
+    executionTimeMs: 12,
+    outputImageBase64: 'OUTPUT_IMAGE',
+    outputData: { score: 1 },
+    observation: {
+      schemaVersion: 'execution-observation.v1',
+      identity: buildObservationIdentity(nodeId, options, overrides),
+      outcome: {
+        success: true,
+        executionTimeMs: 12,
+        executedOperatorCount: 1
+      },
+      summary: [],
+      detail: {
+        kind: 'dictionary',
+        displayValue: '1/1 fields',
+        children: [],
+        truncated: false,
+        pathHint: '$',
+        addressable: false
+      },
+      diagnostics: [],
+      limits: {},
+      truncated: false
+    }
   };
 }
 
@@ -178,4 +226,132 @@ test('NodePreviewCoordinator compacts preview outputData before retaining state 
   } finally {
     coordinator.destroy();
   }
+});
+
+test('NodePreviewCoordinator sends client request sequence and flow revision', async () => {
+  let capturedOptions = null;
+  const { coordinator, node } = createCoordinator({
+    flowRevision: 7,
+    onPreviewOptions: options => {
+      capturedOptions = options;
+    },
+    previewResponse: (_count, executorOptions, nodeId) =>
+      buildObservationResponse(nodeId, executorOptions)
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    assert.ok(Number.isSafeInteger(capturedOptions.clientRequestSequence));
+    assert.ok(capturedOptions.clientRequestSequence > 0);
+    assert.equal(capturedOptions.flowRevision, 7);
+    assert.equal(coordinator.getState().outputData.score, 1);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator drops observation responses with mismatched identity fields', async () => {
+  const mismatchCases = [
+    ['projectId', 'other-project'],
+    ['targetNodeId', 'other-node'],
+    ['debugSessionId', '00000000-0000-0000-0000-000000000000'],
+    ['clientRequestSequence', 999999],
+    ['flowRevision', 999999]
+  ];
+
+  for (const [field, value] of mismatchCases) {
+    const { coordinator, node, getExecuteCount } = createCoordinator({
+      flowRevision: 3,
+      previewResponse: (_count, executorOptions, nodeId) =>
+        buildObservationResponse(nodeId, executorOptions, { [field]: value })
+    });
+
+    try {
+      coordinator.setActiveNode(node);
+      coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+      await waitFor(() => assert.equal(getExecuteCount(), 1));
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(coordinator.getState().status, 'loading', `${field} mismatch should not complete preview`);
+      assert.equal(coordinator.getState().outputData, null);
+      assert.equal(coordinator.getState().errorMessage, null);
+      assert.equal(coordinator.cache.size, 0);
+    } finally {
+      coordinator.destroy();
+    }
+  }
+});
+
+test('NodePreviewCoordinator ignores late observation response without overwriting newer state', async () => {
+  let callCount = 0;
+  let resolveFirst = null;
+  const node = {
+    id: 'node-1',
+    type: 'Thresholding',
+    parameters: [],
+    outputs: [{ type: 'image' }]
+  };
+  const coordinator = new NodePreviewCoordinator({
+    getProjectId: () => 'project-1',
+    getFlowRevision: () => 5,
+    getNodeById: () => node,
+    getInputImageBase64: () => 'INPUT_IMAGE',
+    getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
+    previewExecutor: async (nodeId, options) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Promise(resolve => {
+          resolveFirst = () => resolve({
+            ...buildObservationResponse(nodeId, options),
+            outputData: { score: 'late' }
+          });
+        });
+      }
+
+      return {
+        ...buildObservationResponse(nodeId, options),
+        outputData: { score: 'current' }
+      };
+    },
+    debounceMs: 0
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    await waitFor(() => assert.equal(callCount, 1));
+
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+    await waitFor(() => assert.equal(coordinator.getState().outputData?.score, 'current'));
+
+    resolveFirst();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(callCount, 2);
+    assert.equal(coordinator.getState().status, 'success');
+    assert.equal(coordinator.getState().outputData.score, 'current');
+    assert.equal(coordinator.getState().errorMessage, null);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('previewObservationMatchesRequest keeps compatibility for old responses without observation', () => {
+  assert.equal(
+    previewObservationMatchesRequest(
+      { success: true, outputData: { score: 1 } },
+      {
+        projectId: 'project-1',
+        targetNodeId: 'node-1',
+        debugSessionId: 'debug-1',
+        clientRequestSequence: 1,
+        flowRevision: 1
+      }
+    ),
+    true
+  );
 });

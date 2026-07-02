@@ -105,6 +105,9 @@ public class PreviewNodeEndpointsTests
         document.RootElement.GetProperty("debugSessionId").GetGuid().Should().Be(debugSessionId);
         document.RootElement.GetProperty("outputImageBase64").GetString().Should().Be(Convert.ToBase64String(outputBytes));
         document.RootElement.GetProperty("executedOperators").GetArrayLength().Should().Be(1);
+        var oldClientObservationIdentity = document.RootElement.GetProperty("observation").GetProperty("identity");
+        oldClientObservationIdentity.GetProperty("clientRequestSequence").ValueKind.Should().Be(JsonValueKind.Null);
+        oldClientObservationIdentity.GetProperty("flowRevision").ValueKind.Should().Be(JsonValueKind.Null);
 
         capturedOptions.Should().NotBeNull();
         capturedOptions!.BreakAtOperatorId.Should().Be(targetNodeId);
@@ -120,6 +123,292 @@ public class PreviewNodeEndpointsTests
             .GetValue();
 
         ReadIntValue(thresholdParameter).Should().Be(180);
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldReturnObservationEnvelopeForSuccessfulPreview()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    DebugSessionId = debugSessionId,
+                    ExecutionTimeMs = 21,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Score"] = 0.98d,
+                            ["Seen"] = 3L
+                        }
+                    },
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Threshold",
+                            IsSuccess = true,
+                            ExecutionOrder = 0,
+                            ExecutionTimeMs = 21
+                        }
+                    ]
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            DebugSessionId = debugSessionId,
+            ClientRequestSequence = 42,
+            FlowRevision = 9,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeTrue();
+        root.GetProperty("outputData").GetProperty("Score").GetDouble().Should().BeApproximately(0.98d, 0.001d);
+
+        var observation = root.GetProperty("observation");
+        observation.GetProperty("schemaVersion").GetString().Should().Be("execution-observation.v1");
+        var identity = observation.GetProperty("identity");
+        identity.GetProperty("projectId").GetGuid().Should().Be(projectId);
+        identity.GetProperty("targetNodeId").GetGuid().Should().Be(targetNodeId);
+        identity.GetProperty("debugSessionId").GetGuid().Should().Be(debugSessionId);
+        identity.GetProperty("clientRequestSequence").GetInt64().Should().Be(42);
+        identity.GetProperty("flowRevision").GetInt64().Should().Be(9);
+        identity.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var outcome = observation.GetProperty("outcome");
+        outcome.GetProperty("success").GetBoolean().Should().BeTrue();
+        outcome.GetProperty("executionTimeMs").GetInt64().Should().Be(21);
+        outcome.GetProperty("executedOperatorCount").GetInt32().Should().Be(1);
+        observation.GetProperty("summary").EnumerateArray()
+            .Should().Contain(item => item.GetProperty("key").GetString() == "Score");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldReturnObservationEnvelopeForExecutionFailure()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = false,
+                    DebugSessionId = debugSessionId,
+                    ExecutionTimeMs = 17,
+                    ErrorMessage = "Target failed",
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Threshold",
+                            IsSuccess = false,
+                            ExecutionOrder = 0,
+                            ExecutionTimeMs = 17,
+                            ErrorMessage = "Target failed",
+                            OutputSnapshot = new Dictionary<string, object>
+                            {
+                                ["Score"] = 0.42d
+                            }
+                        }
+                    ]
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            DebugSessionId = debugSessionId,
+            ClientRequestSequence = 43,
+            FlowRevision = 10,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("outputData").GetProperty("Score").GetDouble().Should().BeApproximately(0.42d, 0.001d);
+
+        var observation = root.GetProperty("observation");
+        observation.GetProperty("identity").GetProperty("clientRequestSequence").GetInt64().Should().Be(43);
+        observation.GetProperty("identity").GetProperty("flowRevision").GetInt64().Should().Be(10);
+        var outcome = observation.GetProperty("outcome");
+        outcome.GetProperty("success").GetBoolean().Should().BeFalse();
+        outcome.GetProperty("errorMessage").GetString().Should().Contain("Target failed");
+        outcome.GetProperty("failedOperatorId").GetGuid().Should().Be(targetNodeId);
+        outcome.GetProperty("failedOperatorName").GetString().Should().Be("Threshold");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldRejectUnsafeClientObservationIdentityValues()
+    {
+        await using var host = await PreviewNodeTestHost.CreateAsync(_ => { });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = Guid.NewGuid(),
+            ClientRequestSequence = -1,
+            FlowRevision = 0
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().Contain("clientRequestSequence");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldDowngradeSingleUnsafeValueWithoutEndpointFailure()
+    {
+        var targetNodeId = Guid.NewGuid();
+        var circular = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        circular["Self"] = circular;
+
+        using var mat = new Mat(1, 1, MatType.CV_8UC1, Scalar.All(255));
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 5,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Score"] = 0.95d,
+                            ["Unsafe"] = new UnsafePreviewValue(),
+                            ["Loop"] = circular,
+                            ["Matrix"] = mat,
+                            ["BadNumber"] = double.NaN
+                        }
+                    },
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Unsafe",
+                            IsSuccess = true,
+                            ExecutionOrder = 0
+                        }
+                    ]
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Unsafe", OperatorType.Thresholding))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("Score").GetDouble().Should().BeApproximately(0.95d, 0.001d);
+        outputData.GetProperty("Unsafe").GetProperty("Explodes").GetProperty("kind").GetString().Should().Be("propertyError");
+        outputData.GetProperty("Loop").GetProperty("Self").GetProperty("kind").GetString().Should().Be("circular");
+        outputData.GetProperty("Matrix").GetProperty("kind").GetString().Should().Be("matrix");
+        outputData.GetProperty("BadNumber").GetProperty("kind").GetString().Should().Be("nonFiniteNumber");
+        document.RootElement.GetProperty("observation").GetProperty("diagnostics").EnumerateArray()
+            .Should().Contain(item => item.GetProperty("code").GetString() == "getter-error");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldBoundLargeObservationResponseJson()
+    {
+        var targetNodeId = Guid.NewGuid();
+        var rows = Enumerable.Range(0, 64)
+            .Select(row => Enumerable.Range(0, 64).ToDictionary(
+                col => $"C{col:D2}",
+                _ => (object)new string('x', 8_000),
+                StringComparer.OrdinalIgnoreCase))
+            .Cast<object>()
+            .ToList();
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 5,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Rows"] = rows
+                        }
+                    },
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Large",
+                            IsSuccess = true,
+                            ExecutionOrder = 0
+                        }
+                    ]
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Large", OperatorType.Thresholding))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        payload.Length.Should().BeLessThan(900_000);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("observation").GetProperty("truncated").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("observation").GetProperty("diagnostics").EnumerateArray()
+            .Should().Contain(item =>
+                item.GetProperty("code").GetString() == "byte-budget" ||
+                item.GetProperty("code").GetString() == "node-limit");
     }
 
     [Fact]
@@ -1535,6 +1824,13 @@ public class PreviewNodeEndpointsTests
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         });
+    }
+
+    private sealed class UnsafePreviewValue
+    {
+        public int Safe => 1;
+
+        public int Explodes => throw new InvalidOperationException("getter failed");
     }
 
     private sealed class PreviewNodeTestHost : IAsyncDisposable

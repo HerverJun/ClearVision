@@ -577,6 +577,66 @@ function parsePreviewResponse(response) {
     };
 }
 
+function normalizeIdentityString(value) {
+    return value === undefined || value === null
+        ? null
+        : String(value).trim().toLowerCase();
+}
+
+function normalizeIdentityNumber(value) {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    const numberValue = Number(value);
+    return Number.isSafeInteger(numberValue) && numberValue >= 0
+        ? numberValue
+        : null;
+}
+
+function normalizeFlowRevision(value) {
+    const numberValue = Number(value ?? 0);
+    return Number.isSafeInteger(numberValue) && numberValue >= 0
+        ? numberValue
+        : 0;
+}
+
+export function readPreviewObservationIdentity(response) {
+    const observation = readFirstDefined(response, ['observation', 'Observation']);
+    if (!observation || typeof observation !== 'object') {
+        return null;
+    }
+
+    const identity = readFirstDefined(observation, ['identity', 'Identity']);
+    if (!identity || typeof identity !== 'object') {
+        return undefined;
+    }
+
+    return {
+        projectId: normalizeIdentityString(readFirstDefined(identity, ['projectId', 'ProjectId'])),
+        targetNodeId: normalizeIdentityString(readFirstDefined(identity, ['targetNodeId', 'TargetNodeId'])),
+        debugSessionId: normalizeIdentityString(readFirstDefined(identity, ['debugSessionId', 'DebugSessionId'])),
+        clientRequestSequence: normalizeIdentityNumber(readFirstDefined(identity, ['clientRequestSequence', 'ClientRequestSequence'])),
+        flowRevision: normalizeIdentityNumber(readFirstDefined(identity, ['flowRevision', 'FlowRevision']))
+    };
+}
+
+export function previewObservationMatchesRequest(response, expectedIdentity) {
+    const identity = readPreviewObservationIdentity(response);
+    if (identity === null) {
+        return true;
+    }
+    if (!identity) {
+        return false;
+    }
+
+    return identity.projectId === normalizeIdentityString(expectedIdentity.projectId) &&
+        identity.targetNodeId === normalizeIdentityString(expectedIdentity.targetNodeId) &&
+        identity.debugSessionId === normalizeIdentityString(expectedIdentity.debugSessionId) &&
+        identity.clientRequestSequence === normalizeIdentityNumber(expectedIdentity.clientRequestSequence) &&
+        identity.flowRevision === normalizeIdentityNumber(expectedIdentity.flowRevision);
+}
+
 function isAbortError(error) {
     return error?.name === 'AbortError';
 }
@@ -757,6 +817,7 @@ export class NodePreviewCoordinator {
 
             const projectId = this.getProjectId();
             if (!projectId) {
+                const flowRevision = normalizeFlowRevision(this.getFlowRevision());
                 this.debugSessionId = null;
                 this.debugSessionScopeKey = null;
                 this.updateState({
@@ -770,7 +831,7 @@ export class NodePreviewCoordinator {
                     request: buildPreviewRequestKey({
                         projectId: null,
                         nodeId: activeNode.id,
-                        flowRevision: this.getFlowRevision(),
+                        flowRevision,
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64: null
                     })
@@ -786,6 +847,7 @@ export class NodePreviewCoordinator {
             }
 
             if (isPreviewPayloadTooLarge(inputImageBase64)) {
+                const flowRevision = normalizeFlowRevision(this.getFlowRevision());
                 this.updateState({
                     status: 'idle',
                     executionTimeMs: null,
@@ -797,7 +859,7 @@ export class NodePreviewCoordinator {
                     request: buildPreviewRequestKey({
                         projectId,
                         nodeId: activeNode.id,
-                        flowRevision: this.getFlowRevision(),
+                        flowRevision,
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64: null
                     })
@@ -807,6 +869,7 @@ export class NodePreviewCoordinator {
 
             const prerequisiteError = validatePreviewPrerequisites(activeNode, inputImageBase64);
             if (prerequisiteError) {
+                const flowRevision = normalizeFlowRevision(this.getFlowRevision());
                 this.updateState({
                     status: 'idle',
                     executionTimeMs: null,
@@ -818,7 +881,7 @@ export class NodePreviewCoordinator {
                     request: buildPreviewRequestKey({
                         projectId,
                         nodeId: activeNode.id,
-                        flowRevision: this.getFlowRevision(),
+                        flowRevision,
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64
                     })
@@ -826,10 +889,12 @@ export class NodePreviewCoordinator {
                 return;
             }
 
+            const flowRevision = normalizeFlowRevision(this.getFlowRevision());
+            const clientRequestSequence = scheduledVersion;
             const request = buildPreviewRequestKey({
                 projectId,
                 nodeId: activeNode.id,
-                flowRevision: this.getFlowRevision(),
+                flowRevision,
                 parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                 inputImageBase64
             });
@@ -874,8 +939,18 @@ export class NodePreviewCoordinator {
             }
 
             try {
+                const debugSessionId = this.getDebugSessionId(projectId, activeNode.id);
+                const expectedObservationIdentity = {
+                    projectId,
+                    targetNodeId: activeNode.id,
+                    debugSessionId,
+                    clientRequestSequence,
+                    flowRevision
+                };
                 const response = await this.previewExecutor(activeNode.id, {
-                    debugSessionId: this.getDebugSessionId(projectId, activeNode.id),
+                    debugSessionId,
+                    clientRequestSequence,
+                    flowRevision,
                     inputImageBase64,
                     parameters: null,
                     signal: abortController?.signal,
@@ -883,6 +958,9 @@ export class NodePreviewCoordinator {
                 });
 
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
+                    return;
+                }
+                if (!previewObservationMatchesRequest(response, expectedObservationIdentity)) {
                     return;
                 }
 

@@ -914,6 +914,8 @@ class InspectionController {
                 projectId: this.projectId,
                 targetNodeId: targetNodeId,
                 debugSessionId: options.debugSessionId || this.generateSessionId(),
+                clientRequestSequence: options.clientRequestSequence,
+                flowRevision: options.flowRevision,
                 flowData: flowData,
                 inputImageBase64: options.inputImageBase64,
                 parameters: options.parameters,
