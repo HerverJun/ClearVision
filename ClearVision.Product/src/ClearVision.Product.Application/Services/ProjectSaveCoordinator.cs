@@ -216,7 +216,7 @@ public sealed class ProjectSaveCoordinator
 
     private async Task<ProjectSaveResult> SaveExistingProjectUnderGateAsync(ProjectSaveRequest request)
     {
-        var project = await _projectRepository.GetByIdAsync(request.Project.Id)
+        var project = await _projectRepository.GetByIdForUpdateAsync(request.Project.Id)
             ?? throw new InvalidOperationException($"PSV002: project '{request.Project.Id}' does not exist.");
         if (project.PersistenceRevision != request.ExpectedRevision)
         {
@@ -394,7 +394,7 @@ public sealed class ProjectSaveCoordinator
     private async Task ApplyCommittedIntentAsync(string saveDirectory, ProjectSaveManifest manifest)
     {
         var projectCandidate = DeserializeFile<ProjectCandidate>(Path.Combine(saveDirectory, ProjectCandidateFileName));
-        var project = await _projectRepository.GetByIdAsync(manifest.ProjectId)
+        var project = await _projectRepository.GetByIdForUpdateAsync(manifest.ProjectId)
             ?? throw new InvalidOperationException($"PSV002: project '{manifest.ProjectId}' does not exist.");
 
         await InjectFailureAsync(ProjectSaveFailurePoint.BeforeProjectApply, manifest);

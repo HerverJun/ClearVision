@@ -40,6 +40,26 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
     }
 
+    public async Task<Project?> GetByIdForUpdateAsync(Guid id)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Project id cannot be empty.", nameof(id));
+        }
+
+        var trackedEntry = _context.ChangeTracker.Entries<Project>()
+            .FirstOrDefault(entry => entry.Entity.Id == id);
+        if (trackedEntry != null)
+        {
+            await trackedEntry.ReloadAsync();
+            return trackedEntry.State == EntityState.Detached || trackedEntry.Entity.IsDeleted
+                ? null
+                : trackedEntry.Entity;
+        }
+
+        return await _dbSet.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+    }
+
     public async Task<Project?> GetByNameAsync(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

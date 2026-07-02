@@ -61,6 +61,11 @@ export interface StudioProjectPersistenceResult {
 
 export type StudioProjectPersistenceListener = (snapshot: StudioProjectPersistenceSnapshot) => void;
 
+interface OpenProjectIntent {
+  readonly projectId: string;
+  readonly requestSequence: number;
+}
+
 export interface StudioProjectPersistencePort {
   openProject(projectId: string): Promise<StudioProjectPersistenceResult>;
   getSnapshot(): StudioProjectPersistenceSnapshot;
@@ -84,6 +89,7 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
   private readonly openControllers = new Set<AbortController>();
   private readonly saveControllersByProject = new Map<string, AbortController>();
   private readonly unsubscribeFlowStructure: () => void;
+  private latestOpenIntent: OpenProjectIntent | null = null;
 
   constructor(
     private readonly httpClient: LegacyHttpClient,
@@ -100,6 +106,8 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
     }
 
     const requestSequence = this.flowEditorPort.nextRequestSequence(projectId);
+    const intent: OpenProjectIntent = { projectId, requestSequence };
+    this.latestOpenIntent = intent;
     const controller = new AbortController();
     this.openControllers.add(controller);
     this.setSnapshot({
@@ -110,11 +118,16 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
     });
 
     try {
-      const project = normalizeProjectDto(await this.httpClient.get(
+      const response = await this.httpClient.get(
         `/projects/${encodeURIComponent(projectId)}`,
         null,
         { signal: controller.signal }
-      ));
+      );
+      if (!this.isLatestOpenIntent(intent)) {
+        return this.result(false, 'stale_request');
+      }
+
+      const project = normalizeProjectDto(response);
       const replaceResult = this.flowEditorPort.replaceFlow({
         projectId: project.id,
         requestSequence,
@@ -134,6 +147,10 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
       ));
       return this.result(true, 'accepted');
     } catch (error) {
+      if (!this.isLatestOpenIntent(intent)) {
+        return this.result(false, 'stale_request');
+      }
+
       return this.handleRequestError(error, projectId, 'open');
     } finally {
       this.openControllers.delete(controller);
@@ -264,6 +281,11 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
     });
   }
 
+  private isLatestOpenIntent(intent: OpenProjectIntent): boolean {
+    return this.latestOpenIntent?.projectId === intent.projectId &&
+      this.latestOpenIntent.requestSequence === intent.requestSequence;
+  }
+
   private handleRejectedReplace(replaceResult: FlowEditorCommandResult): StudioProjectPersistenceResult {
     const disposition = replaceResult.disposition === 'stale_request'
       ? 'stale_request'
@@ -295,6 +317,18 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
       return this.result(false, 'stale_request');
     }
 
+    if (saved.id !== capture.projectId) {
+      this.setSnapshot({
+        ...this.snapshot,
+        status: this.snapshot.loaded ? 'loaded' : 'error',
+        saving: false,
+        dirty: true,
+        error: 'project_mismatch',
+        lastDisposition: 'project_mismatch'
+      });
+      return this.result(false, 'project_mismatch');
+    }
+
     const latestFlow = this.flowEditorPort.getSnapshot();
     if (latestFlow.projectId !== capture.projectId) {
       return this.result(false, 'stale_request');
@@ -321,7 +355,7 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
     }
 
     const mapped = mapRequestError(error);
-    if (this.snapshot.projectId && this.snapshot.projectId !== projectId) {
+    if (phase === 'save' && this.snapshot.projectId && this.snapshot.projectId !== projectId) {
       return this.result(false, 'stale_request', mapped.httpStatus, mapped.errorCode);
     }
 

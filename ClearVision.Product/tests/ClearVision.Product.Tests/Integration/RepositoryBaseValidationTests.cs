@@ -90,6 +90,34 @@ public sealed class RepositoryBaseValidationTests : IDisposable
     }
 
     [Fact]
+    public async Task GetByIdForUpdateAsync_WhenContextTracksOldProject_ShouldReloadTrackedEntity()
+    {
+        var project = new Project("demo");
+        await _repository.AddAsync(project);
+        var tracked = await _repository.GetByIdAsync(project.Id);
+        tracked.Should().NotBeNull();
+        tracked!.PersistenceRevision.Should().Be(0);
+
+        await using (var updateContext = new VisionDbContext(_options))
+        {
+            var updateRepository = new ProjectRepository(updateContext);
+            var latest = await updateRepository.GetByIdAsync(project.Id);
+            latest.Should().NotBeNull();
+            latest!.UpdateInfo("remote", "updated elsewhere");
+            latest.SetPersistenceRevision(1);
+            await updateRepository.UpdateAsync(latest);
+        }
+
+        var reloaded = await _repository.GetByIdForUpdateAsync(project.Id);
+
+        reloaded.Should().BeSameAs(tracked);
+        reloaded!.Name.Should().Be("remote");
+        reloaded.Description.Should().Be("updated elsewhere");
+        reloaded.PersistenceRevision.Should().Be(1);
+        _context.Entry(reloaded).State.Should().Be(EntityState.Unchanged);
+    }
+
+    [Fact]
     public async Task ProjectServiceLists_WhenContextTracksOldProject_ShouldMapFreshEntityInsideProjectGate()
     {
         ProjectSaveCoordinator.ResetStaticStateForTests();

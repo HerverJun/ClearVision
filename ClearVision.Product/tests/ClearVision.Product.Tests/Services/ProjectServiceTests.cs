@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -32,6 +32,8 @@ public class ProjectServiceTests
             repository.GetByIdAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
             repository.GetByIdFreshAsync(badProject.Id).Returns(Task.FromResult<Project?>(badProject));
             repository.GetByIdFreshAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
+            repository.GetByIdForUpdateAsync(badProject.Id).Returns(Task.FromResult<Project?>(badProject));
+            repository.GetByIdForUpdateAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
             repository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.SearchAsync("project").Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.GetRecentlyOpenedAsync(10).Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
@@ -105,6 +107,7 @@ public class ProjectServiceTests
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
 
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
 
@@ -136,6 +139,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository
             .When(item => item.UpdateAsync(Arg.Any<Project>()))
             .Do(_ => throw new InvalidOperationException("save failed"));
@@ -163,6 +167,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
@@ -192,6 +197,7 @@ public class ProjectServiceTests
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var sut = new ProjectService(repository, storage, factory, null, registry);
         var schema = CreateSchema(variableId, 3);
@@ -222,6 +228,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.SetPersistenceRevision(2);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var sut = new ProjectService(repository, storage, factory);
 
@@ -249,6 +256,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.SetPersistenceRevision(2);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var sut = new ProjectService(repository, storage, factory);
 
@@ -275,6 +283,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var session = registry.GetOrCreate(project.Id, project.GlobalVariables);
         session.SetValue(variableId, 128L, ProjectVariableUpdatedBy.StudioManual);
@@ -316,6 +325,7 @@ public class ProjectServiceTests
         var storedFlow = CreateVariableReadFlow(variableId, "stats.old");
         var storedFlowJson = JsonSerializer.Serialize(storedFlow);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
@@ -339,6 +349,7 @@ public class ProjectServiceTests
         var storedFlow = CreateLegacyVariableReadFlow("stats.count");
         var storedFlowJson = JsonSerializer.Serialize(storedFlow);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
@@ -360,6 +371,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1, "stats.count"));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
         await sut.UpdateAsync(project.Id, new UpdateProjectRequest
@@ -389,6 +401,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         project.UpdateGlobalVariables(schema);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
@@ -415,6 +428,7 @@ public class ProjectServiceTests
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
         const string oldFlowJson = "{\"name\":\"old\",\"operators\":[],\"connections\":[]}";
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository
             .When(item => item.UpdateAsync(Arg.Any<Project>()))
             .Do(_ => throw new InvalidOperationException("db failed"));
@@ -452,6 +466,7 @@ public class ProjectServiceTests
             project.UpdateGlobalVariables(CreateSchema(variableId, 1));
 
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+            repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.UpdateAsync(Arg.Any<Project>()).Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
             storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
 

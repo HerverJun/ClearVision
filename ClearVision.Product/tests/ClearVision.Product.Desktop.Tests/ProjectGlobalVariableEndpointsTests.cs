@@ -467,7 +467,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 Description = "changed"
             });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         host.Project.Name.Should().Be("renamed");
         host.Project.Description.Should().Be("changed");
         await host.Repository.Received(1).UpdateAsync(host.Project);
@@ -676,6 +676,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             project.UpdateGlobalVariables(schema);
             var repository = Substitute.For<IProjectRepository>();
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+            repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
 
             var storage = flowStorage ?? Substitute.For<IProjectFlowStorage>();

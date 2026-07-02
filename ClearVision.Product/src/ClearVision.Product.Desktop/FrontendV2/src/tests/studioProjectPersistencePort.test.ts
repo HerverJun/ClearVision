@@ -37,6 +37,47 @@ describe('StudioProjectPersistencePort', () => {
     expect(fixture.persistencePort.getSnapshot().projectId).toBe('project-a');
   });
 
+  it('does not let an earlier open success pollute the current snapshot after a newer open fails', async () => {
+    const fixture = createPersistenceFixture();
+    await openProject(fixture, createProjectDto('project-c', 1, createFlowFixture('project-c')));
+
+    const projectAOpen = fixture.persistencePort.openProject('project-a');
+    const projectBOpen = fixture.persistencePort.openProject('project-b');
+    getCall(fixture.http, 2).deferred.reject(new Error('network down'));
+    const projectB = await projectBOpen;
+    const snapshotAfterProjectBFailure = fixture.persistencePort.getSnapshot();
+
+    getCall(fixture.http, 1).deferred.resolve(createProjectDto('project-a', 3, createFlowFixture('project-a')));
+    const lateProjectA = await projectAOpen;
+
+    expect(projectB.disposition).toBe('network_error');
+    expect(snapshotAfterProjectBFailure.projectId).toBe('project-c');
+    expect(snapshotAfterProjectBFailure.lastDisposition).toBe('network_error');
+    expect(lateProjectA.disposition).toBe('stale_request');
+    expect(fixture.persistencePort.getSnapshot()).toEqual(snapshotAfterProjectBFailure);
+    expect(fixture.flowPort.getSnapshot().projectId).toBe('project-c');
+  });
+
+  it('leaves the loaded project snapshot unchanged when an older open returns after a newer success', async () => {
+    const fixture = createPersistenceFixture();
+    const projectAOpen = fixture.persistencePort.openProject('project-a');
+    const projectBOpen = fixture.persistencePort.openProject('project-b');
+
+    getCall(fixture.http, 1).deferred.resolve(createProjectDto('project-b', 7, createFlowFixture('project-b')));
+    const projectB = await projectBOpen;
+    const snapshotAfterProjectB = fixture.persistencePort.getSnapshot();
+
+    getCall(fixture.http, 0).deferred.resolve(createProjectDto('project-a', 3, createFlowFixture('project-a')));
+    const lateProjectA = await projectAOpen;
+
+    expect(projectB.disposition).toBe('accepted');
+    expect(lateProjectA.disposition).toBe('stale_request');
+    expect(lateProjectA.snapshot).toEqual(snapshotAfterProjectB);
+    expect(fixture.persistencePort.getSnapshot()).toEqual(snapshotAfterProjectB);
+    expect(fixture.persistencePort.getSnapshot().lastDisposition).toBe('accepted');
+    expect(fixture.persistencePort.getSnapshot().error).toBe('');
+  });
+
   it('saves project metadata, flow and global variables through one project PUT with expected persistence revision', async () => {
     const fixture = createPersistenceFixture();
     await openProject(fixture, createProjectDto('project-a', 5));
@@ -130,6 +171,25 @@ describe('StudioProjectPersistencePort', () => {
     expect(oldSave.disposition).toBe('stale_request');
     expect(fixture.persistencePort.getSnapshot().projectId).toBe('project-b');
     expect(fixture.persistencePort.getSnapshot().persistenceRevision).toBe(10);
+  });
+
+  it('rejects a save response for another project without writing it into the current projection', async () => {
+    const fixture = createPersistenceFixture();
+    await openProject(fixture, createProjectDto('project-a', 5));
+    patchThreshold(fixture.flowPort, 'project-a', 'node-a', 21);
+
+    const saveTask = fixture.persistencePort.save();
+    putCall(fixture.http, 0).deferred.resolve(createProjectDto('project-b', 6, createFlowFixture('project-b')));
+    const result = await saveTask;
+    const snapshot = fixture.persistencePort.getSnapshot();
+
+    expect(result.disposition).toBe('project_mismatch');
+    expect(snapshot.projectId).toBe('project-a');
+    expect(snapshot.name).toBe('Project project-a');
+    expect(snapshot.persistenceRevision).toBe(5);
+    expect(snapshot.project?.id).toBe('project-a');
+    expect(snapshot.lastDisposition).toBe('project_mismatch');
+    expect(fixture.flowPort.getSnapshot().projectId).toBe('project-a');
   });
 
   it('rejects same-project duplicate saves while a save is in flight', async () => {

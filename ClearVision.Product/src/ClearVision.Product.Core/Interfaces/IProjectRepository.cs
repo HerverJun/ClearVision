@@ -17,6 +17,11 @@ public interface IProjectRepository : IRepository<Project>
     Task<Project?> GetByIdFreshAsync(Guid id);
 
     /// <summary>
+    /// Re-read a database-current tracked project instance for save-time updates.
+    /// </summary>
+    Task<Project?> GetByIdForUpdateAsync(Guid id);
+
+    /// <summary>
     /// 根据名称查找工程
     /// </summary>
     Task<Project?> GetByNameAsync(string name);
