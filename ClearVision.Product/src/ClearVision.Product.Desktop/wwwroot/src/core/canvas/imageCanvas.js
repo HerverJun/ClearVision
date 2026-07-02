@@ -1,20 +1,25 @@
 import {
-    cancelRectangleDraft,
     clampRectToBounds,
-    commitRectangleDraft,
-    createRectangleDraftSession,
+    getAnnulusHandlePoints,
+    getCircleHandlePoints,
     getRectHandlePoints,
+    hitTestAnnulus,
+    hitTestAnnulusHandle,
+    hitTestCircle,
+    hitTestCircleHandle,
     hitTestRectHandle,
     hitTestRectangle,
     normalizeRectFromPoints,
+    normalizeAnnulusGeometry,
+    normalizeCircleGeometry,
     nudgeRect,
-    redoRectangleDraft,
+    resizeAnnulusByHandle,
+    resizeCircleByHandle,
     resizeRectByHandle,
     roundRect,
     screenToImagePoint,
-    setRectangleDraftCurrent,
-    translateRect,
-    undoRectangleDraft
+    translateAnnulus,
+    translateCircle,
 } from '../../features/flow-editor/roiGeometry.mjs';
 
 function createLegacyOverlayId() {
@@ -24,6 +29,25 @@ function createLegacyOverlayId() {
 function normalizeOverlayNumber(value, fallback = 0) {
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function cloneGeometry(geometry) {
+    return geometry ? { ...geometry } : null;
+}
+
+function geometryKey(geometry) {
+    if (!geometry) {
+        return '';
+    }
+
+    return Object.keys(geometry)
+        .sort()
+        .map(key => `${key}:${Number.isFinite(Number(geometry[key])) ? Number(geometry[key]).toFixed(6) : String(geometry[key])}`)
+        .join('|');
+}
+
+function sameGeometry(left, right) {
+    return geometryKey(left) === geometryKey(right);
 }
 
 function compareOverlayOrder(left, right) {
@@ -55,6 +79,11 @@ export function buildOverlayRenderCommands(overlays = []) {
             width: normalizeOverlayNumber(overlay.width),
             height: normalizeOverlayNumber(overlay.height),
             radius: normalizeOverlayNumber(overlay.radius, 0),
+            innerRadius: normalizeOverlayNumber(overlay.innerRadius, 0),
+            outerRadius: normalizeOverlayNumber(overlay.outerRadius ?? overlay.radius, 0),
+            startAngle: normalizeOverlayNumber(overlay.startAngle, 0),
+            endAngle: normalizeOverlayNumber(overlay.endAngle, 360),
+            spanDegrees: normalizeOverlayNumber(overlay.spanDegrees, 360),
             points: Array.isArray(overlay.points)
                 ? overlay.points
                     .map(point => ({
@@ -500,8 +529,46 @@ class ImageCanvas {
         this.onOverlayChanged = callback;
     }
 
-    setEditableRectangle(rect, options = {}) {
-        const normalized = this.clampRectToImage(roundRect(rect));
+    normalizeEditableGeometry(geometry) {
+        const kind = geometry?.kind || geometry?.type || 'rectangle';
+        if (kind === 'circle') {
+            const circle = normalizeCircleGeometry(geometry, this.getImageBounds(), this.minimumOverlaySize);
+            return {
+                ...circle,
+                type: 'circle',
+                x: circle.centerX,
+                y: circle.centerY,
+                width: circle.radius * 2,
+                height: circle.radius * 2,
+                radius: circle.radius
+            };
+        }
+
+        if (kind === 'annulus' || kind === 'arc') {
+            const annulus = normalizeAnnulusGeometry(geometry, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+            return {
+                ...annulus,
+                type: annulus.kind,
+                x: annulus.centerX,
+                y: annulus.centerY,
+                width: annulus.outerRadius * 2,
+                height: annulus.outerRadius * 2,
+                radius: annulus.outerRadius
+            };
+        }
+
+        const rect = this.clampRectToImage(roundRect(geometry));
+        return {
+            kind: 'rectangle',
+            type: 'rectangle',
+            ...rect
+        };
+    }
+
+    setEditableGeometry(geometry, options = {}) {
+        const normalized = this.normalizeEditableGeometry(geometry);
         const existing = this.activeOverlayId
             ? this.overlays.find(overlay => overlay.id === this.activeOverlayId)
             : null;
@@ -518,21 +585,31 @@ class ImageCanvas {
             Object.assign(existing, normalized, overlayStyle);
             this.selectedOverlay = existing.id;
             if (options.resetDraft !== false) {
-                this.resetRectangleDraft(normalized);
+                this.resetGeometryDraft(this.readOverlayGeometry(existing));
             }
             this.invalidate();
             return existing;
         }
 
-        const overlay = this.addOverlay('rectangle', normalized.x, normalized.y, normalized.width, normalized.height, overlayStyle);
+        const overlay = this.addOverlay(normalized.type, normalized.x, normalized.y, normalized.width, normalized.height, {
+            ...overlayStyle,
+            ...normalized
+        });
         overlay.editable = true;
         this.activeOverlayId = overlay.id;
         this.selectedOverlay = overlay.id;
         if (options.resetDraft !== false) {
-            this.resetRectangleDraft(normalized);
+            this.resetGeometryDraft(this.readOverlayGeometry(overlay));
         }
         this.invalidate();
         return overlay;
+    }
+
+    setEditableRectangle(rect, options = {}) {
+        return this.setEditableGeometry({
+            kind: 'rectangle',
+            ...rect
+        }, options);
     }
 
     clearEditableRectangle() {
@@ -646,6 +723,53 @@ class ImageCanvas {
                 break;
             }
 
+            case 'annulus':
+            case 'arc': {
+                const centerX = command.x;
+                const centerY = command.y;
+                const innerRadius = Math.max(0, command.innerRadius);
+                const outerRadius = Math.max(innerRadius + 1, command.outerRadius || command.radius);
+                const startRadians = command.startAngle * Math.PI / 180;
+                const endRadians = (command.startAngle + command.spanDegrees) * Math.PI / 180;
+                const isArc = command.type === 'arc' && command.spanDegrees > 0 && command.spanDegrees < 360;
+
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, outerRadius, isArc ? startRadians : 0, isArc ? endRadians : Math.PI * 2);
+                this.ctx.stroke();
+
+                if (innerRadius > 0) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(centerX, centerY, innerRadius, isArc ? startRadians : 0, isArc ? endRadians : Math.PI * 2);
+                    this.ctx.stroke();
+                }
+
+                if (isArc) {
+                    const startOuter = {
+                        x: centerX + outerRadius * Math.cos(startRadians),
+                        y: centerY + outerRadius * Math.sin(startRadians)
+                    };
+                    const startInner = {
+                        x: centerX + innerRadius * Math.cos(startRadians),
+                        y: centerY + innerRadius * Math.sin(startRadians)
+                    };
+                    const endOuter = {
+                        x: centerX + outerRadius * Math.cos(endRadians),
+                        y: centerY + outerRadius * Math.sin(endRadians)
+                    };
+                    const endInner = {
+                        x: centerX + innerRadius * Math.cos(endRadians),
+                        y: centerY + innerRadius * Math.sin(endRadians)
+                    };
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startInner.x, startInner.y);
+                    this.ctx.lineTo(startOuter.x, startOuter.y);
+                    this.ctx.moveTo(endInner.x, endInner.y);
+                    this.ctx.lineTo(endOuter.x, endOuter.y);
+                    this.ctx.stroke();
+                }
+                break;
+            }
+
             case 'point': {
                 const radius = command.radius > 0 ? command.radius : 4;
                 this.ctx.beginPath();
@@ -701,7 +825,7 @@ class ImageCanvas {
         this.ctx.strokeRect(bounds.x - 5, bounds.y - 5, bounds.width + 10, bounds.height + 10);
         this.ctx.setLineDash([]);
 
-        if (this.interactionMode === 'roi-rect' && overlay.type === 'rectangle' && overlay.editable) {
+        if (this.interactionMode === 'roi-rect' && overlay.editable) {
             this.drawResizeHandles(overlay);
         }
     }
@@ -965,37 +1089,175 @@ class ImageCanvas {
         };
     }
 
-    resetRectangleDraft(rect) {
-        this.roiDraftState = createRectangleDraftSession(rect, this.getImageBounds(), {
-            minSize: this.minimumOverlaySize
-        });
+    resetGeometryDraft(geometry) {
+        const current = cloneGeometry(geometry);
+        this.roiDraftState = {
+            initial: cloneGeometry(current),
+            current,
+            past: [],
+            future: [],
+            historyLimit: 50
+        };
     }
 
-    updateEditableOverlayRect(overlay, rect, phase = 'dragging') {
-        const nextRect = this.clampRectToImage(rect);
-        Object.assign(overlay, nextRect);
+    setGeometryDraftCurrent(geometry) {
         if (this.roiDraftState) {
-            this.roiDraftState = setRectangleDraftCurrent(this.roiDraftState, nextRect);
+            this.roiDraftState = {
+                ...this.roiDraftState,
+                current: cloneGeometry(geometry)
+            };
         }
+    }
+
+    commitGeometryDraft(geometry, previousGeometry = null) {
+        if (!this.roiDraftState) {
+            this.resetGeometryDraft(geometry);
+        }
+
+        const previous = previousGeometry || this.roiDraftState.current;
+        const past = sameGeometry(previous, geometry)
+            ? this.roiDraftState.past
+            : [...this.roiDraftState.past, cloneGeometry(previous)].slice(-this.roiDraftState.historyLimit);
+
+        this.roiDraftState = {
+            ...this.roiDraftState,
+            current: cloneGeometry(geometry),
+            past,
+            future: []
+        };
+    }
+
+    undoGeometryDraft() {
+        if (!this.roiDraftState || this.roiDraftState.past.length === 0) {
+            return null;
+        }
+
+        const previous = this.roiDraftState.past[this.roiDraftState.past.length - 1];
+        this.roiDraftState = {
+            ...this.roiDraftState,
+            current: cloneGeometry(previous),
+            past: this.roiDraftState.past.slice(0, -1),
+            future: [cloneGeometry(this.roiDraftState.current), ...this.roiDraftState.future].slice(0, this.roiDraftState.historyLimit)
+        };
+        return this.roiDraftState.current;
+    }
+
+    redoGeometryDraft() {
+        if (!this.roiDraftState || this.roiDraftState.future.length === 0) {
+            return null;
+        }
+
+        const next = this.roiDraftState.future[0];
+        this.roiDraftState = {
+            ...this.roiDraftState,
+            current: cloneGeometry(next),
+            past: [...this.roiDraftState.past, cloneGeometry(this.roiDraftState.current)].slice(-this.roiDraftState.historyLimit),
+            future: this.roiDraftState.future.slice(1)
+        };
+        return this.roiDraftState.current;
+    }
+
+    readOverlayGeometry(overlay) {
+        if (!overlay) {
+            return null;
+        }
+
+        if (overlay.type === 'circle') {
+            return {
+                kind: 'circle',
+                centerX: normalizeOverlayNumber(overlay.centerX ?? overlay.x),
+                centerY: normalizeOverlayNumber(overlay.centerY ?? overlay.y),
+                radius: Math.max(this.minimumOverlaySize, normalizeOverlayNumber(overlay.radius, this.minimumOverlaySize))
+            };
+        }
+
+        if (overlay.type === 'annulus' || overlay.type === 'arc') {
+            return {
+                kind: overlay.type,
+                centerX: normalizeOverlayNumber(overlay.centerX ?? overlay.x),
+                centerY: normalizeOverlayNumber(overlay.centerY ?? overlay.y),
+                innerRadius: Math.max(0, normalizeOverlayNumber(overlay.innerRadius, 0)),
+                outerRadius: Math.max(this.minimumOverlaySize, normalizeOverlayNumber(overlay.outerRadius ?? overlay.radius, this.minimumOverlaySize)),
+                startAngle: normalizeOverlayNumber(overlay.startAngle, 0),
+                endAngle: normalizeOverlayNumber(overlay.endAngle, 360),
+                spanDegrees: normalizeOverlayNumber(overlay.spanDegrees, 360)
+            };
+        }
+
+        return {
+            kind: 'rectangle',
+            ...roundRect({
+                x: overlay.x,
+                y: overlay.y,
+                width: overlay.width,
+                height: overlay.height
+            })
+        };
+    }
+
+    translateEditableGeometry(geometry, delta) {
+        if (!geometry) {
+            return null;
+        }
+
+        if (geometry.kind === 'circle') {
+            return translateCircle(geometry, delta, this.getImageBounds(), this.minimumOverlaySize);
+        }
+
+        if (geometry.kind === 'annulus' || geometry.kind === 'arc') {
+            return translateAnnulus(geometry, delta, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+        }
+
+        return {
+            kind: 'rectangle',
+            ...nudgeRect(geometry, delta, this.getImageBounds(), this.minimumOverlaySize)
+        };
+    }
+
+    resizeEditableGeometry(geometry, handle, imagePoint) {
+        if (!geometry) {
+            return null;
+        }
+
+        if (geometry.kind === 'circle') {
+            return resizeCircleByHandle(geometry, handle, imagePoint, this.getImageBounds(), this.minimumOverlaySize);
+        }
+
+        if (geometry.kind === 'annulus' || geometry.kind === 'arc') {
+            return resizeAnnulusByHandle(geometry, handle, imagePoint, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+        }
+
+        return {
+            kind: 'rectangle',
+            ...resizeRectByHandle(geometry, handle, imagePoint, this.getImageBounds(), this.minimumOverlaySize)
+        };
+    }
+
+    updateEditableOverlayGeometry(overlay, geometry, phase = 'dragging') {
+        const normalized = this.normalizeEditableGeometry(geometry);
+        Object.assign(overlay, normalized);
+        this.setGeometryDraftCurrent(this.readOverlayGeometry(overlay));
         this.invalidate();
         this.emitOverlayChanged(overlay, phase);
-        return nextRect;
+        return normalized;
     }
 
-    commitEditableOverlayRect(overlay, previousRect = null) {
-        const nextRect = this.clampRectToImage(overlay);
-        Object.assign(overlay, nextRect);
-        if (!this.roiDraftState) {
-            this.resetRectangleDraft(nextRect);
-        }
-        this.roiDraftState = commitRectangleDraft(this.roiDraftState, nextRect, { previousRect });
+    commitEditableOverlayGeometry(overlay, previousGeometry = null) {
+        const normalized = this.normalizeEditableGeometry(this.readOverlayGeometry(overlay));
+        Object.assign(overlay, normalized);
+        const current = this.readOverlayGeometry(overlay);
+        this.commitGeometryDraft(current, previousGeometry);
         this.invalidate();
         this.emitOverlayChanged(overlay, 'commit');
-        return nextRect;
+        return current;
     }
 
     drawResizeHandles(overlay) {
-        const handles = getRectHandlePoints(overlay);
+        const handles = this.getEditableHandlePoints(overlay);
         const radius = this.handleSize / this.scale / 2;
         Object.values(handles).forEach(point => {
             this.ctx.beginPath();
@@ -1008,9 +1270,33 @@ class ImageCanvas {
         });
     }
 
+    getEditableHandlePoints(overlay) {
+        if (!overlay) {
+            return {};
+        }
+
+        if (overlay.type === 'circle') {
+            return getCircleHandlePoints(this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'annulus' || overlay.type === 'arc') {
+            return getAnnulusHandlePoints(this.readOverlayGeometry(overlay));
+        }
+
+        return getRectHandlePoints(overlay);
+    }
+
     hitTestResizeHandle(imagePoint, overlay) {
         if (!overlay) {
             return null;
+        }
+
+        if (overlay.type === 'circle') {
+            return hitTestCircleHandle(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
+        }
+
+        if (overlay.type === 'annulus' || overlay.type === 'arc') {
+            return hitTestAnnulusHandle(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
         }
 
         return hitTestRectHandle(imagePoint, overlay, { scale: this.scale, offset: this.offset }, this.handleSize);
@@ -1023,6 +1309,14 @@ class ImageCanvas {
 
         if (overlay.type === 'rectangle') {
             return hitTestRectangle(imagePoint, this.getOverlayBounds(overlay));
+        }
+
+        if (overlay.type === 'circle') {
+            return hitTestCircle(imagePoint, this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'annulus' || overlay.type === 'arc') {
+            return hitTestAnnulus(imagePoint, this.readOverlayGeometry(overlay));
         }
 
         const bounds = this.getOverlayBounds(overlay);
@@ -1064,6 +1358,16 @@ class ImageCanvas {
             };
         }
 
+        if (type === 'annulus' || type === 'arc') {
+            const radius = normalizeOverlayNumber(command?.outerRadius ?? overlay.outerRadius ?? overlay.radius, 1);
+            return {
+                x: normalizeOverlayNumber(command?.x ?? overlay.x) - radius,
+                y: normalizeOverlayNumber(command?.y ?? overlay.y) - radius,
+                width: radius * 2,
+                height: radius * 2
+            };
+        }
+
         if ((type === 'polyline' || type === 'polygon') && Array.isArray(overlay.points) && overlay.points.length > 0) {
             const xs = overlay.points.map(point => normalizeOverlayNumber(point?.x));
             const ys = overlay.points.map(point => normalizeOverlayNumber(point?.y));
@@ -1092,12 +1396,7 @@ class ImageCanvas {
             return;
         }
 
-        this.onOverlayChanged(roundRect({
-            x: overlay.x,
-            y: overlay.y,
-            width: overlay.width,
-            height: overlay.height
-        }), phase);
+        this.onOverlayChanged(this.readOverlayGeometry(overlay), phase);
     }
 
     cancelActiveRoiInteraction() {
@@ -1118,23 +1417,25 @@ class ImageCanvas {
             return true;
         }
 
-        if (interaction.createdOverlay && !interaction.originalRect) {
+        if (interaction.createdOverlay && !interaction.originalGeometry) {
             this.removeOverlay(overlay.id);
             this.activeOverlayId = null;
             this.selectedOverlay = null;
-            this.roiDraftState = cancelRectangleDraft(this.roiDraftState);
+            this.roiDraftState = this.roiDraftState
+                ? {
+                    ...this.roiDraftState,
+                    current: cloneGeometry(this.roiDraftState.initial),
+                    past: [],
+                    future: []
+                }
+                : null;
             return true;
         }
 
-        const fallbackRect = interaction.originalRect || this.roiDraftState?.initial;
-        if (fallbackRect) {
-            Object.assign(overlay, this.clampRectToImage(fallbackRect));
-            this.roiDraftState = setRectangleDraftCurrent(
-                this.roiDraftState || createRectangleDraftSession(overlay, this.getImageBounds(), {
-                    minSize: this.minimumOverlaySize
-                }),
-                overlay
-            );
+        const fallbackGeometry = interaction.originalGeometry || this.roiDraftState?.initial;
+        if (fallbackGeometry) {
+            Object.assign(overlay, this.normalizeEditableGeometry(fallbackGeometry));
+            this.setGeometryDraftCurrent(this.readOverlayGeometry(overlay));
             this.invalidate();
             this.emitOverlayChanged(overlay, 'cancel');
         }
@@ -1142,8 +1443,8 @@ class ImageCanvas {
         return true;
     }
 
-    applyRoiDraftHistory(nextDraftState) {
-        if (!nextDraftState || !nextDraftState.current) {
+    applyRoiDraftHistory(nextGeometry) {
+        if (!nextGeometry) {
             return false;
         }
 
@@ -1152,8 +1453,7 @@ class ImageCanvas {
             return false;
         }
 
-        this.roiDraftState = nextDraftState;
-        Object.assign(overlay, this.roiDraftState.current);
+        Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
         this.invalidate();
         this.emitOverlayChanged(overlay, 'commit');
         return true;
@@ -1177,14 +1477,14 @@ class ImageCanvas {
             ((e.ctrlKey || e.metaKey) && e.shiftKey && String(e.key).toLowerCase() === 'z');
 
         if (isUndo) {
-            if (this.applyRoiDraftHistory(undoRectangleDraft(this.roiDraftState))) {
+            if (this.applyRoiDraftHistory(this.undoGeometryDraft())) {
                 e.preventDefault?.();
             }
             return;
         }
 
         if (isRedo) {
-            if (this.applyRoiDraftHistory(redoRectangleDraft(this.roiDraftState))) {
+            if (this.applyRoiDraftHistory(this.redoGeometryDraft())) {
                 e.preventDefault?.();
             }
             return;
@@ -1202,16 +1502,13 @@ class ImageCanvas {
         }
 
         const step = e.shiftKey ? 10 : 1;
-        const previousRect = { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height };
-        const nextRect = nudgeRect(overlay, {
+        const previousGeometry = this.readOverlayGeometry(overlay);
+        const nextGeometry = this.translateEditableGeometry(previousGeometry, {
             x: delta.x * step,
             y: delta.y * step
-        }, this.getImageBounds(), this.minimumOverlaySize);
-        Object.assign(overlay, nextRect);
-        if (!this.roiDraftState) {
-            this.resetRectangleDraft(previousRect);
-        }
-        this.roiDraftState = commitRectangleDraft(this.roiDraftState, nextRect, { previousRect });
+        });
+        Object.assign(overlay, this.normalizeEditableGeometry(nextGeometry));
+        this.commitGeometryDraft(this.readOverlayGeometry(overlay), previousGeometry);
         this.invalidate();
         this.emitOverlayChanged(overlay, 'commit');
         e.preventDefault?.();
@@ -1246,7 +1543,8 @@ class ImageCanvas {
         const overlay = this.getPrimaryEditableOverlay();
         const handle = this.hitTestResizeHandle(imagePoint, overlay);
 
-        if (overlay && handle) {
+        if (overlay && handle && handle !== 'center') {
+            const originalGeometry = this.readOverlayGeometry(overlay);
             this.selectedOverlay = overlay.id;
             this.activeOverlayId = overlay.id;
             this.activeHandle = handle;
@@ -1254,41 +1552,53 @@ class ImageCanvas {
                 type: 'resize',
                 handle,
                 overlayId: overlay.id,
-                originalRect: { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height }
+                originalGeometry
             };
             this.invalidate();
             return;
         }
 
         if (overlay && this.hitTestOverlay(imagePoint, overlay)) {
+            const originalGeometry = this.readOverlayGeometry(overlay);
             this.selectedOverlay = overlay.id;
             this.activeOverlayId = overlay.id;
             this.activeHandle = null;
             this.interactionState = {
                 type: 'move',
                 overlayId: overlay.id,
-                originalRect: { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height },
+                originalGeometry,
                 dragAnchor: imagePoint
             };
             this.invalidate();
             return;
         }
 
-        const originalRect = overlay
-            ? { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height }
-            : null;
-        const nextOverlay = this.setEditableRectangle({
-            x: imagePoint.x,
-            y: imagePoint.y,
-            width: this.minimumOverlaySize,
-            height: this.minimumOverlaySize
-        }, { resetDraft: !overlay });
+        const originalGeometry = overlay ? this.readOverlayGeometry(overlay) : null;
+        const drawKind = originalGeometry?.kind || 'rectangle';
+        const initialGeometry = drawKind === 'circle'
+            ? { kind: 'circle', centerX: imagePoint.x, centerY: imagePoint.y, radius: this.minimumOverlaySize }
+            : drawKind === 'annulus' || drawKind === 'arc'
+                ? {
+                    ...originalGeometry,
+                    centerX: imagePoint.x,
+                    centerY: imagePoint.y,
+                    innerRadius: 0,
+                    outerRadius: this.minimumOverlaySize
+                }
+                : {
+                    kind: 'rectangle',
+                    x: imagePoint.x,
+                    y: imagePoint.y,
+                    width: this.minimumOverlaySize,
+                    height: this.minimumOverlaySize
+                };
+        const nextOverlay = this.setEditableGeometry(initialGeometry, { resetDraft: !overlay });
         this.activeHandle = null;
         this.interactionState = {
             type: 'draw',
             overlayId: nextOverlay.id,
             startPoint: imagePoint,
-            originalRect,
+            originalGeometry,
             createdOverlay: !overlay
         };
     }
@@ -1312,35 +1622,43 @@ class ImageCanvas {
         }
 
         const imagePoint = this.getImagePointFromEvent(e);
-        let nextRect = null;
+        let nextGeometry = null;
 
         if (this.interactionState.type === 'draw') {
-            nextRect = this.clampRectToImage(normalizeRectFromPoints(this.interactionState.startPoint, imagePoint));
+            const currentGeometry = this.readOverlayGeometry(overlay);
+            if (currentGeometry.kind === 'circle') {
+                nextGeometry = resizeCircleByHandle(currentGeometry, 'radius', imagePoint, this.getImageBounds(), this.minimumOverlaySize);
+            } else if (currentGeometry.kind === 'annulus' || currentGeometry.kind === 'arc') {
+                nextGeometry = resizeAnnulusByHandle(currentGeometry, 'outerRadius', imagePoint, this.getImageBounds(), {
+                    minRadius: this.minimumOverlaySize
+                });
+            } else {
+                nextGeometry = {
+                    kind: 'rectangle',
+                    ...this.clampRectToImage(normalizeRectFromPoints(this.interactionState.startPoint, imagePoint))
+                };
+            }
         } else if (this.interactionState.type === 'move') {
-            nextRect = translateRect(
-                this.interactionState.originalRect,
+            nextGeometry = this.translateEditableGeometry(
+                this.interactionState.originalGeometry,
                 {
                     x: imagePoint.x - this.interactionState.dragAnchor.x,
                     y: imagePoint.y - this.interactionState.dragAnchor.y
-                },
-                { width: this.image.width, height: this.image.height },
-                this.minimumOverlaySize
+                }
             );
         } else if (this.interactionState.type === 'resize') {
-            nextRect = resizeRectByHandle(
-                this.interactionState.originalRect,
+            nextGeometry = this.resizeEditableGeometry(
+                this.interactionState.originalGeometry,
                 this.interactionState.handle,
-                imagePoint,
-                { width: this.image.width, height: this.image.height },
-                this.minimumOverlaySize
+                imagePoint
             );
         }
 
-        if (!nextRect) {
+        if (!nextGeometry) {
             return;
         }
 
-        this.updateEditableOverlayRect(overlay, nextRect, 'dragging');
+        this.updateEditableOverlayGeometry(overlay, nextGeometry, 'dragging');
     }
 
     handleRoiMouseUp() {
@@ -1358,7 +1676,7 @@ class ImageCanvas {
 
         const overlay = this.overlays.find(item => item.id === interaction.overlayId);
         if (overlay) {
-            this.commitEditableOverlayRect(overlay, interaction.originalRect);
+            this.commitEditableOverlayGeometry(overlay, interaction.originalGeometry);
         }
     }
 }

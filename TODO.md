@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G09B`
-- 当前卡片：`docs/进行中/Studio2/goals/G09B.md`
+- 当前 Goal：`G09C`
+- 当前卡片：`docs/进行中/Studio2/goals/G09C.md`
 - 当前阶段：`Geometry/Spatial`
 - 总状态：`IN_PROGRESS`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -98,8 +98,8 @@
 | G07B | Observation | 字段级全局变量绑定 V1 | DONE | G07A | `docs/进行中/Studio2/goals/G07B.md` | 见 G07B final follow-up 完成提交与最终报告 |
 | G08 | Observation | Visual Scene V1（只读投影） | DONE | G07B | `docs/进行中/Studio2/goals/G08.md` | 见 G08 完成提交与最终报告 |
 | G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | DONE | G08 | `docs/进行中/Studio2/goals/G09A.md` | 见 G09A 完成提交与最终报告 |
-| G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | IN_PROGRESS | G09A | `docs/进行中/Studio2/goals/G09B.md` |  |
-| G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | LOCKED | G09B | `docs/进行中/Studio2/goals/G09C.md` |  |
+| G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | DONE | G09A | `docs/进行中/Studio2/goals/G09B.md` | 见 G09B 完成提交与最终报告 |
+| G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | IN_PROGRESS | G09B | `docs/进行中/Studio2/goals/G09C.md` |  |
 | G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | LOCKED | G09C | `docs/进行中/Studio2/goals/G10A.md` |  |
 | G10B | Geometry/Spatial | RoiManager Crop 空间传播 | LOCKED | G10A | `docs/进行中/Studio2/goals/G10B.md` |  |
 | G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | LOCKED | G10B | `docs/进行中/Studio2/goals/G10C.md` |  |

@@ -23,7 +23,25 @@ export const REGION_RECT_PARAM_KEYS = {
     height: 'RegionH'
 };
 
+export const CIRCLE_PARAM_KEYS = {
+    centerX: 'CenterX',
+    centerY: 'CenterY',
+    radius: 'Radius'
+};
+
+export const POLAR_ANNULUS_ARC_PARAM_KEYS = {
+    centerX: 'CenterX',
+    centerY: 'CenterY',
+    innerRadius: 'InnerRadius',
+    outerRadius: 'OuterRadius',
+    startAngle: 'StartAngle',
+    endAngle: 'EndAngle'
+};
+
 export const RECT_DRAFT_HISTORY_LIMIT = 50;
+export const GEOMETRY_ANGLE_UNITS = 'degrees';
+export const GEOMETRY_ANGLE_ZERO_DIRECTION = '+x';
+export const GEOMETRY_ANGLE_DIRECTION = 'clockwise-image-y-down';
 
 export function clamp(value, min, max) {
     if (!Number.isFinite(value)) {
@@ -83,6 +101,168 @@ export function validateRectangleGeometry(rect, bounds = null, minSize = 1) {
         }
         if (!Number.isFinite(y) || y < 0 || y + height > normalizedBounds.height) {
             errors.push('y');
+        }
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors
+    };
+}
+
+export function normalizeAngleDegrees(angle) {
+    const value = Number(angle);
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+
+    return ((value % 360) + 360) % 360;
+}
+
+export function computeClockwiseAngleSpanDegrees(startAngle, endAngle, options = {}) {
+    if (!Number.isFinite(Number(startAngle)) || !Number.isFinite(Number(endAngle))) {
+        return 0;
+    }
+
+    const rawSpan = Number(endAngle) - Number(startAngle);
+    const normalized = ((rawSpan % 360) + 360) % 360;
+    if (normalized === 0 && options.allowFullCircle === true && Math.abs(rawSpan) >= 360) {
+        return 360;
+    }
+
+    return normalized;
+}
+
+export function angleDegreesFromCenter(center, point) {
+    if (!isFinitePoint(center) || !isFinitePoint(point)) {
+        return 0;
+    }
+
+    const radians = Math.atan2(Number(point.y) - Number(center.y), Number(point.x) - Number(center.x));
+    return normalizeAngleDegrees(radians * 180 / Math.PI);
+}
+
+export function pointFromAngleDegrees(center, radius, angleDegrees) {
+    const angle = normalizeAngleDegrees(angleDegrees) * Math.PI / 180;
+    return {
+        x: Number(center?.x ?? center?.centerX ?? 0) + Number(radius ?? 0) * Math.cos(angle),
+        y: Number(center?.y ?? center?.centerY ?? 0) + Number(radius ?? 0) * Math.sin(angle)
+    };
+}
+
+function maxContainedRadius(centerX, centerY, bounds, minRadius = 1) {
+    const normalizedBounds = normalizeBounds(bounds, minRadius);
+    const x = clamp(readNumber(centerX, 0), 0, normalizedBounds.width);
+    const y = clamp(readNumber(centerY, 0), 0, normalizedBounds.height);
+    return Math.max(
+        minRadius,
+        Math.min(x, y, normalizedBounds.width - x, normalizedBounds.height - y)
+    );
+}
+
+export function normalizeCircleGeometry(circle, bounds, minRadius = 1) {
+    const minimum = Math.max(1, readNumber(minRadius, 1));
+    const normalizedBounds = normalizeBounds(bounds, minimum);
+    const centerX = clamp(readNumber(circle?.centerX ?? circle?.x, normalizedBounds.width / 2), 0, normalizedBounds.width);
+    const centerY = clamp(readNumber(circle?.centerY ?? circle?.y, normalizedBounds.height / 2), 0, normalizedBounds.height);
+    const maxRadius = maxContainedRadius(centerX, centerY, normalizedBounds, minimum);
+    const radius = clamp(readNumber(circle?.radius, minimum), minimum, maxRadius);
+
+    return {
+        kind: 'circle',
+        centerX,
+        centerY,
+        radius
+    };
+}
+
+export function validateCircleGeometry(circle, bounds = null, minRadius = 1) {
+    const minimum = Math.max(1, readNumber(minRadius, 1));
+    const errors = [];
+    if (!Number.isFinite(Number(circle?.centerX)) ||
+        !Number.isFinite(Number(circle?.centerY)) ||
+        !Number.isFinite(Number(circle?.radius))) {
+        errors.push('non-finite');
+    }
+
+    if (!Number.isFinite(Number(circle?.radius)) || Number(circle.radius) < minimum) {
+        errors.push('radius');
+    }
+
+    if (bounds) {
+        const normalized = normalizeCircleGeometry(circle, bounds, minimum);
+        if (Math.round(normalized.centerX) !== Math.round(Number(circle?.centerX)) ||
+            Math.round(normalized.centerY) !== Math.round(Number(circle?.centerY)) ||
+            Math.round(normalized.radius) !== Math.round(Number(circle?.radius))) {
+            errors.push('bounds');
+        }
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors
+    };
+}
+
+export function normalizeAnnulusGeometry(annulus, bounds, options = {}) {
+    const minimumOuter = Math.max(1, readNumber(options.minRadius, 1));
+    const normalizedBounds = normalizeBounds(bounds, minimumOuter);
+    const centerX = clamp(readNumber(annulus?.centerX ?? annulus?.x, normalizedBounds.width / 2), 0, normalizedBounds.width);
+    const centerY = clamp(readNumber(annulus?.centerY ?? annulus?.y, normalizedBounds.height / 2), 0, normalizedBounds.height);
+    const maxRadius = maxContainedRadius(centerX, centerY, normalizedBounds, minimumOuter);
+    const outerRadius = clamp(readNumber(annulus?.outerRadius ?? annulus?.radius, minimumOuter), minimumOuter, maxRadius);
+    const innerRadius = clamp(readNumber(annulus?.innerRadius, 0), 0, Math.max(0, outerRadius - minimumOuter));
+    const startAngle = normalizeAngleDegrees(annulus?.startAngle ?? 0);
+    const rawEnd = annulus?.endAngle ?? 360;
+    const spanDegrees = computeClockwiseAngleSpanDegrees(annulus?.startAngle ?? 0, rawEnd, { allowFullCircle: true });
+
+    return {
+        kind: annulus?.kind === 'arc' || (spanDegrees > 0 && spanDegrees < 360) ? 'arc' : 'annulus',
+        centerX,
+        centerY,
+        innerRadius,
+        outerRadius,
+        startAngle,
+        endAngle: startAngle + (spanDegrees || 360),
+        spanDegrees: spanDegrees || 360
+    };
+}
+
+export function validateAnnulusGeometry(annulus, bounds = null, options = {}) {
+    const errors = [];
+    const inner = Number(annulus?.innerRadius);
+    const outer = Number(annulus?.outerRadius);
+    const start = Number(annulus?.startAngle ?? 0);
+    const end = Number(annulus?.endAngle ?? 360);
+
+    if (!Number.isFinite(Number(annulus?.centerX)) ||
+        !Number.isFinite(Number(annulus?.centerY)) ||
+        !Number.isFinite(inner) ||
+        !Number.isFinite(outer) ||
+        !Number.isFinite(start) ||
+        !Number.isFinite(end)) {
+        errors.push('non-finite');
+    }
+
+    if (!Number.isFinite(inner) || inner < 0) {
+        errors.push('innerRadius');
+    }
+    if (!Number.isFinite(outer) || outer <= inner) {
+        errors.push('outerRadius');
+    }
+
+    const span = computeClockwiseAngleSpanDegrees(start, end, { allowFullCircle: true });
+    if (annulus?.kind === 'arc' && (span <= 0 || span >= 360)) {
+        errors.push('arcSpan');
+    }
+
+    if (bounds && errors.length === 0) {
+        const normalized = normalizeAnnulusGeometry(annulus, bounds, options);
+        if (Math.round(normalized.centerX) !== Math.round(Number(annulus.centerX)) ||
+            Math.round(normalized.centerY) !== Math.round(Number(annulus.centerY)) ||
+            Math.round(normalized.innerRadius) !== Math.round(inner) ||
+            Math.round(normalized.outerRadius) !== Math.round(outer)) {
+            errors.push('bounds');
         }
     }
 
@@ -338,6 +518,172 @@ export function nudgeRect(rect, delta, bounds, minSize = 1) {
         x: Number(delta?.x ?? 0),
         y: Number(delta?.y ?? 0)
     }, bounds, minSize);
+}
+
+export function getCircleHandlePoints(circle) {
+    const center = {
+        x: Number(circle?.centerX ?? circle?.x ?? 0),
+        y: Number(circle?.centerY ?? circle?.y ?? 0)
+    };
+    const radius = Number(circle?.radius ?? 0);
+    return {
+        center,
+        radius: pointFromAngleDegrees(center, radius, 0)
+    };
+}
+
+export function hitTestCircle(point, circle) {
+    if (!isFinitePoint(point)) {
+        return false;
+    }
+
+    const centerX = Number(circle?.centerX ?? circle?.x);
+    const centerY = Number(circle?.centerY ?? circle?.y);
+    const radius = Number(circle?.radius);
+    if (!Number.isFinite(centerX) || !Number.isFinite(centerY) || !Number.isFinite(radius) || radius <= 0) {
+        return false;
+    }
+
+    const dx = Number(point.x) - centerX;
+    const dy = Number(point.y) - centerY;
+    return Math.sqrt(dx * dx + dy * dy) <= radius;
+}
+
+export function hitTestCircleHandle(point, circle, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const handles = getCircleHandlePoints(circle);
+
+    return Object.entries(handles).find(([, handlePoint]) =>
+        Math.abs(Number(point.x) - handlePoint.x) <= tolerance &&
+        Math.abs(Number(point.y) - handlePoint.y) <= tolerance)?.[0] || null;
+}
+
+export function translateCircle(circle, delta, bounds, minRadius = 1) {
+    return normalizeCircleGeometry({
+        ...circle,
+        centerX: Number(circle?.centerX ?? circle?.x ?? 0) + Number(delta?.x ?? 0),
+        centerY: Number(circle?.centerY ?? circle?.y ?? 0) + Number(delta?.y ?? 0)
+    }, bounds, minRadius);
+}
+
+export function resizeCircleByHandle(circle, handle, point, bounds, minRadius = 1) {
+    if (handle !== 'radius') {
+        return normalizeCircleGeometry(circle, bounds, minRadius);
+    }
+
+    const centerX = Number(circle?.centerX ?? circle?.x ?? 0);
+    const centerY = Number(circle?.centerY ?? circle?.y ?? 0);
+    const dx = Number(point?.x ?? centerX) - centerX;
+    const dy = Number(point?.y ?? centerY) - centerY;
+    return normalizeCircleGeometry({
+        ...circle,
+        radius: Math.sqrt(dx * dx + dy * dy)
+    }, bounds, minRadius);
+}
+
+export function getAnnulusHandlePoints(annulus) {
+    const center = {
+        x: Number(annulus?.centerX ?? annulus?.x ?? 0),
+        y: Number(annulus?.centerY ?? annulus?.y ?? 0)
+    };
+    const innerRadius = Number(annulus?.innerRadius ?? 0);
+    const outerRadius = Number(annulus?.outerRadius ?? annulus?.radius ?? 0);
+    const startAngle = Number(annulus?.startAngle ?? 0);
+    const endAngle = Number(annulus?.endAngle ?? 360);
+
+    return {
+        center,
+        innerRadius: pointFromAngleDegrees(center, innerRadius, 0),
+        outerRadius: pointFromAngleDegrees(center, outerRadius, 0),
+        startAngle: pointFromAngleDegrees(center, outerRadius, startAngle),
+        endAngle: pointFromAngleDegrees(center, outerRadius, endAngle)
+    };
+}
+
+export function angleIsWithinClockwiseSpan(angle, startAngle, spanDegrees) {
+    const normalizedAngle = normalizeAngleDegrees(angle);
+    const normalizedStart = normalizeAngleDegrees(startAngle);
+    const delta = computeClockwiseAngleSpanDegrees(normalizedStart, normalizedAngle, { allowFullCircle: false });
+    return spanDegrees >= 360 || delta <= spanDegrees;
+}
+
+export function hitTestAnnulus(point, annulus) {
+    if (!isFinitePoint(point)) {
+        return false;
+    }
+
+    const centerX = Number(annulus?.centerX ?? annulus?.x);
+    const centerY = Number(annulus?.centerY ?? annulus?.y);
+    const innerRadius = Number(annulus?.innerRadius ?? 0);
+    const outerRadius = Number(annulus?.outerRadius ?? annulus?.radius);
+    if (!Number.isFinite(centerX) ||
+        !Number.isFinite(centerY) ||
+        !Number.isFinite(innerRadius) ||
+        !Number.isFinite(outerRadius) ||
+        innerRadius < 0 ||
+        outerRadius <= innerRadius) {
+        return false;
+    }
+
+    const dx = Number(point.x) - centerX;
+    const dy = Number(point.y) - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const span = Number(annulus?.spanDegrees ?? computeClockwiseAngleSpanDegrees(annulus?.startAngle ?? 0, annulus?.endAngle ?? 360, { allowFullCircle: true }));
+    const angle = angleDegreesFromCenter({ x: centerX, y: centerY }, point);
+
+    return distance >= innerRadius &&
+        distance <= outerRadius &&
+        angleIsWithinClockwiseSpan(angle, annulus?.startAngle ?? 0, span || 360);
+}
+
+export function hitTestAnnulusHandle(point, annulus, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const handles = getAnnulusHandlePoints(annulus);
+
+    return Object.entries(handles).find(([, handlePoint]) =>
+        Math.abs(Number(point.x) - handlePoint.x) <= tolerance &&
+        Math.abs(Number(point.y) - handlePoint.y) <= tolerance)?.[0] || null;
+}
+
+export function translateAnnulus(annulus, delta, bounds, options = {}) {
+    return normalizeAnnulusGeometry({
+        ...annulus,
+        centerX: Number(annulus?.centerX ?? annulus?.x ?? 0) + Number(delta?.x ?? 0),
+        centerY: Number(annulus?.centerY ?? annulus?.y ?? 0) + Number(delta?.y ?? 0)
+    }, bounds, options);
+}
+
+export function resizeAnnulusByHandle(annulus, handle, point, bounds, options = {}) {
+    const center = {
+        x: Number(annulus?.centerX ?? annulus?.x ?? 0),
+        y: Number(annulus?.centerY ?? annulus?.y ?? 0)
+    };
+    const dx = Number(point?.x ?? center.x) - center.x;
+    const dy = Number(point?.y ?? center.y) - center.y;
+    const radius = Math.sqrt(dx * dx + dy * dy);
+    const next = { ...annulus };
+
+    if (handle === 'innerRadius') {
+        next.innerRadius = radius;
+    } else if (handle === 'outerRadius') {
+        next.outerRadius = radius;
+    } else if (handle === 'startAngle') {
+        next.startAngle = angleDegreesFromCenter(center, point);
+    } else if (handle === 'endAngle') {
+        next.endAngle = angleDegreesFromCenter(center, point);
+    }
+
+    return normalizeAnnulusGeometry(next, bounds, options);
 }
 
 function sameRect(left, right) {

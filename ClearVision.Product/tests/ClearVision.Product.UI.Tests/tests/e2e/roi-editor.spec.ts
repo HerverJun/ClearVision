@@ -102,6 +102,54 @@ async function addAndSelectRoiNode(page: Page, overrides: Record<string, unknown
   }, createRoiParameters(overrides));
 }
 
+function createPolarParameters(overrides: Record<string, unknown> = {}) {
+  const values = {
+    CenterX: 32,
+    CenterY: 32,
+    InnerRadius: 8,
+    OuterRadius: 20,
+    StartAngle: 0,
+    EndAngle: 180,
+    OutputWidth: 0,
+    UseWarpPolar: true,
+    ...overrides,
+  };
+
+  return [
+    { name: 'CenterX', displayName: 'Center X', dataType: 'int', value: values.CenterX, defaultValue: values.CenterX },
+    { name: 'CenterY', displayName: 'Center Y', dataType: 'int', value: values.CenterY, defaultValue: values.CenterY },
+    { name: 'InnerRadius', displayName: 'Inner Radius', dataType: 'int', value: values.InnerRadius, defaultValue: values.InnerRadius, min: 0 },
+    { name: 'OuterRadius', displayName: 'Outer Radius', dataType: 'int', value: values.OuterRadius, defaultValue: values.OuterRadius, min: 1 },
+    { name: 'StartAngle', displayName: 'Start Angle', dataType: 'double', value: values.StartAngle, defaultValue: values.StartAngle },
+    { name: 'EndAngle', displayName: 'End Angle', dataType: 'double', value: values.EndAngle, defaultValue: values.EndAngle },
+    { name: 'OutputWidth', displayName: 'Output Width', dataType: 'int', value: values.OutputWidth, defaultValue: values.OutputWidth },
+    { name: 'UseWarpPolar', displayName: 'Use WarpPolar', dataType: 'bool', value: values.UseWarpPolar, defaultValue: values.UseWarpPolar },
+  ];
+}
+
+async function addAndSelectPolarNode(page: Page, overrides: Record<string, unknown> = {}) {
+  return page.evaluate((parameters) => {
+    const flowCanvas = (window as any).flowCanvas;
+    const node = flowCanvas.addNode(
+      'PolarUnwrap',
+      180,
+      140,
+      {
+        title: '极坐标展开',
+        parameters,
+        inputs: [{ name: 'Image', type: 'Image' }],
+        outputs: [{ name: 'Image', type: 'Image' }],
+        color: '#1890ff',
+      }
+    );
+
+    flowCanvas.selectedNode = node.id;
+    flowCanvas.onNodeSelected?.(node);
+    (window as any).__e2eRoiNodeId = node.id;
+    return node.id;
+  }, createPolarParameters(overrides));
+}
+
 async function waitForRoiEditorReady(page: Page) {
   await expect(page.locator('.roi-editor-panel')).toBeVisible();
   await page.waitForFunction(() => {
@@ -192,6 +240,66 @@ async function dispatchRoiDrag(
     startPoint: from,
     endPoint: to,
     mouseButton: button
+  });
+}
+
+async function getCircleState(page: Page) {
+  return page.evaluate(() => {
+    const panel = (window as any).propertyPanel;
+    const overlay = panel?.roiEditorPanel?.imageCanvas?.getPrimaryEditableOverlay?.();
+    const readValue = (name: string) => {
+      const input = document.querySelector<HTMLInputElement>(`#param-${name}`);
+      return input ? Number.parseInt(input.value, 10) : null;
+    };
+
+    return {
+      params: {
+        centerX: readValue('CenterX'),
+        centerY: readValue('CenterY'),
+        radius: readValue('Radius'),
+      },
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            centerX: Math.round(overlay.centerX ?? overlay.x),
+            centerY: Math.round(overlay.centerY ?? overlay.y),
+            radius: Math.round(overlay.radius),
+          }
+        : null,
+    };
+  });
+}
+
+async function getPolarState(page: Page) {
+  return page.evaluate(() => {
+    const panel = (window as any).propertyPanel;
+    const overlay = panel?.roiEditorPanel?.imageCanvas?.getPrimaryEditableOverlay?.();
+    const readNumber = (name: string) => {
+      const input = document.querySelector<HTMLInputElement>(`#param-${name}`);
+      return input ? Number(input.value) : null;
+    };
+
+    return {
+      params: {
+        centerX: readNumber('CenterX'),
+        centerY: readNumber('CenterY'),
+        innerRadius: readNumber('InnerRadius'),
+        outerRadius: readNumber('OuterRadius'),
+        startAngle: readNumber('StartAngle'),
+        endAngle: readNumber('EndAngle'),
+      },
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            centerX: Math.round(overlay.centerX ?? overlay.x),
+            centerY: Math.round(overlay.centerY ?? overlay.y),
+            innerRadius: Math.round(overlay.innerRadius),
+            outerRadius: Math.round(overlay.outerRadius ?? overlay.radius),
+            startAngle: Math.round(overlay.startAngle),
+            spanDegrees: Math.round(overlay.spanDegrees),
+          }
+        : null,
+    };
   });
 }
 
@@ -309,7 +417,7 @@ test.describe('ROI Editor', () => {
     await setCurrentProject(page);
   });
 
-  test('shows ROI editor for rectangle and disables it for non-rectangle shapes', async ({ page }) => {
+  test('shows ROI editor for rectangle and circle then disables it for polygon shapes', async ({ page }) => {
     await page.route('**/api/flows/preview-node', async route => {
       await route.fulfill({
         status: 200,
@@ -331,6 +439,9 @@ test.describe('ROI Editor', () => {
     await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
 
     await page.selectOption('#param-Shape', 'Circle');
+    await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
+
+    await page.selectOption('#param-Shape', 'Polygon');
     await expect(page.locator('#roi-editor-readonly')).toBeVisible();
   });
 
@@ -430,6 +541,89 @@ test.describe('ROI Editor', () => {
     expect(roiState.params.width).toBe(24);
     expect(roiState.params.height).toBe(26);
     expect(roiState.overlay).toEqual({ x: 18, y: 20, width: 24, height: 26 });
+  });
+
+  test('circle ROI move and radius handle update CenterX CenterY and Radius', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { Shape: 'Circle', CenterX: 24, CenterY: 24, Radius: 8 });
+    await waitForRoiEditorReady(page);
+
+    let circleState = await getCircleState(page);
+    expect(circleState.overlay).toEqual({ type: 'circle', centerX: 24, centerY: 24, radius: 8 });
+
+    await dispatchRoiDrag(page, { x: 24, y: 24 }, { x: 30, y: 32 });
+    circleState = await getCircleState(page);
+    expect(circleState.params).toEqual({ centerX: 30, centerY: 32, radius: 8 });
+    expect(circleState.overlay).toEqual({ type: 'circle', centerX: 30, centerY: 32, radius: 8 });
+
+    await dispatchRoiDrag(page, { x: 38, y: 32 }, { x: 50, y: 32 });
+    circleState = await getCircleState(page);
+    expect(circleState.params).toEqual({ centerX: 30, centerY: 32, radius: 20 });
+    expect(circleState.overlay).toEqual({ type: 'circle', centerX: 30, centerY: 32, radius: 20 });
+  });
+
+  test('PolarUnwrap arc editing updates annulus radii and angle params', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectPolarNode(page, {
+      CenterX: 32,
+      CenterY: 32,
+      InnerRadius: 8,
+      OuterRadius: 20,
+      StartAngle: 0,
+      EndAngle: 180,
+    });
+    await waitForRoiEditorReady(page);
+
+    let polarState = await getPolarState(page);
+    expect(polarState.overlay).toEqual({
+      type: 'arc',
+      centerX: 32,
+      centerY: 32,
+      innerRadius: 8,
+      outerRadius: 20,
+      startAngle: 0,
+      spanDegrees: 180,
+    });
+
+    await dispatchRoiDrag(page, { x: 52, y: 32 }, { x: 58, y: 32 });
+    polarState = await getPolarState(page);
+    expect(polarState.params.outerRadius).toBe(26);
+
+    await dispatchRoiDrag(page, { x: 40, y: 32 }, { x: 44, y: 32 });
+    polarState = await getPolarState(page);
+    expect(polarState.params.innerRadius).toBe(12);
+
+    await dispatchRoiDrag(page, { x: 6, y: 32 }, { x: 32, y: 58 });
+    polarState = await getPolarState(page);
+    expect(polarState.params.startAngle).toBe(0);
+    expect(polarState.params.endAngle).toBe(90);
+    expect(polarState.overlay?.spanDegrees).toBe(90);
   });
 
   test('pointer movement stays local draft until mouseup commit', async ({ page }) => {

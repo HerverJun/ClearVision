@@ -1,6 +1,9 @@
 import ImageCanvas from '../../core/canvas/imageCanvas.js';
-import { rectFromParams, rectToParams } from './roiGeometry.mjs';
-import { getOperatorRoiConfig } from './roiEditorSupport.mjs';
+import {
+    geometryFromParams,
+    geometryToParams,
+    getOperatorRoiConfig
+} from './roiEditorSupport.mjs';
 
 export class RoiEditorPanel {
     constructor(container, options = {}) {
@@ -17,7 +20,7 @@ export class RoiEditorPanel {
         this.currentImageSource = null;
         this.currentShape = 'Rectangle';
         this.currentConfig = getOperatorRoiConfig(null);
-        this.currentRect = null;
+        this.currentGeometry = null;
 
         this.render();
         this.bindPreview();
@@ -94,8 +97,8 @@ export class RoiEditorPanel {
     }
 
     handleRectChanged(rect, phase) {
-        this.currentRect = rect;
-        this.onRectChanged(rectToParams(rect, this.currentConfig?.rectParamKeys), phase);
+        this.currentGeometry = rect;
+        this.onRectChanged(geometryToParams(rect, this.currentConfig), phase);
     }
 
     syncOverlayFromOperator() {
@@ -109,9 +112,19 @@ export class RoiEditorPanel {
         }
 
         const values = this.extractRectParams(operator);
-        const rect = rectFromParams(values, this.currentConfig?.rectParamKeys);
-        this.currentRect = rect;
-        this.imageCanvas.setEditableRectangle(rect);
+        const bounds = {
+            width: this.imageCanvas.image?.width || 1,
+            height: this.imageCanvas.image?.height || 1
+        };
+        const geometry = geometryFromParams(values, this.currentConfig, bounds);
+        if (!geometry) {
+            this.imageCanvas.clearEditableRectangle();
+            this.currentGeometry = null;
+            return;
+        }
+
+        this.currentGeometry = geometry;
+        this.imageCanvas.setEditableGeometry(geometry);
     }
 
     extractRectParams(operator) {
@@ -125,7 +138,7 @@ export class RoiEditorPanel {
     }
 
     hasEditableImage() {
-        return Boolean(this.currentImageSource) && Boolean(this.currentConfig?.editable) && this.currentShape === 'Rectangle';
+        return Boolean(this.currentImageSource) && Boolean(this.currentConfig?.editable);
     }
 
     async applyState() {
@@ -142,21 +155,19 @@ export class RoiEditorPanel {
         const subtitle = this.container?.querySelector('#roi-editor-subtitle');
 
         if (subtitle) {
-            subtitle.textContent = this.currentShape === 'Rectangle'
-                ? '拖拽框选矩形区域，自动同步到 X / Y / Width / Height'
-                : '图上编辑当前仅支持矩形 ROI，圆形/多边形仍使用参数输入';
+            subtitle.textContent = this.currentConfig?.subtitle || '拖拽 ROI，自动同步参数';
         }
 
         if (readonlyState) {
-            readonlyState.classList.toggle('hidden', this.currentShape === 'Rectangle');
+            readonlyState.classList.toggle('hidden', Boolean(this.currentConfig?.editable));
         }
 
         if (emptyState) {
-            emptyState.style.display = this.currentShape === 'Rectangle' && !inputImageSrc ? 'flex' : 'none';
+            emptyState.style.display = this.currentConfig?.editable && !inputImageSrc ? 'flex' : 'none';
         }
 
         if (stage) {
-            stage.classList.toggle('is-disabled', this.currentShape !== 'Rectangle');
+            stage.classList.toggle('is-disabled', !this.currentConfig?.editable);
         }
 
         if (subtitle && this.currentConfig) {
@@ -187,7 +198,7 @@ export class RoiEditorPanel {
             return;
         }
 
-        if (!this.currentConfig?.editable || this.currentShape !== 'Rectangle') {
+        if (!this.currentConfig?.editable) {
             this.imageCanvas.clearEditableRectangle();
             return;
         }
