@@ -224,7 +224,7 @@ public static class PreviewNodeEndpoints
                         artifactMaterializer,
                         artifactOwner,
                         useArtifactReferences,
-                        context.RequestAborted,
+                        previewCancellation.Token,
                         logger));
                 }
 
@@ -263,6 +263,8 @@ public static class PreviewNodeEndpoints
 
                 var targetDebugResult = result.DebugOperatorResults.FirstOrDefault(r => r.OperatorId == request.TargetNodeId);
                 var rawInputImageBytes = ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64);
+                try
+                {
                 if (useArtifactReferences)
                 {
                     materialization = artifactMaterializer.MaterializePreview(
@@ -270,7 +272,7 @@ public static class PreviewNodeEndpoints
                         nodeOutput,
                         rawInputImageBytes,
                         rawOutputImageBytes,
-                        context.RequestAborted);
+                        previewCancellation.Token);
                     artifacts = materialization.Artifacts.Count > 0 ? materialization.Artifacts : null;
                     observationOutputData = materialization.OutputData;
                     sanitizedOutputData = BuildResponseOutputData(materialization.OutputData);
@@ -321,9 +323,14 @@ public static class PreviewNodeEndpoints
                     }).ToList(),
                     Observation = observation
                 };
+                previewCancellation.Token.ThrowIfCancellationRequested();
                 materialization?.Commit();
-                materialization?.Dispose();
                 return Results.Ok(response);
+                }
+                finally
+                {
+                    materialization?.Dispose();
+                }
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {
@@ -1025,6 +1032,8 @@ public static class PreviewNodeEndpoints
         string? inputImageBase64;
         List<PreviewArtifactReferenceV1>? artifacts = null;
         PreviewArtifactMaterializationResult? materialization = null;
+        try
+        {
         if (useArtifactReferences)
         {
             materialization = artifactMaterializer.MaterializePreview(
@@ -1082,9 +1091,14 @@ public static class PreviewNodeEndpoints
                 successOverride: false,
                 errorMessageOverride: failureMessage)
         };
+        cancellationToken.ThrowIfCancellationRequested();
         materialization?.Commit();
-        materialization?.Dispose();
         return response;
+        }
+        finally
+        {
+            materialization?.Dispose();
+        }
     }
 
     private static IResult? ValidateObservationIdentity(PreviewNodeRequest request)

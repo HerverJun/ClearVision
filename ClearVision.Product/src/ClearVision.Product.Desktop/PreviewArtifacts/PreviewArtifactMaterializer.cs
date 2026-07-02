@@ -367,6 +367,7 @@ public sealed class PreviewArtifactMaterializer
         var jsonSafeItems = new List<object?>(count);
         for (var index = 0; index < count; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             jsonSafeItems.Add(ToJsonSafeCollectionItem(readItem(index)));
         }
 

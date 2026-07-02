@@ -194,6 +194,30 @@ public sealed class PreviewArtifactStore : IDisposable
         return true;
     }
 
+    internal void ValidatePendingBatchCanContain(
+        int pendingCount,
+        long pendingBytes,
+        string pathHint)
+    {
+        ThrowIfDisposed();
+        if (_options.MaxEntries <= 0 || _options.MaxTotalBytes <= 0 || _options.MaxEntryBytes <= 0)
+        {
+            throw new PreviewArtifactStoreRejectedException("PreviewArtifactStore capacity is disabled.");
+        }
+
+        if (pendingCount > _options.MaxEntries)
+        {
+            throw new PreviewArtifactStoreRejectedException(
+                $"Preview artifact batch at {pathHint} has {pendingCount} entries, exceeding max entries {_options.MaxEntries}.");
+        }
+
+        if (pendingBytes > _options.MaxTotalBytes)
+        {
+            throw new PreviewArtifactStoreRejectedException(
+                $"Preview artifact batch at {pathHint} has {pendingBytes} bytes, exceeding max total {_options.MaxTotalBytes}.");
+        }
+    }
+
     internal PreviewArtifactPendingEntry CreatePendingEntry(
         PreviewArtifactOwnerScope owner,
         string kind,
@@ -206,6 +230,7 @@ public sealed class PreviewArtifactStore : IDisposable
         int? channels)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(bytes);
         if (_options.MaxEntries <= 0 || _options.MaxTotalBytes <= 0 || _options.MaxEntryBytes <= 0)
         {
             throw new PreviewArtifactStoreRejectedException("PreviewArtifactStore capacity is disabled.");
@@ -220,7 +245,7 @@ public sealed class PreviewArtifactStore : IDisposable
         var createdAt = _clock.UtcNow;
         var expiresAt = createdAt.Add(_options.Ttl);
         var clonedBytes = bytes.ToArray();
-        var sha256 = Convert.ToHexString(SHA256.HashData(clonedBytes)).ToLowerInvariant();
+        var sha256 = ComputeSha256(clonedBytes);
         var artifactId = GenerateArtifactId();
         var entry = new PreviewArtifactPendingEntry(
             artifactId,
@@ -244,42 +269,119 @@ public sealed class PreviewArtifactStore : IDisposable
         PreviewArtifactOwnerScope owner,
         IReadOnlyList<PreviewArtifactPendingEntry> pendingEntries)
     {
+        ArgumentNullException.ThrowIfNull(pendingEntries);
         lock (_gate)
         {
             ThrowIfDisposedUnderLock();
             CleanupExpiredUnderLock();
 
-            var keepIds = pendingEntries.Select(entry => entry.ArtifactId).ToHashSet(StringComparer.Ordinal);
-            RemoveOwnerUnderLock(owner, keepIds);
-
-            foreach (var pending in pendingEntries)
+            var pending = pendingEntries.ToList();
+            var pendingIds = new HashSet<string>(StringComparer.Ordinal);
+            long pendingBytes = 0;
+            foreach (var entry in pending)
             {
-                var entry = new PreviewArtifactEntry(
-                    pending.ArtifactId,
-                    pending.Owner,
-                    pending.Kind,
-                    pending.Role,
-                    pending.PathHint,
-                    pending.ContentType,
-                    pending.Bytes,
-                    pending.Sha256,
-                    pending.CreatedAtUtc,
-                    pending.ExpiresAtUtc,
-                    pending.Width,
-                    pending.Height,
-                    pending.Channels);
-                _entries[entry.ArtifactId] = entry;
-                if (!_ownerIndex.TryGetValue(owner, out var ownerIds))
+                if (entry.Owner != owner)
                 {
-                    ownerIds = new HashSet<string>(StringComparer.Ordinal);
-                    _ownerIndex[owner] = ownerIds;
+                    throw new PreviewArtifactStoreRejectedException("Preview artifact batch contains a mismatched owner.");
                 }
 
-                ownerIds.Add(entry.ArtifactId);
-                _totalBytes += entry.Bytes.LongLength;
+                if (!pendingIds.Add(entry.ArtifactId))
+                {
+                    throw new PreviewArtifactStoreRejectedException("Preview artifact batch contains a duplicate artifact id.");
+                }
+
+                if (entry.Length > _options.MaxEntryBytes)
+                {
+                    throw new PreviewArtifactStoreRejectedException(
+                        $"Preview artifact {entry.PathHint} has {entry.Length} bytes, exceeding max entry {_options.MaxEntryBytes}.");
+                }
+
+                pendingBytes += entry.Length;
             }
 
-            TrimCapacityUnderLock();
+            if (pending.Count > 0)
+            {
+                if (_options.MaxEntries <= 0 || _options.MaxTotalBytes <= 0 || _options.MaxEntryBytes <= 0)
+                {
+                    throw new PreviewArtifactStoreRejectedException("PreviewArtifactStore capacity is disabled.");
+                }
+
+                if (pending.Count > _options.MaxEntries)
+                {
+                    throw new PreviewArtifactStoreRejectedException(
+                        $"Preview artifact batch has {pending.Count} entries, exceeding max entries {_options.MaxEntries}.");
+                }
+
+                if (pendingBytes > _options.MaxTotalBytes)
+                {
+                    throw new PreviewArtifactStoreRejectedException(
+                        $"Preview artifact batch has {pendingBytes} bytes, exceeding max total {_options.MaxTotalBytes}.");
+                }
+            }
+
+            var ownerIdsToReplace = _ownerIndex.TryGetValue(owner, out var ownerIds)
+                ? ownerIds.ToHashSet(StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var artifactId in pendingIds)
+            {
+                if (_entries.ContainsKey(artifactId) && !ownerIdsToReplace.Contains(artifactId))
+                {
+                    throw new PreviewArtifactStoreRejectedException("Preview artifact id collision detected.");
+                }
+            }
+
+            var survivorCandidates = _entries.Values
+                .Where(entry => !ownerIdsToReplace.Contains(entry.ArtifactId))
+                .OrderBy(entry => entry.CreatedAtUtc)
+                .ThenBy(entry => entry.ArtifactId, StringComparer.Ordinal)
+                .ToList();
+
+            var plannedEvictions = new HashSet<string>(StringComparer.Ordinal);
+            var survivorCount = survivorCandidates.Count;
+            var survivorBytes = survivorCandidates.Sum(entry => entry.Bytes.LongLength);
+            var evictionIndex = 0;
+            while (survivorCount + pending.Count > _options.MaxEntries ||
+                   survivorBytes + pendingBytes > _options.MaxTotalBytes)
+            {
+                if (evictionIndex >= survivorCandidates.Count)
+                {
+                    throw new PreviewArtifactStoreRejectedException("Preview artifact batch cannot fit into store capacity.");
+                }
+
+                var candidate = survivorCandidates[evictionIndex++];
+                if (!plannedEvictions.Add(candidate.ArtifactId))
+                {
+                    continue;
+                }
+
+                survivorCount--;
+                survivorBytes -= candidate.Bytes.LongLength;
+            }
+
+            foreach (var artifactId in ownerIdsToReplace)
+            {
+                RemoveEntryUnderLock(artifactId);
+            }
+
+            foreach (var artifactId in plannedEvictions)
+            {
+                RemoveEntryUnderLock(artifactId);
+            }
+
+            foreach (var pendingEntry in pending)
+            {
+                var entry = pendingEntry.ToCommittedEntry();
+                _entries[entry.ArtifactId] = entry;
+                if (!_ownerIndex.TryGetValue(owner, out var newOwnerIds))
+                {
+                    newOwnerIds = new HashSet<string>(StringComparer.Ordinal);
+                    _ownerIndex[owner] = newOwnerIds;
+                }
+
+                newOwnerIds.Add(entry.ArtifactId);
+                _totalBytes += entry.Bytes.LongLength;
+            }
         }
     }
 
@@ -305,23 +407,6 @@ public sealed class PreviewArtifactStore : IDisposable
         foreach (var artifactId in expiredIds)
         {
             RemoveEntryUnderLock(artifactId);
-        }
-    }
-
-    private void TrimCapacityUnderLock()
-    {
-        while (_entries.Count > _options.MaxEntries || _totalBytes > _options.MaxTotalBytes)
-        {
-            var candidate = _entries.Values
-                .OrderBy(entry => entry.CreatedAtUtc)
-                .ThenBy(entry => entry.ArtifactId, StringComparer.Ordinal)
-                .FirstOrDefault();
-            if (candidate == null)
-            {
-                return;
-            }
-
-            RemoveEntryUnderLock(candidate.ArtifactId);
         }
     }
 
@@ -386,6 +471,9 @@ public sealed class PreviewArtifactStore : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
+
+    internal static string ComputeSha256(byte[] bytes) =>
+        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 }
 
 public sealed class PreviewArtifactBatch : IDisposable
@@ -401,7 +489,7 @@ public sealed class PreviewArtifactBatch : IDisposable
         _owner = owner;
     }
 
-    public IReadOnlyList<PreviewArtifactPendingEntry> PendingEntries => _pendingEntries;
+    private long PendingBytes => _pendingEntries.Sum(entry => entry.Length);
 
     public PreviewArtifactReferenceV1 Add(
         string kind,
@@ -417,6 +505,12 @@ public sealed class PreviewArtifactBatch : IDisposable
         {
             throw new InvalidOperationException("Preview artifact batch is already completed.");
         }
+
+        ArgumentNullException.ThrowIfNull(bytes);
+        _store.ValidatePendingBatchCanContain(
+            _pendingEntries.Count + 1,
+            PendingBytes + bytes.LongLength,
+            pathHint);
 
         var pending = _store.CreatePendingEntry(
             _owner,
@@ -468,21 +562,54 @@ public sealed class PreviewArtifactStoreRejectedException : Exception
     }
 }
 
-public sealed record PreviewArtifactPendingEntry(
-    string ArtifactId,
-    PreviewArtifactOwnerScope Owner,
-    string Kind,
-    string Role,
-    string PathHint,
-    string ContentType,
-    byte[] Bytes,
-    string Sha256,
-    DateTimeOffset CreatedAtUtc,
-    DateTimeOffset ExpiresAtUtc,
-    int? Width,
-    int? Height,
-    int? Channels)
+internal sealed class PreviewArtifactPendingEntry
 {
+    private readonly byte[] _bytes;
+
+    public PreviewArtifactPendingEntry(
+        string artifactId,
+        PreviewArtifactOwnerScope owner,
+        string kind,
+        string role,
+        string pathHint,
+        string contentType,
+        byte[] bytes,
+        string sha256,
+        DateTimeOffset createdAtUtc,
+        DateTimeOffset expiresAtUtc,
+        int? width,
+        int? height,
+        int? channels)
+    {
+        ArtifactId = artifactId;
+        Owner = owner;
+        Kind = kind;
+        Role = role;
+        PathHint = pathHint;
+        ContentType = contentType;
+        _bytes = bytes.ToArray();
+        Sha256 = sha256;
+        CreatedAtUtc = createdAtUtc;
+        ExpiresAtUtc = expiresAtUtc;
+        Width = width;
+        Height = height;
+        Channels = channels;
+    }
+
+    public string ArtifactId { get; }
+    public PreviewArtifactOwnerScope Owner { get; }
+    public string Kind { get; }
+    public string Role { get; }
+    public string PathHint { get; }
+    public string ContentType { get; }
+    public string Sha256 { get; }
+    public DateTimeOffset CreatedAtUtc { get; }
+    public DateTimeOffset ExpiresAtUtc { get; }
+    public int? Width { get; }
+    public int? Height { get; }
+    public int? Channels { get; }
+    public long Length => _bytes.LongLength;
+
     public PreviewArtifactReferenceV1 ToReference() => new()
     {
         ArtifactId = ArtifactId,
@@ -490,7 +617,7 @@ public sealed record PreviewArtifactPendingEntry(
         Role = Role,
         PathHint = PathHint,
         ContentType = ContentType,
-        Length = Bytes.LongLength,
+        Length = _bytes.LongLength,
         Sha256 = Sha256,
         CreatedAtUtc = CreatedAtUtc,
         ExpiresAtUtc = ExpiresAtUtc,
@@ -498,6 +625,25 @@ public sealed record PreviewArtifactPendingEntry(
         Height = Height,
         Channels = Channels
     };
+
+    public PreviewArtifactEntry ToCommittedEntry()
+    {
+        var committedBytes = _bytes.ToArray();
+        return new PreviewArtifactEntry(
+            ArtifactId,
+            Owner,
+            Kind,
+            Role,
+            PathHint,
+            ContentType,
+            committedBytes,
+            PreviewArtifactStore.ComputeSha256(committedBytes),
+            CreatedAtUtc,
+            ExpiresAtUtc,
+            Width,
+            Height,
+            Channels);
+    }
 }
 
 internal sealed record PreviewArtifactEntry(

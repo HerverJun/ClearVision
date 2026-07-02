@@ -538,6 +538,10 @@ function createEmptyState() {
         inputImageBase64: null,
         outputImageBase64: null,
         outputData: null,
+        artifacts: [],
+        previewArtifactIds: [],
+        previewArtifactObjectUrls: [],
+        previewArtifactReleased: false,
         previewCost: {
             level: 'light',
             autoPreviewAllowed: true,
@@ -549,6 +553,29 @@ function createEmptyState() {
 
     state.presenter = createPresenterState(state);
     return state;
+}
+
+function withClearedPreviewResources(patch = {}) {
+    return {
+        artifacts: [],
+        previewArtifactIds: [],
+        previewArtifactObjectUrls: [],
+        previewArtifactReleased: false,
+        ...patch
+    };
+}
+
+function createPreviewArtifactAbortError(message) {
+    if (typeof DOMException !== 'undefined') {
+        const error = new DOMException(message, 'AbortError');
+        error.previewArtifactResolutionAborted = true;
+        return error;
+    }
+
+    const error = new Error(message);
+    error.name = 'AbortError';
+    error.previewArtifactResolutionAborted = true;
+    return error;
 }
 
 function buildPreviewRequestKey({ projectId, nodeId, flowRevision, parameterSnapshot, inputImageBase64 }) {
@@ -719,8 +746,6 @@ export class NodePreviewCoordinator {
         this.requestVersion = 0;
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
-        this.releasedObjectUrls = new Set();
-        this.deletedArtifactIds = new Set();
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
@@ -741,14 +766,13 @@ export class NodePreviewCoordinator {
         }
 
         const objectUrls = Array.isArray(value.previewArtifactObjectUrls)
-            ? value.previewArtifactObjectUrls
+            ? Array.from(new Set(value.previewArtifactObjectUrls))
             : [];
         for (const objectUrl of objectUrls) {
-            if (!objectUrl || this.releasedObjectUrls.has(objectUrl)) {
+            if (!objectUrl) {
                 continue;
             }
 
-            this.releasedObjectUrls.add(objectUrl);
             try {
                 globalThis.URL?.revokeObjectURL?.(objectUrl);
             } catch (error) {
@@ -757,14 +781,13 @@ export class NodePreviewCoordinator {
         }
 
         const artifactIds = Array.isArray(value.previewArtifactIds)
-            ? value.previewArtifactIds
+            ? Array.from(new Set(value.previewArtifactIds))
             : [];
         for (const artifactId of artifactIds) {
-            if (!artifactId || this.deletedArtifactIds.has(artifactId)) {
+            if (!artifactId) {
                 continue;
             }
 
-            this.deletedArtifactIds.add(artifactId);
             void this.artifactClient.deletePreviewArtifact?.(artifactId).catch(error => {
                 if (!isAbortError(error)) {
                     console.warn('[NodePreviewCoordinator] Failed to delete preview artifact:', error);
@@ -787,7 +810,11 @@ export class NodePreviewCoordinator {
     }
 
     releaseAllPreviewResources() {
-        this.releasePreviewResources(this.state);
+        const requestKey = this.state?.request?.requestKey;
+        if (!(requestKey && this.cache.has(requestKey))) {
+            this.releasePreviewResources(this.state);
+        }
+
         for (const value of this.cache.values()) {
             this.releasePreviewResources(value);
         }
@@ -810,21 +837,14 @@ export class NodePreviewCoordinator {
 
     releaseResponseArtifacts(response) {
         const parsed = parsePreviewResponse(response);
-        for (const artifact of parsed.artifacts) {
-            if (!artifact.artifactId || this.deletedArtifactIds.has(artifact.artifactId)) {
-                continue;
-            }
-
-            this.deletedArtifactIds.add(artifact.artifactId);
-            void this.artifactClient.deletePreviewArtifact?.(artifact.artifactId).catch(error => {
-                if (!isAbortError(error)) {
-                    console.warn('[NodePreviewCoordinator] Failed to delete stale preview artifact:', error);
-                }
-            });
-        }
+        this.releasePreviewResources({
+            previewArtifactIds: parsed.artifacts.map(artifact => artifact.artifactId).filter(Boolean),
+            previewArtifactObjectUrls: [],
+            previewArtifactReleased: false
+        });
     }
 
-    async resolveArtifactImages(artifacts, signal) {
+    async resolveArtifactImages(artifacts, signal, isCurrent = () => true) {
         const result = {
             inputImageSrc: null,
             outputImageSrc: null,
@@ -833,33 +853,50 @@ export class NodePreviewCoordinator {
             diagnostics: []
         };
 
+        const ensureCurrent = () => {
+            if (signal?.aborted) {
+                throw createPreviewArtifactAbortError('Preview artifact read aborted.');
+            }
+            if (!isCurrent()) {
+                throw createPreviewArtifactAbortError('Preview artifact response is stale.');
+            }
+        };
+
         const inputArtifact = findArtifactByRole(artifacts, 'inputImage');
         const outputArtifact = findArtifactByRole(artifacts, 'outputImage', 'image');
+        let readIndex = 0;
         for (const [slot, artifact] of [['inputImageSrc', inputArtifact], ['outputImageSrc', outputArtifact]]) {
             if (!artifact?.artifactId) {
                 continue;
             }
 
-            if (signal?.aborted) {
-                throw new DOMException('Preview artifact read aborted.', 'AbortError');
-            }
-
             try {
+                ensureCurrent();
                 const response = await this.artifactClient.getPreviewArtifactBlob(artifact.artifactId, { signal });
+                ensureCurrent();
                 if (!globalThis.URL?.createObjectURL) {
                     result.diagnostics.push(`PreviewArtifactObjectUrlUnavailable:${artifact.role}`);
+                    readIndex += 1;
                     continue;
                 }
 
                 const objectUrl = globalThis.URL.createObjectURL(response.blob);
                 result.previewArtifactObjectUrls.push(objectUrl);
                 result[slot] = objectUrl;
+                readIndex += 1;
             } catch (error) {
                 if (isAbortError(error)) {
+                    this.releasePreviewResources(result);
                     throw error;
                 }
 
+                if (readIndex > 0 || result.previewArtifactObjectUrls.length > 0) {
+                    this.releasePreviewResources(result);
+                    throw createPreviewArtifactAbortError('Preview artifact resolution failed after partial reads.');
+                }
+
                 result.diagnostics.push(`PreviewArtifactReadFailed:${artifact.role || artifact.kind || 'artifact'}`);
+                readIndex += 1;
             }
         }
 
@@ -909,6 +946,11 @@ export class NodePreviewCoordinator {
                 console.error('[NodePreviewCoordinator] Listener failed:', error);
             }
         });
+    }
+
+    replacePreviewState(patch) {
+        this.releaseCurrentPreviewResourcesIfUncached();
+        this.updateState(patch);
     }
 
     setActiveNode(node) {
@@ -989,7 +1031,7 @@ export class NodePreviewCoordinator {
             const metadata = this.getOperatorMetadata(activeNode.type);
             const previewCost = getOperatorPreviewCostPolicy(activeNode, metadata);
             if (trigger === 'auto' && !previewCost.autoPreviewAllowed) {
-                this.updateState({
+                this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
                     errorMessage: previewCost.reason,
@@ -997,7 +1039,7 @@ export class NodePreviewCoordinator {
                     outputImageBase64: null,
                     outputData: null,
                     previewCost
-                });
+                }));
                 return;
             }
 
@@ -1006,7 +1048,7 @@ export class NodePreviewCoordinator {
                 const flowRevision = normalizeFlowRevision(this.getFlowRevision());
                 this.debugSessionId = null;
                 this.debugSessionScopeKey = null;
-                this.updateState({
+                this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
                     errorMessage: null,
@@ -1021,7 +1063,7 @@ export class NodePreviewCoordinator {
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64: null
                     })
-                });
+                }));
                 return;
             }
 
@@ -1034,7 +1076,7 @@ export class NodePreviewCoordinator {
 
             if (isPreviewPayloadTooLarge(inputImageBase64)) {
                 const flowRevision = normalizeFlowRevision(this.getFlowRevision());
-                this.updateState({
+                this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
                     errorMessage: '输入图像过大，已跳过预览。请先缩小图像或执行完整检测。',
@@ -1049,14 +1091,14 @@ export class NodePreviewCoordinator {
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64: null
                     })
-                });
+                }));
                 return;
             }
 
             const prerequisiteError = validatePreviewPrerequisites(activeNode, inputImageBase64);
             if (prerequisiteError) {
                 const flowRevision = normalizeFlowRevision(this.getFlowRevision());
-                this.updateState({
+                this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
                     errorMessage: prerequisiteError,
@@ -1071,7 +1113,7 @@ export class NodePreviewCoordinator {
                         parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
                         inputImageBase64
                     })
-                });
+                }));
                 return;
             }
 
@@ -1090,6 +1132,7 @@ export class NodePreviewCoordinator {
             if (!force && !bypassCache && cached) {
                 this.cache.delete(request.requestKey);
                 this.cache.set(request.requestKey, cached);
+                this.releaseCurrentPreviewResourcesIfUncached();
                 this.updateState({
                     ...cached,
                     request,
@@ -1098,14 +1141,14 @@ export class NodePreviewCoordinator {
                 return;
             }
 
-            this.updateState({
+            this.replacePreviewState(withClearedPreviewResources({
                 status: 'loading',
                 errorMessage: null,
                 executionTimeMs: null,
                 request,
                 inputImageBase64: inputImageBase64 || null,
                 previewCost
-            });
+            }));
 
             const abortController = typeof AbortController !== 'undefined'
                 ? new AbortController()
@@ -1154,7 +1197,10 @@ export class NodePreviewCoordinator {
                 }
 
                 const parsed = parsePreviewResponse(response);
-                const resolvedArtifacts = await this.resolveArtifactImages(parsed.artifacts, abortController?.signal);
+                const resolvedArtifacts = await this.resolveArtifactImages(
+                    parsed.artifacts,
+                    abortController?.signal,
+                    () => scheduledVersion === this.requestVersion && this.state.activeNodeId === activeNode.id);
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
                     this.releasePreviewResources({
                         previewArtifactIds: resolvedArtifacts.previewArtifactIds,
@@ -1212,7 +1258,7 @@ export class NodePreviewCoordinator {
                     return;
                 }
 
-                this.updateState({
+                this.replacePreviewState(withClearedPreviewResources({
                     status: 'error',
                     executionTimeMs: null,
                     errorMessage: timedOut
@@ -1223,7 +1269,7 @@ export class NodePreviewCoordinator {
                     outputImageBase64: null,
                     outputData: null,
                     previewCost
-                });
+                }));
             } finally {
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);

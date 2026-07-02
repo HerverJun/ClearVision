@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -33,6 +34,30 @@ public sealed class PreviewArtifactStoreTests
         read.ContentType.Should().Be("image/png");
         read.Length.Should().Be(8);
         read.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData(read.Bytes)).ToLowerInvariant());
+
+        read.Bytes[4] = 0xEE;
+        store.TryRead(reference.ArtifactId, out var secondRead).Should().BeTrue();
+        secondRead!.Bytes.Should().Equal(0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4);
+        secondRead.Length.Should().Be(8);
+        secondRead.Sha256.Should().Be(read.Sha256);
+    }
+
+    [Fact]
+    public void Store_PublicApiDoesNotExposePendingByteArrays()
+    {
+        typeof(PreviewArtifactBatch)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Should()
+            .NotContain(property => property.Name.Contains("Pending", StringComparison.Ordinal));
+
+        var pendingType = typeof(PreviewArtifactStore).Assembly.GetType(
+            "ClearVision.Product.Desktop.PreviewArtifacts.PreviewArtifactPendingEntry");
+
+        pendingType.Should().NotBeNull();
+        pendingType!.IsPublic.Should().BeFalse();
+        pendingType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Should()
+            .NotContain(property => property.PropertyType == typeof(byte[]));
     }
 
     [Fact]
@@ -94,6 +119,93 @@ public sealed class PreviewArtifactStoreTests
         var replacement = AddArtifact(store, replaceOwner, [5]);
         store.TryRead(oldForOwner.ArtifactId, out _).Should().BeFalse("a successful new preview replaces old artifacts for the same owner.");
         store.TryRead(replacement.ArtifactId, out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Store_CommitsMultiArtifactBatchAtomicallyWhenCapacityAllows()
+    {
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 2,
+            MaxTotalBytes = 16,
+            MaxEntryBytes = 8
+        });
+        var owner = CreateOwner();
+
+        PreviewArtifactReferenceV1 first;
+        PreviewArtifactReferenceV1 second;
+        using (var batch = store.CreateBatch(owner))
+        {
+            first = batch.Add("binary", "input", "$.Input", "application/octet-stream", [1, 2, 3]);
+            second = batch.Add("binary", "output", "$.Output", "application/octet-stream", [4, 5, 6]);
+            batch.Commit();
+        }
+
+        store.Count.Should().Be(2);
+        store.TryRead(first.ArtifactId, out var firstRead).Should().BeTrue();
+        store.TryRead(second.ArtifactId, out var secondRead).Should().BeTrue();
+        firstRead!.Bytes.Should().Equal(1, 2, 3);
+        secondRead!.Bytes.Should().Equal(4, 5, 6);
+    }
+
+    [Fact]
+    public void Store_RejectedBatchDoesNotCreateDanglingReferenceOrReplaceOldOwner()
+    {
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 1,
+            MaxTotalBytes = 8,
+            MaxEntryBytes = 8
+        });
+        var owner = CreateOwner();
+        var existing = AddArtifact(store, owner, [9, 9]);
+
+        PreviewArtifactReferenceV1 pending;
+        using (var batch = store.CreateBatch(owner))
+        {
+            pending = batch.Add("binary", "first", "$.First", "application/octet-stream", [1, 1]);
+            batch.Invoking(item => item.Add("binary", "second", "$.Second", "application/octet-stream", [2, 2]))
+                .Should()
+                .Throw<PreviewArtifactStoreRejectedException>();
+        }
+
+        store.Count.Should().Be(1);
+        store.TryRead(existing.ArtifactId, out var oldRead).Should().BeTrue();
+        oldRead!.Bytes.Should().Equal(9, 9);
+        store.TryRead(pending.ArtifactId, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Store_EvictsOldEntriesForWholeNewBatchWithoutEvictingCurrentBatch()
+    {
+        var clock = new FakePreviewArtifactClock(new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero));
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 2,
+            MaxTotalBytes = 8,
+            MaxEntryBytes = 4,
+            Ttl = TimeSpan.FromMinutes(10)
+        }, clock);
+        var owner = CreateOwner();
+        var oldFirst = AddArtifact(store, owner with { ClientRequestSequence = 1 }, [1, 1]);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var oldSecond = AddArtifact(store, owner with { ClientRequestSequence = 2 }, [2, 2]);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        PreviewArtifactReferenceV1 newFirst;
+        PreviewArtifactReferenceV1 newSecond;
+        using (var batch = store.CreateBatch(owner with { ClientRequestSequence = 3 }))
+        {
+            newFirst = batch.Add("binary", "first", "$.First", "application/octet-stream", [3, 3]);
+            newSecond = batch.Add("binary", "second", "$.Second", "application/octet-stream", [4, 4]);
+            batch.Commit();
+        }
+
+        store.Count.Should().Be(2);
+        store.TryRead(oldFirst.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(oldSecond.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(newFirst.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(newSecond.ArtifactId, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -179,6 +291,34 @@ public sealed class PreviewArtifactStoreTests
         result.Artifacts.Should().BeEmpty();
         result.Diagnostics.Should().Contain(item => item.Contains("PreviewArtifactRejected", StringComparison.Ordinal));
         store.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Materializer_CancelDoesNotReplaceExistingOwnerArtifacts()
+    {
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 16,
+            MaxTotalBytes = 1024,
+            MaxEntryBytes = 512
+        });
+        var owner = CreateOwner();
+        var existing = AddArtifact(store, owner, [7, 7, 7]);
+        var materializer = new PreviewArtifactMaterializer(store, NullLogger<PreviewArtifactMaterializer>.Instance);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => materializer.MaterializePreview(
+            owner,
+            new Dictionary<string, object> { ["Profile"] = Enumerable.Range(0, 128).ToList() },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            cts.Token);
+
+        act.Should().Throw<OperationCanceledException>();
+        store.Count.Should().Be(1);
+        store.TryRead(existing.ArtifactId, out var read).Should().BeTrue();
+        read!.Bytes.Should().Equal(7, 7, 7);
     }
 
     private static PreviewArtifactReferenceV1 AddArtifact(

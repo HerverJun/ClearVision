@@ -214,10 +214,30 @@ public class PreviewNodeEndpointsTests
         using var pathInjection = await host.Client.GetAsync("/api/preview-artifacts/..%2Fsecret");
         pathInjection.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
 
+        using var doubleEncodedPath = await host.Client.GetAsync("/api/preview-artifacts/..%252Fsecret");
+        doubleEncodedPath.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        using var overlongToken = await host.Client.GetAsync($"/api/preview-artifacts/{new string('a', 44)}");
+        overlongToken.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        var variantArtifactId = MutateArtifactId(artifactId);
+        using var variantResponse = await host.Client.GetAsync($"/api/preview-artifacts/{variantArtifactId}");
+        variantResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
         using var deleteResponse = await host.Client.DeleteAsync($"/api/preview-artifacts/{artifactId}");
         deleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
         using var afterDelete = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
         afterDelete.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        var remainingArtifactId = artifacts
+            .Select(item => item.GetProperty("artifactId").GetString()!)
+            .First(item => item != artifactId);
+        var store = host.Services.GetRequiredService<PreviewArtifactStore>();
+        store.RevokeOwner(new PreviewArtifactOwnerScope(projectId, targetNodeId, debugSessionId, 10, 20))
+            .Should()
+            .BeGreaterThan(0);
+        using var afterRevoke = await host.Client.GetAsync($"/api/preview-artifacts/{remainingArtifactId}");
+        afterRevoke.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -2016,6 +2036,23 @@ public class PreviewNodeEndpointsTests
         });
     }
 
+    private static string MutateArtifactId(string artifactId)
+    {
+        var chars = artifactId.ToCharArray();
+        chars[0] = chars[0] switch
+        {
+            >= 'a' and <= 'z' => char.ToUpperInvariant(chars[0]),
+            >= 'A' and <= 'Z' => char.ToLowerInvariant(chars[0]),
+            '0' => '1',
+            '1' => '2',
+            '-' => '_',
+            '_' => '-',
+            _ => '0'
+        };
+
+        return new string(chars);
+    }
+
     private sealed class UnsafePreviewValue
     {
         public int Safe => 1;
@@ -2064,6 +2101,7 @@ public class PreviewNodeEndpointsTests
         }
 
         public HttpClient Client { get; }
+        public IServiceProvider Services => _app.Services;
 
         public static async Task<PreviewNodeTestHost> CreateAsync(
             Action<IFlowExecutionService> configureFlowExecution,

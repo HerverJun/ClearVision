@@ -112,6 +112,18 @@ function buildObservationResponse(nodeId, options, overrides = {}) {
   };
 }
 
+function buildArtifactPreviewResponse(nodeId, options, suffix = '1') {
+  return {
+    ...buildObservationResponse(nodeId, options),
+    inputImageBase64: null,
+    outputImageBase64: null,
+    artifacts: [
+      { artifactId: `input-artifact-${suffix}`, kind: 'image', role: 'inputImage', contentType: 'image/png', length: 4 },
+      { artifactId: `output-artifact-${suffix}`, kind: 'image', role: 'outputImage', contentType: 'image/png', length: 4 }
+    ]
+  };
+}
+
 test('NodePreviewCoordinator cache entries do not retain input image base64', async () => {
   const inputImageBase64 = 'A'.repeat(1024 * 1024);
   const { coordinator, node, getExecuteCount } = createCoordinator({ inputImageBase64 });
@@ -242,7 +254,7 @@ test('NodePreviewCoordinator sends client request sequence and flow revision', a
 
   try {
     coordinator.setActiveNode(node);
-    coordinator.invalidateActivePreview({ immediate: true, force: true });
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
 
     await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
 
@@ -324,7 +336,7 @@ test('NodePreviewCoordinator reads artifact images and releases object URLs plus
 
   try {
     coordinator.setActiveNode(node);
-    coordinator.invalidateActivePreview({ immediate: true, force: true });
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
 
     await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
 
@@ -339,6 +351,219 @@ test('NodePreviewCoordinator reads artifact images and releases object URLs plus
     assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact', 'output-artifact']);
   } finally {
     globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator releases uncached artifact resources before replacing maxCacheEntries zero state', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const deletedArtifactIds = [];
+  let objectUrlSequence = 0;
+  globalThis.URL.createObjectURL = () => `blob:uncached-${++objectUrlSequence}`;
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      return { blob: { artifactId } };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+
+  const { coordinator, node } = createCoordinator({
+    maxCacheEntries: 0,
+    artifactClient,
+    previewResponse: (count, executorOptions, nodeId) =>
+      buildArtifactPreviewResponse(nodeId, executorOptions, count)
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    assert.equal(coordinator.getState().inputImageBase64, 'blob:uncached-1');
+
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().inputImageBase64, 'blob:uncached-3'));
+
+    assert.deepEqual(revokedUrls, ['blob:uncached-1', 'blob:uncached-2']);
+    assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-1', 'output-artifact-1']);
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator releases live camera artifact resources between bypass previews', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const deletedArtifactIds = [];
+  let objectUrlSequence = 0;
+  globalThis.URL.createObjectURL = () => `blob:camera-${++objectUrlSequence}`;
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'camera' },
+      { name: 'CameraId', value: 'cam-1' }
+    ],
+    outputs: [{ type: 'image' }]
+  };
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      return { blob: { artifactId } };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+  const { coordinator } = createCoordinator({
+    node: cameraNode,
+    artifactClient,
+    getInputImageBase64: () => null,
+    previewResponse: (count, executorOptions, nodeId) =>
+      buildArtifactPreviewResponse(nodeId, executorOptions, `camera-${count}`)
+  });
+
+  try {
+    coordinator.setActiveNode(cameraNode);
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().inputImageBase64, 'blob:camera-3'));
+
+    assert.deepEqual(revokedUrls, ['blob:camera-1', 'blob:camera-2']);
+    assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-camera-1', 'output-artifact-camera-1']);
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator rolls back partial artifact URLs when later artifact read fails', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const deletedArtifactIds = [];
+  globalThis.URL.createObjectURL = () => 'blob:partial-1';
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      if (artifactId === 'output-artifact-1') {
+        throw new Error('second artifact failed');
+      }
+      return { blob: { artifactId } };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+  const { coordinator, node, getExecuteCount } = createCoordinator({
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) =>
+      buildArtifactPreviewResponse(nodeId, executorOptions, '1')
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(getExecuteCount(), 1));
+    await waitFor(() => assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-1', 'output-artifact-1']));
+
+    assert.deepEqual(revokedUrls, ['blob:partial-1']);
+    assert.equal(coordinator.getState().status, 'loading');
+    assert.equal(coordinator.cache.size, 0);
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator releases artifact resources on cache replacement eviction node switch and duplicate release', () => {
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const deletedArtifactIds = [];
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const { coordinator, node } = createCoordinator({
+    maxCacheEntries: 1,
+    artifactClient: {
+      async deletePreviewArtifact(artifactId) {
+        deletedArtifactIds.push(artifactId);
+      }
+    }
+  });
+
+  try {
+    const bundle = {
+      previewArtifactIds: ['duplicate-artifact', 'duplicate-artifact'],
+      previewArtifactObjectUrls: ['blob:duplicate', 'blob:duplicate'],
+      previewArtifactReleased: false
+    };
+    coordinator.releasePreviewResources(bundle);
+    coordinator.releasePreviewResources(bundle);
+
+    coordinator.setCacheEntry('same', {
+      status: 'success',
+      outputImageBase64: 'blob:old',
+      previewArtifactIds: ['cache-old'],
+      previewArtifactObjectUrls: ['blob:cache-old'],
+      previewArtifactReleased: false
+    });
+    coordinator.setCacheEntry('same', {
+      status: 'success',
+      outputImageBase64: 'blob:new',
+      previewArtifactIds: ['cache-new'],
+      previewArtifactObjectUrls: ['blob:cache-new'],
+      previewArtifactReleased: false
+    });
+    coordinator.setCacheEntry('evicting', {
+      status: 'success',
+      outputImageBase64: 'blob:evicting',
+      previewArtifactIds: ['cache-evicted'],
+      previewArtifactObjectUrls: ['blob:cache-evicted'],
+      previewArtifactReleased: false
+    });
+
+    coordinator.state = {
+      ...coordinator.getState(),
+      activeNodeId: 'node-1',
+      previewArtifactIds: ['state-node-switch'],
+      previewArtifactObjectUrls: ['blob:state-node-switch'],
+      previewArtifactReleased: false
+    };
+    coordinator.setActiveNode(null);
+
+    assert.equal(coordinator.releasedObjectUrls, undefined);
+    assert.equal(coordinator.deletedArtifactIds, undefined);
+    assert.deepEqual(revokedUrls.sort(), [
+      'blob:cache-evicted',
+      'blob:cache-new',
+      'blob:cache-old',
+      'blob:duplicate',
+      'blob:state-node-switch'
+    ]);
+    assert.deepEqual(deletedArtifactIds.sort(), [
+      'cache-evicted',
+      'cache-new',
+      'cache-old',
+      'duplicate-artifact',
+      'state-node-switch'
+    ]);
+  } finally {
     globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
     coordinator.destroy();
   }
