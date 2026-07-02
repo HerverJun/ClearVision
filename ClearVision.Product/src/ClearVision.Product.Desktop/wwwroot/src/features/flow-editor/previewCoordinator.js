@@ -2,6 +2,7 @@ import {
     buildPreviewSummaryItems,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
+import httpClient from '../../core/messaging/httpClient.js';
 import { normalizeAcquisitionSourceType } from '../../shared/parameterDependencyRules.js';
 
 const DEFAULT_DEBOUNCE_MS = 500;
@@ -569,12 +570,61 @@ function parsePreviewResponse(response) {
         inputImageBase64: normalizeBase64Image(readFirstDefined(response, ['inputImageBase64', 'InputImageBase64'])),
         outputImageBase64: normalizeBase64Image(readFirstDefined(response, ['outputImageBase64', 'OutputImageBase64'])),
         outputData: readFirstDefined(response, ['outputData', 'OutputData']) || null,
+        artifacts: normalizeArtifactReferences(readFirstDefined(response, ['artifacts', 'Artifacts'])),
         executionTimeMs: readFirstDefined(response, ['executionTimeMs', 'ExecutionTimeMs']) ?? null,
         errorMessage: readFirstDefined(response, ['errorMessage', 'ErrorMessage']) || null,
         failedOperatorId: readFirstDefined(response, ['failedOperatorId', 'FailedOperatorId']) || null,
         failedOperatorName: readFirstDefined(response, ['failedOperatorName', 'FailedOperatorName']) || null,
         failedOperatorType: readFirstDefined(response, ['failedOperatorType', 'FailedOperatorType']) || null
     };
+}
+
+function normalizeArtifactReferences(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map(item => {
+            const artifactId = readFirstDefined(item, ['artifactId', 'ArtifactId']);
+            if (!artifactId || typeof artifactId !== 'string') {
+                return null;
+            }
+
+            return {
+                artifactId,
+                kind: readFirstDefined(item, ['kind', 'Kind']) || '',
+                role: readFirstDefined(item, ['role', 'Role']) || '',
+                pathHint: readFirstDefined(item, ['pathHint', 'PathHint']) || '$',
+                contentType: readFirstDefined(item, ['contentType', 'ContentType']) || 'application/octet-stream',
+                length: Number(readFirstDefined(item, ['length', 'Length']) || 0),
+                sha256: readFirstDefined(item, ['sha256', 'Sha256']) || '',
+                width: readFirstDefined(item, ['width', 'Width']) ?? null,
+                height: readFirstDefined(item, ['height', 'Height']) ?? null,
+                channels: readFirstDefined(item, ['channels', 'Channels']) ?? null
+            };
+        })
+        .filter(Boolean);
+}
+
+function findArtifactByRole(artifacts, ...roles) {
+    const roleSet = new Set(roles.map(role => String(role).toLowerCase()));
+    return artifacts.find(artifact => roleSet.has(String(artifact.role || '').toLowerCase())) || null;
+}
+
+function appendArtifactDiagnostics(outputData, diagnostics) {
+    if (!diagnostics.length) {
+        return outputData;
+    }
+
+    const target = outputData && typeof outputData === 'object' && !Array.isArray(outputData)
+        ? { ...outputData }
+        : {};
+    const existing = Array.isArray(target._previewArtifactDiagnostics)
+        ? target._previewArtifactDiagnostics
+        : [];
+    target._previewArtifactDiagnostics = [...existing, ...diagnostics];
+    return target;
 }
 
 function normalizeIdentityString(value) {
@@ -649,6 +699,7 @@ export class NodePreviewCoordinator {
         this.getOperatorMetadata = options.getOperatorMetadata ?? (() => null);
         this.getInputImageBase64 = options.getInputImageBase64 ?? (() => null);
         this.previewExecutor = options.previewExecutor ?? (async () => null);
+        this.artifactClient = options.artifactClient ?? httpClient;
         this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
         const maxCacheEntries = Number(options.maxCacheEntries ?? 30);
         this.maxCacheEntries = Number.isFinite(maxCacheEntries)
@@ -668,6 +719,8 @@ export class NodePreviewCoordinator {
         this.requestVersion = 0;
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
+        this.releasedObjectUrls = new Set();
+        this.deletedArtifactIds = new Set();
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
@@ -682,6 +735,137 @@ export class NodePreviewCoordinator {
         this.activeAbortController = null;
     }
 
+    releasePreviewResources(value) {
+        if (!value || value.previewArtifactReleased) {
+            return;
+        }
+
+        const objectUrls = Array.isArray(value.previewArtifactObjectUrls)
+            ? value.previewArtifactObjectUrls
+            : [];
+        for (const objectUrl of objectUrls) {
+            if (!objectUrl || this.releasedObjectUrls.has(objectUrl)) {
+                continue;
+            }
+
+            this.releasedObjectUrls.add(objectUrl);
+            try {
+                globalThis.URL?.revokeObjectURL?.(objectUrl);
+            } catch (error) {
+                console.warn('[NodePreviewCoordinator] Failed to revoke preview artifact object URL:', error);
+            }
+        }
+
+        const artifactIds = Array.isArray(value.previewArtifactIds)
+            ? value.previewArtifactIds
+            : [];
+        for (const artifactId of artifactIds) {
+            if (!artifactId || this.deletedArtifactIds.has(artifactId)) {
+                continue;
+            }
+
+            this.deletedArtifactIds.add(artifactId);
+            void this.artifactClient.deletePreviewArtifact?.(artifactId).catch(error => {
+                if (!isAbortError(error)) {
+                    console.warn('[NodePreviewCoordinator] Failed to delete preview artifact:', error);
+                }
+            });
+        }
+
+        value.previewArtifactReleased = true;
+        value.previewArtifactObjectUrls = [];
+        value.previewArtifactIds = [];
+    }
+
+    releaseCurrentPreviewResourcesIfUncached() {
+        const requestKey = this.state?.request?.requestKey;
+        if (requestKey && this.cache.has(requestKey)) {
+            return;
+        }
+
+        this.releasePreviewResources(this.state);
+    }
+
+    releaseAllPreviewResources() {
+        this.releasePreviewResources(this.state);
+        for (const value of this.cache.values()) {
+            this.releasePreviewResources(value);
+        }
+        this.cache.clear();
+    }
+
+    releaseArtifactResourcesForNodeSwitch() {
+        this.releaseCurrentPreviewResourcesIfUncached();
+        for (const [key, value] of this.cache.entries()) {
+            const hasArtifacts = (Array.isArray(value.previewArtifactIds) && value.previewArtifactIds.length > 0) ||
+                (Array.isArray(value.previewArtifactObjectUrls) && value.previewArtifactObjectUrls.length > 0);
+            if (!hasArtifacts) {
+                continue;
+            }
+
+            this.releasePreviewResources(value);
+            this.cache.delete(key);
+        }
+    }
+
+    releaseResponseArtifacts(response) {
+        const parsed = parsePreviewResponse(response);
+        for (const artifact of parsed.artifacts) {
+            if (!artifact.artifactId || this.deletedArtifactIds.has(artifact.artifactId)) {
+                continue;
+            }
+
+            this.deletedArtifactIds.add(artifact.artifactId);
+            void this.artifactClient.deletePreviewArtifact?.(artifact.artifactId).catch(error => {
+                if (!isAbortError(error)) {
+                    console.warn('[NodePreviewCoordinator] Failed to delete stale preview artifact:', error);
+                }
+            });
+        }
+    }
+
+    async resolveArtifactImages(artifacts, signal) {
+        const result = {
+            inputImageSrc: null,
+            outputImageSrc: null,
+            previewArtifactIds: artifacts.map(artifact => artifact.artifactId).filter(Boolean),
+            previewArtifactObjectUrls: [],
+            diagnostics: []
+        };
+
+        const inputArtifact = findArtifactByRole(artifacts, 'inputImage');
+        const outputArtifact = findArtifactByRole(artifacts, 'outputImage', 'image');
+        for (const [slot, artifact] of [['inputImageSrc', inputArtifact], ['outputImageSrc', outputArtifact]]) {
+            if (!artifact?.artifactId) {
+                continue;
+            }
+
+            if (signal?.aborted) {
+                throw new DOMException('Preview artifact read aborted.', 'AbortError');
+            }
+
+            try {
+                const response = await this.artifactClient.getPreviewArtifactBlob(artifact.artifactId, { signal });
+                if (!globalThis.URL?.createObjectURL) {
+                    result.diagnostics.push(`PreviewArtifactObjectUrlUnavailable:${artifact.role}`);
+                    continue;
+                }
+
+                const objectUrl = globalThis.URL.createObjectURL(response.blob);
+                result.previewArtifactObjectUrls.push(objectUrl);
+                result[slot] = objectUrl;
+            } catch (error) {
+                if (isAbortError(error)) {
+                    throw error;
+                }
+
+                result.diagnostics.push(`PreviewArtifactReadFailed:${artifact.role || artifact.kind || 'artifact'}`);
+            }
+        }
+
+        return result;
+    }
+
     destroy() {
         if (this.pendingTimer) {
             clearTimeout(this.pendingTimer);
@@ -692,7 +876,7 @@ export class NodePreviewCoordinator {
         this.cancelActivePreviewRequest();
         this.unsubscribeStructure?.();
         this.listeners.clear();
-        this.cache.clear();
+        this.releaseAllPreviewResources();
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
     }
@@ -738,6 +922,7 @@ export class NodePreviewCoordinator {
         const previousNodeId = this.state.activeNodeId || null;
 
         if (!node?.id) {
+            this.releaseArtifactResourcesForNodeSwitch();
             this.debugSessionId = null;
             this.debugSessionScopeKey = null;
             this.updateState(createEmptyState());
@@ -745,6 +930,7 @@ export class NodePreviewCoordinator {
         }
 
         if (previousNodeId !== node.id) {
+            this.releaseArtifactResourcesForNodeSwitch();
             this.debugSessionId = null;
             this.debugSessionScopeKey = null;
         }
@@ -953,23 +1139,36 @@ export class NodePreviewCoordinator {
                     flowRevision,
                     inputImageBase64,
                     parameters: null,
+                    artifactMode: 'references',
                     signal: abortController?.signal,
                     timeoutMs: effectiveTimeoutMs
                 });
 
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
+                    this.releaseResponseArtifacts(response);
                     return;
                 }
                 if (!previewObservationMatchesRequest(response, expectedObservationIdentity)) {
+                    this.releaseResponseArtifacts(response);
                     return;
                 }
 
                 const parsed = parsePreviewResponse(response);
+                const resolvedArtifacts = await this.resolveArtifactImages(parsed.artifacts, abortController?.signal);
+                if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
+                    this.releasePreviewResources({
+                        previewArtifactIds: resolvedArtifacts.previewArtifactIds,
+                        previewArtifactObjectUrls: resolvedArtifacts.previewArtifactObjectUrls
+                    });
+                    return;
+                }
+
                 const outputData = compactPreviewOutputValue(parsed.outputData);
+                const outputDataWithDiagnostics = appendArtifactDiagnostics(outputData, resolvedArtifacts.diagnostics);
                 if (parsed.outputImageBase64 && isPreviewPayloadTooLarge(parsed.outputImageBase64)) {
                     parsed.outputImageBase64 = null;
-                    if (outputData && typeof outputData === 'object') {
-                        outputData._previewWarning = '输出图像过大，已省略图像，仅保留结构化摘要。';
+                    if (outputDataWithDiagnostics && typeof outputDataWithDiagnostics === 'object') {
+                        outputDataWithDiagnostics._previewWarning = '输出图像过大，已省略图像，仅保留结构化摘要。';
                     }
                 }
 
@@ -986,10 +1185,14 @@ export class NodePreviewCoordinator {
                             : (parsed.errorMessage || '预览执行失败')),
                     canvasEligibility: this.state.canvasEligibility,
                     request,
-                    inputImageBase64: parsed.inputImageBase64 || inputImageBase64 || null,
-                    outputImageBase64: parsed.outputImageBase64,
-                    outputData,
-                    previewCost
+                    inputImageBase64: resolvedArtifacts.inputImageSrc || parsed.inputImageBase64 || inputImageBase64 || null,
+                    outputImageBase64: resolvedArtifacts.outputImageSrc || parsed.outputImageBase64,
+                    outputData: outputDataWithDiagnostics,
+                    previewCost,
+                    artifacts: parsed.artifacts,
+                    previewArtifactIds: resolvedArtifacts.previewArtifactIds,
+                    previewArtifactObjectUrls: resolvedArtifacts.previewArtifactObjectUrls,
+                    previewArtifactReleased: false
                 };
 
                 const cacheableImage = !nextState.outputImageBase64 ||
@@ -998,6 +1201,7 @@ export class NodePreviewCoordinator {
                     this.setCacheEntry(request.requestKey, nextState);
                 }
 
+                this.releaseCurrentPreviewResourcesIfUncached();
                 this.updateState(nextState);
             } catch (error) {
                 if (isAbortError(error) && !timedOut) {
@@ -1073,6 +1277,7 @@ export class NodePreviewCoordinator {
         }
 
         if (this.cache.has(requestKey)) {
+            this.releasePreviewResources(this.cache.get(requestKey));
             this.cache.delete(requestKey);
         }
 
@@ -1080,7 +1285,10 @@ export class NodePreviewCoordinator {
             ...value,
             inputImageBase64: null
         });
-        this.pruneCache();
+        const protectKey = Array.isArray(value.previewArtifactIds) && value.previewArtifactIds.length > 0
+            ? requestKey
+            : null;
+        this.pruneCache(protectKey);
     }
 
     getCachedOutputImageBase64Chars() {
@@ -1092,12 +1300,13 @@ export class NodePreviewCoordinator {
         return total;
     }
 
-    pruneCache() {
+    pruneCache(protectedKey = null) {
         while (this.cache.size > this.maxCacheEntries) {
-            const oldestKey = this.cache.keys().next().value;
+            const oldestKey = this.findOldestCacheKey(protectedKey);
             if (oldestKey === undefined) {
                 break;
             }
+            this.releasePreviewResources(this.cache.get(oldestKey));
             this.cache.delete(oldestKey);
         }
 
@@ -1105,12 +1314,25 @@ export class NodePreviewCoordinator {
             this.cache.size > 0
             && this.getCachedOutputImageBase64Chars() > this.maxCacheOutputImageBase64Chars
         ) {
-            const oldestKey = this.cache.keys().next().value;
+            const oldestKey = this.findOldestCacheKey(protectedKey);
             if (oldestKey === undefined) {
                 break;
             }
+            this.releasePreviewResources(this.cache.get(oldestKey));
             this.cache.delete(oldestKey);
         }
+    }
+
+    findOldestCacheKey(protectedKey = null) {
+        for (const key of this.cache.keys()) {
+            if (key !== protectedKey) {
+                return key;
+            }
+        }
+
+        return protectedKey
+            ? undefined
+            : this.cache.keys().next().value;
     }
 }
 

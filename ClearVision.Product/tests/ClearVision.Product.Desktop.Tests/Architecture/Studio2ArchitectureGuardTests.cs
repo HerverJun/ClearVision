@@ -274,23 +274,10 @@ public sealed class Studio2ArchitectureGuardTests
         Regex.Matches(previewEndpointFiles[0].Text, "MapPost\\(\\\"/api/flows/preview-node\\\"")
             .Should().ContainSingle("there must be exactly one preview-node POST endpoint.");
 
-        foreach (var relativePath in allowedObservationPaths)
-        {
-            var absolutePath = Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
-            var files = File.Exists(absolutePath)
-                ? [absolutePath]
-                : Directory.Exists(absolutePath)
-                    ? Directory.EnumerateFiles(absolutePath, "*.cs", SearchOption.AllDirectories).ToArray()
-                    : [];
-
-            foreach (var file in files)
-            {
-                var text = File.ReadAllText(file);
-                text.Should().NotContain("PreviewArtifactStore", ToRelativePath(file));
-                text.Should().NotContain("artifactId", ToRelativePath(file));
-                text.Should().NotContain("/api/preview-artifacts", ToRelativePath(file));
-            }
-        }
+        File.ReadAllText(Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/ExecutionObservationEnvelopeV1.cs"
+                .Replace('/', Path.DirectorySeparatorChar)))
+            .Should()
+            .Contain("PreviewArtifactReferenceV1?", "G05B may attach optional artifact refs to resource detail nodes without making Observation persistent authority.");
     }
 
     [Fact]
@@ -312,8 +299,68 @@ public sealed class Studio2ArchitectureGuardTests
 
         var endpoint = File.ReadAllText(endpointPath);
         endpoint.Should().NotContain("Cast<object?>().Count()", "G05A metrics must not count unknown custom IEnumerable values.");
-        endpoint.Should().NotContain("PreviewArtifactStore", "G05A follow-up must not start G05B artifact lifecycle work.");
-        endpoint.Should().NotContain("artifactId", "G05A follow-up must not introduce artifact read identifiers.");
+        endpoint.Should().Contain("ArtifactMode", "G05B keeps artifact transport additive and opt-in for first-party preview calls.");
+    }
+
+    [Fact]
+    public void PreviewArtifact_ShouldRemainDesktopScopedAndAvoidLiveResourceStorage()
+    {
+        var sourceRoot = Path.Combine(Root, "ClearVision.Product/src");
+        var sourceFiles = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var allowedArtifactPaths = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Desktop/PreviewArtifacts/",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewArtifactEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"
+        };
+
+        foreach (var file in sourceFiles)
+        {
+            var text = File.ReadAllText(file);
+            if (!Regex.IsMatch(text, @"\bPreviewArtifact\w*\b") &&
+                !text.Contains("preview-artifacts", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var relativePath = ToRelativePath(file);
+            allowedArtifactPaths.Any(path => relativePath.StartsWith(path, StringComparison.OrdinalIgnoreCase) ||
+                                             string.Equals(relativePath, path, StringComparison.OrdinalIgnoreCase))
+                .Should().BeTrue($"{relativePath} must not move Preview Artifact authority outside Desktop.");
+        }
+
+        var storeText = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/PreviewArtifacts/PreviewArtifactStore.cs"
+                .Replace('/', Path.DirectorySeparatorChar)));
+        storeText.Should().NotContain("OpenCvSharp", "PreviewArtifactStore stores immutable bytes and metadata only.");
+        storeText.Should().NotContain("ImageWrapper", "PreviewArtifactStore must not hold live ImageWrapper instances.");
+        storeText.Should().NotMatchRegex(@"\bMat\b", "PreviewArtifactStore must not hold live Mat instances.");
+
+        var artifactEndpointText = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewArtifactEndpoints.cs"
+                .Replace('/', Path.DirectorySeparatorChar)));
+        artifactEndpointText.Should().Contain("MapGet(\"/api/preview-artifacts/{artifactId}\"");
+        artifactEndpointText.Should().Contain("MapDelete(\"/api/preview-artifacts/{artifactId}\"");
+        artifactEndpointText.Should().NotContain("MapGet(\"/api/preview-artifacts/stream");
+        artifactEndpointText.Should().NotContain("text/event-stream");
+
+        var previewCoordinatorText = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js"
+                .Replace('/', Path.DirectorySeparatorChar)));
+        Regex.Matches(previewCoordinatorText, @"class\s+NodePreviewCoordinator\b")
+            .Should().ContainSingle("G05B must reuse the existing preview coordinator.");
+        previewCoordinatorText.Should().Contain("artifactMode: 'references'");
+        previewCoordinatorText.Should().NotContain("new EventSource('/api/preview-artifacts");
     }
 
     [Fact]

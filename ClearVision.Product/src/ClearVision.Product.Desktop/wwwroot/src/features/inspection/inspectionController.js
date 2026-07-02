@@ -920,7 +920,8 @@ class InspectionController {
                 inputImageBase64: options.inputImageBase64,
                 parameters: options.parameters,
                 imageFormat: options.imageFormat || '.png',
-                timeoutMs: options.timeoutMs
+                timeoutMs: options.timeoutMs,
+                artifactMode: options.artifactMode || 'references'
             }, {
                 signal: options.signal
             });

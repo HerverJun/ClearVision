@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 
 namespace ClearVision.Product.Desktop.Observation;
 
@@ -120,6 +121,10 @@ public sealed class ExecutionObservationDetailNodeV1
 
     [JsonPropertyOrder(7)]
     public string? Name { get; init; }
+
+    [JsonPropertyOrder(8)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PreviewArtifactReferenceV1? Artifact { get; init; }
 }
 
 public sealed class ExecutionObservationDiagnosticV1

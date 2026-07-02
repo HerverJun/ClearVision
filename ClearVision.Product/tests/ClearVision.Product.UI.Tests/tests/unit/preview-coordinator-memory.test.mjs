@@ -39,6 +39,7 @@ function createCoordinator(options = {}) {
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
+    artifactClient: options.artifactClient,
     previewExecutor: async (nodeId, executorOptions) => {
       executeCount += 1;
       options.onPreviewOptions?.(executorOptions, executeCount, nodeId);
@@ -248,6 +249,7 @@ test('NodePreviewCoordinator sends client request sequence and flow revision', a
     assert.ok(Number.isSafeInteger(capturedOptions.clientRequestSequence));
     assert.ok(capturedOptions.clientRequestSequence > 0);
     assert.equal(capturedOptions.flowRevision, 7);
+    assert.equal(capturedOptions.artifactMode, 'references');
     assert.equal(coordinator.getState().outputData.score, 1);
   } finally {
     coordinator.destroy();
@@ -284,6 +286,99 @@ test('NodePreviewCoordinator drops observation responses with mismatched identit
     } finally {
       coordinator.destroy();
     }
+  }
+});
+
+test('NodePreviewCoordinator reads artifact images and releases object URLs plus server artifacts', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const readArtifactIds = [];
+  const deletedArtifactIds = [];
+  let objectUrlSequence = 0;
+  globalThis.URL.createObjectURL = () => `blob:preview-artifact-${++objectUrlSequence}`;
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      readArtifactIds.push(artifactId);
+      return { blob: { artifactId } };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+
+  const { coordinator, node } = createCoordinator({
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) => ({
+      ...buildObservationResponse(nodeId, executorOptions),
+      inputImageBase64: null,
+      outputImageBase64: null,
+      artifacts: [
+        { artifactId: 'input-artifact', kind: 'image', role: 'inputImage', contentType: 'image/png', length: 4 },
+        { artifactId: 'output-artifact', kind: 'image', role: 'outputImage', contentType: 'image/png', length: 4 }
+      ]
+    })
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    assert.deepEqual(readArtifactIds, ['input-artifact', 'output-artifact']);
+    assert.equal(coordinator.getState().inputImageBase64, 'blob:preview-artifact-1');
+    assert.equal(coordinator.getState().outputImageBase64, 'blob:preview-artifact-2');
+
+    coordinator.destroy();
+    await Promise.resolve();
+
+    assert.deepEqual(revokedUrls.sort(), ['blob:preview-artifact-1', 'blob:preview-artifact-2']);
+    assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact', 'output-artifact']);
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator deletes stale response artifacts without reading blobs', async () => {
+  const readArtifactIds = [];
+  const deletedArtifactIds = [];
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      readArtifactIds.push(artifactId);
+      throw new Error('stale artifacts must not be read');
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+  const { coordinator, node, getExecuteCount } = createCoordinator({
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) => ({
+      ...buildObservationResponse(nodeId, executorOptions, { clientRequestSequence: 999999 }),
+      artifacts: [
+        { artifactId: 'stale-output', kind: 'image', role: 'outputImage', contentType: 'image/png', length: 4 }
+      ]
+    })
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(getExecuteCount(), 1));
+    await Promise.resolve();
+
+    assert.equal(coordinator.getState().status, 'loading');
+    assert.deepEqual(readArtifactIds, []);
+    assert.deepEqual(deletedArtifactIds, ['stale-output']);
+    assert.equal(coordinator.cache.size, 0);
+  } finally {
+    coordinator.destroy();
   }
 });
 

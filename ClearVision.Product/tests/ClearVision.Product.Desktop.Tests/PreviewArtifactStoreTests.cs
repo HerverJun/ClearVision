@@ -1,0 +1,217 @@
+using System.Security.Cryptography;
+using ClearVision.Product.Desktop.PreviewArtifacts;
+using ClearVision.Product.Infrastructure.Operators;
+using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace ClearVision.Product.Desktop.Tests;
+
+public sealed class PreviewArtifactStoreTests
+{
+    [Fact]
+    public void Store_CommitsOpaqueImmutableArtifactWithChecksum()
+    {
+        var clock = new FakePreviewArtifactClock(new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero));
+        using var store = new PreviewArtifactStore(clock: clock);
+        var owner = CreateOwner();
+        var source = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4 };
+
+        PreviewArtifactReferenceV1 reference;
+        using (var batch = store.CreateBatch(owner))
+        {
+            reference = batch.Add("image", "outputImage", "$.Image", "image/png", source);
+            reference.ArtifactId.Should().HaveLength(43);
+            reference.ArtifactId.Should().MatchRegex("^[A-Za-z0-9_-]+$");
+            reference.ArtifactId.Should().NotContain(owner.ProjectId.ToString("N"));
+            batch.Commit();
+        }
+
+        source[4] = 0xFF;
+
+        store.TryRead(reference.ArtifactId, out var read).Should().BeTrue();
+        read!.Bytes.Should().Equal(0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4);
+        read.ContentType.Should().Be("image/png");
+        read.Length.Should().Be(8);
+        read.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData(read.Bytes)).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void Store_ExpiresDeletesRevokesAndDisposesArtifacts()
+    {
+        var clock = new FakePreviewArtifactClock(new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero));
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            Ttl = TimeSpan.FromMinutes(10),
+            MaxEntries = 16,
+            MaxTotalBytes = 1024,
+            MaxEntryBytes = 512
+        }, clock);
+        var owner = CreateOwner();
+        var first = AddArtifact(store, owner, [1, 2, 3]);
+        store.TryRead(first.ArtifactId, out _).Should().BeTrue();
+
+        clock.Advance(TimeSpan.FromMinutes(11));
+        store.TryRead(first.ArtifactId, out _).Should().BeFalse();
+        store.Count.Should().Be(0);
+
+        var second = AddArtifact(store, owner, [4, 5, 6]);
+        store.RevokeOwner(owner).Should().Be(1);
+        store.TryRead(second.ArtifactId, out _).Should().BeFalse();
+
+        var third = AddArtifact(store, owner, [7, 8, 9]);
+        store.Delete(third.ArtifactId).Should().BeTrue();
+        store.TryRead(third.ArtifactId, out _).Should().BeFalse();
+
+        var fourth = AddArtifact(store, owner, [10, 11, 12]);
+        store.Dispose();
+        store.TryRead(fourth.ArtifactId, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Store_UsesDeterministicCapacityEvictionAndBatchReplacement()
+    {
+        var clock = new FakePreviewArtifactClock(new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero));
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 2,
+            MaxTotalBytes = 6,
+            MaxEntryBytes = 4,
+            Ttl = TimeSpan.FromMinutes(10)
+        }, clock);
+        var owner = CreateOwner();
+        var first = AddArtifact(store, owner with { ClientRequestSequence = 1 }, [1, 1, 1]);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var second = AddArtifact(store, owner with { ClientRequestSequence = 2 }, [2, 2, 2]);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var third = AddArtifact(store, owner with { ClientRequestSequence = 3 }, [3, 3, 3]);
+
+        store.TryRead(first.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(second.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(third.ArtifactId, out _).Should().BeTrue();
+
+        var replaceOwner = owner with { ClientRequestSequence = 4 };
+        var oldForOwner = AddArtifact(store, replaceOwner, [4]);
+        var replacement = AddArtifact(store, replaceOwner, [5]);
+        store.TryRead(oldForOwner.ArtifactId, out _).Should().BeFalse("a successful new preview replaces old artifacts for the same owner.");
+        store.TryRead(replacement.ArtifactId, out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Store_AllowsConcurrentReadDeleteWithoutPathTokens()
+    {
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 16,
+            MaxTotalBytes = 1024,
+            MaxEntryBytes = 512
+        });
+        var reference = AddArtifact(store, CreateOwner(), [1, 2, 3, 4]);
+
+        var tasks = Enumerable.Range(0, 32)
+            .Select(index => Task.Run(() =>
+            {
+                _ = index;
+                _ = store.TryRead(reference.ArtifactId, out var ignoredRead);
+                _ = ignoredRead;
+                _ = store.Delete(reference.ArtifactId);
+            }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        PreviewArtifactStore.IsValidArtifactId("../secret").Should().BeFalse();
+        PreviewArtifactStore.IsValidArtifactId("C:\\temp\\file").Should().BeFalse();
+        store.TryRead(reference.ArtifactId, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Materializer_CopiesImageWrapperBytesBeforeOriginalRelease()
+    {
+        using var mat = new OpenCvSharp.Mat(2, 2, OpenCvSharp.MatType.CV_8UC3, OpenCvSharp.Scalar.White);
+        var pngBytes = mat.ToBytes(".png");
+        var wrapper = ImageWrapper.FromBytes(pngBytes);
+        using var store = new PreviewArtifactStore();
+        var materializer = new PreviewArtifactMaterializer(store, NullLogger<PreviewArtifactMaterializer>.Instance);
+
+        using var result = materializer.MaterializePreview(
+            CreateOwner(),
+            new Dictionary<string, object> { ["Image"] = wrapper },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            CancellationToken.None);
+        result.Commit();
+        wrapper.Release();
+
+        var imageArtifact = result.Artifacts.Should().ContainSingle().Subject;
+        store.TryRead(imageArtifact.ArtifactId, out var read).Should().BeTrue();
+        read!.Bytes.Should().NotBeEmpty();
+        read.ContentType.Should().Be("image/png");
+    }
+
+    [Fact]
+    public void Materializer_RollsBackCanceledBatchAndDowngradesOversizeArtifacts()
+    {
+        using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+        {
+            MaxEntries = 16,
+            MaxTotalBytes = 16,
+            MaxEntryBytes = 4
+        });
+        var materializer = new PreviewArtifactMaterializer(store, NullLogger<PreviewArtifactMaterializer>.Instance);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => materializer.MaterializePreview(
+            CreateOwner(),
+            new Dictionary<string, object> { ["Image"] = new byte[] { 1, 2, 3 } },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            cts.Token);
+        act.Should().Throw<OperationCanceledException>();
+        store.Count.Should().Be(0);
+
+        using var result = materializer.MaterializePreview(
+            CreateOwner() with { ClientRequestSequence = 2 },
+            new Dictionary<string, object> { ["Mask"] = new byte[] { 1, 2, 3, 4, 5 } },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            CancellationToken.None);
+        result.Artifacts.Should().BeEmpty();
+        result.Diagnostics.Should().Contain(item => item.Contains("PreviewArtifactRejected", StringComparison.Ordinal));
+        store.Count.Should().Be(0);
+    }
+
+    private static PreviewArtifactReferenceV1 AddArtifact(
+        PreviewArtifactStore store,
+        PreviewArtifactOwnerScope owner,
+        byte[] bytes)
+    {
+        using var batch = store.CreateBatch(owner);
+        var reference = batch.Add("binary", "resource", "$.Data", "application/octet-stream", bytes);
+        batch.Commit();
+        return reference;
+    }
+
+    private static PreviewArtifactOwnerScope CreateOwner() =>
+        new(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+            1,
+            2);
+
+    private sealed class FakePreviewArtifactClock : IPreviewArtifactClock
+    {
+        public FakePreviewArtifactClock(DateTimeOffset utcNow)
+        {
+            UtcNow = utcNow;
+        }
+
+        public DateTimeOffset UtcNow { get; private set; }
+
+        public void Advance(TimeSpan value)
+        {
+            UtcNow = UtcNow.Add(value);
+        }
+    }
+}

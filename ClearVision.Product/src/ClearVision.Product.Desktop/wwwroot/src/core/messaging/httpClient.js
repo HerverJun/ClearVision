@@ -470,13 +470,34 @@ class HttpClient {
     /**
      * 发送 DELETE 请求
      */
-    async delete(url) {
+    async delete(url, options = {}) {
         const fullUrl = this.buildRequestUrl(url);
+        const signal = options?.signal;
         const response = await fetch(fullUrl, {
             method: 'DELETE',
-            headers: this.defaultHeaders
+            headers: this.defaultHeaders,
+            signal
         });
+        if (options?.ignoreNotFound && response.status === 404) {
+            return null;
+        }
         return this.handleResponse(response);
+    }
+
+    async getPreviewArtifactBlob(artifactId, options = {}) {
+        const safeArtifactId = encodeURIComponent(String(artifactId || ''));
+        return this.getForBlob(`/preview-artifacts/${safeArtifactId}`, {
+            ...options,
+            cache: 'no-store'
+        });
+    }
+
+    async deletePreviewArtifact(artifactId, options = {}) {
+        const safeArtifactId = encodeURIComponent(String(artifactId || ''));
+        return this.delete(`/preview-artifacts/${safeArtifactId}`, {
+            ...options,
+            ignoreNotFound: true
+        });
     }
 
     /**

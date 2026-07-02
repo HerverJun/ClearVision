@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
 using OpenCvSharp;
 
@@ -671,7 +672,8 @@ public static class ExecutionObservationProjector
             Truncated = true,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
+            Name = name,
+            Artifact = descriptor.Artifact
         };
     }
 
@@ -1127,6 +1129,13 @@ public static class ExecutionObservationProjector
         {
             switch (value)
             {
+                case PreviewArtifactValue artifactValue:
+                    return new ResourceDescriptor(
+                        artifactValue.Kind,
+                        artifactValue.DisplayValue,
+                        artifactValue.Metadata,
+                        artifactValue.Truncated,
+                        artifactValue.Artifact);
                 case ImageWrapper wrapper:
                 {
                     var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -1141,7 +1150,7 @@ public static class ExecutionObservationProjector
                         metadata["channels"] = wrapper.Channels.ToString(CultureInfo.InvariantCulture);
                     }
 
-                    return new ResourceDescriptor("image", "ImageWrapper descriptor; content omitted.", metadata, true);
+                    return new ResourceDescriptor("image", "ImageWrapper descriptor; content omitted.", metadata, true, null);
                 }
                 case Mat mat:
                 {
@@ -1157,20 +1166,20 @@ public static class ExecutionObservationProjector
                         metadata["type"] = mat.Type().ToString();
                     }
 
-                    return new ResourceDescriptor("matrix", "Mat descriptor; content omitted.", metadata, true);
+                    return new ResourceDescriptor("matrix", "Mat descriptor; content omitted.", metadata, true, null);
                 }
                 case byte[] bytes:
                     return new ResourceDescriptor("binary", "byte[] descriptor; content omitted.", new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["length"] = bytes.Length.ToString(CultureInfo.InvariantCulture)
-                    }, true);
+                    }, true, null);
                 case Stream stream:
                     return new ResourceDescriptor("stream", "Stream descriptor; content omitted.", new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["canRead"] = stream.CanRead ? "true" : "false",
                         ["canSeek"] = stream.CanSeek ? "true" : "false",
                         ["length"] = stream.CanSeek ? SafeStreamLength(stream) : "unknown"
-                    }, true);
+                    }, true, null);
             }
 
             var type = value.GetType();
@@ -1179,15 +1188,15 @@ public static class ExecutionObservationProjector
                 return new ResourceDescriptor("resource", $"{ClipForDisplay(type.Name)} descriptor; content omitted.", new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["type"] = ClipForDisplay(type.FullName ?? type.Name)
-                }, true);
+                }, true, null);
             }
         }
         catch (Exception ex)
         {
-            return new ResourceDescriptor("resource", $"Resource descriptor failed: {ClipForDisplay(ex.GetBaseException().Message)}", new Dictionary<string, string>(StringComparer.Ordinal), true);
+            return new ResourceDescriptor("resource", $"Resource descriptor failed: {ClipForDisplay(ex.GetBaseException().Message)}", new Dictionary<string, string>(StringComparer.Ordinal), true, null);
         }
 
-        return new ResourceDescriptor("resource", "Resource descriptor; content omitted.", new Dictionary<string, string>(StringComparer.Ordinal), true);
+        return new ResourceDescriptor("resource", "Resource descriptor; content omitted.", new Dictionary<string, string>(StringComparer.Ordinal), true, null);
     }
 
     private static string SafeStreamLength(Stream stream)
@@ -1204,7 +1213,7 @@ public static class ExecutionObservationProjector
 
     private static bool IsResourceLike(object value)
     {
-        if (value is ImageWrapper or Mat or byte[] or Stream)
+        if (value is PreviewArtifactValue or ImageWrapper or Mat or byte[] or Stream)
         {
             return true;
         }
@@ -1497,7 +1506,8 @@ public static class ExecutionObservationProjector
         string Kind,
         string DisplayValue,
         Dictionary<string, string> Metadata,
-        bool Truncated)
+        bool Truncated,
+        PreviewArtifactReferenceV1? Artifact)
     {
         public Dictionary<string, object?> ToLegacyDictionary()
         {
@@ -1507,6 +1517,11 @@ public static class ExecutionObservationProjector
                 ["displayValue"] = DisplayValue,
                 ["truncated"] = Truncated
             };
+            if (Artifact != null)
+            {
+                result["artifact"] = Artifact;
+            }
+
             foreach (var pair in Metadata.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 result[pair.Key] = pair.Value;

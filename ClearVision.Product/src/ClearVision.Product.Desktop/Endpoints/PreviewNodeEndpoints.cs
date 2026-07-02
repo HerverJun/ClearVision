@@ -15,6 +15,7 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Desktop.Observation;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -82,6 +83,7 @@ public static class PreviewNodeEndpoints
             IProjectFlowStorage flowStorage,
             ProjectVariableSessionRegistry projectVariableSessions,
             IServiceProvider serviceProvider,
+            PreviewArtifactMaterializer artifactMaterializer,
             ILogger<object> logger) =>
         {
             ProjectAccessLease? projectAccess = null;
@@ -96,6 +98,9 @@ public static class PreviewNodeEndpoints
                 {
                     return identityValidationProblem;
                 }
+
+                var useArtifactReferences = UsesPreviewArtifactReferences(request);
+                var artifactOwner = CreateArtifactOwner(request);
 
                 if (request.ProjectId != Guid.Empty)
                 {
@@ -210,19 +215,45 @@ public static class PreviewNodeEndpoints
 
                 if (nodeOutput == null)
                 {
-                    return Results.Ok(BuildFailureResponse(request, flow, result, request.TargetNodeId, externalInputImageBase64, logger));
+                    return Results.Ok(BuildFailureResponse(
+                        request,
+                        flow,
+                        result,
+                        request.TargetNodeId,
+                        externalInputImageBase64,
+                        artifactMaterializer,
+                        artifactOwner,
+                        useArtifactReferences,
+                        context.RequestAborted,
+                        logger));
                 }
 
                 // 提取输出图像
+                var rawOutputImageBytes = TryGetOutputImageBytes(nodeOutput);
                 var sanitizedOutputData = BuildResponseOutputData(nodeOutput);
-                var outputImageBytes = LimitPreviewImageBytes(
-                    TryGetOutputImageBytes(nodeOutput),
-                    sanitizedOutputData,
-                    "输出图像",
-                    logger);
-                var outputImageBase64 = outputImageBytes != null
-                    ? Convert.ToBase64String(outputImageBytes)
-                    : null;
+                byte[]? outputImageBytes;
+                string? outputImageBase64;
+                string? inputImageBase64;
+                List<PreviewArtifactReferenceV1>? artifacts = null;
+                Dictionary<string, object> observationOutputData = nodeOutput;
+                PreviewArtifactMaterializationResult? materialization = null;
+
+                if (useArtifactReferences)
+                {
+                    outputImageBytes = rawOutputImageBytes;
+                    outputImageBase64 = null;
+                }
+                else
+                {
+                    outputImageBytes = LimitPreviewImageBytes(
+                        rawOutputImageBytes,
+                        sanitizedOutputData,
+                        "输出图像",
+                        logger);
+                    outputImageBase64 = outputImageBytes != null
+                        ? Convert.ToBase64String(outputImageBytes)
+                        : null;
+                }
                 var metricsInput = BuildMetricsOutputData(nodeOutput);
                 var metrics = BuildPreviewMetrics(metricsInput.OutputData, outputImageBytes, result.ErrorMessage, metricsInput.Diagnostics);
 
@@ -231,22 +262,40 @@ public static class PreviewNodeEndpoints
                     request.ProjectId, request.TargetNodeId, result.IsSuccess);
 
                 var targetDebugResult = result.DebugOperatorResults.FirstOrDefault(r => r.OperatorId == request.TargetNodeId);
-                var inputImageBytes = LimitPreviewImageBytes(
-                    ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64),
-                    sanitizedOutputData,
-                    "输入图像",
-                    logger);
-                var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+                var rawInputImageBytes = ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64);
+                if (useArtifactReferences)
+                {
+                    materialization = artifactMaterializer.MaterializePreview(
+                        artifactOwner,
+                        nodeOutput,
+                        rawInputImageBytes,
+                        rawOutputImageBytes,
+                        context.RequestAborted);
+                    artifacts = materialization.Artifacts.Count > 0 ? materialization.Artifacts : null;
+                    observationOutputData = materialization.OutputData;
+                    sanitizedOutputData = BuildResponseOutputData(materialization.OutputData);
+                    AppendPreviewArtifactDiagnostics(sanitizedOutputData, materialization.Diagnostics);
+                    inputImageBase64 = null;
+                }
+                else
+                {
+                    var inputImageBytes = LimitPreviewImageBytes(
+                        rawInputImageBytes,
+                        sanitizedOutputData,
+                        "输入图像",
+                        logger);
+                    inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+                }
 
                 var failedOperator = FindFailedOperator(result, request.TargetNodeId);
                 var observation = BuildPreviewObservation(
                     request,
                     result,
-                    nodeOutput,
+                    observationOutputData,
                     flow,
                     failedOperator);
 
-                return Results.Ok(new PreviewNodeResponse
+                var response = new PreviewNodeResponse
                 {
                     Success = result.IsSuccess,
                     ProjectId = request.ProjectId,
@@ -261,6 +310,7 @@ public static class PreviewNodeEndpoints
                     FailedOperatorName = failedOperator?.OperatorName,
                     FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
                     Metrics = metrics,
+                    Artifacts = artifacts,
                     ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
                     {
                         OperatorId = r.OperatorId,
@@ -270,7 +320,10 @@ public static class PreviewNodeEndpoints
                         IsSuccess = r.IsSuccess
                     }).ToList(),
                     Observation = observation
-                });
+                };
+                materialization?.Commit();
+                materialization?.Dispose();
+                return Results.Ok(response);
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {
@@ -410,6 +463,32 @@ public static class PreviewNodeEndpoints
     {
         var timeoutMs = requestedTimeoutMs ?? DefaultPreviewTimeoutMs;
         return Math.Clamp(timeoutMs, MinPreviewTimeoutMs, MaxPreviewTimeoutMs);
+    }
+
+    private static bool UsesPreviewArtifactReferences(PreviewNodeRequest request) =>
+        string.Equals(request.ArtifactMode, "references", StringComparison.OrdinalIgnoreCase);
+
+    private static PreviewArtifactOwnerScope CreateArtifactOwner(PreviewNodeRequest request) =>
+        new(
+            request.ProjectId,
+            request.TargetNodeId,
+            request.DebugSessionId,
+            request.ClientRequestSequence,
+            request.FlowRevision);
+
+    private static void AppendPreviewArtifactDiagnostics(
+        Dictionary<string, object> outputData,
+        IReadOnlyList<string> diagnostics)
+    {
+        if (diagnostics.Count == 0)
+        {
+            return;
+        }
+
+        outputData["_previewArtifactDiagnostics"] = diagnostics
+            .Distinct(StringComparer.Ordinal)
+            .Take(MaxMetricsItems)
+            .ToList();
     }
 
     private static byte[]? LimitPreviewImageBytes(
@@ -922,6 +1001,10 @@ public static class PreviewNodeEndpoints
         FlowDebugExecutionResult result,
         Guid targetNodeId,
         string? externalInputImageBase64,
+        PreviewArtifactMaterializer artifactMaterializer,
+        PreviewArtifactOwnerScope artifactOwner,
+        bool useArtifactReferences,
+        CancellationToken cancellationToken,
         ILogger logger)
     {
         var targetResult = result.DebugOperatorResults
@@ -932,19 +1015,41 @@ public static class PreviewNodeEndpoints
 
         var failureMessage = BuildMissingNodeOutputDetail(result, targetNodeId);
         var failureOutputData = targetResult?.OutputSnapshot ?? failedOperator?.OutputSnapshot;
+        var outputDataForObservation = failureOutputData;
         var sanitizedOutputData = failureOutputData != null
             ? BuildResponseOutputData(failureOutputData)
             : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        var inputImageBytes = LimitPreviewImageBytes(
-            TryGetImageBytesFromSnapshot(targetResult?.InputSnapshot)
-                ?? TryGetImageBytesFromSnapshot(failedOperator?.InputSnapshot)
-                ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, externalInputImageBase64),
-            sanitizedOutputData,
-            "输入图像",
-            logger);
-        var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+        var rawInputImageBytes = TryGetImageBytesFromSnapshot(targetResult?.InputSnapshot)
+            ?? TryGetImageBytesFromSnapshot(failedOperator?.InputSnapshot)
+            ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, externalInputImageBase64);
+        string? inputImageBase64;
+        List<PreviewArtifactReferenceV1>? artifacts = null;
+        PreviewArtifactMaterializationResult? materialization = null;
+        if (useArtifactReferences)
+        {
+            materialization = artifactMaterializer.MaterializePreview(
+                artifactOwner,
+                failureOutputData,
+                rawInputImageBytes,
+                TryGetImageBytesFromSnapshot(failureOutputData),
+                cancellationToken);
+            artifacts = materialization.Artifacts.Count > 0 ? materialization.Artifacts : null;
+            outputDataForObservation = materialization.OutputData;
+            sanitizedOutputData = BuildResponseOutputData(materialization.OutputData);
+            AppendPreviewArtifactDiagnostics(sanitizedOutputData, materialization.Diagnostics);
+            inputImageBase64 = null;
+        }
+        else
+        {
+            var inputImageBytes = LimitPreviewImageBytes(
+                rawInputImageBytes,
+                sanitizedOutputData,
+                "输入图像",
+                logger);
+            inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+        }
 
-        return new PreviewNodeResponse
+        var response = new PreviewNodeResponse
         {
             Success = false,
             ProjectId = request.ProjectId,
@@ -959,6 +1064,7 @@ public static class PreviewNodeEndpoints
             FailedOperatorName = failedOperator?.OperatorName,
             FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
             Metrics = null,
+            Artifacts = artifacts,
             ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
             {
                 OperatorId = r.OperatorId,
@@ -970,12 +1076,15 @@ public static class PreviewNodeEndpoints
             Observation = BuildPreviewObservation(
                 request,
                 result,
-                failureOutputData,
+                outputDataForObservation,
                 flow,
                 failedOperator,
                 successOverride: false,
                 errorMessageOverride: failureMessage)
         };
+        materialization?.Commit();
+        materialization?.Dispose();
+        return response;
     }
 
     private static IResult? ValidateObservationIdentity(PreviewNodeRequest request)
@@ -1527,6 +1636,11 @@ public class PreviewNodeRequest
     /// 预览超时（毫秒）
     /// </summary>
     public int? TimeoutMs { get; set; }
+
+    /// <summary>
+    /// Artifact transport mode. Null preserves legacy Base64 compatibility; references returns artifact refs.
+    /// </summary>
+    public string? ArtifactMode { get; set; }
 }
 
 /// <summary>
@@ -1582,6 +1696,11 @@ public class PreviewNodeResponse
     public string? FailedOperatorName { get; set; }
     public string? FailedOperatorType { get; set; }
     public PreviewFeedbackMetrics? Metrics { get; set; }
+
+    /// <summary>
+    /// Bounded preview artifacts returned when ArtifactMode is references.
+    /// </summary>
+    public List<PreviewArtifactReferenceV1>? Artifacts { get; set; }
 
     /// <summary>
     /// 执行的算子列表（上游子图）

@@ -10,6 +10,7 @@ using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Handlers;
 using ClearVision.Product.Desktop.Hubs;
 using ClearVision.Product.Desktop.Middleware;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.AI;
@@ -284,6 +285,7 @@ static class Program
         builder.Services.AddScoped<RuntimePackageValidator>();
         builder.Services.AddScoped<RuntimePackageLoader>();
         builder.Services.AddSingleton<RuntimeResultNormalizer>();
+        builder.Services.AddPreviewArtifactServices();
         builder.Services.AddSingleton<WebMessageHandler>();
         builder.Services.AddSingleton<StationIngressAuthService>();
         builder.Services.AddSingleton<StationCommunicationSettingsStore>();

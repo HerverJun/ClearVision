@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Observation;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -127,6 +128,96 @@ public class PreviewNodeEndpointsTests
             .GetValue();
 
         ReadIntValue(thresholdParameter).Should().Be(180);
+    }
+
+    [Fact]
+    public async Task PreviewNode_ArtifactModeReferences_ReturnsArtifactRefsAndSafeBlobEndpoint()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4 };
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    DebugSessionId = debugSessionId,
+                    ExecutionTimeMs = 12,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Image"] = imageBytes,
+                            ["Score"] = 0.95
+                        }
+                    },
+                    DebugOperatorResults = new List<OperatorDebugResult>
+                    {
+                        new()
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Threshold",
+                            IsSuccess = true,
+                            ExecutionOrder = 0,
+                            ExecutionTimeMs = 12
+                        }
+                    }
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            DebugSessionId = debugSessionId,
+            ClientRequestSequence = 10,
+            FlowRevision = 20,
+            ArtifactMode = "references",
+            InputImageBase64 = Convert.ToBase64String(imageBytes),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("inputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+        document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+        document.RootElement.GetProperty("outputData").GetProperty("Score").GetDouble().Should().Be(0.95);
+
+        var artifacts = document.RootElement.GetProperty("artifacts").EnumerateArray().ToList();
+        artifacts.Should().HaveCountGreaterThanOrEqualTo(2);
+        artifacts.Should().OnlyContain(artifact =>
+            artifact.GetProperty("artifactId").GetString()!.Length == 43 &&
+            artifact.GetProperty("contentType").GetString() == "image/png" &&
+            artifact.GetProperty("length").GetInt64() == imageBytes.Length);
+        artifacts.Should().Contain(artifact => artifact.GetProperty("role").GetString() == "inputImage");
+        artifacts.Should().Contain(artifact => artifact.GetProperty("role").GetString() == "outputImage");
+
+        var artifactId = artifacts.First().GetProperty("artifactId").GetString()!;
+        using var artifactResponse = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
+        artifactResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        artifactResponse.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+        artifactResponse.Content.Headers.ContentLength.Should().Be(imageBytes.Length);
+        artifactResponse.Headers.CacheControl!.NoStore.Should().BeTrue();
+        artifactResponse.Headers.ETag!.Tag.Should().StartWith("\"sha256-");
+        artifactResponse.Headers.GetValues("X-Content-Type-Options").Should().Contain("nosniff");
+        (await artifactResponse.Content.ReadAsByteArrayAsync()).Should().Equal(imageBytes);
+
+        using var pathInjection = await host.Client.GetAsync("/api/preview-artifacts/..%2Fsecret");
+        pathInjection.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        using var deleteResponse = await host.Client.DeleteAsync($"/api/preview-artifacts/{artifactId}");
+        deleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+        using var afterDelete = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
+        afterDelete.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -1998,9 +2089,11 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton(flowStorage);
             builder.Services.AddSingleton(registry);
+            builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
             app.MapPreviewNodeEndpoints();
+            app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
 
             return new PreviewNodeTestHost(app, app.GetTestClient());
@@ -2032,9 +2125,11 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton(flowStorage);
             builder.Services.AddSingleton(registry);
+            builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
             app.MapPreviewNodeEndpoints();
+            app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
 
             return new PreviewNodeTestHost(app, app.GetTestClient());
