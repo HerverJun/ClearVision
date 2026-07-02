@@ -138,6 +138,32 @@ function buildLargeDetail() {
   };
 }
 
+async function installStartup(page, inspectorEnabled: boolean) {
+  await page.addInitScript((enabled) => {
+    const startup = {
+      workspaceV2Enabled: false,
+      nodePreviewInspectorEnabled: enabled,
+      featureFlags: {
+        'Studio:NodePreviewInspectorEnabled': enabled,
+      },
+    };
+    const featureFlags = Object.freeze({ ...startup.featureFlags });
+    Object.defineProperty(startup, 'featureFlags', {
+      value: featureFlags,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+    Object.freeze(startup);
+    Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
+      value: startup,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  }, inspectorEnabled);
+}
+
 test.describe('Node Preview Overlay', () => {
   test.beforeEach(async ({ page }) => {
     await stubOperatorLibrary(page);
@@ -344,23 +370,47 @@ test.describe('Node Preview Overlay', () => {
     await page.mouse.dblclick(coords.x, coords.y);
     await expect(page.locator('#subgraph-breadcrumb')).toBeVisible();
   });
+
+  test('flag off mounts only legacy overlay and leaves selection store unregistered', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          outputImageBase64: PNG_BASE64,
+          outputData: { Score: 0.99 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Legacy Preview Node',
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+
+    await expect(page.locator('.node-preview-card')).toBeVisible();
+    await expect(page.locator('.node-preview-inspector-card')).toHaveCount(0);
+    const owners = await page.evaluate(() => ({
+      hasOverlay: Boolean((window as any).nodePreviewOverlay),
+      hasInspector: Boolean((window as any).nodePreviewInspector),
+      hasSelectionStore: Boolean((window as any).nodePreviewSelectionStore),
+      hasCoordinator: Boolean((window as any).nodePreviewCoordinator),
+    }));
+    expect(owners).toEqual({
+      hasOverlay: true,
+      hasInspector: false,
+      hasSelectionStore: false,
+      hasCoordinator: true,
+    });
+  });
 });
 
 test.describe('Node Preview Inspector flag', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
-        value: Object.freeze({
-          workspaceV2Enabled: false,
-          nodePreviewInspectorEnabled: true,
-          featureFlags: {
-            'Studio:NodePreviewInspectorEnabled': true,
-          },
-        }),
-        writable: false,
-        configurable: false,
-      });
-    });
+    await installStartup(page, true);
     await stubOperatorLibrary(page);
     await bootAuthenticatedApp(page);
     await setCurrentProject(page);
@@ -425,6 +475,53 @@ test.describe('Node Preview Inspector flag', () => {
       hasCoordinator: true,
     });
 
+    const mutationResult = await page.evaluate(() => {
+      const key = 'Studio:NodePreviewInspectorEnabled';
+      const startup = (window as any).__CLEARVISION_STARTUP__;
+      const before = startup.featureFlags[key];
+      let redefineFailed = false;
+      try {
+        startup.featureFlags[key] = false;
+      } catch {
+        // Strict mode assignment failures are acceptable; value must remain unchanged.
+      }
+      try {
+        (window as any).__CLEARVISION_STARTUP__ = {
+          featureFlags: { [key]: false },
+        };
+      } catch {
+        // Non-writable window property may throw in strict mode.
+      }
+      try {
+        Object.defineProperty(window, '__CLEARVISION_STARTUP__', { value: { featureFlags: { [key]: false } } });
+      } catch {
+        redefineFailed = true;
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(window, '__CLEARVISION_STARTUP__');
+      return {
+        before,
+        after: startup.featureFlags[key],
+        startupFrozen: Object.isFrozen(startup),
+        featureFlagsFrozen: Object.isFrozen(startup.featureFlags),
+        writable: descriptor?.writable,
+        configurable: descriptor?.configurable,
+        redefineFailed,
+        hasOverlay: Boolean((window as any).nodePreviewOverlay),
+        hasInspector: Boolean((window as any).nodePreviewInspector),
+      };
+    });
+    expect(mutationResult).toEqual({
+      before: true,
+      after: true,
+      startupFrozen: true,
+      featureFlagsFrozen: true,
+      writable: false,
+      configurable: false,
+      redefineFailed: true,
+      hasOverlay: false,
+      hasInspector: true,
+    });
+
     await page.locator('.node-preview-inspector-tab', { hasText: 'Detail' }).click();
     await expect(page.locator('.node-preview-inspector-tree')).toBeVisible();
     const initialRows = await page.locator('.node-preview-inspector-tree-row').count();
@@ -457,5 +554,153 @@ test.describe('Node Preview Inspector flag', () => {
     });
     await expect.poll(async () => page.evaluate(() => (window as any).nodePreviewSelectionStore.getSelection()))
       .toBeNull();
+  });
+
+  test('keeps inspector state on the newer node when an older preview resolves late', async ({ page }) => {
+    let nodeAId = '';
+    let nodeBId = '';
+    let releaseA: (() => void) | null = null;
+    let sawARequest: (() => void) | null = null;
+    const aRequestSeen = new Promise<void>(resolve => {
+      sawARequest = resolve;
+    });
+    const allowAResponse = new Promise<void>(resolve => {
+      releaseA = resolve;
+    });
+
+    const detailFor = (label: string) => ({
+      kind: 'dictionary',
+      displayValue: '1/1 fields',
+      pathHint: '$',
+      addressable: false,
+      children: [{
+        kind: 'number',
+        displayValue: `${label}-value`,
+        originalType: 'System.Int32',
+        name: `${label}Field`,
+        pathHint: `$["${label}Field"]`,
+        addressable: true,
+        children: [],
+      }],
+    });
+
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      const targetNodeId = request.targetNodeId || request.TargetNodeId;
+      if (targetNodeId === nodeAId) {
+        sawARequest?.();
+        await allowAResponse;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(buildObservationResponse(request, detailFor('A'), [{
+            artifactId: 'artifact-a',
+            kind: 'profile',
+            role: 'AArtifact',
+            contentType: 'application/json',
+            length: 12,
+          }])),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildObservationResponse(request, detailFor('B'), [{
+          artifactId: 'artifact-b',
+          kind: 'profile',
+          role: 'BArtifact',
+          contentType: 'application/json',
+          length: 12,
+        }])),
+      });
+    });
+
+    nodeAId = await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Node A',
+      x: 100,
+      y: 100,
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await aRequestSeen;
+
+    nodeBId = await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Node B',
+      x: 360,
+      y: 120,
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+    await expect(page.locator('.node-preview-inspector-title')).toContainText('Node B');
+
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Detail' }).click();
+    await expect(page.locator('.node-preview-inspector-tree-row', { hasText: 'BField' })).toBeVisible();
+    await page.locator('.node-preview-inspector-tree-row', { hasText: 'BField' }).first().click();
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Artifact' }).click();
+    await expect(page.locator('.node-preview-inspector-artifact')).toContainText('BArtifact');
+
+    releaseA?.();
+    await page.waitForTimeout(250);
+
+    await expect(page.locator('.node-preview-inspector-title')).toContainText('Node B');
+    await expect(page.locator('.node-preview-inspector-card')).not.toContainText('AField');
+    await expect(page.locator('.node-preview-inspector-artifact')).toContainText('BArtifact');
+    const selection = await page.evaluate(() => (window as any).nodePreviewSelectionStore.getSelection());
+    expect(selection.identity.targetNodeId).toBe(nodeBId.toLowerCase());
+    expect(selection.pathHint).toBe('$["BField"]');
+  });
+
+  test('does not fetch declared-oversized text artifacts and keeps the page interactive', async ({ page }) => {
+    let artifactGetCount = 0;
+    const largeArtifact = {
+      artifactId: 'large-json-artifact',
+      kind: 'profile',
+      role: 'LargeProfile',
+      pathHint: '$["LargeProfile"]',
+      contentType: 'application/json',
+      length: 128 * 1024,
+      sha256: 'large-sha',
+      expiresAtUtc: '2026-07-02T09:00:00Z',
+    };
+
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildObservationResponse(request, buildLargeDetail(), [largeArtifact])),
+      });
+    });
+
+    await page.route('**/api/preview-artifacts/large-json-artifact', async route => {
+      artifactGetCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ huge: true }),
+      });
+    });
+
+    await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Large Text Artifact Node',
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Artifact' }).click();
+    await page.locator('.node-preview-inspector-action-btn', { hasText: '按需读取' }).click();
+    await expect(page.locator('.node-preview-inspector-artifact-read.success')).toContainText('内容过大，仅展示元数据');
+    await expect(page.locator('.node-preview-inspector-artifact-read.success')).toContainText('large-sha');
+    expect(artifactGetCount).toBe(0);
+
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Summary' }).click();
+    await expect(page.locator('.node-preview-inspector-panel.summary')).toBeVisible();
   });
 });

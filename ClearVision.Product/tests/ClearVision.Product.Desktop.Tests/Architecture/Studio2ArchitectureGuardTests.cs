@@ -371,6 +371,7 @@ public sealed class Studio2ArchitectureGuardTests
         var inspectorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/nodePreviewInspector.js");
         var selectionStoreText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/nodePreviewSelectionStore.js");
         var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var webViewHostText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs");
         var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
         var adrText = ReadRepoText("docs/进行中/Studio2/architecture/Studio2-架构边界-ADR.md");
 
@@ -386,14 +387,28 @@ public sealed class Studio2ArchitectureGuardTests
         appText.Should().Contain("serviceRegistry.register('nodePreviewCoordinator'");
         appText.Should().Contain("serviceRegistry.register('nodePreviewOverlay'");
         appText.Should().Contain("serviceRegistry.register('nodePreviewInspector'");
+        appText.Should().Contain("const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce()");
+        appText.Should().Contain("featureFlags?.[NODE_PREVIEW_INSPECTOR_FLAG_KEY] === true");
+        appText.Should().NotContain("startup.nodePreviewInspectorEnabled === true", "owner decision must use only the canonical featureFlags key.");
+        Regex.Matches(appText, @"createNodePreviewSelectionStore\(\)")
+            .Should().ContainSingle("selectionStore must only be created in the inspector-enabled branch.");
+        appText.IndexOf("createNodePreviewSelectionStore()", StringComparison.Ordinal)
+            .Should().BeGreaterThan(appText.IndexOf("if (inspectorEnabled)", StringComparison.Ordinal));
 
         studioOptionsText.Should().Contain("NodePreviewInspectorEnabled");
+        webViewHostText.Should().Contain("const featureFlags = Object.freeze");
+        webViewHostText.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
+        webViewHostText.Should().Contain("Object.freeze(startup)");
+        webViewHostText.Should().Contain("configurable: false");
         appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
         adrText.Should().Contain("Studio:NodePreviewInspectorEnabled");
         adrText.Should().Contain("G15.2/G16");
 
         inspectorText.Should().NotMatchRegex(@"\bfetch\s*\(", "Inspector must read artifacts through NodePreviewCoordinator.");
         inspectorText.Should().NotContain("httpClient", "Inspector must not import or create a second Artifact client.");
+        inspectorText.Should().NotMatchRegex(@"\bblob\s*\.\s*text\s*\(", "Inspector must not decode a full Artifact Blob before bounding it.");
+        inspectorText.Should().Contain("MAX_ARTIFACT_TEXT_PREVIEW_BYTES");
+        inspectorText.Should().Contain("MAX_ARTIFACT_TEXT_DISPLAY_CHARS");
         inspectorText.Should().Contain("readArtifactForCurrentState");
         coordinatorText.Should().Contain("readArtifactForCurrentState");
         coordinatorText.Should().Contain("findCurrentArtifact");

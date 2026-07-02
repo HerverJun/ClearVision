@@ -81,7 +81,19 @@ public sealed class WebView2Host : IAsyncDisposable
 
         return $$"""
             (() => {
-                const startup = Object.freeze({{startupJson}});
+                const startup = {{startupJson}};
+                const featureFlags = Object.freeze({
+                    ...(startup.featureFlags && typeof startup.featureFlags === 'object'
+                        ? startup.featureFlags
+                        : {})
+                });
+                Object.defineProperty(startup, 'featureFlags', {
+                    value: featureFlags,
+                    writable: false,
+                    configurable: false,
+                    enumerable: true
+                });
+                Object.freeze(startup);
                 Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
                     value: startup,
                     writable: false,

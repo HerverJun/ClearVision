@@ -7,7 +7,10 @@ const DEFAULT_ROW_LIMIT = 80;
 const ROW_LIMIT_INCREMENT = 80;
 const MAX_SEARCH_NODES = 2048;
 const MAX_DISPLAY_CHARS = 512;
+export const MAX_ARTIFACT_TEXT_PREVIEW_BYTES = 64 * 1024;
+export const MAX_ARTIFACT_TEXT_DISPLAY_CHARS = 4096;
 const ARTIFACT_UNAVAILABLE_TEXT = '资源已过期或不可用';
+const ARTIFACT_TEXT_TOO_LARGE_TEXT = '内容过大，仅展示元数据';
 
 function readOwn(source, ...keys) {
     if (!source || typeof source !== 'object') {
@@ -40,6 +43,18 @@ function clipForDisplay(value, maxChars = MAX_DISPLAY_CHARS) {
 
 function normalizeBool(value) {
     return value === true || value === 'true' || value === 1;
+}
+
+function normalizeKindKey(value) {
+    return asString(value, 'unknown').trim().toLowerCase();
+}
+
+function getKindKey(node) {
+    return normalizeKindKey(readOwn(node, 'kind', 'Kind'));
+}
+
+function getOriginalTypeKey(node) {
+    return asString(readOwn(node, 'originalType', 'OriginalType')).trim().toLowerCase();
 }
 
 function getObservationFromState(state) {
@@ -148,16 +163,54 @@ function getNodeChildren(node) {
     return Array.isArray(children) ? children : [];
 }
 
-function kindIncludes(node, ...needles) {
-    const normalized = normalizeObservationNode(node);
-    const haystack = `${normalized.kind} ${normalized.originalType || ''}`.toLowerCase();
-    return needles.some(needle => haystack.includes(needle));
+function hasExplicitKind(node, ...kindKeys) {
+    return kindKeys.includes(getKindKey(node));
 }
+
+function hasControlledOriginalType(node, ...typeNames) {
+    const originalType = getOriginalTypeKey(node);
+    if (!originalType) {
+        return false;
+    }
+
+    return typeNames.some(typeName => {
+        const normalizedTypeName = String(typeName).toLowerCase();
+        return originalType === normalizedTypeName ||
+            originalType.endsWith(`.${normalizedTypeName}`) ||
+            originalType.endsWith(`+${normalizedTypeName}`);
+    });
+}
+
+const SCALAR_KIND_KEYS = new Set([
+    'null',
+    'boolean',
+    'number',
+    'string',
+    'enum',
+    'guid',
+    'datetime',
+    'duration',
+    'nonfinitenumber'
+]);
+
+const RESOURCE_KIND_KEYS = new Set([
+    'matrix',
+    'image',
+    'mask',
+    'binary',
+    'stream',
+    'resource',
+    'profile',
+    'pointset'
+]);
+
+const CONTAINER_KIND_KEYS = new Set(['dictionary', 'object', 'array']);
+const BOUNDED_KIND_KEYS = new Set(['truncated', 'unsupportedenumerable', 'objectdescriptor', 'circular']);
 
 const rendererDefinitions = [
     {
         name: 'scalar',
-        matches: node => ['null', 'boolean', 'number', 'string', 'enum'].includes(normalizeObservationNode(node).kind),
+        matches: node => SCALAR_KIND_KEYS.has(getKindKey(node)),
         render: node => {
             const normalized = normalizeObservationNode(node);
             return {
@@ -170,28 +223,31 @@ const rendererDefinitions = [
     },
     {
         name: 'point',
-        matches: node => kindIncludes(node, 'point'),
+        matches: node => hasExplicitKind(node, 'point') ||
+            hasControlledOriginalType(node, 'point', 'pointf', 'point2d', 'point2f', 'point3d', 'point3f'),
         render: node => renderKnownShapeNode(node, 'Point')
     },
     {
         name: 'circle',
-        matches: node => kindIncludes(node, 'circle'),
+        matches: node => hasExplicitKind(node, 'circle') ||
+            hasControlledOriginalType(node, 'circle', 'circle2d', 'circlef'),
         render: node => renderKnownShapeNode(node, 'Circle')
     },
     {
         name: 'line',
-        matches: node => kindIncludes(node, 'line'),
+        matches: node => hasExplicitKind(node, 'line') ||
+            hasControlledOriginalType(node, 'line', 'line2d', 'linef'),
         render: node => renderKnownShapeNode(node, 'Line')
     },
     {
         name: 'rectangle',
-        matches: node => kindIncludes(node, 'rectangle', 'rect'),
+        matches: node => hasExplicitKind(node, 'rectangle', 'rect') ||
+            hasControlledOriginalType(node, 'rectangle', 'rectanglef', 'rect'),
         render: node => renderKnownShapeNode(node, 'Rectangle')
     },
     {
         name: 'resource',
-        matches: node => ['matrix', 'image', 'mask', 'resource', 'binary', 'stream', 'pointSet', 'profile']
-            .includes(normalizeObservationNode(node).kind),
+        matches: node => RESOURCE_KIND_KEYS.has(getKindKey(node)),
         render: node => {
             const normalized = normalizeObservationNode(node);
             return {
@@ -204,22 +260,23 @@ const rendererDefinitions = [
     },
     {
         name: 'detectionList',
-        matches: node => normalizeObservationNode(node).kind === 'detectionList',
+        matches: node => hasExplicitKind(node, 'detectionlist'),
         render: node => renderKnownShapeNode(node, 'Detection List', 'detectionList')
     },
     {
         name: 'detection',
-        matches: node => normalizeObservationNode(node).kind === 'detection',
+        matches: node => hasExplicitKind(node, 'detection'),
         render: node => renderKnownShapeNode(node, 'Detection')
     },
     {
         name: 'calibrationQuality',
-        matches: node => kindIncludes(node, 'calibration'),
+        matches: node => hasExplicitKind(node, 'calibrationquality') ||
+            hasControlledOriginalType(node, 'calibrationquality'),
         render: node => renderKnownShapeNode(node, 'Calibration Quality', 'calibrationQuality')
     },
     {
         name: 'container',
-        matches: node => ['dictionary', 'object', 'array'].includes(normalizeObservationNode(node).kind),
+        matches: node => CONTAINER_KIND_KEYS.has(getKindKey(node)),
         render: node => {
             const normalized = normalizeObservationNode(node);
             return {
@@ -232,8 +289,7 @@ const rendererDefinitions = [
     },
     {
         name: 'bounded',
-        matches: node => ['truncated', 'unsupportedEnumerable', 'objectDescriptor', 'circular']
-            .includes(normalizeObservationNode(node).kind),
+        matches: node => BOUNDED_KIND_KEYS.has(getKindKey(node)),
         render: node => {
             const normalized = normalizeObservationNode(node);
             return {
@@ -424,6 +480,26 @@ function isImageArtifact(artifact) {
         String(artifact?.kind || '').toLowerCase() === 'image';
 }
 
+function isTextArtifact(artifact) {
+    const contentType = String(artifact?.contentType || '').toLowerCase();
+    return contentType.startsWith('text/') || contentType.includes('json');
+}
+
+function isArtifactDeclaredTooLargeForTextPreview(artifact) {
+    const length = Number(artifact?.length ?? 0);
+    return Number.isFinite(length) && length > MAX_ARTIFACT_TEXT_PREVIEW_BYTES;
+}
+
+function buildArtifactMetadataPreview(artifact, message) {
+    return [
+        message,
+        `Length: ${formatByteLength(artifact?.length)}`,
+        `Content type: ${artifact?.contentType || 'application/octet-stream'}`,
+        `SHA-256: ${artifact?.sha256 || '-'}`,
+        `Expires: ${formatDateTime(artifact?.expiresAtUtc)}`
+    ].join('\n');
+}
+
 function formatByteLength(value) {
     const numberValue = Number(value);
     if (!Number.isFinite(numberValue) || numberValue < 0) {
@@ -501,6 +577,7 @@ export class NodePreviewInspector {
         this.artifactReadState = new Map();
         this.identitySignature = getObservationIdentitySignatureFromState(this.state);
         this.dismissedNodeId = null;
+        this.destroyed = false;
 
         this.root = createElement('div', 'node-preview-inspector-root');
         this.container?.appendChild(this.root);
@@ -525,6 +602,7 @@ export class NodePreviewInspector {
     }
 
     destroy() {
+        this.destroyed = true;
         this.cancelSearch();
         this.cancelArtifactRead();
         this.unsubscribePreview?.();
@@ -907,6 +985,13 @@ export class NodePreviewInspector {
         }
     }
 
+    isArtifactReadCurrent(token, identity, abortController = null) {
+        return !this.destroyed &&
+            token === this.artifactReadToken &&
+            abortController?.signal?.aborted !== true &&
+            getObservationIdentitySignatureFromState(this.state) === getNodePreviewIdentitySignature(identity);
+    }
+
     cancelArtifactRead() {
         this.artifactReadAbort?.abort?.();
         this.artifactReadAbort = null;
@@ -935,34 +1020,71 @@ export class NodePreviewInspector {
 
         this.cancelArtifactRead();
         const token = this.artifactReadToken;
+        const artifactForRead = normalizeArtifactReference(artifact);
+        if (!artifactForRead) {
+            return;
+        }
+
+        if (mode !== 'image') {
+            if (!isTextArtifact(artifactForRead)) {
+                if (!this.isArtifactReadCurrent(token, identity)) {
+                    return;
+                }
+
+                this.artifactReadState.set(artifactForRead.artifactId, {
+                    status: 'success',
+                    text: buildArtifactMetadataPreview(artifactForRead, '非文本 Artifact，仅展示元数据')
+                });
+                this.render();
+                return;
+            }
+
+            if (isArtifactDeclaredTooLargeForTextPreview(artifactForRead)) {
+                if (!this.isArtifactReadCurrent(token, identity)) {
+                    return;
+                }
+
+                this.artifactReadState.set(artifactForRead.artifactId, {
+                    status: 'success',
+                    text: buildArtifactMetadataPreview(artifactForRead, ARTIFACT_TEXT_TOO_LARGE_TEXT)
+                });
+                this.render();
+                return;
+            }
+        }
+
         const abortController = typeof AbortController !== 'undefined'
             ? new AbortController()
             : null;
         this.artifactReadAbort = abortController;
-        this.artifactReadState.set(artifact.artifactId, {
+        this.artifactReadState.set(artifactForRead.artifactId, {
             status: 'loading',
             text: mode === 'image' ? '正在读取图像 Artifact...' : '正在按需读取 Artifact...'
         });
         this.render();
 
         try {
+            if (!this.isArtifactReadCurrent(token, identity, abortController)) {
+                return;
+            }
+
             const result = await this.previewCoordinator?.readArtifactForCurrentState?.(
-                artifact.artifactId,
+                artifactForRead.artifactId,
                 identity,
                 { signal: abortController?.signal, objectUrl: mode === 'image' });
-            if (token !== this.artifactReadToken) {
+            if (!this.isArtifactReadCurrent(token, identity, abortController)) {
                 return;
             }
 
             if (mode === 'image') {
                 if (result?.objectUrl) {
                     this.onOpenImage(result.objectUrl);
-                    this.artifactReadState.set(artifact.artifactId, {
+                    this.artifactReadState.set(artifactForRead.artifactId, {
                         status: 'success',
                         text: '图像 Artifact 已打开。'
                     });
                 } else {
-                    this.artifactReadState.set(artifact.artifactId, {
+                    this.artifactReadState.set(artifactForRead.artifactId, {
                         status: 'error',
                         text: ARTIFACT_UNAVAILABLE_TEXT
                     });
@@ -972,27 +1094,43 @@ export class NodePreviewInspector {
             }
 
             const blob = result?.blob;
-            const contentType = String(result?.artifact?.contentType || artifact.contentType || '').toLowerCase();
-            let text = `已读取 ${formatByteLength(blob?.size ?? artifact.length)}。`;
+            const artifactMetadata = normalizeArtifactReference(result?.artifact) || artifactForRead;
+            const contentType = String(artifactMetadata.contentType || '').toLowerCase();
+            let text = `已读取 ${formatByteLength(blob?.size ?? artifactMetadata.length)}。`;
             if (blob && (contentType.includes('json') || contentType.startsWith('text/'))) {
-                const rawText = await blob.text();
-                if (token !== this.artifactReadToken) {
+                if (typeof blob.slice !== 'function') {
+                    throw new Error('Artifact Blob 不支持有界文本预览');
+                }
+
+                const actualSize = Number(blob.size ?? 0);
+                const actualTextTooLarge = Number.isFinite(actualSize) && actualSize > MAX_ARTIFACT_TEXT_PREVIEW_BYTES;
+                const previewBlob = blob.slice(0, MAX_ARTIFACT_TEXT_PREVIEW_BYTES);
+                const rawText = await previewBlob.text();
+                if (!this.isArtifactReadCurrent(token, identity, abortController)) {
                     return;
                 }
-                text = clipForDisplay(rawText, 4096);
+                const displayText = clipForDisplay(rawText, MAX_ARTIFACT_TEXT_DISPLAY_CHARS);
+                const displayTruncated = actualTextTooLarge || rawText.length > MAX_ARTIFACT_TEXT_DISPLAY_CHARS;
+                text = displayTruncated
+                    ? `${displayText}\n已截断。`
+                    : displayText;
             }
 
-            this.artifactReadState.set(artifact.artifactId, {
+            if (!this.isArtifactReadCurrent(token, identity, abortController)) {
+                return;
+            }
+
+            this.artifactReadState.set(artifactForRead.artifactId, {
                 status: 'success',
                 text
             });
             this.render();
         } catch (error) {
-            if (token !== this.artifactReadToken || error?.name === 'AbortError') {
+            if (!this.isArtifactReadCurrent(token, identity, abortController) || error?.name === 'AbortError') {
                 return;
             }
 
-            this.artifactReadState.set(artifact.artifactId, {
+            this.artifactReadState.set(artifactForRead.artifactId, {
                 status: 'error',
                 text: isArtifactUnavailableError(error)
                     ? ARTIFACT_UNAVAILABLE_TEXT

@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  MAX_ARTIFACT_TEXT_DISPLAY_CHARS,
+  MAX_ARTIFACT_TEXT_PREVIEW_BYTES,
+  NodePreviewInspector,
   buildVisibleObservationRows,
   nodePreviewRendererRegistry,
   searchObservationRows
@@ -37,6 +40,98 @@ function node(kind, fields = {}) {
   };
 }
 
+function createFakeElement(tagName) {
+  return {
+    tagName,
+    children: [],
+    dataset: {},
+    style: {
+      setProperty() {}
+    },
+    classList: {
+      add() {},
+      remove() {}
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    replaceChildren(...children) {
+      this.children = children;
+    },
+    remove() {
+      this.removed = true;
+    },
+    addEventListener() {},
+    setAttribute() {},
+    querySelector() {
+      return null;
+    }
+  };
+}
+
+function installFakeDocument() {
+  const originalDocument = globalThis.document;
+  const fakeBody = createFakeElement('body');
+  globalThis.document = {
+    body: fakeBody,
+    createElement: createFakeElement,
+    execCommand() {
+      return false;
+    }
+  };
+
+  return () => {
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+  };
+}
+
+function createInspectorHarness(options = {}) {
+  const state = options.state ?? {
+    activeNodeId: 'node-1',
+    nodeType: 'Thresholding',
+    title: 'Threshold',
+    status: 'success',
+    executionTimeMs: 5,
+    observation: {
+      identity: identity(),
+      detail: node('dictionary', {
+        pathHint: '$',
+        addressable: false,
+        children: []
+      })
+    },
+    artifacts: options.artifacts ?? []
+  };
+  const calls = [];
+  const coordinator = {
+    getState: () => state,
+    subscribe: () => () => {},
+    readArtifactForCurrentState: async (artifactId, expectedIdentity, readOptions) => {
+      calls.push({ artifactId, expectedIdentity, readOptions });
+      if (typeof options.readArtifactForCurrentState === 'function') {
+        return options.readArtifactForCurrentState(artifactId, expectedIdentity, readOptions);
+      }
+      return options.readResult;
+    }
+  };
+  const inspector = new NodePreviewInspector(
+    createFakeElement('div'),
+    {
+      subscribeViewState: () => () => {},
+      getNodeScreenRect: () => null
+    },
+    coordinator,
+    { selectionStore: options.selectionStore ?? null }
+  );
+
+  return { inspector, calls, state };
+}
+
 test('NodePreviewInspector renderer registry covers bounded Observation DTO kinds', () => {
   assert.deepEqual(
     nodePreviewRendererRegistry.coverage(),
@@ -57,9 +152,16 @@ test('NodePreviewInspector renderer registry covers bounded Observation DTO kind
   );
 
   assert.equal(nodePreviewRendererRegistry.render(node('number')).renderer, 'scalar');
+  assert.equal(nodePreviewRendererRegistry.render(node('guid')).renderer, 'scalar');
+  assert.equal(nodePreviewRendererRegistry.render(node('dateTime')).renderer, 'scalar');
+  assert.equal(nodePreviewRendererRegistry.render(node('duration')).renderer, 'scalar');
+  assert.equal(nodePreviewRendererRegistry.render(node('nonFiniteNumber')).renderer, 'scalar');
   assert.equal(nodePreviewRendererRegistry.render(node('object')).renderer, 'container');
   assert.equal(nodePreviewRendererRegistry.render(node('detectionList')).renderer, 'detectionList');
   assert.equal(nodePreviewRendererRegistry.render(node('image')).renderer, 'resource');
+  assert.equal(nodePreviewRendererRegistry.render(node('pointSet')).renderer, 'resource');
+  assert.equal(nodePreviewRendererRegistry.render(node('profile')).renderer, 'resource');
+  assert.equal(nodePreviewRendererRegistry.render(node('binary')).renderer, 'resource');
   assert.equal(nodePreviewRendererRegistry.render(node('unknownKind')).renderer, 'unknown');
   assert.equal(
     nodePreviewRendererRegistry.render(node('object', { originalType: 'OpenCvSharp.Point2f' })).label,
@@ -69,6 +171,14 @@ test('NodePreviewInspector renderer registry covers bounded Observation DTO kind
     nodePreviewRendererRegistry.render(node('object', { originalType: 'CalibrationQuality' })).label,
     'Calibration Quality'
   );
+});
+
+test('NodePreviewInspector renderer priority avoids broad substring matches', () => {
+  assert.equal(nodePreviewRendererRegistry.render(node('pointSet')).renderer, 'resource');
+  assert.equal(nodePreviewRendererRegistry.render(node('DetectionList')).renderer, 'detectionList');
+  assert.equal(nodePreviewRendererRegistry.render(node('Detection')).renderer, 'detection');
+  assert.equal(nodePreviewRendererRegistry.render(node('object', { originalType: 'PointSet' })).renderer, 'container');
+  assert.equal(nodePreviewRendererRegistry.render(node('object', { originalType: 'System.Drawing.RectangleF' })).label, 'Rectangle');
 });
 
 test('NodePreviewInspector tree rendering is row-limited and searches only bounded DTO fields', () => {
@@ -155,4 +265,200 @@ test('nodePreviewSelectionStore stores complete identity and clears on identity 
   store.select({ identity: identity(), displayValue: 'x', pathHint: '$["x"]' });
   store.clear();
   assert.equal(store.getSelection(), null);
+});
+
+test('NodePreviewInspector does not fetch declared-oversized text artifacts', async () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const oversizedArtifact = {
+      artifactId: 'large-json',
+      kind: 'profile',
+      role: 'profile',
+      contentType: 'application/json',
+      length: MAX_ARTIFACT_TEXT_PREVIEW_BYTES + 1,
+      sha256: 'sha-large',
+      expiresAtUtc: '2026-07-02T09:00:00Z'
+    };
+    const { inspector, calls } = createInspectorHarness({ artifacts: [oversizedArtifact] });
+
+    await inspector.startArtifactRead(oversizedArtifact, 'text');
+
+    assert.equal(calls.length, 0);
+    const readState = inspector.artifactReadState.get('large-json');
+    assert.equal(readState.status, 'success');
+    assert.match(readState.text, /内容过大，仅展示元数据/);
+    assert.match(readState.text, /sha-large/);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector decodes text only from bounded Blob slices', async () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    let originalTextCalls = 0;
+    let sliceTextCalls = 0;
+    const sliceCalls = [];
+    const blob = {
+      size: 5,
+      text() {
+        originalTextCalls += 1;
+        throw new Error('full blob text must not be called');
+      },
+      slice(start, end) {
+        sliceCalls.push([start, end]);
+        return {
+          async text() {
+            sliceTextCalls += 1;
+            return 'hello';
+          }
+        };
+      }
+    };
+    const artifact = {
+      artifactId: 'small-text',
+      kind: 'profile',
+      contentType: 'text/plain',
+      length: 5
+    };
+    const { inspector, calls } = createInspectorHarness({
+      artifacts: [artifact],
+      readResult: { blob, artifact }
+    });
+
+    await inspector.startArtifactRead(artifact, 'text');
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(sliceCalls, [[0, MAX_ARTIFACT_TEXT_PREVIEW_BYTES]]);
+    assert.equal(originalTextCalls, 0);
+    assert.equal(sliceTextCalls, 1);
+    assert.equal(inspector.artifactReadState.get('small-text').text, 'hello');
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector truncates when actual Blob size exceeds text limit despite smaller declaration', async () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const artifact = {
+      artifactId: 'mismatch-text',
+      kind: 'profile',
+      contentType: 'application/json',
+      length: 12
+    };
+    const blob = new Blob(['x'.repeat(MAX_ARTIFACT_TEXT_DISPLAY_CHARS + 256)], {
+      type: 'application/json'
+    });
+    Object.defineProperty(blob, 'size', { value: MAX_ARTIFACT_TEXT_PREVIEW_BYTES + 10 });
+    const { inspector } = createInspectorHarness({
+      artifacts: [artifact],
+      readResult: { blob, artifact }
+    });
+
+    await inspector.startArtifactRead(artifact, 'text');
+
+    const text = inspector.artifactReadState.get('mismatch-text').text;
+    assert.match(text, /已截断/);
+    assert.ok(text.length < MAX_ARTIFACT_TEXT_DISPLAY_CHARS + 64);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector ignores stale text completion after identity change or destroy', async () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const artifact = {
+      artifactId: 'late-text',
+      kind: 'profile',
+      contentType: 'text/plain',
+      length: 16
+    };
+    let releaseText;
+    let textStartedResolve;
+    const textStarted = new Promise(resolve => {
+      textStartedResolve = resolve;
+    });
+    const blob = {
+      size: 16,
+      slice() {
+        textStartedResolve();
+        return {
+          text: () => new Promise(resolveText => {
+            releaseText = () => resolveText('late text');
+          })
+        };
+      }
+    };
+    const { inspector } = createInspectorHarness({
+      artifacts: [artifact],
+      readResult: { blob, artifact }
+    });
+
+    const staleRead = inspector.startArtifactRead(artifact, 'text');
+    await textStarted;
+    inspector.state = {
+      ...inspector.state,
+      observation: {
+        ...inspector.state.observation,
+        identity: identity({ flowRevision: 99 })
+      }
+    };
+    releaseText();
+    await staleRead;
+    assert.notEqual(inspector.artifactReadState.get('late-text')?.status, 'success');
+
+    let destroyReleaseText;
+    let destroyTextStartedResolve;
+    const destroyTextStarted = new Promise(resolve => {
+      destroyTextStartedResolve = resolve;
+    });
+    const destroyBlob = {
+      size: 16,
+      slice() {
+        destroyTextStartedResolve();
+        return {
+          text: () => new Promise(resolveText => {
+            destroyReleaseText = () => resolveText('destroyed text');
+          })
+        };
+      }
+    };
+    inspector.state = {
+      ...inspector.state,
+      observation: {
+        ...inspector.state.observation,
+        identity: identity()
+      }
+    };
+    inspector.artifactReadState.clear();
+    inspector.previewCoordinator.readArtifactForCurrentState = async () => ({ blob: destroyBlob, artifact });
+    const destroyRead = inspector.startArtifactRead(artifact, 'text');
+    await destroyTextStarted;
+    inspector.destroy();
+    destroyReleaseText();
+    await destroyRead;
+    assert.equal(inspector.destroyed, true);
+    assert.notEqual(inspector.artifactReadState.get('late-text')?.status, 'success');
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('app node preview cutover creates selectionStore only in inspector-enabled branch', () => {
+  const appSourcePath = path.resolve(
+    process.cwd(),
+    '../../src/ClearVision.Product.Desktop/wwwroot/src/app.js'
+  );
+  const appSource = fs.readFileSync(appSourcePath, 'utf8');
+
+  assert.equal((appSource.match(/createNodePreviewSelectionStore\(\)/g) || []).length, 1);
+  assert.match(appSource, /const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce\(\);/);
+  assert.match(appSource, /featureFlags\?\.\[NODE_PREVIEW_INSPECTOR_FLAG_KEY\] === true/);
+  assert.equal(appSource.includes('startup.nodePreviewInspectorEnabled === true'), false);
+  assert.match(appSource, /if \(inspectorEnabled\) \{[\s\S]*createNodePreviewSelectionStore\(\)[\s\S]*new NodePreviewInspector/);
 });

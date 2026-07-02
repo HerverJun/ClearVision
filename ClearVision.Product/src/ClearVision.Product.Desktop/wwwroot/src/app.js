@@ -93,6 +93,20 @@ import projectManager, {
     subscribeProject
 } from './features/project/projectManager.js';
 
+const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
+
+function readNodePreviewInspectorFlagOnce() {
+    const startup = window.__CLEARVISION_STARTUP__;
+    const featureFlags = startup && typeof startup === 'object' &&
+        startup.featureFlags && typeof startup.featureFlags === 'object'
+        ? startup.featureFlags
+        : null;
+
+    return featureFlags?.[NODE_PREVIEW_INSPECTOR_FLAG_KEY] === true;
+}
+
+const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce();
+
 // 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
 const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = createSignal(null);
@@ -861,16 +875,7 @@ function openImageViewerFromPreview(imageSource) {
 }
 
 function isNodePreviewInspectorEnabled() {
-    const startup = window.__CLEARVISION_STARTUP__;
-    if (!startup || typeof startup !== 'object') {
-        return false;
-    }
-
-    const featureFlags = startup.featureFlags && typeof startup.featureFlags === 'object'
-        ? startup.featureFlags
-        : {};
-    return featureFlags['Studio:NodePreviewInspectorEnabled'] === true ||
-        startup.nodePreviewInspectorEnabled === true;
+    return NODE_PREVIEW_INSPECTOR_ENABLED;
 }
 
 function initializeNodePreviewExperience() {
@@ -892,13 +897,13 @@ function initializeNodePreviewExperience() {
         serviceRegistry.register('nodePreviewCoordinator', nodePreviewCoordinator);
     }
 
-    if (!nodePreviewSelectionStore) {
-        nodePreviewSelectionStore = createNodePreviewSelectionStore();
-        serviceRegistry.register('nodePreviewSelectionStore', nodePreviewSelectionStore);
-    }
-
     const inspectorEnabled = isNodePreviewInspectorEnabled();
     if (inspectorEnabled) {
+        if (!nodePreviewSelectionStore) {
+            nodePreviewSelectionStore = createNodePreviewSelectionStore();
+            serviceRegistry.register('nodePreviewSelectionStore', nodePreviewSelectionStore);
+        }
+
         if (!nodePreviewInspector) {
             const container = document.querySelector('.flow-editor-container');
             if (container) {
