@@ -13,6 +13,8 @@ const LEGACY_SERVICE_GLOBALS = {
     aiPanel: 'aiPanel',
     nodePreviewCoordinator: 'nodePreviewCoordinator',
     nodePreviewOverlay: 'nodePreviewOverlay',
+    nodePreviewInspector: 'nodePreviewInspector',
+    nodePreviewSelectionStore: 'nodePreviewSelectionStore',
     cvSettingsView: 'settingsView'
 };
 

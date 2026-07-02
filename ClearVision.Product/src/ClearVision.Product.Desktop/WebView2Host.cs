@@ -56,7 +56,8 @@ public sealed class WebView2Host : IAsyncDisposable
     internal static string BuildStartupInjectionScript(
         bool workspaceV2Enabled,
         string apiBaseUrl,
-        string cssVersion)
+        string cssVersion,
+        bool nodePreviewInspectorEnabled = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
@@ -64,9 +65,14 @@ public sealed class WebView2Host : IAsyncDisposable
         var startup = new
         {
             workspaceV2Enabled,
+            nodePreviewInspectorEnabled,
             apiBaseUrl,
             hostKind = "desktop-webview2",
-            frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath
+            frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath,
+            featureFlags = new Dictionary<string, bool>
+            {
+                ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled
+            }
         };
 
         var startupJson = JsonSerializer.Serialize(startup, StartupScriptJsonOptions);
@@ -227,7 +233,8 @@ public sealed class WebView2Host : IAsyncDisposable
         var initScript = BuildStartupInjectionScript(
             _studioOptions.WorkspaceV2Enabled,
             apiBaseUrl,
-            cssVersion);
+            cssVersion,
+            _studioOptions.NodePreviewInspectorEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] 已注入 API 配置脚本: {apiBaseUrl}");
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] CSS版本号: {cssVersion}");

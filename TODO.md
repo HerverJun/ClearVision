@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G06`
-- 当前卡片：`docs/进行中/Studio2/goals/G06.md`
+- 当前 Goal：`G07A`
+- 当前卡片：`docs/进行中/Studio2/goals/G07A.md`
 - 当前阶段：`Observation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -93,8 +93,8 @@
 | G04B | Foundation | V2 单请求工程保存与持久化身份 | DONE | G04A | `docs/进行中/Studio2/goals/G04B.md` | 见 G04B 完成提交与最终报告 |
 | G05A | Observation | Execution Observation 投影与身份 | DONE | G04B | `docs/进行中/Studio2/goals/G05A.md` | 见 G05A 完成提交与最终报告 |
 | G05B | Observation | Preview Artifact 生命周期与安全读取 | DONE | G05A | `docs/进行中/Studio2/goals/G05B.md` | 见 G05B follow-up 完成提交与最终报告 |
-| G06 | Observation | 节点预览结果检查器 MVP | READY | G05B | `docs/进行中/Studio2/goals/G06.md` |  |
-| G07A | Observation | Canonical ResultPath 解析器 | LOCKED | G06 | `docs/进行中/Studio2/goals/G07A.md` |  |
+| G06 | Observation | 节点预览结果检查器 MVP | DONE | G05B | `docs/进行中/Studio2/goals/G06.md` | 见 G06 完成提交与最终报告 |
+| G07A | Observation | Canonical ResultPath 解析器 | READY | G06 | `docs/进行中/Studio2/goals/G07A.md` |  |
 | G07B | Observation | 字段级全局变量绑定 V1 | LOCKED | G07A | `docs/进行中/Studio2/goals/G07B.md` |  |
 | G08 | Observation | Visual Scene V1（只读投影） | LOCKED | G07B | `docs/进行中/Studio2/goals/G08.md` |  |
 | G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | LOCKED | G08 | `docs/进行中/Studio2/goals/G09A.md` |  |
@@ -163,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-02 | G06 | `52f7c07dfe2842e5ec17649e8b0de203edcaf5ea` | 见 G06 完成提交与最终报告 | UI focused unit PASS（19 tests）；Playwright `node-preview.spec.ts` PASS（6 tests）；Desktop targeted serial tests PASS（73 tests）；UI `test:unit` PASS（569 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口节点预览结果检查器 MVP：新增默认关闭 `Studio:NodePreviewInspectorEnabled` 与 flag ledger；flag on 时仅挂载 `NodePreviewInspector`，legacy overlay 不构造/不订阅/无 timer；Summary/Detail/Artifact、受控 renderer、搜索/copy/分页增量、selectionStore 与 stale artifact 读取均经现有 coordinator；未执行 G07A。 |
 | 2026-07-02 | G05B follow-up | `1c8f1c25194d8e2d169ff710bfa3c604e262bf92` | 见 G05B follow-up 完成提交与最终报告 | Desktop targeted tests PASS，60 tests；FlowExecutionService targeted PASS，13 tests；UI `test:unit` PASS，563 tests；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05B Artifact follow-up：Store public API 不再暴露 pending bytes，commit 使用正式 bytes copy 和 SHA-256；batch 先预检/规划再原子替换 owner、淘汰旧项并插入全部当前批次；取消/异常未 commit batch rollback；前端 artifact URL 与服务端 artifact 释放覆盖 uncached、live camera bypass、cache replacement/eviction、node switch、stale/partial read/destroy；下一项为 G06，未执行 G06。 |
 | 2026-07-02 | G05B | `633635569249a53b1e55bce98410e5e5a5d4e5cf` | 见 G05B 完成提交与最终报告 | Desktop targeted tests PASS，67 tests；FlowExecutionService targeted PASS，13 tests；UI `test:unit` PASS，559 tests；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 Desktop-only Preview Artifact 生命周期：独立 `PreviewArtifactStore`、`PreviewArtifactMaterializer`、opaque bearer artifactId、TTL/容量/checksum/DELETE/revoke/dispose；preview `ArtifactMode=references` 不再把大图塞入主 JSON；旧 Base64 兼容保留为 G16 删除债；下一项为 G06，未执行 G06。 |
 | 2026-07-02 | G05A follow-up | `18cd539cccca3b3ec7d570768661fc88ce9a8ec1` | 见 G05A follow-up 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，59 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05A Observation fail-soft：未知对象不再调用 `ToString()`、任意 public getter 或任意自定义 enumerable；`Detail` 使用最终 UTF-8 byte 硬上限；legacy outputData 和 metrics 输入均有界；endpoint adversarial 场景保持 HTTP 200 且普通 `Score`/`Seen` 可读；当前 Goal 仍为 G05B，未执行 G05B。 |

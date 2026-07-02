@@ -67,6 +67,77 @@ async function addAndSelectNode(page, config: {
   }, config);
 }
 
+function buildObservationResponse(request: any, detail: any, artifacts: any[] = []) {
+  const targetNodeId = request.targetNodeId || request.TargetNodeId;
+  return {
+    success: true,
+    executionTimeMs: 21,
+    outputData: { Score: 0.98 },
+    artifacts,
+    observation: {
+      schemaVersion: 'execution-observation.v1',
+      observedAtUtc: '2026-07-02T08:00:00Z',
+      identity: {
+        projectId: request.projectId || request.ProjectId,
+        targetNodeId,
+        debugSessionId: request.debugSessionId || request.DebugSessionId,
+        clientRequestSequence: request.clientRequestSequence || request.ClientRequestSequence,
+        flowRevision: request.flowRevision || request.FlowRevision,
+      },
+      outcome: {
+        success: true,
+        executionTimeMs: 21,
+        errorMessage: null,
+        failedOperatorId: null,
+        failedOperatorName: null,
+        failedOperatorType: null,
+        executedOperatorCount: 2,
+      },
+      summary: [
+        {
+          key: 'Score',
+          displayValue: '0.98',
+          originalType: 'System.Double',
+          pathHint: '$["Score"]',
+          addressable: true,
+        },
+      ],
+      detail,
+      diagnostics: [],
+      limits: {
+        maxDepth: 4,
+        maxObjectFields: 64,
+        maxCollectionItems: 64,
+        maxStringChars: 1024,
+        maxNodes: 2048,
+        maxDetailBytes: 262144,
+      },
+      truncated: false,
+    },
+  };
+}
+
+function buildLargeDetail() {
+  return {
+    kind: 'dictionary',
+    displayValue: '180/180 fields',
+    originalType: 'System.Collections.Generic.Dictionary',
+    pathHint: '$',
+    addressable: false,
+    truncated: false,
+    children: Array.from({ length: 180 }, (_, index) => ({
+      kind: 'number',
+      displayValue: index === 3 ? '<script>alert(1)</script><img src=x onerror=alert(2)>' : `Value${index}`,
+      originalType: 'System.Int32',
+      name: `Field${index}`,
+      pathHint: `$["Field${index}"]`,
+      addressable: index % 2 === 0,
+      truncated: false,
+      children: [],
+    })),
+  };
+}
+
 test.describe('Node Preview Overlay', () => {
   test.beforeEach(async ({ page }) => {
     await stubOperatorLibrary(page);
@@ -272,5 +343,119 @@ test.describe('Node Preview Overlay', () => {
 
     await page.mouse.dblclick(coords.x, coords.y);
     await expect(page.locator('#subgraph-breadcrumb')).toBeVisible();
+  });
+});
+
+test.describe('Node Preview Inspector flag', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
+        value: Object.freeze({
+          workspaceV2Enabled: false,
+          nodePreviewInspectorEnabled: true,
+          featureFlags: {
+            'Studio:NodePreviewInspectorEnabled': true,
+          },
+        }),
+        writable: false,
+        configurable: false,
+      });
+    });
+    await stubOperatorLibrary(page);
+    await bootAuthenticatedApp(page);
+    await setCurrentProject(page);
+  });
+
+  test('flag on mounts only inspector and keeps detail/artifact state bounded', async ({ page }) => {
+    let releasePreview: (() => void) | null = null;
+    const previewBlocked = new Promise<void>(resolve => {
+      releasePreview = resolve;
+    });
+    const artifact = {
+      artifactId: 'profile-artifact',
+      kind: 'profile',
+      role: 'profile',
+      pathHint: '$["Profile"]',
+      contentType: 'application/json',
+      length: 128,
+      sha256: 'abc123',
+      expiresAtUtc: '2026-07-02T09:00:00Z',
+    };
+
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      await previewBlocked;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildObservationResponse(request, buildLargeDetail(), [artifact])),
+      });
+    });
+
+    await page.route('**/api/preview-artifacts/profile-artifact', async route => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'text/plain',
+        body: 'expired',
+      });
+    });
+
+    await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Inspector Node',
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+
+    await expect(page.locator('.node-preview-inspector-card')).toBeVisible();
+    await expect(page.locator('.node-preview-card')).toHaveCount(0);
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('loading');
+    releasePreview?.();
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+    await expect(page.locator('.node-preview-inspector-card')).toContainText('Score');
+
+    const owners = await page.evaluate(() => ({
+      hasOverlay: Boolean((window as any).nodePreviewOverlay),
+      hasInspector: Boolean((window as any).nodePreviewInspector),
+      hasCoordinator: Boolean((window as any).nodePreviewCoordinator),
+    }));
+    expect(owners).toEqual({
+      hasOverlay: false,
+      hasInspector: true,
+      hasCoordinator: true,
+    });
+
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Detail' }).click();
+    await expect(page.locator('.node-preview-inspector-tree')).toBeVisible();
+    const initialRows = await page.locator('.node-preview-inspector-tree-row').count();
+    expect(initialRows).toBeLessThanOrEqual(80);
+    await expect(page.locator('.node-preview-inspector-card script')).toHaveCount(0);
+    await expect(page.locator('.node-preview-inspector-card')).toContainText('<script>alert(1)</script>');
+
+    await page.locator('.node-preview-inspector-search').fill('Field120');
+    await expect(page.locator('.node-preview-inspector-tree-row', { hasText: 'Field120' })).toBeVisible();
+    await page.locator('.node-preview-inspector-tree-row', { hasText: 'Field120' }).first().click();
+
+    const selection = await page.evaluate(() => (window as any).nodePreviewSelectionStore.getSelection());
+    expect(selection.pathHint).toBe('$["Field120"]');
+    expect(selection.identity.targetNodeId).toBeTruthy();
+    expect(selection.addressable).toBe(true);
+
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Artifact' }).click();
+    await expect(page.locator('.node-preview-inspector-artifact')).toContainText('profile');
+    await page.locator('.node-preview-inspector-action-btn', { hasText: '按需读取' }).click();
+    await expect(page.locator('.node-preview-inspector-artifact-read.error')).toContainText('资源已过期或不可用');
+
+    await page.evaluate(async () => {
+      const projectModule = await import('/src/features/project/projectManager.js');
+      projectModule.setCurrentProject({
+        id: 'other-project',
+        name: 'Other Project',
+        description: '',
+        flow: null,
+      });
+    });
+    await expect.poll(async () => page.evaluate(() => (window as any).nodePreviewSelectionStore.getSelection()))
+      .toBeNull();
   });
 });

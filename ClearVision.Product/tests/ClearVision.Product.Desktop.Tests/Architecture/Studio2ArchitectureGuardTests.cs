@@ -364,6 +364,83 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void NodePreviewInspector_ShouldStayBehindSingleCoordinatorFlagAndAvoidNewAuthorities()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js");
+        var inspectorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/nodePreviewInspector.js");
+        var selectionStoreText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/nodePreviewSelectionStore.js");
+        var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+        var adrText = ReadRepoText("docs/进行中/Studio2/architecture/Studio2-架构边界-ADR.md");
+
+        Regex.Matches(coordinatorText, @"class\s+NodePreviewCoordinator\b")
+            .Should().ContainSingle("G06 must reuse the existing preview coordinator owner.");
+        Regex.Matches(appText, @"new\s+NodePreviewCoordinator\s*\(")
+            .Should().ContainSingle("legacy app composition root should create one preview coordinator.");
+        Regex.Matches(appText, @"new\s+NodePreviewOverlay\s*\(")
+            .Should().ContainSingle("flag off keeps the legacy overlay as the only old owner.");
+        Regex.Matches(appText, @"new\s+NodePreviewInspector\s*\(")
+            .Should().ContainSingle("flag on creates one inspector owner.");
+        appText.Should().Contain("if (inspectorEnabled)");
+        appText.Should().Contain("serviceRegistry.register('nodePreviewCoordinator'");
+        appText.Should().Contain("serviceRegistry.register('nodePreviewOverlay'");
+        appText.Should().Contain("serviceRegistry.register('nodePreviewInspector'");
+
+        studioOptionsText.Should().Contain("NodePreviewInspectorEnabled");
+        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+        adrText.Should().Contain("Studio:NodePreviewInspectorEnabled");
+        adrText.Should().Contain("G15.2/G16");
+
+        inspectorText.Should().NotMatchRegex(@"\bfetch\s*\(", "Inspector must read artifacts through NodePreviewCoordinator.");
+        inspectorText.Should().NotContain("httpClient", "Inspector must not import or create a second Artifact client.");
+        inspectorText.Should().Contain("readArtifactForCurrentState");
+        coordinatorText.Should().Contain("readArtifactForCurrentState");
+        coordinatorText.Should().Contain("findCurrentArtifact");
+
+        selectionStoreText.Should().NotContain("localStorage");
+        selectionStoreText.Should().NotContain("IndexedDB");
+        selectionStoreText.Should().NotContain("saveProject");
+        selectionStoreText.Should().NotContain("ProjectSave");
+        selectionStoreText.Should().NotContain("GlobalVariables");
+        selectionStoreText.Should().NotContain("ResultPath");
+
+        var g06FrontendText = string.Join(
+            "\n",
+            inspectorText,
+            selectionStoreText,
+            coordinatorText,
+            appText);
+        g06FrontendText.Should().NotContain("ResultPathVersion");
+        g06FrontendText.Should().NotMatchRegex(@"class\s+\w*ResultPath\w*Parser\b");
+        g06FrontendText.Should().NotMatchRegex(@"function\s+\w*ResultPath\w*Parser\s*\(");
+
+        var previewEndpointText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs");
+        previewEndpointText.Should().NotContain("ResultPathVersion");
+        previewEndpointText.Should().NotContain("MapPost(\"/api/results");
+        previewEndpointText.Should().NotContain("MapGet(\"/api/results/fields");
+
+        var forbiddenRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Station",
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Core",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+        };
+
+        foreach (var root in forbiddenRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar));
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.*", SearchOption.AllDirectories)
+                         .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                                        path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.ReadAllText(file).Should().NotContain("NodePreviewInspector", ToRelativePath(file));
+            }
+        }
+    }
+
+    [Fact]
     public void Station_ShouldNotDependOnVueNodeOrStudioFrontend()
     {
         var stationRoot = Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Station");
@@ -440,6 +517,9 @@ public sealed class Studio2ArchitectureGuardTests
 
     private static string ToRelativePath(string path) =>
         Path.GetRelativePath(Root, path).Replace('\\', '/');
+
+    private static string ReadRepoText(string relativePath) =>
+        File.ReadAllText(Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
 
     private static string FindRepositoryRoot([CallerFilePath] string sourceFile = "")
     {

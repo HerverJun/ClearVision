@@ -660,6 +660,116 @@ test('NodePreviewCoordinator ignores late observation response without overwriti
   }
 });
 
+test('NodePreviewCoordinator retains accepted observation and reads current artifacts on demand', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const createdObjectUrls = [];
+  const readArtifactIds = [];
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      readArtifactIds.push(artifactId);
+      return {
+        blob: new Blob(['payload'], { type: artifactId === 'image-artifact' ? 'image/png' : 'text/plain' }),
+        headers: new Map()
+      };
+    },
+    async deletePreviewArtifact() {}
+  };
+  globalThis.URL.createObjectURL = blob => {
+    const url = `blob://artifact-${createdObjectUrls.length + 1}`;
+    createdObjectUrls.push({ url, type: blob.type });
+    return url;
+  };
+
+  const { coordinator, node } = createCoordinator({
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) => ({
+      ...buildObservationResponse(nodeId, executorOptions),
+      outputImageBase64: null,
+      artifacts: [
+        { artifactId: 'text-artifact', kind: 'profile', role: 'profile', contentType: 'text/plain', length: 7 },
+        { artifactId: 'image-artifact', kind: 'image', role: 'mask', contentType: 'image/png', length: 7 }
+      ]
+    })
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    const state = coordinator.getState();
+    assert.equal(state.observation.identity.targetNodeId, node.id);
+    assert.equal(state.artifacts.length, 2);
+
+    const textRead = await coordinator.readArtifactForCurrentState(
+      'text-artifact',
+      state.observation.identity
+    );
+    assert.equal(await textRead.blob.text(), 'payload');
+
+    const imageRead = await coordinator.readArtifactForCurrentState(
+      'image-artifact',
+      state.observation.identity,
+      { objectUrl: true }
+    );
+    assert.equal(imageRead.objectUrl, 'blob://artifact-1');
+    assert.deepEqual(readArtifactIds, ['text-artifact', 'image-artifact']);
+    assert.equal(coordinator.getState().previewArtifactObjectUrls.includes('blob://artifact-1'), true);
+
+    await assert.rejects(
+      () => coordinator.readArtifactForCurrentState('missing-artifact', state.observation.identity),
+      /stale/
+    );
+    await assert.rejects(
+      () => coordinator.readArtifactForCurrentState('text-artifact', {
+        ...state.observation.identity,
+        flowRevision: 999
+      }),
+      /stale/
+    );
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator maps expired artifact reads without polluting preview state', async () => {
+  const artifactClient = {
+    async getPreviewArtifactBlob() {
+      const error = new Error('HTTP 404');
+      error.status = 404;
+      throw error;
+    },
+    async deletePreviewArtifact() {}
+  };
+  const { coordinator, node } = createCoordinator({
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) => ({
+      ...buildObservationResponse(nodeId, executorOptions),
+      artifacts: [
+        { artifactId: 'expired-artifact', kind: 'profile', role: 'profile', contentType: 'application/json', length: 2 }
+      ]
+    })
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    const identity = coordinator.getState().observation.identity;
+
+    await assert.rejects(
+      () => coordinator.readArtifactForCurrentState('expired-artifact', identity),
+      /资源已过期或不可用/
+    );
+    assert.equal(coordinator.getState().status, 'success');
+    assert.equal(coordinator.getState().errorMessage, null);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
 test('previewObservationMatchesRequest keeps compatibility for old responses without observation', () => {
   assert.equal(
     previewObservationMatchesRequest(

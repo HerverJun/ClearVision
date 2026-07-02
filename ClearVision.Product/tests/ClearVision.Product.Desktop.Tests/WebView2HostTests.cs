@@ -39,11 +39,14 @@ public class WebView2HostTests
         var script = WebView2Host.BuildStartupInjectionScript(
             workspaceV2Enabled: true,
             apiBaseUrl: "http://localhost:5000/api",
-            cssVersion: "123");
+            cssVersion: "123",
+            nodePreviewInspectorEnabled: true);
 
         script.Should().Contain("Object.freeze");
         script.Should().Contain("__CLEARVISION_STARTUP__");
         script.Should().Contain("\"workspaceV2Enabled\":true");
+        script.Should().Contain("\"nodePreviewInspectorEnabled\":true");
+        script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
         script.Should().Contain("\"hostKind\":\"desktop-webview2\"");
         script.Should().Contain("\"frontendV2BasePath\":\"/v2\"");

@@ -85,7 +85,9 @@ import {
 import { PropertyPanel } from './features/flow-editor/propertyPanel.js';
 import PropertySidebarController from './features/flow-editor/propertySidebarController.mjs';
 import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
+import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js';
 import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js';
+import { createNodePreviewSelectionStore } from './features/flow-editor/nodePreviewSelectionStore.js';
 import projectManager, {
     getCurrentProject,
     subscribeProject
@@ -115,6 +117,9 @@ let propertyPanel = null;
 let propertySidebarController = null;
 let nodePreviewCoordinator = null;
 let nodePreviewOverlay = null;
+let nodePreviewInspector = null;
+let nodePreviewSelectionStore = null;
+let nodePreviewProjectId = null;
 let projectView = null;
 let resultPanel = null;
 let inspectionPanel = null;
@@ -855,6 +860,19 @@ function openImageViewerFromPreview(imageSource) {
         });
 }
 
+function isNodePreviewInspectorEnabled() {
+    const startup = window.__CLEARVISION_STARTUP__;
+    if (!startup || typeof startup !== 'object') {
+        return false;
+    }
+
+    const featureFlags = startup.featureFlags && typeof startup.featureFlags === 'object'
+        ? startup.featureFlags
+        : {};
+    return featureFlags['Studio:NodePreviewInspectorEnabled'] === true ||
+        startup.nodePreviewInspectorEnabled === true;
+}
+
 function initializeNodePreviewExperience() {
     if (!flowCanvas) {
         return;
@@ -872,6 +890,26 @@ function initializeNodePreviewExperience() {
             debounceMs: 500
         });
         serviceRegistry.register('nodePreviewCoordinator', nodePreviewCoordinator);
+    }
+
+    if (!nodePreviewSelectionStore) {
+        nodePreviewSelectionStore = createNodePreviewSelectionStore();
+        serviceRegistry.register('nodePreviewSelectionStore', nodePreviewSelectionStore);
+    }
+
+    const inspectorEnabled = isNodePreviewInspectorEnabled();
+    if (inspectorEnabled) {
+        if (!nodePreviewInspector) {
+            const container = document.querySelector('.flow-editor-container');
+            if (container) {
+                nodePreviewInspector = new NodePreviewInspector(container, flowCanvas, nodePreviewCoordinator, {
+                    selectionStore: nodePreviewSelectionStore,
+                    onOpenImage: openImageViewerFromPreview
+                });
+                serviceRegistry.register('nodePreviewInspector', nodePreviewInspector);
+            }
+        }
+        return;
     }
 
     if (!nodePreviewOverlay) {
@@ -1674,6 +1712,14 @@ async function bootstrapApp() {
 
 async function handleProjectChange(project) {
     eventBus.emit('project:changed', { project });
+    const nextProjectId = project?.id || null;
+    const shouldClearPreview = nextProjectId === null ||
+        (nodePreviewProjectId !== null && nodePreviewProjectId !== nextProjectId);
+    nodePreviewProjectId = nextProjectId;
+    if (shouldClearPreview) {
+        nodePreviewSelectionStore?.clear?.();
+        nodePreviewCoordinator?.setActiveNode?.(null);
+    }
     if (!project?.id) {
         flowCanvas?.setGlobalVariableSchema?.(null);
         inspectionController.setProject(null);

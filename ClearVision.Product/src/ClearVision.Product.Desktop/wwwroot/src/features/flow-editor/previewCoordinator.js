@@ -538,6 +538,7 @@ function createEmptyState() {
         inputImageBase64: null,
         outputImageBase64: null,
         outputData: null,
+        observation: null,
         artifacts: [],
         previewArtifactIds: [],
         previewArtifactObjectUrls: [],
@@ -557,6 +558,7 @@ function createEmptyState() {
 
 function withClearedPreviewResources(patch = {}) {
     return {
+        observation: null,
         artifacts: [],
         previewArtifactIds: [],
         previewArtifactObjectUrls: [],
@@ -597,6 +599,7 @@ function parsePreviewResponse(response) {
         inputImageBase64: normalizeBase64Image(readFirstDefined(response, ['inputImageBase64', 'InputImageBase64'])),
         outputImageBase64: normalizeBase64Image(readFirstDefined(response, ['outputImageBase64', 'OutputImageBase64'])),
         outputData: readFirstDefined(response, ['outputData', 'OutputData']) || null,
+        observation: readFirstDefined(response, ['observation', 'Observation']) || null,
         artifacts: normalizeArtifactReferences(readFirstDefined(response, ['artifacts', 'Artifacts'])),
         executionTimeMs: readFirstDefined(response, ['executionTimeMs', 'ExecutionTimeMs']) ?? null,
         errorMessage: readFirstDefined(response, ['errorMessage', 'ErrorMessage']) || null,
@@ -628,7 +631,9 @@ function normalizeArtifactReferences(value) {
                 sha256: readFirstDefined(item, ['sha256', 'Sha256']) || '',
                 width: readFirstDefined(item, ['width', 'Width']) ?? null,
                 height: readFirstDefined(item, ['height', 'Height']) ?? null,
-                channels: readFirstDefined(item, ['channels', 'Channels']) ?? null
+                channels: readFirstDefined(item, ['channels', 'Channels']) ?? null,
+                createdAtUtc: readFirstDefined(item, ['createdAtUtc', 'CreatedAtUtc']) ?? null,
+                expiresAtUtc: readFirstDefined(item, ['expiresAtUtc', 'ExpiresAtUtc']) ?? null
             };
         })
         .filter(Boolean);
@@ -716,6 +721,18 @@ export function previewObservationMatchesRequest(response, expectedIdentity) {
 
 function isAbortError(error) {
     return error?.name === 'AbortError';
+}
+
+function isImageArtifact(artifact) {
+    return String(artifact?.contentType || '').toLowerCase().startsWith('image/') ||
+        String(artifact?.kind || '').toLowerCase() === 'image';
+}
+
+function createArtifactUnavailableError(message = '资源已过期或不可用') {
+    const error = new Error(message);
+    error.name = 'PreviewArtifactUnavailableError';
+    error.status = 404;
+    return error;
 }
 
 export class NodePreviewCoordinator {
@@ -901,6 +918,96 @@ export class NodePreviewCoordinator {
         }
 
         return result;
+    }
+
+    currentObservationMatches(expectedIdentity) {
+        const observation = this.state?.observation;
+        if (!observation || typeof observation !== 'object') {
+            return false;
+        }
+
+        return previewObservationMatchesRequest({ observation }, expectedIdentity);
+    }
+
+    findCurrentArtifact(artifactId) {
+        const safeArtifactId = String(artifactId || '');
+        if (!safeArtifactId) {
+            return null;
+        }
+
+        const artifacts = Array.isArray(this.state?.artifacts) ? this.state.artifacts : [];
+        return artifacts.find(artifact => artifact?.artifactId === safeArtifactId) || null;
+    }
+
+    trackCurrentArtifactObjectUrl(artifactId, objectUrl) {
+        if (!this.state || !artifactId || !objectUrl) {
+            return;
+        }
+
+        if (!Array.isArray(this.state.previewArtifactIds)) {
+            this.state.previewArtifactIds = [];
+        }
+        if (!Array.isArray(this.state.previewArtifactObjectUrls)) {
+            this.state.previewArtifactObjectUrls = [];
+        }
+        if (!this.state.previewArtifactIds.includes(artifactId)) {
+            this.state.previewArtifactIds.push(artifactId);
+        }
+        if (!this.state.previewArtifactObjectUrls.includes(objectUrl)) {
+            this.state.previewArtifactObjectUrls.push(objectUrl);
+        }
+        this.state.previewArtifactReleased = false;
+    }
+
+    async readArtifactForCurrentState(artifactId, expectedIdentity, options = {}) {
+        const artifact = this.findCurrentArtifact(artifactId);
+        if (!artifact || !this.currentObservationMatches(expectedIdentity)) {
+            throw createPreviewArtifactAbortError('Preview artifact request is stale.');
+        }
+
+        if (options?.signal?.aborted) {
+            throw createPreviewArtifactAbortError('Preview artifact read aborted.');
+        }
+
+        try {
+            const response = await this.artifactClient.getPreviewArtifactBlob(artifact.artifactId, {
+                signal: options?.signal
+            });
+
+            if (options?.signal?.aborted) {
+                throw createPreviewArtifactAbortError('Preview artifact read aborted.');
+            }
+            if (!this.currentObservationMatches(expectedIdentity) || !this.findCurrentArtifact(artifact.artifactId)) {
+                throw createPreviewArtifactAbortError('Preview artifact response is stale.');
+            }
+
+            let objectUrl = null;
+            if (options?.objectUrl === true && isImageArtifact(artifact)) {
+                if (!globalThis.URL?.createObjectURL) {
+                    throw createArtifactUnavailableError('资源已过期或不可用');
+                }
+
+                objectUrl = globalThis.URL.createObjectURL(response.blob);
+                this.trackCurrentArtifactObjectUrl(artifact.artifactId, objectUrl);
+            }
+
+            return {
+                artifact,
+                blob: response.blob,
+                headers: response.headers,
+                objectUrl
+            };
+        } catch (error) {
+            if (isAbortError(error) || error?.previewArtifactResolutionAborted) {
+                throw error;
+            }
+
+            if (error?.status === 404 || error?.statusCode === 404) {
+                throw createArtifactUnavailableError();
+            }
+
+            throw error;
+        }
     }
 
     destroy() {
@@ -1234,6 +1341,7 @@ export class NodePreviewCoordinator {
                     inputImageBase64: resolvedArtifacts.inputImageSrc || parsed.inputImageBase64 || inputImageBase64 || null,
                     outputImageBase64: resolvedArtifacts.outputImageSrc || parsed.outputImageBase64,
                     outputData: outputDataWithDiagnostics,
+                    observation: parsed.observation,
                     previewCost,
                     artifacts: parsed.artifacts,
                     previewArtifactIds: resolvedArtifacts.previewArtifactIds,
