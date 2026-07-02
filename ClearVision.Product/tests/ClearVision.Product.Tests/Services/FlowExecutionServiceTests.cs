@@ -14,6 +14,8 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Calibration;
+using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -78,6 +80,65 @@ public class FlowExecutionServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse("Flow execution should be cancelled");
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_ShouldForwardSpatialContextSidecarWithConnectedImageOutput()
+    {
+        _executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        var spatialContext = SpatialContextV1.DefaultImageFull();
+        var imagePayload = new byte[] { 1, 2, 3 };
+        Dictionary<string, object>? targetInputs = null;
+
+        _executor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var op = callInfo.Arg<Operator>();
+                if (op.Name.Equals("Source", StringComparison.Ordinal))
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Success(
+                        new Dictionary<string, object>
+                        {
+                            ["Image"] = imagePayload,
+                            [RoiManagerOperator.SpatialContextOutputKey] = spatialContext
+                        },
+                        executionTimeMs: 5));
+                }
+
+                var inputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
+                targetInputs = inputs == null
+                    ? null
+                    : new Dictionary<string, object>(inputs, StringComparer.OrdinalIgnoreCase);
+
+                return Task.FromResult(OperatorExecutionOutput.Success(
+                    new Dictionary<string, object>(),
+                    executionTimeMs: 5));
+            });
+
+        var flow = new OperatorFlow("SpatialSidecarFlow");
+        var source = new Operator("Source", OperatorType.Thresholding, 0, 0);
+        source.AddOutputPort("Image", PortDataType.Image);
+        source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
+        var target = new Operator("Target", OperatorType.Thresholding, 0, 0);
+        target.AddInputPort("Image", PortDataType.Image);
+
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(
+            source.Id,
+            source.OutputPorts.Single(port => port.Name == "Image").Id,
+            target.Id,
+            target.InputPorts.Single().Id));
+
+        var result = await _sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        targetInputs.Should().NotBeNull();
+        targetInputs![RoiManagerOperator.SpatialContextOutputKey].Should().BeSameAs(spatialContext);
+        targetInputs["Image"].Should().BeSameAs(imagePayload);
     }
 
     [Fact]

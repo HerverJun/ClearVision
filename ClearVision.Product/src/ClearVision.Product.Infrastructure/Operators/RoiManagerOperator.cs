@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Infrastructure.Calibration;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
@@ -24,6 +25,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "ROI图像", PortDataType.Image)]
 [OutputPort("Mask", "掩膜", PortDataType.Image)]
+[OutputPort("SpatialContext", "空间上下文", PortDataType.Any)]
 [OperatorParam("Shape", "形状", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|矩形", "Circle|圆形", "Polygon|多边形" })]
 [OperatorParam("Operation", "操作", "enum", DefaultValue = "Crop", Options = new[] { "Crop|裁剪", "Mask|掩膜" })]
 [OperatorParam("X", "X", "int", DefaultValue = 0, Min = 0)]
@@ -36,6 +38,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("PolygonPoints", "多边形顶点(JSON)", "string", DefaultValue = "[[10,10],[200,10],[200,200],[10,200]]")]
 public class RoiManagerOperator : OperatorBase
 {
+    public const string SpatialContextOutputKey = "SpatialContext";
+    public const string MaskSpatialContextOutputKey = "MaskSpatialContext";
+
+    private static readonly JsonSerializerOptions SpatialJsonOptions = new(JsonSerializerDefaults.Web);
+
     public override OperatorType OperatorType => OperatorType.RoiManager;
 
     public RoiManagerOperator(ILogger<RoiManagerOperator> logger) : base(logger)
@@ -80,24 +87,26 @@ public class RoiManagerOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
         }
 
+        var inputSpatialContext = ResolveInputSpatialContext(inputs);
         Mat resultImage;
         Mat mask = new Mat(src.Size(), MatType.CV_8UC1, Scalar.All(0));
+        Rect outputBounds;
 
         try
         {
             switch (shape)
             {
                 case "Rectangle":
-                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height);
+                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height, out outputBounds);
                     break;
                 case "Circle":
-                    ProcessCircle(src, out resultImage, mask, operation, centerX, centerY, radius);
+                    ProcessCircle(src, out resultImage, mask, operation, centerX, centerY, radius, out outputBounds);
                     break;
                 case "Polygon":
-                    ProcessPolygon(src, out resultImage, mask, operation, polygonPoints);
+                    ProcessPolygon(src, out resultImage, mask, operation, polygonPoints, out outputBounds);
                     break;
                 default:
-                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height);
+                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height, out outputBounds);
                     break;
             }
 
@@ -105,7 +114,11 @@ public class RoiManagerOperator : OperatorBase
             {
                 { "Shape", shape },
                 { "Operation", operation },
-                { "Mask", new ImageWrapper(mask.Clone()) }
+                { "ParentWidth", src.Width },
+                { "ParentHeight", src.Height },
+                { "Mask", new ImageWrapper(mask.Clone()) },
+                { SpatialContextOutputKey, BuildImageSpatialContext(inputSpatialContext, @operator, operation, outputBounds) },
+                { MaskSpatialContextOutputKey, BuildPassThroughSpatialContext(inputSpatialContext, @operator, "Mask") }
             };
 
             return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
@@ -116,7 +129,16 @@ public class RoiManagerOperator : OperatorBase
         }
     }
 
-    private void ProcessRectangle(Mat src, out Mat resultImage, Mat mask, string operation, int x, int y, int width, int height)
+    private void ProcessRectangle(
+        Mat src,
+        out Mat resultImage,
+        Mat mask,
+        string operation,
+        int x,
+        int y,
+        int width,
+        int height,
+        out Rect outputBounds)
     {
         var rect = new Rect(x, y, width, height);
 
@@ -124,6 +146,7 @@ public class RoiManagerOperator : OperatorBase
         {
             // 裁剪模式
             resultImage = new Mat(src, rect);
+            outputBounds = rect;
             // 创建完整尺寸的掩膜
             Cv2.Rectangle(mask, rect, Scalar.All(255), -1);
         }
@@ -131,12 +154,21 @@ public class RoiManagerOperator : OperatorBase
         {
             // 掩膜模式 - 保留原图，应用掩膜
             resultImage = src.Clone();
+            outputBounds = new Rect(0, 0, src.Width, src.Height);
             Cv2.Rectangle(mask, rect, Scalar.All(255), -1);
             Cv2.BitwiseAnd(src, src, resultImage, mask);
         }
     }
 
-    private void ProcessCircle(Mat src, out Mat resultImage, Mat mask, string operation, int centerX, int centerY, int radius)
+    private void ProcessCircle(
+        Mat src,
+        out Mat resultImage,
+        Mat mask,
+        string operation,
+        int centerX,
+        int centerY,
+        int radius,
+        out Rect outputBounds)
     {
         var center = new Point(centerX, centerY);
 
@@ -153,6 +185,7 @@ public class RoiManagerOperator : OperatorBase
         {
             // 裁剪模式 - 裁剪外接矩形并应用圆形掩膜
             var rect = new Rect(rectX, rectY, rectWidth, rectHeight);
+            outputBounds = rect;
             using var cropped = new Mat(src, rect);
             using var croppedMask = new Mat(mask, rect);
             resultImage = new Mat(cropped.Size(), src.Type(), Scalar.All(0));
@@ -162,11 +195,18 @@ public class RoiManagerOperator : OperatorBase
         {
             // 掩膜模式
             resultImage = src.Clone();
+            outputBounds = new Rect(0, 0, src.Width, src.Height);
             Cv2.BitwiseAnd(src, src, resultImage, mask);
         }
     }
 
-    private void ProcessPolygon(Mat src, out Mat resultImage, Mat mask, string operation, string polygonPointsJson)
+    private void ProcessPolygon(
+        Mat src,
+        out Mat resultImage,
+        Mat mask,
+        string operation,
+        string polygonPointsJson,
+        out Rect outputBounds)
     {
         Point[][]? points = null;
         try
@@ -206,6 +246,7 @@ public class RoiManagerOperator : OperatorBase
             maxY = Math.Min(src.Height, maxY);
 
             var rect = new Rect(minX, minY, maxX - minX, maxY - minY);
+            outputBounds = rect;
             using var cropped = new Mat(src, rect);
             using var croppedMask = new Mat(mask, rect);
             resultImage = new Mat(cropped.Size(), src.Type(), Scalar.All(0));
@@ -215,8 +256,141 @@ public class RoiManagerOperator : OperatorBase
         {
             // 掩膜模式
             resultImage = src.Clone();
+            outputBounds = new Rect(0, 0, src.Width, src.Height);
             Cv2.BitwiseAnd(src, src, resultImage, mask);
         }
+    }
+
+    private static SpatialContextV1 ResolveInputSpatialContext(Dictionary<string, object>? inputs)
+    {
+        if (inputs != null &&
+            TryGetDictionaryValue(inputs, SpatialContextOutputKey, out var rawContext) &&
+            TryReadSpatialContext(rawContext, out var context))
+        {
+            return context;
+        }
+
+        return SpatialContextV1.DefaultImageFull();
+    }
+
+    private static bool TryGetDictionaryValue(
+        IDictionary<string, object> dictionary,
+        string key,
+        out object? value)
+    {
+        foreach (var pair in dictionary)
+        {
+            if (pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = pair.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryReadSpatialContext(object? raw, out SpatialContextV1 context)
+    {
+        context = SpatialContextV1.DefaultImageFull();
+        switch (raw)
+        {
+            case SpatialContextV1 typed:
+                context = typed;
+                return true;
+            case JsonElement element:
+                try
+                {
+                    var parsed = element.Deserialize<SpatialContextV1>(SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            case string text when !string.IsNullOrWhiteSpace(text):
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<SpatialContextV1>(text, SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    private static SpatialContextV1 BuildImageSpatialContext(
+        SpatialContextV1 inputContext,
+        Operator @operator,
+        string operation,
+        Rect outputBounds)
+    {
+        if (!operation.Equals("Crop", StringComparison.OrdinalIgnoreCase))
+        {
+            return BuildPassThroughSpatialContext(inputContext, @operator, "Image");
+        }
+
+        var currentFrame = new FrameRefV1(
+            $"roi.local.{@operator.Id:N}.image",
+            SpatialFrameKindV1.RoiLocal,
+            SpatialUnitV1.Pixel,
+            inputContext.CurrentFrame.FrameId);
+        var localToParent = new SpatialTransform2DV1(
+            currentFrame,
+            inputContext.CurrentFrame,
+            [
+                [1, 0, outputBounds.X],
+                [0, 1, outputBounds.Y],
+                [0, 0, 1]
+            ]);
+
+        var transforms = inputContext.Transforms.ToList();
+        transforms.Add(localToParent);
+        return new SpatialContextV1(
+            currentFrame,
+            transforms,
+            CreateSpatialBinding(@operator, "Image"));
+    }
+
+    private static SpatialContextV1 BuildPassThroughSpatialContext(
+        SpatialContextV1 inputContext,
+        Operator @operator,
+        string outputName)
+    {
+        return new SpatialContextV1(
+            inputContext.CurrentFrame,
+            inputContext.Transforms,
+            CreateSpatialBinding(@operator, outputName));
+    }
+
+    private static SpatialContextBindingV1 CreateSpatialBinding(Operator @operator, string outputName)
+    {
+        var outputPortId = @operator.OutputPorts
+            .FirstOrDefault(port => port.Name.Equals(outputName, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
+        return new SpatialContextBindingV1
+        {
+            SourceOperatorId = @operator.Id,
+            OutputPortId = outputPortId,
+            OutputName = outputName
+        };
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)

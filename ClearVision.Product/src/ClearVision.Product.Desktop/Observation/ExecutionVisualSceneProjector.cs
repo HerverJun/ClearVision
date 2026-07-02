@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ResultPaths;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using OpenCvSharp;
 using Operator = ClearVision.Product.Core.Entities.Operator;
@@ -24,6 +25,8 @@ public static class ExecutionVisualSceneProjector
     public const int MaxDiagnostics = 64;
     public const int MaxStringChars = 256;
     public const int MaxPrimitiveIdChars = 160;
+
+    private static readonly JsonSerializerOptions SpatialJsonOptions = new(JsonSerializerDefaults.Web);
 
     private static readonly HashSet<string> KnownPrimitiveKinds = new(StringComparer.Ordinal)
     {
@@ -73,6 +76,12 @@ public static class ExecutionVisualSceneProjector
 
     private static void ProjectRoi(Operator @operator, SceneProjectionContext context)
     {
+        if (ReadParameterString(@operator, "Operation", "Crop").Equals("Crop", StringComparison.OrdinalIgnoreCase) &&
+            TryProjectRoiSpatialCrop(@operator, context))
+        {
+            return;
+        }
+
         var shape = ReadParameterString(@operator, "Shape", "Rectangle");
         if (!shape.Equals("Rectangle", StringComparison.OrdinalIgnoreCase))
         {
@@ -113,6 +122,126 @@ public static class ExecutionVisualSceneProjector
             }
         };
         context.AddPrimitive(primitive);
+    }
+
+    private static bool TryProjectRoiSpatialCrop(Operator @operator, SceneProjectionContext context)
+    {
+        if (!context.TryGetOutput(RoiManagerOperator.SpatialContextOutputKey, out var rawContext) ||
+            !TryReadSpatialContext(rawContext, out var spatialContext))
+        {
+            return false;
+        }
+
+        if (!context.TryResolveOutputImageSize(out var width, out var height) || width <= 0 || height <= 0)
+        {
+            context.AddDiagnostic("visual-scene-roi-spatial-size-missing", "ROI spatial context was present but output image size is unavailable.", null);
+            return false;
+        }
+
+        if (!spatialContext.TryResolveTransform(spatialContext.CurrentFrame, FrameRefV1.ImageFull(), out var localToFull, out var error))
+        {
+            context.AddDiagnostic("visual-scene-roi-spatial-transform-missing", $"ROI spatial context cannot resolve to ImageFull: {Clip(error)}", null);
+            return false;
+        }
+
+        var corners = new[]
+        {
+            (X: 0.0, Y: 0.0),
+            (X: (double)width, Y: 0.0),
+            (X: (double)width, Y: (double)height),
+            (X: 0.0, Y: (double)height)
+        };
+        var projected = new List<(double X, double Y)>(corners.Length);
+        foreach (var corner in corners)
+        {
+            if (!localToFull.TryApply(corner.X, corner.Y, out var x, out var y, out error))
+            {
+                context.AddDiagnostic("visual-scene-roi-spatial-transform-invalid", $"ROI spatial transform failed: {Clip(error)}", null);
+                return false;
+            }
+
+            projected.Add((x, y));
+        }
+
+        var minX = projected.Min(point => point.X);
+        var minY = projected.Min(point => point.Y);
+        var maxX = projected.Max(point => point.X);
+        var maxY = projected.Max(point => point.Y);
+        if (!AreFinite(minX, minY, maxX, maxY) || maxX <= minX || maxY <= minY)
+        {
+            context.AddDiagnostic("visual-scene-roi-spatial-bounds-invalid", "ROI spatial context projected to invalid bounds.", null);
+            return false;
+        }
+
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = $"roi:spatial-crop:{@operator.Id:D}",
+            Kind = "rectangle",
+            Layer = "roi",
+            ZOrder = 10,
+            Visible = true,
+            Selectable = true,
+            Label = "ROI Crop",
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                X = minX,
+                Y = minY,
+                Width = maxX - minX,
+                Height = maxY - minY
+            },
+            Style = new ExecutionVisualSceneStyleV1
+            {
+                Stroke = "#f97316",
+                Fill = "rgba(249,115,22,0.12)",
+                StrokeWidth = 2
+            }
+        });
+        return true;
+    }
+
+    private static bool TryReadSpatialContext(object? raw, out SpatialContextV1 context)
+    {
+        context = SpatialContextV1.DefaultImageFull();
+        switch (raw)
+        {
+            case SpatialContextV1 typed:
+                context = typed;
+                return true;
+            case JsonElement element:
+                try
+                {
+                    var parsed = element.Deserialize<SpatialContextV1>(SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            case string text when !string.IsNullOrWhiteSpace(text):
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<SpatialContextV1>(text, SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            default:
+                return false;
+        }
     }
 
     private static void ProjectCircleMeasurement(SceneProjectionContext context)
@@ -887,6 +1016,18 @@ public static class ExecutionVisualSceneProjector
             return true;
         }
 
+        public bool TryResolveOutputImageSize(out int width, out int height)
+        {
+            if (TryReadSizePair("Width", "Height", out width, out height) ||
+                TryReadSizePair("ImageWidth", "ImageHeight", out width, out height))
+            {
+                return width > 0 && height > 0;
+            }
+
+            (width, height) = ResolveImageObjectSize();
+            return width > 0 && height > 0;
+        }
+
         public void AddPrimitive(ExecutionVisualScenePrimitiveV1 primitive)
         {
             if (_primitives.Count >= MaxPrimitives)
@@ -1089,12 +1230,23 @@ public static class ExecutionVisualSceneProjector
 
         private (int Width, int Height) ResolveImageSize()
         {
+            if (TryGetOutput(RoiManagerOperator.SpatialContextOutputKey, out _) &&
+                TryReadSizePair("ParentWidth", "ParentHeight", out var parentWidth, out var parentHeight))
+            {
+                return (parentWidth, parentHeight);
+            }
+
             if (TryReadSizePair("Width", "Height", out var width, out var height) ||
                 TryReadSizePair("ImageWidth", "ImageHeight", out width, out height))
             {
                 return (width, height);
             }
 
+            return ResolveImageObjectSize();
+        }
+
+        private (int Width, int Height) ResolveImageObjectSize()
+        {
             if (TryGetOutput("Image", out var image))
             {
                 switch (image)

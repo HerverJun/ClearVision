@@ -50,10 +50,10 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G10B`
-- 当前卡片：`docs/进行中/Studio2/goals/G10B.md`
+- 当前 Goal：`G10C`
+- 当前卡片：`docs/进行中/Studio2/goals/G10C.md`
 - 当前阶段：`Geometry/Spatial`
-- 总状态：`IN_PROGRESS`
+- 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
 - G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
@@ -101,8 +101,8 @@
 | G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | DONE | G09A | `docs/进行中/Studio2/goals/G09B.md` | 见 G09B 完成提交与最终报告 |
 | G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | DONE | G09B | `docs/进行中/Studio2/goals/G09C.md` | 见 G09C 完成提交与最终报告 |
 | G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | DONE | G09C | `docs/进行中/Studio2/goals/G10A.md` | 见 G10A 完成提交与最终报告 |
-| G10B | Geometry/Spatial | RoiManager Crop 空间传播 | IN_PROGRESS | G10A | `docs/进行中/Studio2/goals/G10B.md` |  |
-| G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | LOCKED | G10B | `docs/进行中/Studio2/goals/G10C.md` |  |
+| G10B | Geometry/Spatial | RoiManager Crop 空间传播 | DONE | G10A | `docs/进行中/Studio2/goals/G10B.md` | 见 G10B 完成提交与最终报告 |
+| G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | READY | G10B | `docs/进行中/Studio2/goals/G10C.md` |  |
 | G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | LOCKED | G10C | `docs/进行中/Studio2/goals/G11A.md` |  |
 | G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | LOCKED | G11A | `docs/进行中/Studio2/goals/G11B.md` |  |
 | G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | LOCKED | G11B | `docs/进行中/Studio2/goals/G11C.md` |  |
@@ -163,6 +163,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-03 | G10B | `68acaca16e8c0c71162bb8bb1bcc1c89372fa0eb` | 见 G10B 完成提交与最终报告 | Product focused RoiManager/SpatialContext PASS（18 tests）；Desktop focused ExecutionObservationProjector PASS（22 tests）；Product targeted RoiManager/SpatialContext/FlowExecution sidecar PASS（19 tests）；Product targeted SpatialContext/PixelToWorld/CalibrationV2/LegacyCalibration/FlowExecution PASS（39 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（84 tests）；`git diff --check` PASS；process audit PASS after compiler-server cleanup（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | RoiManager Rectangle/Circle/Polygon Crop 输出 clamped local→parent sidecar，Mask 保持 full-frame 语义，FlowExecutionService 既有 output propagation 传递 `SpatialContext` sidecar，Scene 可按 sidecar 将 Crop 结果投回 Full Image；当前 Goal 已推进到 G10C READY，未执行 G10C。 |
 | 2026-07-03 | G10A | `55b14652121d4e7b11fd80686b1f8ca996d2b01d` | 见 G10A 完成提交与最终报告 | Product focused `SpatialContextV1Tests` PASS（10 tests）；Product targeted SpatialContext/PixelToWorld/CalibrationV2/LegacyCalibration PASS（30 tests）；`git diff --check` PASS；process audit PASS（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 `SpatialContextV1` sidecar contract、FrameRef、3x3 transform apply/inverse/compose、legacy ImageFull/px 默认语义、flow output 与 preview artifact identity binding；ADR 采用 sidecar 而不是扩展 `ImageWrapper`；当前 Goal 已推进到 G10B，未执行 G10C。 |
 | 2026-07-03 | G09C | `736b3e98629d8cf948f80b02c9c7f4de661baff7` | 见 G09C 完成提交与最终报告 | UI focused ROI geometry PASS（26 tests）；canvas-core PASS（25 tests）；Playwright ROI editor PASS（10 tests single-worker and 10 tests normal）；UI `test:unit` PASS（605 tests）；`test:preview-smoke` PASS；Product targeted NPoint/RoiManager PASS（15 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（83 tests）；`git diff --check` PASS；process audit PASS（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Polygon/PointSequence 编辑：Polygon fail-closed，PointPairs optional `Enabled=false` additive and ignored by runtime/scene projection，Scene/edit overlay group isolated；当前 Goal 已推进到 G10A，未执行 G10C。 |
 | 2026-07-02 | G07B final follow-up | `de327a5e0f0d48abb79a2791211eea6189ac5737` | 见 G07B final follow-up 完成提交与最终报告 | UI focused `app-infrastructure`/`global-variable-panel` PASS（66 tests）；UI `test:unit` PASS（588 tests）；`test:preview-smoke` PASS；Playwright field-binding focused PASS（2 tests）；Product targeted G07A/G07B PASS（95 tests）；Desktop targeted Observation/Preview/Artifact/Architecture Guard PASS（71 tests）；Product full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish V2 asset audit PASS（0 prohibited files/dirs）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 修复全局变量异步保存跨工程污染：`ProjectManager.saveGlobalVariables` 冻结 targetProjectId，并在迟到响应返回旧工程 schema 时不写入当前工程、signal、cache、baseline 或 dirty 状态；`GlobalVariablePanel.save`/`bindPreviewField` 传入 expectedProjectId，await 后同时确认 panel project 与 ProjectManager 当前工程仍匹配才应用 schema、同步 FlowCanvas、刷新值和显示成功 toast；新增 A->B 延迟保存与字段绑定竞态测试；G08 仅标记 READY，未执行 G08。 |

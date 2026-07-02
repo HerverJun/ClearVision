@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Observation;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using OpenCvSharp;
@@ -513,6 +514,57 @@ public sealed class ExecutionObservationProjectorTests
             primitive.Geometry.Width == 80 &&
             primitive.Geometry.Height == 40 &&
             primitive.ResultPath == null);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectRoiCropSpatialContextBackToFullImage()
+    {
+        var localFrame = new FrameRefV1(
+            "roi.local.test.image",
+            SpatialFrameKindV1.RoiLocal,
+            SpatialUnitV1.Pixel,
+            "image.full");
+        var spatialContext = new SpatialContextV1(
+            localFrame,
+            [
+                SpatialTransform2DV1.Identity(FrameRefV1.ImageFull()),
+                new SpatialTransform2DV1(
+                    localFrame,
+                    FrameRefV1.ImageFull(),
+                    [
+                        [1, 0, 5],
+                        [0, 1, 6],
+                        [0, 0, 1]
+                    ])
+            ]);
+        var targetOperator = CreateOperator(OperatorType.RoiManager, [
+            new Parameter(Guid.NewGuid(), "Shape", "Shape", string.Empty, "enum", "Circle"),
+            new Parameter(Guid.NewGuid(), "Operation", "Operation", string.Empty, "enum", "Crop")
+        ]);
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 4,
+                ["Height"] = 3,
+                ["ParentWidth"] = 20,
+                ["ParentHeight"] = 18,
+                [RoiManagerOperator.SpatialContextOutputKey] = JsonSerializer.SerializeToElement(spatialContext, CamelCaseJson)
+            },
+            targetOperator: targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.ImageWidth.Should().Be(20);
+        scene.ImageHeight.Should().Be(18);
+        scene.Diagnostics.Should().BeEmpty();
+        var primitive = scene.Primitives.Should().ContainSingle().Subject;
+        primitive.PrimitiveId.Should().Be($"roi:spatial-crop:{targetOperator.Id:D}");
+        primitive.Kind.Should().Be("rectangle");
+        primitive.Geometry.X.Should().Be(5);
+        primitive.Geometry.Y.Should().Be(6);
+        primitive.Geometry.Width.Should().Be(4);
+        primitive.Geometry.Height.Should().Be(3);
     }
 
     [Fact]
