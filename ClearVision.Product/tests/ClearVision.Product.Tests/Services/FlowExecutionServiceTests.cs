@@ -44,6 +44,16 @@ public class FlowExecutionServiceTests
         _sut = new FlowExecutionService(executors, _logger, _variableContext);
     }
 
+    private static (FlowExecutionService Sut, IOperatorExecutor Executor) CreateSingleExecutorService(OperatorType operatorType)
+    {
+        var executor = Substitute.For<IOperatorExecutor>();
+        executor.OperatorType.Returns(operatorType);
+        var logger = Substitute.For<ILogger<FlowExecutionService>>();
+        var variableContext = Substitute.For<IVariableContext>();
+
+        return (new FlowExecutionService(new List<IOperatorExecutor> { executor }, logger, variableContext), executor);
+    }
+
     [Fact]
     public async Task ExecuteFlowAsync_ShouldRespectCancellation()
     {
@@ -85,12 +95,13 @@ public class FlowExecutionServiceTests
     [Fact]
     public async Task ExecuteFlowAsync_ShouldForwardSpatialContextSidecarWithConnectedImageOutput()
     {
-        _executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.RoiManager);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
         SpatialContextV1? spatialContext = null;
         var imagePayload = new byte[] { 1, 2, 3 };
         Dictionary<string, object>? targetInputs = null;
 
-        _executor.ExecuteAsync(
+        executor.ExecuteAsync(
                 Arg.Any<Operator>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
@@ -119,14 +130,14 @@ public class FlowExecutionServiceTests
             });
 
         var flow = new OperatorFlow("SpatialSidecarFlow");
-        var source = new Operator("Source", OperatorType.Thresholding, 0, 0);
+        var source = new Operator("Source", OperatorType.RoiManager, 0, 0);
         source.AddOutputPort("Image", PortDataType.Image);
         source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
         spatialContext = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(
             source.Id,
             source.OutputPorts.Single(port => port.Name == "Image").Id,
             "Image"));
-        var target = new Operator("Target", OperatorType.Thresholding, 0, 0);
+        var target = new Operator("Target", OperatorType.RoiManager, 0, 0);
         target.AddInputPort("Image", PortDataType.Image);
 
         flow.AddOperator(source);
@@ -137,7 +148,7 @@ public class FlowExecutionServiceTests
             target.Id,
             target.InputPorts.Single().Id));
 
-        var result = await _sut.ExecuteFlowAsync(flow);
+        var result = await sut.ExecuteFlowAsync(flow);
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         targetInputs.Should().NotBeNull();
@@ -148,15 +159,16 @@ public class FlowExecutionServiceTests
     [Fact]
     public async Task ExecuteFlowAsync_ShouldSelectSpatialContextByConnectedSourcePortBinding()
     {
-        _executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.RoiManager);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
         Dictionary<string, object>? targetInputs = null;
 
         var flow = new OperatorFlow("PortAwareSpatialSidecarFlow");
-        var source = new Operator("Roi", OperatorType.Thresholding, 0, 0);
+        var source = new Operator("Roi", OperatorType.RoiManager, 0, 0);
         source.AddOutputPort("Image", PortDataType.Image);
         source.AddOutputPort("Mask", PortDataType.Image);
         source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
-        var target = new Operator("Target", OperatorType.Thresholding, 0, 0);
+        var target = new Operator("Target", OperatorType.RoiManager, 0, 0);
         target.AddInputPort("Image", PortDataType.Image);
         var imagePort = source.OutputPorts.Single(port => port.Name == "Image");
         var maskPort = source.OutputPorts.Single(port => port.Name == "Mask");
@@ -165,7 +177,7 @@ public class FlowExecutionServiceTests
         var imageContext = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(source.Id, imagePort.Id, "Image"));
         var maskContext = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(source.Id, maskPort.Id, "Mask"));
 
-        _executor.ExecuteAsync(
+        executor.ExecuteAsync(
                 Arg.Any<Operator>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
@@ -193,7 +205,7 @@ public class FlowExecutionServiceTests
         flow.AddOperator(target);
         flow.AddConnection(new OperatorConnection(source.Id, maskPort.Id, target.Id, targetImagePort.Id));
 
-        var result = await _sut.ExecuteFlowAsync(flow);
+        var result = await sut.ExecuteFlowAsync(flow);
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         targetInputs.Should().NotBeNull();
@@ -204,22 +216,23 @@ public class FlowExecutionServiceTests
     [Fact]
     public async Task ExecuteFlowAsync_ShouldNotFallbackToMismatchedSpatialContextBinding()
     {
-        _executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.RoiManager);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
         Dictionary<string, object>? targetInputs = null;
 
         var flow = new OperatorFlow("MismatchedSpatialSidecarFlow");
-        var source = new Operator("Source", OperatorType.Thresholding, 0, 0);
+        var source = new Operator("Source", OperatorType.RoiManager, 0, 0);
         source.AddOutputPort("Image", PortDataType.Image);
         source.AddOutputPort("OtherImage", PortDataType.Image);
         source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
-        var target = new Operator("Target", OperatorType.Thresholding, 0, 0);
+        var target = new Operator("Target", OperatorType.RoiManager, 0, 0);
         target.AddInputPort("Image", PortDataType.Image);
         var imagePort = source.OutputPorts.Single(port => port.Name == "Image");
         var otherPort = source.OutputPorts.Single(port => port.Name == "OtherImage");
         var targetImagePort = target.InputPorts.Single(port => port.Name == "Image");
         var mismatchedContext = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(source.Id, otherPort.Id, "OtherImage"));
 
-        _executor.ExecuteAsync(
+        executor.ExecuteAsync(
                 Arg.Any<Operator>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
@@ -245,32 +258,36 @@ public class FlowExecutionServiceTests
         flow.AddOperator(target);
         flow.AddConnection(new OperatorConnection(source.Id, imagePort.Id, target.Id, targetImagePort.Id));
 
-        var result = await _sut.ExecuteFlowAsync(flow);
+        var result = await sut.ExecuteFlowAsync(flow);
 
-        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
-        targetInputs.Should().NotBeNull();
-        targetInputs!.Should().NotContainKey(RoiManagerOperator.ImageSpatialContextInputKey);
-        targetInputs.Should().NotContainKey(RoiManagerOperator.SpatialContextOutputKey);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_CONTEXT_BINDING_INVALID");
+        result.OperatorResults.Should().ContainSingle(item =>
+            item.OperatorId == target.Id &&
+            item.IsSuccess == false &&
+            item.ErrorMessage!.Contains("SPATIAL_CONTEXT_BINDING_INVALID", StringComparison.Ordinal));
+        targetInputs.Should().BeNull("the target executor must not run with an invalid SpatialContext");
     }
 
     [Fact]
     public async Task ExecuteFlowAsync_ShouldFailClosedForDuplicateSpatialContextBindingMatches()
     {
-        _executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.RoiManager);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
         Dictionary<string, object>? targetInputs = null;
 
         var flow = new OperatorFlow("DuplicateSpatialSidecarFlow");
-        var source = new Operator("Source", OperatorType.Thresholding, 0, 0);
+        var source = new Operator("Source", OperatorType.RoiManager, 0, 0);
         source.AddOutputPort("Image", PortDataType.Image);
         source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
-        var target = new Operator("Target", OperatorType.Thresholding, 0, 0);
+        var target = new Operator("Target", OperatorType.RoiManager, 0, 0);
         target.AddInputPort("Image", PortDataType.Image);
         var imagePort = source.OutputPorts.Single(port => port.Name == "Image");
         var targetImagePort = target.InputPorts.Single(port => port.Name == "Image");
         var first = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(source.Id, imagePort.Id, "Image"));
         var duplicate = SpatialContextV1.DefaultImageFull(SpatialContextBindingV1.ForFlowOutput(source.Id, imagePort.Id, "Image"));
 
-        _executor.ExecuteAsync(
+        executor.ExecuteAsync(
                 Arg.Any<Operator>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
@@ -297,12 +314,64 @@ public class FlowExecutionServiceTests
         flow.AddOperator(target);
         flow.AddConnection(new OperatorConnection(source.Id, imagePort.Id, target.Id, targetImagePort.Id));
 
-        var result = await _sut.ExecuteFlowAsync(flow);
+        var result = await sut.ExecuteFlowAsync(flow);
 
-        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
-        targetInputs.Should().NotBeNull();
-        targetInputs!.Should().NotContainKey(RoiManagerOperator.ImageSpatialContextInputKey);
-        targetInputs.Should().NotContainKey(RoiManagerOperator.SpatialContextOutputKey);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_CONTEXT_BINDING_AMBIGUOUS");
+        result.OperatorResults.Should().ContainSingle(item =>
+            item.OperatorId == target.Id &&
+            item.IsSuccess == false &&
+            item.ErrorMessage!.Contains("SPATIAL_CONTEXT_BINDING_AMBIGUOUS", StringComparison.Ordinal));
+        targetInputs.Should().BeNull("the target executor must not run with an ambiguous SpatialContext");
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_ShouldFailClosedForMalformedSpatialContextSidecar()
+    {
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.RoiManager);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        Dictionary<string, object>? targetInputs = null;
+
+        var flow = new OperatorFlow("MalformedSpatialSidecarFlow");
+        var source = new Operator("Source", OperatorType.RoiManager, 0, 0);
+        source.AddOutputPort("Image", PortDataType.Image);
+        source.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
+        var target = new Operator("Target", OperatorType.RoiManager, 0, 0);
+        target.AddInputPort("Image", PortDataType.Image);
+        var imagePort = source.OutputPorts.Single(port => port.Name == "Image");
+        var targetImagePort = target.InputPorts.Single(port => port.Name == "Image");
+
+        executor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var op = callInfo.Arg<Operator>();
+                if (op.Id == source.Id)
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Success(
+                        new Dictionary<string, object>
+                        {
+                            ["Image"] = new byte[] { 1 },
+                            [RoiManagerOperator.SpatialContextOutputKey] = "{not valid json"
+                        },
+                        executionTimeMs: 5));
+                }
+
+                targetInputs = new Dictionary<string, object>(callInfo.ArgAt<Dictionary<string, object>?>(1)!, StringComparer.OrdinalIgnoreCase);
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>(), executionTimeMs: 5));
+            });
+
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, imagePort.Id, target.Id, targetImagePort.Id));
+
+        var result = await sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_CONTEXT_MALFORMED");
+        targetInputs.Should().BeNull("the target executor must not run with malformed SpatialContext");
     }
 
     [Fact]

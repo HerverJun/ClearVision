@@ -75,6 +75,8 @@ public sealed class ResultPathResolverOptions
         ResultPathDefaultResourceClassifier.Instance;
 
     public bool RequireTerminalScalar { get; init; } = true;
+
+    public bool AllowIndexSegments { get; init; }
 }
 
 public sealed class ResultPathDefaultResourceClassifier : IResultPathResourceClassifier
@@ -546,6 +548,11 @@ public static class ResultPathResolver
                     }
                     break;
                 case ResultPathSegmentKind.Index:
+                    if (!options.AllowIndexSegments)
+                    {
+                        return Failure(path, new ResultPathDiagnostic("RP122", "Index segments are disabled by the current ResultPath resolver policy.", segmentIndex));
+                    }
+
                     if (!TryResolveIndex(current, segment.Value, out current, out var indexDiagnostic, segmentIndex))
                     {
                         return Failure(path, indexDiagnostic!);
@@ -679,7 +686,7 @@ public static class ResultPathResolver
         {
             if (element.ValueKind != JsonValueKind.Array)
             {
-                diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+                diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array, one-dimensional CLR array, or IList container.", segmentIndex);
                 return false;
             }
 
@@ -690,6 +697,24 @@ public static class ResultPathResolver
             }
 
             resolved = element.EnumerateArray().ElementAt(index).Clone();
+            return true;
+        }
+
+        if (value is Array array)
+        {
+            if (array.Rank != 1)
+            {
+                diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array, one-dimensional CLR array, or IList container.", segmentIndex);
+                return false;
+            }
+
+            if (index >= array.Length)
+            {
+                diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
+                return false;
+            }
+
+            resolved = array.GetValue(index);
             return true;
         }
 
@@ -705,49 +730,13 @@ public static class ResultPathResolver
             return true;
         }
 
-        if (value is Array array)
-        {
-            if (index >= array.Length)
-            {
-                diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
-                return false;
-            }
-
-            resolved = array.GetValue(index);
-            return true;
-        }
-
         if (IsDictionaryLike(value))
         {
-            diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+            diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array, one-dimensional CLR array, or IList container.", segmentIndex);
             return false;
         }
 
-        if (value is IEnumerable enumerable)
-        {
-            var scanned = 0;
-            foreach (var item in enumerable)
-            {
-                if (scanned >= ResultPathV1.MaxStableCollectionScanCount)
-                {
-                    diagnostic = new ResultPathDiagnostic("RP116", "Index collection scan exceeded the configured limit.", segmentIndex);
-                    return false;
-                }
-
-                if (scanned == index)
-                {
-                    resolved = item;
-                    return true;
-                }
-
-                scanned++;
-            }
-
-            diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
-            return false;
-        }
-
-        diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+        diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array, one-dimensional CLR array, or IList container.", segmentIndex);
         return false;
     }
 

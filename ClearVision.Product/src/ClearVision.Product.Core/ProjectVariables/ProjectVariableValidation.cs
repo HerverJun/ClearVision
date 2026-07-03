@@ -317,7 +317,18 @@ public static partial class ProjectGlobalVariableSchemaValidator
             return;
         }
 
-        if (!string.Equals(parsed.Path!.CanonicalPath, binding.ResultPath, StringComparison.Ordinal))
+        if (parsed.Path!.Segments.Any(segment => segment.Kind == ResultPathSegmentKind.Index))
+        {
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "RP122",
+                "Source binding ResultPath index segments are not supported for project global variables.",
+                binding.VariableId,
+                binding.OperatorId,
+                binding.OutputPortId));
+            return;
+        }
+
+        if (!string.Equals(parsed.Path.CanonicalPath, binding.ResultPath, StringComparison.Ordinal))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "RP107",

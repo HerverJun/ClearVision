@@ -138,6 +138,7 @@ function normalizeObservationNode(node) {
             name: null,
             pathHint: '$',
             addressable: false,
+            locatable: false,
             truncated: false,
             artifact: null,
             outputPortId: null,
@@ -167,6 +168,7 @@ function normalizeObservationNode(node) {
             : asString(readOwn(node, 'name', 'Name')),
         pathHint: asString(readOwn(node, 'pathHint', 'PathHint'), '$'),
         addressable: normalizeBool(readOwn(node, 'addressable', 'Addressable')),
+        locatable: normalizeBool(readOwn(node, 'locatable', 'Locatable')),
         truncated: normalizeBool(readOwn(node, 'truncated', 'Truncated')),
         artifact: normalizeArtifactReference(readOwn(node, 'artifact', 'Artifact')),
         outputPortId: outputPortId === undefined || outputPortId === null ? null : asString(outputPortId),
@@ -583,10 +585,60 @@ function normalizeScenePrimitive(primitive) {
     };
 }
 
-function normalizeScenePrimitives(scene) {
+function countDetailLocatorMatches(detail, locator) {
+    if (!detail ||
+        !locator?.outputPortId ||
+        locator.resultPathVersion == null ||
+        !locator.resultPath) {
+        return 0;
+    }
+
+    let count = 0;
+    const stack = [detail];
+    while (stack.length > 0) {
+        const node = stack.pop();
+        const normalized = normalizeObservationNode(node);
+        if ((normalized.locatable === true || normalized.addressable === true) &&
+            normalized.outputPortId === locator.outputPortId &&
+            normalized.resultPathVersion === locator.resultPathVersion &&
+            normalized.resultPath === locator.resultPath) {
+            count += 1;
+            if (count > 1) {
+                return count;
+            }
+        }
+
+        getNodeChildren(node).forEach(child => stack.push(child));
+    }
+
+    return count;
+}
+
+function enforceScenePrimitiveDetailMatch(primitive, detail) {
+    if (!primitive?.selectable) {
+        return primitive;
+    }
+
+    const matchCount = countDetailLocatorMatches(detail, primitive);
+    return matchCount === 1
+        ? {
+            ...primitive,
+            detailMatchCount: 1
+        }
+        : {
+            ...primitive,
+            selectable: false,
+            detailMatchCount: matchCount
+        };
+}
+
+function normalizeScenePrimitives(scene, detail = null) {
     const primitives = readOwn(scene, 'primitives', 'Primitives');
     return Array.isArray(primitives)
-        ? primitives.map(normalizeScenePrimitive).filter(Boolean)
+        ? primitives
+            .map(normalizeScenePrimitive)
+            .filter(Boolean)
+            .map(primitive => detail ? enforceScenePrimitiveDetailMatch(primitive, detail) : primitive)
         : [];
 }
 
@@ -990,7 +1042,8 @@ export class NodePreviewInspector {
             return panel;
         }
 
-        const primitives = normalizeScenePrimitives(scene);
+        const detail = getObservationDetail(observation);
+        const primitives = normalizeScenePrimitives(scene, detail);
         const diagnostics = normalizeSceneDiagnostics(scene);
         const toolbar = createElement('div', 'node-preview-inspector-scene-toolbar');
         [
@@ -1019,22 +1072,26 @@ export class NodePreviewInspector {
             }
         } else {
             const sceneSize = getSceneImageSize(scene);
-            const stage = createElement('div', 'node-preview-inspector-scene-stage');
-            stage.style.height = '280px';
-            stage.style.minHeight = '220px';
-            const canvas = createElement('canvas', 'node-preview-inspector-scene-canvas');
-            canvas.id = this.sceneCanvasId;
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            stage.appendChild(canvas);
-            panel.appendChild(stage);
-            this.pendingSceneRender = {
-                scene,
-                primitives,
-                imageCandidates: getSceneBaseImageCandidates(this.state),
-                sceneSize,
-                identitySignature: getObservationIdentitySignatureFromState(this.state)
-            };
+            if (!sceneSize && primitives.length > 0) {
+                panel.appendChild(createElement('div', 'node-preview-inspector-empty-line', 'Scene 坐标尺寸不可用，无法安全叠加显示'));
+            } else {
+                const stage = createElement('div', 'node-preview-inspector-scene-stage');
+                stage.style.height = '280px';
+                stage.style.minHeight = '220px';
+                const canvas = createElement('canvas', 'node-preview-inspector-scene-canvas');
+                canvas.id = this.sceneCanvasId;
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                stage.appendChild(canvas);
+                panel.appendChild(stage);
+                this.pendingSceneRender = {
+                    scene,
+                    primitives,
+                    imageCandidates: getSceneBaseImageCandidates(this.state),
+                    sceneSize,
+                    identitySignature: getObservationIdentitySignatureFromState(this.state)
+                };
+            }
         }
 
         const list = createElement('div', 'node-preview-inspector-scene-list');
@@ -1378,6 +1435,7 @@ export class NodePreviewInspector {
             originalType: row.normalized.originalType,
             pathHint: row.normalized.pathHint,
             addressable: row.normalized.addressable,
+            locatable: row.normalized.locatable,
             truncated: row.normalized.truncated,
             bindableVariableTypes: row.normalized.bindableVariableTypes,
             artifact: row.normalized.artifact
@@ -1438,8 +1496,11 @@ export class NodePreviewInspector {
 
         const detailNode = this.findDetailNodeForScenePrimitive(primitive);
         if (!detailNode) {
-            if (!primitive?.resultPath) {
-                this.selectionStore?.clear?.();
+            this.activeScenePrimitiveId = null;
+            this.selectionStore?.clear?.();
+            if (this.sceneImageCanvas) {
+                this.sceneImageCanvas.selectedOverlay = null;
+                this.sceneImageCanvas.invalidate();
             }
             return null;
         }
@@ -1464,10 +1525,13 @@ export class NodePreviewInspector {
         }
 
         const scene = getObservationVisualScene(getObservationFromState(this.state));
-        return normalizeScenePrimitives(scene).find(primitive =>
+        const detail = getObservationDetail(getObservationFromState(this.state));
+        const matches = normalizeScenePrimitives(scene, detail).filter(primitive =>
+            primitive.selectable === true &&
             primitive.outputPortId === descriptor.outputPortId &&
             primitive.resultPathVersion === descriptor.resultPathVersion &&
-            primitive.resultPath === descriptor.resultPath) || null;
+            primitive.resultPath === descriptor.resultPath);
+        return matches.length === 1 ? matches[0] : null;
     }
 
     findDetailNodeForScenePrimitive(primitive) {
@@ -1478,20 +1542,25 @@ export class NodePreviewInspector {
         }
 
         const detail = getObservationDetail(getObservationFromState(this.state));
+        const matches = [];
         const stack = detail ? [detail] : [];
         while (stack.length > 0) {
             const node = stack.pop();
             const normalized = normalizeObservationNode(node);
-            if (normalized.outputPortId === primitive.outputPortId &&
+            if ((normalized.locatable === true || normalized.addressable === true) &&
+                normalized.outputPortId === primitive.outputPortId &&
                 normalized.resultPathVersion === primitive.resultPathVersion &&
                 normalized.resultPath === primitive.resultPath) {
-                return node;
+                matches.push(node);
+                if (matches.length > 1) {
+                    return null;
+                }
             }
 
             getNodeChildren(node).forEach(child => stack.push(child));
         }
 
-        return null;
+        return matches.length === 1 ? matches[0] : null;
     }
 
     renderArtifacts() {

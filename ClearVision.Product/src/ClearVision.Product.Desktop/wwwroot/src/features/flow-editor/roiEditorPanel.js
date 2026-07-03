@@ -21,6 +21,7 @@ export class RoiEditorPanel {
         this.currentShape = 'Rectangle';
         this.currentConfig = getOperatorRoiConfig(null);
         this.currentGeometry = null;
+        this.applyStateGeneration = 0;
 
         this.render();
         this.bindPreview();
@@ -29,6 +30,7 @@ export class RoiEditorPanel {
     }
 
     destroy() {
+        this.applyStateGeneration += 1;
         this.unsubscribePreview?.();
         this.unsubscribePreview = null;
         this.imageCanvas?.destroy();
@@ -142,6 +144,7 @@ export class RoiEditorPanel {
     }
 
     async applyState() {
+        const applyGeneration = ++this.applyStateGeneration;
         const operator = this.getOperator();
         this.currentConfig = this.getRoiConfig(operator);
         this.currentShape = this.currentConfig?.shape || 'Rectangle';
@@ -205,6 +208,9 @@ export class RoiEditorPanel {
 
         if (imageChanged) {
             await this.imageCanvas.loadImage(inputImageSrc);
+            if (applyGeneration !== this.applyStateGeneration) {
+                return;
+            }
         }
 
         this.syncOverlayFromOperator();

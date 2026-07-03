@@ -1303,7 +1303,11 @@ public static class ExecutionVisualSceneProjector
                 ResultPathV1.Version,
                 resultPath,
                 rootValue,
-                new ResultPathResolverOptions { RequireTerminalScalar = false });
+                new ResultPathResolverOptions
+                {
+                    AllowIndexSegments = true,
+                    RequireTerminalScalar = false
+                });
             if (!resolved.Succeeded || resolved.Path == null)
             {
                 return false;

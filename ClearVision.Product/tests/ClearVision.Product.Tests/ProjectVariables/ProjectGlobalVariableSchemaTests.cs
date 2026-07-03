@@ -910,6 +910,7 @@ public sealed class ProjectGlobalVariableSchemaTests
     [InlineData(1, "", "RP101")]
     [InlineData(1, "$.Score", "RP104")]
     [InlineData(1, "$[\"\\u0053core\"]", "RP107")]
+    [InlineData(1, "$[\"Items\"][0]", "RP122")]
     public void Validate_WhenSourceBindingResultPathPairIsInvalid_ReturnsVersionedDiagnostic(
         int? version,
         string? path,

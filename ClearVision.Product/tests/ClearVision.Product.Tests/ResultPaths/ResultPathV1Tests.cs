@@ -95,26 +95,35 @@ public sealed class ResultPathV1Tests
     }
 
     [Fact]
-    public void Resolver_ShouldResolveCanonicalIndexesFromJsonAndEnumerables()
+    public void Resolver_ShouldResolveCanonicalIndexesOnlyWhenExplicitlyEnabled()
     {
         using var document = JsonDocument.Parse("{\"Items\":[{\"Score\":4},{\"Score\":7}]}");
+        var options = new ResultPathResolverOptions { AllowIndexSegments = true };
         var dictionary = new Dictionary<string, object?>
         {
             ["Items"] = new List<object?>
             {
                 new Dictionary<string, object?> { ["Score"] = 4L },
                 new Dictionary<string, object?> { ["Score"] = 7L }
-            }
+            },
+            ["Array"] = new object?[] { 1L, 2L }
         };
 
         ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", document.RootElement)
+            .Diagnostic!.Code.Should().Be("RP122");
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", dictionary)
+            .Diagnostic!.Code.Should().Be("RP122");
+
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", document.RootElement, options)
             .Value.Should().BeOfType<JsonElement>()
             .Which.GetInt32().Should().Be(7);
-        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", dictionary)
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", dictionary, options)
             .Value.Should().Be(7L);
-        ResultPathResolver.Resolve(ResultPathV1.Version, "$[0]", dictionary)
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Array\"][1]", dictionary, options)
+            .Value.Should().Be(2L);
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[0]", dictionary, options)
             .Diagnostic!.Code.Should().Be("RP120");
-        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][2]", dictionary)
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][2]", dictionary, options)
             .Diagnostic!.Code.Should().Be("RP121");
     }
 
@@ -147,12 +156,18 @@ public sealed class ResultPathV1Tests
         };
 
         ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][0]", root)
+            .Diagnostic!.Code.Should().Be("RP122");
+        ResultPathResolver.Resolve(
+                ResultPathV1.Version,
+                "$[\"Items\"][0]",
+                root,
+                new ResultPathResolverOptions { AllowIndexSegments = true })
             .Diagnostic!.Code.Should().Be("RP118");
         ResultPathResolver.Resolve(
                 ResultPathV1.Version,
                 "$[\"Items\"][0]",
                 root,
-                new ResultPathResolverOptions { RequireTerminalScalar = false })
+                new ResultPathResolverOptions { AllowIndexSegments = true, RequireTerminalScalar = false })
             .Value.Should().BeAssignableTo<IReadOnlyDictionary<string, object?>>();
     }
 
@@ -183,6 +198,24 @@ public sealed class ResultPathV1Tests
         var result = ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][@id=\"A\"]", root);
 
         result.Diagnostic!.Code.Should().Be("RP112");
+        enumerable.GetEnumeratorCallCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Resolver_ShouldNotEnumerateUnknownEnumerableForIndexSegments()
+    {
+        var enumerable = new CountingEnumerable();
+        var root = new Dictionary<string, object?>
+        {
+            ["Items"] = enumerable
+        };
+
+        ResultPathResolver.Resolve(
+                ResultPathV1.Version,
+                "$[\"Items\"][0]",
+                root,
+                new ResultPathResolverOptions { AllowIndexSegments = true })
+            .Diagnostic!.Code.Should().Be("RP120");
         enumerable.GetEnumeratorCallCount.Should().Be(0);
     }
 

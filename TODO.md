@@ -103,6 +103,7 @@
 | G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | DONE | G09C | `docs/进行中/Studio2/goals/G10A.md` | 见 G10A 完成提交与最终报告 |
 | G10B | Geometry/Spatial | RoiManager Crop 空间传播 | DONE | G10A | `docs/进行中/Studio2/goals/G10B.md` | 见 G10B 完成提交与最终报告 |
 | G08-G10B-FOLLOWUP | Geometry/Spatial | Visual Geometry 与 SpatialContext 联合收口 | DONE | G10B | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP.md` | 见 G08-G10B-FOLLOWUP 完成提交与最终报告 |
+| G08-G10B-FOLLOWUP-2 | Geometry/Spatial | Scene 定位与 Spatial fail-closed 最终收口 | DONE | G08-G10B-FOLLOWUP | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP-2.md` | 见本轮最终报告；未执行 G10C |
 | G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | READY | G08-G10B-FOLLOWUP | `docs/进行中/Studio2/goals/G10C.md` |  |
 | G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | LOCKED | G10C | `docs/进行中/Studio2/goals/G11A.md` |  |
 | G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | LOCKED | G11A | `docs/进行中/Studio2/goals/G11B.md` |  |

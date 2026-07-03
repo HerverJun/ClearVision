@@ -100,22 +100,25 @@ public sealed class ExecutionObservationSummaryItemV1
     public bool Addressable { get; init; }
 
     [JsonPropertyOrder(5)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Guid? OutputPortId { get; init; }
+    public bool Locatable { get; init; }
 
     [JsonPropertyOrder(6)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? OutputPortName { get; init; }
+    public Guid? OutputPortId { get; init; }
 
     [JsonPropertyOrder(7)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? ResultPathVersion { get; init; }
+    public string? OutputPortName { get; init; }
 
     [JsonPropertyOrder(8)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ResultPath { get; init; }
+    public int? ResultPathVersion { get; init; }
 
     [JsonPropertyOrder(9)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultPath { get; init; }
+
+    [JsonPropertyOrder(10)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? BindableVariableTypes { get; init; }
 }
@@ -144,29 +147,32 @@ public sealed class ExecutionObservationDetailNodeV1
     public bool Addressable { get; init; }
 
     [JsonPropertyOrder(7)]
-    public string? Name { get; init; }
+    public bool Locatable { get; set; }
 
     [JsonPropertyOrder(8)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public PreviewArtifactReferenceV1? Artifact { get; init; }
+    public string? Name { get; init; }
 
     [JsonPropertyOrder(9)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Guid? OutputPortId { get; init; }
+    public PreviewArtifactReferenceV1? Artifact { get; init; }
 
     [JsonPropertyOrder(10)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? OutputPortName { get; init; }
+    public Guid? OutputPortId { get; set; }
 
     [JsonPropertyOrder(11)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? ResultPathVersion { get; init; }
+    public string? OutputPortName { get; set; }
 
     [JsonPropertyOrder(12)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ResultPath { get; init; }
+    public int? ResultPathVersion { get; set; }
 
     [JsonPropertyOrder(13)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultPath { get; set; }
+
+    [JsonPropertyOrder(14)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? BindableVariableTypes { get; init; }
 }

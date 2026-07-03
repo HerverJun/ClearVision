@@ -48,7 +48,7 @@ public static class ExecutionObservationProjector
         var detail = ProjectDetailNode(rootValue, PathInfo.Root, null, 0, addressableCandidate: false, context);
         detail = EnforceDetailByteBudget(detail, context);
         var summary = BuildSummary(detail);
-        var visualScene = CreateVisualScene(input);
+        var visualScene = ReconcileVisualSceneWithDetail(CreateVisualScene(input), detail);
 
         return new ExecutionObservationEnvelopeV1
         {
@@ -107,6 +107,119 @@ public static class ExecutionObservationProjector
             };
         }
     }
+
+    private static ExecutionVisualSceneV1 ReconcileVisualSceneWithDetail(
+        ExecutionVisualSceneV1 visualScene,
+        ExecutionObservationDetailNodeV1 detail)
+    {
+        if (visualScene.Primitives.Count == 0)
+        {
+            return visualScene;
+        }
+
+        var detailLocators = CountDetailLocators(detail);
+        var primitives = new List<ExecutionVisualScenePrimitiveV1>(visualScene.Primitives.Count);
+        var diagnostics = new List<ExecutionVisualSceneDiagnosticV1>(visualScene.Diagnostics);
+
+        foreach (var primitive in visualScene.Primitives)
+        {
+            if (!primitive.Selectable)
+            {
+                primitives.Add(primitive);
+                continue;
+            }
+
+            var key = TryCreateLocatorKey(primitive.OutputPortId, primitive.ResultPathVersion, primitive.ResultPath);
+            var matches = 0;
+            if (key != null)
+            {
+                detailLocators.TryGetValue(key.Value, out matches);
+            }
+
+            if (matches != 1)
+            {
+                primitives.Add(CloneScenePrimitive(primitive, selectable: false));
+                diagnostics.Add(new ExecutionVisualSceneDiagnosticV1
+                {
+                    Code = matches > 1
+                        ? "visual-scene-detail-locator-ambiguous"
+                        : "visual-scene-detail-locator-missing",
+                    Message = matches > 1
+                        ? "Selectable scene primitive locator matched multiple Observation Detail nodes; selection disabled."
+                        : "Selectable scene primitive locator did not match exactly one Observation Detail node; selection disabled.",
+                    PrimitiveId = primitive.PrimitiveId
+                });
+                continue;
+            }
+
+            primitives.Add(primitive);
+        }
+
+        return new ExecutionVisualSceneV1
+        {
+            SchemaVersion = visualScene.SchemaVersion,
+            CoordinateSpace = visualScene.CoordinateSpace,
+            ImageWidth = visualScene.ImageWidth,
+            ImageHeight = visualScene.ImageHeight,
+            Primitives = primitives,
+            Diagnostics = diagnostics,
+            Truncated = visualScene.Truncated
+        };
+    }
+
+    private static Dictionary<DetailLocatorKey, int> CountDetailLocators(ExecutionObservationDetailNodeV1 detail)
+    {
+        var counts = new Dictionary<DetailLocatorKey, int>();
+        var stack = new Stack<ExecutionObservationDetailNodeV1>();
+        stack.Push(detail);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (current.Locatable &&
+                TryCreateLocatorKey(current.OutputPortId, current.ResultPathVersion, current.ResultPath) is { } key)
+            {
+                counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
+            }
+
+            for (var index = current.Children.Count - 1; index >= 0; index--)
+            {
+                stack.Push(current.Children[index]);
+            }
+        }
+
+        return counts;
+    }
+
+    private static DetailLocatorKey? TryCreateLocatorKey(Guid? outputPortId, int? resultPathVersion, string? resultPath)
+    {
+        if (!outputPortId.HasValue ||
+            !resultPathVersion.HasValue ||
+            string.IsNullOrWhiteSpace(resultPath))
+        {
+            return null;
+        }
+
+        return new DetailLocatorKey(outputPortId.Value, resultPathVersion.Value, resultPath);
+    }
+
+    private static ExecutionVisualScenePrimitiveV1 CloneScenePrimitive(
+        ExecutionVisualScenePrimitiveV1 primitive,
+        bool selectable) =>
+        new()
+        {
+            PrimitiveId = primitive.PrimitiveId,
+            Kind = primitive.Kind,
+            Layer = primitive.Layer,
+            ZOrder = primitive.ZOrder,
+            Visible = primitive.Visible,
+            Selectable = selectable,
+            Label = primitive.Label,
+            Geometry = primitive.Geometry,
+            Style = primitive.Style,
+            OutputPortId = primitive.OutputPortId,
+            ResultPathVersion = primitive.ResultPathVersion,
+            ResultPath = primitive.ResultPath
+        };
 
     public static Dictionary<string, object> BuildLegacyOutputData(
         IReadOnlyDictionary<string, object> nodeOutput,
@@ -193,7 +306,7 @@ public static class ExecutionObservationProjector
                 IDictionary dictionary => ProjectDictionary(dictionary, path, safeName, depth, context),
                 _ when TryProjectKnownFiniteCollection(value, path, safeName, depth, context, out var collectionNode) => collectionNode,
                 IEnumerable and not string => UnsupportedEnumerableNode(value, path, safeName, context),
-                _ => UnsupportedObjectNode(value, path, safeName)
+                _ => UnsupportedObjectNode(value, path, safeName, context)
             };
         }
         finally
@@ -257,7 +370,7 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("field-limit", $"Object field count {properties.Count} exceeds limit {MaxObjectFields}.", path.Value);
         }
 
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "object",
             DisplayValue = $"{Math.Min(properties.Count, MaxObjectFields)}/{properties.Count} fields",
@@ -267,7 +380,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static ExecutionObservationDetailNodeV1 ProjectJsonArray(
@@ -297,7 +410,7 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("collection-limit", $"Collection item count {total} exceeds limit {MaxCollectionItems}.", path.Value);
         }
 
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "array",
             DisplayValue = $"{Math.Min(total, MaxCollectionItems)}/{total} items",
@@ -307,7 +420,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static ExecutionObservationDetailNodeV1 ProjectDictionary(
@@ -355,7 +468,7 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("field-limit", $"Dictionary field count {entries.Count} exceeds limit {MaxObjectFields}.", path.Value);
         }
 
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "dictionary",
             DisplayValue = $"{Math.Min(entries.Count, MaxObjectFields)}/{entries.Count} fields",
@@ -365,7 +478,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static bool TryProjectKnownFiniteCollection(
@@ -461,7 +574,7 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("collection-limit", $"Collection item count {total} exceeds limit {MaxCollectionItems}.", path.Value);
         }
 
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "array",
             DisplayValue = $"{Math.Min(total, MaxCollectionItems)}/{total} items",
@@ -471,7 +584,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static ExecutionObservationDetailNodeV1 ProjectDetectionList(
@@ -497,7 +610,7 @@ public static class ExecutionObservationProjector
             context));
 
         var truncated = detections.Count > MaxCollectionItems;
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "detectionList",
             DisplayValue = $"{Math.Min(detections.Count, MaxCollectionItems)}/{detections.Count} detections",
@@ -507,7 +620,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static ExecutionObservationDetailNodeV1 ProjectDetectionResult(
@@ -532,7 +645,7 @@ public static class ExecutionObservationProjector
             .Select(field => ProjectDetailNode(field.Value, AppendObjectKey(path, field.Name, context), field.Name, depth + 1, true, context))
             .ToList();
 
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "detection",
             DisplayValue = $"Detection {ClipForDisplay(detection.Label)}",
@@ -541,7 +654,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static ExecutionObservationDetailNodeV1 UnsupportedEnumerableNode(
@@ -566,9 +679,10 @@ public static class ExecutionObservationProjector
     private static ExecutionObservationDetailNodeV1 UnsupportedObjectNode(
         object value,
         PathInfo path,
-        string? name)
+        string? name,
+        ProjectionContext context)
     {
-        return new ExecutionObservationDetailNodeV1
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "objectDescriptor",
             DisplayValue = "Unsupported object; content omitted.",
@@ -577,7 +691,7 @@ public static class ExecutionObservationProjector
             PathHint = path.Value,
             Addressable = false,
             Name = name
-        };
+        }, path, context);
     }
 
     private static bool TryProjectScalar(
@@ -685,12 +799,17 @@ public static class ExecutionObservationProjector
         ProjectionContext context,
         object? scalarValue)
     {
-        var effectiveAddressable = addressable && path.Value != "$" && path.ResultPathBinding != null;
+        var locator = ValidateLocatableResultPath(path.ResultPathBinding, scalarValue, path.Value, context, compareScalarValue: true);
+        var effectiveAddressable = addressable &&
+            path.AllowsBinding &&
+            path.Value != "$" &&
+            path.ResultPathBinding != null &&
+            !path.ResultPathBinding.ContainsIndex;
         var binding = effectiveAddressable
             ? ValidateBindableResultPath(path.ResultPathBinding!, scalarValue, path.Value, context)
             : null;
         effectiveAddressable = binding != null;
-        var canonicalPath = binding?.ToCanonicalPath();
+        var canonicalPath = binding?.ToCanonicalPath() ?? locator?.ResultPath;
         var bindableVariableTypes = binding == null
             ? null
             : GetBindableVariableTypes(scalarValue);
@@ -701,13 +820,68 @@ public static class ExecutionObservationProjector
             OriginalType = originalType,
             PathHint = path.Value,
             Addressable = effectiveAddressable,
+            Locatable = locator != null || binding != null,
             Name = name,
-            OutputPortId = binding?.OutputPortId,
-            OutputPortName = binding?.OutputPortName,
-            ResultPathVersion = binding == null ? null : ResultPathV1.Version,
+            OutputPortId = binding?.OutputPortId ?? locator?.OutputPortId,
+            OutputPortName = binding?.OutputPortName ?? locator?.OutputPortName,
+            ResultPathVersion = binding != null || locator != null ? ResultPathV1.Version : null,
             ResultPath = canonicalPath,
             BindableVariableTypes = bindableVariableTypes == null || bindableVariableTypes.Count == 0 ? null : bindableVariableTypes
         };
+    }
+
+    private static ExecutionObservationDetailNodeV1 WithLocatableMetadata(
+        ExecutionObservationDetailNodeV1 node,
+        PathInfo path,
+        ProjectionContext context)
+    {
+        var locator = ValidateLocatableResultPath(path.ResultPathBinding, null, path.Value, context, compareScalarValue: false);
+        if (locator == null)
+        {
+            return node;
+        }
+
+        node.Locatable = true;
+        node.OutputPortId = locator.OutputPortId;
+        node.OutputPortName = locator.OutputPortName;
+        node.ResultPathVersion = ResultPathV1.Version;
+        node.ResultPath = locator.ResultPath;
+        return node;
+    }
+
+    private static LocatableMetadata? ValidateLocatableResultPath(
+        ResultPathBindingInfo? binding,
+        object? projectedValue,
+        string pathHint,
+        ProjectionContext context,
+        bool compareScalarValue)
+    {
+        if (binding == null)
+        {
+            return null;
+        }
+
+        var canonicalPath = binding.ToCanonicalPath();
+        var resolved = ResultPathResolver.Resolve(
+            ResultPathV1.Version,
+            canonicalPath,
+            binding.OutputPortRoot,
+            new ResultPathResolverOptions
+            {
+                AllowIndexSegments = true,
+                RequireTerminalScalar = false
+            });
+        if (resolved.Succeeded &&
+            (!compareScalarValue || AreEquivalentScalarValues(projectedValue, resolved.Value)))
+        {
+            return new LocatableMetadata(binding.OutputPortId, binding.OutputPortName, canonicalPath);
+        }
+
+        var message = resolved.Succeeded
+            ? "Canonical locator resolved to a different value; metadata omitted."
+            : $"Canonical locator is not resolvable by the read-only locator resolver: {resolved.Diagnostic!.Code}.";
+        context.AddDiagnostic("resultpath-locator-unresolvable", message, pathHint);
+        return null;
     }
 
     private static List<string> GetBindableVariableTypes(object? scalarValue)
@@ -894,6 +1068,7 @@ public static class ExecutionObservationProjector
                     OriginalType = current.OriginalType,
                     PathHint = current.PathHint,
                     Addressable = current.Addressable,
+                    Locatable = current.Locatable,
                     OutputPortId = current.OutputPortId,
                     OutputPortName = current.OutputPortName,
                     ResultPathVersion = current.ResultPathVersion,
@@ -1409,6 +1584,7 @@ public static class ExecutionObservationProjector
         var candidate = $"{path.Value}{ResultPathFormatter.FormatObjectKeySegment(key)}";
         var withinPathLimits = key.Length <= MaxNameChars && candidate.Length <= MaxPathHintChars;
         var addressable = path.Addressable && withinPathLimits;
+        var allowsBinding = path.AllowsBinding && withinPathLimits;
         ResultPathBindingInfo? binding = null;
         if (addressable)
         {
@@ -1416,10 +1592,12 @@ public static class ExecutionObservationProjector
             {
                 binding = context.CreateOutputPortBinding(key, path.Value);
                 addressable = binding != null;
+                allowsBinding = allowsBinding && binding != null;
             }
             else
             {
                 binding = path.ResultPathBinding?.AppendKey(key);
+                allowsBinding = allowsBinding && binding != null;
             }
         }
 
@@ -1431,16 +1609,22 @@ public static class ExecutionObservationProjector
         return new PathInfo(
             candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
             addressable,
+            allowsBinding,
             binding);
     }
 
     private static PathInfo AppendArrayIndex(PathInfo path, int index)
     {
         var candidate = $"{path.Value}[{index.ToString(CultureInfo.InvariantCulture)}]";
+        var withinPathLimits = candidate.Length <= MaxPathHintChars;
+        var binding = withinPathLimits
+            ? path.ResultPathBinding?.AppendIndex(index)
+            : null;
         return new PathInfo(
             candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
-            path.Addressable && candidate.Length <= MaxPathHintChars,
-            null);
+            path.Addressable && withinPathLimits && binding != null,
+            false,
+            binding);
     }
 
     private static PathInfo AppendDisplayObjectKey(PathInfo path, string key)
@@ -1448,6 +1632,7 @@ public static class ExecutionObservationProjector
         var candidate = $"{path.Value}{ResultPathFormatter.FormatObjectKeySegment(key)}";
         return new PathInfo(
             candidate.Length <= MaxPathHintChars ? candidate : candidate[..MaxPathHintChars] + "...",
+            false,
             false,
             null);
     }
@@ -1532,28 +1717,40 @@ public static class ExecutionObservationProjector
     private static string? GetTypeName(object? value) =>
         value?.GetType().FullName;
 
-    private readonly record struct PathInfo(string Value, bool Addressable, ResultPathBindingInfo? ResultPathBinding)
+    private readonly record struct PathInfo(string Value, bool Addressable, bool AllowsBinding, ResultPathBindingInfo? ResultPathBinding)
     {
-        public static PathInfo Root { get; } = new("$", true, null);
+        public static PathInfo Root { get; } = new("$", true, true, null);
 
-        public PathInfo WithoutResultPathBinding() => this with { ResultPathBinding = null };
+        public PathInfo WithoutResultPathBinding() => this with { AllowsBinding = false, ResultPathBinding = null };
     }
 
     private sealed record FieldEntry(string SortKey, string Name, PathInfo ParentPath, object? Value, bool CanUseResultPath);
+
+    private sealed record LocatableMetadata(Guid OutputPortId, string OutputPortName, string ResultPath);
+
+    private readonly record struct DetailLocatorKey(Guid OutputPortId, int ResultPathVersion, string ResultPath);
 
     private sealed record ResultPathBindingInfo(
         Guid OutputPortId,
         string OutputPortName,
         object? OutputPortRoot,
-        IReadOnlyList<string> RelativeKeys)
+        IReadOnlyList<ResultPathSegment> RelativeSegments)
     {
         public ResultPathBindingInfo AppendKey(string key)
         {
-            var keys = RelativeKeys.Concat([key]).ToArray();
-            return this with { RelativeKeys = keys };
+            var segments = RelativeSegments.Concat([ResultPathSegment.ObjectKey(key)]).ToArray();
+            return this with { RelativeSegments = segments };
         }
 
-        public string ToCanonicalPath() => ResultPathFormatter.FormatObjectPath(RelativeKeys);
+        public ResultPathBindingInfo AppendIndex(int index)
+        {
+            var segments = RelativeSegments.Concat([ResultPathSegment.Index(index)]).ToArray();
+            return this with { RelativeSegments = segments };
+        }
+
+        public bool ContainsIndex => RelativeSegments.Any(segment => segment.Kind == ResultPathSegmentKind.Index);
+
+        public string ToCanonicalPath() => ResultPathFormatter.Format(RelativeSegments);
     }
 
     private sealed class ProjectionContext

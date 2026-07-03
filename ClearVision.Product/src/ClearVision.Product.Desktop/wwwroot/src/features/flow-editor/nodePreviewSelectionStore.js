@@ -143,6 +143,7 @@ export function createNodePreviewSelectionStore() {
                     ? '$'
                     : String(selection.pathHint),
                 addressable: selection?.addressable === true,
+                locatable: selection?.locatable === true,
                 truncated: selection?.truncated === true,
                 bindableVariableTypes: normalizeBindableVariableTypes(selection?.bindableVariableTypes),
                 artifact: cloneArtifactMetadata(selection?.artifact)

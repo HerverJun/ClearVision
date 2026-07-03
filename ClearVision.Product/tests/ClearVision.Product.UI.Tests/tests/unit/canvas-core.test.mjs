@@ -1180,3 +1180,98 @@ test('ImageCanvas clear releases image resources and redraws empty canvas', asyn
     rafSpy.restore();
   }
 });
+
+test('ImageCanvas cancelAndReleaseActiveInteraction restores ROI geometry without commit', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  let releasedPointerId = null;
+  canvas.hasPointerCapture = pointerId => pointerId === 42;
+  canvas.releasePointerCapture = pointerId => {
+    releasedPointerId = pointerId;
+  };
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const phases = [];
+  const ic = new ImageCanvas('canvas', {
+    interactionMode: 'roi-rect',
+    onOverlayChanged: (_geometry, phase) => phases.push(phase)
+  });
+  ic.image = { width: 400, height: 300 };
+  ic.overlays = [{ id: 'roi-1', type: 'rectangle', x: 50, y: 60, width: 70, height: 80, editable: true }];
+  ic.activeOverlayId = 'roi-1';
+  ic.selectedOverlay = 'roi-1';
+  ic.resetGeometryDraft({ kind: 'rectangle', x: 50, y: 60, width: 70, height: 80 });
+  ic.interactionState = {
+    type: 'move',
+    overlayId: 'roi-1',
+    originalGeometry: { kind: 'rectangle', x: 50, y: 60, width: 70, height: 80 },
+    dragAnchor: { x: 50, y: 60 }
+  };
+  Object.assign(ic.overlays[0], { x: 90, y: 100, width: 70, height: 80 });
+  ic.activeHandle = 'center';
+  ic.activePointerId = 42;
+
+  ic.clear();
+
+  assert.deepEqual(phases, ['cancel'], 'clear during drag must emit cancel only');
+  assert.equal(releasedPointerId, 42, 'active pointer capture should be released');
+  assert.equal(ic.activePointerId, null);
+  assert.equal(ic.interactionState, null);
+  assert.equal(ic.activeHandle, null);
+  ic.destroy();
+});
+
+test('ImageCanvas ignores late image load completions from stale generations', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const originalImage = global.Image;
+  const createdImages = [];
+  class DeferredImage {
+    constructor() {
+      this.onload = null;
+      this.onerror = null;
+      this.width = 100;
+      this.height = 100;
+      createdImages.push(this);
+    }
+    set src(value) {
+      this._src = value;
+    }
+    get src() {
+      return this._src;
+    }
+  }
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+  global.Image = DeferredImage;
+
+  try {
+    const ic = new ImageCanvas('canvas');
+    const first = ic.loadImage('first.png');
+    const second = ic.loadImage('second.png');
+
+    createdImages[1].width = 222;
+    createdImages[1].height = 111;
+    createdImages[1].onload();
+    await second;
+    assert.equal(ic.image, createdImages[1], 'newer image should become authoritative');
+
+    createdImages[0].width = 10;
+    createdImages[0].height = 10;
+    createdImages[0].onload();
+    await first;
+    assert.equal(ic.image, createdImages[1], 'late older image should not overwrite the current image');
+
+    ic.destroy();
+  } finally {
+    global.Image = originalImage;
+  }
+});

@@ -199,6 +199,47 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
+    private sealed class OperatorInputPreparationException : Exception
+    {
+        public OperatorInputPreparationException(string code, string message)
+            : base(message)
+        {
+            Code = code;
+        }
+
+        public string Code { get; }
+    }
+
+    private enum SpatialContextResolverStatus
+    {
+        Absent,
+        Matched,
+        InvalidBinding,
+        AmbiguousBinding,
+        Malformed
+    }
+
+    private sealed record SpatialContextCandidate(string Key, SpatialContextV1 Context);
+
+    private sealed record SpatialContextResolverOutcome(
+        SpatialContextResolverStatus Status,
+        SpatialContextV1? Context,
+        string? ErrorCode,
+        string Message)
+    {
+        public static SpatialContextResolverOutcome Absent { get; } =
+            new(SpatialContextResolverStatus.Absent, null, null, string.Empty);
+
+        public static SpatialContextResolverOutcome Matched(SpatialContextV1 context) =>
+            new(SpatialContextResolverStatus.Matched, context, null, string.Empty);
+
+        public static SpatialContextResolverOutcome Fail(
+            SpatialContextResolverStatus status,
+            string errorCode,
+            string message) =>
+            new(status, null, errorCode, message);
+    }
+
     private sealed class FlowTopologyIndex
     {
         private readonly Dictionary<Guid, Operator> _operatorsById;
@@ -761,7 +802,20 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
             // 准备输入数据
-            var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+            Dictionary<string, object> inputs;
+            try
+            {
+                inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+            }
+            catch (OperatorInputPreparationException ex)
+            {
+                var preparationFailure = CreateInputPreparationFailureResult(op, ex);
+                result.OperatorResults.Add(preparationFailure);
+                result.IsSuccess = false;
+                result.ErrorMessage = $"Operator '{op.Name}' input preparation failed: {preparationFailure.ErrorMessage}";
+                break;
+            }
+
             if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
             {
                 result.OperatorResults.Add(new OperatorExecutionResult
@@ -1137,7 +1191,22 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return missingExecutorResult;
         }
 
-        var inputs = PrepareOperatorInputs(plan.Flow, op, operatorOutputs, inputPreparationIndex);
+        Dictionary<string, object> inputs;
+        try
+        {
+            inputs = PrepareOperatorInputs(plan.Flow, op, operatorOutputs, inputPreparationIndex);
+        }
+        catch (OperatorInputPreparationException ex)
+        {
+            var preparationFailure = CreateInputPreparationFailureResult(op, ex);
+            if (!cancellationToken.IsCancellationRequested && signalLayerFailure(preparationFailure))
+            {
+                await CancelLayerAsync(layerCts);
+            }
+
+            return preparationFailure;
+        }
+
         if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
         {
             var targetBindingResult = new OperatorExecutionResult
@@ -2045,7 +2114,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                     // Encoding cleanup: previous comment text was unreadable.
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
-                                    PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, targetPort, inputs);
+                                    PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, op, targetPort, inputs);
                                 }
                             }
                         }
@@ -2087,57 +2156,100 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         OperatorConnection connection,
         Operator? sourceOperator,
         Port sourcePort,
+        Operator targetOperator,
         Port targetPort,
         Dictionary<string, object> inputs)
     {
-        if (targetPort.DataType != PortDataType.Image)
+        if (!RequiresSpatialContextBinding(targetOperator, targetPort))
         {
-            return;
-        }
-
-        var candidates = CollectSpatialContextCandidates(sourceOutputs);
-        if (candidates.Count == 0)
-        {
-            return;
-        }
-
-        var matching = candidates
-            .Where(candidate => SpatialContextMatchesConnection(candidate.Context, connection, sourcePort))
-            .ToList();
-
-        if (matching.Count == 1)
-        {
-            inputs[GetSpatialContextInputKey(targetPort.Name)] = matching[0].Context;
             return;
         }
 
         var sourceName = sourceOperator?.Name ?? connection.SourceOperatorId.ToString();
-        if (matching.Count == 0)
+        var outcome = ResolveSpatialContextForConnection(sourceOutputs, connection, sourcePort, sourceName, targetPort.Name);
+        switch (outcome.Status)
         {
-            _logger.LogWarning(
-                "[FlowExecution] SpatialContext sidecar was present on source {SourceOperator}.{SourcePort} but none matched binding SourceOperatorId/OutputPortId; target input {TargetPort} receives no context.",
-                SanitizeLogValue(sourceName),
-                SanitizeLogValue(sourcePort.Name),
-                SanitizeLogValue(targetPort.Name));
-            return;
+            case SpatialContextResolverStatus.Absent:
+                return;
+            case SpatialContextResolverStatus.Matched:
+                inputs[GetSpatialContextInputKey(targetPort.Name)] = outcome.Context!;
+                return;
+            case SpatialContextResolverStatus.InvalidBinding:
+            case SpatialContextResolverStatus.AmbiguousBinding:
+            case SpatialContextResolverStatus.Malformed:
+                throw new OperatorInputPreparationException(outcome.ErrorCode!, outcome.Message);
+            default:
+                throw new OperatorInputPreparationException(
+                    "SPATIAL_CONTEXT_BINDING_INVALID",
+                    "SpatialContext binding resolver returned an unsupported outcome.");
         }
-
-        _logger.LogWarning(
-            "[FlowExecution] Multiple SpatialContext sidecars matched source {SourceOperator}.{SourcePort}; target input {TargetPort} receives no context.",
-            SanitizeLogValue(sourceName),
-            SanitizeLogValue(sourcePort.Name),
-            SanitizeLogValue(targetPort.Name));
     }
 
-    private static List<(string Key, SpatialContextV1 Context)> CollectSpatialContextCandidates(IReadOnlyDictionary<string, object> outputs)
+    private static bool RequiresSpatialContextBinding(Operator targetOperator, Port targetPort) =>
+        targetPort.DataType == PortDataType.Image &&
+        targetOperator.Type == OperatorType.RoiManager;
+
+    private static SpatialContextResolverOutcome ResolveSpatialContextForConnection(
+        IReadOnlyDictionary<string, object> sourceOutputs,
+        OperatorConnection connection,
+        Port sourcePort,
+        string sourceName,
+        string targetPortName)
     {
-        var candidates = new List<(string Key, SpatialContextV1 Context)>();
-        foreach (var pair in outputs)
+        var candidates = CollectSpatialContextCandidates(sourceOutputs, out var malformedKey);
+        if (malformedKey != null)
         {
+            return SpatialContextResolverOutcome.Fail(
+                SpatialContextResolverStatus.Malformed,
+                "SPATIAL_CONTEXT_MALFORMED",
+                $"Malformed SpatialContext sidecar '{malformedKey}' from {sourceName}.{sourcePort.Name} cannot be bound to target input {targetPortName}.");
+        }
+
+        if (candidates.Count == 0)
+        {
+            return SpatialContextResolverOutcome.Absent;
+        }
+
+        var matching = candidates
+            .Where(candidate => SpatialContextMatchesConnection(candidate.Context, connection, sourcePort))
+            .OrderBy(candidate => candidate.Key, StringComparer.Ordinal)
+            .ToList();
+
+        return matching.Count switch
+        {
+            1 => SpatialContextResolverOutcome.Matched(matching[0].Context),
+            0 => SpatialContextResolverOutcome.Fail(
+                SpatialContextResolverStatus.InvalidBinding,
+                "SPATIAL_CONTEXT_BINDING_INVALID",
+                $"SpatialContext sidecar was present on source {sourceName}.{sourcePort.Name} but none matched SourceOperatorId/OutputPortId for target input {targetPortName}."),
+            _ => SpatialContextResolverOutcome.Fail(
+                SpatialContextResolverStatus.AmbiguousBinding,
+                "SPATIAL_CONTEXT_BINDING_AMBIGUOUS",
+                $"Multiple SpatialContext sidecars matched source {sourceName}.{sourcePort.Name} for target input {targetPortName}.")
+        };
+    }
+
+    private static List<SpatialContextCandidate> CollectSpatialContextCandidates(
+        IReadOnlyDictionary<string, object> outputs,
+        out string? malformedKey)
+    {
+        malformedKey = null;
+        var candidates = new List<SpatialContextCandidate>();
+        foreach (var pair in outputs.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!IsSpatialContextFallbackValue(pair.Key, pair.Value))
+            {
+                continue;
+            }
+
             if (TryReadSpatialContextSidecar(pair.Value, out var context))
             {
-                candidates.Add((pair.Key, context));
+                candidates.Add(new SpatialContextCandidate(pair.Key, context));
+                continue;
             }
+
+            malformedKey = pair.Key;
+            return candidates;
         }
 
         return candidates;
@@ -2523,7 +2635,21 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
                 // 准备输入数据
-                var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+                Dictionary<string, object> inputs;
+                try
+                {
+                    inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+                }
+                catch (OperatorInputPreparationException ex)
+                {
+                    var debugResult = CreateInputPreparationDebugFailureResult(op, ex, completedCount, options.Breakpoints.Contains(op.Id));
+                    result.DebugOperatorResults.Add(debugResult);
+                    result.OperatorResults.Add(debugResult);
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Operator '{op.Name}' input preparation failed: {debugResult.ErrorMessage}";
+                    break;
+                }
+
                 if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
                 {
                     var debugResult = new OperatorDebugResult
@@ -3248,6 +3374,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         };
     }
 
+    private static OperatorExecutionResult CreateInputPreparationFailureResult(Operator op, OperatorInputPreparationException ex)
+    {
+        return new OperatorExecutionResult
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            IsSuccess = false,
+            ExecutionTimeMs = 0,
+            ErrorMessage = $"{ex.Code}: {ex.Message}"
+        };
+    }
+
     private static OperatorDebugResult CreateSkippedDebugOperatorResult(Operator op, int executionOrder, bool isBreakpoint)
     {
         var now = DateTime.UtcNow;
@@ -3261,6 +3399,30 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             StartTime = now,
             EndTime = now,
             IsBreakpoint = isBreakpoint,
+            InputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
+            OutputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
+            OutputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static OperatorDebugResult CreateInputPreparationDebugFailureResult(
+        Operator op,
+        OperatorInputPreparationException ex,
+        int executionOrder,
+        bool isBreakpoint)
+    {
+        var now = DateTime.UtcNow;
+        return new OperatorDebugResult
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            IsSuccess = false,
+            ExecutionTimeMs = 0,
+            ExecutionOrder = executionOrder,
+            StartTime = now,
+            EndTime = now,
+            IsBreakpoint = isBreakpoint,
+            ErrorMessage = $"{ex.Code}: {ex.Message}",
             InputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
             OutputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
             OutputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)

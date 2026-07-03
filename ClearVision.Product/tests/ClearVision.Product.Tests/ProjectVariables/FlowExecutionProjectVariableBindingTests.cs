@@ -733,7 +733,7 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Theory]
-    [InlineData("$[0]", "RP120")]
+    [InlineData("$[0]", "RP122")]
     [InlineData("$[\"Missing\"]", "RP111")]
     public async Task ExecuteFlowAsync_WhenSourceBindingResultPathIsInvalidOrMissing_ShouldFailWithoutSessionWrite(
         string resultPath,

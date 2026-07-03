@@ -34,6 +34,7 @@ function node(kind, fields = {}) {
     name: fields.name ?? kind,
     pathHint: fields.pathHint ?? `$["${fields.name ?? kind}"]`,
     addressable: fields.addressable ?? true,
+    locatable: fields.locatable ?? false,
     truncated: fields.truncated ?? false,
     outputPortId: fields.outputPortId ?? null,
     outputPortName: fields.outputPortName ?? null,
@@ -148,6 +149,34 @@ function createInspectorHarness(options = {}) {
   );
 
   return { inspector, calls, state };
+}
+
+function collectText(element) {
+  if (!element) {
+    return '';
+  }
+
+  const ownText = typeof element.textContent === 'string' ? element.textContent : '';
+  return [ownText, ...(element.children || []).map(collectText)].join(' ');
+}
+
+function findElement(element, predicate) {
+  if (!element) {
+    return null;
+  }
+
+  if (predicate(element)) {
+    return element;
+  }
+
+  for (const child of element.children || []) {
+    const found = findElement(child, predicate);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 test('NodePreviewInspector renderer registry covers bounded Observation DTO kinds', () => {
@@ -523,6 +552,200 @@ test('NodePreviewInspector links detail fields and scene primitives by canonical
     assert.equal(sceneDescriptor.outputPortId, 'radius-port');
     assert.equal(store.getSelection().resultPath, '$');
     assert.equal(inspector.activeScenePrimitiveId, 'circle:primary');
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector links locatable list items without enabling global variable binding', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const store = createNodePreviewSelectionStore();
+    const circleItem = node('objectDescriptor', {
+      name: '0',
+      displayValue: 'Unsupported object; content omitted.',
+      addressable: false,
+      locatable: true,
+      outputPortId: 'circles-port',
+      outputPortName: 'CircleDataList',
+      resultPathVersion: 1,
+      resultPath: '$[0]',
+      bindableVariableTypes: null
+    });
+    const circleList = node('array', {
+      name: 'CircleDataList',
+      addressable: false,
+      locatable: true,
+      outputPortId: 'circles-port',
+      outputPortName: 'CircleDataList',
+      resultPathVersion: 1,
+      resultPath: '$',
+      children: [circleItem]
+    });
+    const primitive = {
+      primitiveId: 'circle:data-list:0',
+      kind: 'circle',
+      layer: 'measurement',
+      zOrder: 20,
+      visible: true,
+      selectable: true,
+      label: 'Circle 1',
+      geometry: { centerX: 10, centerY: 20, radius: 5 },
+      style: { stroke: '#16a34a' },
+      outputPortId: 'circles-port',
+      resultPathVersion: 1,
+      resultPath: '$[0]'
+    };
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'CircleMeasurement',
+      title: 'Circle',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [circleList]
+        }),
+        visualScene: {
+          schemaVersion: 'visual-scene.v1',
+          coordinateSpace: 'image.pixel',
+          imageWidth: 320,
+          imageHeight: 240,
+          primitives: [primitive],
+          diagnostics: [],
+          truncated: false
+        }
+      },
+      artifacts: []
+    };
+
+    const { inspector } = createInspectorHarness({ state, selectionStore: store });
+    const rows = buildVisibleObservationRows(state.observation.detail, { limit: 10, searchQuery: '0' }).rows;
+    const itemRow = rows.find(row => row.normalized.name === '0');
+
+    assert.equal(inspector.canBindGlobalVariable(itemRow), false);
+    const detailDescriptor = inspector.selectDetailRow(itemRow);
+    assert.equal(detailDescriptor.resultPath, '$[0]');
+    assert.equal(detailDescriptor.addressable, false);
+    assert.equal(detailDescriptor.locatable, true);
+    assert.equal(inspector.activeScenePrimitiveId, 'circle:data-list:0');
+
+    store.clear();
+    inspector.activeScenePrimitiveId = null;
+    const sceneDescriptor = inspector.selectScenePrimitive(primitive);
+    assert.equal(sceneDescriptor.resultPath, '$[0]');
+    assert.equal(store.getSelection().locatable, true);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector fails closed when scene locator has duplicate or missing detail nodes', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const store = createNodePreviewSelectionStore();
+    const duplicateA = node('objectDescriptor', {
+      name: '0',
+      addressable: false,
+      locatable: true,
+      outputPortId: 'circles-port',
+      outputPortName: 'CircleDataList',
+      resultPathVersion: 1,
+      resultPath: '$[0]'
+    });
+    const duplicateB = node('objectDescriptor', {
+      name: 'duplicate',
+      addressable: false,
+      locatable: true,
+      outputPortId: 'circles-port',
+      outputPortName: 'CircleDataList',
+      resultPathVersion: 1,
+      resultPath: '$[0]'
+    });
+    const primitive = {
+      primitiveId: 'circle:data-list:0',
+      kind: 'circle',
+      selectable: true,
+      outputPortId: 'circles-port',
+      resultPathVersion: 1,
+      resultPath: '$[0]',
+      geometry: {},
+      style: {}
+    };
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'CircleMeasurement',
+      title: 'Circle',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', {
+          pathHint: '$',
+          addressable: false,
+          children: [duplicateA, duplicateB]
+        }),
+        visualScene: {
+          imageWidth: 320,
+          imageHeight: 240,
+          primitives: [primitive],
+          diagnostics: []
+        }
+      },
+      artifacts: []
+    };
+
+    const { inspector } = createInspectorHarness({ state, selectionStore: store });
+    assert.equal(inspector.selectScenePrimitive(primitive), null);
+    assert.equal(store.getSelection(), null);
+    assert.equal(inspector.activeScenePrimitiveId, null);
+
+    state.observation.detail.children = [];
+    const panel = inspector.renderScene(state.observation);
+    const rowButton = findElement(panel, item => item.dataset?.primitiveId === 'circle:data-list:0')
+      ?.children?.[0];
+    assert.equal(rowButton?.disabled, true);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
+test('NodePreviewInspector shows controlled state instead of blank canvas when scene size is unavailable', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const primitive = {
+      primitiveId: 'npoint:point:1',
+      kind: 'point',
+      selectable: false,
+      geometry: { x: 10, y: 20 },
+      style: {}
+    };
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'NPointCalibration',
+      title: 'Calibration',
+      status: 'success',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', { pathHint: '$', addressable: false }),
+        visualScene: {
+          imageWidth: 0,
+          imageHeight: 0,
+          primitives: [primitive],
+          diagnostics: []
+        }
+      },
+      artifacts: []
+    };
+
+    const { inspector } = createInspectorHarness({ state });
+    const panel = inspector.renderScene(state.observation);
+    assert.match(collectText(panel), /Scene 坐标尺寸不可用，无法安全叠加显示/);
+    assert.equal(inspector.pendingSceneRender, null);
     inspector.destroy();
   } finally {
     restoreDocument();

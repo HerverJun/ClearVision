@@ -1,4 +1,4 @@
-import {
+﻿import {
     clampRectToBounds,
     deletePointSequencePoint,
     deletePolygonVertex,
@@ -181,6 +181,8 @@ class ImageCanvas {
         this.roiDraftState = null;
         this.activePointerId = null;
         this._suppressMouseCompatibilityUntil = 0;
+        this._imageLoadGeneration = 0;
+        this._destroyed = false;
 
         // 【关键修复】记录是否有待处理的重置视图（当画布尺寸为0时）
         this._pendingResetView = false;
@@ -264,8 +266,9 @@ class ImageCanvas {
      * 销毁画布，清理所有事件监听和动画循环
      */
     destroy() {
-        this.cancelActiveRoiInteraction();
-        this.releaseActivePointerCapture();
+        this._destroyed = true;
+        this._imageLoadGeneration += 1;
+        this.cancelAndReleaseActiveInteraction('destroy');
 
         // 停止渲染循环
         if (this._animationFrameId) {
@@ -358,11 +361,21 @@ class ImageCanvas {
      * 加载图像
      */
     loadImage(imageSource) {
+        const generation = ++this._imageLoadGeneration;
+        this.cancelAndReleaseActiveInteraction('load-image');
         return new Promise((resolve, reject) => {
             const img = new Image();
             let urlToRevoke = null;
 
             img.onload = () => {
+                if (generation !== this._imageLoadGeneration || this._destroyed) {
+                    if (urlToRevoke) {
+                        URL.revokeObjectURL(urlToRevoke);
+                    }
+                    resolve(img);
+                    return;
+                }
+
                 this._releaseCurrentImage();
                 this._imageUrlToRevoke = urlToRevoke;
                 this.image = img;
@@ -374,6 +387,10 @@ class ImageCanvas {
             img.onerror = () => {
                 if (urlToRevoke) {
                     URL.revokeObjectURL(urlToRevoke);
+                }
+                if (generation !== this._imageLoadGeneration || this._destroyed) {
+                    resolve(null);
+                    return;
                 }
                 reject(new Error('图像加载失败'));
             };
@@ -430,11 +447,18 @@ class ImageCanvas {
      * 从共享缓冲区加载图像 (RGBA格式)
      */
     loadImageFromBuffer(buffer, width, height) {
+        const generation = ++this._imageLoadGeneration;
+        this.cancelAndReleaseActiveInteraction('load-image-buffer');
         try {
             const pixelData = new Uint8ClampedArray(buffer);
             const imageData = new ImageData(pixelData, width, height);
 
             createImageBitmap(imageData).then(bitmap => {
+                if (generation !== this._imageLoadGeneration || this._destroyed) {
+                    bitmap.close?.();
+                    return;
+                }
+
                 this._releaseCurrentImage();
                 this.image = bitmap;
                 // 如果是第一帧，重置视图；否则保持视图状态以支持视频流
@@ -578,7 +602,12 @@ class ImageCanvas {
     }
 
     setInteractionMode(mode) {
-        this.interactionMode = mode || 'legacy';
+        const nextMode = mode || 'legacy';
+        if (this.interactionMode === 'roi-rect' && nextMode !== 'roi-rect') {
+            this.cancelAndReleaseActiveInteraction('interaction-mode-change');
+        }
+
+        this.interactionMode = nextMode;
         this.enableRightButtonPan = this.interactionMode === 'roi-rect';
         this.interactionState = null;
         this.activeHandle = null;
@@ -700,6 +729,7 @@ class ImageCanvas {
             return;
         }
 
+        this.cancelAndReleaseActiveInteraction('clear-editable-overlay');
         this.removeOverlay(this.activeOverlayId);
         this.activeOverlayId = null;
         this.activeHandle = null;
@@ -725,6 +755,7 @@ class ImageCanvas {
      * 清空标注
      */
     clearOverlays() {
+        this.cancelAndReleaseActiveInteraction('clear-overlays');
         this.overlays = [];
         this.selectedOverlay = null;
         this.activeOverlayId = null;
@@ -1110,8 +1141,7 @@ class ImageCanvas {
         try {
             this.canvas.setPointerCapture?.(e.pointerId);
         } catch {
-            this.activePointerId = null;
-            this.cancelActiveRoiInteraction();
+            this.cancelAndReleaseActiveInteraction('pointer-capture-failed');
             return;
         }
 
@@ -1143,8 +1173,7 @@ class ImageCanvas {
         }
 
         this._suppressMouseCompatibilityUntil = Date.now() + 1000;
-        this.releaseActivePointerCapture();
-        this.cancelActiveRoiInteraction();
+        this.cancelAndReleaseActiveInteraction('pointer-cancel');
     }
 
     handleLostPointerCapture(e) {
@@ -1152,8 +1181,7 @@ class ImageCanvas {
             return;
         }
 
-        this.activePointerId = null;
-        this.cancelActiveRoiInteraction();
+        this.cancelAndReleaseActiveInteraction('lost-pointer-capture');
     }
 
     handleWindowBlur() {
@@ -1161,8 +1189,25 @@ class ImageCanvas {
             return;
         }
 
+        this.cancelAndReleaseActiveInteraction('window-blur');
+    }
+
+    cancelAndReleaseActiveInteraction(reason = 'cancel') {
+        void reason;
+        const hadPointerCapture = this.activePointerId !== null;
+        if (this.interactionMode === 'roi-rect' && hadPointerCapture) {
+            this._suppressMouseCompatibilityUntil = Date.now() + 1000;
+        }
+
+        const canceled = this.cancelActiveRoiInteraction();
         this.releaseActivePointerCapture();
-        this.cancelActiveRoiInteraction();
+        this.activePointerId = null;
+        this.interactionState = null;
+        this.activeHandle = null;
+        this.isDragging = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.lastMouse = { x: 0, y: 0 };
+        return canceled || hadPointerCapture;
     }
 
     releaseActivePointerCapture() {
@@ -1251,6 +1296,8 @@ class ImageCanvas {
      * 清空画布
      */
     clear() {
+        this._imageLoadGeneration += 1;
+        this.cancelAndReleaseActiveInteraction('clear');
         this._releaseCurrentImage();
         this.overlays = [];
         this.selectedOverlay = null;

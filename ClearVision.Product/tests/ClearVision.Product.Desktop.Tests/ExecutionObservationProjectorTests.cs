@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -329,10 +330,14 @@ public sealed class ExecutionObservationProjectorTests
             },
             [new ExecutionObservationOutputPortV1 { Id = Guid.NewGuid(), Name = "Payload" }]);
 
-        FindNode(unique.Detail, "Values")!.ResultPath.Should().BeNull();
+        var values = FindNode(unique.Detail, "Values")!;
+        values.Locatable.Should().BeTrue();
+        values.Addressable.Should().BeFalse();
+        values.BindableVariableTypes.Should().BeNull();
+        values.ResultPath.Should().Be("$[\"Values\"]");
         FindNode(unique.Detail, "Image")!.ResultPath.Should().BeNull();
         unique.Summary.Any(item =>
-            (item.Key == "Values" || item.Key == "Image") &&
+            item.Key == "Image" &&
             item.ResultPath != null).Should().BeFalse();
     }
 
@@ -642,6 +647,113 @@ public sealed class ExecutionObservationProjectorTests
         var second = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:data-list:1").Subject;
         second.ResultPath.Should().Be("$[1]");
         second.Selectable.Should().BeTrue();
+
+        var listNode = FindNode(observation.Detail, "CircleDataList")!;
+        listNode.Locatable.Should().BeTrue();
+        listNode.Addressable.Should().BeFalse();
+        listNode.BindableVariableTypes.Should().BeNull();
+        listNode.OutputPortId.Should().Be(circlesPortId);
+        listNode.ResultPathVersion.Should().Be(1);
+        listNode.ResultPath.Should().Be("$");
+
+        var firstItemNode = FindNode(observation.Detail, "0")!;
+        firstItemNode.Locatable.Should().BeTrue();
+        firstItemNode.Addressable.Should().BeFalse();
+        firstItemNode.BindableVariableTypes.Should().BeNull();
+        firstItemNode.OutputPortId.Should().Be(circlesPortId);
+        firstItemNode.ResultPathVersion.Should().Be(1);
+        firstItemNode.ResultPath.Should().Be("$[0]");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldMapCircleRootObjectToCanonicalRootPath()
+    {
+        var circlePortId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Circle"] = new CircleData(10, 20, 5),
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlePortId, Name = "Circle" }
+            ],
+            targetOperator);
+
+        var primitive = observation.VisualScene!.Primitives.Should().ContainSingle(item => item.PrimitiveId == "circle:primary").Subject;
+        primitive.OutputPortId.Should().Be(circlePortId);
+        primitive.ResultPathVersion.Should().Be(1);
+        primitive.ResultPath.Should().Be("$");
+        primitive.Selectable.Should().BeTrue();
+
+        var detailNode = FindNode(observation.Detail, "Circle")!;
+        detailNode.Locatable.Should().BeTrue();
+        detailNode.Addressable.Should().BeFalse();
+        detailNode.BindableVariableTypes.Should().BeNull();
+        detailNode.OutputPortId.Should().Be(circlePortId);
+        detailNode.ResultPathVersion.Should().Be(1);
+        detailNode.ResultPath.Should().Be("$");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldMapCirclesDictionaryListItemsToCanonicalIndexPaths()
+    {
+        var circlesPortId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Circles"] = new List<Dictionary<string, object>>
+                {
+                    new() { ["CenterX"] = 10d, ["CenterY"] = 20d, ["Radius"] = 5d },
+                    new() { ["CenterX"] = 30d, ["CenterY"] = 40d, ["Radius"] = 7d }
+                },
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlesPortId, Name = "Circles" }
+            ],
+            targetOperator);
+
+        var first = observation.VisualScene!.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:circles:0").Subject;
+        first.OutputPortId.Should().Be(circlesPortId);
+        first.ResultPathVersion.Should().Be(1);
+        first.ResultPath.Should().Be("$[0]");
+        first.Selectable.Should().BeTrue();
+        FindNode(observation.Detail, "0")!.ResultPath.Should().Be("$[0]");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldDisableSceneSelectionWhenDetailBudgetOmitsLocator()
+    {
+        var circlesPortId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var circles = Enumerable.Range(0, ExecutionObservationProjector.MaxCollectionItems + 2)
+            .Select(index => new CircleData(index + 10, index + 20, 5))
+            .ToList();
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["CircleDataList"] = circles,
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlesPortId, Name = "CircleDataList" }
+            ],
+            targetOperator);
+
+        var retained = observation.VisualScene!.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:data-list:0").Subject;
+        retained.Selectable.Should().BeTrue();
+        var omitted = observation.VisualScene!.Primitives.Should().ContainSingle(primitive =>
+            primitive.PrimitiveId == $"circle:data-list:{ExecutionObservationProjector.MaxCollectionItems.ToString(CultureInfo.InvariantCulture)}").Subject;
+        omitted.ResultPath.Should().Be($"$[{ExecutionObservationProjector.MaxCollectionItems.ToString(CultureInfo.InvariantCulture)}]");
+        omitted.Selectable.Should().BeFalse();
+        observation.VisualScene!.Diagnostics.Should().Contain(item => item.Code == "visual-scene-detail-locator-missing");
     }
 
     [Fact]
