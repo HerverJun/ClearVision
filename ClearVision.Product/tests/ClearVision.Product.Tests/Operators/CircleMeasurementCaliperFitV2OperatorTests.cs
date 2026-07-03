@@ -1,0 +1,177 @@
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using OpenCvSharp;
+
+namespace ClearVision.Product.Tests.Operators;
+
+public class CircleMeasurementCaliperFitV2OperatorTests
+{
+    [Fact]
+    public async Task ExecuteAsync_WithCaliperFitV2_ShouldMapLegacyAndAdditiveOutputs()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = CreateV2Operator(centerX: 160.25, centerY: 120.75, radius: 55.4);
+
+        using var image = IndustrialMeasurementSceneFactory.CreateFilledCircleImage(
+            320,
+            240,
+            new Point2d(160.25, 120.75),
+            55.4,
+            supersample: 16);
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["StatusCode"].Should().Be("OK");
+        result.OutputData["Method"].Should().Be("CaliperFitV2");
+        result.OutputData["CircleCount"].Should().Be(1);
+        result.OutputData["Circle"].Should().BeOfType<CircleData>();
+        result.OutputData["Center"].Should().BeOfType<Position>();
+        Convert.ToDouble(result.OutputData["Radius"]).Should().BeApproximately(55.4, 0.60);
+        Convert.ToDouble(result.OutputData["ResidualRmse"]).Should().BeLessThan(0.80);
+        Convert.ToDouble(result.OutputData["Confidence"]).Should().BeGreaterThan(0.25);
+        double.IsFinite(Convert.ToDouble(result.OutputData["UncertaintyPx"])).Should().BeTrue();
+
+        var v2 = result.OutputData["CaliperFitV2Result"].Should().BeOfType<CircleCaliperFitV2Result>().Subject;
+        v2.Success.Should().BeTrue();
+        v2.ContractVersion.Should().Be(CircleCaliperFitV2Request.ContractVersionValue);
+        result.OutputData["EdgePoints"].Should().BeAssignableTo<IReadOnlyList<Position>>().Which.Should().NotBeEmpty();
+        result.OutputData["InlierPoints"].Should().BeAssignableTo<IReadOnlyList<Position>>().Which.Should().NotBeEmpty();
+        result.OutputData["OutlierPoints"].Should().BeAssignableTo<IReadOnlyList<Position>>();
+        result.OutputData["CaliperDiagnostics"].Should().BeAssignableTo<IReadOnlyList<CircleCaliperFitV2Diagnostic>>();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCaliperFitV2Failure_ShouldNotFallbackOrEmitFakeCircle()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+
+        using var image = TestHelpers.CreateGrayTestImage(220, 220, 0);
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("[InsufficientEdges] CaliperFitV2:");
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!.Keys.Should().NotContain("Center");
+        result.OutputData.Keys.Should().NotContain("Radius");
+        result.OutputData.Keys.Should().NotContain("Circle");
+        result.OutputData.Keys.Should().NotContain("CircleCount");
+        result.OutputData["StatusCode"].Should().Be("InsufficientEdges");
+        var v2 = result.OutputData["CaliperFitV2Result"].Should().BeOfType<CircleCaliperFitV2Result>().Subject;
+        v2.Success.Should().BeFalse();
+        v2.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InsufficientEdges);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithHoughCircle_ShouldIgnoreCaliperFitV2Parameters()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var baseline = new Operator("circle-hough-baseline", OperatorType.CircleMeasurement, 0, 0);
+        baseline.AddParameter(TestHelpers.CreateParameter("Method", "HoughCircle", "enum"));
+        baseline.AddParameter(TestHelpers.CreateParameter("MinRadius", 52, "int"));
+        baseline.AddParameter(TestHelpers.CreateParameter("MaxRadius", 68, "int"));
+        baseline.AddParameter(TestHelpers.CreateParameter("Param2", 20.0, "double"));
+
+        var withV2Params = new Operator("circle-hough-v2-params", OperatorType.CircleMeasurement, 0, 0);
+        withV2Params.AddParameter(TestHelpers.CreateParameter("Method", "HoughCircle", "enum"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("MinRadius", 52, "int"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("MaxRadius", 68, "int"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("Param2", 20.0, "double"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("SearchCenterMode", "Explicit", "enum"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("SearchCenterX", 1.0, "double"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("SearchCenterY", 2.0, "double"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("NominalRadius", 12.0, "double"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("CaliperCount", 3, "int"));
+        withV2Params.AddParameter(TestHelpers.CreateParameter("EdgePolarity", "DarkToLight", "enum"));
+
+        using var baselineImage = TestHelpers.CreateGrayShapeTestImage();
+        using var v2ParamImage = TestHelpers.CreateGrayShapeTestImage();
+        var baselineResult = await sut.ExecuteAsync(baseline, TestHelpers.CreateImageInputs(baselineImage));
+        var withV2ParamsResult = await sut.ExecuteAsync(withV2Params, TestHelpers.CreateImageInputs(v2ParamImage));
+
+        baselineResult.IsSuccess.Should().BeTrue(baselineResult.ErrorMessage);
+        withV2ParamsResult.IsSuccess.Should().BeTrue(withV2ParamsResult.ErrorMessage);
+        ((Position)withV2ParamsResult.OutputData!["Center"]).X.Should().Be(((Position)baselineResult.OutputData!["Center"]).X);
+        ((Position)withV2ParamsResult.OutputData["Center"]).Y.Should().Be(((Position)baselineResult.OutputData["Center"]).Y);
+        Convert.ToDouble(withV2ParamsResult.OutputData["Radius"]).Should().Be(Convert.ToDouble(baselineResult.OutputData["Radius"]));
+        withV2ParamsResult.OutputData.Keys.Should().NotContain("CaliperFitV2Result");
+    }
+
+    [Fact]
+    public void ValidateParameters_WithCaliperFitV2_ShouldValidateV2OnlyInputs()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var valid = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+        sut.ValidateParameters(valid).IsValid.Should().BeTrue();
+
+        var invalid = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+        invalid.Parameters.First(parameter => parameter.Name == "SearchCenterMode").SetValue("Magic");
+        sut.ValidateParameters(invalid).IsValid.Should().BeFalse();
+
+        var invalidNumericEnum = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+        invalidNumericEnum.Parameters.First(parameter => parameter.Name == "EdgePolarity").SetValue("999");
+        sut.ValidateParameters(invalidNumericEnum).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Metadata_ShouldExposeCaliperFitV2ContractAdditively()
+    {
+        var metadata = new OperatorMetadataScanner().Scan().Single(item => item.Type == OperatorType.CircleMeasurement);
+
+        metadata.Version.Should().Be("1.1.0");
+        metadata.OutputPorts.Select(port => port.Name).Should().Contain(new[]
+        {
+            "CaliperFitV2Result",
+            "EdgePoints",
+            "InlierPoints",
+            "OutlierPoints",
+            "CaliperDiagnostics"
+        });
+        metadata.Parameters.First(parameter => parameter.Name == "Method")
+            .Options!.Select(option => option.Value)
+            .Should().Contain("CaliperFitV2");
+        metadata.Parameters.Select(parameter => parameter.Name).Should().Contain(new[]
+        {
+            "SearchCenterMode",
+            "NominalRadius",
+            "CaliperCount",
+            "EdgePolarity",
+            "OutlierMode",
+            "MaxResidualRmse"
+        });
+    }
+
+    private static Operator CreateV2Operator(double centerX, double centerY, double radius)
+    {
+        var op = new Operator("circle-v2", OperatorType.CircleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Method", "CaliperFitV2", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("MinRadius", (int)Math.Floor(radius - 8), "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxRadius", (int)Math.Ceiling(radius + 8), "int"));
+        op.AddParameter(TestHelpers.CreateParameter("SearchCenterMode", "Explicit", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("SearchCenterX", centerX, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("SearchCenterY", centerY, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalRadius", radius, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("CaliperCount", 96, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("AveragingThickness", 5.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ProfileSampleCount", 129, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("GaussianSigma", 1.2, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EdgePolarity", "LightToDark", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("EdgeThreshold", 0.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("MinEdgeStrength", 4.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("MinValidCalipers", 28, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MinCoverageRatio", 0.35, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("MinAngularCoverageDegrees", 180.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("OutlierMode", "Mad", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("OutlierThreshold", 3.5, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxOutlierIterations", 3, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxResidualRmse", 1.4, "double"));
+        return op;
+    }
+}

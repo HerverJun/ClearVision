@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T18:17:50.1111427+08:00",
+  "generatedAt": "2026-07-03T20:14:49.8005279+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -3305,7 +3305,7 @@
       "displayName": "圆测量",
       "description": "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
@@ -3362,6 +3362,36 @@
           "displayName": "圆数据列表",
           "dataType": "Any",
           "isRequired": null
+        },
+        {
+          "name": "CaliperFitV2Result",
+          "displayName": "卡尺圆拟合 V2 结果",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "EdgePoints",
+          "displayName": "V2 边缘点",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "InlierPoints",
+          "displayName": "V2 内点",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "OutlierPoints",
+          "displayName": "V2 离群点",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "CaliperDiagnostics",
+          "displayName": "V2 诊断",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -3382,6 +3412,10 @@
             {
               "value": "FitEllipse",
               "label": "拟合椭圆"
+            },
+            {
+              "value": "CaliperFitV2",
+              "label": "卡尺圆拟合 V2"
             }
           ]
         },
@@ -3450,16 +3484,249 @@
           "max": "255",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "SearchCenterMode",
+          "displayName": "V2 搜索中心模式",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "ImageCenter",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "ImageCenter",
+              "label": "图像中心"
+            },
+            {
+              "value": "Explicit",
+              "label": "显式中心"
+            }
+          ]
+        },
+        {
+          "name": "SearchCenterX",
+          "displayName": "V2 搜索中心 X",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "SearchCenterY",
+          "displayName": "V2 搜索中心 Y",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NominalRadius",
+          "displayName": "V2 标称半径",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "100",
+          "min": "1",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CaliperCount",
+          "displayName": "V2 卡尺数量",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "96",
+          "min": "3",
+          "max": "720",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AveragingThickness",
+          "displayName": "V2 平均厚度",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "5",
+          "min": "1",
+          "max": "128",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ProfileSampleCount",
+          "displayName": "V2 轮廓采样数",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "129",
+          "min": "16",
+          "max": "4096",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "GaussianSigma",
+          "displayName": "V2 高斯 Sigma",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "1.2",
+          "min": "0",
+          "max": "12",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EdgePolarity",
+          "displayName": "V2 边缘极性",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "自动"
+            },
+            {
+              "value": "DarkToLight",
+              "label": "暗到亮"
+            },
+            {
+              "value": "LightToDark",
+              "label": "亮到暗"
+            }
+          ]
+        },
+        {
+          "name": "EdgeThreshold",
+          "displayName": "V2 边缘阈值",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinEdgeStrength",
+          "displayName": "V2 最小边缘强度",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "4",
+          "min": "0",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinValidCalipers",
+          "displayName": "V2 最小有效卡尺",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "24",
+          "min": "3",
+          "max": "720",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinCoverageRatio",
+          "displayName": "V2 最小覆盖率",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.35",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinAngularCoverageDegrees",
+          "displayName": "V2 最小角覆盖",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "180",
+          "min": "0",
+          "max": "360",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OutlierMode",
+          "displayName": "V2 离群模式",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Mad",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "关闭"
+            },
+            {
+              "value": "Mad",
+              "label": "MAD"
+            },
+            {
+              "value": "Huber",
+              "label": "Huber"
+            }
+          ]
+        },
+        {
+          "name": "OutlierThreshold",
+          "displayName": "V2 离群阈值",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "3.5",
+          "min": "0.1",
+          "max": "20",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MaxOutlierIterations",
+          "displayName": "V2 最大离群迭代",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "3",
+          "min": "0",
+          "max": "20",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MaxResidualRmse",
+          "displayName": "V2 最大残差 RMSE",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2",
+          "min": "0.01",
+          "max": "128",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/CircleMeasurement.md"
     },

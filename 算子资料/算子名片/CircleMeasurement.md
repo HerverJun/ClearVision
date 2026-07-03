@@ -6,7 +6,7 @@
 | 类名 (Class) | `CircleMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.CircleMeasurement` |
 | 分类 (Category) | 检测 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
 
@@ -16,7 +16,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 7 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 25 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
@@ -24,9 +24,11 @@
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
 - `Cv2.CvtColor`
+- `Cv2.Circle`
+- `Cv2.Line`
+- `Cv2.PutText`
 - `Cv2.GaussianBlur`
 - `Cv2.HoughCircles`
-- `Cv2.Circle`
 - `Cv2.Threshold`
 - `Cv2.FindContours`
 - `Cv2.BoundingRect`
@@ -34,19 +36,35 @@
 - `Cv2.ArcLength`
 - `Cv2.FitEllipse`
 - `Cv2.Ellipse`
-- `Cv2.Canny`
-- `Convert.ToDouble`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Method` | 检测方法 | `enum` | HoughCircle | HoughCircle/霍夫圆；FitEllipse/拟合椭圆 | Yes | - |
+| `Method` | 检测方法 | `enum` | HoughCircle | HoughCircle/霍夫圆；FitEllipse/拟合椭圆；CaliperFitV2/卡尺圆拟合 V2 | Yes | - |
 | `MinRadius` | 最小半径 | `int` | 10 | >= 0 | Yes | - |
 | `MaxRadius` | 最大半径 | `int` | 200 | >= 0 | Yes | - |
 | `Dp` | 分辨率比 | `double` | 1 | [0.5, 4] | Yes | - |
 | `MinDist` | 最小圆距 | `double` | 50 | >= 1 | Yes | - |
 | `Param1` | Canny阈值 | `double` | 100 | [0, 255] | Yes | - |
 | `Param2` | 累加器阈值 | `double` | 30 | [0, 255] | Yes | - |
+| `SearchCenterMode` | V2 搜索中心模式 | `enum` | ImageCenter | ImageCenter/图像中心；Explicit/显式中心 | Yes | - |
+| `SearchCenterX` | V2 搜索中心 X | `double` | 0 | - | Yes | - |
+| `SearchCenterY` | V2 搜索中心 Y | `double` | 0 | - | Yes | - |
+| `NominalRadius` | V2 标称半径 | `double` | 100 | >= 1 | Yes | - |
+| `CaliperCount` | V2 卡尺数量 | `int` | 96 | [3, 720] | Yes | - |
+| `AveragingThickness` | V2 平均厚度 | `double` | 5 | [1, 128] | Yes | - |
+| `ProfileSampleCount` | V2 轮廓采样数 | `int` | 129 | [16, 4096] | Yes | - |
+| `GaussianSigma` | V2 高斯 Sigma | `double` | 1.2 | [0, 12] | Yes | - |
+| `EdgePolarity` | V2 边缘极性 | `enum` | Auto | Auto/自动；DarkToLight/暗到亮；LightToDark/亮到暗 | Yes | - |
+| `EdgeThreshold` | V2 边缘阈值 | `double` | 0 | [0, 255] | Yes | - |
+| `MinEdgeStrength` | V2 最小边缘强度 | `double` | 4 | [0, 255] | Yes | - |
+| `MinValidCalipers` | V2 最小有效卡尺 | `int` | 24 | [3, 720] | Yes | - |
+| `MinCoverageRatio` | V2 最小覆盖率 | `double` | 0.35 | [0, 1] | Yes | - |
+| `MinAngularCoverageDegrees` | V2 最小角覆盖 | `double` | 180 | [0, 360] | Yes | - |
+| `OutlierMode` | V2 离群模式 | `enum` | Mad | None/关闭；Mad/MAD；Huber/Huber | Yes | - |
+| `OutlierThreshold` | V2 离群阈值 | `double` | 3.5 | [0.1, 20] | Yes | - |
+| `MaxOutlierIterations` | V2 最大离群迭代 | `int` | 3 | [0, 20] | Yes | - |
+| `MaxResidualRmse` | V2 最大残差 RMSE | `double` | 2 | [0.01, 128] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -64,19 +82,31 @@
 | `CircleCount` | 圆数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Circularity` | 圆度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `CircleDataList` | 圆数据列表 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `CaliperFitV2Result` | 卡尺圆拟合 V2 结果 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `EdgePoints` | V2 边缘点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
+| `InlierPoints` | V2 内点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
+| `OutlierPoints` | V2 离群点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
+| `CaliperDiagnostics` | V2 诊断 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
+| `AngularCoverageDegrees` | `Any` | 源码输出字典初始化中可见字段。 |
 | `Circles` | `Any` | 源码输出字典初始化中可见字段。 |
 | `Confidence` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ContractVersion` | `Any` | 源码输出字典初始化中可见字段。 |
+| `CoverageRatio` | `Float` | 源码输出字典初始化中可见字段。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `PolarityProfile` | `Any` | 源码输出字典初始化中可见字段。 |
 | `RefinedEdgePointCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `RejectedCaliperCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `ResidualMax` | `Float` | 源码输出字典初始化中可见字段。 |
 | `ResidualRmse` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ResolvedPolarity` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StatusCode` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StatusMessage` | `String` | 源码通过输出字典索引赋值写入。 |
 | `UncertaintyPx` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ValidCaliperCount` | `Integer` | 源码输出字典初始化中可见字段。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -90,7 +120,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -104,4 +134,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-03 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

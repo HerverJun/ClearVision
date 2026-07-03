@@ -19,7 +19,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
     Category = "检测",
     IconName = "circle-measure",
-    Keywords = new[] { "圆", "半径", "圆心", "霍夫", "孔", "圆检测", "Circle", "Radius", "Hough" }
+    Keywords = new[] { "圆", "半径", "圆心", "霍夫", "孔", "圆检测", "Circle", "Radius", "Hough", "CaliperFitV2" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
@@ -29,13 +30,36 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("CircleCount", "圆数量", PortDataType.Integer)]
 [OutputPort("Circularity", "圆度", PortDataType.Float)]
 [OutputPort("CircleDataList", "圆数据列表", PortDataType.Any)]
-[OperatorParam("Method", "检测方法", "enum", DefaultValue = "HoughCircle", Options = new[] { "HoughCircle|霍夫圆", "FitEllipse|拟合椭圆" })]
+[OutputPort("CaliperFitV2Result", "卡尺圆拟合 V2 结果", PortDataType.Any)]
+[OutputPort("EdgePoints", "V2 边缘点", PortDataType.PointList)]
+[OutputPort("InlierPoints", "V2 内点", PortDataType.PointList)]
+[OutputPort("OutlierPoints", "V2 离群点", PortDataType.PointList)]
+[OutputPort("CaliperDiagnostics", "V2 诊断", PortDataType.Any)]
+[OperatorParam("Method", "检测方法", "enum", DefaultValue = "HoughCircle", Options = new[] { "HoughCircle|霍夫圆", "FitEllipse|拟合椭圆", "CaliperFitV2|卡尺圆拟合 V2" })]
 [OperatorParam("MinRadius", "最小半径", "int", DefaultValue = 10, Min = 0)]
 [OperatorParam("MaxRadius", "最大半径", "int", DefaultValue = 200, Min = 0)]
 [OperatorParam("Dp", "分辨率比", "double", DefaultValue = 1.0, Min = 0.5, Max = 4.0)]
 [OperatorParam("MinDist", "最小圆距", "double", DefaultValue = 50.0, Min = 1.0)]
 [OperatorParam("Param1", "Canny阈值", "double", DefaultValue = 100.0, Min = 0.0, Max = 255.0)]
 [OperatorParam("Param2", "累加器阈值", "double", DefaultValue = 30.0, Min = 0.0, Max = 255.0)]
+[OperatorParam("SearchCenterMode", "V2 搜索中心模式", "enum", DefaultValue = "ImageCenter", Options = new[] { "ImageCenter|图像中心", "Explicit|显式中心" })]
+[OperatorParam("SearchCenterX", "V2 搜索中心 X", "double", DefaultValue = 0.0)]
+[OperatorParam("SearchCenterY", "V2 搜索中心 Y", "double", DefaultValue = 0.0)]
+[OperatorParam("NominalRadius", "V2 标称半径", "double", DefaultValue = 100.0, Min = 1.0)]
+[OperatorParam("CaliperCount", "V2 卡尺数量", "int", DefaultValue = 96, Min = 3, Max = CircleCaliperFitV2Request.MaxCaliperCountLimit)]
+[OperatorParam("AveragingThickness", "V2 平均厚度", "double", DefaultValue = 5.0, Min = 1.0, Max = 128.0)]
+[OperatorParam("ProfileSampleCount", "V2 轮廓采样数", "int", DefaultValue = 129, Min = 16, Max = CircleCaliperFitV2Request.MaxProfileSampleCountLimit)]
+[OperatorParam("GaussianSigma", "V2 高斯 Sigma", "double", DefaultValue = 1.2, Min = 0.0, Max = 12.0)]
+[OperatorParam("EdgePolarity", "V2 边缘极性", "enum", DefaultValue = "Auto", Options = new[] { "Auto|自动", "DarkToLight|暗到亮", "LightToDark|亮到暗" })]
+[OperatorParam("EdgeThreshold", "V2 边缘阈值", "double", DefaultValue = 0.0, Min = 0.0, Max = 255.0)]
+[OperatorParam("MinEdgeStrength", "V2 最小边缘强度", "double", DefaultValue = 4.0, Min = 0.0, Max = 255.0)]
+[OperatorParam("MinValidCalipers", "V2 最小有效卡尺", "int", DefaultValue = 24, Min = 3, Max = CircleCaliperFitV2Request.MaxCaliperCountLimit)]
+[OperatorParam("MinCoverageRatio", "V2 最小覆盖率", "double", DefaultValue = 0.35, Min = 0.0, Max = 1.0)]
+[OperatorParam("MinAngularCoverageDegrees", "V2 最小角覆盖", "double", DefaultValue = 180.0, Min = 0.0, Max = 360.0)]
+[OperatorParam("OutlierMode", "V2 离群模式", "enum", DefaultValue = "Mad", Options = new[] { "None|关闭", "Mad|MAD", "Huber|Huber" })]
+[OperatorParam("OutlierThreshold", "V2 离群阈值", "double", DefaultValue = 3.5, Min = 0.1, Max = 20.0)]
+[OperatorParam("MaxOutlierIterations", "V2 最大离群迭代", "int", DefaultValue = 3, Min = 0, Max = 20)]
+[OperatorParam("MaxResidualRmse", "V2 最大残差 RMSE", "double", DefaultValue = 2.0, Min = 0.01, Max = 128.0)]
 public class CircleMeasurementOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.CircleMeasurement;
@@ -84,6 +108,7 @@ public class CircleMeasurementOperator : OperatorBase
         var normalizedMethod = method.Trim();
         var circleResults = new List<Dictionary<string, object>>();
         var circleDataList = new List<CircleData>();
+        CircleCaliperFitV2Result? caliperFitV2Result = null;
 
         if (normalizedMethod.Equals("FitEllipse", StringComparison.OrdinalIgnoreCase))
         {
@@ -96,9 +121,35 @@ public class CircleMeasurementOperator : OperatorBase
         {
             TryDetectByHough(gray, resultImage, minRadius, maxRadius, dp, minDist, param1, param2, circleResults, circleDataList);
         }
+        else if (normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryBuildCaliperFitV2Request(@operator, gray.Size(), minRadius, maxRadius, out var request, out var failureReason))
+            {
+                return Task.FromResult(CreateCaliperFitV2FailureOutput(
+                    resultImage,
+                    CircleCaliperFitV2FailureCode.InvalidInput,
+                    failureReason,
+                    normalizedMethod,
+                    null));
+            }
+
+            caliperFitV2Result = CircleCaliperFitV2Kernel.Fit(gray, request, cancellationToken);
+            DrawCaliperFitV2Overlay(resultImage, request, caliperFitV2Result);
+            if (!caliperFitV2Result.Success)
+            {
+                return Task.FromResult(CreateCaliperFitV2FailureOutput(
+                    resultImage,
+                    caliperFitV2Result.FailureCode,
+                    caliperFitV2Result.FailureMessage,
+                    normalizedMethod,
+                    caliperFitV2Result));
+            }
+
+            MapCaliperFitV2Success(caliperFitV2Result, circleResults, circleDataList);
+        }
         else
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("[InvalidParameter] Method must be HoughCircle or FitEllipse"));
+            return Task.FromResult(OperatorExecutionOutput.Failure("[InvalidParameter] Method must be HoughCircle, FitEllipse or CaliperFitV2"));
         }
 
         SortCircleCandidates(circleResults, circleDataList);
@@ -112,6 +163,15 @@ public class CircleMeasurementOperator : OperatorBase
             { "CircleDataList", circleDataList },
             { "Method", normalizedMethod }
         };
+
+        if (caliperFitV2Result != null)
+        {
+            additionalData["CaliperFitV2Result"] = caliperFitV2Result;
+            additionalData["EdgePoints"] = ToPositions(caliperFitV2Result.EdgePoints);
+            additionalData["InlierPoints"] = ToPositions(caliperFitV2Result.InlierPoints);
+            additionalData["OutlierPoints"] = ToPositions(caliperFitV2Result.OutlierPoints);
+            additionalData["CaliperDiagnostics"] = caliperFitV2Result.Diagnostics;
+        }
 
         if (circleResults.Count > 0)
         {
@@ -137,14 +197,244 @@ public class CircleMeasurementOperator : OperatorBase
         }
 
         var hasFeature = circleResults.Count > 0;
-        additionalData["StatusCode"] = hasFeature ? "OK" : "NoFeature";
-        additionalData["StatusMessage"] = hasFeature ? "Success" : "No circle found";
-        additionalData["Confidence"] = hasFeature ? 1.0 : 0.0;
-        additionalData["UncertaintyPx"] = hasFeature && circleResults[0].TryGetValue("ResidualRmse", out var rmse)
-            ? Convert.ToDouble(rmse)
-            : (hasFeature ? 0.5 : double.NaN);
+        if (caliperFitV2Result != null)
+        {
+            additionalData["StatusCode"] = "OK";
+            additionalData["StatusMessage"] = "CaliperFitV2 success";
+            additionalData["Confidence"] = caliperFitV2Result.Confidence;
+            additionalData["UncertaintyPx"] = caliperFitV2Result.UncertaintyPx;
+        }
+        else
+        {
+            additionalData["StatusCode"] = hasFeature ? "OK" : "NoFeature";
+            additionalData["StatusMessage"] = hasFeature ? "Success" : "No circle found";
+            additionalData["Confidence"] = hasFeature ? 1.0 : 0.0;
+            additionalData["UncertaintyPx"] = hasFeature && circleResults[0].TryGetValue("ResidualRmse", out var rmse)
+                ? Convert.ToDouble(rmse)
+                : (hasFeature ? 0.5 : double.NaN);
+        }
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
+    }
+
+    private bool TryBuildCaliperFitV2Request(
+        Operator @operator,
+        Size imageSize,
+        int minRadius,
+        int maxRadius,
+        out CircleCaliperFitV2Request request,
+        out string failureReason)
+    {
+        request = new CircleCaliperFitV2Request();
+        failureReason = string.Empty;
+
+        var searchCenterMode = GetStringParam(@operator, "SearchCenterMode", "ImageCenter").Trim();
+        double searchCenterX;
+        double searchCenterY;
+        if (searchCenterMode.Equals("ImageCenter", StringComparison.OrdinalIgnoreCase))
+        {
+            searchCenterX = (imageSize.Width - 1) * 0.5;
+            searchCenterY = (imageSize.Height - 1) * 0.5;
+        }
+        else if (searchCenterMode.Equals("Explicit", StringComparison.OrdinalIgnoreCase))
+        {
+            searchCenterX = GetDoubleParam(@operator, "SearchCenterX", 0.0);
+            searchCenterY = GetDoubleParam(@operator, "SearchCenterY", 0.0);
+        }
+        else
+        {
+            failureReason = "SearchCenterMode must be ImageCenter or Explicit";
+            return false;
+        }
+
+        if (!TryParseEnumParam(
+                @operator,
+                "EdgePolarity",
+                CircleCaliperFitV2EdgePolarity.Auto,
+                out CircleCaliperFitV2EdgePolarity edgePolarity,
+                out failureReason) ||
+            !TryParseEnumParam(
+                @operator,
+                "OutlierMode",
+                CircleCaliperFitV2OutlierMode.Mad,
+                out CircleCaliperFitV2OutlierMode outlierMode,
+                out failureReason))
+        {
+            return false;
+        }
+
+        request = new CircleCaliperFitV2Request
+        {
+            SearchCenterX = searchCenterX,
+            SearchCenterY = searchCenterY,
+            MinRadius = minRadius,
+            MaxRadius = maxRadius,
+            NominalRadius = GetDoubleParam(@operator, "NominalRadius", 100.0),
+            CaliperCount = GetIntParam(@operator, "CaliperCount", 96, min: 3, max: CircleCaliperFitV2Request.MaxCaliperCountLimit),
+            AveragingThickness = GetDoubleParam(@operator, "AveragingThickness", 5.0, min: 1.0, max: 128.0),
+            ProfileSampleCount = GetIntParam(@operator, "ProfileSampleCount", 129, min: 16, max: CircleCaliperFitV2Request.MaxProfileSampleCountLimit),
+            GaussianSigma = GetDoubleParam(@operator, "GaussianSigma", 1.2, min: 0.0, max: 12.0),
+            EdgePolarity = edgePolarity,
+            EdgeThreshold = GetDoubleParam(@operator, "EdgeThreshold", 0.0, min: 0.0, max: 255.0),
+            MinEdgeStrength = GetDoubleParam(@operator, "MinEdgeStrength", 4.0, min: 0.0, max: 255.0),
+            MinValidCalipers = GetIntParam(@operator, "MinValidCalipers", 24, min: 3, max: CircleCaliperFitV2Request.MaxCaliperCountLimit),
+            MinCoverageRatio = GetDoubleParam(@operator, "MinCoverageRatio", 0.35, min: 0.0, max: 1.0),
+            MinAngularCoverageDegrees = GetDoubleParam(@operator, "MinAngularCoverageDegrees", 180.0, min: 0.0, max: 360.0),
+            OutlierMode = outlierMode,
+            OutlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5, min: 0.1, max: 20.0),
+            MaxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3, min: 0, max: 20),
+            MaxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0, min: 0.01, max: 128.0)
+        };
+
+        return true;
+    }
+
+    private bool TryParseEnumParam<TEnum>(
+        Operator @operator,
+        string parameterName,
+        TEnum defaultValue,
+        out TEnum value,
+        out string failureReason)
+        where TEnum : struct, Enum
+    {
+        var raw = GetStringParam(@operator, parameterName, defaultValue.ToString());
+        if (Enum.TryParse<TEnum>(raw, ignoreCase: true, out value) && Enum.IsDefined(value))
+        {
+            failureReason = string.Empty;
+            return true;
+        }
+
+        failureReason = $"{parameterName} must be one of: {string.Join(", ", Enum.GetNames<TEnum>())}";
+        return false;
+    }
+
+    private static bool TryParseDefinedEnum<TEnum>(string raw, out TEnum value)
+        where TEnum : struct, Enum
+    {
+        return Enum.TryParse(raw, ignoreCase: true, out value) && Enum.IsDefined(value);
+    }
+
+    private static void MapCaliperFitV2Success(
+        CircleCaliperFitV2Result result,
+        List<Dictionary<string, object>> circleResults,
+        List<CircleData> circleDataList)
+    {
+        var center = new Position(result.CenterX!.Value, result.CenterY!.Value);
+        var radius = result.Radius!.Value;
+        var circularity = Math.Clamp(1.0 - (result.ResidualRmse / Math.Max(radius, 1e-6)), 0.0, 1.0);
+
+        circleResults.Add(new Dictionary<string, object>
+        {
+            { "Center", center },
+            { "Radius", radius },
+            { "Circularity", circularity },
+            { "ResidualRmse", result.ResidualRmse },
+            { "ResidualMax", result.ResidualMax },
+            { "CoverageRatio", result.CoverageRatio },
+            { "AngularCoverageDegrees", result.AngularCoverageDegrees },
+            { "ValidCaliperCount", result.ValidCaliperCount },
+            { "RejectedCaliperCount", result.RejectedCaliperCount },
+            { "ResolvedPolarity", result.ResolvedPolarity.ToString() },
+            { "ContractVersion", result.ContractVersion }
+        });
+        circleDataList.Add(new CircleData((float)center.X, (float)center.Y, (float)radius));
+    }
+
+    private OperatorExecutionOutput CreateCaliperFitV2FailureOutput(
+        Mat resultImage,
+        CircleCaliperFitV2FailureCode failureCode,
+        string failureMessage,
+        string normalizedMethod,
+        CircleCaliperFitV2Result? result)
+    {
+        var boundedMessage = string.IsNullOrWhiteSpace(failureMessage)
+            ? "CaliperFitV2 failed"
+            : (failureMessage.Length <= 240 ? failureMessage : failureMessage[..240]);
+        var outputData = CreateImageOutput(resultImage, new Dictionary<string, object>
+        {
+            { "Method", normalizedMethod },
+            { "CaliperFitV2Result", result ?? new CircleCaliperFitV2Result
+                {
+                    Success = false,
+                    FailureCode = failureCode,
+                    FailureMessage = boundedMessage
+                }
+            },
+            { "EdgePoints", result != null ? ToPositions(result.EdgePoints) : Array.Empty<Position>() },
+            { "InlierPoints", Array.Empty<Position>() },
+            { "OutlierPoints", result != null ? ToPositions(result.OutlierPoints) : Array.Empty<Position>() },
+            { "CaliperDiagnostics", result?.Diagnostics ?? Array.Empty<CircleCaliperFitV2Diagnostic>() },
+            { "StatusCode", failureCode.ToString() },
+            { "StatusMessage", $"CaliperFitV2: {boundedMessage}" },
+            { "Confidence", 0.0 },
+            { "UncertaintyPx", double.NaN }
+        });
+
+        var failure = OperatorExecutionOutput.Failure($"[{failureCode}] CaliperFitV2: {boundedMessage}");
+        failure.OutputData = outputData;
+        return failure;
+    }
+
+    private void DrawCaliperFitV2Overlay(Mat image, CircleCaliperFitV2Request request, CircleCaliperFitV2Result result)
+    {
+        try
+        {
+            var center = new Point((int)Math.Round(request.SearchCenterX), (int)Math.Round(request.SearchCenterY));
+            Cv2.Circle(image, center, (int)Math.Round(request.MinRadius), new Scalar(255, 180, 0), 1);
+            Cv2.Circle(image, center, (int)Math.Round(request.MaxRadius), new Scalar(255, 180, 0), 1);
+
+            foreach (var point in result.EdgePoints)
+            {
+                var angle = point.AngleDegrees * Math.PI / 180.0;
+                var dirX = Math.Cos(angle);
+                var dirY = Math.Sin(angle);
+                var start = new Point(
+                    (int)Math.Round(request.SearchCenterX + (request.MinRadius * dirX)),
+                    (int)Math.Round(request.SearchCenterY + (request.MinRadius * dirY)));
+                var end = new Point(
+                    (int)Math.Round(request.SearchCenterX + (request.MaxRadius * dirX)),
+                    (int)Math.Round(request.SearchCenterY + (request.MaxRadius * dirY)));
+                Cv2.Line(image, start, end, new Scalar(80, 80, 80), 1);
+            }
+
+            foreach (var point in result.InlierPoints)
+            {
+                Cv2.Circle(image, new Point((int)Math.Round(point.X), (int)Math.Round(point.Y)), 2, new Scalar(0, 255, 0), -1);
+            }
+
+            foreach (var point in result.OutlierPoints)
+            {
+                Cv2.Circle(image, new Point((int)Math.Round(point.X), (int)Math.Round(point.Y)), 3, new Scalar(0, 0, 255), 1);
+            }
+
+            if (result.Success && result.CenterX.HasValue && result.CenterY.HasValue && result.Radius.HasValue)
+            {
+                var fittedCenter = new Point((int)Math.Round(result.CenterX.Value), (int)Math.Round(result.CenterY.Value));
+                Cv2.Circle(image, fittedCenter, (int)Math.Round(result.Radius.Value), new Scalar(0, 255, 255), 2);
+                Cv2.Circle(image, fittedCenter, 3, new Scalar(255, 0, 255), -1);
+            }
+
+            var summary = result.Success
+                ? $"CaliperFitV2 OK r={result.Radius:F2} rmse={result.ResidualRmse:F2} cov={result.CoverageRatio:F2}"
+                : $"CaliperFitV2 {result.FailureCode}";
+            Cv2.PutText(
+                image,
+                summary,
+                new Point(8, 24),
+                HersheyFonts.HersheySimplex,
+                0.55,
+                new Scalar(255, 255, 255),
+                2);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "[CircleMeasurement] CaliperFitV2 overlay drawing failed: {ErrorMessage}", ex.Message);
+        }
+    }
+
+    private static List<Position> ToPositions(IReadOnlyList<CircleCaliperFitV2Point> points)
+    {
+        return points.Select(static point => new Position(point.X, point.Y)).ToList();
     }
 
     private static void SortCircleCandidates(
@@ -529,16 +819,18 @@ public class CircleMeasurementOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var method = GetStringParam(@operator, "Method", "HoughCircle");
+        var normalizedMethod = method.Trim();
         var minRadius = GetIntParam(@operator, "MinRadius", 10);
         var maxRadius = GetIntParam(@operator, "MaxRadius", 200);
         var dp = GetDoubleParam(@operator, "Dp", 1.0);
         var param1 = GetDoubleParam(@operator, "Param1", 100.0);
         var param2 = GetDoubleParam(@operator, "Param2", 30.0);
 
-        if (!method.Equals("HoughCircle", StringComparison.OrdinalIgnoreCase) &&
-            !method.Equals("FitEllipse", StringComparison.OrdinalIgnoreCase))
+        if (!normalizedMethod.Equals("HoughCircle", StringComparison.OrdinalIgnoreCase) &&
+            !normalizedMethod.Equals("FitEllipse", StringComparison.OrdinalIgnoreCase) &&
+            !normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("Method must be HoughCircle or FitEllipse");
+            return ValidationResult.Invalid("Method must be HoughCircle, FitEllipse or CaliperFitV2");
         }
 
         if (minRadius < 0)
@@ -561,6 +853,70 @@ public class CircleMeasurementOperator : OperatorBase
         {
             return ValidationResult.Invalid("累加器阈值必须在 0-255 之间");
         }
+
+        if (normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
+        {
+            var searchCenterMode = GetStringParam(@operator, "SearchCenterMode", "ImageCenter");
+            if (!searchCenterMode.Equals("ImageCenter", StringComparison.OrdinalIgnoreCase) &&
+                !searchCenterMode.Equals("Explicit", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Invalid("SearchCenterMode must be ImageCenter or Explicit");
+            }
+
+            if (!TryParseDefinedEnum(GetStringParam(@operator, "EdgePolarity", "Auto"), out CircleCaliperFitV2EdgePolarity _) ||
+                !TryParseDefinedEnum(GetStringParam(@operator, "OutlierMode", "Mad"), out CircleCaliperFitV2OutlierMode _))
+            {
+                return ValidationResult.Invalid("CaliperFitV2 enum parameters are invalid");
+            }
+
+            var nominalRadius = GetDoubleParam(@operator, "NominalRadius", 100.0);
+            var searchCenterX = GetDoubleParam(@operator, "SearchCenterX", 0.0);
+            var searchCenterY = GetDoubleParam(@operator, "SearchCenterY", 0.0);
+            var averagingThickness = GetDoubleParam(@operator, "AveragingThickness", 5.0);
+            var gaussianSigma = GetDoubleParam(@operator, "GaussianSigma", 1.2);
+            var edgeThreshold = GetDoubleParam(@operator, "EdgeThreshold", 0.0);
+            var minEdgeStrength = GetDoubleParam(@operator, "MinEdgeStrength", 4.0);
+            var minCoverageRatio = GetDoubleParam(@operator, "MinCoverageRatio", 0.35);
+            var minAngularCoverage = GetDoubleParam(@operator, "MinAngularCoverageDegrees", 180.0);
+            var outlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5);
+            var maxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0);
+            var finiteValues = new[]
+            {
+                nominalRadius,
+                searchCenterX,
+                searchCenterY,
+                averagingThickness,
+                gaussianSigma,
+                edgeThreshold,
+                minEdgeStrength,
+                minCoverageRatio,
+                minAngularCoverage,
+                outlierThreshold,
+                maxResidualRmse
+            };
+            if (finiteValues.Any(static value => !double.IsFinite(value)))
+            {
+                return ValidationResult.Invalid("CaliperFitV2 numeric parameters must be finite");
+            }
+
+            if (nominalRadius < minRadius || nominalRadius > maxRadius)
+            {
+                return ValidationResult.Invalid("NominalRadius must be inside MinRadius and MaxRadius");
+            }
+
+            var caliperCount = GetIntParam(@operator, "CaliperCount", 96);
+            var profileSampleCount = GetIntParam(@operator, "ProfileSampleCount", 129);
+            var minValidCalipers = GetIntParam(@operator, "MinValidCalipers", 24);
+            var maxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3);
+            if (caliperCount < 3 || caliperCount > CircleCaliperFitV2Request.MaxCaliperCountLimit ||
+                profileSampleCount < 16 || profileSampleCount > CircleCaliperFitV2Request.MaxProfileSampleCountLimit ||
+                minValidCalipers < 3 || minValidCalipers > caliperCount ||
+                maxOutlierIterations < 0 || maxOutlierIterations > 20)
+            {
+                return ValidationResult.Invalid("CaliperFitV2 bounded collection parameters are invalid");
+            }
+        }
+
         return ValidationResult.Valid();
     }
 }

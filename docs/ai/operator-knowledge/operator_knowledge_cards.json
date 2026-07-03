@@ -2735,7 +2735,8 @@
       "\u5706\u68C0\u6D4B",
       "Circle",
       "Radius",
-      "Hough"
+      "Hough",
+      "CaliperFitV2"
     ],
     "IntentTags": [
       "measurement",
@@ -2802,6 +2803,41 @@
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CaliperFitV2Result",
+        "DisplayName": "\u5361\u5C3A\u5706\u62DF\u5408 V2 \u7ED3\u679C",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "EdgePoints",
+        "DisplayName": "V2 \u8FB9\u7F18\u70B9",
+        "DataType": "PointList",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "InlierPoints",
+        "DisplayName": "V2 \u5185\u70B9",
+        "DataType": "PointList",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "OutlierPoints",
+        "DisplayName": "V2 \u79BB\u7FA4\u70B9",
+        "DataType": "PointList",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CaliperDiagnostics",
+        "DisplayName": "V2 \u8BCA\u65AD",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -2816,7 +2852,8 @@
         "IsRequired": true,
         "AllowedValues": [
           "\u970D\u592B\u5706",
-          "\u62DF\u5408\u692D\u5706"
+          "\u62DF\u5408\u692D\u5706",
+          "\u5361\u5C3A\u5706\u62DF\u5408 V2"
         ]
       },
       {
@@ -2882,6 +2919,215 @@
         "DefaultValue": "30",
         "MinValue": "0",
         "MaxValue": "255",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "SearchCenterMode",
+        "DisplayName": "V2 \u641C\u7D22\u4E2D\u5FC3\u6A21\u5F0F",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "ImageCenter",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u56FE\u50CF\u4E2D\u5FC3",
+          "\u663E\u5F0F\u4E2D\u5FC3"
+        ]
+      },
+      {
+        "Name": "SearchCenterX",
+        "DisplayName": "V2 \u641C\u7D22\u4E2D\u5FC3 X",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "SearchCenterY",
+        "DisplayName": "V2 \u641C\u7D22\u4E2D\u5FC3 Y",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "NominalRadius",
+        "DisplayName": "V2 \u6807\u79F0\u534A\u5F84",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "100",
+        "MinValue": "1",
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "CaliperCount",
+        "DisplayName": "V2 \u5361\u5C3A\u6570\u91CF",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "96",
+        "MinValue": "3",
+        "MaxValue": "720",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "AveragingThickness",
+        "DisplayName": "V2 \u5E73\u5747\u539A\u5EA6",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "5",
+        "MinValue": "1",
+        "MaxValue": "128",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "ProfileSampleCount",
+        "DisplayName": "V2 \u8F6E\u5ED3\u91C7\u6837\u6570",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "129",
+        "MinValue": "16",
+        "MaxValue": "4096",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "GaussianSigma",
+        "DisplayName": "V2 \u9AD8\u65AF Sigma",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "1.2",
+        "MinValue": "0",
+        "MaxValue": "12",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "EdgePolarity",
+        "DisplayName": "V2 \u8FB9\u7F18\u6781\u6027",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Auto",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u81EA\u52A8",
+          "\u6697\u5230\u4EAE",
+          "\u4EAE\u5230\u6697"
+        ]
+      },
+      {
+        "Name": "EdgeThreshold",
+        "DisplayName": "V2 \u8FB9\u7F18\u9608\u503C",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0",
+        "MinValue": "0",
+        "MaxValue": "255",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MinEdgeStrength",
+        "DisplayName": "V2 \u6700\u5C0F\u8FB9\u7F18\u5F3A\u5EA6",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "4",
+        "MinValue": "0",
+        "MaxValue": "255",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MinValidCalipers",
+        "DisplayName": "V2 \u6700\u5C0F\u6709\u6548\u5361\u5C3A",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "24",
+        "MinValue": "3",
+        "MaxValue": "720",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MinCoverageRatio",
+        "DisplayName": "V2 \u6700\u5C0F\u8986\u76D6\u7387",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0.35",
+        "MinValue": "0",
+        "MaxValue": "1",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MinAngularCoverageDegrees",
+        "DisplayName": "V2 \u6700\u5C0F\u89D2\u8986\u76D6",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "180",
+        "MinValue": "0",
+        "MaxValue": "360",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "OutlierMode",
+        "DisplayName": "V2 \u79BB\u7FA4\u6A21\u5F0F",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Mad",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u5173\u95ED",
+          "MAD",
+          "Huber"
+        ]
+      },
+      {
+        "Name": "OutlierThreshold",
+        "DisplayName": "V2 \u79BB\u7FA4\u9608\u503C",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "3.5",
+        "MinValue": "0.1",
+        "MaxValue": "20",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MaxOutlierIterations",
+        "DisplayName": "V2 \u6700\u5927\u79BB\u7FA4\u8FED\u4EE3",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "3",
+        "MinValue": "0",
+        "MaxValue": "20",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MaxResidualRmse",
+        "DisplayName": "V2 \u6700\u5927\u6B8B\u5DEE RMSE",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "2",
+        "MinValue": "0.01",
+        "MaxValue": "128",
         "IsRequired": true,
         "AllowedValues": []
       }

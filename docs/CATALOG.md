@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-03 18:17:50 +08:00`
+> 生成时间 / Generated At: `2026-07-03 20:14:49 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 分类统计 / Category Summary
@@ -39,7 +39,7 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.3**
+- 平均分 / Average: **95.4**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
@@ -209,7 +209,7 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.ArcCaliper` | Arc Caliper | 7 | 2 | 0 | 81 (B) | `1.0.1` | Radial band-profile arc edge scan | [ArcCaliper](./operators/ArcCaliper.md) |
 | `OperatorType.CaliperTool` | 卡尺工具 | 2 | 7 | 9 | 96 (A) | `1.0.0` | 当前元数据描述为：Detects edge pairs along a scan l… | [CaliperTool](./operators/CaliperTool.md) |
-| `OperatorType.CircleMeasurement` | 圆测量 | 1 | 7 | 7 | 90 (A) | `1.0.0` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./operators/CircleMeasurement.md) |
+| `OperatorType.CircleMeasurement` | 圆测量 | 1 | 12 | 25 | 100 (A) | `1.1.0` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./operators/CircleMeasurement.md) |
 | `OperatorType.ContourExtrema` | Contour Extrema | 3 | 6 | 0 | 89 (A) | `1.0.1` | Directional contour extrema scan | [ContourExtrema](./operators/ContourExtrema.md) |
 | `OperatorType.GapMeasurement` | 间隙测量 | 2 | 9 | 8 | 96 (A) | `1.0.0` | 当前元数据描述为：Measures spacing using points or … | [GapMeasurement](./operators/GapMeasurement.md) |
 | `OperatorType.GeoMeasurement` | 几何测量 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 当前元数据描述为：General geometry measurement betw… | [GeoMeasurement](./operators/GeoMeasurement.md) |
