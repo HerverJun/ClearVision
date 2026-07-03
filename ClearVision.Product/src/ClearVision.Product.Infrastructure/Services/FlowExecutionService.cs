@@ -219,6 +219,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         Malformed
     }
 
+    private enum SpatialContextPortAssociation
+    {
+        None,
+        Current,
+        Other
+    }
+
     private sealed record SpatialContextCandidate(string Key, SpatialContextV1 Context);
 
     private sealed record SpatialContextResolverOutcome(
@@ -2114,7 +2121,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                     // Encoding cleanup: previous comment text was unreadable.
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
-                                    PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, op, targetPort, inputs);
+                                    PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, targetPort, inputs);
                                 }
                             }
                         }
@@ -2156,17 +2163,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         OperatorConnection connection,
         Operator? sourceOperator,
         Port sourcePort,
-        Operator targetOperator,
         Port targetPort,
         Dictionary<string, object> inputs)
     {
-        if (!RequiresSpatialContextBinding(targetOperator, targetPort))
+        if (!RequiresSpatialContextBinding(targetPort))
         {
             return;
         }
 
         var sourceName = sourceOperator?.Name ?? connection.SourceOperatorId.ToString();
-        var outcome = ResolveSpatialContextForConnection(sourceOutputs, connection, sourcePort, sourceName, targetPort.Name);
+        var outcome = ResolveSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, sourceName, targetPort.Name);
         switch (outcome.Status)
         {
             case SpatialContextResolverStatus.Absent:
@@ -2185,18 +2191,24 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
-    private static bool RequiresSpatialContextBinding(Operator targetOperator, Port targetPort) =>
-        targetPort.DataType == PortDataType.Image &&
-        targetOperator.Type == OperatorType.RoiManager;
+    private static bool RequiresSpatialContextBinding(Port targetPort) =>
+        targetPort.DataType == PortDataType.Image;
 
     private static SpatialContextResolverOutcome ResolveSpatialContextForConnection(
         IReadOnlyDictionary<string, object> sourceOutputs,
         OperatorConnection connection,
+        Operator? sourceOperator,
         Port sourcePort,
         string sourceName,
         string targetPortName)
     {
-        var candidates = CollectSpatialContextCandidates(sourceOutputs, out var malformedKey);
+        var candidates = CollectSpatialContextCandidatesForConnection(
+            sourceOutputs,
+            connection,
+            sourceOperator,
+            sourcePort,
+            out var malformedKey,
+            out var invalidBindingKey);
         if (malformedKey != null)
         {
             return SpatialContextResolverOutcome.Fail(
@@ -2205,13 +2217,20 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 $"Malformed SpatialContext sidecar '{malformedKey}' from {sourceName}.{sourcePort.Name} cannot be bound to target input {targetPortName}.");
         }
 
+        if (invalidBindingKey != null)
+        {
+            return SpatialContextResolverOutcome.Fail(
+                SpatialContextResolverStatus.InvalidBinding,
+                "SPATIAL_CONTEXT_BINDING_INVALID",
+                $"SpatialContext sidecar '{invalidBindingKey}' binding does not match source {sourceName}.{sourcePort.Name} for target input {targetPortName}.");
+        }
+
         if (candidates.Count == 0)
         {
             return SpatialContextResolverOutcome.Absent;
         }
 
         var matching = candidates
-            .Where(candidate => SpatialContextMatchesConnection(candidate.Context, connection, sourcePort))
             .OrderBy(candidate => candidate.Key, StringComparer.Ordinal)
             .ToList();
 
@@ -2229,11 +2248,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         };
     }
 
-    private static List<SpatialContextCandidate> CollectSpatialContextCandidates(
+    private static List<SpatialContextCandidate> CollectSpatialContextCandidatesForConnection(
         IReadOnlyDictionary<string, object> outputs,
-        out string? malformedKey)
+        OperatorConnection connection,
+        Operator? sourceOperator,
+        Port sourcePort,
+        out string? malformedKey,
+        out string? invalidBindingKey)
     {
         malformedKey = null;
+        invalidBindingKey = null;
         var candidates = new List<SpatialContextCandidate>();
         foreach (var pair in outputs.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
@@ -2242,38 +2266,144 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 continue;
             }
 
+            var keyCompanionOutputName = GetSpatialContextCompanionOutputName(pair.Key, sourceOperator);
+            var keyAssociatesCurrentPort = OutputNameMatches(keyCompanionOutputName, sourcePort.Name);
+
             if (TryReadSpatialContextSidecar(pair.Value, out var context))
             {
+                var bindingAssociation = GetSpatialContextBindingAssociation(context.Binding, connection, sourcePort);
+                var bindingAssociatesCurrentPort = bindingAssociation == SpatialContextPortAssociation.Current;
+                if (!keyAssociatesCurrentPort && !bindingAssociatesCurrentPort)
+                {
+                    continue;
+                }
+
+                if (IsSpatialContextBindingInvalidForCurrentConnection(
+                    context.Binding,
+                    bindingAssociation,
+                    keyCompanionOutputName,
+                    keyAssociatesCurrentPort,
+                    connection))
+                {
+                    invalidBindingKey = pair.Key;
+                    return candidates;
+                }
+
                 candidates.Add(new SpatialContextCandidate(pair.Key, context));
                 continue;
             }
 
-            malformedKey = pair.Key;
-            return candidates;
+            if (keyAssociatesCurrentPort)
+            {
+                malformedKey = pair.Key;
+                return candidates;
+            }
         }
 
         return candidates;
     }
 
-    private static bool SpatialContextMatchesConnection(
-        SpatialContextV1 context,
+    private static SpatialContextPortAssociation GetSpatialContextBindingAssociation(
+        SpatialContextBindingV1 binding,
         OperatorConnection connection,
         Port sourcePort)
     {
-        var binding = context.Binding;
-        if (binding.SourceOperatorId.HasValue && binding.SourceOperatorId.Value != connection.SourceOperatorId)
+        if (!binding.HasFlowOutputBinding)
         {
-            return false;
+            return SpatialContextPortAssociation.None;
+        }
+
+        if (binding.SourceOperatorId.HasValue &&
+            binding.SourceOperatorId.Value != connection.SourceOperatorId)
+        {
+            return SpatialContextPortAssociation.Other;
         }
 
         if (binding.OutputPortId.HasValue)
         {
-            return binding.OutputPortId.Value == connection.SourcePortId;
+            return binding.OutputPortId.Value == connection.SourcePortId
+                ? SpatialContextPortAssociation.Current
+                : SpatialContextPortAssociation.Other;
         }
 
-        return !string.IsNullOrWhiteSpace(binding.OutputName) &&
-            binding.OutputName.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(binding.OutputName))
+        {
+            return binding.OutputName.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase)
+                ? SpatialContextPortAssociation.Current
+                : SpatialContextPortAssociation.Other;
+        }
+
+        return SpatialContextPortAssociation.None;
     }
+
+    private static bool IsSpatialContextBindingInvalidForCurrentConnection(
+        SpatialContextBindingV1 binding,
+        SpatialContextPortAssociation bindingAssociation,
+        string? keyCompanionOutputName,
+        bool keyAssociatesCurrentPort,
+        OperatorConnection connection)
+    {
+        if (!binding.HasFlowOutputBinding)
+        {
+            return false;
+        }
+
+        if (binding.SourceOperatorId.HasValue &&
+            binding.SourceOperatorId.Value != connection.SourceOperatorId)
+        {
+            return keyAssociatesCurrentPort;
+        }
+
+        var hasOutputSpecificBinding =
+            binding.OutputPortId.HasValue ||
+            !string.IsNullOrWhiteSpace(binding.OutputName);
+        if (!hasOutputSpecificBinding)
+        {
+            return false;
+        }
+
+        if (bindingAssociation == SpatialContextPortAssociation.Current)
+        {
+            return keyCompanionOutputName != null && !keyAssociatesCurrentPort;
+        }
+
+        return keyAssociatesCurrentPort;
+    }
+
+    private static string? GetSpatialContextCompanionOutputName(string key, Operator? sourceOperator)
+    {
+        string? candidate = null;
+        if (key.Equals(RoiManagerOperator.SpatialContextOutputKey, StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = "Image";
+        }
+        else if (key.EndsWith(RoiManagerOperator.SpatialContextOutputKey, StringComparison.OrdinalIgnoreCase))
+        {
+            var prefix = key[..^RoiManagerOperator.SpatialContextOutputKey.Length];
+            if (!string.IsNullOrWhiteSpace(prefix))
+            {
+                candidate = prefix;
+            }
+        }
+
+        if (candidate == null)
+        {
+            return null;
+        }
+
+        if (sourceOperator == null)
+        {
+            return candidate;
+        }
+
+        return sourceOperator.OutputPorts.Any(port => port.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase))
+            ? candidate
+            : null;
+    }
+
+    private static bool OutputNameMatches(string? left, string right) =>
+        !string.IsNullOrWhiteSpace(left) &&
+        left.Equals(right, StringComparison.OrdinalIgnoreCase);
 
     private static bool TryReadSpatialContextSidecar(object? raw, out SpatialContextV1 context)
     {

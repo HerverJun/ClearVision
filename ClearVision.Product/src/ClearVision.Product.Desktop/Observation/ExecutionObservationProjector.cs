@@ -112,14 +112,11 @@ public static class ExecutionObservationProjector
         ExecutionVisualSceneV1 visualScene,
         ExecutionObservationDetailNodeV1 detail)
     {
-        if (visualScene.Primitives.Count == 0)
-        {
-            return visualScene;
-        }
-
-        var detailLocators = CountDetailLocators(detail);
+        var detailLocators = visualScene.Primitives.Count == 0
+            ? new Dictionary<DetailLocatorKey, int>()
+            : CountDetailLocators(detail);
         var primitives = new List<ExecutionVisualScenePrimitiveV1>(visualScene.Primitives.Count);
-        var diagnostics = new List<ExecutionVisualSceneDiagnosticV1>(visualScene.Diagnostics);
+        var reconcileDiagnostics = new List<ExecutionVisualSceneDiagnosticV1>();
 
         foreach (var primitive in visualScene.Primitives)
         {
@@ -139,7 +136,7 @@ public static class ExecutionObservationProjector
             if (matches != 1)
             {
                 primitives.Add(CloneScenePrimitive(primitive, selectable: false));
-                diagnostics.Add(new ExecutionVisualSceneDiagnosticV1
+                reconcileDiagnostics.Add(new ExecutionVisualSceneDiagnosticV1
                 {
                     Code = matches > 1
                         ? "visual-scene-detail-locator-ambiguous"
@@ -155,6 +152,11 @@ public static class ExecutionObservationProjector
             primitives.Add(primitive);
         }
 
+        var diagnostics = MergeVisualSceneDiagnostics(
+            visualScene.Diagnostics,
+            reconcileDiagnostics,
+            out var diagnosticsTruncated);
+
         return new ExecutionVisualSceneV1
         {
             SchemaVersion = visualScene.SchemaVersion,
@@ -163,8 +165,53 @@ public static class ExecutionObservationProjector
             ImageHeight = visualScene.ImageHeight,
             Primitives = primitives,
             Diagnostics = diagnostics,
-            Truncated = visualScene.Truncated
+            Truncated = visualScene.Truncated || diagnosticsTruncated
         };
+    }
+
+    private static List<ExecutionVisualSceneDiagnosticV1> MergeVisualSceneDiagnostics(
+        IReadOnlyList<ExecutionVisualSceneDiagnosticV1> originalDiagnostics,
+        IReadOnlyList<ExecutionVisualSceneDiagnosticV1> reconcileDiagnostics,
+        out bool truncated)
+    {
+        truncated = false;
+        var diagnostics = originalDiagnostics
+            .Take(ExecutionVisualSceneProjector.MaxDiagnostics)
+            .ToList();
+
+        if (originalDiagnostics.Count > ExecutionVisualSceneProjector.MaxDiagnostics)
+        {
+            truncated = true;
+        }
+
+        if (reconcileDiagnostics.Count == 0)
+        {
+            return diagnostics;
+        }
+
+        var remaining = ExecutionVisualSceneProjector.MaxDiagnostics - diagnostics.Count;
+        if (remaining <= 0)
+        {
+            truncated = true;
+            return diagnostics;
+        }
+
+        if (reconcileDiagnostics.Count <= remaining)
+        {
+            diagnostics.AddRange(reconcileDiagnostics);
+            return diagnostics;
+        }
+
+        var individualCount = Math.Max(0, remaining - 1);
+        diagnostics.AddRange(reconcileDiagnostics.Take(individualCount));
+        var omittedCount = reconcileDiagnostics.Count - individualCount;
+        diagnostics.Add(new ExecutionVisualSceneDiagnosticV1
+        {
+            Code = "visual-scene-detail-locator-diagnostics-truncated",
+            Message = $"{omittedCount.ToString(CultureInfo.InvariantCulture)} visual scene detail locator diagnostics were omitted because the diagnostics budget {ExecutionVisualSceneProjector.MaxDiagnostics.ToString(CultureInfo.InvariantCulture)} was reached."
+        });
+        truncated = true;
+        return diagnostics;
     }
 
     private static Dictionary<DetailLocatorKey, int> CountDetailLocators(ExecutionObservationDetailNodeV1 detail)

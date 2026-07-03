@@ -3,6 +3,8 @@ import { bootAuthenticatedApp } from './authHelper';
 
 const PREVIEW_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACNSURBVHhe7dAxAQAwDITAyn73qQEcwHALI2/bmTWAokkDKJo0gKJJAyiaNICiSQMomjSAokkDKJo0gKJJAyiaNICiSQMomjSAokkDKJo0gKJJAyiaNICiSQMomjSAokkDKJo0gKJJAyiaNICiSQMomjSAokkDKJo0gKJJAyiaNICiSQMomjSAool8wO4D9cdyOzoyljkAAAAASUVORK5CYII=';
+const SECOND_PREVIEW_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAYUlEQVR42u3QAQ0AAAwCIPuX1hzfGQ1I+pwAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBBw3wBSmOHSCAaCYwAAAABJRU5ErkJggg==';
 
 async function stubOperatorLibrary(page: Page) {
   await page.route('**/api/operators/types', async route => {
@@ -195,6 +197,29 @@ async function addAndSelectNPointNode(page: Page, overrides: Record<string, unkn
     (window as any).__e2eRoiNodeId = node.id;
     return node.id;
   }, createNPointParameters(overrides));
+}
+
+async function addAndSelectPlainImageNode(page: Page) {
+  return page.evaluate(() => {
+    const flowCanvas = (window as any).flowCanvas;
+    const node = flowCanvas.addNode(
+      'Thresholding',
+      420,
+      180,
+      {
+        title: 'Threshold',
+        parameters: [],
+        inputs: [{ name: 'Image', type: 'Image' }],
+        outputs: [{ name: 'Image', type: 'Image' }],
+        color: '#64748b',
+      }
+    );
+
+    flowCanvas.selectedNode = node.id;
+    flowCanvas.onNodeSelected?.(node);
+    (window as any).__e2ePlainNodeId = node.id;
+    return node.id;
+  });
 }
 
 async function waitForRoiEditorReady(page: Page) {
@@ -494,6 +519,20 @@ async function installRoiParameterChangeCounter(page: Page) {
   });
 }
 
+async function installRoiLifecycleProbe(page: Page) {
+  await installRoiParameterChangeCounter(page);
+  await page.evaluate(() => {
+    (window as any).__roiUnhandledRejections = [];
+    if (!(window as any).__roiUnhandledRejectionProbeInstalled) {
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = (event as PromiseRejectionEvent).reason;
+        (window as any).__roiUnhandledRejections.push(String(reason?.message || reason || 'unknown'));
+      });
+      (window as any).__roiUnhandledRejectionProbeInstalled = true;
+    }
+  });
+}
+
 async function getRoiCommitProbeState(page: Page) {
   return page.evaluate(() => {
     const node = (window as any).flowCanvas.nodes.get((window as any).__e2eRoiNodeId);
@@ -509,6 +548,76 @@ async function getRoiCommitProbeState(page: Page) {
       activePointerId: imageCanvas?.activePointerId ?? null,
     };
   });
+}
+
+async function getRoiLifecycleProbeState(page: Page) {
+  return page.evaluate(() => {
+    const flowCanvas = (window as any).flowCanvas;
+    const roiNode = flowCanvas.nodes.get((window as any).__e2eRoiNodeId);
+    const panel = (window as any).propertyPanel?.roiEditorPanel ?? null;
+    const imageCanvas = panel?.imageCanvas ?? null;
+    const readNodeParam = (name: string) => {
+      const raw = roiNode?.parameters?.find((param: any) => param.name === name)?.value;
+      return raw === undefined ? null : Number(raw);
+    };
+    const readInput = (name: string) => {
+      const input = document.querySelector<HTMLInputElement>(`#param-${name}`);
+      return input ? Number(input.value) : null;
+    };
+
+    return {
+      changeCount: (window as any).__roiParameterChangeCount ?? 0,
+      nodeX: readNodeParam('X'),
+      nodeY: readNodeParam('Y'),
+      nodeWidth: readNodeParam('Width'),
+      nodeHeight: readNodeParam('Height'),
+      formX: readInput('X'),
+      formY: readInput('Y'),
+      activePointerId: imageCanvas?.activePointerId ?? null,
+      interactionState: imageCanvas?.interactionState ?? null,
+      activeHandle: imageCanvas?.activeHandle ?? null,
+      capturedPointerCount: (window as any).__roiCapturedPointers?.size ?? 0,
+      roiEditorExists: Boolean(panel),
+      currentImageSource: panel?.currentImageSource ?? null,
+      imageWidth: imageCanvas?.image?.width ?? null,
+      imageHeight: imageCanvas?.image?.height ?? null,
+      emptyVisible: (document.querySelector<HTMLElement>('#roi-editor-empty')?.style.display ?? '') !== 'none',
+      previewCardCount: document.querySelectorAll('.node-preview-card, .node-preview-inspector-card').length,
+      unhandledRejections: (window as any).__roiUnhandledRejections ?? [],
+    };
+  });
+}
+
+async function requestImmediateRoiPreview(page: Page) {
+  await page.evaluate(() => {
+    (window as any).nodePreviewCoordinator?.requestActivePreview?.({
+      immediate: true,
+      force: true,
+      debounceMs: 0,
+      trigger: 'manual',
+    });
+  });
+}
+
+async function waitForRoiImageSource(page: Page, expectedBase64: string | null) {
+  await page.waitForFunction((expected) => {
+    const source = (window as any).propertyPanel?.roiEditorPanel?.currentImageSource ?? null;
+    if (expected === null) {
+      return source === null;
+    }
+
+    return typeof source === 'string' && source.includes(expected as string);
+  }, expectedBase64);
+}
+
+function createPreviewResponse(inputImageBase64: string | null, count = 1) {
+  return {
+    success: true,
+    inputImageBase64,
+    outputImageBase64: inputImageBase64,
+    outputData: { Width: 64, Height: 64, Count: count },
+    executionTimeMs: 10,
+  };
 }
 
 async function dispatchPointerDragByClientPoints(
@@ -530,6 +639,7 @@ async function dispatchPointerDragByClientPoints(
     if (!target.__e2ePointerCapturePatched) {
       const captured = new Set<number>();
       target.__e2eCapturedPointers = captured;
+      (window as any).__roiCapturedPointers = captured;
       target.setPointerCapture = (id: number) => {
         captured.add(id);
       };
@@ -538,6 +648,8 @@ async function dispatchPointerDragByClientPoints(
       };
       target.hasPointerCapture = (id: number) => captured.has(id);
       target.__e2ePointerCapturePatched = true;
+    } else {
+      (window as any).__roiCapturedPointers = target.__e2eCapturedPointers;
     }
 
     const dispatch = (type: string, point: { x: number; y: number }, buttons: number) => {
@@ -1037,6 +1149,259 @@ test.describe('ROI Editor', () => {
       formY: 12,
       activePointerId: null,
     });
+  });
+
+  test('unreleased pointer drag is canceled when the preview input image switches', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let previewCallCount = 0;
+    await page.route('**/api/flows/preview-node', async route => {
+      previewCallCount += 1;
+      const image = previewCallCount === 1 ? PREVIEW_PNG_BASE64 : SECOND_PREVIEW_PNG_BASE64;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createPreviewResponse(image, previewCallCount)),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+    await waitForRoiImageSource(page, PREVIEW_PNG_BASE64);
+    expect(previewCallCount).toBe(1);
+    await installRoiLifecycleProbe(page);
+
+    await dispatchPointerDragWithoutRelease(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    expect(await getRoiLifecycleProbeState(page)).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 18,
+      formY: 20,
+    });
+
+    await requestImmediateRoiPreview(page);
+    await waitForRoiImageSource(page, SECOND_PREVIEW_PNG_BASE64);
+
+    const state = await getRoiLifecycleProbeState(page);
+    expect(state).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 10,
+      formY: 12,
+      activePointerId: null,
+      interactionState: null,
+      activeHandle: null,
+      capturedPointerCount: 0,
+      imageWidth: 64,
+      imageHeight: 64,
+    });
+    expect(state.currentImageSource).toContain(SECOND_PREVIEW_PNG_BASE64);
+    expect(previewCallCount).toBe(2);
+    expect(state.previewCardCount).toBeLessThanOrEqual(1);
+    expect(state.unhandledRejections).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('unreleased pointer drag is canceled when the preview input image disappears', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let previewCallCount = 0;
+    await page.route('**/api/flows/preview-node', async route => {
+      previewCallCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createPreviewResponse(PREVIEW_PNG_BASE64, previewCallCount)),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+    await installRoiLifecycleProbe(page);
+
+    await dispatchPointerDragWithoutRelease(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    await page.evaluate(() => {
+      const coordinator = (window as any).nodePreviewCoordinator;
+      coordinator?.updateState?.({
+        status: 'success',
+        inputImageBase64: null,
+        outputImageBase64: null,
+        outputData: { Width: 64, Height: 64 },
+      });
+    });
+    await waitForRoiImageSource(page, null);
+    await page.waitForFunction(() => !(window as any).propertyPanel?.roiEditorPanel?.imageCanvas?.image);
+
+    const state = await getRoiLifecycleProbeState(page);
+    expect(state).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 10,
+      formY: 12,
+      activePointerId: null,
+      interactionState: null,
+      activeHandle: null,
+      capturedPointerCount: 0,
+      currentImageSource: null,
+      imageWidth: null,
+      imageHeight: null,
+      emptyVisible: true,
+    });
+    expect(previewCallCount).toBe(1);
+    expect(state.previewCardCount).toBeLessThanOrEqual(1);
+    expect(state.unhandledRejections).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('unreleased pointer drag is canceled when switching to another node', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let previewCallCount = 0;
+    await page.route('**/api/flows/preview-node', async route => {
+      previewCallCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createPreviewResponse(PREVIEW_PNG_BASE64, previewCallCount)),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+    await installRoiLifecycleProbe(page);
+
+    await dispatchPointerDragWithoutRelease(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    await addAndSelectPlainImageNode(page);
+    await page.waitForFunction(() => !(window as any).propertyPanel?.roiEditorPanel);
+
+    const state = await getRoiLifecycleProbeState(page);
+    expect(state).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      nodeWidth: 12,
+      nodeHeight: 14,
+      activePointerId: null,
+      interactionState: null,
+      activeHandle: null,
+      capturedPointerCount: 0,
+      roiEditorExists: false,
+    });
+    expect(previewCallCount).toBe(1);
+    expect(state.previewCardCount).toBeLessThanOrEqual(1);
+    expect(state.unhandledRejections).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('unreleased pointer drag is canceled when ROI editor is destroyed', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let previewCallCount = 0;
+    await page.route('**/api/flows/preview-node', async route => {
+      previewCallCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createPreviewResponse(PREVIEW_PNG_BASE64, previewCallCount)),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+    await installRoiLifecycleProbe(page);
+
+    await dispatchPointerDragWithoutRelease(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    await page.evaluate(() => {
+      (window as any).propertyPanel?.roiEditorPanel?.destroy?.();
+      if ((window as any).propertyPanel) {
+        (window as any).propertyPanel.roiEditorPanel = null;
+      }
+    });
+
+    const state = await getRoiLifecycleProbeState(page);
+    expect(state).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 10,
+      formY: 12,
+      activePointerId: null,
+      interactionState: null,
+      activeHandle: null,
+      capturedPointerCount: 0,
+      roiEditorExists: false,
+    });
+    expect(previewCallCount).toBe(1);
+    expect(state.previewCardCount).toBeLessThanOrEqual(1);
+    expect(state.unhandledRejections).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('delayed older preview image cannot replace newer preview during unreleased drag', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let previewCallCount = 0;
+    let releaseDelayedPreview: (() => void) | null = null;
+    const delayedPreview = new Promise<void>(resolve => {
+      releaseDelayedPreview = resolve;
+    });
+
+    await page.route('**/api/flows/preview-node', async route => {
+      previewCallCount += 1;
+      const call = previewCallCount;
+      if (call === 2) {
+        await delayedPreview;
+      }
+
+      const image = call === 3 ? SECOND_PREVIEW_PNG_BASE64 : PREVIEW_PNG_BASE64;
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(createPreviewResponse(image, call)),
+        });
+      } catch {
+        // The delayed request is expected to be aborted by the newer preview request.
+      }
+    });
+
+    await addAndSelectRoiNode(page, { X: 10, Y: 12, Width: 12, Height: 14 });
+    await waitForRoiEditorReady(page);
+    await waitForRoiImageSource(page, PREVIEW_PNG_BASE64);
+    await installRoiLifecycleProbe(page);
+
+    await dispatchPointerDragWithoutRelease(page, { x: 16, y: 18 }, { x: 24, y: 26 });
+    await requestImmediateRoiPreview(page);
+    await expect.poll(() => previewCallCount).toBe(2);
+    await requestImmediateRoiPreview(page);
+    await expect.poll(() => previewCallCount).toBe(3);
+    await waitForRoiImageSource(page, SECOND_PREVIEW_PNG_BASE64);
+
+    releaseDelayedPreview?.();
+    await page.waitForTimeout(250);
+
+    const state = await getRoiLifecycleProbeState(page);
+    expect(state).toMatchObject({
+      changeCount: 0,
+      nodeX: 10,
+      nodeY: 12,
+      formX: 10,
+      formY: 12,
+      activePointerId: null,
+      interactionState: null,
+      activeHandle: null,
+      capturedPointerCount: 0,
+      imageWidth: 64,
+      imageHeight: 64,
+    });
+    expect(state.currentImageSource).toContain(SECOND_PREVIEW_PNG_BASE64);
+    expect(previewCallCount).toBe(3);
+    expect(state.previewCardCount).toBeLessThanOrEqual(1);
+    expect(state.unhandledRejections).toEqual([]);
+    expect(pageErrors).toEqual([]);
   });
 
   test('pointer cancel and ROI editor destroy roll back active drafts without commit', async ({ page }) => {

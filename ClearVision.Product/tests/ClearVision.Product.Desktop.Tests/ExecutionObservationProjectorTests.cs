@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -757,6 +758,88 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldBoundSceneLocatorDiagnosticsForLargeCircleList()
+    {
+        var circlesPortId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var circles = Enumerable.Range(0, ExecutionVisualSceneProjector.MaxPrimitives)
+            .Select(index => new CircleData(index + 10, index + 20, 5))
+            .ToList();
+
+        var first = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["CircleDataList"] = circles,
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlesPortId, Name = "CircleDataList" }
+            ],
+            targetOperator);
+        var second = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["CircleDataList"] = circles,
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlesPortId, Name = "CircleDataList" }
+            ],
+            targetOperator);
+
+        var scene = first.VisualScene!;
+        scene.Primitives.Should().HaveCount(ExecutionVisualSceneProjector.MaxPrimitives);
+        FindNode(first.Detail, "CircleDataList")!.Children.Should().HaveCount(ExecutionObservationProjector.MaxCollectionItems);
+        scene.Primitives
+            .Where(primitive => ParseCircleDataListIndex(primitive.ResultPath) >= ExecutionObservationProjector.MaxCollectionItems)
+            .Should()
+            .OnlyContain(primitive => primitive.Selectable == false);
+        scene.Diagnostics.Should().HaveCount(ExecutionVisualSceneProjector.MaxDiagnostics);
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-detail-locator-diagnostics-truncated");
+        scene.Truncated.Should().BeTrue();
+
+        JsonSerializer.Serialize(first.VisualScene, CamelCaseJson)
+            .Should()
+            .Be(JsonSerializer.Serialize(second.VisualScene, CamelCaseJson));
+    }
+
+    [Fact]
+    public void ReconcileVisualSceneWithDetail_ShouldRespectDiagnosticBudgetBoundary()
+    {
+        var outputPortId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        var detail = new ExecutionObservationDetailNodeV1 { Kind = "object", PathHint = "$" };
+        var primitives = new List<ExecutionVisualScenePrimitiveV1>
+        {
+            CreateScenePrimitive("circle:missing:0", outputPortId, "$[0]"),
+            CreateScenePrimitive("circle:missing:1", outputPortId, "$[1]")
+        };
+
+        var withSixtyThree = ReconcileVisualSceneForTest(
+            CreateVisualSceneForTest(primitives, existingDiagnosticCount: 63),
+            detail);
+        withSixtyThree.Diagnostics.Should().HaveCount(ExecutionVisualSceneProjector.MaxDiagnostics);
+        withSixtyThree.Diagnostics.Last().Code.Should().Be("visual-scene-detail-locator-diagnostics-truncated");
+        withSixtyThree.Diagnostics.Last().Message.Should().Contain("2");
+        withSixtyThree.Truncated.Should().BeTrue();
+
+        var withSixtyFour = ReconcileVisualSceneForTest(
+            CreateVisualSceneForTest(primitives, existingDiagnosticCount: 64),
+            detail);
+        withSixtyFour.Diagnostics.Should().HaveCount(ExecutionVisualSceneProjector.MaxDiagnostics);
+        withSixtyFour.Diagnostics.Should().OnlyContain(item => item.Code.StartsWith("existing-", StringComparison.Ordinal));
+        withSixtyFour.Truncated.Should().BeTrue();
+
+        var withSixtyFive = ReconcileVisualSceneForTest(
+            CreateVisualSceneForTest([], existingDiagnosticCount: 65),
+            detail);
+        withSixtyFive.Diagnostics.Should().HaveCount(ExecutionVisualSceneProjector.MaxDiagnostics);
+        withSixtyFive.Diagnostics.Last().Code.Should().Be("existing-63");
+        withSixtyFive.Truncated.Should().BeTrue();
+    }
+
+    [Fact]
     public void CreatePreviewObservation_ShouldProjectNPointImageSamplesWithoutWorldProjection()
     {
         var targetOperator = CreateOperator(OperatorType.NPointCalibration, [
@@ -843,6 +926,69 @@ public sealed class ExecutionObservationProjectorTests
 
         return @operator;
     }
+
+    private static int ParseCircleDataListIndex(string? resultPath)
+    {
+        if (string.IsNullOrWhiteSpace(resultPath) ||
+            !resultPath.StartsWith("$[", StringComparison.Ordinal) ||
+            !resultPath.EndsWith(']'))
+        {
+            return -1;
+        }
+
+        return int.TryParse(resultPath[2..^1], NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+            ? index
+            : -1;
+    }
+
+    private static ExecutionVisualSceneV1 ReconcileVisualSceneForTest(
+        ExecutionVisualSceneV1 visualScene,
+        ExecutionObservationDetailNodeV1 detail)
+    {
+        var method = typeof(ExecutionObservationProjector).GetMethod(
+            "ReconcileVisualSceneWithDetail",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+        return (ExecutionVisualSceneV1)method.Invoke(null, [visualScene, detail])!;
+    }
+
+    private static ExecutionVisualSceneV1 CreateVisualSceneForTest(
+        IReadOnlyList<ExecutionVisualScenePrimitiveV1> primitives,
+        int existingDiagnosticCount) =>
+        new()
+        {
+            Primitives = primitives.ToList(),
+            Diagnostics = Enumerable.Range(0, existingDiagnosticCount)
+                .Select(index => new ExecutionVisualSceneDiagnosticV1
+                {
+                    Code = $"existing-{index.ToString("D2", CultureInfo.InvariantCulture)}",
+                    Message = "existing diagnostic"
+                })
+                .ToList()
+        };
+
+    private static ExecutionVisualScenePrimitiveV1 CreateScenePrimitive(
+        string primitiveId,
+        Guid outputPortId,
+        string resultPath) =>
+        new()
+        {
+            PrimitiveId = primitiveId,
+            Kind = "circle",
+            Layer = "measurement",
+            ZOrder = 10,
+            Visible = true,
+            Selectable = true,
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                CenterX = 10,
+                CenterY = 20,
+                Radius = 5
+            },
+            Style = new ExecutionVisualSceneStyleV1(),
+            OutputPortId = outputPortId,
+            ResultPathVersion = 1,
+            ResultPath = resultPath
+        };
 
     private static ExecutionObservationDetailNodeV1? FindNode(ExecutionObservationDetailNodeV1 root, string name)
     {
