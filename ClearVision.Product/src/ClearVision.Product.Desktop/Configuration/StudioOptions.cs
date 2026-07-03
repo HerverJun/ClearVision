@@ -6,4 +6,5 @@ public sealed class StudioOptions
 
     public bool WorkspaceV2Enabled { get; set; }
     public bool NodePreviewInspectorEnabled { get; set; }
+    public bool CircleSearchV2ToolEnabled { get; set; } = true;
 }

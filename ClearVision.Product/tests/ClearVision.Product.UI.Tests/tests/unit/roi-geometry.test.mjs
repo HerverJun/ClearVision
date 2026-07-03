@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_RECT_PARAM_KEYS,
   CIRCLE_PARAM_KEYS,
+  CIRCLE_SEARCH_V2_PARAM_KEYS,
   POINT_PAIRS_PARAM_KEYS,
   POLYGON_PARAM_KEYS,
   POLAR_ANNULUS_ARC_PARAM_KEYS,
@@ -25,6 +26,8 @@ import {
   hitTestRectangle,
   hitTestCircle,
   hitTestCircleHandle,
+  hitTestCircleSearchV2,
+  hitTestCircleSearchV2Handle,
   hitTestAnnulus,
   hitTestAnnulusHandle,
   imageToScreenPoint,
@@ -34,6 +37,7 @@ import {
   movePolygonVertex,
   normalizeAngleDegrees,
   normalizeAnnulusGeometry,
+  normalizeCircleSearchV2Geometry,
   normalizeCircleGeometry,
   normalizePointSequenceGeometry,
   normalizePolygonGeometry,
@@ -48,18 +52,21 @@ import {
   redoRectangleDraft,
   reorderPointSequencePoint,
   resizeAnnulusByHandle,
+  resizeCircleSearchV2ByHandle,
   resizeCircleByHandle,
   resizeRectByHandle,
   screenToImageRect,
   screenToImagePoint,
   togglePointSequencePointEnabled,
   translateAnnulus,
+  translateCircleSearchV2,
   translateCircle,
   translatePointSequence,
   translatePolygon,
   translateRect,
   undoRectangleDraft,
   validateAnnulusGeometry,
+  validateCircleSearchV2Geometry,
   validateCircleGeometry,
   validatePointSequenceGeometry,
   validatePolygonGeometry,
@@ -272,6 +279,98 @@ test('annulus and arc geometry use clockwise image-space degree rules and fail c
   });
   assert.equal(invalid.valid, false);
   assert.ok(invalid.errors.includes('outerRadius'));
+});
+
+test('Circle Search V2 geometry validates radius order and round-trips operator params', () => {
+  const bounds = { width: 240, height: 180 };
+  const geometry = normalizeCircleSearchV2Geometry({
+    kind: 'circleSearchV2',
+    centerX: 100,
+    centerY: 90,
+    minRadius: 20,
+    nominalRadius: 30,
+    maxRadius: 40
+  }, bounds);
+
+  assert.deepEqual(geometry, {
+    kind: 'circleSearchV2',
+    searchCenterMode: 'Explicit',
+    centerX: 100,
+    centerY: 90,
+    minRadius: 20,
+    nominalRadius: 30,
+    maxRadius: 40
+  });
+  assert.deepEqual(validateCircleSearchV2Geometry(geometry, bounds), { valid: true });
+  assert.equal(hitTestCircleSearchV2({ x: 130, y: 90 }, geometry), true);
+  assert.equal(hitTestCircleSearchV2Handle({ x: 130, y: 90 }, geometry, { scale: 2 }, 10), 'nominalRadius');
+
+  assert.deepEqual(
+    translateCircleSearchV2(geometry, { x: 5, y: -4 }, bounds),
+    {
+      ...geometry,
+      searchCenterMode: 'Explicit',
+      centerX: 105,
+      centerY: 86
+    }
+  );
+  assert.equal(
+    resizeCircleSearchV2ByHandle(geometry, 'nominalRadius', { x: 135, y: 90 }, bounds).nominalRadius,
+    35
+  );
+  assert.equal(validateCircleSearchV2Geometry({ ...geometry, minRadius: 35, nominalRadius: 30 }, bounds).valid, false);
+
+  const config = {
+    geometryAdapter: { kind: 'circleSearchV2', paramKeys: CIRCLE_SEARCH_V2_PARAM_KEYS }
+  };
+  assert.deepEqual(geometryToParams(geometry, config), {
+    SearchCenterMode: 'Explicit',
+    SearchCenterX: 100,
+    SearchCenterY: 90,
+    MinRadius: 20,
+    NominalRadius: 30,
+    MaxRadius: 40
+  });
+
+  const fromImageCenter = geometryFromParams({
+    SearchCenterMode: 'ImageCenter',
+    SearchCenterX: 0,
+    SearchCenterY: 0,
+    MinRadius: 20,
+    NominalRadius: 30,
+    MaxRadius: 40
+  }, config, bounds);
+
+  assert.equal(fromImageCenter.centerX, 119.5);
+  assert.equal(fromImageCenter.centerY, 89.5);
+
+  const operatorConfig = getOperatorRoiConfig({
+    type: 'CircleMeasurement',
+    parameters: [
+      { name: 'Method', value: 'CaliperFitV2' },
+      { name: 'SearchCenterX', value: 100 },
+      { name: 'SearchCenterY', value: 90 },
+      { name: 'MinRadius', value: 20 },
+      { name: 'NominalRadius', value: 30 },
+      { name: 'MaxRadius', value: 40 }
+    ]
+  });
+  assert.equal(operatorConfig.supported, true);
+  assert.equal(operatorConfig.editable, true);
+  assert.equal(operatorConfig.geometryAdapter.kind, 'circleSearchV2');
+
+  const flagOffConfig = getOperatorRoiConfig({
+    type: 'CircleMeasurement',
+    parameters: [
+      { name: 'Method', value: 'CaliperFitV2' },
+      { name: 'SearchCenterX', value: 100 },
+      { name: 'SearchCenterY', value: 90 },
+      { name: 'MinRadius', value: 20 },
+      { name: 'NominalRadius', value: 30 },
+      { name: 'MaxRadius', value: 40 }
+    ]
+  }, { featureEnabled: false });
+  assert.equal(flagOffConfig.supported, false);
 });
 
 test('geometry parameter adapters round-trip circle and PolarUnwrap annulus arc params', () => {
@@ -604,6 +703,24 @@ test('refreshFromOperator re-applies ROI state instead of only syncing the old o
   await RoiEditorPanel.prototype.refreshFromOperator.call(panel);
 
   assert.equal(panel.currentConfig.editable, true);
+});
+
+test('RoiEditorPanel publishes loaded image bounds for image-center displays', () => {
+  let received = null;
+  const panel = {
+    imageCanvas: {
+      image: { width: 240, height: 180 }
+    },
+    onImageBoundsChanged(bounds) {
+      received = bounds;
+    }
+  };
+
+  RoiEditorPanel.prototype.publishImageBounds.call(panel);
+  assert.deepEqual(received, { width: 240, height: 180 });
+
+  RoiEditorPanel.prototype.publishImageBounds.call(panel, null);
+  assert.equal(received, null);
 });
 
 test('ImageCanvas addOverlay accepts stable ids while preserving legacy generated ids', () => {

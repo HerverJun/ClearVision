@@ -51,6 +51,7 @@ public class WebView2HostTests
         script.Should().Contain("\"workspaceV2Enabled\":true");
         script.Should().Contain("\"nodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":true");
+        script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
         script.Should().Contain("\"hostKind\":\"desktop-webview2\"");
         script.Should().Contain("\"frontendV2BasePath\":\"/v2\"");
@@ -68,8 +69,23 @@ public class WebView2HostTests
 
         script.Should().Contain("\"nodePreviewInspectorEnabled\":false");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":false");
+        script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
         script.Should().Contain("writable: false");
         script.Should().Contain("configurable: false");
+    }
+
+    [Fact]
+    public void BuildStartupInjectionScript_ShouldExposeCircleSearchV2ToolFlag()
+    {
+        var script = WebView2Host.BuildStartupInjectionScript(
+            workspaceV2Enabled: false,
+            apiBaseUrl: "http://localhost:5000/api",
+            cssVersion: "123",
+            nodePreviewInspectorEnabled: false,
+            circleSearchV2ToolEnabled: false);
+
+        script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":false");
+        script.Should().Contain("Object.freeze(startup)");
     }
 }

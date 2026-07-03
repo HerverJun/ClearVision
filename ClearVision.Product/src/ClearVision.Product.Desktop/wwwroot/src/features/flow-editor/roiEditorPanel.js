@@ -11,6 +11,7 @@ export class RoiEditorPanel {
         this.getOperator = options.getOperator ?? (() => null);
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onRectChanged = options.onRectChanged ?? (() => {});
+        this.onImageBoundsChanged = options.onImageBoundsChanged ?? (() => {});
         this.onRequestSyncFromParams = options.onRequestSyncFromParams ?? (() => {});
         this.getRoiConfig = options.getRoiConfig ?? (operator => getOperatorRoiConfig(operator));
         this.canvasId = `roi-editor-canvas-${Math.random().toString(36).slice(2)}`;
@@ -198,11 +199,13 @@ export class RoiEditorPanel {
 
         if (!inputImageSrc) {
             this.imageCanvas.clear();
+            this.publishImageBounds(null);
             return;
         }
 
         if (!this.currentConfig?.editable) {
             this.imageCanvas.clearEditableRectangle();
+            this.publishImageBounds(null);
             return;
         }
 
@@ -213,7 +216,20 @@ export class RoiEditorPanel {
             }
         }
 
+        this.publishImageBounds();
         this.syncOverlayFromOperator();
+    }
+
+    publishImageBounds(bounds = undefined) {
+        const imageBounds = bounds !== undefined
+            ? bounds
+            : (this.imageCanvas?.image
+                ? {
+                    width: this.imageCanvas.image.width,
+                    height: this.imageCanvas.image.height
+                }
+                : null);
+        this.onImageBoundsChanged?.(imageBounds);
     }
 
     resolveInputImageSrc() {

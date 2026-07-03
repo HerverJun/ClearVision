@@ -396,11 +396,14 @@ public sealed class Studio2ArchitectureGuardTests
             .Should().BeGreaterThan(appText.IndexOf("if (inspectorEnabled)", StringComparison.Ordinal));
 
         studioOptionsText.Should().Contain("NodePreviewInspectorEnabled");
+        studioOptionsText.Should().Contain("CircleSearchV2ToolEnabled");
         webViewHostText.Should().Contain("const featureFlags = Object.freeze");
+        webViewHostText.Should().Contain("Studio:CircleSearchV2ToolEnabled");
         webViewHostText.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
         webViewHostText.Should().Contain("Object.freeze(startup)");
         webViewHostText.Should().Contain("configurable: false");
         appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+        appSettingsText.Should().Contain("\"CircleSearchV2ToolEnabled\": true");
         adrText.Should().Contain("Studio:NodePreviewInspectorEnabled");
         adrText.Should().Contain("G15.2/G16");
 

@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Observation;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using Microsoft.AspNetCore.Builder;
@@ -21,6 +22,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Desktop.Endpoints;
@@ -84,6 +86,7 @@ public static class PreviewNodeEndpoints
             ProjectVariableSessionRegistry projectVariableSessions,
             IServiceProvider serviceProvider,
             PreviewArtifactMaterializer artifactMaterializer,
+            IOptions<StudioOptions> studioOptions,
             ILogger<object> logger) =>
         {
             ProjectAccessLease? projectAccess = null;
@@ -224,6 +227,7 @@ public static class PreviewNodeEndpoints
                         artifactMaterializer,
                         artifactOwner,
                         useArtifactReferences,
+                        studioOptions.Value,
                         previewCancellation.Token,
                         logger));
                 }
@@ -295,7 +299,8 @@ public static class PreviewNodeEndpoints
                     result,
                     observationOutputData,
                     flow,
-                    failedOperator);
+                    failedOperator,
+                    studioOptions.Value);
 
                 var response = new PreviewNodeResponse
                 {
@@ -1011,6 +1016,7 @@ public static class PreviewNodeEndpoints
         PreviewArtifactMaterializer artifactMaterializer,
         PreviewArtifactOwnerScope artifactOwner,
         bool useArtifactReferences,
+        StudioOptions studioOptions,
         CancellationToken cancellationToken,
         ILogger logger)
     {
@@ -1088,6 +1094,7 @@ public static class PreviewNodeEndpoints
                 outputDataForObservation,
                 flow,
                 failedOperator,
+                studioOptions,
                 successOverride: false,
                 errorMessageOverride: failureMessage)
         };
@@ -1126,6 +1133,7 @@ public static class PreviewNodeEndpoints
         IReadOnlyDictionary<string, object>? outputData,
         ClearVision.Product.Core.Entities.OperatorFlow flow,
         OperatorDebugResult? failedOperator,
+        StudioOptions studioOptions,
         bool? successOverride = null,
         string? errorMessageOverride = null)
     {
@@ -1153,9 +1161,16 @@ public static class PreviewNodeEndpoints
                     Name = port.Name
                 })
                 .ToList() ?? [],
-            TargetOperator = targetOperator
+            TargetOperator = targetOperator,
+            FeatureFlags = BuildObservationFeatureFlags(studioOptions)
         });
     }
+
+    private static IReadOnlyDictionary<string, bool> BuildObservationFeatureFlags(StudioOptions studioOptions) =>
+        new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled
+        };
 
     private static byte[]? ResolveInputImageBytes(
         ClearVision.Product.Core.Entities.OperatorFlow flow,

@@ -38,6 +38,24 @@ async function setCurrentProject(page: Page) {
   });
 }
 
+async function installCircleSearchV2StartupFlag(page: Page, enabled: boolean) {
+  await page.addInitScript((flagEnabled) => {
+    const startup = {
+      workspaceV2Enabled: false,
+      featureFlags: Object.freeze({
+        'Studio:CircleSearchV2ToolEnabled': flagEnabled,
+      }),
+    };
+    Object.freeze(startup);
+    Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
+      value: startup,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  }, enabled);
+}
+
 function createRoiParameters(overrides: Record<string, unknown> = {}) {
   const values = {
     Shape: 'Rectangle',
@@ -102,6 +120,88 @@ async function addAndSelectRoiNode(page: Page, overrides: Record<string, unknown
     (window as any).__e2eRoiNodeId = node.id;
     return node.id;
   }, createRoiParameters(overrides));
+}
+
+function createCircleMeasurementParameters(overrides: Record<string, unknown> = {}) {
+  const values = {
+    Method: 'CaliperFitV2',
+    SearchCenterMode: 'ImageCenter',
+    SearchCenterX: 10,
+    SearchCenterY: 12,
+    MinRadius: 12,
+    NominalRadius: 18,
+    MaxRadius: 24,
+    Dp: 1,
+    MinDist: 50,
+    Param1: 100,
+    Param2: 30,
+    CaliperCount: 96,
+    AveragingThickness: 5,
+    ProfileSampleCount: 129,
+    GaussianSigma: 1.2,
+    EdgePolarity: 'Auto',
+    EdgeThreshold: 0,
+    MinEdgeStrength: 4,
+    OutlierMode: 'Mad',
+    OutlierThreshold: 3.5,
+    MaxOutlierIterations: 3,
+    MinValidCalipers: 24,
+    MinCoverageRatio: 0.35,
+    MinAngularCoverageDegrees: 180,
+    MaxResidualRmse: 2,
+    ...overrides,
+  };
+
+  return [
+    { name: 'Method', displayName: 'Method', dataType: 'enum', value: values.Method, defaultValue: 'HoughCircle', options: ['HoughCircle', 'FitEllipse', 'CaliperFitV2'] },
+    { name: 'Dp', displayName: 'Dp', dataType: 'double', value: values.Dp, defaultValue: values.Dp },
+    { name: 'MinDist', displayName: 'MinDist', dataType: 'double', value: values.MinDist, defaultValue: values.MinDist },
+    { name: 'Param1', displayName: 'Param1', dataType: 'double', value: values.Param1, defaultValue: values.Param1 },
+    { name: 'Param2', displayName: 'Param2', dataType: 'double', value: values.Param2, defaultValue: values.Param2 },
+    { name: 'SearchCenterMode', displayName: 'SearchCenterMode', dataType: 'enum', value: values.SearchCenterMode, defaultValue: 'ImageCenter', options: ['ImageCenter', 'Explicit'] },
+    { name: 'SearchCenterX', displayName: 'SearchCenterX', dataType: 'double', value: values.SearchCenterX, defaultValue: values.SearchCenterX, min: 0, max: 64 },
+    { name: 'SearchCenterY', displayName: 'SearchCenterY', dataType: 'double', value: values.SearchCenterY, defaultValue: values.SearchCenterY, min: 0, max: 64 },
+    { name: 'MinRadius', displayName: 'MinRadius', dataType: 'double', value: values.MinRadius, defaultValue: values.MinRadius, min: 1, max: 64 },
+    { name: 'NominalRadius', displayName: 'NominalRadius', dataType: 'double', value: values.NominalRadius, defaultValue: values.NominalRadius, min: 1, max: 64 },
+    { name: 'MaxRadius', displayName: 'MaxRadius', dataType: 'double', value: values.MaxRadius, defaultValue: values.MaxRadius, min: 1, max: 64 },
+    { name: 'CaliperCount', displayName: 'CaliperCount', dataType: 'int', value: values.CaliperCount, defaultValue: values.CaliperCount, min: 1, max: 720 },
+    { name: 'AveragingThickness', displayName: 'AveragingThickness', dataType: 'double', value: values.AveragingThickness, defaultValue: values.AveragingThickness },
+    { name: 'ProfileSampleCount', displayName: 'ProfileSampleCount', dataType: 'int', value: values.ProfileSampleCount, defaultValue: values.ProfileSampleCount },
+    { name: 'GaussianSigma', displayName: 'GaussianSigma', dataType: 'double', value: values.GaussianSigma, defaultValue: values.GaussianSigma },
+    { name: 'EdgePolarity', displayName: 'EdgePolarity', dataType: 'enum', value: values.EdgePolarity, defaultValue: 'Auto', options: ['Auto', 'DarkToLight', 'LightToDark'] },
+    { name: 'EdgeThreshold', displayName: 'EdgeThreshold', dataType: 'double', value: values.EdgeThreshold, defaultValue: values.EdgeThreshold },
+    { name: 'MinEdgeStrength', displayName: 'MinEdgeStrength', dataType: 'double', value: values.MinEdgeStrength, defaultValue: values.MinEdgeStrength },
+    { name: 'OutlierMode', displayName: 'OutlierMode', dataType: 'enum', value: values.OutlierMode, defaultValue: 'Mad', options: ['None', 'Mad', 'Huber'] },
+    { name: 'OutlierThreshold', displayName: 'OutlierThreshold', dataType: 'double', value: values.OutlierThreshold, defaultValue: values.OutlierThreshold },
+    { name: 'MaxOutlierIterations', displayName: 'MaxOutlierIterations', dataType: 'int', value: values.MaxOutlierIterations, defaultValue: values.MaxOutlierIterations },
+    { name: 'MinValidCalipers', displayName: 'MinValidCalipers', dataType: 'int', value: values.MinValidCalipers, defaultValue: values.MinValidCalipers },
+    { name: 'MinCoverageRatio', displayName: 'MinCoverageRatio', dataType: 'double', value: values.MinCoverageRatio, defaultValue: values.MinCoverageRatio },
+    { name: 'MinAngularCoverageDegrees', displayName: 'MinAngularCoverageDegrees', dataType: 'double', value: values.MinAngularCoverageDegrees, defaultValue: values.MinAngularCoverageDegrees },
+    { name: 'MaxResidualRmse', displayName: 'MaxResidualRmse', dataType: 'double', value: values.MaxResidualRmse, defaultValue: values.MaxResidualRmse },
+  ];
+}
+
+async function addAndSelectCircleMeasurementNode(page: Page, overrides: Record<string, unknown> = {}) {
+  return page.evaluate((parameters) => {
+    const flowCanvas = (window as any).flowCanvas;
+    const node = flowCanvas.addNode(
+      'CircleMeasurement',
+      180,
+      140,
+      {
+        title: 'Circle Search',
+        parameters,
+        inputs: [{ name: 'Image', type: 'Image' }],
+        outputs: [{ name: 'Circle', type: 'Circle' }, { name: 'EdgePoints', type: 'PointList' }],
+        color: '#0ea5e9',
+      }
+    );
+
+    flowCanvas.selectedNode = node.id;
+    flowCanvas.onNodeSelected?.(node);
+    (window as any).__e2eRoiNodeId = node.id;
+    return node.id;
+  }, createCircleMeasurementParameters(overrides));
 }
 
 function createPolarParameters(overrides: Record<string, unknown> = {}) {
@@ -343,6 +443,60 @@ async function getCircleState(page: Page) {
             radius: Math.round(overlay.radius),
           }
         : null,
+    };
+  });
+}
+
+async function getCircleSearchV2State(page: Page) {
+  return page.evaluate(() => {
+    const node = (window as any).flowCanvas.nodes.get((window as any).__e2eRoiNodeId);
+    const overlay = (window as any).propertyPanel?.roiEditorPanel?.imageCanvas?.getPrimaryEditableOverlay?.();
+    const round = (value: unknown) => {
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue)
+        ? Math.round(numberValue * 1000) / 1000
+        : null;
+    };
+    const readInputValue = (name: string) =>
+      document.querySelector<HTMLInputElement | HTMLSelectElement>(`#param-${name}`)?.value ?? null;
+    const readInputNumber = (name: string) => round(readInputValue(name));
+    const readNodeValue = (name: string) =>
+      node?.parameters?.find((param: any) => param.name === name)?.value ?? null;
+    const readNodeNumber = (name: string) => round(readNodeValue(name));
+
+    return {
+      changeCount: (window as any).__roiParameterChangeCount ?? 0,
+      params: {
+        searchCenterMode: readInputValue('SearchCenterMode'),
+        searchCenterX: readInputNumber('SearchCenterX'),
+        searchCenterY: readInputNumber('SearchCenterY'),
+        minRadius: readInputNumber('MinRadius'),
+        nominalRadius: readInputNumber('NominalRadius'),
+        maxRadius: readInputNumber('MaxRadius'),
+      },
+      nodeParams: {
+        searchCenterMode: readNodeValue('SearchCenterMode'),
+        searchCenterX: readNodeNumber('SearchCenterX'),
+        searchCenterY: readNodeNumber('SearchCenterY'),
+        minRadius: readNodeNumber('MinRadius'),
+        nominalRadius: readNodeNumber('NominalRadius'),
+        maxRadius: readNodeNumber('MaxRadius'),
+      },
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            centerX: round(overlay.centerX ?? overlay.x),
+            centerY: round(overlay.centerY ?? overlay.y),
+            minRadius: round(overlay.minRadius ?? overlay.innerRadius),
+            nominalRadius: round(overlay.nominalRadius),
+            maxRadius: round(overlay.maxRadius ?? overlay.outerRadius ?? overlay.radius),
+          }
+        : null,
+      readonly: {
+        searchCenterX: document.querySelector<HTMLInputElement>('#param-SearchCenterX')?.readOnly ?? false,
+        searchCenterY: document.querySelector<HTMLInputElement>('#param-SearchCenterY')?.readOnly ?? false,
+      },
+      roiEditorExists: Boolean((window as any).propertyPanel?.roiEditorPanel),
     };
   });
 }
@@ -911,6 +1065,119 @@ test.describe('ROI Editor', () => {
     circleState = await getCircleState(page);
     expect(circleState.params).toEqual({ centerX: 30, centerY: 32, radius: 20 });
     expect(circleState.overlay).toEqual({ type: 'circle', centerX: 30, centerY: 32, radius: 20 });
+  });
+
+  test('CircleMeasurement CaliperFitV2 groups parameters and mounts circle search geometry', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64, StatusCode: 'OK' },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectCircleMeasurementNode(page);
+    await waitForRoiEditorReady(page);
+
+    const groupTitles = await page.locator('.param-group .group-title').allTextContents();
+    expect(groupTitles).toEqual([
+      '\u68c0\u6d4b\u65b9\u6cd5',
+      '\u641c\u7d22\u51e0\u4f55',
+      '\u5361\u5c3a\u91c7\u6837',
+      '\u8fb9\u7f18',
+      '\u7a33\u5065\u62df\u5408',
+      '\u8d28\u91cf\u95e8\u7981',
+    ]);
+    await expect(page.locator('#param-Dp')).toHaveCount(0);
+    await expect(page.locator('#param-SearchCenterMode')).toHaveValue('ImageCenter');
+    await expect(page.locator('#param-SearchCenterX')).toHaveValue('31.5');
+    await expect(page.locator('#param-SearchCenterY')).toHaveValue('31.5');
+    await expect(page.locator('#param-SearchCenterX')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#param-SearchCenterY')).toHaveAttribute('readonly', '');
+    await expect(page.locator('[data-circle-search-v2-workload="true"]')).toContainText('Sampling work: 61,920');
+
+    const state = await getCircleSearchV2State(page);
+    expect(state).toMatchObject({
+      params: {
+        searchCenterMode: 'ImageCenter',
+        searchCenterX: 31.5,
+        searchCenterY: 31.5,
+        minRadius: 12,
+        nominalRadius: 18,
+        maxRadius: 24,
+      },
+      overlay: {
+        type: 'circleSearchV2',
+        centerX: 31.5,
+        centerY: 31.5,
+        minRadius: 12,
+        nominalRadius: 18,
+        maxRadius: 24,
+      },
+      readonly: {
+        searchCenterX: true,
+        searchCenterY: true,
+      },
+      roiEditorExists: true,
+    });
+  });
+
+  test('CircleMeasurement circle search center drag commits explicit geometry once', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64, StatusCode: 'OK' },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectCircleMeasurementNode(page);
+    await waitForRoiEditorReady(page);
+    await installRoiParameterChangeCounter(page);
+
+    await dispatchRoiDrag(page, { x: 31.5, y: 31.5 }, { x: 36, y: 38 });
+    await page.waitForTimeout(100);
+
+    const state = await getCircleSearchV2State(page);
+    expect(state).toMatchObject({
+      changeCount: 1,
+      params: {
+        searchCenterMode: 'Explicit',
+        minRadius: 12,
+        nominalRadius: 18,
+        maxRadius: 24,
+      },
+      nodeParams: {
+        searchCenterMode: 'Explicit',
+        minRadius: 12,
+        nominalRadius: 18,
+        maxRadius: 24,
+      },
+      overlay: {
+        type: 'circleSearchV2',
+        minRadius: 12,
+        nominalRadius: 18,
+        maxRadius: 24,
+      },
+    });
+    expect(state.params.searchCenterX).toBeCloseTo(36, 1);
+    expect(state.params.searchCenterY).toBeCloseTo(38, 1);
+    expect(state.nodeParams.searchCenterX).toBeCloseTo(36, 1);
+    expect(state.nodeParams.searchCenterY).toBeCloseTo(38, 1);
+    expect(state.overlay?.centerX).toBeCloseTo(36, 1);
+    expect(state.overlay?.centerY).toBeCloseTo(38, 1);
   });
 
   test('PolarUnwrap arc editing updates annulus radii and angle params', async ({ page }) => {
@@ -1553,6 +1820,49 @@ test.describe('ROI Editor', () => {
       y: 16,
       width: 18,
       height: 20,
+    });
+  });
+});
+
+test.describe('ROI Editor Circle Search V2 startup flag off', () => {
+  test.beforeEach(async ({ page }) => {
+    await installCircleSearchV2StartupFlag(page, false);
+    await stubOperatorLibrary(page);
+    await bootAuthenticatedApp(page);
+    await setCurrentProject(page);
+  });
+
+  test('keeps CaliperFitV2 on the generic parameter panel when the startup flag is off', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64, StatusCode: 'OK' },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectCircleMeasurementNode(page);
+    await expect(page.locator('#property-form')).toBeVisible();
+    await expect(page.locator('.roi-editor-panel')).toHaveCount(0);
+    await expect(page.locator('[data-circle-search-v2-workload="true"]')).toHaveCount(0);
+    await expect(page.locator('#param-Dp')).toHaveCount(1);
+    await expect(page.locator('#param-SearchCenterMode')).toHaveValue('ImageCenter');
+    await expect(page.locator('#param-SearchCenterX')).toHaveValue('10');
+    await expect(page.locator('#param-SearchCenterY')).toHaveValue('12');
+
+    const state = await getCircleSearchV2State(page);
+    expect(state).toMatchObject({
+      readonly: {
+        searchCenterX: false,
+        searchCenterY: false,
+      },
+      roiEditorExists: false,
     });
   });
 });

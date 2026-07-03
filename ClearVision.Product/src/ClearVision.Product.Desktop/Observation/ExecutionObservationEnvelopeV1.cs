@@ -227,6 +227,7 @@ public sealed class ExecutionObservationPreviewInput
     public IReadOnlyDictionary<string, object>? OutputData { get; init; }
     public IReadOnlyList<ExecutionObservationOutputPortV1> OutputPorts { get; init; } = [];
     public ClearVision.Product.Core.Entities.Operator? TargetOperator { get; init; }
+    public IReadOnlyDictionary<string, bool> FeatureFlags { get; init; } = new Dictionary<string, bool>();
     public DateTimeOffset? ObservedAtUtc { get; init; }
 }
 

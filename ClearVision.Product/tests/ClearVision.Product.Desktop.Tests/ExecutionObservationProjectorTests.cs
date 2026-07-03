@@ -895,6 +895,174 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldProjectCaliperFitV2SuccessVisualScene()
+    {
+        var edgePortId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+        var inlierPortId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
+        var circlePortId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003");
+        var targetOperator = CreateCaliperFitV2Operator();
+        var edgePoints = Enumerable.Range(0, 8)
+            .Select(index => CreateCaliperPoint(index, 100, 90, 30))
+            .ToArray();
+        var result = new CircleCaliperFitV2Result
+        {
+            Success = true,
+            CenterX = 100,
+            CenterY = 90,
+            Radius = 30,
+            EdgePoints = edgePoints,
+            InlierPoints = edgePoints.Take(6).ToArray(),
+            OutlierPoints = edgePoints.Skip(6).Take(1).ToArray(),
+            CoverageRatio = 0.82,
+            ResidualRmse = 0.41,
+            ResidualMax = 0.9,
+            CollectedPointCount = edgePoints.Length
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 240,
+                ["Height"] = 180,
+                ["Circle"] = new CircleData(100, 90, 30),
+                ["CaliperFitV2Result"] = result,
+                ["EdgePoints"] = edgePoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["InlierPoints"] = result.InlierPoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["OutlierPoints"] = result.OutlierPoints.Select(point => new Position(point.X, point.Y)).ToList()
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = edgePortId, Name = "EdgePoints" },
+                new ExecutionObservationOutputPortV1 { Id = inlierPortId, Name = "InlierPoints" },
+                new ExecutionObservationOutputPortV1 { Id = circlePortId, Name = "Circle" }
+            ],
+            targetOperator);
+
+        var scene = observation.VisualScene!;
+        scene.Primitives.Should().Contain(primitive => primitive.PrimitiveId.StartsWith("circle-search-region:min:", StringComparison.Ordinal));
+        scene.Primitives.Should().Contain(primitive => primitive.PrimitiveId.StartsWith("circle-search-nominal:", StringComparison.Ordinal));
+        scene.Primitives.Should().Contain(primitive => primitive.Layer == "circle-search-calipers" && primitive.Kind == "polyline");
+        var fit = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId.StartsWith("circle-search-fit:", StringComparison.Ordinal)).Subject;
+        fit.OutputPortId.Should().Be(circlePortId);
+        fit.ResultPath.Should().Be("$");
+        fit.Selectable.Should().BeTrue();
+
+        var accepted = scene.Primitives.Single(primitive => primitive.Layer == "circle-search-accepted" && primitive.ResultPath == "$[0]");
+        accepted.OutputPortId.Should().Be(inlierPortId);
+        accepted.ResultPathVersion.Should().Be(1);
+        accepted.ResultPath.Should().Be("$[0]");
+        accepted.Selectable.Should().BeTrue();
+        scene.Diagnostics.Should().NotContain(item => item.Code == "visual-scene-circle-output-missing");
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldUseLegacyCircleSceneWhenCircleSearchV2FeatureIsOff()
+    {
+        var targetOperator = CreateCaliperFitV2Operator();
+        var result = new CircleCaliperFitV2Result
+        {
+            Success = true,
+            CenterX = 100,
+            CenterY = 90,
+            Radius = 30,
+            EdgePoints = [CreateCaliperPoint(0, 100, 90, 30)]
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Circle"] = new CircleData(100, 90, 30),
+                ["CaliperFitV2Result"] = result
+            },
+            targetOperator: targetOperator,
+            featureFlags: new Dictionary<string, bool>
+            {
+                ["Studio:CircleSearchV2ToolEnabled"] = false
+            });
+
+        var scene = observation.VisualScene!;
+        scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:primary");
+        scene.Primitives.Should().NotContain(primitive => primitive.PrimitiveId.StartsWith("circle-search-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectCaliperFitV2FailureEvidenceWithoutFitCircle()
+    {
+        var targetOperator = CreateCaliperFitV2Operator();
+        var edgePoints = Enumerable.Range(0, 6)
+            .Select(index => CreateCaliperPoint(index, 100, 90, 30))
+            .ToArray();
+        var result = new CircleCaliperFitV2Result
+        {
+            Success = false,
+            FailureCode = CircleCaliperFitV2FailureCode.InsufficientCoverage,
+            FailureMessage = "coverage too low",
+            EdgePoints = edgePoints,
+            InlierPoints = edgePoints.Take(3).ToArray(),
+            OutlierPoints = edgePoints.Skip(3).Take(2).ToArray(),
+            CoverageRatio = 0.2,
+            CollectedPointCount = edgePoints.Length
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 240,
+                ["Height"] = 180,
+                ["CaliperFitV2Result"] = result,
+                ["EdgePoints"] = edgePoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["InlierPoints"] = result.InlierPoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["OutlierPoints"] = result.OutlierPoints.Select(point => new Position(point.X, point.Y)).ToList()
+            },
+            targetOperator: targetOperator);
+
+        var scene = observation.VisualScene!;
+        scene.Primitives.Should().Contain(primitive => primitive.Layer == "circle-search-region");
+        scene.Primitives.Should().Contain(primitive => primitive.Layer == "circle-search-candidates");
+        scene.Primitives.Should().Contain(primitive => primitive.Layer == "circle-search-accepted");
+        scene.Primitives.Should().Contain(primitive => primitive.Layer == "circle-search-rejected");
+        scene.Primitives.Should().NotContain(primitive => primitive.PrimitiveId.StartsWith("circle-search-fit:", StringComparison.Ordinal));
+        scene.Primitives.Should().Contain(primitive =>
+            primitive.Layer == "circle-search-quality" &&
+            primitive.Geometry.Text!.Contains("InsufficientCoverage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldDownsampleCaliperFitV2SceneWithinPrimitiveBudget()
+    {
+        var targetOperator = CreateCaliperFitV2Operator(caliperCount: 720);
+        var edgePoints = Enumerable.Range(0, 720)
+            .Select(index => CreateCaliperPoint(index, 100, 90, 30))
+            .ToArray();
+        var result = new CircleCaliperFitV2Result
+        {
+            Success = false,
+            FailureCode = CircleCaliperFitV2FailureCode.InsufficientCoverage,
+            EdgePoints = edgePoints,
+            InlierPoints = edgePoints.Take(220).ToArray(),
+            OutlierPoints = edgePoints.Skip(220).Take(140).ToArray(),
+            CollectedPointCount = edgePoints.Length
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 240,
+                ["Height"] = 180,
+                ["CaliperFitV2Result"] = result,
+                ["EdgePoints"] = edgePoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["InlierPoints"] = result.InlierPoints.Select(point => new Position(point.X, point.Y)).ToList(),
+                ["OutlierPoints"] = result.OutlierPoints.Select(point => new Position(point.X, point.Y)).ToList()
+            },
+            targetOperator: targetOperator);
+
+        var scene = observation.VisualScene!;
+        scene.Primitives.Should().HaveCountLessThanOrEqualTo(ExecutionVisualSceneProjector.MaxPrimitives);
+        scene.Primitives.Count(primitive => primitive.Layer == "circle-search-calipers").Should().BeLessThanOrEqualTo(48);
+        scene.Truncated.Should().BeTrue();
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-circle-calipers-truncated");
+    }
+
+    [Fact]
     public void CreatePreviewObservation_ShouldProjectPixelToWorldPointsOnWorldNeutralPlane()
     {
         var targetOperator = CreateOperator(OperatorType.PixelToWorldTransform, []);
@@ -1019,7 +1187,8 @@ public sealed class ExecutionObservationProjectorTests
     private static ExecutionObservationEnvelopeV1 CreateObservation(
         IReadOnlyDictionary<string, object> outputData,
         IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts = null,
-        Operator? targetOperator = null)
+        Operator? targetOperator = null,
+        IReadOnlyDictionary<string, bool>? featureFlags = null)
     {
         return ExecutionObservationProjector.CreatePreviewObservation(new ExecutionObservationPreviewInput
         {
@@ -1034,6 +1203,7 @@ public sealed class ExecutionObservationProjectorTests
             OutputData = outputData,
             OutputPorts = outputPorts ?? [],
             TargetOperator = targetOperator,
+            FeatureFlags = featureFlags ?? new Dictionary<string, bool>(),
             ObservedAtUtc = DateTimeOffset.Parse("2026-07-02T01:02:03Z")
         });
     }
@@ -1047,6 +1217,32 @@ public sealed class ExecutionObservationProjectorTests
         }
 
         return @operator;
+    }
+
+    private static Operator CreateCaliperFitV2Operator(int caliperCount = 96) =>
+        CreateOperator(OperatorType.CircleMeasurement, [
+            new Parameter(Guid.NewGuid(), "Method", "Method", string.Empty, "enum", "CaliperFitV2"),
+            new Parameter(Guid.NewGuid(), "SearchCenterMode", "SearchCenterMode", string.Empty, "enum", "Explicit"),
+            new Parameter(Guid.NewGuid(), "SearchCenterX", "SearchCenterX", string.Empty, "double", 100.0),
+            new Parameter(Guid.NewGuid(), "SearchCenterY", "SearchCenterY", string.Empty, "double", 90.0),
+            new Parameter(Guid.NewGuid(), "MinRadius", "MinRadius", string.Empty, "int", 20),
+            new Parameter(Guid.NewGuid(), "NominalRadius", "NominalRadius", string.Empty, "double", 30.0),
+            new Parameter(Guid.NewGuid(), "MaxRadius", "MaxRadius", string.Empty, "int", 40),
+            new Parameter(Guid.NewGuid(), "CaliperCount", "CaliperCount", string.Empty, "int", caliperCount)
+        ]);
+
+    private static CircleCaliperFitV2Point CreateCaliperPoint(int index, double centerX, double centerY, double radius)
+    {
+        var angle = index * 13.0;
+        var radians = angle * Math.PI / 180.0;
+        return new CircleCaliperFitV2Point(
+            centerX + (Math.Cos(radians) * radius),
+            centerY + (Math.Sin(radians) * radius),
+            index,
+            angle,
+            radius,
+            24.0,
+            "LightToDark");
     }
 
     private static int ParseCircleDataListIndex(string? resultPath)

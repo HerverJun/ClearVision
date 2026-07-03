@@ -32,6 +32,15 @@ const FEATURE_REGISTRY = Object.freeze({
         title: '当前仅开放只读策略查看',
         description: '当前仅开放只读策略查看；任务入口、状态展示和结果应用流程尚未产品化。'
     }),
+    'operator.circleSearchV2Tool': Object.freeze({
+        id: 'operator.circleSearchV2Tool',
+        state: FEATURE_STATES.AVAILABLE,
+        enabled: true,
+        badge: '已开放',
+        buttonLabel: 'Circle Search V2',
+        title: 'Circle Search V2 参数区与图上几何编辑已开放',
+        description: 'CircleMeasurement 在 CaliperFitV2 方法下启用结构化参数区、搜索环几何编辑和同源 Scene 显示。'
+    }),
     'project.demoCreation': Object.freeze({
         id: 'project.demoCreation',
         state: FEATURE_STATES.AVAILABLE,

@@ -57,7 +57,8 @@ public sealed class WebView2Host : IAsyncDisposable
         bool workspaceV2Enabled,
         string apiBaseUrl,
         string cssVersion,
-        bool nodePreviewInspectorEnabled = false)
+        bool nodePreviewInspectorEnabled = false,
+        bool circleSearchV2ToolEnabled = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
@@ -71,7 +72,8 @@ public sealed class WebView2Host : IAsyncDisposable
             frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath,
             featureFlags = new Dictionary<string, bool>
             {
-                ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled
+                ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
+                ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled
             }
         };
 
@@ -246,7 +248,8 @@ public sealed class WebView2Host : IAsyncDisposable
             _studioOptions.WorkspaceV2Enabled,
             apiBaseUrl,
             cssVersion,
-            _studioOptions.NodePreviewInspectorEnabled);
+            _studioOptions.NodePreviewInspectorEnabled,
+            _studioOptions.CircleSearchV2ToolEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] 已注入 API 配置脚本: {apiBaseUrl}");
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] CSS版本号: {cssVersion}");

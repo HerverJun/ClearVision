@@ -1,5 +1,6 @@
 import {
     CIRCLE_PARAM_KEYS,
+    CIRCLE_SEARCH_V2_PARAM_KEYS,
     DEFAULT_RECT_PARAM_KEYS,
     POINT_PAIRS_PARAM_KEYS,
     POLYGON_PARAM_KEYS,
@@ -9,6 +10,7 @@ import {
     computeRawAngleSpanDegrees,
     normalizeAnnulusGeometry,
     normalizeAngleDegrees,
+    normalizeCircleSearchV2Geometry,
     normalizeCircleGeometry,
     normalizePointSequenceGeometry,
     normalizePolygonGeometry,
@@ -19,9 +21,27 @@ import {
     rectFromParams,
     rectToParams,
     validateAnnulusGeometry,
+    validateCircleSearchV2Geometry,
     validatePointSequenceGeometry,
     validatePolygonGeometry
 } from './roiGeometry.mjs';
+import { isFeatureEnabled } from '../../shared/featureRegistry.js';
+
+export const CIRCLE_SEARCH_V2_TOOL_FEATURE_ID = 'operator.circleSearchV2Tool';
+export const CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG = 'Studio:CircleSearchV2ToolEnabled';
+
+export function isCircleSearchV2ToolEnabled(options = {}) {
+    if (typeof options?.featureEnabled === 'boolean') {
+        return options.featureEnabled;
+    }
+
+    const startupFlags = globalThis?.window?.__CLEARVISION_STARTUP__?.featureFlags;
+    if (startupFlags && Object.prototype.hasOwnProperty.call(startupFlags, CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG)) {
+        return startupFlags[CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG] === true;
+    }
+
+    return isFeatureEnabled(CIRCLE_SEARCH_V2_TOOL_FEATURE_ID);
+}
 
 function readOperatorValue(operator, name, fallback = '') {
     const parameter = (operator?.parameters || []).find(item =>
@@ -45,6 +65,13 @@ function readOperatorValues(operator) {
 function readNumberValue(values, key, fallback = 0) {
     const value = Number(values?.[key]);
     return Number.isFinite(value) ? value : fallback;
+}
+
+function readStringValue(values, key, fallback = '') {
+    const value = values?.[key];
+    return value === null || value === undefined || String(value).trim() === ''
+        ? fallback
+        : String(value);
 }
 
 function roundGeometryNumber(value, digits = 3) {
@@ -92,6 +119,31 @@ export function geometryFromParams(values, config, bounds = null) {
             endAngle: readNumberValue(values, keys.endAngle, 360)
         };
         return normalizeAnnulusGeometry(annulus, null);
+    }
+
+    if (adapter.kind === 'circleSearchV2') {
+        const keys = adapter.paramKeys || CIRCLE_SEARCH_V2_PARAM_KEYS;
+        const mode = readStringValue(values, keys.searchCenterMode, 'ImageCenter');
+        const centerX = mode.toLowerCase() === 'imagecenter' && bounds
+            ? (Number(bounds.width) - 1) * 0.5
+            : readNumberValue(values, keys.centerX, 0);
+        const centerY = mode.toLowerCase() === 'imagecenter' && bounds
+            ? (Number(bounds.height) - 1) * 0.5
+            : readNumberValue(values, keys.centerY, 0);
+        const geometry = {
+            kind: 'circleSearchV2',
+            searchCenterMode: mode,
+            centerX,
+            centerY,
+            minRadius: readNumberValue(values, keys.minRadius, 1),
+            nominalRadius: readNumberValue(values, keys.nominalRadius, 1),
+            maxRadius: readNumberValue(values, keys.maxRadius, 1)
+        };
+        if (!validateCircleSearchV2Geometry(geometry, bounds).valid) {
+            return null;
+        }
+
+        return normalizeCircleSearchV2Geometry(geometry, bounds);
     }
 
     if (adapter.kind === 'polygon') {
@@ -152,6 +204,18 @@ export function geometryToParams(geometry, config) {
         };
     }
 
+    if (adapter.kind === 'circleSearchV2') {
+        const keys = adapter.paramKeys || CIRCLE_SEARCH_V2_PARAM_KEYS;
+        return {
+            [keys.searchCenterMode]: 'Explicit',
+            [keys.centerX]: roundGeometryNumber(Number(geometry.centerX ?? geometry.x ?? 0)),
+            [keys.centerY]: roundGeometryNumber(Number(geometry.centerY ?? geometry.y ?? 0)),
+            [keys.minRadius]: Math.max(1, roundGeometryNumber(Number(geometry.minRadius ?? geometry.innerRadius ?? 1))),
+            [keys.nominalRadius]: Math.max(1, roundGeometryNumber(Number(geometry.nominalRadius ?? 1))),
+            [keys.maxRadius]: Math.max(1, roundGeometryNumber(Number(geometry.maxRadius ?? geometry.outerRadius ?? geometry.radius ?? 1)))
+        };
+    }
+
     if (adapter.kind === 'polygon') {
         const keys = adapter.paramKeys || POLYGON_PARAM_KEYS;
         return {
@@ -169,7 +233,7 @@ export function geometryToParams(geometry, config) {
     return {};
 }
 
-export function getOperatorRoiConfig(operator) {
+export function getOperatorRoiConfig(operator, options = {}) {
     const type = String(operator?.type || operator?.operatorType || '').trim();
 
     if (type === 'RoiManager') {
@@ -263,6 +327,32 @@ export function getOperatorRoiConfig(operator) {
             subtitle: 'Edit calibration image sample points; commit preserves WorldX / WorldY in PointPairs JSON.',
             readonlyMessage: 'PointPairs must be a parseable legacy JSON array.'
         };
+    }
+
+    if (type === 'CircleMeasurement') {
+        const method = String(readOperatorValue(operator, 'Method', 'HoughCircle'));
+        if (method.trim().toLowerCase() === 'caliperfitv2' && isCircleSearchV2ToolEnabled(options)) {
+            const values = readOperatorValues(operator);
+            const geometry = {
+                kind: 'circleSearchV2',
+                centerX: readNumberValue(values, 'SearchCenterX', 0),
+                centerY: readNumberValue(values, 'SearchCenterY', 0),
+                minRadius: readNumberValue(values, 'MinRadius', 1),
+                nominalRadius: readNumberValue(values, 'NominalRadius', 1),
+                maxRadius: readNumberValue(values, 'MaxRadius', 1)
+            };
+            const validation = validateCircleSearchV2Geometry(geometry);
+
+            return {
+                supported: true,
+                editable: validation.valid,
+                shape: 'CircleSearchV2',
+                geometryAdapter: { kind: 'circleSearchV2', paramKeys: CIRCLE_SEARCH_V2_PARAM_KEYS },
+                rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
+                subtitle: 'Edit the search ring and nominal circle; commit writes SearchCenterX / SearchCenterY / MinRadius / NominalRadius / MaxRadius.',
+                readonlyMessage: 'Circle Search V2 geometry requires 1 <= MinRadius <= NominalRadius <= MaxRadius.'
+            };
+        }
     }
 
     return {

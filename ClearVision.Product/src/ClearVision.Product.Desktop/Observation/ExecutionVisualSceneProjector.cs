@@ -16,10 +16,13 @@ public sealed class ExecutionVisualSceneInput
     public Operator? TargetOperator { get; init; }
     public IReadOnlyDictionary<string, object>? OutputData { get; init; }
     public IReadOnlyList<ExecutionObservationOutputPortV1> OutputPorts { get; init; } = [];
+    public IReadOnlyDictionary<string, bool> FeatureFlags { get; init; } = new Dictionary<string, bool>();
 }
 
 public static class ExecutionVisualSceneProjector
 {
+    private const string CircleSearchV2ToolFeatureFlag = "Studio:CircleSearchV2ToolEnabled";
+
     public const int MaxPrimitives = 300;
     public const int MaxPoints = 512;
     public const int MaxDiagnostics = 64;
@@ -57,7 +60,7 @@ public static class ExecutionVisualSceneProjector
                     ProjectRoi(input.TargetOperator, context);
                     break;
                 case OperatorType.CircleMeasurement:
-                    ProjectCircleMeasurement(context);
+                    ProjectCircleMeasurement(input.TargetOperator, context);
                     break;
                 case OperatorType.NPointCalibration:
                     ProjectNPointCalibration(input.TargetOperator, context);
@@ -525,8 +528,15 @@ public static class ExecutionVisualSceneProjector
         }
     }
 
-    private static void ProjectCircleMeasurement(SceneProjectionContext context)
+    private static void ProjectCircleMeasurement(Operator @operator, SceneProjectionContext context)
     {
+        if (ReadParameterString(@operator, "Method", "HoughCircle").Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase) &&
+            context.IsFeatureEnabled(CircleSearchV2ToolFeatureFlag, defaultValue: true))
+        {
+            ProjectCircleMeasurementCaliperFitV2(@operator, context);
+            return;
+        }
+
         var added = false;
         CircleCandidate? primary = null;
         if (context.TryGetOutput("Circle", out var circleValue) &&
@@ -592,6 +602,344 @@ public static class ExecutionVisualSceneProjector
             context.AddDiagnostic("visual-scene-circle-output-missing", "CircleMeasurement did not expose a supported Circle, Center/Radius, CircleDataList, or Circles payload.", null);
         }
     }
+
+    private static void ProjectCircleMeasurementCaliperFitV2(Operator @operator, SceneProjectionContext context)
+    {
+        var operatorId = @operator.Id.ToString("D");
+        var minRadius = ReadParameterDouble(@operator, "MinRadius", 0.0);
+        var nominalRadius = ReadParameterDouble(@operator, "NominalRadius", minRadius);
+        var maxRadius = ReadParameterDouble(@operator, "MaxRadius", Math.Max(minRadius, nominalRadius));
+        if (!TryResolveCaliperSearchCenter(@operator, context, out var searchCenterX, out var searchCenterY))
+        {
+            context.AddDiagnostic("visual-scene-circle-search-center-unresolved", "CaliperFitV2 search center could not be resolved for scene display.", null);
+            return;
+        }
+
+        if (!AreFinite(searchCenterX, searchCenterY, minRadius, nominalRadius, maxRadius) ||
+            minRadius <= 0 ||
+            minRadius > nominalRadius ||
+            nominalRadius > maxRadius)
+        {
+            context.AddDiagnostic("visual-scene-circle-search-geometry-invalid", "CaliperFitV2 search geometry is invalid and was not projected.", null);
+            return;
+        }
+
+        context.AddPrimitive(CreateCaliperCirclePrimitive(
+            $"circle-search-region:min:{operatorId}",
+            searchCenterX,
+            searchCenterY,
+            minRadius,
+            "Search Min",
+            "circle-search-region",
+            10,
+            "#f59e0b",
+            "rgba(245,158,11,0.04)",
+            selectable: false));
+        context.AddPrimitive(CreateCaliperCirclePrimitive(
+            $"circle-search-region:max:{operatorId}",
+            searchCenterX,
+            searchCenterY,
+            maxRadius,
+            "Search Max",
+            "circle-search-region",
+            11,
+            "#f59e0b",
+            "rgba(245,158,11,0.03)",
+            selectable: false));
+        context.AddPrimitive(CreateCaliperCirclePrimitive(
+            $"circle-search-nominal:{operatorId}",
+            searchCenterX,
+            searchCenterY,
+            nominalRadius,
+            "Nominal",
+            "circle-search-nominal",
+            20,
+            "#0ea5e9",
+            "rgba(14,165,233,0.04)",
+            selectable: false));
+
+        CircleCaliperFitV2Result? v2 = null;
+        if (context.TryGetOutput("CaliperFitV2Result", out var rawV2))
+        {
+            v2 = rawV2 as CircleCaliperFitV2Result;
+        }
+
+        var edgePoints = v2?.EdgePoints
+            .Select(static (point, index) => new CaliperScenePoint(point.X, point.Y, point.CaliperIndex, point.AngleDegrees, index))
+            .Where(static point => AreFinite(point.X, point.Y))
+            .ToList() ?? ReadPointOutput(context, "EdgePoints");
+        var inlierPoints = v2?.InlierPoints
+            .Select(static (point, index) => new CaliperScenePoint(point.X, point.Y, point.CaliperIndex, point.AngleDegrees, index))
+            .Where(static point => AreFinite(point.X, point.Y))
+            .ToList() ?? ReadPointOutput(context, "InlierPoints");
+        var outlierPoints = v2?.OutlierPoints
+            .Select(static (point, index) => new CaliperScenePoint(point.X, point.Y, point.CaliperIndex, point.AngleDegrees, index))
+            .Where(static point => AreFinite(point.X, point.Y))
+            .ToList() ?? ReadPointOutput(context, "OutlierPoints");
+
+        ProjectCaliperLines(context, operatorId, searchCenterX, searchCenterY, minRadius, maxRadius, edgePoints);
+        ProjectCaliperPointSet(context, "EdgePoints", "circle-search-candidates", "candidate", operatorId, edgePoints, "#64748b", "rgba(100,116,139,0.55)", 80);
+        ProjectCaliperPointSet(context, "InlierPoints", "circle-search-accepted", "accepted", operatorId, inlierPoints, "#22c55e", "rgba(34,197,94,0.75)", 120);
+        ProjectCaliperPointSet(context, "OutlierPoints", "circle-search-rejected", "rejected", operatorId, outlierPoints, "#ef4444", "rgba(239,68,68,0.72)", 160);
+
+        var success = v2?.Success == true;
+        if (success &&
+            v2!.CenterX.HasValue &&
+            v2.CenterY.HasValue &&
+            v2.Radius.HasValue &&
+            AreFinite(v2.CenterX.Value, v2.CenterY.Value, v2.Radius.Value) &&
+            v2.Radius.Value > 0)
+        {
+            var fit = CreateCaliperCirclePrimitive(
+                $"circle-search-fit:{operatorId}",
+                v2.CenterX.Value,
+                v2.CenterY.Value,
+                v2.Radius.Value,
+                "Fit",
+                "circle-search-fit",
+                220,
+                "#16a34a",
+                "rgba(22,163,74,0.08)",
+                selectable: true);
+            if (context.TryGetOutput("Circle", out var circleValue))
+            {
+                fit = AttachResultPath(fit, context, "Circle", "$", circleValue);
+            }
+
+            context.AddPrimitive(fit);
+        }
+
+        var status = ReadCaliperQualityText(context, v2);
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = $"circle-search-quality:{operatorId}",
+            Kind = "text",
+            Layer = "circle-search-quality",
+            ZOrder = 260,
+            Visible = true,
+            Selectable = false,
+            Label = "Quality",
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                X = Math.Max(0, searchCenterX + 8),
+                Y = Math.Max(0, searchCenterY - Math.Max(maxRadius, 20) - 8),
+                Text = status
+            },
+            Style = new ExecutionVisualSceneStyleV1
+            {
+                Stroke = success ? "#166534" : "#991b1b",
+                FontSize = 13
+            }
+        });
+    }
+
+    private static bool TryResolveCaliperSearchCenter(Operator @operator, SceneProjectionContext context, out double x, out double y)
+    {
+        var mode = ReadParameterString(@operator, "SearchCenterMode", "ImageCenter");
+        if (mode.Equals("ImageCenter", StringComparison.OrdinalIgnoreCase))
+        {
+            if (context.TryResolveSceneImageSize(out var width, out var height) && width > 0 && height > 0)
+            {
+                x = (width - 1) * 0.5;
+                y = (height - 1) * 0.5;
+                return true;
+            }
+
+            x = 0;
+            y = 0;
+            return false;
+        }
+
+        if (mode.Equals("Explicit", StringComparison.OrdinalIgnoreCase) &&
+            TryReadParameterDouble(@operator, "SearchCenterX", out x) &&
+            TryReadParameterDouble(@operator, "SearchCenterY", out y) &&
+            AreFinite(x, y))
+        {
+            return true;
+        }
+
+        x = 0;
+        y = 0;
+        return false;
+    }
+
+    private static void ProjectCaliperLines(
+        SceneProjectionContext context,
+        string operatorId,
+        double centerX,
+        double centerY,
+        double minRadius,
+        double maxRadius,
+        IReadOnlyList<CaliperScenePoint> edgePoints)
+    {
+        if (edgePoints.Count == 0)
+        {
+            return;
+        }
+
+        const int maxCaliperLines = 48;
+        var step = Math.Max(1, (int)Math.Ceiling(edgePoints.Count / (double)maxCaliperLines));
+        if (edgePoints.Count > maxCaliperLines)
+        {
+            context.MarkTruncated();
+            context.AddDiagnostic("visual-scene-circle-calipers-truncated", $"Caliper lines were deterministically downsampled from {edgePoints.Count.ToString(CultureInfo.InvariantCulture)} to {maxCaliperLines.ToString(CultureInfo.InvariantCulture)}.", null);
+        }
+
+        var emitted = 0;
+        for (var index = 0; index < edgePoints.Count && emitted < maxCaliperLines; index += step)
+        {
+            var point = edgePoints[index];
+            if (!double.IsFinite(point.AngleDegrees))
+            {
+                continue;
+            }
+
+            var radians = point.AngleDegrees * Math.PI / 180.0;
+            var dx = Math.Cos(radians);
+            var dy = Math.Sin(radians);
+            var caliperIndex = point.CaliperIndex >= 0 ? point.CaliperIndex : point.Ordinal;
+            context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = $"circle-search-calipers:{operatorId}:{caliperIndex.ToString(CultureInfo.InvariantCulture)}",
+                Kind = "polyline",
+                Layer = "circle-search-calipers",
+                ZOrder = 60 + emitted,
+                Visible = true,
+                Selectable = false,
+                Label = $"Caliper {caliperIndex.ToString(CultureInfo.InvariantCulture)}",
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    Points =
+                    [
+                        new ExecutionVisualScenePointV1 { X = centerX + (minRadius * dx), Y = centerY + (minRadius * dy) },
+                        new ExecutionVisualScenePointV1 { X = centerX + (maxRadius * dx), Y = centerY + (maxRadius * dy) }
+                    ]
+                },
+                Style = new ExecutionVisualSceneStyleV1
+                {
+                    Stroke = "#64748b",
+                    StrokeWidth = 1
+                }
+            });
+            emitted++;
+        }
+    }
+
+    private static void ProjectCaliperPointSet(
+        SceneProjectionContext context,
+        string outputName,
+        string layer,
+        string idSegment,
+        string operatorId,
+        IReadOnlyList<CaliperScenePoint> points,
+        string stroke,
+        string fill,
+        int zOrderBase)
+    {
+        if (points.Count == 0)
+        {
+            return;
+        }
+
+        var maxPoints = Math.Min(points.Count, 80);
+        if (points.Count > maxPoints)
+        {
+            context.MarkTruncated();
+            context.AddDiagnostic($"visual-scene-circle-{idSegment}-truncated", $"{outputName} was deterministically truncated for scene display.", null);
+        }
+
+        context.TryGetOutput(outputName, out var rootValue);
+        for (var index = 0; index < maxPoints; index++)
+        {
+            var point = points[index];
+            var primitive = new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = $"circle-search-{idSegment}:{operatorId}:{point.Ordinal.ToString(CultureInfo.InvariantCulture)}",
+                Kind = "point",
+                Layer = layer,
+                ZOrder = zOrderBase + index,
+                Visible = true,
+                Selectable = true,
+                Label = $"{idSegment} {point.Ordinal.ToString(CultureInfo.InvariantCulture)}",
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    X = point.X,
+                    Y = point.Y,
+                    Radius = idSegment.Equals("rejected", StringComparison.Ordinal) ? 3.5 : 3
+                },
+                Style = new ExecutionVisualSceneStyleV1
+                {
+                    Stroke = stroke,
+                    Fill = fill,
+                    StrokeWidth = 1.5
+                }
+            };
+
+            context.AddPrimitive(rootValue == null
+                ? primitive
+                : AttachResultPath(primitive, context, outputName, $"$[{point.Ordinal.ToString(CultureInfo.InvariantCulture)}]", rootValue));
+        }
+    }
+
+    private static List<CaliperScenePoint> ReadPointOutput(SceneProjectionContext context, string outputName)
+    {
+        if (!context.TryGetOutput(outputName, out var raw) || !TryReadPointList(raw, out var points))
+        {
+            return [];
+        }
+
+        return points.Select((point, index) => new CaliperScenePoint(point.X, point.Y, index, double.NaN, index)).ToList();
+    }
+
+    private static string ReadCaliperQualityText(SceneProjectionContext context, CircleCaliperFitV2Result? result)
+    {
+        if (result != null)
+        {
+            if (result.Success)
+            {
+                return $"OK cov={result.CoverageRatio.ToString("0.###", CultureInfo.InvariantCulture)} rmse={result.ResidualRmse.ToString("0.###", CultureInfo.InvariantCulture)}";
+            }
+
+            return $"{result.FailureCode} cov={result.CoverageRatio.ToString("0.###", CultureInfo.InvariantCulture)} edges={result.CollectedPointCount.ToString(CultureInfo.InvariantCulture)}";
+        }
+
+        var status = context.TryGetOutput("StatusCode", out var statusCode) ? Convert.ToString(statusCode, CultureInfo.InvariantCulture) : "CaliperFitV2";
+        return Clip(status ?? "CaliperFitV2");
+    }
+
+    private static ExecutionVisualScenePrimitiveV1 CreateCaliperCirclePrimitive(
+        string primitiveId,
+        double centerX,
+        double centerY,
+        double radius,
+        string label,
+        string layer,
+        int zOrder,
+        string stroke,
+        string fill,
+        bool selectable) =>
+        new()
+        {
+            PrimitiveId = primitiveId,
+            Kind = "circle",
+            Layer = layer,
+            ZOrder = zOrder,
+            Visible = true,
+            Selectable = selectable,
+            Label = label,
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                CenterX = centerX,
+                CenterY = centerY,
+                Radius = radius
+            },
+            Style = new ExecutionVisualSceneStyleV1
+            {
+                Stroke = stroke,
+                Fill = fill,
+                StrokeWidth = selectable ? 2 : 1.5
+            }
+        };
 
     private static void ProjectNPointCalibration(Operator @operator, SceneProjectionContext context)
     {
@@ -1144,6 +1492,70 @@ public static class ExecutionVisualSceneProjector
         return false;
     }
 
+    private static bool TryReadPointList(object? raw, out List<PointCandidate> points)
+    {
+        points = new List<PointCandidate>();
+        switch (raw)
+        {
+            case IReadOnlyList<Position> positions:
+                for (var index = 0; index < positions.Count; index++)
+                {
+                    if (TryReadPoint(positions[index], out var point))
+                    {
+                        points.Add(point);
+                    }
+                }
+
+                return points.Count > 0;
+            case IReadOnlyList<Point2f> point2fs:
+                for (var index = 0; index < point2fs.Count; index++)
+                {
+                    points.Add(new PointCandidate(point2fs[index].X, point2fs[index].Y));
+                }
+
+                return points.Count > 0;
+            case IReadOnlyList<Point2d> point2ds:
+                for (var index = 0; index < point2ds.Count; index++)
+                {
+                    points.Add(new PointCandidate(point2ds[index].X, point2ds[index].Y));
+                }
+
+                return points.Count > 0;
+            case JsonElement { ValueKind: JsonValueKind.Array } array:
+                foreach (var item in array.EnumerateArray())
+                {
+                    if (points.Count >= MaxPoints)
+                    {
+                        break;
+                    }
+
+                    if (TryReadPoint(item, out var point))
+                    {
+                        points.Add(point);
+                    }
+                }
+
+                return points.Count > 0;
+            case IEnumerable enumerable and not string:
+                foreach (var item in enumerable)
+                {
+                    if (points.Count >= MaxPoints)
+                    {
+                        break;
+                    }
+
+                    if (TryReadPoint(item, out var point))
+                    {
+                        points.Add(point);
+                    }
+                }
+
+                return points.Count > 0;
+            default:
+                return false;
+        }
+    }
+
     private static bool TryReadPoint3D(object? raw, out Point3d point)
     {
         point = default;
@@ -1477,6 +1889,9 @@ public static class ExecutionVisualSceneProjector
     private static bool TryReadParameterDouble(Operator @operator, string name, out double value) =>
         TryReadDouble(ReadParameterValue(@operator, name), out value);
 
+    private static double ReadParameterDouble(Operator @operator, string name, double fallback) =>
+        TryReadParameterDouble(@operator, name, out var value) && double.IsFinite(value) ? value : fallback;
+
     private static bool TryReadDouble(object? raw, out double value)
     {
         switch (raw)
@@ -1676,6 +2091,16 @@ public static class ExecutionVisualSceneProjector
             return false;
         }
 
+        public bool IsFeatureEnabled(string featureFlag, bool defaultValue)
+        {
+            if (_input.FeatureFlags.TryGetValue(featureFlag, out var enabled))
+            {
+                return enabled;
+            }
+
+            return defaultValue;
+        }
+
         public bool TryResolveResultPath(string outputPortName, string resultPath, object? rootValue, out Guid outputPortId, out string canonicalPath)
         {
             outputPortId = Guid.Empty;
@@ -1797,6 +2222,11 @@ public static class ExecutionVisualSceneProjector
                 Message = Clip(message),
                 PrimitiveId = string.IsNullOrWhiteSpace(primitiveId) ? null : ClipPrimitiveId(primitiveId)
             });
+        }
+
+        public void MarkTruncated()
+        {
+            _truncated = true;
         }
 
         public ExecutionVisualSceneV1 Build()
@@ -2084,6 +2514,8 @@ public static class ExecutionVisualSceneProjector
     private readonly record struct PointCandidate(double X, double Y);
 
     private readonly record struct CircleCandidate(double CenterX, double CenterY, double Radius, string Source, int Ordinal);
+
+    private readonly record struct CaliperScenePoint(double X, double Y, int CaliperIndex, double AngleDegrees, int Ordinal);
 
     private readonly record struct PointPairCandidate(PointCandidate ImagePoint);
 }

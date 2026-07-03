@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Reflection;
+using System.Text;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -291,6 +293,43 @@ public sealed class PreviewArtifactStoreTests
         result.Artifacts.Should().BeEmpty();
         result.Diagnostics.Should().Contain(item => item.Contains("PreviewArtifactRejected", StringComparison.Ordinal));
         store.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Materializer_MaterializesPositionPointListsAsBoundedPointSetArtifacts()
+    {
+        using var store = new PreviewArtifactStore();
+        var materializer = new PreviewArtifactMaterializer(store, NullLogger<PreviewArtifactMaterializer>.Instance);
+        var points = Enumerable.Range(0, 80)
+            .Select(index => new Position(10.5 + index, 20.25 + index))
+            .ToList();
+
+        using var result = materializer.MaterializePreview(
+            CreateOwner(),
+            new Dictionary<string, object> { ["EdgePoints"] = points },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            CancellationToken.None);
+        result.Commit();
+
+        var artifact = result.Artifacts.Should().ContainSingle().Subject;
+        artifact.Kind.Should().Be("pointSet");
+        artifact.Role.Should().Be("pointSet");
+        artifact.PathHint.Should().Be("$.\"EdgePoints\"");
+        artifact.ContentType.Should().Be("application/json");
+
+        var value = result.OutputData["EdgePoints"].Should().BeOfType<PreviewArtifactValue>().Subject;
+        value.Kind.Should().Be("pointSet");
+        value.Artifact.Should().BeSameAs(artifact);
+        value.Metadata.Should().Contain("count", "80");
+        value.Metadata.Should().Contain("itemKind", "point");
+
+        store.TryRead(artifact.ArtifactId, out var read).Should().BeTrue();
+        var json = Encoding.UTF8.GetString(read!.Bytes);
+        json.Should().Contain("\"x\":10.5");
+        json.Should().Contain("\"y\":20.25");
+        json.Should().Contain("\"x\":89.5");
+        json.Should().Contain("\"y\":99.25");
     }
 
     [Fact]

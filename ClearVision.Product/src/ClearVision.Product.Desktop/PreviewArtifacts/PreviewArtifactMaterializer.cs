@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text.Json;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -542,7 +543,9 @@ public sealed class PreviewArtifactMaterializer
 
         if (type == typeof(OpenCvSharp.Point) ||
             type == typeof(Point2f) ||
-            type == typeof(Point2d))
+            type == typeof(Point2d) ||
+            type == typeof(Position) ||
+            type == typeof(CircleCaliperFitV2Point))
         {
             kind = "point";
             return true;
@@ -558,6 +561,17 @@ public sealed class PreviewArtifactMaterializer
             OpenCvSharp.Point point => new { x = point.X, y = point.Y },
             Point2f point => new { x = point.X, y = point.Y },
             Point2d point => new { x = point.X, y = point.Y },
+            Position point => new { x = point.X, y = point.Y },
+            CircleCaliperFitV2Point point => new
+            {
+                x = point.X,
+                y = point.Y,
+                caliperIndex = point.CaliperIndex,
+                angleDegrees = point.AngleDegrees,
+                radius = point.Radius,
+                strength = point.Strength,
+                polarity = point.Polarity
+            },
             float number when float.IsFinite(number) => number,
             double number when double.IsFinite(number) => number,
             int number => number,

@@ -38,6 +38,15 @@ export const POLAR_ANNULUS_ARC_PARAM_KEYS = {
     endAngle: 'EndAngle'
 };
 
+export const CIRCLE_SEARCH_V2_PARAM_KEYS = {
+    searchCenterMode: 'SearchCenterMode',
+    centerX: 'SearchCenterX',
+    centerY: 'SearchCenterY',
+    minRadius: 'MinRadius',
+    nominalRadius: 'NominalRadius',
+    maxRadius: 'MaxRadius'
+};
+
 export const POLYGON_PARAM_KEYS = {
     points: 'PolygonPoints'
 };
@@ -477,6 +486,53 @@ export function validateAnnulusGeometry(annulus, bounds = null, options = {}) {
         valid: errors.length === 0,
         errors
     };
+}
+
+export function normalizeCircleSearchV2Geometry(geometry, bounds, options = {}) {
+    const normalizedBounds = bounds ? normalizeBounds(bounds) : null;
+    const minimum = Math.max(1, readNumber(options.minRadius, 1));
+    const centerX = normalizedBounds
+        ? clamp(readNumber(geometry?.centerX ?? geometry?.x, normalizedBounds.width / 2), 0, normalizedBounds.width)
+        : readNumber(geometry?.centerX ?? geometry?.x, 0);
+    const centerY = normalizedBounds
+        ? clamp(readNumber(geometry?.centerY ?? geometry?.y, normalizedBounds.height / 2), 0, normalizedBounds.height)
+        : readNumber(geometry?.centerY ?? geometry?.y, 0);
+    const minRadius = Math.max(minimum, readNumber(geometry?.minRadius ?? geometry?.innerRadius, minimum));
+    const nominalRadius = Math.max(minRadius, readNumber(geometry?.nominalRadius, minRadius));
+    const maxRadius = Math.max(nominalRadius, readNumber(geometry?.maxRadius ?? geometry?.outerRadius ?? geometry?.radius, nominalRadius));
+
+    return {
+        kind: 'circleSearchV2',
+        searchCenterMode: String(geometry?.searchCenterMode || 'Explicit'),
+        centerX: roundCoordinate(centerX),
+        centerY: roundCoordinate(centerY),
+        minRadius: roundCoordinate(minRadius),
+        nominalRadius: roundCoordinate(nominalRadius),
+        maxRadius: roundCoordinate(maxRadius)
+    };
+}
+
+export function validateCircleSearchV2Geometry(geometry, bounds = null, options = {}) {
+    const minimum = Math.max(1, readNumber(options.minRadius, 1));
+    const centerX = Number(geometry?.centerX ?? geometry?.x);
+    const centerY = Number(geometry?.centerY ?? geometry?.y);
+    const minRadius = Number(geometry?.minRadius ?? geometry?.innerRadius);
+    const nominalRadius = Number(geometry?.nominalRadius);
+    const maxRadius = Number(geometry?.maxRadius ?? geometry?.outerRadius ?? geometry?.radius);
+
+    if (![centerX, centerY, minRadius, nominalRadius, maxRadius].every(Number.isFinite)) {
+        return { valid: false, reason: 'Circle Search V2 geometry values must be finite.' };
+    }
+
+    if (minRadius < minimum || minRadius > nominalRadius || nominalRadius > maxRadius) {
+        return { valid: false, reason: 'Circle Search V2 requires MinRadius <= NominalRadius <= MaxRadius.' };
+    }
+
+    if (bounds && !isPointInBounds({ x: centerX, y: centerY }, bounds)) {
+        return { valid: false, reason: 'Circle Search V2 center must stay inside the image bounds.' };
+    }
+
+    return { valid: true };
 }
 
 export function parsePolygonPoints(value) {
@@ -1244,6 +1300,19 @@ export function getAnnulusHandlePoints(annulus) {
     };
 }
 
+export function getCircleSearchV2HandlePoints(geometry) {
+    const center = {
+        x: Number(geometry?.centerX ?? geometry?.x ?? 0),
+        y: Number(geometry?.centerY ?? geometry?.y ?? 0)
+    };
+    return {
+        center,
+        minRadius: pointFromAngleDegrees(center, Number(geometry?.minRadius ?? geometry?.innerRadius ?? 0), 180),
+        nominalRadius: pointFromAngleDegrees(center, Number(geometry?.nominalRadius ?? 0), 0),
+        maxRadius: pointFromAngleDegrees(center, Number(geometry?.maxRadius ?? geometry?.outerRadius ?? geometry?.radius ?? 0), 0)
+    };
+}
+
 export function angleIsWithinClockwiseSpan(angle, startAngle, spanDegrees) {
     const normalizedAngle = normalizeAngleDegrees(angle);
     const normalizedStart = normalizeAngleDegrees(startAngle);
@@ -1292,6 +1361,72 @@ export function hitTestAnnulusHandle(point, annulus, viewport = {}, handleSize =
     return Object.entries(handles).find(([, handlePoint]) =>
         Math.abs(Number(point.x) - handlePoint.x) <= tolerance &&
         Math.abs(Number(point.y) - handlePoint.y) <= tolerance)?.[0] || null;
+}
+
+export function hitTestCircleSearchV2(point, geometry) {
+    if (!isFinitePoint(point)) {
+        return false;
+    }
+
+    const centerX = Number(geometry?.centerX ?? geometry?.x);
+    const centerY = Number(geometry?.centerY ?? geometry?.y);
+    const minRadius = Number(geometry?.minRadius ?? geometry?.innerRadius);
+    const maxRadius = Number(geometry?.maxRadius ?? geometry?.outerRadius ?? geometry?.radius);
+    if (![centerX, centerY, minRadius, maxRadius].every(Number.isFinite) || minRadius < 0 || maxRadius <= minRadius) {
+        return false;
+    }
+
+    const dx = Number(point.x) - centerX;
+    const dy = Number(point.y) - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    return distance >= minRadius && distance <= maxRadius;
+}
+
+export function hitTestCircleSearchV2Handle(point, geometry, viewport = {}, handleSize = 10) {
+    if (!isFinitePoint(point)) {
+        return null;
+    }
+
+    const scale = Math.max(0.0001, Math.abs(Number(viewport?.scale ?? 1) || 1));
+    const tolerance = Math.max(1, Number(handleSize ?? 10)) / scale;
+    const handles = getCircleSearchV2HandlePoints(geometry);
+
+    return Object.entries(handles).find(([, handlePoint]) =>
+        Math.abs(Number(point.x) - handlePoint.x) <= tolerance &&
+        Math.abs(Number(point.y) - handlePoint.y) <= tolerance)?.[0] || null;
+}
+
+export function translateCircleSearchV2(geometry, delta, bounds, options = {}) {
+    return normalizeCircleSearchV2Geometry({
+        ...geometry,
+        centerX: Number(geometry?.centerX ?? geometry?.x ?? 0) + Number(delta?.x ?? 0),
+        centerY: Number(geometry?.centerY ?? geometry?.y ?? 0) + Number(delta?.y ?? 0),
+        searchCenterMode: 'Explicit'
+    }, bounds, options);
+}
+
+export function resizeCircleSearchV2ByHandle(geometry, handle, point, bounds, options = {}) {
+    const center = {
+        x: Number(geometry?.centerX ?? geometry?.x ?? 0),
+        y: Number(geometry?.centerY ?? geometry?.y ?? 0)
+    };
+    const dx = Number(point?.x ?? center.x) - center.x;
+    const dy = Number(point?.y ?? center.y) - center.y;
+    const radius = Math.sqrt(dx * dx + dy * dy);
+    const next = { ...geometry };
+
+    if (handle === 'minRadius') {
+        next.minRadius = Math.min(radius, Number(geometry?.nominalRadius ?? radius));
+    } else if (handle === 'nominalRadius') {
+        next.nominalRadius = clamp(
+            radius,
+            Number(geometry?.minRadius ?? geometry?.innerRadius ?? 1),
+            Number(geometry?.maxRadius ?? geometry?.outerRadius ?? geometry?.radius ?? radius));
+    } else if (handle === 'maxRadius') {
+        next.maxRadius = Math.max(radius, Number(geometry?.nominalRadius ?? radius));
+    }
+
+    return normalizeCircleSearchV2Geometry(next, bounds, options);
 }
 
 export function translateAnnulus(annulus, delta, bounds, options = {}) {

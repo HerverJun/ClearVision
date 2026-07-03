@@ -3,12 +3,15 @@
     deletePointSequencePoint,
     deletePolygonVertex,
     getAnnulusHandlePoints,
+    getCircleSearchV2HandlePoints,
     getCircleHandlePoints,
     getPointSequenceHandlePoints,
     getPolygonHandlePoints,
     getRectHandlePoints,
     hitTestAnnulus,
     hitTestAnnulusHandle,
+    hitTestCircleSearchV2,
+    hitTestCircleSearchV2Handle,
     hitTestCircle,
     hitTestCircleHandle,
     hitTestPointSequencePoint,
@@ -22,18 +25,21 @@
     movePolygonVertex,
     normalizeRectFromPoints,
     normalizeAnnulusGeometry,
+    normalizeCircleSearchV2Geometry,
     normalizeCircleGeometry,
     normalizePointSequenceGeometry,
     normalizePolygonGeometry,
     nudgeRect,
     reorderPointSequencePoint,
     resizeAnnulusByHandle,
+    resizeCircleSearchV2ByHandle,
     resizeCircleByHandle,
     resizeRectByHandle,
     roundRect,
     screenToImagePoint,
     togglePointSequencePointEnabled,
     translateAnnulus,
+    translateCircleSearchV2,
     translateCircle,
     translatePointSequence,
     translatePolygon,
@@ -118,6 +124,7 @@ export function buildOverlayRenderCommands(overlays = []) {
             height: normalizeOverlayNumber(overlay.height),
             radius: normalizeOverlayNumber(overlay.radius, 0),
             innerRadius: normalizeOverlayNumber(overlay.innerRadius, 0),
+            nominalRadius: normalizeOverlayNumber(overlay.nominalRadius, 0),
             outerRadius: normalizeOverlayNumber(overlay.outerRadius ?? overlay.radius, 0),
             startAngle: normalizeOverlayNumber(overlay.startAngle, 0),
             endAngle: normalizeOverlayNumber(overlay.endAngle, 360),
@@ -650,6 +657,24 @@ class ImageCanvas {
             };
         }
 
+        if (kind === 'circleSearchV2') {
+            const search = normalizeCircleSearchV2Geometry(geometry, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+            return {
+                ...search,
+                type: 'circleSearchV2',
+                x: search.centerX,
+                y: search.centerY,
+                width: search.maxRadius * 2,
+                height: search.maxRadius * 2,
+                innerRadius: search.minRadius,
+                nominalRadius: search.nominalRadius,
+                outerRadius: search.maxRadius,
+                radius: search.maxRadius
+            };
+        }
+
         if (kind === 'polygon') {
             const polygon = normalizePolygonGeometry(geometry);
             const bounds = this.getPointsBounds(polygon.points);
@@ -883,6 +908,30 @@ class ImageCanvas {
                 }
                 break;
             }
+
+            case 'circleSearchV2': {
+                const centerX = command.x;
+                const centerY = command.y;
+                const minRadius = Math.max(1, command.innerRadius);
+                const nominalRadius = Math.max(minRadius, command.nominalRadius);
+                const maxRadius = Math.max(nominalRadius, command.outerRadius || command.radius);
+
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                this.ctx.save();
+                this.ctx.setLineDash([5 / this.scale, 4 / this.scale]);
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, minRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, nominalRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.restore();
+                break;
+            }
+
 
             case 'point': {
                 const radius = command.radius > 0 ? command.radius : 4;
@@ -1467,6 +1516,19 @@ class ImageCanvas {
             };
         }
 
+        if (overlay.type === 'circleSearchV2') {
+            return {
+                kind: 'circleSearchV2',
+                searchCenterMode: overlay.searchCenterMode || 'Explicit',
+                centerX: normalizeOverlayNumber(overlay.centerX ?? overlay.x),
+                centerY: normalizeOverlayNumber(overlay.centerY ?? overlay.y),
+                minRadius: Math.max(this.minimumOverlaySize, normalizeOverlayNumber(overlay.minRadius ?? overlay.innerRadius, this.minimumOverlaySize)),
+                nominalRadius: Math.max(this.minimumOverlaySize, normalizeOverlayNumber(overlay.nominalRadius, this.minimumOverlaySize)),
+                maxRadius: Math.max(this.minimumOverlaySize, normalizeOverlayNumber(overlay.maxRadius ?? overlay.outerRadius ?? overlay.radius, this.minimumOverlaySize))
+            };
+        }
+
+
         if (overlay.type === 'polygon') {
             return normalizePolygonGeometry({
                 kind: 'polygon',
@@ -1507,6 +1569,13 @@ class ImageCanvas {
             });
         }
 
+        if (geometry.kind === 'circleSearchV2') {
+            return translateCircleSearchV2(geometry, delta, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+        }
+
+
         if (geometry.kind === 'polygon') {
             return translatePolygon(geometry, delta, this.getImageBounds());
         }
@@ -1535,6 +1604,13 @@ class ImageCanvas {
                 minRadius: this.minimumOverlaySize
             });
         }
+
+        if (geometry.kind === 'circleSearchV2') {
+            return resizeCircleSearchV2ByHandle(geometry, handle, imagePoint, this.getImageBounds(), {
+                minRadius: this.minimumOverlaySize
+            });
+        }
+
 
         if (geometry.kind === 'polygon') {
             const vertexIndex = this.getHandlePointIndex(handle);
@@ -1619,6 +1695,10 @@ class ImageCanvas {
             return getAnnulusHandlePoints(this.readOverlayGeometry(overlay));
         }
 
+        if (overlay.type === 'circleSearchV2') {
+            return getCircleSearchV2HandlePoints(this.readOverlayGeometry(overlay));
+        }
+
         if (overlay.type === 'polygon') {
             return getPolygonHandlePoints(this.readOverlayGeometry(overlay));
         }
@@ -1641,6 +1721,10 @@ class ImageCanvas {
 
         if (overlay.type === 'annulus' || overlay.type === 'arc') {
             return hitTestAnnulusHandle(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
+        }
+
+        if (overlay.type === 'circleSearchV2') {
+            return hitTestCircleSearchV2Handle(imagePoint, this.readOverlayGeometry(overlay), { scale: this.scale, offset: this.offset }, this.handleSize);
         }
 
         if (overlay.type === 'polygon') {
@@ -1669,6 +1753,10 @@ class ImageCanvas {
 
         if (overlay.type === 'annulus' || overlay.type === 'arc') {
             return hitTestAnnulus(imagePoint, this.readOverlayGeometry(overlay));
+        }
+
+        if (overlay.type === 'circleSearchV2') {
+            return hitTestCircleSearchV2(imagePoint, this.readOverlayGeometry(overlay));
         }
 
         if (overlay.type === 'polygon') {
@@ -1720,6 +1808,16 @@ class ImageCanvas {
 
         if (type === 'annulus' || type === 'arc') {
             const radius = normalizeOverlayNumber(command?.outerRadius ?? overlay.outerRadius ?? overlay.radius, 1);
+            return {
+                x: normalizeOverlayNumber(command?.x ?? overlay.x) - radius,
+                y: normalizeOverlayNumber(command?.y ?? overlay.y) - radius,
+                width: radius * 2,
+                height: radius * 2
+            };
+        }
+
+        if (type === 'circleSearchV2') {
+            const radius = normalizeOverlayNumber(command?.outerRadius ?? overlay.outerRadius ?? overlay.maxRadius ?? overlay.radius, 1);
             return {
                 x: normalizeOverlayNumber(command?.x ?? overlay.x) - radius,
                 y: normalizeOverlayNumber(command?.y ?? overlay.y) - radius,
@@ -2006,6 +2104,21 @@ class ImageCanvas {
             ? null
             : this.hitTestResizeHandle(imagePoint, overlay);
 
+        if (overlay && handle === 'center') {
+            const originalGeometry = this.readOverlayGeometry(overlay);
+            this.selectedOverlay = overlay.id;
+            this.activeOverlayId = overlay.id;
+            this.activeHandle = handle;
+            this.interactionState = {
+                type: 'move',
+                overlayId: overlay.id,
+                originalGeometry,
+                dragAnchor: imagePoint
+            };
+            this.invalidate();
+            return;
+        }
+
         if (overlay && handle && handle !== 'center') {
             const originalGeometry = this.readOverlayGeometry(overlay);
             this.selectedOverlay = overlay.id;
@@ -2086,6 +2199,16 @@ class ImageCanvas {
                     innerRadius: 0,
                     outerRadius: this.minimumOverlaySize
                 }
+                : drawKind === 'circleSearchV2'
+                    ? {
+                        kind: 'circleSearchV2',
+                        searchCenterMode: 'Explicit',
+                        centerX: imagePoint.x,
+                        centerY: imagePoint.y,
+                        minRadius: this.minimumOverlaySize,
+                        nominalRadius: this.minimumOverlaySize,
+                        maxRadius: this.minimumOverlaySize
+                    }
                 : {
                     kind: 'rectangle',
                     x: imagePoint.x,
@@ -2131,6 +2254,10 @@ class ImageCanvas {
                 nextGeometry = resizeCircleByHandle(currentGeometry, 'radius', imagePoint, this.getImageBounds(), this.minimumOverlaySize);
             } else if (currentGeometry.kind === 'annulus' || currentGeometry.kind === 'arc') {
                 nextGeometry = resizeAnnulusByHandle(currentGeometry, 'outerRadius', imagePoint, this.getImageBounds(), {
+                    minRadius: this.minimumOverlaySize
+                });
+            } else if (currentGeometry.kind === 'circleSearchV2') {
+                nextGeometry = resizeCircleSearchV2ByHandle(currentGeometry, 'maxRadius', imagePoint, this.getImageBounds(), {
                     minRadius: this.minimumOverlaySize
                 });
             } else {

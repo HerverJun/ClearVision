@@ -89,7 +89,8 @@ public static class ExecutionObservationProjector
             {
                 TargetOperator = input.TargetOperator,
                 OutputData = input.OutputData,
-                OutputPorts = input.OutputPorts
+                OutputPorts = input.OutputPorts,
+                FeatureFlags = input.FeatureFlags
             });
         }
         catch (Exception ex)

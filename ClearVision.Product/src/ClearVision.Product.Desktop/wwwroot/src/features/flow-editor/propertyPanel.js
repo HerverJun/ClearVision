@@ -10,7 +10,10 @@ import PreviewPanel from './previewPanel.js';
 import RoiEditorPanel from './roiEditorPanel.js';
 import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
 import { buildWireSequenceFollowupHint, createWireSequenceParameterPatch } from './wireSequenceAssist.js';
-import { getOperatorRoiConfig } from './roiEditorSupport.mjs';
+import {
+    getOperatorRoiConfig,
+    isCircleSearchV2ToolEnabled
+} from './roiEditorSupport.mjs';
 import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
 import {
     collectEffectiveRequiredParameterErrors,
@@ -69,6 +72,36 @@ function parseNumericValue(rawValue) {
     };
 }
 
+const CIRCLE_MEASUREMENT_HOUGH_PARAMS = new Set(['dp', 'mindist', 'param1', 'param2']);
+const CIRCLE_MEASUREMENT_V2_PARAMS = new Set([
+    'searchcentermode',
+    'searchcenterx',
+    'searchcentery',
+    'nominalradius',
+    'calipercount',
+    'averagingthickness',
+    'profilesamplecount',
+    'gaussiansigma',
+    'edgepolarity',
+    'edgethreshold',
+    'minedgestrength',
+    'minvalidcalipers',
+    'mincoverageratio',
+    'minangularcoveragedegrees',
+    'outliermode',
+    'outlierthreshold',
+    'maxoutlieriterations',
+    'maxresidualrmse'
+]);
+const CIRCLE_MEASUREMENT_GROUPS = [
+    ['检测方法', ['method']],
+    ['搜索几何', ['searchcentermode', 'searchcenterx', 'searchcentery', 'minradius', 'nominalradius', 'maxradius']],
+    ['卡尺采样', ['calipercount', 'averagingthickness', 'profilesamplecount', 'gaussiansigma']],
+    ['边缘', ['edgepolarity', 'edgethreshold', 'minedgestrength']],
+    ['稳健拟合', ['outliermode', 'outlierthreshold', 'maxoutlieriterations']],
+    ['质量门禁', ['minvalidcalipers', 'mincoverageratio', 'minangularcoveragedegrees', 'maxresidualrmse']]
+];
+
 class PropertyPanel {
     constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
@@ -79,11 +112,13 @@ class PropertyPanel {
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
         this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
+        this.circleSearchV2ToolEnabled = options.circleSearchV2ToolEnabled;
         this.pendingRecommendation = null;
         this.recommendedFieldNames = new Set();
         this.cameraBindingsCache = [];
         this.cameraBindingsLoadingPromise = null;
         this.inputImageBase64Load = null;
+        this.circleSearchV2ImageBounds = null;
         this.recommendationSupportedOperators = new Set([
             'Thresholding',
             'Filtering',
@@ -209,10 +244,13 @@ class PropertyPanel {
         const title = this.currentOperator.title || this.currentOperator.displayName || this.currentOperator.type;
         const { type, parameters = [], iconPath, icon } = this.currentOperator;
         const typeDisplay = getOperatorTypeDisplayName(type, { includeType: true });
-        const roiEditorConfig = getOperatorRoiConfig(this.currentOperator);
-        const parametersForRender = type === 'ImageAcquisition'
+        const roiEditorConfig = getOperatorRoiConfig(this.currentOperator, {
+            featureEnabled: this.isCircleSearchV2ToolFeatureEnabled()
+        });
+        const parametersForRenderBase = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
             : parameters;
+        const parametersForRender = this.getParametersForRender(type, parametersForRenderBase);
         const canRecommend = this.canRecommend(type);
         
         const iconHtml = iconPath 
@@ -240,6 +278,7 @@ class PropertyPanel {
             const groupedParams = this.groupParameters(parametersForRender);
             
             html += '<form class="property-form" id="property-form">';
+            html += this.renderCircleMeasurementWorkloadHint(type, parametersForRenderBase);
             
             // 渲染每个分组
             Object.entries(groupedParams).forEach(([groupName, params], index) => {
@@ -466,6 +505,10 @@ class PropertyPanel {
      * 按分组组织参数
      */
     groupParameters(parameters) {
+        if (this.isCircleMeasurementOperator() && this.isCircleSearchV2ToolFeatureEnabled()) {
+            return this.groupCircleMeasurementParameters(parameters);
+        }
+
         const groups = { '基本参数': [] };
         
         parameters.forEach(param => {
@@ -479,6 +522,92 @@ class PropertyPanel {
         // 如果只有基本参数且有多个，保持原样
         // 否则返回所有分组
         return groups;
+    }
+
+    getParametersForRender(type, parameters) {
+        if (String(type || '').trim() !== 'CircleMeasurement') {
+            return parameters;
+        }
+
+        if (!this.isCircleSearchV2ToolFeatureEnabled()) {
+            return parameters;
+        }
+
+        const method = this.getCircleMeasurementMethod(parameters);
+        return parameters.filter(param => {
+            const name = normalizeParameterName(param?.name || param?.Name);
+            if (method === 'caliperfitv2') {
+                return !CIRCLE_MEASUREMENT_HOUGH_PARAMS.has(name);
+            }
+
+            return !CIRCLE_MEASUREMENT_V2_PARAMS.has(name);
+        });
+    }
+
+    isCircleMeasurementOperator() {
+        return String(this.currentOperator?.type || this.currentOperator?.operatorType || '').trim() === 'CircleMeasurement';
+    }
+
+    isCircleSearchV2ToolFeatureEnabled() {
+        return isCircleSearchV2ToolEnabled({ featureEnabled: this.circleSearchV2ToolEnabled });
+    }
+
+    getCircleMeasurementMethod(parameters = this.currentOperator?.parameters || []) {
+        const methodParam = (parameters || []).find(param => normalizeParameterName(param?.name || param?.Name) === 'method');
+        return String(getParameterEffectiveValue(methodParam) || 'HoughCircle').trim().toLowerCase();
+    }
+
+    groupCircleMeasurementParameters(parameters) {
+        const remaining = [...parameters];
+        const groups = {};
+
+        CIRCLE_MEASUREMENT_GROUPS.forEach(([groupName, names]) => {
+            const picked = [];
+            names.forEach(name => {
+                const index = remaining.findIndex(param => normalizeParameterName(param?.name || param?.Name) === name);
+                if (index >= 0) {
+                    picked.push(remaining[index]);
+                    remaining.splice(index, 1);
+                }
+            });
+
+            if (picked.length > 0) {
+                groups[groupName] = picked;
+            }
+        });
+
+        if (remaining.length > 0) {
+            groups['其他参数'] = remaining;
+        }
+
+        return Object.keys(groups).length > 0 ? groups : { '基本参数': parameters };
+    }
+
+    readParameterNumber(parameters, name, fallback = 0) {
+        const param = (parameters || []).find(item => normalizeParameterName(item?.name || item?.Name) === normalizeParameterName(name));
+        const value = Number(getParameterEffectiveValue(param));
+        return Number.isFinite(value) ? value : fallback;
+    }
+
+    renderCircleMeasurementWorkloadHint(type, parameters) {
+        if (String(type || '').trim() !== 'CircleMeasurement' ||
+            !this.isCircleSearchV2ToolFeatureEnabled() ||
+            this.getCircleMeasurementMethod(parameters) !== 'caliperfitv2') {
+            return '';
+        }
+
+        const caliperCount = this.readParameterNumber(parameters, 'CaliperCount', 96);
+        const profileSampleCount = this.readParameterNumber(parameters, 'ProfileSampleCount', 129);
+        const averagingThickness = this.readParameterNumber(parameters, 'AveragingThickness', 5);
+        const workUnits = Math.max(0, Math.round(caliperCount * profileSampleCount * Math.ceil(Math.max(1, averagingThickness))));
+        const nearBudget = workUnits >= 500000;
+
+        return `
+            <div class="circle-search-v2-workload ${nearBudget ? 'warning' : ''}" data-circle-search-v2-workload="true">
+                <span>Sampling work: ${this.escapeHtml(workUnits.toLocaleString())}</span>
+                <span>${nearBudget ? '采样工作量接近预算，后端校验仍为最终权威。' : '采样工作量在常规范围内。'}</span>
+            </div>
+        `;
     }
 
     /**
@@ -641,7 +770,8 @@ class PropertyPanel {
         const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
             ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
             : '';
-        const currentValue = value !== undefined ? value : defaultValue;
+        const readonly = this.isReadonlyCircleMeasurementParameter(name);
+        const currentValue = this.resolveCircleMeasurementDisplayValue(name, value !== undefined ? value : defaultValue);
         let inputHtml = '';
         
         switch (dataType) {
@@ -662,7 +792,8 @@ class PropertyPanel {
                                ${max !== undefined ? `max="${max}"` : ''}
                                step="${stepValue}"
                                class="form-input number-input"
-                               data-type="${dataType}">
+                               data-type="${dataType}"
+                               ${readonly ? 'readonly aria-readonly="true"' : ''}>
                         ${hasRange ? `
                             <input type="range" 
                                    class="param-slider"
@@ -670,6 +801,7 @@ class PropertyPanel {
                                    max="${max}" 
                                    step="${stepValue}"
                                    value="${currentValue}"
+                                   ${readonly ? 'disabled aria-disabled="true"' : ''}
                                    oninput="document.getElementById('param-${name}').value = this.value; document.getElementById('param-${name}').dispatchEvent(new Event('change'));">
                         ` : ''}
                     </div>
@@ -699,16 +831,80 @@ class PropertyPanel {
         }
         
         return `
-            <div class="form-group param-enhanced ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
+            <div class="form-group param-enhanced ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''} ${readonly ? 'is-readonly' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
                 ${this.renderGlobalVariableBindingControl(param)}
                 ${inputHtml}
                 ${description ? `<p class="form-description">${description}</p>` : ''}
+                ${readonly ? '<p class="form-description">ImageCenter 模式下由当前预览图像中心提供。</p>' : ''}
                 ${disabledHint}
             </div>
         `;
+    }
+
+    isReadonlyCircleMeasurementParameter(name) {
+        if (!this.isCircleMeasurementOperator() || !this.isCircleSearchV2ToolFeatureEnabled()) {
+            return false;
+        }
+
+        const normalized = normalizeParameterName(name);
+        if (normalized !== 'searchcenterx' && normalized !== 'searchcentery') {
+            return false;
+        }
+
+        const modeParam = this.getParameterByName('SearchCenterMode');
+        const mode = String(getParameterEffectiveValue(modeParam) || 'ImageCenter').trim().toLowerCase();
+        return mode === 'imagecenter';
+    }
+
+    resolveCircleMeasurementDisplayValue(name, fallbackValue) {
+        if (!this.isReadonlyCircleMeasurementParameter(name)) {
+            return fallbackValue;
+        }
+
+        const bounds = this.circleSearchV2ImageBounds;
+        const normalized = normalizeParameterName(name);
+        const size = normalized === 'searchcenterx'
+            ? Number(bounds?.width)
+            : Number(bounds?.height);
+        if (!Number.isFinite(size) || size <= 0) {
+            return fallbackValue;
+        }
+
+        return Math.round(((size - 1) * 0.5) * 1000) / 1000;
+    }
+
+    handleRoiImageBoundsChanged(bounds) {
+        this.circleSearchV2ImageBounds = bounds &&
+            Number.isFinite(Number(bounds.width)) &&
+            Number.isFinite(Number(bounds.height)) &&
+            Number(bounds.width) > 0 &&
+            Number(bounds.height) > 0
+            ? { width: Number(bounds.width), height: Number(bounds.height) }
+            : null;
+        this.updateCircleSearchV2CenterInputsFromImageBounds();
+    }
+
+    updateCircleSearchV2CenterInputsFromImageBounds() {
+        if (!this.isCircleMeasurementOperator() || !this.isCircleSearchV2ToolFeatureEnabled()) {
+            return;
+        }
+
+        ['SearchCenterX', 'SearchCenterY'].forEach(name => {
+            const input = this.findParamInput(name);
+            if (!input || !this.isReadonlyCircleMeasurementParameter(name)) {
+                return;
+            }
+
+            const displayValue = this.resolveCircleMeasurementDisplayValue(name, input.value);
+            input.value = displayValue ?? '';
+            const range = input.parentElement?.querySelector(`input[type="range"][value]`);
+            if (range && !range.disabled) {
+                range.value = input.value;
+            }
+        });
     }
 
     applyGlobalVariableInputState() {
@@ -855,6 +1051,12 @@ class PropertyPanel {
                     return;
                 }
 
+                if (this.shouldRerenderForCircleMeasurementParameter(input.name)) {
+                    this._notifyValueChanged({ schedulePreview: false, syncRoiEditor: false });
+                    this.render();
+                    return;
+                }
+
                 this._notifyValueChanged();
             });
         });
@@ -878,6 +1080,15 @@ class PropertyPanel {
         this.syncImageAcquisitionSourceControls();
         this.applyGlobalVariableInputState();
         this.loadCameraBindingsForSelects(true);
+    }
+
+    shouldRerenderForCircleMeasurementParameter(name) {
+        if (!this.isCircleMeasurementOperator() || !this.isCircleSearchV2ToolFeatureEnabled()) {
+            return false;
+        }
+
+        const normalized = normalizeParameterName(name);
+        return normalized === 'method' || normalized === 'searchcentermode';
     }
 
     async loadCameraBindingsForSelects(forceRefresh = false) {
@@ -1100,6 +1311,11 @@ class PropertyPanel {
         inputs.forEach(input => {
             const name = input.name;
             if (!name || input.type === 'range') {
+                return;
+            }
+
+            if (this.isReadonlyCircleMeasurementParameter(name)) {
+                values[name] = getParameterEffectiveValue(this.getParameterByName(name));
                 return;
             }
 
@@ -1492,9 +1708,12 @@ class PropertyPanel {
 
         this.roiEditorPanel = new RoiEditorPanel(container, {
             getOperator: () => this.currentOperator,
-            getRoiConfig: operator => getOperatorRoiConfig(operator),
+            getRoiConfig: operator => getOperatorRoiConfig(operator, {
+                featureEnabled: this.isCircleSearchV2ToolFeatureEnabled()
+            }),
             previewCoordinator: this.previewCoordinator,
             onRectChanged: (values, phase) => this.handleRoiRectChanged(values, phase),
+            onImageBoundsChanged: bounds => this.handleRoiImageBoundsChanged(bounds),
             onRequestSyncFromParams: () => this.syncRoiEditorFromParams()
         });
     }
