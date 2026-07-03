@@ -41,12 +41,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("CalibrationUnit", "Calibration Unit", "string", DefaultValue = "mm")]
 public class NPointCalibrationOperator : OperatorBase
 {
-    private const double MinPointDistance = 1e-6;
     private const double DefaultRansacReprojectionThreshold = 3.0;
     private const int DefaultRansacMaxIterations = 3000;
     private const double DefaultRansacConfidence = 0.995;
     private const double DefaultMaxAcceptedReprojectionError = 3.0;
     private const double DefaultMinInlierRatio = 0.5;
+    private readonly NPointCalibrationSolver _solver = new();
 
     public override OperatorType OperatorType => OperatorType.NPointCalibration;
 
@@ -67,34 +67,25 @@ public class NPointCalibrationOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("PointPairs is required and must be valid JSON or list data."));
         }
 
-        var isPerspective = mode.Equals("Perspective", StringComparison.OrdinalIgnoreCase);
-        var requiredCount = isPerspective ? 4 : 3;
+        if (!TryResolveMode(mode, out var calibrationMode))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("CalibrationMode must be Affine or Perspective."));
+        }
+
+        var requiredCount = GetRequiredPointCount(calibrationMode);
         if (pointPairs.Count < requiredCount)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure($"{mode} mode requires at least {requiredCount} point pairs."));
         }
 
-        var srcPoints = pointPairs.Select(p => new Point2d(p.ImagePoint.X, p.ImagePoint.Y)).ToArray();
-        var dstPoints = pointPairs.Select(p => new Point2d(p.WorldPoint.X, p.WorldPoint.Y)).ToArray();
-
-        if (!TryValidatePointSet(srcPoints, requiredCount, "ImagePoint", out var sourceValidationError))
+        var options = ResolveCalibrationOptions(@operator, requiredCount);
+        var result = _solver.Solve(new NPointCalibrationRequest(calibrationMode, pointPairs, options));
+        if (!result.Success)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure(sourceValidationError ?? "ImagePoint set is invalid."));
+            return Task.FromResult(OperatorExecutionOutput.Failure(result.ErrorMessage));
         }
 
-        if (!TryValidatePointSet(dstPoints, requiredCount, "WorldPoint", out var targetValidationError))
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure(targetValidationError ?? "WorldPoint set is invalid."));
-        }
-
-        if (isPerspective)
-        {
-            var config = ResolveCalibrationConfig(@operator, requiredCount);
-            return Task.FromResult(ExecutePerspectiveCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints, config));
-        }
-
-        var affineConfig = ResolveCalibrationConfig(@operator, requiredCount);
-        return Task.FromResult(ExecuteAffineCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints, affineConfig));
+        return Task.FromResult(BuildSuccessOutput(@operator, inputs, pointPairs, result, options));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -107,7 +98,7 @@ public class NPointCalibrationOperator : OperatorBase
         }
 
         var pointPairsRaw = ResolvePointPairsRaw(@operator, null);
-        if (string.IsNullOrWhiteSpace(pointPairsRaw))
+        if (IsPointPairsRawEmpty(pointPairsRaw))
         {
             return ValidationResult.Valid();
         }
@@ -117,13 +108,30 @@ public class NPointCalibrationOperator : OperatorBase
             return ValidationResult.Invalid("PointPairs is not valid JSON/list format.");
         }
 
-        var requiredCount = mode.Equals("Perspective", StringComparison.OrdinalIgnoreCase) ? 4 : 3;
+        if (!TryResolveMode(mode, out var calibrationMode))
+        {
+            return ValidationResult.Invalid("CalibrationMode must be Affine or Perspective.");
+        }
+
+        var requiredCount = GetRequiredPointCount(calibrationMode);
         if (pointPairs.Count < requiredCount)
         {
             return ValidationResult.Invalid($"{mode} mode requires at least {requiredCount} point pairs.");
         }
 
-        var config = ResolveCalibrationConfig(@operator, requiredCount);
+        var srcPoints = pointPairs.Select(p => new Point2d(p.ImagePoint.X, p.ImagePoint.Y)).ToArray();
+        if (!NPointCalibrationSolver.TryValidatePointSet(srcPoints, requiredCount, "ImagePoint", out var sourceValidationError))
+        {
+            return ValidationResult.Invalid(sourceValidationError ?? "ImagePoint set is invalid.");
+        }
+
+        var dstPoints = pointPairs.Select(p => new Point2d(p.WorldPoint.X, p.WorldPoint.Y)).ToArray();
+        if (!NPointCalibrationSolver.TryValidatePointSet(dstPoints, requiredCount, "WorldPoint", out var targetValidationError))
+        {
+            return ValidationResult.Invalid(targetValidationError ?? "WorldPoint set is invalid.");
+        }
+
+        var config = ResolveCalibrationOptions(@operator, requiredCount);
         if (config.RansacReprojectionThreshold <= 0 || !double.IsFinite(config.RansacReprojectionThreshold))
         {
             return ValidationResult.Invalid("RansacReprojectionThreshold must be a positive finite number.");
@@ -157,200 +165,15 @@ public class NPointCalibrationOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private OperatorExecutionOutput ExecuteAffineCalibration(
-        Operator @operator,
-        Dictionary<string, object>? inputs,
-        IReadOnlyList<PointPair> pointPairs,
-        IReadOnlyList<Point2d> srcPoints,
-        IReadOnlyList<Point2d> dstPoints,
-        NPointCalibrationConfig config)
-    {
-        using var srcMat = InputArray.Create(srcPoints.ToArray());
-        using var dstMat = InputArray.Create(dstPoints.ToArray());
-        using var inlierMask = new Mat();
-        using var affineMatrix = Cv2.EstimateAffine2D(
-            srcMat,
-            dstMat,
-            inlierMask,
-            RobustEstimationAlgorithms.RANSAC,
-            config.RansacReprojectionThreshold,
-            (ulong)config.RansacMaxIterations,
-            config.RansacConfidence,
-            20);
-
-        if (affineMatrix is null || affineMatrix.Empty() || affineMatrix.Rows != 2 || affineMatrix.Cols != 3)
-        {
-            return OperatorExecutionOutput.Failure("Failed to estimate a valid affine transform.");
-        }
-
-        var transform = ToMatrixArray(affineMatrix, 2, 3);
-        if (!CalibrationBundleV2Helpers.IsFiniteMatrix(transform))
-        {
-            return OperatorExecutionOutput.Failure("Estimated affine transform contains invalid values.");
-        }
-
-        if (!TryGetInlierFlags(inlierMask, pointPairs.Count, out var inlierFlags))
-        {
-            return OperatorExecutionOutput.Failure("Failed to parse affine inlier mask.");
-        }
-
-        var errorStats = CalculateAffineReprojectionErrors(pointPairs, transform, inlierFlags);
-        if (errorStats.InlierCount < 3)
-        {
-            return OperatorExecutionOutput.Failure("Affine estimation failed because inliers are insufficient.");
-        }
-
-        var pixelSizeX = Math.Sqrt(transform[0][0] * transform[0][0] + transform[1][0] * transform[1][0]);
-        var pixelSizeY = Math.Sqrt(transform[0][1] * transform[0][1] + transform[1][1] * transform[1][1]);
-        double? pixelSize = null;
-        if (pixelSizeX > 0 && pixelSizeY > 0)
-        {
-            var anisotropy = Math.Abs(pixelSizeX - pixelSizeY) / Math.Max(pixelSizeX, pixelSizeY);
-            if (anisotropy <= 0.02)
-            {
-                pixelSize = (pixelSizeX + pixelSizeY) * 0.5;
-            }
-        }
-
-        var accepted = errorStats.InlierMaxError <= config.MaxAcceptedReprojectionError &&
-                       errorStats.InlierCount >= config.MinInlierCount &&
-                       errorStats.InlierRatio >= config.MinInlierRatio;
-
-        var diagnostics = new List<string>
-        {
-            "Affine transform estimated with all points via RANSAC.",
-            $"RansacReprojectionThreshold={config.RansacReprojectionThreshold:F6} {config.CalibrationUnit}",
-            $"RansacMaxIterations={config.RansacMaxIterations}",
-            $"RansacConfidence={config.RansacConfidence:F6}",
-            $"MaxAcceptedReprojectionError={config.MaxAcceptedReprojectionError:F6} {config.CalibrationUnit}",
-            $"MinInlierCount={config.MinInlierCount}",
-            $"MinInlierRatio={config.MinInlierRatio:F3}",
-            $"InlierMeanReprojectionError={errorStats.InlierMeanError:F6} {config.CalibrationUnit}",
-            $"InlierMaxReprojectionError={errorStats.InlierMaxError:F6} {config.CalibrationUnit}",
-            $"AllSampleMeanReprojectionError={errorStats.AllSampleMeanError:F6} {config.CalibrationUnit}",
-            $"AllSampleMaxReprojectionError={errorStats.AllSampleMaxError:F6} {config.CalibrationUnit}",
-            $"InlierRatio={errorStats.InlierRatio:F3}",
-            $"InlierCount={errorStats.InlierCount}/{pointPairs.Count}"
-        };
-        if (!accepted)
-        {
-            diagnostics.Add($"Acceptance failed: inlier max error {errorStats.InlierMaxError:F4} {config.CalibrationUnit}, inliers {errorStats.InlierCount}, ratio {errorStats.InlierRatio:F3}.");
-        }
-
-        var bundle = CreateBundle(
-            TransformModelV2.Affine,
-            transform,
-            pixelSizeX,
-            pixelSizeY,
-            accepted,
-            diagnostics,
-            errorStats,
-            pointPairs.Count,
-            config.CalibrationUnit);
-
-        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize, pixelSizeX, pixelSizeY, errorStats, config);
-    }
-
-    private OperatorExecutionOutput ExecutePerspectiveCalibration(
-        Operator @operator,
-        Dictionary<string, object>? inputs,
-        IReadOnlyList<PointPair> pointPairs,
-        IReadOnlyList<Point2d> srcPoints,
-        IReadOnlyList<Point2d> dstPoints,
-        NPointCalibrationConfig config)
-    {
-        using var srcMat = InputArray.Create(srcPoints);
-        using var dstMat = InputArray.Create(dstPoints);
-        using var inlierMask = new Mat();
-        using var homography = Cv2.FindHomography(
-            srcMat,
-            dstMat,
-            HomographyMethods.Ransac,
-            config.RansacReprojectionThreshold,
-            inlierMask,
-            config.RansacMaxIterations,
-            config.RansacConfidence);
-
-        if (homography is null || homography.Empty() || homography.Rows != 3 || homography.Cols != 3)
-        {
-            return OperatorExecutionOutput.Failure("Failed to estimate a valid homography.");
-        }
-
-        var transform = ToMatrixArray(homography, 3, 3);
-        if (!CalibrationBundleV2Helpers.IsFiniteMatrix(transform))
-        {
-            return OperatorExecutionOutput.Failure("Estimated homography contains invalid values.");
-        }
-
-        var det = Cv2.Determinant(homography);
-        if (!double.IsFinite(det) || Math.Abs(det) <= 1e-12)
-        {
-            return OperatorExecutionOutput.Failure("Estimated homography is singular.");
-        }
-
-        if (!TryGetInlierFlags(inlierMask, pointPairs.Count, out var inlierFlags))
-        {
-            return OperatorExecutionOutput.Failure("Failed to parse homography inlier mask.");
-        }
-
-        var errorStats = CalculateHomographyReprojectionErrors(pointPairs, transform, inlierFlags);
-        if (errorStats.InlierCount < 4)
-        {
-            return OperatorExecutionOutput.Failure("Homography estimation failed because inliers are insufficient.");
-        }
-
-        var accepted = errorStats.InlierMaxError <= config.MaxAcceptedReprojectionError &&
-                       errorStats.InlierCount >= config.MinInlierCount &&
-                       errorStats.InlierRatio >= config.MinInlierRatio;
-
-        var diagnostics = new List<string>
-        {
-            "Perspective transform estimated with all points via FindHomography(RANSAC).",
-            $"RansacReprojectionThreshold={config.RansacReprojectionThreshold:F6} {config.CalibrationUnit}",
-            $"RansacMaxIterations={config.RansacMaxIterations}",
-            $"RansacConfidence={config.RansacConfidence:F6}",
-            $"MaxAcceptedReprojectionError={config.MaxAcceptedReprojectionError:F6} {config.CalibrationUnit}",
-            $"MinInlierCount={config.MinInlierCount}",
-            $"MinInlierRatio={config.MinInlierRatio:F3}",
-            $"InlierMeanReprojectionError={errorStats.InlierMeanError:F6} {config.CalibrationUnit}",
-            $"InlierMaxReprojectionError={errorStats.InlierMaxError:F6} {config.CalibrationUnit}",
-            $"AllSampleMeanReprojectionError={errorStats.AllSampleMeanError:F6} {config.CalibrationUnit}",
-            $"AllSampleMaxReprojectionError={errorStats.AllSampleMaxError:F6} {config.CalibrationUnit}",
-            $"InlierRatio={errorStats.InlierRatio:F3}",
-            $"InlierCount={errorStats.InlierCount}/{pointPairs.Count}",
-            "PixelSize is intentionally not reported for homography model."
-        };
-        if (!accepted)
-        {
-            diagnostics.Add($"Acceptance failed: inlier max error {errorStats.InlierMaxError:F4} {config.CalibrationUnit}, inliers {errorStats.InlierCount}, ratio {errorStats.InlierRatio:F3}.");
-        }
-
-        var bundle = CreateBundle(
-            TransformModelV2.Homography,
-            transform,
-            pixelSizeX: null,
-            pixelSizeY: null,
-            accepted,
-            diagnostics,
-            errorStats,
-            pointPairs.Count,
-            config.CalibrationUnit);
-
-        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize: null, pixelSizeX: null, pixelSizeY: null, errorStats, config);
-    }
-
     private OperatorExecutionOutput BuildSuccessOutput(
         Operator @operator,
         Dictionary<string, object>? inputs,
-        IReadOnlyList<PointPair> pointPairs,
-        CalibrationBundleV2 bundle,
-        double[][] transform,
-        double? pixelSize,
-        double? pixelSizeX,
-        double? pixelSizeY,
-        ReprojectionErrorStats errorStats,
-        NPointCalibrationConfig config)
+        IReadOnlyList<NPointCalibrationPointPair> pointPairs,
+        NPointCalibrationResult result,
+        NPointCalibrationOptions options)
     {
+        var bundle = result.Bundle;
+        var errorStats = result.ErrorStats;
         var calibrationJson = CalibrationBundleV2Json.Serialize(bundle);
         var savePath = GetStringParam(@operator, "SavePath", string.Empty);
         if (!string.IsNullOrWhiteSpace(savePath))
@@ -374,14 +197,14 @@ public class NPointCalibrationOperator : OperatorBase
             ["TotalSampleCount"] = pointPairs.Count,
             ["InlierRatio"] = errorStats.InlierRatio,
             ["Accepted"] = bundle.Quality.Accepted,
-            ["RansacReprojectionThreshold"] = config.RansacReprojectionThreshold,
-            ["RansacMaxIterations"] = config.RansacMaxIterations,
-            ["RansacConfidence"] = config.RansacConfidence,
-            ["MaxAcceptedReprojectionError"] = config.MaxAcceptedReprojectionError,
-            ["MinInlierCount"] = config.MinInlierCount,
-            ["MinInlierRatio"] = config.MinInlierRatio,
-            ["ReprojectionErrorUnit"] = config.CalibrationUnit,
-            ["CalibrationUnit"] = config.CalibrationUnit
+            ["RansacReprojectionThreshold"] = options.RansacReprojectionThreshold,
+            ["RansacMaxIterations"] = options.RansacMaxIterations,
+            ["RansacConfidence"] = options.RansacConfidence,
+            ["MaxAcceptedReprojectionError"] = options.MaxAcceptedReprojectionError,
+            ["MinInlierCount"] = options.MinInlierCount,
+            ["MinInlierRatio"] = options.MinInlierRatio,
+            ["ReprojectionErrorUnit"] = options.CalibrationUnit,
+            ["CalibrationUnit"] = options.CalibrationUnit
         };
 
 
@@ -399,61 +222,45 @@ public class NPointCalibrationOperator : OperatorBase
         return OperatorExecutionOutput.Success(resultData);
     }
 
-    private static CalibrationBundleV2 CreateBundle(
-        TransformModelV2 model,
-        double[][] transformMatrix,
-        double? pixelSizeX,
-        double? pixelSizeY,
-        bool accepted,
-        IReadOnlyList<string> diagnostics,
-        ReprojectionErrorStats errorStats,
-        int sampleCount,
-        string calibrationUnit)
-    {
-        return new CalibrationBundleV2
-        {
-            SchemaVersion = 2,
-            CalibrationKind = CalibrationKindV2.PlanarTransform2D,
-            TransformModel = model,
-            SourceFrame = "image",
-            TargetFrame = "world",
-            Unit = calibrationUnit,
-            Transform2D = new CalibrationTransform2DV2
-            {
-                Model = model,
-                Matrix = transformMatrix,
-                PixelSizeX = pixelSizeX,
-                PixelSizeY = pixelSizeY
-            },
-            Quality = new CalibrationQualityV2
-            {
-                Accepted = accepted,
-                MeanError = errorStats.MeanError,
-                MaxError = errorStats.MaxError,
-                InlierCount = errorStats.InlierCount,
-                TotalSampleCount = sampleCount,
-                Diagnostics = diagnostics.ToList()
-            },
-            GeneratedAtUtc = DateTime.UtcNow,
-            ProducerOperator = nameof(NPointCalibrationOperator)
-        };
-    }
-
-    private NPointCalibrationConfig ResolveCalibrationConfig(Operator @operator, int requiredPointCount)
+    private NPointCalibrationOptions ResolveCalibrationOptions(Operator @operator, int requiredPointCount)
     {
         var configuredMinInlierCount = GetIntParam(@operator, "MinInlierCount", 0, 0, 1000000);
         var minInlierCount = configuredMinInlierCount <= 0
             ? requiredPointCount
             : configuredMinInlierCount;
 
-        return new NPointCalibrationConfig(
+        return new NPointCalibrationOptions(
             GetDoubleParam(@operator, "RansacReprojectionThreshold", DefaultRansacReprojectionThreshold, 0.000001, 100000.0),
             GetIntParam(@operator, "RansacMaxIterations", DefaultRansacMaxIterations, 1, 100000),
             GetDoubleParam(@operator, "RansacConfidence", DefaultRansacConfidence, 0.001, 0.999999),
             GetDoubleParam(@operator, "MaxAcceptedReprojectionError", DefaultMaxAcceptedReprojectionError, 0.0, 100000.0),
             minInlierCount,
             GetDoubleParam(@operator, "MinInlierRatio", DefaultMinInlierRatio, 0.0, 1.0),
-            NormalizeCalibrationUnit(GetStringParam(@operator, "CalibrationUnit", "mm")));
+            NormalizeCalibrationUnit(GetStringParam(@operator, "CalibrationUnit", "mm")),
+            nameof(NPointCalibrationOperator));
+    }
+
+    private static bool TryResolveMode(string mode, out NPointCalibrationMode calibrationMode)
+    {
+        if (mode.Equals("Perspective", StringComparison.OrdinalIgnoreCase))
+        {
+            calibrationMode = NPointCalibrationMode.Perspective;
+            return true;
+        }
+
+        if (mode.Equals("Affine", StringComparison.OrdinalIgnoreCase))
+        {
+            calibrationMode = NPointCalibrationMode.Affine;
+            return true;
+        }
+
+        calibrationMode = NPointCalibrationMode.Affine;
+        return false;
+    }
+
+    private static int GetRequiredPointCount(NPointCalibrationMode mode)
+    {
+        return mode == NPointCalibrationMode.Perspective ? 4 : 3;
     }
 
     private static string NormalizeCalibrationUnit(string rawUnit)
@@ -481,203 +288,26 @@ public class NPointCalibrationOperator : OperatorBase
         }
     }
 
-    private static bool TryValidatePointSet(
-        IReadOnlyList<Point2d> points,
-        int requiredCount,
-        string pointName,
-        out string? error)
-    {
-        error = null;
-        if (points.Count < requiredCount)
-        {
-            error = $"{pointName} requires at least {requiredCount} points.";
-            return false;
-        }
-
-        for (var i = 0; i < points.Count; i++)
-        {
-            if (!double.IsFinite(points[i].X) || !double.IsFinite(points[i].Y))
-            {
-                error = $"{pointName} contains non-finite values.";
-                return false;
-            }
-        }
-
-        for (var i = 0; i < points.Count; i++)
-        {
-            for (var j = i + 1; j < points.Count; j++)
-            {
-                var dx = points[i].X - points[j].X;
-                var dy = points[i].Y - points[j].Y;
-                if (dx * dx + dy * dy <= MinPointDistance * MinPointDistance)
-                {
-                    error = $"{pointName} contains duplicate or near-duplicate points.";
-                    return false;
-                }
-            }
-        }
-
-        var maxTriangleArea = GetMaxTriangleArea(points);
-        var minX = points.Min(p => p.X);
-        var maxX = points.Max(p => p.X);
-        var minY = points.Min(p => p.Y);
-        var maxY = points.Max(p => p.Y);
-        var scale = Math.Max(maxX - minX, maxY - minY);
-        var minArea = Math.Max(1e-8, scale * scale * 1e-4);
-        if (maxTriangleArea < minArea)
-        {
-            error = $"{pointName} is geometrically degenerate (nearly collinear).";
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryGetInlierFlags(Mat inlierMask, int pointCount, out bool[] inlierFlags)
-    {
-        inlierFlags = Enumerable.Repeat(true, pointCount).ToArray();
-        if (inlierMask.Empty())
-        {
-            return true;
-        }
-
-        try
-        {
-            if (inlierMask.Rows == pointCount && inlierMask.Cols >= 1)
-            {
-                for (var i = 0; i < pointCount; i++)
-                {
-                    inlierFlags[i] = inlierMask.At<byte>(i, 0) != 0;
-                }
-
-                return true;
-            }
-
-            if (inlierMask.Cols == pointCount && inlierMask.Rows >= 1)
-            {
-                for (var i = 0; i < pointCount; i++)
-                {
-                    inlierFlags[i] = inlierMask.At<byte>(0, i) != 0;
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static ReprojectionErrorStats CalculateAffineReprojectionErrors(
-        IReadOnlyList<PointPair> pairs,
-        IReadOnlyList<double[]> matrix,
-        IReadOnlyList<bool> inliers)
-    {
-        var allErrors = new List<double>(pairs.Count);
-        var inlierErrors = new List<double>(pairs.Count);
-        var inlierCount = 0;
-
-        for (var i = 0; i < pairs.Count; i++)
-        {
-            var x = pairs[i].ImagePoint.X;
-            var y = pairs[i].ImagePoint.Y;
-            var px = matrix[0][0] * x + matrix[0][1] * y + matrix[0][2];
-            var py = matrix[1][0] * x + matrix[1][1] * y + matrix[1][2];
-            var dx = px - pairs[i].WorldPoint.X;
-            var dy = py - pairs[i].WorldPoint.Y;
-            var error = Math.Sqrt(dx * dx + dy * dy);
-            allErrors.Add(error);
-
-            if (inliers[i])
-            {
-                inlierCount++;
-                inlierErrors.Add(error);
-            }
-        }
-
-        return CreateReprojectionErrorStats(allErrors, inlierErrors, inlierCount, pairs.Count);
-    }
-
-    private static ReprojectionErrorStats CalculateHomographyReprojectionErrors(
-        IReadOnlyList<PointPair> pairs,
-        IReadOnlyList<double[]> matrix,
-        IReadOnlyList<bool> inliers)
-    {
-        var allErrors = new List<double>(pairs.Count);
-        var inlierErrors = new List<double>(pairs.Count);
-        var inlierCount = 0;
-
-        for (var i = 0; i < pairs.Count; i++)
-        {
-            var x = pairs[i].ImagePoint.X;
-            var y = pairs[i].ImagePoint.Y;
-
-            var w = matrix[2][0] * x + matrix[2][1] * y + matrix[2][2];
-            if (Math.Abs(w) <= 1e-12)
-            {
-                var invalidError = double.MaxValue / 4;
-                allErrors.Add(invalidError);
-                if (inliers[i])
-                {
-                    inlierCount++;
-                    inlierErrors.Add(invalidError);
-                }
-
-                continue;
-            }
-
-            var px = (matrix[0][0] * x + matrix[0][1] * y + matrix[0][2]) / w;
-            var py = (matrix[1][0] * x + matrix[1][1] * y + matrix[1][2]) / w;
-            var dx = px - pairs[i].WorldPoint.X;
-            var dy = py - pairs[i].WorldPoint.Y;
-            var error = Math.Sqrt(dx * dx + dy * dy);
-            allErrors.Add(error);
-
-            if (inliers[i])
-            {
-                inlierCount++;
-                inlierErrors.Add(error);
-            }
-        }
-
-        return CreateReprojectionErrorStats(allErrors, inlierErrors, inlierCount, pairs.Count);
-    }
-
-    private static ReprojectionErrorStats CreateReprojectionErrorStats(
-        IReadOnlyList<double> allErrors,
-        IReadOnlyList<double> inlierErrors,
-        int inlierCount,
-        int sampleCount)
-    {
-        var selected = inlierErrors.Count > 0 ? inlierErrors : allErrors;
-        return new ReprojectionErrorStats(
-            selected.Average(),
-            selected.Max(),
-            allErrors.Average(),
-            allErrors.Max(),
-            inlierCount,
-            sampleCount == 0 ? 0 : inlierCount / (double)sampleCount);
-    }
-
-    private static string ResolvePointPairsRaw(Operator @operator, Dictionary<string, object>? inputs)
+    private static object? ResolvePointPairsRaw(Operator @operator, Dictionary<string, object>? inputs)
     {
         if (inputs != null && inputs.TryGetValue("PointPairs", out var pairObj) && pairObj != null)
         {
-            return pairObj.ToString() ?? string.Empty;
+            return pairObj;
         }
 
         return @operator.Parameters.FirstOrDefault(p =>
                    p.Name.Equals("PointPairs", StringComparison.OrdinalIgnoreCase))
-               ?.Value?.ToString()
-               ?? string.Empty;
+               ?.Value;
     }
 
-    private static bool TryParsePointPairs(object? raw, out List<PointPair> pointPairs)
+    private static bool IsPointPairsRawEmpty(object? raw)
     {
-        pointPairs = new List<PointPair>();
+        return raw == null || raw is string text && string.IsNullOrWhiteSpace(text);
+    }
+
+    private static bool TryParsePointPairs(object? raw, out List<NPointCalibrationPointPair> pointPairs)
+    {
+        pointPairs = new List<NPointCalibrationPointPair>();
         if (raw == null)
         {
             return false;
@@ -730,7 +360,7 @@ public class NPointCalibrationOperator : OperatorBase
         return false;
     }
 
-    private static bool TryParsePointPair(object? raw, out PointPair pair)
+    private static bool TryParsePointPair(object? raw, out NPointCalibrationPointPair pair)
     {
         pair = default;
         if (raw == null)
@@ -755,14 +385,14 @@ public class NPointCalibrationOperator : OperatorBase
                 TryGetNumberProperty(element, "WorldX", out var worldX) &&
                 TryGetNumberProperty(element, "WorldY", out var worldY))
             {
-                pair = new PointPair(new Position(imageX, imageY), new Position(worldX, worldY));
+                pair = new NPointCalibrationPointPair(new Position(imageX, imageY), new Position(worldX, worldY));
                 return true;
             }
 
             if (TryGetNestedPoint(element, "ImagePoint", out var imagePoint) &&
                 TryGetNestedPoint(element, "WorldPoint", out var worldPoint))
             {
-                pair = new PointPair(imagePoint, worldPoint);
+                pair = new NPointCalibrationPointPair(imagePoint, worldPoint);
                 return true;
             }
 
@@ -771,7 +401,7 @@ public class NPointCalibrationOperator : OperatorBase
                 TryGetNumberProperty(element, "PhysicalX", out worldX) &&
                 TryGetNumberProperty(element, "PhysicalY", out worldY))
             {
-                pair = new PointPair(new Position(imageX, imageY), new Position(worldX, worldY));
+                pair = new NPointCalibrationPointPair(new Position(imageX, imageY), new Position(worldX, worldY));
                 return true;
             }
 
@@ -790,7 +420,7 @@ public class NPointCalibrationOperator : OperatorBase
                 TryGetDouble(dict, "WorldX", out var worldX) &&
                 TryGetDouble(dict, "WorldY", out var worldY))
             {
-                pair = new PointPair(new Position(imageX, imageY), new Position(worldX, worldY));
+                pair = new NPointCalibrationPointPair(new Position(imageX, imageY), new Position(worldX, worldY));
                 return true;
             }
 
@@ -799,7 +429,7 @@ public class NPointCalibrationOperator : OperatorBase
                 TryParsePoint(imagePointObj, out var imagePoint) &&
                 TryParsePoint(worldPointObj, out var worldPoint))
             {
-                pair = new PointPair(imagePoint, worldPoint);
+                pair = new NPointCalibrationPointPair(imagePoint, worldPoint);
                 return true;
             }
 
@@ -969,46 +599,7 @@ public class NPointCalibrationOperator : OperatorBase
         };
     }
 
-    private static double[][] ToMatrixArray(Mat matrix, int rows, int cols)
-    {
-        var result = new double[rows][];
-        for (var r = 0; r < rows; r++)
-        {
-            result[r] = new double[cols];
-            for (var c = 0; c < cols; c++)
-            {
-                result[r][c] = matrix.At<double>(r, c);
-            }
-        }
-
-        return result;
-    }
-
-    private static double GetMaxTriangleArea(IReadOnlyList<Point2d> points)
-    {
-        var maxArea = 0.0;
-        for (var i = 0; i < points.Count - 2; i++)
-        {
-            for (var j = i + 1; j < points.Count - 1; j++)
-            {
-                for (var k = j + 1; k < points.Count; k++)
-                {
-                    var area = Math.Abs(
-                        points[i].X * (points[j].Y - points[k].Y) +
-                        points[j].X * (points[k].Y - points[i].Y) +
-                        points[k].X * (points[i].Y - points[j].Y)) * 0.5;
-                    if (area > maxArea)
-                    {
-                        maxArea = area;
-                    }
-                }
-            }
-        }
-
-        return maxArea;
-    }
-
-    private static void DrawCalibrationPoints(Mat image, IReadOnlyList<PointPair> pointPairs)
+    private static void DrawCalibrationPoints(Mat image, IReadOnlyList<NPointCalibrationPointPair> pointPairs)
     {
         for (var i = 0; i < pointPairs.Count; i++)
         {
@@ -1025,28 +616,4 @@ public class NPointCalibrationOperator : OperatorBase
                 1);
         }
     }
-
-    private readonly record struct PointPair(Position ImagePoint, Position WorldPoint);
-
-    private readonly record struct ReprojectionErrorStats(
-        double InlierMeanError,
-        double InlierMaxError,
-        double AllSampleMeanError,
-        double AllSampleMaxError,
-        int InlierCount,
-        double InlierRatio)
-    {
-        public double MeanError => InlierMeanError;
-
-        public double MaxError => InlierMaxError;
-    }
-
-    private readonly record struct NPointCalibrationConfig(
-        double RansacReprojectionThreshold,
-        int RansacMaxIterations,
-        double RansacConfidence,
-        double MaxAcceptedReprojectionError,
-        int MinInlierCount,
-        double MinInlierRatio,
-        string CalibrationUnit);
 }

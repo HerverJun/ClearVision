@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G12A`
-- 当前卡片：`docs/进行中/Studio2/goals/G12A.md`
+- 当前 Goal：`G12B`
+- 当前卡片：`docs/进行中/Studio2/goals/G12B.md`
 - 当前阶段：`Vertical Product`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -113,8 +113,8 @@
 | G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | DONE | G11A-FOLLOWUP | `docs/进行中/Studio2/goals/G11B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G11B-FOLLOWUP | Vertical Product | Circle Search evidence、Scene 与 flag 权威收口 | DONE | G11B | `docs/进行中/Studio2/goals/G11B-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | DONE | G11B-FOLLOWUP | `docs/进行中/Studio2/goals/G11C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | READY | G11C | `docs/进行中/Studio2/goals/G12A.md` |  |
-| G12B | Vertical Product | N 点标定工作台 draft 与可视化 | LOCKED | G12A | `docs/进行中/Studio2/goals/G12B.md` |  |
+| G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | DONE | G11C | `docs/进行中/Studio2/goals/G12A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
+| G12B | Vertical Product | N 点标定工作台 draft 与可视化 | READY | G12A | `docs/进行中/Studio2/goals/G12B.md` |  |
 | G13A | Vertical Product | Project 正式资产权威与保存恢复 | LOCKED | G12B | `docs/进行中/Studio2/goals/G13A.md` |  |
 | G13B | Vertical Product | Runtime Package 可选 Calibration/Spatial 扩展 | LOCKED | G13A | `docs/进行中/Studio2/goals/G13B.md` |  |
 | G13C | Vertical Product | Station/Runtime 标定加载与 PixelToWorld E2E | LOCKED | G13B | `docs/进行中/Studio2/goals/G13C.md` |  |
@@ -170,6 +170,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-04 | G12A | `d2d247a30b4ff34fbc09832976dd2428e66e5275` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | `dotnet build ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --no-restore -v:minimal` PASS；NPoint focused `NPointCalibrationOperatorTests,NPointCalibrationSolverTests` PASS（21/21）；calibration regression `-Gate all` PASS（111/111）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 抽取唯一 `NPointCalibrationSolver`，覆盖 Affine/Perspective、RANSAC、误差统计、acceptance、退化/fail-closed 与 `CalibrationBundleV2` 生成；`NPointCalibrationOperator` 收敛为 PointPairs/参数适配、solver 调用、旧 outputs 映射、可选 SavePath 和图像标注 owner；新增 solver/operator parity、异常点集、无第二 OpenCV solve path 审计；未做 UI、正式资产保存、PLC/机器人 provider；当前 Goal 推进到 G12B READY。 |
 | 2026-07-04 | G11C | `38e9c1a19197556b316a4c93e95c19d9e8354748` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-coordinator-memory.test.mjs` PASS（17/17）；UI focused preview/property/ROI batch PASS（54/54）；Product focused Circle Search/preview/formal variable binding/ResultPath compatibility PASS（97/97）；Desktop focused Observation/Artifact/Architecture PASS（63/63）；`previewCoordinator.js` node check PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 Circle Search 连续预览同节点 Method/工程切换 scope invalidation、主动取消、latest-wins、迟到 artifact 删除与资源释放；补齐 typical/upper-bounded 320x240/640x480/1920x1080 p50/p95 benchmark 与 work-budget fail-closed 证据；验证 HoughCircle/FitEllipse/CaliperFitV2 JSON 保存重启兼容、preview/formal ResultPath 与变量绑定一致；未修改 Station、未引入 WebGL、未创建第二套 Preview owner；当前 Goal 推进到 G12A READY。 |
 | 2026-07-04 | G11B-FOLLOWUP | `e1b079df2e4d43cbba44dd4ba4037fe4ca249d50` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused CaliperFitV2/CircleMeasurement PASS（30/30）；Desktop focused ExecutionObservation/Artifact PASS（48/48）；UI focused `property-panel-memory.test.mjs` PASS（8/8）；`roiEditorSupport.mjs` node check PASS；OperatorDocGenerator PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 Circle Search V2 有界 profile evidence、profile artifact、Inspector bounded summary、CaliperFitV2 typed result 客户端载荷边界、全圆 Scene point 选择、CaliperIndex primitive identity、startup flag 权威，以及 Auto polarity/Huber/MAD 诊断债；未执行 G11C 连续预览/性能 benchmark，当前 Goal 保持 G11C READY。 |
 | 2026-07-04 | G11B | `2a8b44d0cb70324924fc0ff13ed060c63f869a85` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Desktop focused ExecutionObservation/Artifact/WebView2/Architecture PASS（70 tests）；Product CaliperFitV2/CircleMeasurement focused PASS（41 tests）；measurement accuracy PASS（122/122）；measurement regression PASS（144/144）；Product full serial PASS（3229 passed, 4 skipped）；Desktop full serial PASS（472/472）；UI `test:unit` PASS（618/618）；`test:preview-smoke` PASS；Playwright `roi-editor.spec.ts` PASS（20/20）与 `roi-editor.spec.ts + node-preview.spec.ts` PASS（33/33）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Circle Search V2 Tool 参数分组与 ImageCenter 显示、复合 search ring/nominal geometry 编辑、Scene/Inspector 同一 Observation identity 对齐、CaliperFitV2 point-set artifacts、feature flag on/off 兼容；未修改 CircleCaliperFitV2 数学内核，未执行 G11C 连续预览/性能收口；G11C 技术债已登记，当前 Goal 推进到 G11C READY。 |
