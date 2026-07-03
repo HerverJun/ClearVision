@@ -1,5 +1,4 @@
 import {
-    appendPointSequencePoint,
     clampRectToBounds,
     deletePointSequencePoint,
     deletePolygonVertex,
@@ -180,6 +179,8 @@ class ImageCanvas {
         this.activeHandle = null;
         this.interactionState = null;
         this.roiDraftState = null;
+        this.activePointerId = null;
+        this._suppressMouseCompatibilityUntil = 0;
 
         // 【关键修复】记录是否有待处理的重置视图（当画布尺寸为0时）
         this._pendingResetView = false;
@@ -206,6 +207,12 @@ class ImageCanvas {
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
         this._mouseUpHandler = this.handleMouseUp.bind(this);
+        this._pointerDownHandler = this.handlePointerDown.bind(this);
+        this._pointerMoveHandler = this.handlePointerMove.bind(this);
+        this._pointerUpHandler = this.handlePointerUp.bind(this);
+        this._pointerCancelHandler = this.handlePointerCancel.bind(this);
+        this._lostPointerCaptureHandler = this.handleLostPointerCapture.bind(this);
+        this._windowBlurHandler = this.handleWindowBlur.bind(this);
         this._wheelHandler = this.handleWheel.bind(this);
         this._dblClickHandler = this.handleDoubleClick.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
@@ -235,6 +242,11 @@ class ImageCanvas {
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
         this.canvas.addEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.addEventListener('mouseup', this._mouseUpHandler);
+        this.canvas.addEventListener('pointerdown', this._pointerDownHandler);
+        this.canvas.addEventListener('pointermove', this._pointerMoveHandler);
+        this.canvas.addEventListener('pointerup', this._pointerUpHandler);
+        this.canvas.addEventListener('pointercancel', this._pointerCancelHandler);
+        this.canvas.addEventListener('lostpointercapture', this._lostPointerCaptureHandler);
         this.canvas.addEventListener('wheel', this._wheelHandler);
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
@@ -242,6 +254,7 @@ class ImageCanvas {
             this.canvas.tabIndex = 0;
         }
         this.canvas.addEventListener('keydown', this._keyDownHandler);
+        window.addEventListener('blur', this._windowBlurHandler);
 
         // 启动渲染循环（由脏标记驱动）
         this.invalidate();
@@ -251,6 +264,9 @@ class ImageCanvas {
      * 销毁画布，清理所有事件监听和动画循环
      */
     destroy() {
+        this.cancelActiveRoiInteraction();
+        this.releaseActivePointerCapture();
+
         // 停止渲染循环
         if (this._animationFrameId) {
             cancelAnimationFrame(this._animationFrameId);
@@ -274,10 +290,16 @@ class ImageCanvas {
         this.canvas.removeEventListener('mousedown', this._mouseDownHandler);
         this.canvas.removeEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.removeEventListener('mouseup', this._mouseUpHandler);
+        this.canvas.removeEventListener('pointerdown', this._pointerDownHandler);
+        this.canvas.removeEventListener('pointermove', this._pointerMoveHandler);
+        this.canvas.removeEventListener('pointerup', this._pointerUpHandler);
+        this.canvas.removeEventListener('pointercancel', this._pointerCancelHandler);
+        this.canvas.removeEventListener('lostpointercapture', this._lostPointerCaptureHandler);
         this.canvas.removeEventListener('wheel', this._wheelHandler);
         this.canvas.removeEventListener('dblclick', this._dblClickHandler);
         this.canvas.removeEventListener('contextmenu', this._contextMenuHandler);
         this.canvas.removeEventListener('keydown', this._keyDownHandler);
+        window.removeEventListener('blur', this._windowBlurHandler);
 
         // 释放旧的 Blob URL
         this._revokeImageUrl();
@@ -296,6 +318,7 @@ class ImageCanvas {
         this.interactionState = null;
         this.activeHandle = null;
         this.roiDraftState = null;
+        this.activePointerId = null;
     }
 
     /**
@@ -984,6 +1007,10 @@ class ImageCanvas {
      * 处理鼠标按下
      */
     handleMouseDown(e) {
+        if (this.shouldIgnoreMouseCompatibilityEvent()) {
+            return;
+        }
+
         if (this.interactionMode === 'roi-rect') {
             this.handleRoiMouseDown(e);
             return;
@@ -1020,6 +1047,10 @@ class ImageCanvas {
      * 处理鼠标移动
      */
     handleMouseMove(e) {
+        if (this.shouldIgnoreMouseCompatibilityEvent()) {
+            return;
+        }
+
         if (this.interactionMode === 'roi-rect') {
             this.handleRoiMouseMove(e);
             return;
@@ -1053,12 +1084,105 @@ class ImageCanvas {
      * 处理鼠标释放
      */
     handleMouseUp(e) {
+        if (this.shouldIgnoreMouseCompatibilityEvent()) {
+            return;
+        }
+
         if (this.interactionMode === 'roi-rect') {
             this.handleRoiMouseUp(e);
             return;
         }
 
         this.isDragging = false;
+    }
+
+    handlePointerDown(e) {
+        if (this.interactionMode !== 'roi-rect') {
+            return;
+        }
+
+        if (this.activePointerId !== null) {
+            return;
+        }
+
+        this._suppressMouseCompatibilityUntil = Date.now() + 1000;
+        this.activePointerId = e.pointerId;
+        try {
+            this.canvas.setPointerCapture?.(e.pointerId);
+        } catch {
+            this.activePointerId = null;
+            this.cancelActiveRoiInteraction();
+            return;
+        }
+
+        this.handleRoiMouseDown(e);
+    }
+
+    handlePointerMove(e) {
+        if (this.interactionMode !== 'roi-rect' || this.activePointerId !== e.pointerId) {
+            return;
+        }
+
+        this._suppressMouseCompatibilityUntil = Date.now() + 1000;
+        this.handleRoiMouseMove(e);
+    }
+
+    handlePointerUp(e) {
+        if (this.interactionMode !== 'roi-rect' || this.activePointerId !== e.pointerId) {
+            return;
+        }
+
+        this._suppressMouseCompatibilityUntil = Date.now() + 1000;
+        this.releaseActivePointerCapture();
+        this.handleRoiMouseUp(e);
+    }
+
+    handlePointerCancel(e) {
+        if (this.interactionMode !== 'roi-rect' || this.activePointerId !== e.pointerId) {
+            return;
+        }
+
+        this._suppressMouseCompatibilityUntil = Date.now() + 1000;
+        this.releaseActivePointerCapture();
+        this.cancelActiveRoiInteraction();
+    }
+
+    handleLostPointerCapture(e) {
+        if (this.interactionMode !== 'roi-rect' || this.activePointerId !== e.pointerId) {
+            return;
+        }
+
+        this.activePointerId = null;
+        this.cancelActiveRoiInteraction();
+    }
+
+    handleWindowBlur() {
+        if (this.interactionMode !== 'roi-rect') {
+            return;
+        }
+
+        this.releaseActivePointerCapture();
+        this.cancelActiveRoiInteraction();
+    }
+
+    releaseActivePointerCapture() {
+        if (this.activePointerId === null) {
+            return;
+        }
+
+        const pointerId = this.activePointerId;
+        this.activePointerId = null;
+        try {
+            if (this.canvas.hasPointerCapture?.(pointerId)) {
+                this.canvas.releasePointerCapture(pointerId);
+            }
+        } catch {
+            // Pointer capture may already be gone after cancel/destroy.
+        }
+    }
+
+    shouldIgnoreMouseCompatibilityEvent() {
+        return this.interactionMode === 'roi-rect' && Date.now() < this._suppressMouseCompatibilityUntil;
     }
 
     handleKeyDown(e) {
@@ -1896,27 +2020,15 @@ class ImageCanvas {
         }
 
         if (overlay?.type === 'pointSequence') {
-            const originalGeometry = this.readOverlayGeometry(overlay);
-            const nextGeometry = appendPointSequencePoint(originalGeometry, imagePoint, this.getImageBounds());
-            if (!sameGeometry(originalGeometry, nextGeometry)) {
-                const pointIndex = Math.max(0, nextGeometry.points.length - 1);
-                overlay.selectedPointIndex = pointIndex;
-                this.updateEditableOverlayGeometry(overlay, nextGeometry, 'dragging');
-                this.selectedOverlay = overlay.id;
-                this.activeOverlayId = overlay.id;
-                this.activeHandle = `point:${pointIndex}`;
-                this.interactionState = {
-                    type: 'resize',
-                    handle: `point:${pointIndex}`,
-                    overlayId: overlay.id,
-                    originalGeometry
-                };
-                return;
-            }
+            return;
         }
 
         const originalGeometry = overlay ? this.readOverlayGeometry(overlay) : null;
         const drawKind = originalGeometry?.kind || 'rectangle';
+        if (drawKind === 'pointSequence') {
+            return;
+        }
+
         const initialGeometry = drawKind === 'circle'
             ? { kind: 'circle', centerX: imagePoint.x, centerY: imagePoint.y, radius: this.minimumOverlaySize }
             : drawKind === 'annulus' || drawKind === 'arc'
@@ -1927,8 +2039,6 @@ class ImageCanvas {
                     innerRadius: 0,
                     outerRadius: this.minimumOverlaySize
                 }
-                : drawKind === 'pointSequence'
-                    ? appendPointSequencePoint(originalGeometry || { kind: 'pointSequence', points: [] }, imagePoint, this.getImageBounds())
                 : {
                     kind: 'rectangle',
                     x: imagePoint.x,

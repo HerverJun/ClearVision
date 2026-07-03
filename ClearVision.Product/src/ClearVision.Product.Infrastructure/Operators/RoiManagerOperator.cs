@@ -40,6 +40,7 @@ public class RoiManagerOperator : OperatorBase
 {
     public const string SpatialContextOutputKey = "SpatialContext";
     public const string MaskSpatialContextOutputKey = "MaskSpatialContext";
+    public const string ImageSpatialContextInputKey = "ImageSpatialContext";
 
     private static readonly JsonSerializerOptions SpatialJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -263,6 +264,13 @@ public class RoiManagerOperator : OperatorBase
 
     private static SpatialContextV1 ResolveInputSpatialContext(Dictionary<string, object>? inputs)
     {
+        if (inputs != null &&
+            TryGetDictionaryValue(inputs, ImageSpatialContextInputKey, out var imageScopedContext) &&
+            TryReadSpatialContext(imageScopedContext, out var scopedContext))
+        {
+            return scopedContext;
+        }
+
         if (inputs != null &&
             TryGetDictionaryValue(inputs, SpatialContextOutputKey, out var rawContext) &&
             TryReadSpatialContext(rawContext, out var context))

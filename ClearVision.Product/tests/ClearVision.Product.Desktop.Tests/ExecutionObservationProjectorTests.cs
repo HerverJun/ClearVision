@@ -509,6 +509,7 @@ public sealed class ExecutionObservationProjectorTests
         scene.Primitives.Should().ContainSingle().Which.Should().Match<ExecutionVisualScenePrimitiveV1>(primitive =>
             primitive.Kind == "rectangle" &&
             primitive.Layer == "roi" &&
+            primitive.Selectable == false &&
             primitive.Geometry.X == 12 &&
             primitive.Geometry.Y == 14 &&
             primitive.Geometry.Width == 80 &&
@@ -539,7 +540,10 @@ public sealed class ExecutionObservationProjectorTests
             ]);
         var targetOperator = CreateOperator(OperatorType.RoiManager, [
             new Parameter(Guid.NewGuid(), "Shape", "Shape", string.Empty, "enum", "Circle"),
-            new Parameter(Guid.NewGuid(), "Operation", "Operation", string.Empty, "enum", "Crop")
+            new Parameter(Guid.NewGuid(), "Operation", "Operation", string.Empty, "enum", "Crop"),
+            new Parameter(Guid.NewGuid(), "CenterX", "CenterX", string.Empty, "int", 7),
+            new Parameter(Guid.NewGuid(), "CenterY", "CenterY", string.Empty, "int", 8),
+            new Parameter(Guid.NewGuid(), "Radius", "Radius", string.Empty, "int", 2)
         ]);
 
         var observation = CreateObservation(
@@ -558,17 +562,24 @@ public sealed class ExecutionObservationProjectorTests
         scene.ImageWidth.Should().Be(20);
         scene.ImageHeight.Should().Be(18);
         scene.Diagnostics.Should().BeEmpty();
-        var primitive = scene.Primitives.Should().ContainSingle().Subject;
-        primitive.PrimitiveId.Should().Be($"roi:spatial-crop:{targetOperator.Id:D}");
-        primitive.Kind.Should().Be("rectangle");
-        primitive.Geometry.X.Should().Be(5);
-        primitive.Geometry.Y.Should().Be(6);
-        primitive.Geometry.Width.Should().Be(4);
-        primitive.Geometry.Height.Should().Be(3);
+        var circle = scene.Primitives.Should().ContainSingle(primitive => primitive.Kind == "circle").Subject;
+        circle.PrimitiveId.Should().Be($"roi:circle:{targetOperator.Id:D}");
+        circle.Geometry.CenterX.Should().Be(7);
+        circle.Geometry.CenterY.Should().Be(8);
+        circle.Geometry.Radius.Should().Be(2);
+        circle.Selectable.Should().BeFalse();
+        var bounds = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == $"roi:crop-bounds:{targetOperator.Id:D}").Subject;
+        bounds.Kind.Should().Be("rectangle");
+        bounds.Label.Should().Be("Crop Bounds");
+        bounds.Geometry.X.Should().Be(5);
+        bounds.Geometry.Y.Should().Be(6);
+        bounds.Geometry.Width.Should().Be(4);
+        bounds.Geometry.Height.Should().Be(3);
+        bounds.Selectable.Should().BeFalse();
     }
 
     [Fact]
-    public void CreatePreviewObservation_ShouldProjectCircleSceneWithCanonicalRadiusMapping()
+    public void CreatePreviewObservation_ShouldProjectPrimaryCircleWithoutMisusingRadiusMapping()
     {
         var radiusPortId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
@@ -592,10 +603,45 @@ public sealed class ExecutionObservationProjectorTests
         circle.Geometry.CenterX.Should().Be(50);
         circle.Geometry.CenterY.Should().Be(60);
         circle.Geometry.Radius.Should().Be(12.5d);
-        circle.OutputPortId.Should().Be(radiusPortId);
-        circle.ResultPathVersion.Should().Be(1);
-        circle.ResultPath.Should().Be("$");
+        circle.OutputPortId.Should().BeNull();
+        circle.ResultPathVersion.Should().BeNull();
+        circle.ResultPath.Should().BeNull();
+        circle.Selectable.Should().BeFalse();
         FindNode(observation.Detail, "Radius")!.OutputPortId.Should().Be(radiusPortId);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldMapCircleDataListItemsToCanonicalIndexPaths()
+    {
+        var circlesPortId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);
+        var circles = new List<CircleData>
+        {
+            new(10, 20, 5),
+            new(30, 40, 7)
+        };
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["CircleDataList"] = circles,
+                ["Width"] = 320,
+                ["Height"] = 240
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = circlesPortId, Name = "CircleDataList" }
+            ],
+            targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        var first = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:data-list:0").Subject;
+        first.OutputPortId.Should().Be(circlesPortId);
+        first.ResultPathVersion.Should().Be(1);
+        first.ResultPath.Should().Be("$[0]");
+        first.Selectable.Should().BeTrue();
+        var second = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "circle:data-list:1").Subject;
+        second.ResultPath.Should().Be("$[1]");
+        second.Selectable.Should().BeTrue();
     }
 
     [Fact]
@@ -625,7 +671,7 @@ public sealed class ExecutionObservationProjectorTests
         scene.Primitives.Where(primitive => primitive.Kind == "point").Should().HaveCount(2);
         scene.Primitives.Where(primitive => primitive.Kind == "text").Should().HaveCount(2);
         scene.Primitives.Should().OnlyContain(primitive =>
-            primitive.ResultPath == null && primitive.OutputPortId == null);
+            primitive.ResultPath == null && primitive.OutputPortId == null && primitive.Selectable == false);
     }
 
     [Fact]

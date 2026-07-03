@@ -299,6 +299,13 @@ test('geometry parameter adapters round-trip circle and PolarUnwrap annulus arc 
     Radius: 13
   });
 
+  const clippedCircle = geometryFromParams({
+    CenterX: -10,
+    CenterY: 30,
+    Radius: 24
+  }, circleConfig, { width: 100, height: 100 });
+  assert.deepEqual(clippedCircle, { kind: 'circle', centerX: -10, centerY: 30, radius: 24 });
+
   const polarConfig = getOperatorRoiConfig({
     type: 'PolarUnwrap',
     parameters: [
@@ -331,6 +338,37 @@ test('geometry parameter adapters round-trip circle and PolarUnwrap annulus arc 
     OuterRadius: 25,
     StartAngle: 45,
     EndAngle: 180
+  });
+
+  const multiTurnConfig = getOperatorRoiConfig({
+    type: 'PolarUnwrap',
+    parameters: [
+      { name: 'CenterX', value: 0 },
+      { name: 'CenterY', value: 50 },
+      { name: 'InnerRadius', value: 5 },
+      { name: 'OuterRadius', value: 40 },
+      { name: 'StartAngle', value: -90 },
+      { name: 'EndAngle', value: 720 }
+    ]
+  });
+  const multiTurn = geometryFromParams({
+    CenterX: 0,
+    CenterY: 50,
+    InnerRadius: 5,
+    OuterRadius: 40,
+    StartAngle: -90,
+    EndAngle: 720
+  }, multiTurnConfig, { width: 100, height: 100 });
+  assert.equal(multiTurn.startAngle, -90);
+  assert.equal(multiTurn.endAngle, 720);
+  assert.equal(multiTurn.spanDegrees, 810);
+  assert.deepEqual(geometryToParams(multiTurn, multiTurnConfig), {
+    CenterX: 0,
+    CenterY: 50,
+    InnerRadius: 5,
+    OuterRadius: 40,
+    StartAngle: -90,
+    EndAngle: 720
   });
 
   const invalidPolar = getOperatorRoiConfig({
@@ -476,22 +514,27 @@ test('point sequence adapter preserves order enabled state and legacy PointPairs
 
   sequence = movePointSequencePoint(sequence, 0, { x: 12, y: 22 }, { width: 64, height: 64 });
   sequence = togglePointSequencePointEnabled(sequence, 1);
-  sequence = appendPointSequencePoint(sequence, { x: 50, y: 52 }, { width: 64, height: 64 });
-  sequence = reorderPointSequencePoint(sequence, 2, -1);
+  const afterBlankAppend = appendPointSequencePoint(sequence, { x: 50, y: 52 }, { width: 64, height: 64 });
+  assert.deepEqual(afterBlankAppend, sequence);
+  sequence = reorderPointSequencePoint(afterBlankAppend, 1, -1);
   sequence = deletePointSequencePoint(sequence, 0);
   sequence = translatePointSequence(sequence, { x: 1, y: -2 }, { width: 64, height: 64 });
 
   assert.deepEqual(sequence.points.map(point => ({ x: point.x, y: point.y, enabled: point.enabled })), [
-    { x: 51, y: 50, enabled: true },
-    { x: 31, y: 38, enabled: true }
+    { x: 13, y: 20, enabled: true }
   ]);
   assert.equal(
     pointPairsToParamsJson(sequence),
-    '[{"ImageX":51,"ImageY":50,"WorldX":50,"WorldY":52,"Enabled":true},{"ImageX":31,"ImageY":38,"WorldX":3,"WorldY":4,"Enabled":true}]'
+    '[{"ImageX":13,"ImageY":20,"WorldX":1,"WorldY":2,"Enabled":true}]'
   );
   assert.deepEqual(geometryToParams(normalizePointSequenceGeometry(sequence), config), {
     PointPairs: pointPairsToParamsJson(sequence)
   });
+
+  assert.equal(validatePointSequenceGeometry({
+    kind: 'pointSequence',
+    points: [{ x: 8, y: 9 }]
+  }).valid, false);
 });
 
 test('rectFromParams supports BoxFilter region parameter names', () => {

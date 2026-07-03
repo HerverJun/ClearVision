@@ -33,6 +33,7 @@ public static class ExecutionVisualSceneProjector
         "rectangle",
         "circle",
         "point",
+        "polygon",
         "polyline",
         "text"
     };
@@ -76,19 +77,39 @@ public static class ExecutionVisualSceneProjector
 
     private static void ProjectRoi(Operator @operator, SceneProjectionContext context)
     {
-        if (ReadParameterString(@operator, "Operation", "Crop").Equals("Crop", StringComparison.OrdinalIgnoreCase) &&
-            TryProjectRoiSpatialCrop(@operator, context))
-        {
-            return;
-        }
-
         var shape = ReadParameterString(@operator, "Shape", "Rectangle");
-        if (!shape.Equals("Rectangle", StringComparison.OrdinalIgnoreCase))
+        var operation = ReadParameterString(@operator, "Operation", "Crop");
+        if (!TryResolveRoiInputTransformToImageFull(context, out var inputToFull, out var transformError))
         {
-            context.AddDiagnostic("visual-scene-roi-shape-unsupported", $"ROI shape {Clip(shape)} is not projected in G08.", null);
+            context.AddDiagnostic("visual-scene-roi-transform-unresolved", $"ROI input frame cannot resolve to ImageFull: {Clip(transformError)}", null);
             return;
         }
 
+        if (shape.Equals("Rectangle", StringComparison.OrdinalIgnoreCase))
+        {
+            ProjectRoiRectangle(@operator, context, inputToFull);
+        }
+        else if (shape.Equals("Circle", StringComparison.OrdinalIgnoreCase))
+        {
+            ProjectRoiCircle(@operator, context, inputToFull);
+        }
+        else if (shape.Equals("Polygon", StringComparison.OrdinalIgnoreCase))
+        {
+            ProjectRoiPolygon(@operator, context, inputToFull);
+        }
+        else
+        {
+            context.AddDiagnostic("visual-scene-roi-shape-unsupported", $"ROI shape {Clip(shape)} is not projected.", null);
+        }
+
+        if (operation.Equals("Crop", StringComparison.OrdinalIgnoreCase))
+        {
+            TryProjectRoiCropBounds(@operator, context);
+        }
+    }
+
+    private static void ProjectRoiRectangle(Operator @operator, SceneProjectionContext context, SpatialTransform2DV1 inputToFull)
+    {
         if (!TryReadParameterDouble(@operator, "X", out var x) ||
             !TryReadParameterDouble(@operator, "Y", out var y) ||
             !TryReadParameterDouble(@operator, "Width", out var width) ||
@@ -98,105 +119,362 @@ public static class ExecutionVisualSceneProjector
             return;
         }
 
-        var primitive = new ExecutionVisualScenePrimitiveV1
+        if (context.TryResolveSceneImageSize(out var imageWidth, out var imageHeight))
+        {
+            width = Math.Min(width, imageWidth - x);
+            height = Math.Min(height, imageHeight - y);
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            context.AddDiagnostic("visual-scene-roi-rectangle-empty", "Rectangle ROI has no positive runtime area after clamping.", null);
+            return;
+        }
+
+        var corners = new List<(double X, double Y)>
+        {
+            (x, y),
+            (x + width, y),
+            (x + width, y + height),
+            (x, y + height)
+        };
+        if (!TryProjectPoints(corners, inputToFull, context, "roi:rectangle", out var projected))
+        {
+            return;
+        }
+
+        var bounds = BoundsOf(projected);
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
         {
             PrimitiveId = $"roi:rectangle:{@operator.Id:D}",
             Kind = "rectangle",
             Layer = "roi",
             ZOrder = 10,
             Visible = true,
-            Selectable = true,
+            Selectable = false,
             Label = "ROI",
             Geometry = new ExecutionVisualSceneGeometryV1
             {
-                X = x,
-                Y = y,
-                Width = width,
-                Height = height
+                X = bounds.X,
+                Y = bounds.Y,
+                Width = bounds.Width,
+                Height = bounds.Height
             },
-            Style = new ExecutionVisualSceneStyleV1
-            {
-                Stroke = "#f59e0b",
-                Fill = "rgba(245,158,11,0.14)",
-                StrokeWidth = 2
-            }
-        };
-        context.AddPrimitive(primitive);
+            Style = RoiShapeStyle()
+        });
     }
 
-    private static bool TryProjectRoiSpatialCrop(Operator @operator, SceneProjectionContext context)
+    private static void ProjectRoiCircle(Operator @operator, SceneProjectionContext context, SpatialTransform2DV1 inputToFull)
     {
-        if (!context.TryGetOutput(RoiManagerOperator.SpatialContextOutputKey, out var rawContext) ||
-            !TryReadSpatialContext(rawContext, out var spatialContext))
+        if (!TryReadParameterDouble(@operator, "CenterX", out var centerX) ||
+            !TryReadParameterDouble(@operator, "CenterY", out var centerY) ||
+            !TryReadParameterDouble(@operator, "Radius", out var radius) ||
+            radius <= 0)
         {
-            return false;
+            context.AddDiagnostic("visual-scene-roi-parameter-missing", "Circle ROI parameters CenterX/CenterY/Radius are incomplete.", null);
+            return;
         }
 
-        if (!context.TryResolveOutputImageSize(out var width, out var height) || width <= 0 || height <= 0)
+        if (!inputToFull.TryApply(centerX, centerY, out var projectedX, out var projectedY, out var error) ||
+            !inputToFull.TryApply(centerX + radius, centerY, out var radiusX, out var radiusY, out error) ||
+            !inputToFull.TryApply(centerX, centerY + radius, out var radiusX2, out var radiusY2, out error))
         {
-            context.AddDiagnostic("visual-scene-roi-spatial-size-missing", "ROI spatial context was present but output image size is unavailable.", null);
+            context.AddDiagnostic("visual-scene-roi-spatial-transform-invalid", $"Circle ROI spatial transform failed: {Clip(error)}", null);
+            return;
+        }
+
+        var projectedRadiusX = Math.Sqrt(Math.Pow(radiusX - projectedX, 2) + Math.Pow(radiusY - projectedY, 2));
+        var projectedRadiusY = Math.Sqrt(Math.Pow(radiusX2 - projectedX, 2) + Math.Pow(radiusY2 - projectedY, 2));
+        if (!AreFinite(projectedX, projectedY, projectedRadiusX, projectedRadiusY) ||
+            projectedRadiusX <= 0 ||
+            Math.Abs(projectedRadiusX - projectedRadiusY) > 0.001)
+        {
+            context.AddDiagnostic("visual-scene-roi-circle-transform-unsupported", "Circle ROI transform is not a uniform ImageFull transform; primitive was skipped.", null);
+            return;
+        }
+
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = $"roi:circle:{@operator.Id:D}",
+            Kind = "circle",
+            Layer = "roi",
+            ZOrder = 10,
+            Visible = true,
+            Selectable = false,
+            Label = "ROI",
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                CenterX = projectedX,
+                CenterY = projectedY,
+                Radius = projectedRadiusX
+            },
+            Style = RoiShapeStyle()
+        });
+    }
+
+    private static void ProjectRoiPolygon(Operator @operator, SceneProjectionContext context, SpatialTransform2DV1 inputToFull)
+    {
+        var raw = ReadParameterValue(@operator, "PolygonPoints");
+        if (!TryParsePolygonParameter(raw, out var points))
+        {
+            context.AddDiagnostic("visual-scene-roi-polygon-invalid", "PolygonPoints could not be parsed as at least three finite points.", null);
+            return;
+        }
+
+        if (!TryProjectPoints(points, inputToFull, context, "roi:polygon", out var projected))
+        {
+            return;
+        }
+
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = $"roi:polygon:{@operator.Id:D}",
+            Kind = "polygon",
+            Layer = "roi",
+            ZOrder = 10,
+            Visible = true,
+            Selectable = false,
+            Label = "ROI",
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                Points = projected.Select(point => new ExecutionVisualScenePointV1 { X = point.X, Y = point.Y }).ToList()
+            },
+            Style = RoiShapeStyle()
+        });
+    }
+
+    private static bool TryProjectRoiCropBounds(Operator @operator, SceneProjectionContext context)
+    {
+        if (!context.TryGetOutput(RoiManagerOperator.SpatialContextOutputKey, out var rawContext) ||
+            !TryReadSpatialContext(rawContext, out var spatialContext) ||
+            !context.TryResolveOutputImageSize(out var width, out var height) || width <= 0 || height <= 0)
+        {
             return false;
         }
 
         if (!spatialContext.TryResolveTransform(spatialContext.CurrentFrame, FrameRefV1.ImageFull(), out var localToFull, out var error))
         {
-            context.AddDiagnostic("visual-scene-roi-spatial-transform-missing", $"ROI spatial context cannot resolve to ImageFull: {Clip(error)}", null);
+            context.AddDiagnostic("visual-scene-roi-spatial-transform-missing", $"ROI crop bounds cannot resolve to ImageFull: {Clip(error)}", null);
             return false;
         }
 
-        var corners = new[]
+        var corners = new List<(double X, double Y)>
         {
-            (X: 0.0, Y: 0.0),
-            (X: (double)width, Y: 0.0),
-            (X: (double)width, Y: (double)height),
-            (X: 0.0, Y: (double)height)
+            (0, 0),
+            (width, 0),
+            (width, height),
+            (0, height)
         };
-        var projected = new List<(double X, double Y)>(corners.Length);
-        foreach (var corner in corners)
+        if (!TryProjectPoints(corners, localToFull, context, "roi:crop-bounds", out var projected))
         {
-            if (!localToFull.TryApply(corner.X, corner.Y, out var x, out var y, out error))
+            return false;
+        }
+
+        var bounds = BoundsOf(projected);
+
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = $"roi:crop-bounds:{@operator.Id:D}",
+            Kind = "rectangle",
+            Layer = "roi-bounds",
+            ZOrder = 20,
+            Visible = true,
+            Selectable = false,
+            Label = "Crop Bounds",
+            Geometry = new ExecutionVisualSceneGeometryV1
             {
-                context.AddDiagnostic("visual-scene-roi-spatial-transform-invalid", $"ROI spatial transform failed: {Clip(error)}", null);
+                X = bounds.X,
+                Y = bounds.Y,
+                Width = bounds.Width,
+                Height = bounds.Height
+            },
+            Style = new ExecutionVisualSceneStyleV1
+            {
+                Stroke = "#f97316",
+                Fill = "rgba(249,115,22,0.08)",
+                StrokeWidth = 1.5
+            }
+        });
+        return true;
+    }
+
+    private static bool TryResolveRoiInputTransformToImageFull(
+        SceneProjectionContext context,
+        out SpatialTransform2DV1 inputToFull,
+        out string error)
+    {
+        var imageFull = FrameRefV1.ImageFull();
+        inputToFull = SpatialTransform2DV1.Identity(imageFull);
+        error = string.Empty;
+
+        if (context.TryGetOutput(RoiManagerOperator.MaskSpatialContextOutputKey, out var rawMaskContext) &&
+            TryReadSpatialContext(rawMaskContext, out var maskContext))
+        {
+            return TryResolveFrameToImageFull(maskContext, maskContext.CurrentFrame, out inputToFull, out error);
+        }
+
+        if (context.TryGetOutput(RoiManagerOperator.SpatialContextOutputKey, out var rawImageContext) &&
+            TryReadSpatialContext(rawImageContext, out var imageContext))
+        {
+            var parentFrame = imageContext.Transforms
+                .FirstOrDefault(transform => transform.SourceFrame.FrameId.Equals(imageContext.CurrentFrame.FrameId, StringComparison.Ordinal))
+                ?.TargetFrame;
+            if (parentFrame != null)
+            {
+                return TryResolveFrameToImageFull(imageContext, parentFrame, out inputToFull, out error);
+            }
+
+            return TryResolveFrameToImageFull(imageContext, imageContext.CurrentFrame, out inputToFull, out error);
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveFrameToImageFull(
+        SpatialContextV1 context,
+        FrameRefV1 frame,
+        out SpatialTransform2DV1 transform,
+        out string error)
+    {
+        transform = SpatialTransform2DV1.Identity(FrameRefV1.ImageFull());
+        error = string.Empty;
+        if (frame.Kind == SpatialFrameKindV1.World2D)
+        {
+            error = "World2D transforms are outside the G08-G10B follow-up scope.";
+            return false;
+        }
+
+        if (frame.Kind == SpatialFrameKindV1.ImageFull)
+        {
+            transform = SpatialTransform2DV1.Identity(frame);
+            return true;
+        }
+
+        return context.TryResolveTransform(frame, FrameRefV1.ImageFull(), out transform, out error);
+    }
+
+    private static bool TryProjectPoints(
+        IReadOnlyList<(double X, double Y)> points,
+        SpatialTransform2DV1 transform,
+        SceneProjectionContext context,
+        string primitiveId,
+        out List<(double X, double Y)> projected)
+    {
+        projected = new List<(double X, double Y)>(points.Count);
+        foreach (var point in points)
+        {
+            if (!transform.TryApply(point.X, point.Y, out var x, out var y, out var error))
+            {
+                context.AddDiagnostic("visual-scene-roi-spatial-transform-invalid", $"ROI spatial transform failed: {Clip(error)}", primitiveId);
+                return false;
+            }
+
+            if (!AreFinite(x, y))
+            {
+                context.AddDiagnostic("visual-scene-roi-spatial-transform-invalid", "ROI spatial transform produced non-finite coordinates.", primitiveId);
                 return false;
             }
 
             projected.Add((x, y));
         }
 
-        var minX = projected.Min(point => point.X);
-        var minY = projected.Min(point => point.Y);
-        var maxX = projected.Max(point => point.X);
-        var maxY = projected.Max(point => point.Y);
-        if (!AreFinite(minX, minY, maxX, maxY) || maxX <= minX || maxY <= minY)
+        return true;
+    }
+
+    private static (double X, double Y, double Width, double Height) BoundsOf(IReadOnlyList<(double X, double Y)> points)
+    {
+        var minX = points.Min(point => point.X);
+        var minY = points.Min(point => point.Y);
+        var maxX = points.Max(point => point.X);
+        var maxY = points.Max(point => point.Y);
+        return (minX, minY, maxX - minX, maxY - minY);
+    }
+
+    private static ExecutionVisualSceneStyleV1 RoiShapeStyle() =>
+        new()
         {
-            context.AddDiagnostic("visual-scene-roi-spatial-bounds-invalid", "ROI spatial context projected to invalid bounds.", null);
+            Stroke = "#f59e0b",
+            Fill = "rgba(245,158,11,0.14)",
+            StrokeWidth = 2
+        };
+
+    private static bool TryParsePolygonParameter(object? raw, out List<(double X, double Y)> points)
+    {
+        points = new List<(double X, double Y)>();
+        if (raw is string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(text);
+                return TryParsePolygonJsonArray(document.RootElement, out points);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        if (raw is JsonElement element)
+        {
+            return TryParsePolygonJsonArray(element, out points);
+        }
+
+        if (raw is IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                if (points.Count >= MaxPoints)
+                {
+                    break;
+                }
+
+                if (TryReadPoint(item, out var point))
+                {
+                    points.Add((point.X, point.Y));
+                }
+            }
+
+            return points.Count >= 3;
+        }
+
+        return false;
+    }
+
+    private static bool TryParsePolygonJsonArray(JsonElement element, out List<(double X, double Y)> points)
+    {
+        points = new List<(double X, double Y)>();
+        if (element.ValueKind != JsonValueKind.Array)
+        {
             return false;
         }
 
-        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        foreach (var item in element.EnumerateArray())
         {
-            PrimitiveId = $"roi:spatial-crop:{@operator.Id:D}",
-            Kind = "rectangle",
-            Layer = "roi",
-            ZOrder = 10,
-            Visible = true,
-            Selectable = true,
-            Label = "ROI Crop",
-            Geometry = new ExecutionVisualSceneGeometryV1
+            if (points.Count >= MaxPoints)
             {
-                X = minX,
-                Y = minY,
-                Width = maxX - minX,
-                Height = maxY - minY
-            },
-            Style = new ExecutionVisualSceneStyleV1
-            {
-                Stroke = "#f97316",
-                Fill = "rgba(249,115,22,0.12)",
-                StrokeWidth = 2
+                break;
             }
-        });
-        return true;
+
+            if (item.ValueKind == JsonValueKind.Array)
+            {
+                var values = item.EnumerateArray().ToList();
+                if (values.Count >= 2 && TryReadDouble(values[0], out var x) && TryReadDouble(values[1], out var y) && AreFinite(x, y))
+                {
+                    points.Add((x, y));
+                }
+            }
+            else if (TryReadPoint(item, out var point))
+            {
+                points.Add((point.X, point.Y));
+            }
+        }
+
+        return points.Count >= 3;
     }
 
     private static bool TryReadSpatialContext(object? raw, out SpatialContextV1 context)
@@ -252,7 +530,7 @@ public static class ExecutionVisualSceneProjector
             TryReadCircle(circleValue, "Circle", 0, out var circle))
         {
             primary = circle with { Source = "circle" };
-            context.AddPrimitive(AttachRadiusResultPath(CreateCirclePrimitive("circle:primary", primary.Value, "Circle", 10), context));
+            context.AddPrimitive(AttachResultPath(CreateCirclePrimitive("circle:primary", primary.Value, "Circle", 10), context, "Circle", "$", circleValue));
             added = true;
         }
 
@@ -263,7 +541,7 @@ public static class ExecutionVisualSceneProjector
             TryReadDouble(radiusValue, out var radius))
         {
             primary = new CircleCandidate(center.X, center.Y, radius, "center-radius", 0);
-            context.AddPrimitive(AttachRadiusResultPath(CreateCirclePrimitive("circle:primary", primary.Value, "Circle", 10), context));
+            context.AddPrimitive(CreateCirclePrimitive("circle:primary", primary.Value, "Circle", 10));
             added = true;
         }
 
@@ -277,7 +555,12 @@ public static class ExecutionVisualSceneProjector
                     continue;
                 }
 
-                context.AddPrimitive(CreateCirclePrimitive($"circle:data-list:{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}", candidate, $"Circle {candidate.Ordinal + 1}", 20 + candidate.Ordinal));
+                context.AddPrimitive(AttachResultPath(
+                    CreateCirclePrimitive($"circle:data-list:{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}", candidate, $"Circle {candidate.Ordinal + 1}", 20 + candidate.Ordinal),
+                    context,
+                    "CircleDataList",
+                    $"$[{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}]",
+                    listValue));
                 added = true;
             }
         }
@@ -291,7 +574,12 @@ public static class ExecutionVisualSceneProjector
                     continue;
                 }
 
-                context.AddPrimitive(CreateCirclePrimitive($"circle:circles:{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}", candidate, $"Circle {candidate.Ordinal + 1}", 20 + candidate.Ordinal));
+                context.AddPrimitive(AttachResultPath(
+                    CreateCirclePrimitive($"circle:circles:{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}", candidate, $"Circle {candidate.Ordinal + 1}", 20 + candidate.Ordinal),
+                    context,
+                    "Circles",
+                    $"$[{candidate.Ordinal.ToString(CultureInfo.InvariantCulture)}]",
+                    circlesValue));
                 added = true;
             }
         }
@@ -346,7 +634,7 @@ public static class ExecutionVisualSceneProjector
                 Layer = "calibration",
                 ZOrder = 20 + index,
                 Visible = true,
-                Selectable = true,
+                Selectable = false,
                 Label = ordinal.ToString(CultureInfo.InvariantCulture),
                 Geometry = new ExecutionVisualSceneGeometryV1
                 {
@@ -409,10 +697,14 @@ public static class ExecutionVisualSceneProjector
             }
         };
 
-    private static ExecutionVisualScenePrimitiveV1 AttachRadiusResultPath(ExecutionVisualScenePrimitiveV1 primitive, SceneProjectionContext context)
+    private static ExecutionVisualScenePrimitiveV1 AttachResultPath(
+        ExecutionVisualScenePrimitiveV1 primitive,
+        SceneProjectionContext context,
+        string outputPortName,
+        string resultPath,
+        object? rootValue)
     {
-        if (!context.TryGetOutput("Radius", out var radiusValue) ||
-            !context.TryResolveResultPath("Radius", "$", radiusValue, out var outputPortId, out var resultPath))
+        if (!context.TryResolveResultPath(outputPortName, resultPath, rootValue, out var outputPortId, out var canonicalPath))
         {
             return primitive;
         }
@@ -424,7 +716,8 @@ public static class ExecutionVisualSceneProjector
             primitive.Style,
             outputPortId,
             ResultPathV1.Version,
-            resultPath);
+            canonicalPath,
+            selectable: true);
     }
 
     private static bool TryReadCircleList(object? value, string source, out List<CircleCandidate> circles)
@@ -941,7 +1234,8 @@ public static class ExecutionVisualSceneProjector
         ExecutionVisualSceneStyleV1 style,
         Guid? outputPortId,
         int? resultPathVersion,
-        string? resultPath) =>
+        string? resultPath,
+        bool? selectable = null) =>
         new()
         {
             PrimitiveId = primitiveId,
@@ -949,7 +1243,7 @@ public static class ExecutionVisualSceneProjector
             Layer = source.Layer,
             ZOrder = source.ZOrder,
             Visible = source.Visible,
-            Selectable = source.Selectable,
+            Selectable = selectable ?? source.Selectable,
             Label = source.Label,
             Geometry = geometry,
             Style = style,
@@ -1005,7 +1299,11 @@ public static class ExecutionVisualSceneProjector
                 return false;
             }
 
-            var resolved = ResultPathResolver.Resolve(ResultPathV1.Version, resultPath, rootValue);
+            var resolved = ResultPathResolver.Resolve(
+                ResultPathV1.Version,
+                resultPath,
+                rootValue,
+                new ResultPathResolverOptions { RequireTerminalScalar = false });
             if (!resolved.Succeeded || resolved.Path == null)
             {
                 return false;
@@ -1025,6 +1323,12 @@ public static class ExecutionVisualSceneProjector
             }
 
             (width, height) = ResolveImageObjectSize();
+            return width > 0 && height > 0;
+        }
+
+        public bool TryResolveSceneImageSize(out int width, out int height)
+        {
+            (width, height) = ResolveImageSize();
             return width > 0 && height > 0;
         }
 
@@ -1121,6 +1425,11 @@ public static class ExecutionVisualSceneProjector
                 return null;
             }
 
+            var selectable = primitive.Selectable &&
+                primitive.OutputPortId.HasValue &&
+                primitive.ResultPathVersion == ResultPathV1.Version &&
+                !string.IsNullOrWhiteSpace(primitive.ResultPath);
+
             return ClonePrimitive(
                 primitive,
                 ClipPrimitiveId(primitive.PrimitiveId),
@@ -1128,7 +1437,8 @@ public static class ExecutionVisualSceneProjector
                 style,
                 primitive.OutputPortId,
                 primitive.ResultPathVersion,
-                primitive.ResultPath == null ? null : Clip(primitive.ResultPath));
+                primitive.ResultPath == null ? null : Clip(primitive.ResultPath),
+                selectable);
         }
 
         private bool TrySanitizeGeometry(string kind, ExecutionVisualSceneGeometryV1 geometry, string primitiveId, out ExecutionVisualSceneGeometryV1 sanitized)
@@ -1164,9 +1474,10 @@ public static class ExecutionVisualSceneProjector
                     sanitized = geometry;
                     return true;
                 case "polyline":
+                case "polygon":
                     if (geometry.Points == null || geometry.Points.Count < 2)
                     {
-                        AddDiagnostic("visual-scene-geometry-invalid", "Polyline requires at least two points.", primitiveId);
+                        AddDiagnostic("visual-scene-geometry-invalid", kind == "polygon" ? "Polygon requires at least three points." : "Polyline requires at least two points.", primitiveId);
                         return false;
                     }
 
@@ -1175,9 +1486,10 @@ public static class ExecutionVisualSceneProjector
                         .Where(point => double.IsFinite(point.X) && double.IsFinite(point.Y))
                         .Select(point => new ExecutionVisualScenePointV1 { X = point.X, Y = point.Y })
                         .ToList();
-                    if (points.Count < 2)
+                    var minPoints = kind == "polygon" ? 3 : 2;
+                    if (points.Count < minPoints)
                     {
-                        AddDiagnostic("visual-scene-geometry-invalid", "Polyline finite point count is less than two.", primitiveId);
+                        AddDiagnostic("visual-scene-geometry-invalid", kind == "polygon" ? "Polygon finite point count is less than three." : "Polyline finite point count is less than two.", primitiveId);
                         return false;
                     }
 

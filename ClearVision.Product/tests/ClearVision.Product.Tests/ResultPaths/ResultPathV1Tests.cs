@@ -44,7 +44,7 @@ public sealed class ResultPathV1Tests
 
     [Theory]
     [InlineData("$.Score", "RP104")]
-    [InlineData("$[0]", "RP104")]
+    [InlineData("$[01]", "RP107")]
     [InlineData("$[*]", "RP104")]
     [InlineData("$[?(@.Score>0)]", "RP104")]
     [InlineData("$[\"\\u0053core\"]", "RP107")]
@@ -95,6 +95,30 @@ public sealed class ResultPathV1Tests
     }
 
     [Fact]
+    public void Resolver_ShouldResolveCanonicalIndexesFromJsonAndEnumerables()
+    {
+        using var document = JsonDocument.Parse("{\"Items\":[{\"Score\":4},{\"Score\":7}]}");
+        var dictionary = new Dictionary<string, object?>
+        {
+            ["Items"] = new List<object?>
+            {
+                new Dictionary<string, object?> { ["Score"] = 4L },
+                new Dictionary<string, object?> { ["Score"] = 7L }
+            }
+        };
+
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", document.RootElement)
+            .Value.Should().BeOfType<JsonElement>()
+            .Which.GetInt32().Should().Be(7);
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][1][\"Score\"]", dictionary)
+            .Value.Should().Be(7L);
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[0]", dictionary)
+            .Diagnostic!.Code.Should().Be("RP120");
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][2]", dictionary)
+            .Diagnostic!.Code.Should().Be("RP121");
+    }
+
+    [Fact]
     public void Resolver_ShouldFailClosedForMissingKeysScalarBeforeEndAndTerminalComplex()
     {
         var root = new Dictionary<string, object?>
@@ -109,6 +133,27 @@ public sealed class ResultPathV1Tests
             .Diagnostic!.Code.Should().Be("RP117");
         ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Object\"]", root)
             .Diagnostic!.Code.Should().Be("RP118");
+    }
+
+    [Fact]
+    public void Resolver_ShouldAllowStructuredTerminalOnlyWhenExplicitlyRequested()
+    {
+        var root = new Dictionary<string, object?>
+        {
+            ["Items"] = new List<object?>
+            {
+                new Dictionary<string, object?> { ["Score"] = 7L }
+            }
+        };
+
+        ResultPathResolver.Resolve(ResultPathV1.Version, "$[\"Items\"][0]", root)
+            .Diagnostic!.Code.Should().Be("RP118");
+        ResultPathResolver.Resolve(
+                ResultPathV1.Version,
+                "$[\"Items\"][0]",
+                root,
+                new ResultPathResolverOptions { RequireTerminalScalar = false })
+            .Value.Should().BeAssignableTo<IReadOnlyDictionary<string, object?>>();
     }
 
     [Fact]

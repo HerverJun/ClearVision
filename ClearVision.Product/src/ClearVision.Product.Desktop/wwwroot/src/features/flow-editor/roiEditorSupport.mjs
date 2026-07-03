@@ -6,6 +6,7 @@ import {
     POLAR_ANNULUS_ARC_PARAM_KEYS,
     REGION_RECT_PARAM_KEYS,
     computeClockwiseAngleSpanDegrees,
+    computeRawAngleSpanDegrees,
     normalizeAnnulusGeometry,
     normalizeAngleDegrees,
     normalizeCircleGeometry,
@@ -76,7 +77,7 @@ export function geometryFromParams(values, config, bounds = null) {
             centerY: readNumberValue(values, keys.centerY, 0),
             radius: readNumberValue(values, keys.radius, 1)
         };
-        return bounds ? normalizeCircleGeometry(circle, bounds) : circle;
+        return normalizeCircleGeometry(circle, null);
     }
 
     if (adapter.kind === 'annulusArc') {
@@ -90,7 +91,7 @@ export function geometryFromParams(values, config, bounds = null) {
             startAngle: readNumberValue(values, keys.startAngle, 0),
             endAngle: readNumberValue(values, keys.endAngle, 360)
         };
-        return bounds ? normalizeAnnulusGeometry(annulus, bounds) : annulus;
+        return normalizeAnnulusGeometry(annulus, null);
     }
 
     if (adapter.kind === 'polygon') {
@@ -137,9 +138,10 @@ export function geometryToParams(geometry, config) {
 
     if (adapter.kind === 'annulusArc') {
         const keys = adapter.paramKeys || POLAR_ANNULUS_ARC_PARAM_KEYS;
-        const startAngle = normalizeAngleDegrees(geometry.startAngle ?? 0);
-        const span = Number(geometry.spanDegrees ?? computeClockwiseAngleSpanDegrees(startAngle, geometry.endAngle ?? 360, { allowFullCircle: true })) || 360;
-        const endAngle = startAngle + span;
+        const startAngle = Number(geometry.startAngle ?? 0);
+        const rawEndAngle = Number(geometry.endAngle ?? 360);
+        const span = Number(geometry.spanDegrees ?? computeRawAngleSpanDegrees(startAngle, rawEndAngle));
+        const endAngle = Number.isFinite(span) ? startAngle + span : rawEndAngle;
         return {
             [keys.centerX]: Math.round(Number(geometry.centerX ?? geometry.x ?? 0)),
             [keys.centerY]: Math.round(Number(geometry.centerY ?? geometry.y ?? 0)),
@@ -230,7 +232,11 @@ export function getOperatorRoiConfig(operator) {
             readNumberValue(values, 'EndAngle', 360),
             { allowFullCircle: true }
         );
-        const shape = span > 0 && span < 360 ? 'Arc' : 'Annulus';
+        const rawSpan = computeRawAngleSpanDegrees(
+            readNumberValue(values, 'StartAngle', 0),
+            readNumberValue(values, 'EndAngle', 360)
+        );
+        const shape = Math.abs(rawSpan) > 0 && Math.abs(rawSpan) < 360 ? 'Arc' : 'Annulus';
 
         return {
             supported: true,

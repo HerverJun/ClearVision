@@ -19,7 +19,8 @@ public static class ResultPathV1
 public enum ResultPathSegmentKind
 {
     ObjectKey = 0,
-    StableId = 1
+    StableId = 1,
+    Index = 2
 }
 
 public sealed record ResultPathSegment(ResultPathSegmentKind Kind, string Value)
@@ -27,6 +28,8 @@ public sealed record ResultPathSegment(ResultPathSegmentKind Kind, string Value)
     public static ResultPathSegment ObjectKey(string key) => new(ResultPathSegmentKind.ObjectKey, key);
 
     public static ResultPathSegment StableId(string stableId) => new(ResultPathSegmentKind.StableId, stableId);
+
+    public static ResultPathSegment Index(int index) => new(ResultPathSegmentKind.Index, index.ToString(CultureInfo.InvariantCulture));
 }
 
 public sealed record ResultPath(int Version, IReadOnlyList<ResultPathSegment> Segments, string CanonicalPath);
@@ -70,6 +73,8 @@ public sealed class ResultPathResolverOptions
 
     public IResultPathResourceClassifier ResourceClassifier { get; init; } =
         ResultPathDefaultResourceClassifier.Instance;
+
+    public bool RequireTerminalScalar { get; init; } = true;
 }
 
 public sealed class ResultPathDefaultResourceClassifier : IResultPathResourceClassifier
@@ -123,6 +128,7 @@ public static class ResultPathFormatter
             {
                 ResultPathSegmentKind.ObjectKey => FormatObjectKeySegment(segment.Value),
                 ResultPathSegmentKind.StableId => FormatStableIdSegment(segment.Value),
+                ResultPathSegmentKind.Index => FormatIndexSegment(segment.Value),
                 _ => throw new ArgumentOutOfRangeException(nameof(segments), "Unknown ResultPath segment kind.")
             });
         }
@@ -140,6 +146,8 @@ public static class ResultPathFormatter
     public static string FormatObjectKeySegment(string key) => $"[{FormatJsonString(key)}]";
 
     public static string FormatStableIdSegment(string stableId) => $"[@id={FormatJsonString(stableId)}]";
+
+    public static string FormatIndexSegment(string index) => $"[{index}]";
 
     internal static string FormatJsonString(string value)
     {
@@ -281,7 +289,47 @@ public static class ResultPathParser
             return ParseStableIdSegment(path, bracketIndex, segmentIndex);
         }
 
+        if (char.IsDigit(path[bracketIndex + 1]))
+        {
+            return ParseIndexSegment(path, bracketIndex, segmentIndex);
+        }
+
         return SegmentFailure("RP104", "Unsupported ResultPath bracket segment syntax.", segmentIndex);
+    }
+
+    private static SegmentParseResult ParseIndexSegment(string path, int bracketIndex, int segmentIndex)
+    {
+        var indexStart = bracketIndex + 1;
+        var indexEnd = indexStart;
+        while (indexEnd < path.Length && char.IsDigit(path[indexEnd]))
+        {
+            indexEnd++;
+        }
+
+        if (indexEnd >= path.Length || path[indexEnd] != ']')
+        {
+            return SegmentFailure("RP105", "Index segment must end immediately after digits.", segmentIndex);
+        }
+
+        var rawIndex = path[indexStart..indexEnd];
+        if (rawIndex.Length > 1 && rawIndex[0] == '0')
+        {
+            return SegmentFailure("RP107", "Index segment is valid but not canonical.", segmentIndex);
+        }
+
+        if (!int.TryParse(rawIndex, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
+        {
+            return SegmentFailure("RP109", "Index segment is outside the supported integer range.", segmentIndex);
+        }
+
+        var canonical = ResultPathFormatter.FormatIndexSegment(index.ToString(CultureInfo.InvariantCulture));
+        var actual = path[bracketIndex..(indexEnd + 1)];
+        if (!string.Equals(canonical, actual, StringComparison.Ordinal))
+        {
+            return SegmentFailure("RP107", "Index segment is valid but not canonical.", segmentIndex);
+        }
+
+        return SegmentParseResult.Success(ResultPathSegment.Index(index), indexEnd + 1);
     }
 
     private static SegmentParseResult ParseObjectKeySegment(string path, int bracketIndex, int segmentIndex)
@@ -497,6 +545,12 @@ public static class ResultPathResolver
                         return Failure(path, stableDiagnostic!);
                     }
                     break;
+                case ResultPathSegmentKind.Index:
+                    if (!TryResolveIndex(current, segment.Value, out current, out var indexDiagnostic, segmentIndex))
+                    {
+                        return Failure(path, indexDiagnostic!);
+                    }
+                    break;
                 default:
                     return Failure(path, new ResultPathDiagnostic("RP104", "Unsupported ResultPath segment kind.", segmentIndex));
             }
@@ -545,6 +599,11 @@ public static class ResultPathResolver
         if (options.ResourceClassifier.IsForbiddenResource(value))
         {
             return new ResultPathDiagnostic("RP119", "ResultPath resolved to a forbidden resource value.", segmentIndex);
+        }
+
+        if (!options.RequireTerminalScalar)
+        {
+            return null;
         }
 
         if (IsScalarValue(value, out var scalarDiagnostic))
@@ -599,6 +658,111 @@ public static class ResultPathResolver
             ? new ResultPathDiagnostic("RP111", "ResultPath object key was not found.", segmentIndex)
             : new ResultPathDiagnostic("RP110", "Object-key segment requires an approved string-key dictionary or JSON object container.", segmentIndex);
         return false;
+    }
+
+    private static bool TryResolveIndex(
+        object? value,
+        string rawIndex,
+        out object? resolved,
+        out ResultPathDiagnostic? diagnostic,
+        int segmentIndex)
+    {
+        resolved = null;
+        diagnostic = null;
+        if (!int.TryParse(rawIndex, NumberStyles.None, CultureInfo.InvariantCulture, out var index) || index < 0)
+        {
+            diagnostic = new ResultPathDiagnostic("RP109", "Index segment is outside the supported integer range.", segmentIndex);
+            return false;
+        }
+
+        if (value is JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Array)
+            {
+                diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+                return false;
+            }
+
+            if (index >= element.GetArrayLength())
+            {
+                diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
+                return false;
+            }
+
+            resolved = element.EnumerateArray().ElementAt(index).Clone();
+            return true;
+        }
+
+        if (value is IList list)
+        {
+            if (index >= list.Count)
+            {
+                diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
+                return false;
+            }
+
+            resolved = list[index];
+            return true;
+        }
+
+        if (value is Array array)
+        {
+            if (index >= array.Length)
+            {
+                diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
+                return false;
+            }
+
+            resolved = array.GetValue(index);
+            return true;
+        }
+
+        if (IsDictionaryLike(value))
+        {
+            diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+            return false;
+        }
+
+        if (value is IEnumerable enumerable)
+        {
+            var scanned = 0;
+            foreach (var item in enumerable)
+            {
+                if (scanned >= ResultPathV1.MaxStableCollectionScanCount)
+                {
+                    diagnostic = new ResultPathDiagnostic("RP116", "Index collection scan exceeded the configured limit.", segmentIndex);
+                    return false;
+                }
+
+                if (scanned == index)
+                {
+                    resolved = item;
+                    return true;
+                }
+
+                scanned++;
+            }
+
+            diagnostic = new ResultPathDiagnostic("RP121", "ResultPath index was outside the collection bounds.", segmentIndex);
+            return false;
+        }
+
+        diagnostic = new ResultPathDiagnostic("RP120", "Index segment requires a JSON array or enumerable container.", segmentIndex);
+        return false;
+    }
+
+    private static bool IsDictionaryLike(object? value)
+    {
+        if (value is IDictionary)
+        {
+            return true;
+        }
+
+        var type = value?.GetType();
+        return type?.GetInterfaces().Any(static item =>
+            item.IsGenericType &&
+            (item.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
+             item.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>))) == true;
     }
 
     private static bool TryResolveStableId(

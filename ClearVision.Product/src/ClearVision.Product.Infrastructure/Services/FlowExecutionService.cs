@@ -16,6 +16,7 @@ using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ResultPaths;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Logging;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
@@ -33,6 +34,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
     private const int DefaultDebugCacheMaxEntries = 256;
+    private static readonly JsonSerializerOptions SpatialJsonOptions = new(JsonSerializerDefaults.Web);
     private const long DefaultDebugCacheMaxBytes = 128L * 1024 * 1024;
     private const long DefaultDebugCacheMaxEntryBytes = 32L * 1024 * 1024;
     private static readonly ConditionalWeakTable<OperatorFlow, FlowExecutionPlanCache> FlowExecutionPlanCaches = new();
@@ -2038,11 +2040,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                             if (sourcePort != null && targetPort != null)
                             {
                                 // Encoding cleanup: previous comment text was unreadable.
-                                if (sourceOutputs.TryGetValue(sourcePort.Name, out var data))
+                                if (TryResolveConnectedSourceOutputData(sourceOutputs, sourceOperator, sourcePort, out var data) && data != null)
                                 {
                                     // Encoding cleanup: previous comment text was unreadable.
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
+                                    PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, targetPort, inputs);
                                 }
                             }
                         }
@@ -2079,12 +2082,172 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return inputs;
     }
 
+    private void PropagateSpatialContextForConnection(
+        IReadOnlyDictionary<string, object> sourceOutputs,
+        OperatorConnection connection,
+        Operator? sourceOperator,
+        Port sourcePort,
+        Port targetPort,
+        Dictionary<string, object> inputs)
+    {
+        if (targetPort.DataType != PortDataType.Image)
+        {
+            return;
+        }
+
+        var candidates = CollectSpatialContextCandidates(sourceOutputs);
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var matching = candidates
+            .Where(candidate => SpatialContextMatchesConnection(candidate.Context, connection, sourcePort))
+            .ToList();
+
+        if (matching.Count == 1)
+        {
+            inputs[GetSpatialContextInputKey(targetPort.Name)] = matching[0].Context;
+            return;
+        }
+
+        var sourceName = sourceOperator?.Name ?? connection.SourceOperatorId.ToString();
+        if (matching.Count == 0)
+        {
+            _logger.LogWarning(
+                "[FlowExecution] SpatialContext sidecar was present on source {SourceOperator}.{SourcePort} but none matched binding SourceOperatorId/OutputPortId; target input {TargetPort} receives no context.",
+                SanitizeLogValue(sourceName),
+                SanitizeLogValue(sourcePort.Name),
+                SanitizeLogValue(targetPort.Name));
+            return;
+        }
+
+        _logger.LogWarning(
+            "[FlowExecution] Multiple SpatialContext sidecars matched source {SourceOperator}.{SourcePort}; target input {TargetPort} receives no context.",
+            SanitizeLogValue(sourceName),
+            SanitizeLogValue(sourcePort.Name),
+            SanitizeLogValue(targetPort.Name));
+    }
+
+    private static List<(string Key, SpatialContextV1 Context)> CollectSpatialContextCandidates(IReadOnlyDictionary<string, object> outputs)
+    {
+        var candidates = new List<(string Key, SpatialContextV1 Context)>();
+        foreach (var pair in outputs)
+        {
+            if (TryReadSpatialContextSidecar(pair.Value, out var context))
+            {
+                candidates.Add((pair.Key, context));
+            }
+        }
+
+        return candidates;
+    }
+
+    private static bool SpatialContextMatchesConnection(
+        SpatialContextV1 context,
+        OperatorConnection connection,
+        Port sourcePort)
+    {
+        var binding = context.Binding;
+        if (binding.SourceOperatorId.HasValue && binding.SourceOperatorId.Value != connection.SourceOperatorId)
+        {
+            return false;
+        }
+
+        if (binding.OutputPortId.HasValue)
+        {
+            return binding.OutputPortId.Value == connection.SourcePortId;
+        }
+
+        return !string.IsNullOrWhiteSpace(binding.OutputName) &&
+            binding.OutputName.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadSpatialContextSidecar(object? raw, out SpatialContextV1 context)
+    {
+        context = SpatialContextV1.DefaultImageFull();
+        switch (raw)
+        {
+            case SpatialContextV1 typed:
+                context = typed;
+                return true;
+            case JsonElement element:
+                try
+                {
+                    var parsed = element.Deserialize<SpatialContextV1>(SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            case string text when !string.IsNullOrWhiteSpace(text):
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<SpatialContextV1>(text, SpatialJsonOptions);
+                    if (parsed != null)
+                    {
+                        context = parsed;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    public static string GetSpatialContextInputKey(string targetInputPortName) =>
+        string.IsNullOrWhiteSpace(targetInputPortName)
+            ? RoiManagerOperator.SpatialContextOutputKey
+            : $"{targetInputPortName.Trim()}SpatialContext";
+
+    private static bool TryResolveConnectedSourceOutputData(
+        IReadOnlyDictionary<string, object> sourceOutputs,
+        Operator? sourceOperator,
+        Port sourcePort,
+        out object? data)
+    {
+        if (sourceOutputs.TryGetValue(sourcePort.Name, out data))
+        {
+            return true;
+        }
+
+        if (sourceOperator?.OutputPorts.Count == 1)
+        {
+            foreach (var key in new[] { "Image", "Mask", "Edges" })
+            {
+                if (sourceOutputs.TryGetValue(key, out data))
+                {
+                    return true;
+                }
+            }
+        }
+
+        data = null;
+        return false;
+    }
+
     private static bool ShouldSkipImplicitFallbackValue(
         string key,
         object? value,
         Operator? sourceOperator,
         Port? connectedSourcePort)
     {
+        if (IsSpatialContextFallbackValue(key, value))
+            return true;
+
         if (!ContainsImageWrapperReference(value))
             return false;
 
@@ -2106,6 +2269,27 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return false;
 
         return true;
+    }
+
+    private static bool IsSpatialContextFallbackValue(string key, object? value) =>
+        key.Contains("SpatialContext", StringComparison.OrdinalIgnoreCase) ||
+        value is SpatialContextV1 ||
+        value is JsonElement element && LooksLikeSpatialContextJson(element) ||
+        value is string text && LooksLikeSpatialContextJson(text);
+
+    private static bool LooksLikeSpatialContextJson(JsonElement element) =>
+        element.ValueKind == JsonValueKind.Object &&
+        (element.TryGetProperty("currentFrame", out _) ||
+         element.TryGetProperty("CurrentFrame", out _)) &&
+        (element.TryGetProperty("transforms", out _) ||
+         element.TryGetProperty("Transforms", out _));
+
+    private static bool LooksLikeSpatialContextJson(string text)
+    {
+        var trimmed = text.TrimStart();
+        return trimmed.StartsWith("{", StringComparison.Ordinal) &&
+            (trimmed.Contains("\"currentFrame\"", StringComparison.OrdinalIgnoreCase) ||
+             trimmed.Contains("\"CurrentFrame\"", StringComparison.Ordinal));
     }
 
     /// <summary>

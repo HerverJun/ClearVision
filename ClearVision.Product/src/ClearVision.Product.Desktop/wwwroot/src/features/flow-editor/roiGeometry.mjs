@@ -126,11 +126,19 @@ function getPointSequencePoints(geometry) {
                     return null;
                 }
 
+                const rawWorldX = point?.worldX ?? point?.WorldX ?? point?.physicalX ?? point?.PhysicalX;
+                const rawWorldY = point?.worldY ?? point?.WorldY ?? point?.physicalY ?? point?.PhysicalY;
+                const worldX = Number(rawWorldX);
+                const worldY = Number(rawWorldY);
+                if (!Number.isFinite(worldX) || !Number.isFinite(worldY)) {
+                    return null;
+                }
+
                 return {
                     x: imagePoint.x,
                     y: imagePoint.y,
-                    worldX: readNumber(point?.worldX ?? point?.WorldX ?? point?.physicalX ?? point?.PhysicalX, imagePoint.x),
-                    worldY: readNumber(point?.worldY ?? point?.WorldY ?? point?.physicalY ?? point?.PhysicalY, imagePoint.y),
+                    worldX,
+                    worldY,
                     enabled: point?.enabled ?? point?.Enabled ?? true
                 };
             })
@@ -294,6 +302,14 @@ export function computeClockwiseAngleSpanDegrees(startAngle, endAngle, options =
     return normalized;
 }
 
+export function computeRawAngleSpanDegrees(startAngle, endAngle) {
+    if (!Number.isFinite(Number(startAngle)) || !Number.isFinite(Number(endAngle))) {
+        return 0;
+    }
+
+    return Number(endAngle) - Number(startAngle);
+}
+
 export function angleDegreesFromCenter(center, point) {
     if (!isFinitePoint(center) || !isFinitePoint(point)) {
         return 0;
@@ -323,6 +339,15 @@ function maxContainedRadius(centerX, centerY, bounds, minRadius = 1) {
 
 export function normalizeCircleGeometry(circle, bounds, minRadius = 1) {
     const minimum = Math.max(1, readNumber(minRadius, 1));
+    if (!bounds) {
+        return {
+            kind: 'circle',
+            centerX: readNumber(circle?.centerX ?? circle?.x, 0),
+            centerY: readNumber(circle?.centerY ?? circle?.y, 0),
+            radius: Math.max(minimum, readNumber(circle?.radius, minimum))
+        };
+    }
+
     const normalizedBounds = normalizeBounds(bounds, minimum);
     const centerX = clamp(readNumber(circle?.centerX ?? circle?.x, normalizedBounds.width / 2), 0, normalizedBounds.width);
     const centerY = clamp(readNumber(circle?.centerY ?? circle?.y, normalizedBounds.height / 2), 0, normalizedBounds.height);
@@ -350,11 +375,16 @@ export function validateCircleGeometry(circle, bounds = null, minRadius = 1) {
         errors.push('radius');
     }
 
-    if (bounds) {
-        const normalized = normalizeCircleGeometry(circle, bounds, minimum);
-        if (Math.round(normalized.centerX) !== Math.round(Number(circle?.centerX)) ||
-            Math.round(normalized.centerY) !== Math.round(Number(circle?.centerY)) ||
-            Math.round(normalized.radius) !== Math.round(Number(circle?.radius))) {
+    if (bounds && errors.length === 0) {
+        const normalizedBounds = normalizeBounds(bounds, minimum);
+        const centerX = Number(circle?.centerX);
+        const centerY = Number(circle?.centerY);
+        const radius = Number(circle?.radius);
+        const intersectsImage = centerX + radius > 0 &&
+            centerY + radius > 0 &&
+            centerX - radius < normalizedBounds.width &&
+            centerY - radius < normalizedBounds.height;
+        if (!intersectsImage) {
             errors.push('bounds');
         }
     }
@@ -367,25 +397,40 @@ export function validateCircleGeometry(circle, bounds = null, minRadius = 1) {
 
 export function normalizeAnnulusGeometry(annulus, bounds, options = {}) {
     const minimumOuter = Math.max(1, readNumber(options.minRadius, 1));
+    if (!bounds) {
+        const startAngle = readNumber(annulus?.startAngle, 0);
+        const endAngle = readNumber(annulus?.endAngle, 360);
+        const spanDegrees = computeRawAngleSpanDegrees(startAngle, endAngle);
+        return {
+            kind: annulus?.kind === 'arc' || Math.abs(spanDegrees) < 360 ? 'arc' : 'annulus',
+            centerX: readNumber(annulus?.centerX ?? annulus?.x, 0),
+            centerY: readNumber(annulus?.centerY ?? annulus?.y, 0),
+            innerRadius: Math.max(0, readNumber(annulus?.innerRadius, 0)),
+            outerRadius: Math.max(minimumOuter, readNumber(annulus?.outerRadius ?? annulus?.radius, minimumOuter)),
+            startAngle,
+            endAngle,
+            spanDegrees
+        };
+    }
+
     const normalizedBounds = normalizeBounds(bounds, minimumOuter);
-    const centerX = clamp(readNumber(annulus?.centerX ?? annulus?.x, normalizedBounds.width / 2), 0, normalizedBounds.width);
-    const centerY = clamp(readNumber(annulus?.centerY ?? annulus?.y, normalizedBounds.height / 2), 0, normalizedBounds.height);
-    const maxRadius = maxContainedRadius(centerX, centerY, normalizedBounds, minimumOuter);
-    const outerRadius = clamp(readNumber(annulus?.outerRadius ?? annulus?.radius, minimumOuter), minimumOuter, maxRadius);
+    const centerX = readNumber(annulus?.centerX ?? annulus?.x, normalizedBounds.width / 2);
+    const centerY = readNumber(annulus?.centerY ?? annulus?.y, normalizedBounds.height / 2);
+    const outerRadius = Math.max(minimumOuter, readNumber(annulus?.outerRadius ?? annulus?.radius, minimumOuter));
     const innerRadius = clamp(readNumber(annulus?.innerRadius, 0), 0, Math.max(0, outerRadius - minimumOuter));
-    const startAngle = normalizeAngleDegrees(annulus?.startAngle ?? 0);
-    const rawEnd = annulus?.endAngle ?? 360;
-    const spanDegrees = computeClockwiseAngleSpanDegrees(annulus?.startAngle ?? 0, rawEnd, { allowFullCircle: true });
+    const startAngle = readNumber(annulus?.startAngle, 0);
+    const rawEnd = readNumber(annulus?.endAngle, 360);
+    const spanDegrees = computeRawAngleSpanDegrees(startAngle, rawEnd);
 
     return {
-        kind: annulus?.kind === 'arc' || (spanDegrees > 0 && spanDegrees < 360) ? 'arc' : 'annulus',
+        kind: annulus?.kind === 'arc' || Math.abs(spanDegrees) < 360 ? 'arc' : 'annulus',
         centerX,
         centerY,
         innerRadius,
         outerRadius,
         startAngle,
-        endAngle: startAngle + (spanDegrees || 360),
-        spanDegrees: spanDegrees || 360
+        endAngle: rawEnd,
+        spanDegrees
     };
 }
 
@@ -412,17 +457,18 @@ export function validateAnnulusGeometry(annulus, bounds = null, options = {}) {
         errors.push('outerRadius');
     }
 
-    const span = computeClockwiseAngleSpanDegrees(start, end, { allowFullCircle: true });
-    if (annulus?.kind === 'arc' && (span <= 0 || span >= 360)) {
+    const span = computeRawAngleSpanDegrees(start, end);
+    if (annulus?.kind === 'arc' && span === 0) {
         errors.push('arcSpan');
     }
 
     if (bounds && errors.length === 0) {
-        const normalized = normalizeAnnulusGeometry(annulus, bounds, options);
-        if (Math.round(normalized.centerX) !== Math.round(Number(annulus.centerX)) ||
-            Math.round(normalized.centerY) !== Math.round(Number(annulus.centerY)) ||
-            Math.round(normalized.innerRadius) !== Math.round(inner) ||
-            Math.round(normalized.outerRadius) !== Math.round(outer)) {
+        const normalizedBounds = normalizeBounds(bounds, Math.max(1, readNumber(options.minRadius, 1)));
+        const intersectsImage = Number(annulus.centerX) + outer > 0 &&
+            Number(annulus.centerY) + outer > 0 &&
+            Number(annulus.centerX) - outer < normalizedBounds.width &&
+            Number(annulus.centerY) - outer < normalizedBounds.height;
+        if (!intersectsImage) {
             errors.push('bounds');
         }
     }
@@ -817,25 +863,7 @@ export function movePointSequencePoint(sequence, pointIndex, point, bounds = nul
 }
 
 export function appendPointSequencePoint(sequence, point, bounds = null) {
-    const points = normalizePointSequenceGeometry(sequence).points;
-    if (!isFinitePoint(point)) {
-        return normalizePointSequenceGeometry(sequence);
-    }
-
-    const next = {
-        kind: 'pointSequence',
-        points: [
-            ...points,
-            {
-                x: roundCoordinate(point.x),
-                y: roundCoordinate(point.y),
-                worldX: roundCoordinate(point.x),
-                worldY: roundCoordinate(point.y),
-                enabled: true
-            }
-        ]
-    };
-    return validatePointSequenceGeometry(next, bounds).valid ? next : normalizePointSequenceGeometry(sequence);
+    return normalizePointSequenceGeometry(sequence);
 }
 
 export function deletePointSequencePoint(sequence, pointIndex) {

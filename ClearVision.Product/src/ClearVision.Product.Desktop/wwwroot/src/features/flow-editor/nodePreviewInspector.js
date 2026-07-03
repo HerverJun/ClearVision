@@ -521,11 +521,29 @@ function normalizeImageSourceForCanvas(source) {
     return `data:image/png;base64,${trimmed}`;
 }
 
-function getSceneBaseImageSource(state) {
-    return normalizeImageSourceForCanvas(state?.presenter?.inputImageSrc) ||
-        normalizeImageSourceForCanvas(state?.inputImageBase64) ||
-        normalizeImageSourceForCanvas(state?.outputImageBase64) ||
-        null;
+function getSceneImageSize(scene) {
+    const width = Number(readOwn(scene, 'imageWidth', 'ImageWidth'));
+    const height = Number(readOwn(scene, 'imageHeight', 'ImageHeight'));
+    return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+        ? { width: Math.round(width), height: Math.round(height) }
+        : null;
+}
+
+function makeNeutralSceneImageSource(width, height) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}" viewBox="0 0 ${safeWidth} ${safeHeight}"><rect width="100%" height="100%" fill="#f8fafc"/><path d="M0 0H${safeWidth}V${safeHeight}H0Z" fill="none" stroke="#cbd5e1" stroke-width="1"/><text x="12" y="24" fill="#475569" font-family="sans-serif" font-size="14">Scene ${safeWidth} x ${safeHeight}</text></svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function getSceneBaseImageCandidates(state) {
+    return [
+        state?.presenter?.inputImageSrc,
+        state?.inputImageBase64,
+        state?.outputImageBase64
+    ]
+        .map(normalizeImageSourceForCanvas)
+        .filter(Boolean);
 }
 
 function normalizeScenePrimitive(primitive) {
@@ -544,13 +562,18 @@ function normalizeScenePrimitive(primitive) {
     const outputPortId = readOwn(primitive, 'outputPortId', 'OutputPortId');
     const resultPathVersion = readOwn(primitive, 'resultPathVersion', 'ResultPathVersion');
     const resultPath = readOwn(primitive, 'resultPath', 'ResultPath');
+    const hasCanonicalResultPath = outputPortId != null &&
+        Number(resultPathVersion) === 1 &&
+        typeof resultPath === 'string' &&
+        resultPath.trim().length > 0;
+
     return {
         primitiveId,
         kind,
         layer: asString(readOwn(primitive, 'layer', 'Layer'), 'scene'),
         zOrder: Number(readOwn(primitive, 'zOrder', 'ZOrder') || 0),
         visible: readOwn(primitive, 'visible', 'Visible') !== false,
-        selectable: readOwn(primitive, 'selectable', 'Selectable') !== false,
+        selectable: readOwn(primitive, 'selectable', 'Selectable') !== false && hasCanonicalResultPath,
         label: readOwn(primitive, 'label', 'Label') == null ? '' : asString(readOwn(primitive, 'label', 'Label')),
         geometry,
         style,
@@ -995,6 +1018,7 @@ export class NodePreviewInspector {
                 panel.appendChild(createElement('div', 'node-preview-inspector-empty-line', '暂无标注图像'));
             }
         } else {
+            const sceneSize = getSceneImageSize(scene);
             const stage = createElement('div', 'node-preview-inspector-scene-stage');
             stage.style.height = '280px';
             stage.style.minHeight = '220px';
@@ -1007,7 +1031,8 @@ export class NodePreviewInspector {
             this.pendingSceneRender = {
                 scene,
                 primitives,
-                imageSource: getSceneBaseImageSource(this.state),
+                imageCandidates: getSceneBaseImageCandidates(this.state),
+                sceneSize,
                 identitySignature: getObservationIdentitySignatureFromState(this.state)
             };
         }
@@ -1047,6 +1072,7 @@ export class NodePreviewInspector {
         const button = makeButton('node-preview-inspector-tree-content', primitive.label || primitive.primitiveId, () => {
             this.selectScenePrimitive(primitive);
         });
+        button.disabled = primitive.selectable !== true;
         button.appendChild(createElement('span', 'node-preview-inspector-node-kind', primitive.kind));
         button.appendChild(createElement('span', 'node-preview-inspector-node-path', primitive.resultPath || 'unmapped'));
         row.appendChild(button);
@@ -1069,6 +1095,10 @@ export class NodePreviewInspector {
         const overlays = pending.primitives
             .map(primitive => this.scenePrimitiveToOverlay(primitive))
             .filter(Boolean);
+        const isCurrentScene = () => !this.destroyed &&
+            this.sceneImageCanvas === sceneCanvas &&
+            pending.identitySignature === getObservationIdentitySignatureFromState(this.state);
+
         const applyOverlays = () => {
             if (this.destroyed ||
                 this.sceneImageCanvas !== sceneCanvas ||
@@ -1084,15 +1114,56 @@ export class NodePreviewInspector {
             }
         };
 
-        if (pending.imageSource) {
-            void sceneCanvas.loadImage(pending.imageSource)
-                .then(applyOverlays)
-                .catch(() => {
-                    applyOverlays();
-                });
-        } else {
+        const sceneSize = pending.sceneSize;
+        const tryLoadCandidate = async () => {
+            if (!sceneSize) {
+                return false;
+            }
+
+            for (const source of pending.imageCandidates || []) {
+                if (!isCurrentScene()) {
+                    return false;
+                }
+
+                try {
+                    const image = await sceneCanvas.loadImage(source);
+                    if (!isCurrentScene()) {
+                        sceneCanvas.destroy();
+                        return false;
+                    }
+
+                    if (Number(image?.width) === sceneSize.width && Number(image?.height) === sceneSize.height) {
+                        return true;
+                    }
+                } catch {
+                    // Try the next candidate; a scene overlay must not attach to an unverified base image.
+                }
+            }
+
+            return false;
+        };
+
+        const loadNeutralPlane = async () => {
+            if (!sceneSize || !isCurrentScene()) {
+                return false;
+            }
+
+            try {
+                await sceneCanvas.loadImage(makeNeutralSceneImageSource(sceneSize.width, sceneSize.height));
+                return isCurrentScene();
+            } catch {
+                return false;
+            }
+        };
+
+        void (async () => {
+            const loadedMatchingImage = await tryLoadCandidate();
+            const loadedSceneBase = loadedMatchingImage || await loadNeutralPlane();
+            if (sceneSize && !loadedSceneBase) {
+                return;
+            }
             applyOverlays();
-        }
+        })();
     }
 
     destroySceneCanvas() {
@@ -1161,6 +1232,24 @@ export class NodePreviewInspector {
             return {
                 ...common,
                 type: 'polyline',
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1,
+                points: Array.isArray(points)
+                    ? points.map(point => ({
+                        x: Number(readOwn(point, 'x', 'X') || 0),
+                        y: Number(readOwn(point, 'y', 'Y') || 0)
+                    }))
+                    : []
+            };
+        }
+
+        if (primitive.kind === 'polygon') {
+            const points = readOwn(geometry, 'points', 'Points');
+            return {
+                ...common,
+                type: 'polygon',
                 x: 0,
                 y: 0,
                 width: 1,
@@ -1331,6 +1420,16 @@ export class NodePreviewInspector {
     }
 
     selectScenePrimitive(primitive) {
+        if (!primitive || primitive.selectable !== true) {
+            this.activeScenePrimitiveId = null;
+            this.selectionStore?.clear?.();
+            if (this.sceneImageCanvas) {
+                this.sceneImageCanvas.selectedOverlay = null;
+                this.sceneImageCanvas.invalidate();
+            }
+            return null;
+        }
+
         this.activeScenePrimitiveId = primitive?.primitiveId || null;
         if (this.sceneImageCanvas) {
             this.sceneImageCanvas.selectedOverlay = this.activeScenePrimitiveId;
