@@ -1027,8 +1027,88 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldProjectBoundedCaliperFitV2SummaryInsteadOfRawTypedResult()
+    {
+        var targetOperator = CreateCaliperFitV2Operator();
+        var edgePoints = Enumerable.Range(0, 8)
+            .Select(index => CreateCaliperPoint(index, 100, 90, 30))
+            .ToArray();
+        var result = new CircleCaliperFitV2Result
+        {
+            Success = true,
+            CenterX = 100,
+            CenterY = 90,
+            Radius = 30,
+            EdgePoints = edgePoints,
+            InlierPoints = edgePoints.Take(6).ToArray(),
+            OutlierPoints = edgePoints.Skip(6).Take(1).ToArray(),
+            CoverageRatio = 0.82,
+            AngularCoverageDegrees = 270,
+            ResidualRmse = 0.41,
+            ResidualMax = 0.9,
+            CollectedPointCount = edgePoints.Length,
+            ValidCaliperCount = 6,
+            RejectedCaliperCount = 2,
+            ResolvedPolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            Confidence = 0.72,
+            UncertaintyPx = 0.44,
+            Diagnostics =
+            [
+                new CircleCaliperFitV2Diagnostic("fit.residualRmse", "Final residual RMSE.", 0.41)
+            ],
+            ProfileEvidence =
+            [
+                new CircleCaliperFitV2ProfileEvidence(
+                    CircleCaliperFitV2ProfileEvidence.ContractVersionValue,
+                    0,
+                    0,
+                    80,
+                    90,
+                    120,
+                    90,
+                    129,
+                    3,
+                    4,
+                    64,
+                    18,
+                    "LightToDark",
+                    [1.0, 2.0, 3.0])
+            ]
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 240,
+                ["Height"] = 180,
+                ["CaliperFitV2Result"] = result
+            },
+            targetOperator: targetOperator);
+
+        var summary = observation.Detail.Children.Should().ContainSingle(child => child.Name == "CaliperFitV2Result").Subject;
+        summary.Kind.Should().Be("caliperFitV2Summary");
+        summary.Truncated.Should().BeTrue();
+        summary.Children.Select(child => child.Name).Should().Contain(new[]
+        {
+            "Success",
+            "FailureCode",
+            "Circle",
+            "PointCount",
+            "CoverageRatio",
+            "ResidualRmse",
+            "Polarity",
+            "Confidence",
+            "UncertaintyPx",
+            "ProfileEvidenceCount",
+            "Diagnostics"
+        });
+        summary.Children.Select(child => child.Name).Should().NotContain(new[] { "EdgePoints", "InlierPoints", "OutlierPoints" });
+    }
+
+    [Fact]
     public void CreatePreviewObservation_ShouldDownsampleCaliperFitV2SceneWithinPrimitiveBudget()
     {
+        var edgePortId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var targetOperator = CreateCaliperFitV2Operator(caliperCount: 720);
         var edgePoints = Enumerable.Range(0, 720)
             .Select(index => CreateCaliperPoint(index, 100, 90, 30))
@@ -1053,11 +1133,27 @@ public sealed class ExecutionObservationProjectorTests
                 ["InlierPoints"] = result.InlierPoints.Select(point => new Position(point.X, point.Y)).ToList(),
                 ["OutlierPoints"] = result.OutlierPoints.Select(point => new Position(point.X, point.Y)).ToList()
             },
+            [
+                new ExecutionObservationOutputPortV1 { Id = edgePortId, Name = "EdgePoints" }
+            ],
             targetOperator: targetOperator);
 
         var scene = observation.VisualScene!;
         scene.Primitives.Should().HaveCountLessThanOrEqualTo(ExecutionVisualSceneProjector.MaxPrimitives);
         scene.Primitives.Count(primitive => primitive.Layer == "circle-search-calipers").Should().BeLessThanOrEqualTo(48);
+        var candidatePrimitives = scene.Primitives
+            .Where(primitive => primitive.Layer == "circle-search-candidates")
+            .ToArray();
+        var candidateCaliperIndexes = candidatePrimitives
+            .Select(primitive => int.Parse(primitive.PrimitiveId.Split(':').Last(), CultureInfo.InvariantCulture))
+            .ToArray();
+        candidateCaliperIndexes.Should().Contain(0);
+        candidateCaliperIndexes.Max().Should().BeGreaterThan(650);
+        candidateCaliperIndexes.Should().Contain(index => index > 80);
+        var highCandidate = candidatePrimitives
+            .OrderByDescending(primitive => int.Parse(primitive.PrimitiveId.Split(':').Last(), CultureInfo.InvariantCulture))
+            .First();
+        highCandidate.ResultPath.Should().Be($"$[{candidateCaliperIndexes.Max().ToString(CultureInfo.InvariantCulture)}]");
         scene.Truncated.Should().BeTrue();
         scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-circle-calipers-truncated");
     }

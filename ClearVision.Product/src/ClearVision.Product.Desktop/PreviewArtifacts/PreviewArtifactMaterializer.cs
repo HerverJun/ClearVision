@@ -337,12 +337,13 @@ public sealed class PreviewArtifactMaterializer
         out object? materialized)
     {
         materialized = null;
-        if (!TryReadKnownFiniteCollection(value, out var count, out var readItem, out var itemKind))
+        if (!TryReadKnownFiniteCollection(value, out var count, out var readItem, out var itemKind, out var itemType))
         {
             return false;
         }
 
-        if (count <= InlineCollectionThreshold)
+        var forceArtifact = itemType == typeof(CircleCaliperFitV2ProfileEvidence) && count > 0;
+        if (!forceArtifact && count <= InlineCollectionThreshold)
         {
             materialized = value;
             return true;
@@ -373,6 +374,24 @@ public sealed class PreviewArtifactMaterializer
         }
 
         var bytes = JsonSerializer.SerializeToUtf8Bytes(jsonSafeItems, JsonOptions);
+        if (forceArtifact && bytes.Length > CircleCaliperFitV2Request.MaxProfileEvidenceArtifactBytes)
+        {
+            diagnostics.Add($"PreviewArtifactProfileEvidenceTooLarge at {pathHint}: {bytes.Length.ToString(CultureInfo.InvariantCulture)} bytes.");
+            materialized = Descriptor(
+                "profile",
+                "CaliperFitV2 profile evidence exceeded the bounded artifact byte budget; artifact omitted.",
+                pathHint,
+                value,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["itemKind"] = itemKind,
+                    ["count"] = count.ToString(CultureInfo.InvariantCulture),
+                    ["bytes"] = bytes.Length.ToString(CultureInfo.InvariantCulture),
+                    ["maxBytes"] = CircleCaliperFitV2Request.MaxProfileEvidenceArtifactBytes.ToString(CultureInfo.InvariantCulture)
+                });
+            return true;
+        }
+
         var role = ResolveRole(sourceKey, itemKind == "point" ? "pointSet" : "profile");
         if (!TryAddBytesArtifact(
                 batch,
@@ -407,7 +426,8 @@ public sealed class PreviewArtifactMaterializer
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["itemKind"] = itemKind,
-                ["count"] = count.ToString(CultureInfo.InvariantCulture)
+                ["count"] = count.ToString(CultureInfo.InvariantCulture),
+                ["bytes"] = bytes.Length.ToString(CultureInfo.InvariantCulture)
             },
             artifact);
         return true;
@@ -490,13 +510,15 @@ public sealed class PreviewArtifactMaterializer
         object value,
         out int count,
         out Func<int, object?> readItem,
-        out string itemKind)
+        out string itemKind,
+        out Type? itemType)
     {
         count = 0;
         readItem = _ => null;
         itemKind = string.Empty;
+        itemType = null;
         var type = value.GetType();
-        var itemType = ResolveFiniteCollectionItemType(type);
+        itemType = ResolveFiniteCollectionItemType(type);
         if (itemType == null || !IsSupportedFiniteArtifactItemType(itemType, out itemKind))
         {
             return false;
@@ -535,7 +557,8 @@ public sealed class PreviewArtifactMaterializer
     {
         if (type == typeof(float) ||
             type == typeof(double) ||
-            type == typeof(int))
+            type == typeof(int) ||
+            type == typeof(CircleCaliperFitV2ProfileEvidence))
         {
             kind = "profile";
             return true;
@@ -571,6 +594,23 @@ public sealed class PreviewArtifactMaterializer
                 radius = point.Radius,
                 strength = point.Strength,
                 polarity = point.Polarity
+            },
+            CircleCaliperFitV2ProfileEvidence evidence => new
+            {
+                contractVersion = evidence.ContractVersion,
+                caliperIndex = evidence.CaliperIndex,
+                angleDegrees = evidence.AngleDegrees,
+                startX = evidence.StartX,
+                startY = evidence.StartY,
+                endX = evidence.EndX,
+                endY = evidence.EndY,
+                originalSampleCount = evidence.OriginalSampleCount,
+                sampleStride = evidence.SampleStride,
+                threshold = evidence.Threshold,
+                selectedPosition = evidence.SelectedPosition,
+                selectedStrength = evidence.SelectedStrength,
+                selectedPolarity = evidence.SelectedPolarity,
+                samples = evidence.Samples
             },
             float number when float.IsFinite(number) => number,
             double number when double.IsFinite(number) => number,

@@ -333,6 +333,56 @@ public sealed class PreviewArtifactStoreTests
     }
 
     [Fact]
+    public void Materializer_MaterializesCaliperProfileEvidenceAsBoundedProfileArtifact()
+    {
+        using var store = new PreviewArtifactStore();
+        var materializer = new PreviewArtifactMaterializer(store, NullLogger<PreviewArtifactMaterializer>.Instance);
+        var profiles = Enumerable.Range(0, CircleCaliperFitV2Request.MaxProfileEvidenceCount)
+            .Select(index => new CircleCaliperFitV2ProfileEvidence(
+                CircleCaliperFitV2ProfileEvidence.ContractVersionValue,
+                index * 4,
+                index * 15.0,
+                10,
+                20,
+                30,
+                40,
+                257,
+                5,
+                4.5,
+                32.0,
+                19.0,
+                "LightToDark",
+                Enumerable.Range(0, CircleCaliperFitV2Request.MaxProfileEvidenceSamplesPerProfile).Select(sample => (double)sample).ToArray()))
+            .ToArray();
+
+        using var result = materializer.MaterializePreview(
+            CreateOwner(),
+            new Dictionary<string, object> { ["CaliperProfileEvidence"] = profiles },
+            inputImageBytes: null,
+            outputImageBytes: null,
+            CancellationToken.None);
+        result.Commit();
+
+        var artifact = result.Artifacts.Should().ContainSingle().Subject;
+        artifact.Kind.Should().Be("profile");
+        artifact.Role.Should().Be("profile");
+        artifact.ContentType.Should().Be("application/json");
+        artifact.Length.Should().BeLessThan(CircleCaliperFitV2Request.MaxProfileEvidenceArtifactBytes);
+
+        var value = result.OutputData["CaliperProfileEvidence"].Should().BeOfType<PreviewArtifactValue>().Subject;
+        value.Kind.Should().Be("profile");
+        value.Artifact.Should().BeSameAs(artifact);
+        value.Metadata.Should().Contain("count", CircleCaliperFitV2Request.MaxProfileEvidenceCount.ToString());
+        value.Metadata.Should().Contain("itemKind", "profile");
+
+        store.TryRead(artifact.ArtifactId, out var read).Should().BeTrue();
+        var json = Encoding.UTF8.GetString(read!.Bytes);
+        json.Should().Contain(CircleCaliperFitV2ProfileEvidence.ContractVersionValue);
+        json.Should().Contain("\"caliperIndex\":0");
+        json.Should().Contain("\"caliperIndex\":92");
+    }
+
+    [Fact]
     public void Materializer_CancelDoesNotReplaceExistingOwnerArtifacts()
     {
         using var store = new PreviewArtifactStore(new PreviewArtifactStoreOptions

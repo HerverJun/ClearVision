@@ -268,6 +268,53 @@ public class CircleCaliperFitV2KernelTests
     }
 
     [Fact]
+    public void Fit_WithAutoPolarity_ShouldBudgetBothHypothesesBeforeSampling()
+    {
+        using var gray = CreateFilledCircleImage(640, 640, 320, 320, 120, 0, 235);
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(320, 320, 120) with
+        {
+            MinRadius = 100,
+            MaxRadius = 140,
+            NominalRadius = 120,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.Auto,
+            CaliperCount = 512,
+            ProfileSampleCount = 4096,
+            AveragingThickness = 2
+        });
+
+        result.Success.Should().BeFalse();
+        result.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InvalidInput);
+        result.CollectedPointCount.Should().Be(0);
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == "sampling.work-budget" &&
+            diagnostic.Value.HasValue &&
+            diagnostic.Value.Value > CircleCaliperFitV2Request.MaxSamplingWorkUnits);
+    }
+
+    [Fact]
+    public void Fit_WithProfileEvidence_ShouldReturnVersionedBoundedFullCircleProfilesFromSingleRun()
+    {
+        using var gray = CreateFilledCircleImage(320, 240, 160.25, 120.75, 55.4, 0, 230);
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(160.25, 120.75, 55.4) with
+        {
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            ProfileSampleCount = 257,
+            IncludeProfileEvidence = true
+        });
+
+        result.Success.Should().BeTrue(result.FailureMessage);
+        result.ProfileEvidence.Should().HaveCount(CircleCaliperFitV2Request.MaxProfileEvidenceCount);
+        result.ProfileEvidence.Sum(item => item.Samples.Count).Should().BeLessThanOrEqualTo(CircleCaliperFitV2Request.MaxProfileEvidenceTotalSamples);
+        result.ProfileEvidence.Should().OnlyContain(item =>
+            item.ContractVersion == CircleCaliperFitV2ProfileEvidence.ContractVersionValue &&
+            item.Samples.Count <= CircleCaliperFitV2Request.MaxProfileEvidenceSamplesPerProfile &&
+            item.OriginalSampleCount == 257);
+        result.ProfileEvidence.Select(item => item.CaliperIndex).Should().OnlyHaveUniqueItems();
+        result.ProfileEvidence.Min(item => item.CaliperIndex).Should().Be(0);
+        result.ProfileEvidence.Max(item => item.CaliperIndex).Should().BeGreaterThan(80);
+    }
+
+    [Fact]
     public void Fit_WithHuberMode_ShouldUseDeterministicWeightedFitDistinctFromMadAndNone()
     {
         using var gray = CreateCircleWithRadialOutlierSectorImage();
@@ -299,6 +346,30 @@ public class CircleCaliperFitV2KernelTests
         huberRepeat.CenterY.Should().Be(huber.CenterY);
         huberRepeat.Radius.Should().Be(huber.Radius);
         huberRepeat.InlierPoints.Select(point => point.CaliperIndex).Should().Equal(huber.InlierPoints.Select(point => point.CaliperIndex));
+    }
+
+    [Fact]
+    public void Fit_WithMadModeAtIterationLimit_ShouldReportNotConverged()
+    {
+        using var gray = CreateCircleWithRadialOutlierSectorImage();
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(160, 120, 56) with
+        {
+            MaxRadius = 104,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            MinValidCalipers = 24,
+            MaxResidualRmse = 20.0,
+            OutlierThreshold = 1.5,
+            OutlierMode = CircleCaliperFitV2OutlierMode.Mad,
+            MaxOutlierIterations = 1
+        });
+
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == "outlier.iterations" &&
+            diagnostic.Value == 1.0);
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == "outlier.converged" &&
+            diagnostic.Value == 0.0 &&
+            diagnostic.Message.Contains("stopped before convergence", StringComparison.Ordinal));
     }
 
     [Fact]

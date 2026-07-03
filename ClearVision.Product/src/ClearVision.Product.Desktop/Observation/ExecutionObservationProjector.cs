@@ -334,6 +334,11 @@ public static class ExecutionObservationProjector
             return ResourceNode(value, path, safeName, context);
         }
 
+        if (value is CircleCaliperFitV2Result caliperFitV2Result)
+        {
+            return ProjectCaliperFitV2Result(caliperFitV2Result, path, safeName, depth, context);
+        }
+
         if (!IsValueTypeLike(value) && !context.EnterReference(value, path.Value))
         {
             context.AddDiagnostic("circular-reference", "Circular reference omitted.", path.Value);
@@ -709,6 +714,33 @@ public static class ExecutionObservationProjector
             DisplayValue = $"Detection {ClipForDisplay(detection.Label)}",
             OriginalType = typeof(DetectionResult).FullName,
             Children = children,
+            PathHint = path.Value,
+            Addressable = false,
+            Name = name
+        }, path, context);
+    }
+
+    private static ExecutionObservationDetailNodeV1 ProjectCaliperFitV2Result(
+        CircleCaliperFitV2Result result,
+        PathInfo path,
+        string? name,
+        int depth,
+        ProjectionContext context)
+    {
+        var fields = BuildCaliperFitV2SummaryFields(result);
+        var children = fields
+            .Select(field => ProjectDetailNode(field.Value, AppendObjectKey(path, field.Name, context), field.Name, depth + 1, true, context))
+            .ToList();
+
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
+        {
+            Kind = "caliperFitV2Summary",
+            DisplayValue = result.Success
+                ? $"CaliperFitV2 OK points={result.CollectedPointCount.ToString(CultureInfo.InvariantCulture)}"
+                : $"CaliperFitV2 {result.FailureCode} points={result.CollectedPointCount.ToString(CultureInfo.InvariantCulture)}",
+            OriginalType = typeof(CircleCaliperFitV2Result).FullName,
+            Children = children,
+            Truncated = result.EdgePoints.Count > 0 || result.InlierPoints.Count > 0 || result.OutlierPoints.Count > 0,
             PathHint = path.Value,
             Addressable = false,
             Name = name
@@ -1162,6 +1194,11 @@ public static class ExecutionObservationProjector
             return scalar;
         }
 
+        if (value is CircleCaliperFitV2Result caliperFitV2Result)
+        {
+            return BuildCaliperFitV2SummaryDictionary(caliperFitV2Result);
+        }
+
         if (IsResourceLike(value))
         {
             return BuildResourceDescriptor(value).ToLegacyDictionary();
@@ -1369,6 +1406,65 @@ public static class ExecutionObservationProjector
             ["Height"] = SanitizeFiniteNumber(detection.Height, context),
             ["Area"] = SanitizeFiniteNumber(detection.Area, context)
         };
+
+    private static List<(string Name, object? Value)> BuildCaliperFitV2SummaryFields(CircleCaliperFitV2Result result)
+    {
+        return
+        [
+            ("ContractVersion", result.ContractVersion),
+            ("Success", result.Success),
+            ("FailureCode", result.FailureCode.ToString()),
+            ("Circle", BuildCaliperFitV2CircleSummary(result)),
+            ("PointCount", result.CollectedPointCount),
+            ("ValidCaliperCount", result.ValidCaliperCount),
+            ("RejectedCaliperCount", result.RejectedCaliperCount),
+            ("CoverageRatio", FiniteOrNull(result.CoverageRatio)),
+            ("AngularCoverageDegrees", FiniteOrNull(result.AngularCoverageDegrees)),
+            ("ResidualRmse", FiniteOrNull(result.ResidualRmse)),
+            ("ResidualMax", FiniteOrNull(result.ResidualMax)),
+            ("Polarity", result.ResolvedPolarity.ToString()),
+            ("Confidence", FiniteOrNull(result.Confidence)),
+            ("UncertaintyPx", FiniteOrNull(result.UncertaintyPx)),
+            ("ProfileEvidenceCount", result.ProfileEvidence.Count),
+            ("Diagnostics", BuildCaliperFitV2DiagnosticSummary(result.Diagnostics))
+        ];
+    }
+
+    private static Dictionary<string, object?> BuildCaliperFitV2SummaryDictionary(CircleCaliperFitV2Result result) =>
+        BuildCaliperFitV2SummaryFields(result)
+            .ToDictionary(field => field.Name, field => field.Value, StringComparer.OrdinalIgnoreCase);
+
+    private static object? BuildCaliperFitV2CircleSummary(CircleCaliperFitV2Result result)
+    {
+        if (!result.Success ||
+            !result.CenterX.HasValue ||
+            !result.CenterY.HasValue ||
+            !result.Radius.HasValue)
+        {
+            return null;
+        }
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["centerX"] = FiniteOrNull(result.CenterX.Value),
+            ["centerY"] = FiniteOrNull(result.CenterY.Value),
+            ["radius"] = FiniteOrNull(result.Radius.Value)
+        };
+    }
+
+    private static List<Dictionary<string, object?>> BuildCaliperFitV2DiagnosticSummary(
+        IReadOnlyList<CircleCaliperFitV2Diagnostic> diagnostics) =>
+        diagnostics
+            .Take(8)
+            .Select(static diagnostic => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["code"] = ClipForDisplay(diagnostic.Code ?? string.Empty),
+                ["message"] = ClipForDisplay(diagnostic.Message ?? string.Empty),
+                ["value"] = diagnostic.Value.HasValue ? FiniteOrNull(diagnostic.Value.Value) : null
+            })
+            .ToList();
+
+    private static object? FiniteOrNull(double value) => double.IsFinite(value) ? value : null;
 
     private static object SanitizeFiniteNumber(float value, LegacySanitizationContext context)
     {

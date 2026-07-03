@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T22:05:12.1815815+08:00",
+  "generatedAt": "2026-07-04T02:29:41.8693597+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -3305,7 +3305,7 @@
       "displayName": "圆测量",
       "description": "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
       "category": "检测",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
@@ -3390,6 +3390,12 @@
         {
           "name": "CaliperDiagnostics",
           "displayName": "V2 诊断",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "CaliperProfileEvidence",
+          "displayName": "V2 profile evidence",
           "dataType": "Any",
           "isRequired": null
         }

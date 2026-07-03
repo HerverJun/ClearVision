@@ -37,6 +37,10 @@ public sealed record CircleCaliperFitV2Request
     public const int MaxCaliperCountLimit = 720;
     public const int MaxProfileSampleCountLimit = 4096;
     public const long MaxSamplingWorkUnits = 8_000_000;
+    public const int MaxProfileEvidenceCount = 24;
+    public const int MaxProfileEvidenceSamplesPerProfile = 64;
+    public const int MaxProfileEvidenceTotalSamples = MaxProfileEvidenceCount * MaxProfileEvidenceSamplesPerProfile;
+    public const int MaxProfileEvidenceArtifactBytes = 64 * 1024;
 
     public double SearchCenterX { get; init; }
     public double SearchCenterY { get; init; }
@@ -57,6 +61,7 @@ public sealed record CircleCaliperFitV2Request
     public double OutlierThreshold { get; init; } = 3.5;
     public int MaxOutlierIterations { get; init; } = 3;
     public double MaxResidualRmse { get; init; } = 2.0;
+    public bool IncludeProfileEvidence { get; init; }
 }
 
 public sealed record CircleCaliperFitV2Point(
@@ -69,6 +74,25 @@ public sealed record CircleCaliperFitV2Point(
     string Polarity);
 
 public sealed record CircleCaliperFitV2Diagnostic(string Code, string Message, double? Value = null);
+
+public sealed record CircleCaliperFitV2ProfileEvidence(
+    string ContractVersion,
+    int CaliperIndex,
+    double AngleDegrees,
+    double StartX,
+    double StartY,
+    double EndX,
+    double EndY,
+    int OriginalSampleCount,
+    int SampleStride,
+    double Threshold,
+    double? SelectedPosition,
+    double? SelectedStrength,
+    string? SelectedPolarity,
+    IReadOnlyList<double> Samples)
+{
+    public const string ContractVersionValue = "caliper-circle-fit.v2.profile-evidence.v1";
+}
 
 public sealed class CircleCaliperFitV2Result
 {
@@ -93,6 +117,7 @@ public sealed class CircleCaliperFitV2Result
     public double Confidence { get; init; }
     public double UncertaintyPx { get; init; } = double.NaN;
     public IReadOnlyList<CircleCaliperFitV2Diagnostic> Diagnostics { get; init; } = Array.Empty<CircleCaliperFitV2Diagnostic>();
+    public IReadOnlyList<CircleCaliperFitV2ProfileEvidence> ProfileEvidence { get; init; } = Array.Empty<CircleCaliperFitV2ProfileEvidence>();
     public string ContractVersion { get; init; } = CircleCaliperFitV2Request.ContractVersionValue;
 }
 
@@ -160,7 +185,8 @@ public static class CircleCaliperFitV2Kernel
                 best.AngularCoverageDegrees,
                 best.ResidualRmse,
                 best.ResidualMax,
-                best.MedianEdgeStrength).ToResult(request.CaliperCount);
+                best.MedianEdgeStrength,
+                best.ProfileEvidence).ToResult(request.CaliperCount);
         }
 
         return successes[0].ToResult(request.CaliperCount);
@@ -300,6 +326,12 @@ public static class CircleCaliperFitV2Kernel
             new("polarity", $"Evaluating {polarity}.")
         };
         var edgePoints = new List<CircleCaliperFitV2Point>(request.CaliperCount);
+        var profileEvidence = request.IncludeProfileEvidence
+            ? new List<CircleCaliperFitV2ProfileEvidence>(Math.Min(request.CaliperCount, CircleCaliperFitV2Request.MaxProfileEvidenceCount))
+            : null;
+        var profileEvidenceIndexes = request.IncludeProfileEvidence
+            ? BuildProfileEvidenceCaliperIndexes(request.CaliperCount)
+            : new HashSet<int>();
         var ambiguousCalipers = 0;
         var polarityName = polarity.ToString();
         var radiusSpan = request.MaxRadius - request.MinRadius;
@@ -338,6 +370,12 @@ public static class CircleCaliperFitV2Kernel
                 .ThenBy(edge => edge.Position)
                 .ToArray();
 
+            IndustrialCaliperEdge? selected = edges.Length > 0 ? edges[0] : null;
+            if (profileEvidence != null && profileEvidenceIndexes.Contains(i))
+            {
+                profileEvidence.Add(CreateProfileEvidence(i, angle, start, end, profile, threshold, selected));
+            }
+
             if (edges.Length == 0)
             {
                 continue;
@@ -348,17 +386,16 @@ public static class CircleCaliperFitV2Kernel
                 ambiguousCalipers++;
             }
 
-            var selected = edges[0];
-            var point = IndustrialCaliperKernel.InterpolatePosition(start, end, selected.Position, request.ProfileSampleCount);
-            var radius = request.MinRadius + ((selected.Position / Math.Max(request.ProfileSampleCount - 1, 1)) * radiusSpan);
+            var point = IndustrialCaliperKernel.InterpolatePosition(start, end, selected!.Value.Position, request.ProfileSampleCount);
+            var radius = request.MinRadius + ((selected.Value.Position / Math.Max(request.ProfileSampleCount - 1, 1)) * radiusSpan);
             edgePoints.Add(new CircleCaliperFitV2Point(
                 point.X,
                 point.Y,
                 i,
                 angle * 180.0 / Math.PI,
                 radius,
-                selected.Strength,
-                selected.Polarity.ToString()));
+                selected.Value.Strength,
+                selected.Value.Polarity.ToString()));
         }
 
         diagnostics.Add(new CircleCaliperFitV2Diagnostic("edges.collected", "Collected caliper edge points.", edgePoints.Count));
@@ -371,6 +408,7 @@ public static class CircleCaliperFitV2Kernel
                 CircleCaliperFitV2FailureCode.InsufficientEdges,
                 $"Collected {edgePoints.Count} edge points, below MinValidCalipers {request.MinValidCalipers}.",
                 edgePoints,
+                profileEvidence,
                 diagnostics);
         }
 
@@ -381,6 +419,7 @@ public static class CircleCaliperFitV2Kernel
                 CircleCaliperFitV2FailureCode.AmbiguousEdge,
                 "Too many calipers had competing edges near the nominal radius.",
                 edgePoints,
+                profileEvidence,
                 diagnostics);
         }
 
@@ -392,6 +431,7 @@ public static class CircleCaliperFitV2Kernel
                 CircleCaliperFitV2FailureCode.DegenerateFit,
                 "Initial circle fit was degenerate.",
                 edgePoints,
+                profileEvidence,
                 diagnostics);
         }
 
@@ -403,6 +443,7 @@ public static class CircleCaliperFitV2Kernel
                 CircleCaliperFitV2FailureCode.DegenerateFit,
                 "Final circle fit was degenerate.",
                 edgePoints,
+                profileEvidence,
                 diagnostics);
         }
 
@@ -439,7 +480,8 @@ public static class CircleCaliperFitV2Kernel
                 angularCoverage,
                 residualRmse,
                 residualMax,
-                medianStrength);
+                medianStrength,
+                profileEvidence);
         }
 
         if (inliers.Count < request.MinValidCalipers)
@@ -457,7 +499,8 @@ public static class CircleCaliperFitV2Kernel
                 angularCoverage,
                 residualRmse,
                 residualMax,
-                medianStrength);
+                medianStrength,
+                profileEvidence);
         }
 
         if (coverageRatio < request.MinCoverageRatio || angularCoverage < request.MinAngularCoverageDegrees)
@@ -475,7 +518,8 @@ public static class CircleCaliperFitV2Kernel
                 angularCoverage,
                 residualRmse,
                 residualMax,
-                medianStrength);
+                medianStrength,
+                profileEvidence);
         }
 
         if (residualRmse > request.MaxResidualRmse)
@@ -493,7 +537,8 @@ public static class CircleCaliperFitV2Kernel
                 angularCoverage,
                 residualRmse,
                 residualMax,
-                medianStrength);
+                medianStrength,
+                profileEvidence);
         }
 
         var residualScore = 1.0 - Math.Clamp(residualRmse / Math.Max(request.MaxResidualRmse, 1e-6), 0.0, 1.0);
@@ -516,6 +561,7 @@ public static class CircleCaliperFitV2Kernel
             residualRmse,
             residualMax,
             medianStrength,
+            profileEvidence,
             confidence,
             uncertainty,
             score);
@@ -607,7 +653,7 @@ public static class CircleCaliperFitV2Kernel
         var robustScale = double.NaN;
         var threshold = double.PositiveInfinity;
         var iterations = 0;
-        var converged = true;
+        var converged = request.MaxOutlierIterations == 0;
 
         for (var iteration = 0; iteration < request.MaxOutlierIterations; iteration++)
         {
@@ -624,6 +670,7 @@ public static class CircleCaliperFitV2Kernel
 
             if (nextIndexes.Count == inlierIndexes.Count)
             {
+                converged = true;
                 break;
             }
 
@@ -708,7 +755,7 @@ public static class CircleCaliperFitV2Kernel
             weights = nextWeights;
             currentFit = nextFit;
 
-            if (centerDelta <= 1e-6 || radiusDelta <= 1e-6 || maxWeightDelta <= 1e-6)
+            if ((centerDelta <= 1e-6 && radiusDelta <= 1e-6) || maxWeightDelta <= 1e-6)
             {
                 converged = true;
                 break;
@@ -993,8 +1040,74 @@ public static class CircleCaliperFitV2Kernel
         checked
         {
             var acrossCount = (long)Math.Ceiling(Math.Max(1.0, request.AveragingThickness));
-            return (long)request.CaliperCount * request.ProfileSampleCount * acrossCount;
+            var polarityMultiplier = request.EdgePolarity == CircleCaliperFitV2EdgePolarity.Auto ? 2L : 1L;
+            return polarityMultiplier * request.CaliperCount * request.ProfileSampleCount * acrossCount;
         }
+    }
+
+    private static HashSet<int> BuildProfileEvidenceCaliperIndexes(int caliperCount)
+    {
+        var count = Math.Min(caliperCount, CircleCaliperFitV2Request.MaxProfileEvidenceCount);
+        var indexes = new HashSet<int>();
+        if (count <= 0)
+        {
+            return indexes;
+        }
+
+        for (var slot = 0; slot < count; slot++)
+        {
+            indexes.Add((int)Math.Floor(slot * caliperCount / (double)count));
+        }
+
+        return indexes;
+    }
+
+    private static CircleCaliperFitV2ProfileEvidence CreateProfileEvidence(
+        int caliperIndex,
+        double angleRadians,
+        Point2d start,
+        Point2d end,
+        IReadOnlyList<double> profile,
+        double threshold,
+        IndustrialCaliperEdge? selected)
+    {
+        var samples = DownsampleProfile(profile);
+        var stride = samples.Count <= 1 || profile.Count <= 1
+            ? 1
+            : Math.Max(1, (int)Math.Ceiling(profile.Count / (double)samples.Count));
+
+        return new CircleCaliperFitV2ProfileEvidence(
+            CircleCaliperFitV2ProfileEvidence.ContractVersionValue,
+            caliperIndex,
+            angleRadians * 180.0 / Math.PI,
+            start.X,
+            start.Y,
+            end.X,
+            end.Y,
+            profile.Count,
+            stride,
+            threshold,
+            selected?.Position,
+            selected?.Strength,
+            selected?.Polarity.ToString(),
+            samples);
+    }
+
+    private static IReadOnlyList<double> DownsampleProfile(IReadOnlyList<double> profile)
+    {
+        if (profile.Count <= CircleCaliperFitV2Request.MaxProfileEvidenceSamplesPerProfile)
+        {
+            return profile.Select(static value => Math.Round(value, 4)).ToArray();
+        }
+
+        var samples = new double[CircleCaliperFitV2Request.MaxProfileEvidenceSamplesPerProfile];
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var sourceIndex = (int)Math.Round(index * (profile.Count - 1) / (double)(samples.Length - 1));
+            samples[index] = Math.Round(profile[sourceIndex], 4);
+        }
+
+        return samples;
     }
 
     private static CircleCaliperFitV2Result Failure(
@@ -1111,6 +1224,7 @@ public static class CircleCaliperFitV2Kernel
             IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
             IReadOnlyList<CircleCaliperFitV2Point> inlierPoints,
             IReadOnlyList<CircleCaliperFitV2Point> outlierPoints,
+            IReadOnlyList<CircleCaliperFitV2ProfileEvidence>? profileEvidence,
             IReadOnlyList<CircleCaliperFitV2Diagnostic> diagnostics,
             double coverageRatio,
             double angularCoverageDegrees,
@@ -1129,6 +1243,7 @@ public static class CircleCaliperFitV2Kernel
             EdgePoints = edgePoints;
             InlierPoints = inlierPoints;
             OutlierPoints = outlierPoints;
+            ProfileEvidence = profileEvidence?.ToArray() ?? Array.Empty<CircleCaliperFitV2ProfileEvidence>();
             Diagnostics = diagnostics;
             CoverageRatio = coverageRatio;
             AngularCoverageDegrees = angularCoverageDegrees;
@@ -1148,6 +1263,7 @@ public static class CircleCaliperFitV2Kernel
         public IReadOnlyList<CircleCaliperFitV2Point> EdgePoints { get; }
         public IReadOnlyList<CircleCaliperFitV2Point> InlierPoints { get; }
         public IReadOnlyList<CircleCaliperFitV2Point> OutlierPoints { get; }
+        public IReadOnlyList<CircleCaliperFitV2ProfileEvidence> ProfileEvidence { get; }
         public IReadOnlyList<CircleCaliperFitV2Diagnostic> Diagnostics { get; }
         public double CoverageRatio { get; }
         public double AngularCoverageDegrees { get; }
@@ -1163,6 +1279,7 @@ public static class CircleCaliperFitV2Kernel
             CircleCaliperFitV2FailureCode code,
             string message,
             IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+            IReadOnlyList<CircleCaliperFitV2ProfileEvidence>? profileEvidence,
             IReadOnlyList<CircleCaliperFitV2Diagnostic> diagnostics)
         {
             return new HypothesisEvaluation(
@@ -1174,6 +1291,7 @@ public static class CircleCaliperFitV2Kernel
                 edgePoints.ToArray(),
                 Array.Empty<CircleCaliperFitV2Point>(),
                 Array.Empty<CircleCaliperFitV2Point>(),
+                profileEvidence?.ToArray() ?? Array.Empty<CircleCaliperFitV2ProfileEvidence>(),
                 diagnostics.ToArray(),
                 0.0,
                 0.0,
@@ -1198,7 +1316,8 @@ public static class CircleCaliperFitV2Kernel
             double angularCoverageDegrees,
             double residualRmse,
             double residualMax,
-            double medianEdgeStrength)
+            double medianEdgeStrength,
+            IReadOnlyList<CircleCaliperFitV2ProfileEvidence>? profileEvidence = null)
         {
             return new HypothesisEvaluation(
                 false,
@@ -1209,6 +1328,7 @@ public static class CircleCaliperFitV2Kernel
                 edgePoints.ToArray(),
                 inlierPoints.ToArray(),
                 outlierPoints.ToArray(),
+                profileEvidence?.ToArray() ?? Array.Empty<CircleCaliperFitV2ProfileEvidence>(),
                 diagnostics.ToArray(),
                 coverageRatio,
                 angularCoverageDegrees,
@@ -1232,6 +1352,7 @@ public static class CircleCaliperFitV2Kernel
             double residualRmse,
             double residualMax,
             double medianEdgeStrength,
+            IReadOnlyList<CircleCaliperFitV2ProfileEvidence>? profileEvidence,
             double confidence,
             double uncertaintyPx,
             double score)
@@ -1245,6 +1366,7 @@ public static class CircleCaliperFitV2Kernel
                 edgePoints.ToArray(),
                 inlierPoints.ToArray(),
                 outlierPoints.ToArray(),
+                profileEvidence?.ToArray() ?? Array.Empty<CircleCaliperFitV2ProfileEvidence>(),
                 diagnostics.ToArray(),
                 coverageRatio,
                 angularCoverageDegrees,
@@ -1268,6 +1390,7 @@ public static class CircleCaliperFitV2Kernel
                     EdgePoints = EdgePoints.ToArray(),
                     InlierPoints = InlierPoints.ToArray(),
                     OutlierPoints = OutlierPoints.ToArray(),
+                    ProfileEvidence = ProfileEvidence.ToArray(),
                     ValidCaliperCount = InlierPoints.Count,
                     RejectedCaliperCount = Math.Max(0, caliperCount - InlierPoints.Count),
                     CollectedPointCount = EdgePoints.Count,
@@ -1293,6 +1416,7 @@ public static class CircleCaliperFitV2Kernel
                 EdgePoints = EdgePoints.ToArray(),
                 InlierPoints = InlierPoints.ToArray(),
                 OutlierPoints = OutlierPoints.ToArray(),
+                ProfileEvidence = ProfileEvidence.ToArray(),
                 ValidCaliperCount = InlierPoints.Count,
                 RejectedCaliperCount = Math.Max(0, caliperCount - InlierPoints.Count),
                 CollectedPointCount = EdgePoints.Count,

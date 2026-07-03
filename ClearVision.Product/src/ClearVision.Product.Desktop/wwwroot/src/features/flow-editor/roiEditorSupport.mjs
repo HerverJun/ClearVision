@@ -31,13 +31,13 @@ export const CIRCLE_SEARCH_V2_TOOL_FEATURE_ID = 'operator.circleSearchV2Tool';
 export const CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG = 'Studio:CircleSearchV2ToolEnabled';
 
 export function isCircleSearchV2ToolEnabled(options = {}) {
-    if (typeof options?.featureEnabled === 'boolean') {
-        return options.featureEnabled;
-    }
-
     const startupFlags = globalThis?.window?.__CLEARVISION_STARTUP__?.featureFlags;
     if (startupFlags && Object.prototype.hasOwnProperty.call(startupFlags, CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG)) {
         return startupFlags[CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG] === true;
+    }
+
+    if (typeof options?.featureEnabled === 'boolean') {
+        return options.featureEnabled;
     }
 
     return isFeatureEnabled(CIRCLE_SEARCH_V2_TOOL_FEATURE_ID);

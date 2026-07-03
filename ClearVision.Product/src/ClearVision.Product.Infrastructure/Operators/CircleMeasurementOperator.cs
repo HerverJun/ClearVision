@@ -20,7 +20,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "检测",
     IconName = "circle-measure",
     Keywords = new[] { "圆", "半径", "圆心", "霍夫", "孔", "圆检测", "Circle", "Radius", "Hough", "CaliperFitV2" },
-    Version = "1.1.1"
+    Version = "1.1.2"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
@@ -35,6 +35,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("InlierPoints", "V2 内点", PortDataType.PointList)]
 [OutputPort("OutlierPoints", "V2 离群点", PortDataType.PointList)]
 [OutputPort("CaliperDiagnostics", "V2 诊断", PortDataType.Any)]
+[OutputPort("CaliperProfileEvidence", "V2 profile evidence", PortDataType.Any)]
 [OperatorParam("Method", "检测方法", "enum", DefaultValue = "HoughCircle", Options = new[] { "HoughCircle|霍夫圆", "FitEllipse|拟合椭圆", "CaliperFitV2|卡尺圆拟合 V2" })]
 [OperatorParam("MinRadius", "最小半径", "int", DefaultValue = 10, Min = 0)]
 [OperatorParam("MaxRadius", "最大半径", "int", DefaultValue = 200, Min = 0)]
@@ -171,6 +172,7 @@ public class CircleMeasurementOperator : OperatorBase
             additionalData["InlierPoints"] = ToPositions(caliperFitV2Result.InlierPoints);
             additionalData["OutlierPoints"] = ToPositions(caliperFitV2Result.OutlierPoints);
             additionalData["CaliperDiagnostics"] = caliperFitV2Result.Diagnostics;
+            additionalData["CaliperProfileEvidence"] = caliperFitV2Result.ProfileEvidence;
         }
 
         if (circleResults.Count > 0)
@@ -283,7 +285,8 @@ public class CircleMeasurementOperator : OperatorBase
             OutlierMode = outlierMode,
             OutlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5, min: 0.1, max: 20.0),
             MaxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3, min: 0, max: 20),
-            MaxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0, min: 0.01, max: 128.0)
+            MaxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0, min: 0.01, max: 128.0),
+            IncludeProfileEvidence = true
         };
 
         return true;
@@ -364,6 +367,7 @@ public class CircleMeasurementOperator : OperatorBase
             { "InlierPoints", result != null ? ToPositions(result.InlierPoints) : Array.Empty<Position>() },
             { "OutlierPoints", result != null ? ToPositions(result.OutlierPoints) : Array.Empty<Position>() },
             { "CaliperDiagnostics", result?.Diagnostics ?? Array.Empty<CircleCaliperFitV2Diagnostic>() },
+            { "CaliperProfileEvidence", result?.ProfileEvidence ?? Array.Empty<CircleCaliperFitV2ProfileEvidence>() },
             { "StatusCode", failureCode.ToString() },
             { "StatusMessage", $"CaliperFitV2: {boundedMessage}" },
             { "Confidence", 0.0 },
@@ -942,7 +946,10 @@ public class CircleMeasurementOperator : OperatorBase
 
         checked
         {
-            var workUnits = (long)caliperCount *
+            var edgePolarity = GetStringParam(@operator, "EdgePolarity", "Auto").Trim();
+            var polarityMultiplier = edgePolarity.Equals("Auto", StringComparison.OrdinalIgnoreCase) ? 2L : 1L;
+            var workUnits = polarityMultiplier *
+                caliperCount *
                 profileSampleCount *
                 (long)Math.Ceiling(Math.Max(1.0, averagingThickness));
             if (workUnits > CircleCaliperFitV2Request.MaxSamplingWorkUnits)

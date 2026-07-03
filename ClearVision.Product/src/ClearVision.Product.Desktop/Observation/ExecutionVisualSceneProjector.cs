@@ -841,26 +841,28 @@ public static class ExecutionVisualSceneProjector
             return;
         }
 
-        var maxPoints = Math.Min(points.Count, 80);
-        if (points.Count > maxPoints)
+        const int maxPointPrimitives = 80;
+        var selectedPoints = SelectCaliperScenePoints(points, maxPointPrimitives);
+        if (points.Count > selectedPoints.Count)
         {
             context.MarkTruncated();
             context.AddDiagnostic($"visual-scene-circle-{idSegment}-truncated", $"{outputName} was deterministically truncated for scene display.", null);
         }
 
         context.TryGetOutput(outputName, out var rootValue);
-        for (var index = 0; index < maxPoints; index++)
+        for (var index = 0; index < selectedPoints.Count; index++)
         {
-            var point = points[index];
+            var point = selectedPoints[index];
+            var stableCaliperIndex = point.CaliperIndex >= 0 ? point.CaliperIndex : point.Ordinal;
             var primitive = new ExecutionVisualScenePrimitiveV1
             {
-                PrimitiveId = $"circle-search-{idSegment}:{operatorId}:{point.Ordinal.ToString(CultureInfo.InvariantCulture)}",
+                PrimitiveId = $"circle-search-{idSegment}:{operatorId}:{stableCaliperIndex.ToString(CultureInfo.InvariantCulture)}",
                 Kind = "point",
                 Layer = layer,
                 ZOrder = zOrderBase + index,
                 Visible = true,
                 Selectable = true,
-                Label = $"{idSegment} {point.Ordinal.ToString(CultureInfo.InvariantCulture)}",
+                Label = $"{idSegment} {stableCaliperIndex.ToString(CultureInfo.InvariantCulture)}",
                 Geometry = new ExecutionVisualSceneGeometryV1
                 {
                     X = point.X,
@@ -879,6 +881,43 @@ public static class ExecutionVisualSceneProjector
                 ? primitive
                 : AttachResultPath(primitive, context, outputName, $"$[{point.Ordinal.ToString(CultureInfo.InvariantCulture)}]", rootValue));
         }
+    }
+
+    private static List<CaliperScenePoint> SelectCaliperScenePoints(
+        IReadOnlyList<CaliperScenePoint> points,
+        int maxPoints)
+    {
+        if (points.Count <= maxPoints)
+        {
+            return points
+                .OrderBy(static point => SortableCaliperAngle(point))
+                .ThenBy(static point => point.CaliperIndex >= 0 ? point.CaliperIndex : point.Ordinal)
+                .ToList();
+        }
+
+        var ordered = points
+            .OrderBy(static point => SortableCaliperAngle(point))
+            .ThenBy(static point => point.CaliperIndex >= 0 ? point.CaliperIndex : point.Ordinal)
+            .ToList();
+        var selected = new List<CaliperScenePoint>(maxPoints);
+        for (var slot = 0; slot < maxPoints; slot++)
+        {
+            var sourceIndex = (int)Math.Floor(slot * ordered.Count / (double)maxPoints);
+            selected.Add(ordered[sourceIndex]);
+        }
+
+        return selected;
+    }
+
+    private static double SortableCaliperAngle(CaliperScenePoint point)
+    {
+        if (double.IsFinite(point.AngleDegrees))
+        {
+            var normalized = point.AngleDegrees % 360.0;
+            return normalized < 0.0 ? normalized + 360.0 : normalized;
+        }
+
+        return point.CaliperIndex >= 0 ? point.CaliperIndex : point.Ordinal;
     }
 
     private static List<CaliperScenePoint> ReadPointOutput(SceneProjectionContext context, string outputName)

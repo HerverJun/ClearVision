@@ -155,7 +155,7 @@ test('PropertyPanel honors startup Circle Search V2 feature flag off', () => {
   };
 
   try {
-    const { panel, parameters } = createCircleMeasurementPanel('CaliperFitV2');
+    const { panel, parameters } = createCircleMeasurementPanel('CaliperFitV2', 'ImageCenter', true);
     const names = panel.getParametersForRender('CircleMeasurement', parameters).map(param => param.name);
 
     assert.ok(names.includes('Dp'));

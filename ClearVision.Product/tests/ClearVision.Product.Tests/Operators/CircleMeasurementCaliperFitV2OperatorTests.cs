@@ -45,6 +45,8 @@ public class CircleMeasurementCaliperFitV2OperatorTests
         result.OutputData["InlierPoints"].Should().BeAssignableTo<IReadOnlyList<Position>>().Which.Should().NotBeEmpty();
         result.OutputData["OutlierPoints"].Should().BeAssignableTo<IReadOnlyList<Position>>();
         result.OutputData["CaliperDiagnostics"].Should().BeAssignableTo<IReadOnlyList<CircleCaliperFitV2Diagnostic>>();
+        result.OutputData["CaliperProfileEvidence"].Should().BeAssignableTo<IReadOnlyList<CircleCaliperFitV2ProfileEvidence>>()
+            .Which.Should().HaveCount(CircleCaliperFitV2Request.MaxProfileEvidenceCount);
     }
 
     [Fact]
@@ -243,14 +245,15 @@ public class CircleMeasurementCaliperFitV2OperatorTests
     {
         var metadata = new OperatorMetadataScanner().Scan().Single(item => item.Type == OperatorType.CircleMeasurement);
 
-        metadata.Version.Should().Be("1.1.1");
+        metadata.Version.Should().Be("1.1.2");
         metadata.OutputPorts.Select(port => port.Name).Should().Contain(new[]
         {
             "CaliperFitV2Result",
             "EdgePoints",
             "InlierPoints",
             "OutlierPoints",
-            "CaliperDiagnostics"
+            "CaliperDiagnostics",
+            "CaliperProfileEvidence"
         });
         metadata.Parameters.First(parameter => parameter.Name == "Method")
             .Options!.Select(option => option.Value)
