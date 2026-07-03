@@ -22,8 +22,20 @@ internal static class IndustrialCaliperKernel
 {
     private const double GaussianKernelSigmaSupport = 3.0;
     private const double MinimumGaussianSigma = 1e-6;
+    private const int CancellationCheckInterval = 256;
 
     public static double[] SampleBandProfile(Mat gray, Point2d start, Point2d end, double averagingThickness, int sampleCount)
+    {
+        return SampleBandProfile(gray, start, end, averagingThickness, sampleCount, CancellationToken.None);
+    }
+
+    public static double[] SampleBandProfile(
+        Mat gray,
+        Point2d start,
+        Point2d end,
+        double averagingThickness,
+        int sampleCount,
+        CancellationToken cancellationToken)
     {
         var profile = new double[Math.Max(sampleCount, 2)];
         var dx = end.X - start.X;
@@ -41,9 +53,11 @@ internal static class IndustrialCaliperKernel
 
         var acrossCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1.0, averagingThickness)));
         var halfThickness = averagingThickness / 2.0;
+        var sampleBudgetCounter = 0;
 
         for (var i = 0; i < profile.Length; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var t = profile.Length <= 1 ? 0.0 : (double)i / (profile.Length - 1);
             var centerX = start.X + ((end.X - start.X) * t);
             var centerY = start.Y + ((end.Y - start.Y) * t);
@@ -58,6 +72,12 @@ internal static class IndustrialCaliperKernel
                 var sampleX = centerX + (normalX * offset);
                 var sampleY = centerY + (normalY * offset);
                 sum += SampleGrayBilinear(gray, sampleX, sampleY);
+
+                sampleBudgetCounter++;
+                if (sampleBudgetCounter % CancellationCheckInterval == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
             }
 
             profile[i] = sum / acrossCount;

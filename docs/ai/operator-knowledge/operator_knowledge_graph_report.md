@@ -1,6 +1,6 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-07-03T11:40:12.9313820Z`
+GeneratedAtUtc: `2026-07-03T13:48:32.0920453Z`
 SchemaVersion: `2026-05.operator-knowledge-graph.v1`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 

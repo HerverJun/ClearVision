@@ -51,9 +51,9 @@
 ## 3. 当前执行项
 
 - 当前 Goal：`G11B`
-- 当前卡片：`docs/进行中/Studio2/goals/G11A.md`
+- 当前卡片：`docs/进行中/Studio2/goals/G11B.md`
 - 当前阶段：`Vertical Product`
-- 总状态：`IN_PROGRESS`
+- 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
 - G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
@@ -109,7 +109,8 @@
 | G10C-FOLLOWUP | Geometry/Spatial | 坐标方向、精度报告与 PointList SpatialContext 最终收口 | DONE | G10C | `docs/进行中/Studio2/goals/G10C-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G10C-FOLLOWUP-2 | Geometry/Spatial | RoundTrip 与 PointList 世界单位权威收口 | DONE | G10C-FOLLOWUP | `docs/进行中/Studio2/goals/G10C-FOLLOWUP-2.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | DONE | G10C-FOLLOWUP-2 | `docs/进行中/Studio2/goals/G11A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | READY | G11A | `docs/进行中/Studio2/goals/G11B.md` |  |
+| G11A-FOLLOWUP | Vertical Product | CaliperFitV2 失败证据、Huber 语义与复杂度门禁收口 | DONE | G11A | `docs/进行中/Studio2/goals/G11A-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
+| G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | READY | G11A-FOLLOWUP | `docs/进行中/Studio2/goals/G11B.md` |  |
 | G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | LOCKED | G11B | `docs/进行中/Studio2/goals/G11C.md` |  |
 | G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | LOCKED | G11C | `docs/进行中/Studio2/goals/G12A.md` |  |
 | G12B | Vertical Product | N 点标定工作台 draft 与可视化 | LOCKED | G12A | `docs/进行中/Studio2/goals/G12B.md` |  |

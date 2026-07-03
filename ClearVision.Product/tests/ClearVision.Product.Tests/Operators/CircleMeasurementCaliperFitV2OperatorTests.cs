@@ -70,6 +70,41 @@ public class CircleMeasurementCaliperFitV2OperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithCaliperFitV2CoverageFailure_ShouldMapEvidencePoints()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = CreateV2Operator(centerX: 160, centerY: 120, radius: 56);
+        op.Parameters.First(parameter => parameter.Name == "MinCoverageRatio").SetValue(0.80);
+        op.Parameters.First(parameter => parameter.Name == "MinAngularCoverageDegrees").SetValue(260.0);
+
+        using var image = IndustrialMeasurementSceneFactory.CreateFilledCircleImage(
+            320,
+            240,
+            new Point2d(160, 120),
+            56,
+            supersample: 8);
+        EraseSector(image.GetMat(), 160, 120, 72, startDegrees: 0, endDegrees: 165, color: 0);
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!.Keys.Should().NotContain("Center");
+        result.OutputData.Keys.Should().NotContain("Radius");
+        result.OutputData.Keys.Should().NotContain("Circle");
+        result.OutputData.Keys.Should().NotContain("CircleCount");
+        result.OutputData["EdgePoints"].Should().BeAssignableTo<IReadOnlyList<Position>>().Which.Should().NotBeEmpty();
+        result.OutputData["InlierPoints"].Should().BeAssignableTo<IReadOnlyList<Position>>().Which.Should().NotBeEmpty();
+
+        var v2 = result.OutputData["CaliperFitV2Result"].Should().BeOfType<CircleCaliperFitV2Result>().Subject;
+        v2.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InsufficientCoverage);
+        v2.CoverageRatio.Should().BeGreaterThan(0);
+        v2.AngularCoverageDegrees.Should().BeGreaterThan(0);
+        v2.CenterX.Should().BeNull();
+        v2.Radius.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithHoughCircle_ShouldIgnoreCaliperFitV2Parameters()
     {
         var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
@@ -109,6 +144,9 @@ public class CircleMeasurementCaliperFitV2OperatorTests
     {
         var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
         var valid = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+        valid.AddParameter(TestHelpers.CreateParameter("Dp", 999.0, "double"));
+        valid.AddParameter(TestHelpers.CreateParameter("Param1", -50.0, "double"));
+        valid.AddParameter(TestHelpers.CreateParameter("Param2", 999.0, "double"));
         sut.ValidateParameters(valid).IsValid.Should().BeTrue();
 
         var invalid = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
@@ -118,6 +156,86 @@ public class CircleMeasurementCaliperFitV2OperatorTests
         var invalidNumericEnum = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
         invalidNumericEnum.Parameters.First(parameter => parameter.Name == "EdgePolarity").SetValue("999");
         sut.ValidateParameters(invalidNumericEnum).IsValid.Should().BeFalse();
+
+        var overBudget = CreateV2Operator(centerX: 100, centerY: 100, radius: 42);
+        overBudget.Parameters.First(parameter => parameter.Name == "CaliperCount").SetValue(720);
+        overBudget.Parameters.First(parameter => parameter.Name == "ProfileSampleCount").SetValue(4096);
+        overBudget.Parameters.First(parameter => parameter.Name == "AveragingThickness").SetValue(3.0);
+        sut.ValidateParameters(overBudget).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCaliperFitV2_ShouldIgnoreInvalidHoughOnlyParameters()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = CreateV2Operator(centerX: 160.25, centerY: 120.75, radius: 55.4);
+        op.AddParameter(TestHelpers.CreateParameter("Dp", 999.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("Param1", -50.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("Param2", 999.0, "double"));
+
+        using var image = IndustrialMeasurementSceneFactory.CreateFilledCircleImage(
+            320,
+            240,
+            new Point2d(160.25, 120.75),
+            55.4,
+            supersample: 16);
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Method"].Should().Be("CaliperFitV2");
+        result.OutputData["CaliperFitV2Result"].Should().BeOfType<CircleCaliperFitV2Result>().Subject.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateParameters_WithFitEllipse_ShouldIgnoreHoughAndV2OnlyParameters()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = new Operator("circle-ellipse", OperatorType.CircleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Method", "FitEllipse", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("MinRadius", 10, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxRadius", 100, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("Dp", 999.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("Param1", -50.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("SearchCenterMode", "Magic", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalRadius", -100.0, "double"));
+
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutMethodParameter_ShouldKeepHoughCircleDefault()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = new Operator("circle-default", OperatorType.CircleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinRadius", 52, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxRadius", 68, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("Param2", 20.0, "double"));
+
+        using var image = TestHelpers.CreateGrayShapeTestImage();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Method"].Should().Be("HoughCircle");
+        result.OutputData.Keys.Should().NotContain("CaliperFitV2Result");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCaliperFitV2Cancellation_ShouldPropagateOperationCanceledException()
+    {
+        var sut = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
+        var op = CreateV2Operator(centerX: 160, centerY: 120, radius: 56);
+        using var image = IndustrialMeasurementSceneFactory.CreateFilledCircleImage(
+            320,
+            240,
+            new Point2d(160, 120),
+            56,
+            supersample: 8);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = async () => await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -125,7 +243,7 @@ public class CircleMeasurementCaliperFitV2OperatorTests
     {
         var metadata = new OperatorMetadataScanner().Scan().Single(item => item.Type == OperatorType.CircleMeasurement);
 
-        metadata.Version.Should().Be("1.1.0");
+        metadata.Version.Should().Be("1.1.1");
         metadata.OutputPorts.Select(port => port.Name).Should().Contain(new[]
         {
             "CaliperFitV2Result",
@@ -173,5 +291,19 @@ public class CircleMeasurementCaliperFitV2OperatorTests
         op.AddParameter(TestHelpers.CreateParameter("MaxOutlierIterations", 3, "int"));
         op.AddParameter(TestHelpers.CreateParameter("MaxResidualRmse", 1.4, "double"));
         return op;
+    }
+
+    private static void EraseSector(Mat gray, double centerX, double centerY, double radius, double startDegrees, double endDegrees, byte color)
+    {
+        var points = new List<Point> { new((int)Math.Round(centerX), (int)Math.Round(centerY)) };
+        for (var angle = startDegrees; angle <= endDegrees; angle += 3.0)
+        {
+            var radians = angle * Math.PI / 180.0;
+            points.Add(new Point(
+                (int)Math.Round(centerX + (Math.Cos(radians) * radius)),
+                (int)Math.Round(centerY + (Math.Sin(radians) * radius))));
+        }
+
+        Cv2.FillConvexPoly(gray, points, new Scalar(color), LineTypes.AntiAlias);
     }
 }

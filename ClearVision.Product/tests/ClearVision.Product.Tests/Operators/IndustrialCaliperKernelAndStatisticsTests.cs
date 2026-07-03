@@ -1,6 +1,7 @@
 using System.Reflection;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
+using OpenCvSharp;
 using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
@@ -66,6 +67,25 @@ public class IndustrialCaliperKernelAndStatisticsTests
         InvokeStatisticsHelper<double>("ComputeConfidenceFromUncertainty", double.PositiveInfinity).Should().Be(0.0);
     }
 
+    [Fact]
+    public void SampleBandProfile_CancellationAwareOverload_ShouldCancelDuringLargeSingleProfile()
+    {
+        using var gray = new Mat(64, 64, MatType.CV_8UC1, Scalar.Black);
+        using var cts = new CancellationTokenSource();
+        cts.CancelAfter(TimeSpan.FromMilliseconds(1));
+
+        Action act = () => InvokeSampleBandProfile(
+            gray,
+            new Point2d(2, 2),
+            new Point2d(61, 61),
+            averagingThickness: 128,
+            sampleCount: 1_000_000,
+            cts.Token);
+
+        act.Should().Throw<TargetInvocationException>()
+            .Which.InnerException.Should().BeOfType<OperationCanceledException>();
+    }
+
     private static double[] InvokeGaussianSmooth(IReadOnlyList<double> profile, double sigma)
     {
         var method = KernelType.GetMethod("GaussianSmooth", BindingFlags.Static | BindingFlags.NonPublic);
@@ -78,6 +98,32 @@ public class IndustrialCaliperKernelAndStatisticsTests
         var method = StatisticsHelperType.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         method.Should().NotBeNull();
         return (T)method!.Invoke(null, arguments)!;
+    }
+
+    private static double[] InvokeSampleBandProfile(
+        Mat gray,
+        Point2d start,
+        Point2d end,
+        double averagingThickness,
+        int sampleCount,
+        CancellationToken cancellationToken)
+    {
+        var method = KernelType.GetMethod(
+            "SampleBandProfile",
+            BindingFlags.Static | BindingFlags.Public,
+            binder: null,
+            types:
+            [
+                typeof(Mat),
+                typeof(Point2d),
+                typeof(Point2d),
+                typeof(double),
+                typeof(int),
+                typeof(CancellationToken)
+            ],
+            modifiers: null);
+        method.Should().NotBeNull();
+        return (double[])method!.Invoke(null, [gray, start, end, averagingThickness, sampleCount, cancellationToken])!;
     }
 
     private static double[] ComputeExpectedGaussianSmooth(

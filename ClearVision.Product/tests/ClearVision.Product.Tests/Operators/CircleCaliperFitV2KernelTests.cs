@@ -112,12 +112,63 @@ public class CircleCaliperFitV2KernelTests
             MinAngularCoverageDegrees = 260
         });
 
-        result.Success.Should().BeFalse();
+        result.Success.Should().BeFalse($"code={result.FailureCode} rmse={result.ResidualRmse:F4} max={result.ResidualMax:F4} inliers={result.InlierPoints.Count} outliers={result.OutlierPoints.Count} radius={result.Radius:F4}");
         result.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InsufficientCoverage);
         result.CenterX.Should().BeNull();
         result.CenterY.Should().BeNull();
         result.Radius.Should().BeNull();
         result.CollectedPointCount.Should().BeGreaterThan(0);
+        result.InlierPoints.Should().NotBeEmpty();
+        result.CoverageRatio.Should().BeGreaterThan(0);
+        result.AngularCoverageDegrees.Should().BeGreaterThan(0);
+        AssertSceneReadyPartition(result);
+    }
+
+    [Fact]
+    public void Fit_WithResidualTooHigh_ShouldPreserveResidualEvidenceWithoutFakeCircle()
+    {
+        using var gray = CreateCircleWithRadialOutlierSectorImage();
+
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(160, 120, 56) with
+        {
+            MaxRadius = 104,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            OutlierMode = CircleCaliperFitV2OutlierMode.None,
+            MaxResidualRmse = 0.50
+        });
+
+        result.Success.Should().BeFalse($"code={result.FailureCode} rmse={result.ResidualRmse:F4} inliers={result.InlierPoints.Count} outliers={result.OutlierPoints.Count}");
+        result.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.ResidualTooHigh);
+        result.CenterX.Should().BeNull();
+        result.CenterY.Should().BeNull();
+        result.Radius.Should().BeNull();
+        result.ResidualRmse.Should().BeGreaterThan(0.05);
+        result.ResidualMax.Should().BeGreaterThanOrEqualTo(result.ResidualRmse);
+        result.InlierPoints.Should().NotBeEmpty();
+        AssertSceneReadyPartition(result);
+    }
+
+    [Fact]
+    public void Fit_WhenOutlierRejectionLeavesTooFewInliers_ShouldPreserveInlierOutlierPartition()
+    {
+        using var gray = CreateCircleWithRadialOutlierSectorImage();
+
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(160, 120, 56) with
+        {
+            MaxRadius = 104,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            OutlierMode = CircleCaliperFitV2OutlierMode.Mad,
+            OutlierThreshold = 1.5,
+            MinValidCalipers = 86,
+            MaxResidualRmse = 1.4
+        });
+
+        result.Success.Should().BeFalse();
+        result.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InsufficientEdges);
+        result.InlierPoints.Should().NotBeEmpty();
+        result.OutlierPoints.Should().NotBeEmpty();
+        result.ValidCaliperCount.Should().Be(result.InlierPoints.Count);
+        AssertSceneReadyPartition(result);
     }
 
     [Fact]
@@ -200,6 +251,57 @@ public class CircleCaliperFitV2KernelTests
     }
 
     [Fact]
+    public void Fit_WhenSamplingWorkBudgetExceeded_ShouldReturnInvalidInputBeforeSampling()
+    {
+        using var gray = CreateFilledCircleImage(240, 240, 120, 120, 40, 0, 235);
+        var result = CircleCaliperFitV2Kernel.Fit(gray, Request(120, 120, 40) with
+        {
+            CaliperCount = 720,
+            ProfileSampleCount = 4096,
+            AveragingThickness = 3
+        });
+
+        result.Success.Should().BeFalse();
+        result.FailureCode.Should().Be(CircleCaliperFitV2FailureCode.InvalidInput);
+        result.CollectedPointCount.Should().Be(0);
+        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "sampling.work-budget");
+    }
+
+    [Fact]
+    public void Fit_WithHuberMode_ShouldUseDeterministicWeightedFitDistinctFromMadAndNone()
+    {
+        using var gray = CreateCircleWithRadialOutlierSectorImage();
+        var baseRequest = Request(160, 120, 56) with
+        {
+            MaxRadius = 104,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            MinValidCalipers = 24,
+            MaxResidualRmse = 20.0,
+            OutlierThreshold = 1.5,
+            MaxOutlierIterations = 6
+        };
+
+        var none = CircleCaliperFitV2Kernel.Fit(gray, baseRequest with { OutlierMode = CircleCaliperFitV2OutlierMode.None });
+        var mad = CircleCaliperFitV2Kernel.Fit(gray, baseRequest with { OutlierMode = CircleCaliperFitV2OutlierMode.Mad });
+        var huber = CircleCaliperFitV2Kernel.Fit(gray, baseRequest with { OutlierMode = CircleCaliperFitV2OutlierMode.Huber });
+        var huberRepeat = CircleCaliperFitV2Kernel.Fit(gray, baseRequest with { OutlierMode = CircleCaliperFitV2OutlierMode.Huber });
+
+        none.Success.Should().BeTrue(none.FailureMessage);
+        mad.Success.Should().BeTrue(mad.FailureMessage);
+        huber.Success.Should().BeTrue(huber.FailureMessage);
+        huber.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "huber.iterations");
+        huber.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "huber.robustScale");
+        huber.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "huber.delta");
+        Math.Abs(huber.Radius!.Value - none.Radius!.Value).Should().BeGreaterThan(0.01, $"none r={none.Radius:F4} rmse={none.ResidualRmse:F4} mad r={mad.Radius:F4} rmse={mad.ResidualRmse:F4} huber r={huber.Radius:F4} rmse={huber.ResidualRmse:F4}");
+        huber.Diagnostics.Select(diagnostic => diagnostic.Code).Should().NotEqual(mad.Diagnostics.Select(diagnostic => diagnostic.Code));
+        huber.ResidualRmse.Should().BeLessThan(none.ResidualRmse);
+        huberRepeat.CenterX.Should().Be(huber.CenterX);
+        huberRepeat.CenterY.Should().Be(huber.CenterY);
+        huberRepeat.Radius.Should().Be(huber.Radius);
+        huberRepeat.InlierPoints.Select(point => point.CaliperIndex).Should().Equal(huber.InlierPoints.Select(point => point.CaliperIndex));
+    }
+
+    [Fact]
     public void Fit_WithCancellation_ShouldPropagateOperationCanceledException()
     {
         using var gray = CreateFilledCircleImage(220, 220, 110, 110, 44, 0, 235);
@@ -209,6 +311,27 @@ public class CircleCaliperFitV2KernelTests
         Action act = () => CircleCaliperFitV2Kernel.Fit(gray, Request(110, 110, 44), cts.Token);
 
         act.Should().Throw<OperationCanceledException>();
+    }
+
+    private static void AssertSceneReadyPartition(CircleCaliperFitV2Result result)
+    {
+        result.EdgePoints.Should().HaveCountLessThanOrEqualTo(96);
+        result.CollectedPointCount.Should().Be(result.EdgePoints.Count);
+        result.ValidCaliperCount.Should().Be(result.InlierPoints.Count);
+        result.RejectedCaliperCount.Should().BeGreaterThanOrEqualTo(result.OutlierPoints.Count);
+        result.Diagnostics.Should().HaveCountLessThanOrEqualTo(64);
+        result.Diagnostics.Should().OnlyContain(diagnostic => diagnostic.Message.Length <= 160);
+
+        var edgeIndexes = result.EdgePoints.Select(point => point.CaliperIndex).OrderBy(index => index).ToArray();
+        var partitionIndexes = result.InlierPoints
+            .Concat(result.OutlierPoints)
+            .Select(point => point.CaliperIndex)
+            .OrderBy(index => index)
+            .ToArray();
+        partitionIndexes.Should().Equal(edgeIndexes);
+        result.InlierPoints.Select(point => point.CaliperIndex)
+            .Intersect(result.OutlierPoints.Select(point => point.CaliperIndex))
+            .Should().BeEmpty();
     }
 
     private static CircleCaliperFitV2Request Request(double centerX, double centerY, double radius)
@@ -279,17 +402,54 @@ public class CircleCaliperFitV2KernelTests
         return noisy;
     }
 
+    private static Mat CreateCircleWithRadialOutlierSectorImage()
+    {
+        var gray = CreateFilledCircleImage(320, 240, 160, 120, 56, 0, 230);
+        EraseSector(gray, 160, 120, 72, startDegrees: 18, endDegrees: 98, color: 0);
+        DrawAnnularSector(gray, 160, 120, innerRadius: 82, outerRadius: 96, startDegrees: 18, endDegrees: 98, color: 230);
+        return gray;
+    }
+
+    private static void DrawAnnularSector(
+        Mat gray,
+        double centerX,
+        double centerY,
+        double innerRadius,
+        double outerRadius,
+        double startDegrees,
+        double endDegrees,
+        byte color)
+    {
+        var points = new List<Point>();
+        for (var angle = startDegrees; angle <= endDegrees; angle += 3.0)
+        {
+            points.Add(PointOnCircle(centerX, centerY, outerRadius, angle));
+        }
+
+        for (var angle = endDegrees; angle >= startDegrees; angle -= 3.0)
+        {
+            points.Add(PointOnCircle(centerX, centerY, innerRadius, angle));
+        }
+
+        Cv2.FillPoly(gray, [points], new Scalar(color), LineTypes.AntiAlias);
+    }
+
     private static void EraseSector(Mat gray, double centerX, double centerY, double radius, double startDegrees, double endDegrees, byte color)
     {
         var points = new List<Point> { new((int)Math.Round(centerX), (int)Math.Round(centerY)) };
         for (var angle = startDegrees; angle <= endDegrees; angle += 3.0)
         {
-            var radians = angle * Math.PI / 180.0;
-            points.Add(new Point(
-                (int)Math.Round(centerX + (Math.Cos(radians) * radius)),
-                (int)Math.Round(centerY + (Math.Sin(radians) * radius))));
+            points.Add(PointOnCircle(centerX, centerY, radius, angle));
         }
 
         Cv2.FillConvexPoly(gray, points, new Scalar(color), LineTypes.AntiAlias);
+    }
+
+    private static Point PointOnCircle(double centerX, double centerY, double radius, double angleDegrees)
+    {
+        var radians = angleDegrees * Math.PI / 180.0;
+        return new Point(
+            (int)Math.Round(centerX + (Math.Cos(radians) * radius)),
+            (int)Math.Round(centerY + (Math.Sin(radians) * radius)));
     }
 }

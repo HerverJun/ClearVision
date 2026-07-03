@@ -20,7 +20,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "检测",
     IconName = "circle-measure",
     Keywords = new[] { "圆", "半径", "圆心", "霍夫", "孔", "圆检测", "Circle", "Radius", "Hough", "CaliperFitV2" },
-    Version = "1.1.0"
+    Version = "1.1.1"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
@@ -361,7 +361,7 @@ public class CircleMeasurementOperator : OperatorBase
                 }
             },
             { "EdgePoints", result != null ? ToPositions(result.EdgePoints) : Array.Empty<Position>() },
-            { "InlierPoints", Array.Empty<Position>() },
+            { "InlierPoints", result != null ? ToPositions(result.InlierPoints) : Array.Empty<Position>() },
             { "OutlierPoints", result != null ? ToPositions(result.OutlierPoints) : Array.Empty<Position>() },
             { "CaliperDiagnostics", result?.Diagnostics ?? Array.Empty<CircleCaliperFitV2Diagnostic>() },
             { "StatusCode", failureCode.ToString() },
@@ -822,16 +822,6 @@ public class CircleMeasurementOperator : OperatorBase
         var normalizedMethod = method.Trim();
         var minRadius = GetIntParam(@operator, "MinRadius", 10);
         var maxRadius = GetIntParam(@operator, "MaxRadius", 200);
-        var dp = GetDoubleParam(@operator, "Dp", 1.0);
-        var param1 = GetDoubleParam(@operator, "Param1", 100.0);
-        var param2 = GetDoubleParam(@operator, "Param2", 30.0);
-
-        if (!normalizedMethod.Equals("HoughCircle", StringComparison.OrdinalIgnoreCase) &&
-            !normalizedMethod.Equals("FitEllipse", StringComparison.OrdinalIgnoreCase) &&
-            !normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
-        {
-            return ValidationResult.Invalid("Method must be HoughCircle, FitEllipse or CaliperFitV2");
-        }
 
         if (minRadius < 0)
         {
@@ -841,79 +831,123 @@ public class CircleMeasurementOperator : OperatorBase
         {
             return ValidationResult.Invalid("最大半径必须大于最小半径");
         }
-        if (dp < 0.5 || dp > 4.0)
+
+        if (normalizedMethod.Equals("HoughCircle", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("分辨率比必须在 0.5-4.0 之间");
+            var dp = GetDoubleParam(@operator, "Dp", 1.0);
+            var minDist = GetDoubleParam(@operator, "MinDist", 50.0);
+            var param1 = GetDoubleParam(@operator, "Param1", 100.0);
+            var param2 = GetDoubleParam(@operator, "Param2", 30.0);
+            if (dp < 0.5 || dp > 4.0)
+            {
+                return ValidationResult.Invalid("分辨率比必须在 0.5-4.0 之间");
+            }
+            if (minDist < 1.0)
+            {
+                return ValidationResult.Invalid("最小圆距必须大于等于 1");
+            }
+            if (param1 < 0 || param1 > 255)
+            {
+                return ValidationResult.Invalid("Canny阈值必须在 0-255 之间");
+            }
+            if (param2 < 0 || param2 > 255)
+            {
+                return ValidationResult.Invalid("累加器阈值必须在 0-255 之间");
+            }
+
+            return ValidationResult.Valid();
         }
-        if (param1 < 0 || param1 > 255)
+
+        if (normalizedMethod.Equals("FitEllipse", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("Canny阈值必须在 0-255 之间");
-        }
-        if (param2 < 0 || param2 > 255)
-        {
-            return ValidationResult.Invalid("累加器阈值必须在 0-255 之间");
+            return ValidationResult.Valid();
         }
 
-        if (normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
+        if (!normalizedMethod.Equals("CaliperFitV2", StringComparison.OrdinalIgnoreCase))
         {
-            var searchCenterMode = GetStringParam(@operator, "SearchCenterMode", "ImageCenter");
-            if (!searchCenterMode.Equals("ImageCenter", StringComparison.OrdinalIgnoreCase) &&
-                !searchCenterMode.Equals("Explicit", StringComparison.OrdinalIgnoreCase))
-            {
-                return ValidationResult.Invalid("SearchCenterMode must be ImageCenter or Explicit");
-            }
+            return ValidationResult.Invalid("Method must be HoughCircle, FitEllipse or CaliperFitV2");
+        }
 
-            if (!TryParseDefinedEnum(GetStringParam(@operator, "EdgePolarity", "Auto"), out CircleCaliperFitV2EdgePolarity _) ||
-                !TryParseDefinedEnum(GetStringParam(@operator, "OutlierMode", "Mad"), out CircleCaliperFitV2OutlierMode _))
-            {
-                return ValidationResult.Invalid("CaliperFitV2 enum parameters are invalid");
-            }
+        var searchCenterMode = GetStringParam(@operator, "SearchCenterMode", "ImageCenter");
+        if (!searchCenterMode.Equals("ImageCenter", StringComparison.OrdinalIgnoreCase) &&
+            !searchCenterMode.Equals("Explicit", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("SearchCenterMode must be ImageCenter or Explicit");
+        }
 
-            var nominalRadius = GetDoubleParam(@operator, "NominalRadius", 100.0);
-            var searchCenterX = GetDoubleParam(@operator, "SearchCenterX", 0.0);
-            var searchCenterY = GetDoubleParam(@operator, "SearchCenterY", 0.0);
-            var averagingThickness = GetDoubleParam(@operator, "AveragingThickness", 5.0);
-            var gaussianSigma = GetDoubleParam(@operator, "GaussianSigma", 1.2);
-            var edgeThreshold = GetDoubleParam(@operator, "EdgeThreshold", 0.0);
-            var minEdgeStrength = GetDoubleParam(@operator, "MinEdgeStrength", 4.0);
-            var minCoverageRatio = GetDoubleParam(@operator, "MinCoverageRatio", 0.35);
-            var minAngularCoverage = GetDoubleParam(@operator, "MinAngularCoverageDegrees", 180.0);
-            var outlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5);
-            var maxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0);
-            var finiteValues = new[]
-            {
-                nominalRadius,
-                searchCenterX,
-                searchCenterY,
-                averagingThickness,
-                gaussianSigma,
-                edgeThreshold,
-                minEdgeStrength,
-                minCoverageRatio,
-                minAngularCoverage,
-                outlierThreshold,
-                maxResidualRmse
-            };
-            if (finiteValues.Any(static value => !double.IsFinite(value)))
-            {
-                return ValidationResult.Invalid("CaliperFitV2 numeric parameters must be finite");
-            }
+        if (!TryParseDefinedEnum(GetStringParam(@operator, "EdgePolarity", "Auto"), out CircleCaliperFitV2EdgePolarity _) ||
+            !TryParseDefinedEnum(GetStringParam(@operator, "OutlierMode", "Mad"), out CircleCaliperFitV2OutlierMode _))
+        {
+            return ValidationResult.Invalid("CaliperFitV2 enum parameters are invalid");
+        }
 
-            if (nominalRadius < minRadius || nominalRadius > maxRadius)
-            {
-                return ValidationResult.Invalid("NominalRadius must be inside MinRadius and MaxRadius");
-            }
+        var nominalRadius = GetDoubleParam(@operator, "NominalRadius", 100.0);
+        var searchCenterX = GetDoubleParam(@operator, "SearchCenterX", 0.0);
+        var searchCenterY = GetDoubleParam(@operator, "SearchCenterY", 0.0);
+        var averagingThickness = GetDoubleParam(@operator, "AveragingThickness", 5.0);
+        var gaussianSigma = GetDoubleParam(@operator, "GaussianSigma", 1.2);
+        var edgeThreshold = GetDoubleParam(@operator, "EdgeThreshold", 0.0);
+        var minEdgeStrength = GetDoubleParam(@operator, "MinEdgeStrength", 4.0);
+        var minCoverageRatio = GetDoubleParam(@operator, "MinCoverageRatio", 0.35);
+        var minAngularCoverage = GetDoubleParam(@operator, "MinAngularCoverageDegrees", 180.0);
+        var outlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5);
+        var maxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0);
+        var finiteValues = new[]
+        {
+            nominalRadius,
+            searchCenterX,
+            searchCenterY,
+            averagingThickness,
+            gaussianSigma,
+            edgeThreshold,
+            minEdgeStrength,
+            minCoverageRatio,
+            minAngularCoverage,
+            outlierThreshold,
+            maxResidualRmse
+        };
+        if (finiteValues.Any(static value => !double.IsFinite(value)))
+        {
+            return ValidationResult.Invalid("CaliperFitV2 numeric parameters must be finite");
+        }
 
-            var caliperCount = GetIntParam(@operator, "CaliperCount", 96);
-            var profileSampleCount = GetIntParam(@operator, "ProfileSampleCount", 129);
-            var minValidCalipers = GetIntParam(@operator, "MinValidCalipers", 24);
-            var maxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3);
-            if (caliperCount < 3 || caliperCount > CircleCaliperFitV2Request.MaxCaliperCountLimit ||
-                profileSampleCount < 16 || profileSampleCount > CircleCaliperFitV2Request.MaxProfileSampleCountLimit ||
-                minValidCalipers < 3 || minValidCalipers > caliperCount ||
-                maxOutlierIterations < 0 || maxOutlierIterations > 20)
+        if (nominalRadius < minRadius || nominalRadius > maxRadius)
+        {
+            return ValidationResult.Invalid("NominalRadius must be inside MinRadius and MaxRadius");
+        }
+
+        if (averagingThickness < 1.0 || averagingThickness > 128.0 ||
+            gaussianSigma < 0.0 || gaussianSigma > 12.0 ||
+            edgeThreshold < 0.0 || edgeThreshold > 255.0 ||
+            minEdgeStrength < 0.0 || minEdgeStrength > 255.0 ||
+            minCoverageRatio < 0.0 || minCoverageRatio > 1.0 ||
+            minAngularCoverage < 0.0 || minAngularCoverage > 360.0 ||
+            outlierThreshold <= 0.0 || outlierThreshold > 20.0 ||
+            maxResidualRmse <= 0.0 || maxResidualRmse > 128.0)
+        {
+            return ValidationResult.Invalid("CaliperFitV2 numeric parameters are outside supported limits");
+        }
+
+        var caliperCount = GetIntParam(@operator, "CaliperCount", 96);
+        var profileSampleCount = GetIntParam(@operator, "ProfileSampleCount", 129);
+        var minValidCalipers = GetIntParam(@operator, "MinValidCalipers", 24);
+        var maxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3);
+        if (caliperCount < 3 || caliperCount > CircleCaliperFitV2Request.MaxCaliperCountLimit ||
+            profileSampleCount < 16 || profileSampleCount > CircleCaliperFitV2Request.MaxProfileSampleCountLimit ||
+            minValidCalipers < 3 || minValidCalipers > caliperCount ||
+            maxOutlierIterations < 0 || maxOutlierIterations > 20)
+        {
+            return ValidationResult.Invalid("CaliperFitV2 bounded collection parameters are invalid");
+        }
+
+        checked
+        {
+            var workUnits = (long)caliperCount *
+                profileSampleCount *
+                (long)Math.Ceiling(Math.Max(1.0, averagingThickness));
+            if (workUnits > CircleCaliperFitV2Request.MaxSamplingWorkUnits)
             {
-                return ValidationResult.Invalid("CaliperFitV2 bounded collection parameters are invalid");
+                return ValidationResult.Invalid($"CaliperFitV2 sampling work units exceed {CircleCaliperFitV2Request.MaxSamplingWorkUnits}");
             }
         }
 

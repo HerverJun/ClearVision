@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-03 20:14:49 +08:00`
+> 生成时间 / Generated At: `2026-07-03 22:05:12 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 当前版本快照 / Current Snapshot
@@ -89,7 +89,7 @@
 | `OperatorType.Undistort` | Undistort | 标定 | `1.0.0` |
 | `OperatorType.ArcCaliper` | Arc Caliper | 检测 | `1.0.1` |
 | `OperatorType.CaliperTool` | 卡尺工具 | 检测 | `1.0.0` |
-| `OperatorType.CircleMeasurement` | 圆测量 | 检测 | `1.1.0` |
+| `OperatorType.CircleMeasurement` | 圆测量 | 检测 | `1.1.1` |
 | `OperatorType.ContourExtrema` | Contour Extrema | 检测 | `1.0.1` |
 | `OperatorType.GapMeasurement` | 间隙测量 | 检测 | `1.0.0` |
 | `OperatorType.GeoMeasurement` | 几何测量 | 检测 | `1.0.0` |
@@ -391,6 +391,7 @@
 ### OperatorType.CircleMeasurement / 圆测量
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.1.1` | `2026-07-03T21:48:17.3666159+08:00` | `E0A8874D6BEE` |
 | `1.1.0` | `2026-07-03T19:53:45.9834695+08:00` | `026AAE59BD0F` |
 | `1.1.0` | `2026-07-03T19:39:52.6116319+08:00` | `7448D2348291` |
 | `1.0.0` | `2026-06-25T11:35:53.9102407+08:00` | `1CB951CB0030` |

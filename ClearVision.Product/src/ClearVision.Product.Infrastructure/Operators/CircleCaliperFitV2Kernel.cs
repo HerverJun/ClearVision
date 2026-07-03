@@ -36,6 +36,7 @@ public sealed record CircleCaliperFitV2Request
     public const string ContractVersionValue = "caliper-circle-fit.v2";
     public const int MaxCaliperCountLimit = 720;
     public const int MaxProfileSampleCountLimit = 4096;
+    public const long MaxSamplingWorkUnits = 8_000_000;
 
     public double SearchCenterX { get; init; }
     public double SearchCenterY { get; init; }
@@ -98,6 +99,10 @@ public sealed class CircleCaliperFitV2Result
 public static class CircleCaliperFitV2Kernel
 {
     private const double TwoPi = Math.PI * 2.0;
+    private const int MaxDiagnosticCount = 64;
+    private const int MaxDiagnosticMessageLength = 160;
+    private const double MinimumRobustScale = 0.05;
+    private const double MinimumClassificationThreshold = 0.35;
 
     public static CircleCaliperFitV2Result Fit(Mat gray, CircleCaliperFitV2Request request, CancellationToken cancellationToken = default)
     {
@@ -141,12 +146,21 @@ public static class CircleCaliperFitV2Kernel
 
         if (successes.Length > 1 && IsGlobalPolarityAmbiguous(successes[0], successes[1]))
         {
-            return Failure(
+            var best = successes[0];
+            return HypothesisEvaluation.FailWithEvidence(
+                best.ResolvedPolarity,
                 CircleCaliperFitV2FailureCode.AmbiguousEdge,
                 "Auto polarity produced indistinguishable circle hypotheses.",
-                successes[0].ResolvedPolarity,
-                successes[0].EdgePoints,
-                successes[0].Diagnostics);
+                best.Fit,
+                best.EdgePoints,
+                best.InlierPoints,
+                best.OutlierPoints,
+                best.Diagnostics,
+                best.CoverageRatio,
+                best.AngularCoverageDegrees,
+                best.ResidualRmse,
+                best.ResidualMax,
+                best.MedianEdgeStrength).ToResult(request.CaliperCount);
         }
 
         return successes[0].ToResult(request.CaliperCount);
@@ -249,6 +263,19 @@ public static class CircleCaliperFitV2Kernel
             return Failure(CircleCaliperFitV2FailureCode.InvalidInput, "MaxResidualRmse must be in (0, 128].", diagnostics: diagnostics);
         }
 
+        var workUnits = ComputeSamplingWorkUnits(request);
+        if (workUnits > CircleCaliperFitV2Request.MaxSamplingWorkUnits)
+        {
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic(
+                "sampling.work-budget",
+                "Sampling work units exceed the fixed CaliperFitV2 budget.",
+                workUnits));
+            return Failure(
+                CircleCaliperFitV2FailureCode.InvalidInput,
+                $"Sampling work units {workUnits} exceed maximum {CircleCaliperFitV2Request.MaxSamplingWorkUnits}.",
+                diagnostics: diagnostics);
+        }
+
         var border = (request.AveragingThickness * 0.5) + 1.0;
         if (request.SearchCenterX - request.MaxRadius - border < 0.0 ||
             request.SearchCenterY - request.MaxRadius - border < 0.0 ||
@@ -297,7 +324,8 @@ public static class CircleCaliperFitV2Kernel
                 start,
                 end,
                 request.AveragingThickness,
-                request.ProfileSampleCount);
+                request.ProfileSampleCount,
+                cancellationToken);
             var threshold = request.EdgeThreshold > 0.0
                 ? request.EdgeThreshold
                 : IndustrialCaliperKernel.EstimateEdgeThreshold(profile, Math.Max(1.0, request.MinEdgeStrength));
@@ -356,9 +384,8 @@ public static class CircleCaliperFitV2Kernel
                 diagnostics);
         }
 
-        var inlierIndexes = Enumerable.Range(0, edgePoints.Count).ToList();
-        var currentFit = FitCircle(edgePoints);
-        if (!currentFit.IsValid)
+        var initialFit = FitCircle(edgePoints);
+        if (!initialFit.IsValid)
         {
             return HypothesisEvaluation.Fail(
                 polarity,
@@ -368,47 +395,8 @@ public static class CircleCaliperFitV2Kernel
                 diagnostics);
         }
 
-        if (request.OutlierMode != CircleCaliperFitV2OutlierMode.None)
-        {
-            for (var iteration = 0; iteration < request.MaxOutlierIterations; iteration++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var residuals = inlierIndexes
-                    .Select(index => Math.Abs(ComputeSignedResidual(edgePoints[index], currentFit)))
-                    .ToArray();
-                var median = MeasurementStatisticsHelper.ComputeMedian(residuals);
-                var sigma = MeasurementStatisticsHelper.ComputeScaledMedianAbsoluteDeviation(residuals, median);
-                var threshold = Math.Max(0.35, request.OutlierThreshold * Math.Max(sigma, 0.05));
-                if (request.OutlierMode == CircleCaliperFitV2OutlierMode.Huber)
-                {
-                    threshold = Math.Max(threshold, request.MaxResidualRmse * 1.5);
-                }
-
-                var nextIndexes = inlierIndexes
-                    .Where(index => Math.Abs(ComputeSignedResidual(edgePoints[index], currentFit)) <= threshold)
-                    .ToList();
-
-                if (nextIndexes.Count < request.MinValidCalipers || nextIndexes.Count == inlierIndexes.Count)
-                {
-                    break;
-                }
-
-                inlierIndexes = nextIndexes;
-                currentFit = FitCircle(inlierIndexes.Select(index => edgePoints[index]).ToArray());
-                if (!currentFit.IsValid)
-                {
-                    return HypothesisEvaluation.Fail(
-                        polarity,
-                        CircleCaliperFitV2FailureCode.DegenerateFit,
-                        "Circle fit became degenerate during outlier rejection.",
-                        edgePoints,
-                        diagnostics);
-                }
-            }
-        }
-
-        currentFit = FitCircle(inlierIndexes.Select(index => edgePoints[index]).ToArray());
-        if (!currentFit.IsValid)
+        var robust = BuildRobustFit(edgePoints, initialFit, request, diagnostics, cancellationToken);
+        if (!robust.Fit.IsValid)
         {
             return HypothesisEvaluation.Fail(
                 polarity,
@@ -418,15 +406,18 @@ public static class CircleCaliperFitV2Kernel
                 diagnostics);
         }
 
-        var inlierSet = inlierIndexes.ToHashSet();
-        var inliers = inlierIndexes.Select(index => edgePoints[index]).ToList();
-        var outliers = edgePoints.Where((_, index) => !inlierSet.Contains(index)).ToList();
-        var residualsFinal = inliers.Select(point => ComputeSignedResidual(point, currentFit)).ToArray();
-        var residualRmse = Math.Sqrt(residualsFinal.Select(static value => value * value).Average());
-        var residualMax = residualsFinal.Select(Math.Abs).DefaultIfEmpty(double.NaN).Max();
+        var currentFit = robust.Fit;
+        var inliers = robust.InlierIndexes.Select(index => edgePoints[index]).ToList();
+        var outlierSet = robust.OutlierIndexes.ToHashSet();
+        var outliers = edgePoints
+            .Where((_, index) => outlierSet.Contains(index))
+            .ToList();
+        var (residualRmse, residualMax) = ComputeResidualStats(inliers, currentFit);
         var coverageRatio = (double)inliers.Count / request.CaliperCount;
         var angularCoverage = ComputeAngularCoverageDegrees(inliers);
-        var medianStrength = MeasurementStatisticsHelper.ComputeMedian(inliers.Select(static point => point.Strength).ToArray());
+        var medianStrength = inliers.Count > 0
+            ? MeasurementStatisticsHelper.ComputeMedian(inliers.Select(static point => point.Strength).ToArray())
+            : double.NaN;
 
         diagnostics.Add(new CircleCaliperFitV2Diagnostic("fit.radius", "Final fitted radius.", currentFit.Radius));
         diagnostics.Add(new CircleCaliperFitV2Diagnostic("fit.residualRmse", "Final residual RMSE.", residualRmse));
@@ -435,42 +426,74 @@ public static class CircleCaliperFitV2Kernel
 
         if (currentFit.Radius < request.MinRadius || currentFit.Radius > request.MaxRadius)
         {
-            return HypothesisEvaluation.Fail(
+            return HypothesisEvaluation.FailWithEvidence(
                 polarity,
                 CircleCaliperFitV2FailureCode.RadiusOutOfRange,
                 "Fitted radius is outside the search radius range.",
+                currentFit,
                 edgePoints,
-                diagnostics);
+                inliers,
+                outliers,
+                diagnostics,
+                coverageRatio,
+                angularCoverage,
+                residualRmse,
+                residualMax,
+                medianStrength);
         }
 
         if (inliers.Count < request.MinValidCalipers)
         {
-            return HypothesisEvaluation.Fail(
+            return HypothesisEvaluation.FailWithEvidence(
                 polarity,
                 CircleCaliperFitV2FailureCode.InsufficientEdges,
                 "Inlier count is below MinValidCalipers after outlier rejection.",
+                currentFit,
                 edgePoints,
-                diagnostics);
+                inliers,
+                outliers,
+                diagnostics,
+                coverageRatio,
+                angularCoverage,
+                residualRmse,
+                residualMax,
+                medianStrength);
         }
 
         if (coverageRatio < request.MinCoverageRatio || angularCoverage < request.MinAngularCoverageDegrees)
         {
-            return HypothesisEvaluation.Fail(
+            return HypothesisEvaluation.FailWithEvidence(
                 polarity,
                 CircleCaliperFitV2FailureCode.InsufficientCoverage,
                 "Inlier coverage is below the configured gate.",
+                currentFit,
                 edgePoints,
-                diagnostics);
+                inliers,
+                outliers,
+                diagnostics,
+                coverageRatio,
+                angularCoverage,
+                residualRmse,
+                residualMax,
+                medianStrength);
         }
 
         if (residualRmse > request.MaxResidualRmse)
         {
-            return HypothesisEvaluation.Fail(
+            return HypothesisEvaluation.FailWithEvidence(
                 polarity,
                 CircleCaliperFitV2FailureCode.ResidualTooHigh,
                 "Residual RMSE is above MaxResidualRmse.",
+                currentFit,
                 edgePoints,
-                diagnostics);
+                inliers,
+                outliers,
+                diagnostics,
+                coverageRatio,
+                angularCoverage,
+                residualRmse,
+                residualMax,
+                medianStrength);
         }
 
         var residualScore = 1.0 - Math.Clamp(residualRmse / Math.Max(request.MaxResidualRmse, 1e-6), 0.0, 1.0);
@@ -547,6 +570,193 @@ public static class CircleCaliperFitV2Kernel
         };
     }
 
+    private static RobustFitResult BuildRobustFit(
+        IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+        CircleFit initialFit,
+        CircleCaliperFitV2Request request,
+        List<CircleCaliperFitV2Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        return request.OutlierMode switch
+        {
+            CircleCaliperFitV2OutlierMode.None => BuildNoOutlierFit(edgePoints, initialFit, diagnostics),
+            CircleCaliperFitV2OutlierMode.Huber => BuildHuberFit(edgePoints, initialFit, request, diagnostics, cancellationToken),
+            _ => BuildMadFit(edgePoints, initialFit, request, diagnostics, cancellationToken)
+        };
+    }
+
+    private static RobustFitResult BuildNoOutlierFit(
+        IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+        CircleFit initialFit,
+        List<CircleCaliperFitV2Diagnostic> diagnostics)
+    {
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.mode", "Outlier rejection disabled; all collected edge points remain inliers."));
+        var inlierIndexes = Enumerable.Range(0, edgePoints.Count).ToArray();
+        return new RobustFitResult(initialFit, inlierIndexes, Array.Empty<int>(), double.NaN, double.PositiveInfinity, 0, true);
+    }
+
+    private static RobustFitResult BuildMadFit(
+        IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+        CircleFit initialFit,
+        CircleCaliperFitV2Request request,
+        List<CircleCaliperFitV2Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var currentFit = initialFit;
+        var inlierIndexes = Enumerable.Range(0, edgePoints.Count).ToList();
+        var robustScale = double.NaN;
+        var threshold = double.PositiveInfinity;
+        var iterations = 0;
+        var converged = true;
+
+        for (var iteration = 0; iteration < request.MaxOutlierIterations; iteration++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            iterations = iteration + 1;
+            var residuals = inlierIndexes
+                .Select(index => ComputeSignedResidual(edgePoints[index], currentFit))
+                .ToArray();
+            robustScale = ComputeRobustScale(residuals);
+            threshold = Math.Max(MinimumClassificationThreshold, request.OutlierThreshold * robustScale);
+            var nextIndexes = inlierIndexes
+                .Where(index => Math.Abs(ComputeSignedResidual(edgePoints[index], currentFit)) <= threshold)
+                .ToList();
+
+            if (nextIndexes.Count == inlierIndexes.Count)
+            {
+                break;
+            }
+
+            if (nextIndexes.Count < 3)
+            {
+                converged = false;
+                break;
+            }
+
+            var nextFit = FitCircle(nextIndexes.Select(index => edgePoints[index]).ToArray());
+            if (!nextFit.IsValid)
+            {
+                return RobustFitResult.Invalid;
+            }
+
+            inlierIndexes = nextIndexes;
+            currentFit = nextFit;
+        }
+
+        var inlierSet = inlierIndexes.ToHashSet();
+        var outlierIndexes = Enumerable.Range(0, edgePoints.Count)
+            .Where(index => !inlierSet.Contains(index))
+            .ToArray();
+
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.mode", "MAD hard-rejection outlier mode."));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.iterations", "MAD outlier rejection iterations.", iterations));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.robustScale", "Final MAD robust scale.", robustScale));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.threshold", "Final MAD classification threshold.", threshold));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.converged", converged ? "MAD rejection converged." : "MAD rejection stopped before convergence.", converged ? 1.0 : 0.0));
+
+        return new RobustFitResult(currentFit, inlierIndexes.ToArray(), outlierIndexes, robustScale, threshold, iterations, converged);
+    }
+
+    private static RobustFitResult BuildHuberFit(
+        IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+        CircleFit initialFit,
+        CircleCaliperFitV2Request request,
+        List<CircleCaliperFitV2Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var currentFit = initialFit;
+        var weights = Enumerable.Repeat(1.0, edgePoints.Count).ToArray();
+        var robustScale = double.NaN;
+        var delta = double.PositiveInfinity;
+        var iterations = 0;
+        var converged = request.MaxOutlierIterations == 0;
+
+        for (var iteration = 0; iteration < request.MaxOutlierIterations; iteration++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            iterations = iteration + 1;
+            var residuals = edgePoints
+                .Select(point => ComputeSignedResidual(point, currentFit))
+                .ToArray();
+            robustScale = ComputeRobustScale(residuals);
+            delta = Math.Max(MinimumClassificationThreshold, request.OutlierThreshold * robustScale);
+            var nextWeights = residuals
+                .Select(residual =>
+                {
+                    var absResidual = Math.Abs(residual);
+                    return absResidual <= delta || absResidual <= 1e-12
+                        ? 1.0
+                        : delta / absResidual;
+                })
+                .ToArray();
+
+            var nextFit = FitCircleWeighted(edgePoints, nextWeights);
+            if (!nextFit.IsValid)
+            {
+                return RobustFitResult.Invalid;
+            }
+
+            var centerDelta = Math.Sqrt(
+                Math.Pow(nextFit.CenterX - currentFit.CenterX, 2) +
+                Math.Pow(nextFit.CenterY - currentFit.CenterY, 2));
+            var radiusDelta = Math.Abs(nextFit.Radius - currentFit.Radius);
+            var maxWeightDelta = nextWeights
+                .Zip(weights, static (next, previous) => Math.Abs(next - previous))
+                .DefaultIfEmpty(0.0)
+                .Max();
+
+            weights = nextWeights;
+            currentFit = nextFit;
+
+            if (centerDelta <= 1e-6 || radiusDelta <= 1e-6 || maxWeightDelta <= 1e-6)
+            {
+                converged = true;
+                break;
+            }
+        }
+
+        var finalResiduals = edgePoints
+            .Select(point => ComputeSignedResidual(point, currentFit))
+            .ToArray();
+        robustScale = ComputeRobustScale(finalResiduals);
+        delta = Math.Max(MinimumClassificationThreshold, request.OutlierThreshold * robustScale);
+        var inlierIndexes = finalResiduals
+            .Select((residual, index) => new { residual, index })
+            .Where(item => Math.Abs(item.residual) <= delta)
+            .Select(item => item.index)
+            .ToArray();
+        var inlierSet = inlierIndexes.ToHashSet();
+        var outlierIndexes = Enumerable.Range(0, edgePoints.Count)
+            .Where(index => !inlierSet.Contains(index))
+            .ToArray();
+
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("outlier.mode", "Huber IRLS weighted robust fit mode."));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("huber.iterations", "Huber IRLS iteration count.", iterations));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("huber.robustScale", "Final Huber robust scale.", robustScale));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("huber.delta", "Final Huber delta.", delta));
+        diagnostics.Add(new CircleCaliperFitV2Diagnostic("huber.converged", converged ? "Huber IRLS converged." : "Huber IRLS reached iteration limit.", converged ? 1.0 : 0.0));
+
+        return new RobustFitResult(currentFit, inlierIndexes, outlierIndexes, robustScale, delta, iterations, converged);
+    }
+
+    private static double ComputeRobustScale(IReadOnlyList<double> residuals)
+    {
+        if (residuals.Count == 0)
+        {
+            return MinimumRobustScale;
+        }
+
+        var finite = residuals.Where(IsFinite).ToArray();
+        if (finite.Length == 0)
+        {
+            return MinimumRobustScale;
+        }
+
+        var median = MeasurementStatisticsHelper.ComputeMedian(finite);
+        var scale = MeasurementStatisticsHelper.ComputeScaledMedianAbsoluteDeviation(finite, median);
+        return Math.Max(MinimumRobustScale, scale);
+    }
+
     private static CircleFit FitCircle(IReadOnlyList<CircleCaliperFitV2Point> points)
     {
         var n = points.Count;
@@ -621,6 +831,125 @@ public static class CircleCaliperFitV2Kernel
             : CircleFit.Invalid;
     }
 
+    private static CircleFit FitCircleWeighted(IReadOnlyList<CircleCaliperFitV2Point> points, IReadOnlyList<double> weights)
+    {
+        if (points.Count < 3 || points.Count != weights.Count)
+        {
+            return CircleFit.Invalid;
+        }
+
+        var weightSum = weights.Where(IsFinite).Where(static weight => weight > 0.0).Sum();
+        if (weightSum <= 1e-12)
+        {
+            return CircleFit.Invalid;
+        }
+
+        var meanX = 0.0;
+        var meanY = 0.0;
+        for (var i = 0; i < points.Count; i++)
+        {
+            var weight = Math.Max(0.0, weights[i]);
+            meanX += points[i].X * weight;
+            meanY += points[i].Y * weight;
+        }
+
+        meanX /= weightSum;
+        meanY /= weightSum;
+
+        var scale = 0.0;
+        for (var i = 0; i < points.Count; i++)
+        {
+            var weight = Math.Max(0.0, weights[i]);
+            scale += weight * Math.Sqrt(Math.Pow(points[i].X - meanX, 2) + Math.Pow(points[i].Y - meanY, 2));
+        }
+
+        scale /= weightSum;
+        if (!IsFinite(scale) || scale < 1e-9)
+        {
+            return CircleFit.Invalid;
+        }
+
+        double sumW = 0.0;
+        double sumX = 0.0;
+        double sumY = 0.0;
+        double sumX2 = 0.0;
+        double sumY2 = 0.0;
+        double sumXY = 0.0;
+        double sumX3 = 0.0;
+        double sumY3 = 0.0;
+        double sumX2Y = 0.0;
+        double sumXY2 = 0.0;
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            var weight = Math.Max(0.0, weights[i]);
+            if (weight <= 0.0 || !IsFinite(weight))
+            {
+                continue;
+            }
+
+            var x = (points[i].X - meanX) / scale;
+            var y = (points[i].Y - meanY) / scale;
+            sumW += weight;
+            sumX += weight * x;
+            sumY += weight * y;
+            sumX2 += weight * x * x;
+            sumY2 += weight * y * y;
+            sumXY += weight * x * y;
+            sumX3 += weight * x * x * x;
+            sumY3 += weight * y * y * y;
+            sumX2Y += weight * x * x * y;
+            sumXY2 += weight * x * y * y;
+        }
+
+        if (sumW <= 1e-12)
+        {
+            return CircleFit.Invalid;
+        }
+
+        var a = (sumW * sumX2) - (sumX * sumX);
+        var b = (sumW * sumXY) - (sumX * sumY);
+        var c = (sumW * sumY2) - (sumY * sumY);
+        var d = 0.5 * ((sumW * sumX3) + (sumW * sumXY2) - (sumX * sumX2) - (sumX * sumY2));
+        var e = 0.5 * ((sumW * sumX2Y) + (sumW * sumY3) - (sumY * sumX2) - (sumY * sumY2));
+
+        var det = (a * c) - (b * b);
+        if (Math.Abs(det) < 1e-10)
+        {
+            return CircleFit.Invalid;
+        }
+
+        var normalizedCx = ((d * c) - (b * e)) / det;
+        var normalizedCy = ((a * e) - (b * d)) / det;
+        var normalizedRadiusSquared =
+            (sumX2 / sumW) - ((2.0 * normalizedCx * sumX) / sumW) + (normalizedCx * normalizedCx) +
+            (sumY2 / sumW) - ((2.0 * normalizedCy * sumY) / sumW) + (normalizedCy * normalizedCy);
+        if (normalizedRadiusSquared <= 0.0)
+        {
+            return CircleFit.Invalid;
+        }
+
+        var centerX = (normalizedCx * scale) + meanX;
+        var centerY = (normalizedCy * scale) + meanY;
+        var radius = Math.Sqrt(normalizedRadiusSquared) * scale;
+        return IsFinite(centerX) && IsFinite(centerY) && IsFinite(radius) && radius > 0.0
+            ? new CircleFit(true, centerX, centerY, radius)
+            : CircleFit.Invalid;
+    }
+
+    private static (double Rmse, double Max) ComputeResidualStats(IReadOnlyList<CircleCaliperFitV2Point> points, CircleFit fit)
+    {
+        if (points.Count == 0 || !fit.IsValid)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        var residuals = points.Select(point => ComputeSignedResidual(point, fit)).ToArray();
+        return (
+            Math.Sqrt(residuals.Select(static value => value * value).Average()),
+            residuals.Select(Math.Abs).DefaultIfEmpty(double.NaN).Max());
+    }
+
     private static double ComputeSignedResidual(CircleCaliperFitV2Point point, CircleFit fit)
     {
         return Math.Sqrt(Math.Pow(point.X - fit.CenterX, 2) + Math.Pow(point.Y - fit.CenterY, 2)) - fit.Radius;
@@ -659,6 +988,15 @@ public static class CircleCaliperFitV2Kernel
         return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
+    private static long ComputeSamplingWorkUnits(CircleCaliperFitV2Request request)
+    {
+        checked
+        {
+            var acrossCount = (long)Math.Ceiling(Math.Max(1.0, request.AveragingThickness));
+            return (long)request.CaliperCount * request.ProfileSampleCount * acrossCount;
+        }
+    }
+
     private static CircleCaliperFitV2Result Failure(
         CircleCaliperFitV2FailureCode code,
         string message,
@@ -676,11 +1014,50 @@ public static class CircleCaliperFitV2Kernel
             InlierPoints = Array.Empty<CircleCaliperFitV2Point>(),
             OutlierPoints = Array.Empty<CircleCaliperFitV2Point>(),
             CollectedPointCount = points.Count,
-            ValidCaliperCount = points.Count,
+            ValidCaliperCount = 0,
             RejectedCaliperCount = 0,
             ResolvedPolarity = polarity,
-            Diagnostics = diagnostics?.ToArray() ?? Array.Empty<CircleCaliperFitV2Diagnostic>()
+            Diagnostics = BoundDiagnostics(diagnostics)
         };
+    }
+
+    private static IReadOnlyList<CircleCaliperFitV2Diagnostic> BoundDiagnostics(
+        IReadOnlyList<CircleCaliperFitV2Diagnostic>? diagnostics)
+    {
+        if (diagnostics == null || diagnostics.Count == 0)
+        {
+            return Array.Empty<CircleCaliperFitV2Diagnostic>();
+        }
+
+        return diagnostics
+            .Take(MaxDiagnosticCount)
+            .Select(static diagnostic => new CircleCaliperFitV2Diagnostic(
+                BoundDiagnosticCode(diagnostic.Code),
+                BoundDiagnosticMessage(diagnostic.Message),
+                diagnostic.Value))
+            .ToArray();
+    }
+
+    private static string BoundDiagnosticCode(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return "diagnostic";
+        }
+
+        code = code.Trim();
+        return code.Length <= 64 ? code : code[..64];
+    }
+
+    private static string BoundDiagnosticMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return string.Empty;
+        }
+
+        message = message.Trim();
+        return message.Length <= MaxDiagnosticMessageLength ? message : message[..MaxDiagnosticMessageLength];
     }
 
     private static string BoundMessage(string message)
@@ -702,6 +1079,25 @@ public static class CircleCaliperFitV2Kernel
     private readonly record struct CircleFit(bool IsValid, double CenterX, double CenterY, double Radius)
     {
         public static CircleFit Invalid => new(false, double.NaN, double.NaN, double.NaN);
+    }
+
+    private readonly record struct RobustFitResult(
+        CircleFit Fit,
+        IReadOnlyList<int> InlierIndexes,
+        IReadOnlyList<int> OutlierIndexes,
+        double RobustScale,
+        double Threshold,
+        int Iterations,
+        bool Converged)
+    {
+        public static RobustFitResult Invalid => new(
+            CircleFit.Invalid,
+            Array.Empty<int>(),
+            Array.Empty<int>(),
+            double.NaN,
+            double.NaN,
+            0,
+            false);
     }
 
     private sealed class HypothesisEvaluation
@@ -789,6 +1185,41 @@ public static class CircleCaliperFitV2Kernel
                 0.0);
         }
 
+        public static HypothesisEvaluation FailWithEvidence(
+            CircleCaliperFitV2EdgePolarity polarity,
+            CircleCaliperFitV2FailureCode code,
+            string message,
+            CircleFit fit,
+            IReadOnlyList<CircleCaliperFitV2Point> edgePoints,
+            IReadOnlyList<CircleCaliperFitV2Point> inlierPoints,
+            IReadOnlyList<CircleCaliperFitV2Point> outlierPoints,
+            IReadOnlyList<CircleCaliperFitV2Diagnostic> diagnostics,
+            double coverageRatio,
+            double angularCoverageDegrees,
+            double residualRmse,
+            double residualMax,
+            double medianEdgeStrength)
+        {
+            return new HypothesisEvaluation(
+                false,
+                polarity,
+                code,
+                BoundMessage(message),
+                fit,
+                edgePoints.ToArray(),
+                inlierPoints.ToArray(),
+                outlierPoints.ToArray(),
+                diagnostics.ToArray(),
+                coverageRatio,
+                angularCoverageDegrees,
+                residualRmse,
+                residualMax,
+                medianEdgeStrength,
+                0.0,
+                double.NaN,
+                0.0);
+        }
+
         public static HypothesisEvaluation Pass(
             CircleCaliperFitV2EdgePolarity polarity,
             CircleFit fit,
@@ -829,7 +1260,27 @@ public static class CircleCaliperFitV2Kernel
         {
             if (!Success)
             {
-                return Failure(FailureCode, FailureMessage, ResolvedPolarity, EdgePoints, Diagnostics);
+                return new CircleCaliperFitV2Result
+                {
+                    Success = false,
+                    FailureCode = FailureCode,
+                    FailureMessage = BoundMessage(FailureMessage),
+                    EdgePoints = EdgePoints.ToArray(),
+                    InlierPoints = InlierPoints.ToArray(),
+                    OutlierPoints = OutlierPoints.ToArray(),
+                    ValidCaliperCount = InlierPoints.Count,
+                    RejectedCaliperCount = Math.Max(0, caliperCount - InlierPoints.Count),
+                    CollectedPointCount = EdgePoints.Count,
+                    CoverageRatio = CoverageRatio,
+                    AngularCoverageDegrees = AngularCoverageDegrees,
+                    ResidualRmse = ResidualRmse,
+                    ResidualMax = ResidualMax,
+                    MedianEdgeStrength = MedianEdgeStrength,
+                    ResolvedPolarity = ResolvedPolarity,
+                    Confidence = 0.0,
+                    UncertaintyPx = double.NaN,
+                    Diagnostics = BoundDiagnostics(Diagnostics)
+                };
             }
 
             return new CircleCaliperFitV2Result
@@ -853,7 +1304,7 @@ public static class CircleCaliperFitV2Kernel
                 ResolvedPolarity = ResolvedPolarity,
                 Confidence = Confidence,
                 UncertaintyPx = UncertaintyPx,
-                Diagnostics = Diagnostics.ToArray()
+                Diagnostics = BoundDiagnostics(Diagnostics)
             };
         }
     }
