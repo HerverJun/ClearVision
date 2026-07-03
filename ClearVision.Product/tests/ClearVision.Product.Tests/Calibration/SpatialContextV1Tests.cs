@@ -117,6 +117,18 @@ public sealed class SpatialContextV1Tests
         error.Should().Contain("does not support unit");
     }
 
+    [Theory]
+    [InlineData(SpatialUnitV1.Meter, "m")]
+    [InlineData(SpatialUnitV1.Centimeter, "cm")]
+    [InlineData(SpatialUnitV1.Micrometer, "um")]
+    public void FrameRef_ShouldSerializePhysicalWorld2DUnits(SpatialUnitV1 unit, string symbol)
+    {
+        var frame = FrameRefV1.World2D(unit: unit);
+
+        frame.Unit.Should().Be(unit);
+        frame.UnitSymbol.Should().Be(symbol);
+    }
+
     [Fact]
     public void Transform_ShouldRejectUnitlessToPixelAndNonFiniteMatrix()
     {

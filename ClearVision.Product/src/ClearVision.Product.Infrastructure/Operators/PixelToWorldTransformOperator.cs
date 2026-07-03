@@ -90,7 +90,12 @@ public class PixelToWorldTransformOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure(pointError));
         }
 
-        if (!TryResolveInputSpatialContext(inputs, out var spatialContext, out var spatialContextError))
+        if (!TryResolveInputSpatialContexts(
+                inputs,
+                out var pointsSpatialContext,
+                out var imageSpatialContext,
+                out var spatialContextDiagnostics,
+                out var spatialContextError))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure(spatialContextError));
         }
@@ -102,7 +107,9 @@ public class PixelToWorldTransformOperator : OperatorBase
                 inputs,
                 bundle,
                 inputPoints,
-                spatialContext,
+                pointsSpatialContext,
+                imageSpatialContext,
+                spatialContextDiagnostics,
                 isPixelToWorld,
                 requestedInputFrame,
                 requestedOutputFrame,
@@ -116,7 +123,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             inputs,
             bundle,
             inputPoints,
-            spatialContext,
+            pointsSpatialContext,
+            imageSpatialContext,
+            spatialContextDiagnostics,
             isPixelToWorld,
             requestedInputFrame,
             requestedOutputFrame,
@@ -181,6 +190,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         CalibrationBundleV2 bundle,
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
+        SpatialContextV1? imageSpatialContext,
+        IReadOnlyList<string> spatialContextDiagnostics,
         bool isPixelToWorld,
         string? requestedInputFrame,
         string? requestedOutputFrame,
@@ -223,8 +234,9 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         var accuracyReport = generateReport
-            ? BuildPlanarAccuracyReport(runtime, inputPoints, transformResult.OutputPoints, isPixelToWorld, unitScale, transformResult.Diagnostics)
+            ? BuildPlanarAccuracyReport(runtime, inputPoints, transformResult.OutputPoints, isPixelToWorld, unitScale, transformResult, transformResult.Diagnostics)
             : null;
+        var outputDiagnostics = transformResult.Diagnostics.Concat(spatialContextDiagnostics).ToList();
 
         return BuildSuccessOutput(
             @operator,
@@ -236,12 +248,12 @@ public class PixelToWorldTransformOperator : OperatorBase
             runtime.Model.ToString(),
             bundle,
             transformResult,
-            spatialContext,
+            imageSpatialContext,
             worldPlaneZ,
             unitScale,
             generateReport,
             accuracyReport,
-            transformResult.Diagnostics);
+            outputDiagnostics);
     }
 
     private OperatorExecutionOutput ExecuteRayPlanePath(
@@ -250,6 +262,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         CalibrationBundleV2 bundle,
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
+        SpatialContextV1? imageSpatialContext,
+        IReadOnlyList<string> spatialContextDiagnostics,
         bool isPixelToWorld,
         string? requestedInputFrame,
         string? requestedOutputFrame,
@@ -307,8 +321,9 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         var accuracyReport = generateReport
-            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, frameResult.Diagnostics)
+            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, frameResult, frameResult.Diagnostics)
             : null;
+        var outputDiagnostics = frameResult.Diagnostics.Concat(spatialContextDiagnostics).ToList();
 
         return BuildSuccessOutput(
             @operator,
@@ -320,12 +335,12 @@ public class PixelToWorldTransformOperator : OperatorBase
             "Projection",
             bundle,
             frameResult,
-            spatialContext,
+            imageSpatialContext,
             worldPlaneZ,
             unitScale,
             generateReport,
             accuracyReport,
-            frameResult.Diagnostics);
+            outputDiagnostics);
     }
 
     private static bool TryExecuteRayPlaneTransform(
@@ -370,6 +385,7 @@ public class PixelToWorldTransformOperator : OperatorBase
                 calibrationSourceFrame,
                 calibrationTargetFrame,
                 requestedInputFrame,
+                requestedOutputFrame,
                 worldPlaneZ,
                 unitScale,
                 worldUnit,
@@ -403,6 +419,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         FrameRefV1 calibrationSourceFrame,
         FrameRefV1 calibrationTargetFrame,
         string? requestedInputFrame,
+        string? requestedOutputFrame,
         double worldPlaneZ,
         double unitScale,
         string? worldUnit,
@@ -427,6 +444,29 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
+        if (inputFrame.Kind == SpatialFrameKindV1.World2D)
+        {
+            error = "SPATIAL_FRAME_DIRECTION_INVALID: PixelToWorld input frame cannot be World2D.";
+            return false;
+        }
+
+        if (!SpatialCalibrationTransformService.TryNormalizeRequestedFrame(
+                requestedOutputFrame,
+                calibrationTargetFrame,
+                out var outputFrame,
+                out var outputDiagnostics,
+                out error))
+        {
+            return false;
+        }
+
+        diagnostics.AddRange(outputDiagnostics);
+        if (outputFrame.Kind != SpatialFrameKindV1.World2D)
+        {
+            error = $"SPATIAL_FRAME_DIRECTION_INVALID: PixelToWorld output frame must be World2D, got {outputFrame.Kind}.";
+            return false;
+        }
+
         if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
                 spatialContext,
                 inputFrame,
@@ -473,7 +513,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             inputFrame,
             calibrationSourceFrame,
             calibrationTargetFrame,
-            calibrationTargetFrame,
+            outputFrame,
             inputFrame.UnitSymbol,
             SpatialCalibrationTransformService.NormalizeWorldUnit(worldUnit, unitScale),
             spatialPath.Count,
@@ -521,7 +561,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
         if (inputFrame.Kind != SpatialFrameKindV1.World2D)
         {
-            error = $"WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
+            error = $"SPATIAL_FRAME_DIRECTION_INVALID: WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
             return false;
         }
 
@@ -709,10 +749,6 @@ public class PixelToWorldTransformOperator : OperatorBase
             (transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase)
                 ? FrameRefV1.World2D()
                 : FrameRefV1.ImageFull());
-        if (outputFrame.Kind == SpatialFrameKindV1.World2D && Math.Abs(unitScale - 1.0) > Epsilon)
-        {
-            outputFrame = FrameRefV1.World2D(outputFrame.FrameId, SpatialUnitV1.Unitless);
-        }
 
         return new SpatialContextV1(
             outputFrame,
@@ -744,19 +780,24 @@ public class PixelToWorldTransformOperator : OperatorBase
         };
     }
 
-    private static bool TryResolveInputSpatialContext(
+    private static bool TryResolveInputSpatialContexts(
         IReadOnlyDictionary<string, object>? inputs,
-        out SpatialContextV1? context,
+        out SpatialContextV1? pointsContext,
+        out SpatialContextV1? imageContext,
+        out IReadOnlyList<string> diagnostics,
         out string error)
     {
-        context = null;
+        pointsContext = null;
+        imageContext = null;
+        diagnostics = Array.Empty<string>();
         error = string.Empty;
         if (inputs == null || inputs.Count == 0)
         {
             return true;
         }
 
-        var candidates = new List<(string Key, SpatialContextV1 Context)>();
+        SpatialContextV1? legacyContext = null;
+        var parsedKeys = new List<string>();
         foreach (var key in new[] { "PointsSpatialContext", RoiManagerOperator.ImageSpatialContextInputKey, RoiManagerOperator.SpatialContextOutputKey })
         {
             if (!TryGetInputValue(inputs, key, out var raw))
@@ -770,23 +811,55 @@ public class PixelToWorldTransformOperator : OperatorBase
                 return false;
             }
 
-            candidates.Add((key, parsed));
+            parsedKeys.Add(key);
+            if (key.Equals("PointsSpatialContext", StringComparison.OrdinalIgnoreCase))
+            {
+                pointsContext = parsed;
+            }
+            else if (key.Equals(RoiManagerOperator.ImageSpatialContextInputKey, StringComparison.OrdinalIgnoreCase))
+            {
+                imageContext = parsed;
+            }
+            else
+            {
+                legacyContext = parsed;
+            }
         }
 
-        if (candidates.Count == 0)
+        if (parsedKeys.Count == 0)
         {
             return true;
         }
 
-        if (candidates.Count > 1)
+        if (legacyContext != null)
         {
-            error = $"Ambiguous SpatialContext inputs: {string.Join(", ", candidates.Select(candidate => candidate.Key))}.";
-            return false;
+            if (pointsContext != null && !SpatialContextsHaveSameFrame(pointsContext, legacyContext))
+            {
+                error = "SPATIAL_CONTEXT_SCOPE_CONFLICT: legacy SpatialContext conflicts with PointsSpatialContext.";
+                return false;
+            }
+
+            if (imageContext != null && !SpatialContextsHaveSameFrame(imageContext, legacyContext))
+            {
+                error = "SPATIAL_CONTEXT_SCOPE_CONFLICT: legacy SpatialContext conflicts with ImageSpatialContext.";
+                return false;
+            }
+
+            pointsContext ??= legacyContext;
+            imageContext ??= legacyContext;
         }
 
-        context = candidates[0].Context;
+        if (pointsContext == null && imageContext != null)
+        {
+            pointsContext = imageContext;
+            diagnostics = ["Compatibility SpatialContext fallback: coordinates used ImageSpatialContext because PointsSpatialContext was absent."];
+        }
+
         return true;
     }
+
+    private static bool SpatialContextsHaveSameFrame(SpatialContextV1 left, SpatialContextV1 right) =>
+        Equals(left.CurrentFrame, right.CurrentFrame);
 
     private static bool TryGetInputValue(
         IReadOnlyDictionary<string, object> inputs,
@@ -812,6 +885,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         IReadOnlyList<Point3d> outputPoints,
         bool isPixelToWorld,
         double unitScale,
+        SpatialCalibrationTransformResult frameResult,
         IReadOnlyList<string>? diagnostics)
     {
         var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
@@ -847,7 +921,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             inputPoints,
             outputPoints,
             roundTripErrors,
-            isPixelToWorld ? "px" : "world_unit",
+            frameResult.InputUnit,
+            frameResult.InputFrame.FrameId,
+            frameResult.AppliedSpatialTransformCount,
             diagnostics);
     }
 
@@ -859,6 +935,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         bool isPixelToWorld,
         double worldPlaneZ,
         double unitScale,
+        SpatialCalibrationTransformResult frameResult,
         IReadOnlyList<string>? diagnostics)
     {
         var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
@@ -899,7 +976,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             inputPoints,
             outputPoints,
             roundTripErrors,
-            isPixelToWorld ? "px" : "world_unit",
+            frameResult.InputUnit,
+            frameResult.InputFrame.FrameId,
+            frameResult.AppliedSpatialTransformCount,
             diagnostics);
     }
 
@@ -908,6 +987,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         IReadOnlyList<Point3d> outputPoints,
         IReadOnlyList<double> roundTripErrors,
         string roundTripUnit,
+        string roundTripFrame,
+        int roundTripSpatialTransformCount,
         IReadOnlyList<string>? diagnostics)
     {
         var mean = roundTripErrors.Count > 0 ? roundTripErrors.Average() : 0.0;
@@ -921,7 +1002,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["InputPoints"] = inputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
             ["OutputPoints"] = outputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
             ["RoundTripErrors"] = roundTripErrors.ToList(),
+            ["RoundTripFrame"] = roundTripFrame,
             ["RoundTripUnit"] = roundTripUnit,
+            ["RoundTripSpatialTransformCount"] = roundTripSpatialTransformCount,
             ["RoundTripMean"] = mean,
             ["RoundTripMax"] = max,
             ["RoundTripP95"] = ComputePercentile(roundTripErrors, 0.95),
@@ -941,7 +1024,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["InputPoints"] = inputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
             ["OutputPoints"] = outputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
             ["RoundTripErrors"] = new List<double>(),
+            ["RoundTripFrame"] = string.Empty,
             ["RoundTripUnit"] = string.Empty,
+            ["RoundTripSpatialTransformCount"] = 0,
             ["RoundTripMean"] = 0.0,
             ["RoundTripMax"] = 0.0,
             ["RoundTripP95"] = 0.0,

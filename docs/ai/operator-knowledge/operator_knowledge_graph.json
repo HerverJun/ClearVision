@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-06-25T01:00:55.8909961Z",
+  "GeneratedAtUtc": "2026-07-03T07:29:27.5427551Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -15299,6 +15299,40 @@
           "AllowedValues": [
             "\u50CF\u7D20\u5230\u4E16\u754C",
             "\u4E16\u754C\u5230\u50CF\u7D20"
+          ]
+        },
+        {
+          "Name": "InputFrame",
+          "DisplayName": "Input Frame",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u81EA\u52A8",
+            "Image Full",
+            "ROI Local",
+            "Undistorted",
+            "World 2D"
+          ]
+        },
+        {
+          "Name": "OutputFrame",
+          "DisplayName": "Output Frame",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u81EA\u52A8",
+            "Image Full",
+            "ROI Local",
+            "Undistorted",
+            "World 2D"
           ]
         },
         {
@@ -37018,19 +37052,19 @@
     {
       "RelationType": "PRODUCES",
       "Source": "RoiManager",
-      "Target": "Image",
+      "Target": "Any",
       "Weight": 1,
       "Metadata": {
-        "port": "Image"
+        "port": "SpatialContext"
       }
     },
     {
       "RelationType": "PRODUCES",
       "Source": "RoiManager",
-      "Target": "Any",
+      "Target": "Image",
       "Weight": 1,
       "Metadata": {
-        "port": "SpatialContext"
+        "port": "Image"
       }
     },
     {

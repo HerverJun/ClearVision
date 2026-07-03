@@ -17,7 +17,10 @@ public enum SpatialUnitV1
 {
     Pixel = 0,
     Millimeter = 1,
-    Unitless = 2
+    Unitless = 2,
+    Meter = 3,
+    Centimeter = 4,
+    Micrometer = 5
 }
 
 /// <summary>
@@ -56,6 +59,9 @@ public sealed record FrameRefV1
     {
         SpatialUnitV1.Pixel => "px",
         SpatialUnitV1.Millimeter => "mm",
+        SpatialUnitV1.Meter => "m",
+        SpatialUnitV1.Centimeter => "cm",
+        SpatialUnitV1.Micrometer => "um",
         SpatialUnitV1.Unitless => "unitless",
         _ => "unknown"
     };
@@ -99,7 +105,13 @@ public sealed record FrameRefV1
 
         return (sourceUnit, targetUnit) is
             (SpatialUnitV1.Pixel, SpatialUnitV1.Millimeter) or
-            (SpatialUnitV1.Millimeter, SpatialUnitV1.Pixel);
+            (SpatialUnitV1.Millimeter, SpatialUnitV1.Pixel) or
+            (SpatialUnitV1.Pixel, SpatialUnitV1.Meter) or
+            (SpatialUnitV1.Meter, SpatialUnitV1.Pixel) or
+            (SpatialUnitV1.Pixel, SpatialUnitV1.Centimeter) or
+            (SpatialUnitV1.Centimeter, SpatialUnitV1.Pixel) or
+            (SpatialUnitV1.Pixel, SpatialUnitV1.Micrometer) or
+            (SpatialUnitV1.Micrometer, SpatialUnitV1.Pixel);
     }
 
     private static bool TryValidate(
@@ -160,7 +172,7 @@ public sealed record FrameRefV1
             SpatialFrameKindV1.ImageFull or SpatialFrameKindV1.RoiLocal or SpatialFrameKindV1.Undistorted =>
                 unit is SpatialUnitV1.Pixel or SpatialUnitV1.Unitless,
             SpatialFrameKindV1.World2D =>
-                unit is SpatialUnitV1.Millimeter or SpatialUnitV1.Unitless,
+                unit is SpatialUnitV1.Millimeter or SpatialUnitV1.Meter or SpatialUnitV1.Centimeter or SpatialUnitV1.Micrometer,
             _ => false
         };
 

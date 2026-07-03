@@ -3,6 +3,8 @@ import { bootAuthenticatedApp } from './authHelper';
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+const MATCHING_512_IMAGE_SOURCE =
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#111827"/><text x="16" y="32">matching-real-image-512</text></svg>')}`;
 
 async function stubOperatorLibrary(page) {
   await page.route('**/api/operators/types', async route => {
@@ -777,6 +779,101 @@ test.describe('Node Preview Inspector flag', () => {
     expect(selection.resultPathVersion).toBe(1);
     expect(selection.resultPath).toBe('$');
     expect(selection.pathHint).toBe('$["Radius"]');
+  });
+
+  test('forces neutral plane for World2D scene when input and output images are exactly 512px', async ({ page }) => {
+    await page.evaluate(() => {
+      const loadedSources: string[] = [];
+      const descriptor = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+      Object.defineProperty(Image.prototype, 'src', {
+        configurable: true,
+        get() {
+          return descriptor?.get?.call(this) ?? '';
+        },
+        set(value) {
+          loadedSources.push(String(value));
+          descriptor?.set?.call(this, value);
+        },
+      });
+      (window as any).__sceneLoadedImageSources = loadedSources;
+    });
+
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      const response: any = buildObservationResponse(request, {
+        kind: 'dictionary',
+        displayValue: '1/1 fields',
+        originalType: 'System.Collections.Generic.Dictionary',
+        pathHint: '$',
+        addressable: false,
+        truncated: false,
+        children: [],
+      }, []);
+      response.inputImageBase64 = MATCHING_512_IMAGE_SOURCE;
+      response.outputImageBase64 = MATCHING_512_IMAGE_SOURCE;
+      response.observation.visualScene = {
+        schemaVersion: 'visual-scene.v1',
+        coordinateSpace: 'world.2d.neutral-plane',
+        frameId: 'world.2d',
+        frameKind: 'World2D',
+        unit: 'cm',
+        worldMinX: 0,
+        worldMinY: 0,
+        worldMaxX: 2,
+        worldMaxY: 2,
+        worldToSceneScale: 216,
+        imageWidth: 512,
+        imageHeight: 512,
+        primitives: [{
+          primitiveId: 'ptw:point:0',
+          kind: 'point',
+          layer: 'world',
+          zOrder: 10,
+          visible: true,
+          selectable: false,
+          label: 'World Point',
+          geometry: { x: 256, y: 256 },
+          style: { stroke: '#2563eb', fill: '#2563eb', strokeWidth: 2 },
+        }],
+        diagnostics: [],
+        truncated: false,
+      };
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
+    });
+
+    await addAndSelectNode(page, {
+      type: 'PixelToWorldTransform',
+      title: 'World2D Scene Node',
+      outputs: [{ name: 'TransformedPoints', type: 'PointList' }],
+    });
+
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await expect(page.locator('.node-preview-inspector-status')).toContainText('success');
+    await page.evaluate(() => {
+      (window as any).__sceneLoadedImageSources.length = 0;
+    });
+    await page.locator('.node-preview-inspector-tab', { hasText: 'Scene' }).click();
+
+    await expect(page.locator('.node-preview-inspector-scene-canvas')).toBeVisible();
+    await expect(page.locator('.node-preview-inspector-scene-toolbar')).toContainText('FrameId world.2d');
+    await expect(page.locator('.node-preview-inspector-scene-toolbar')).toContainText('Unit cm');
+    await expect(page.locator('.node-preview-inspector-scene-toolbar')).toContainText('World bounds');
+    await expect(page.locator('.node-preview-inspector-scene-toolbar')).toContainText('WorldToSceneScale');
+    await expect.poll(async () => page.locator('.node-preview-inspector-scene-canvas').evaluate(canvas =>
+      (canvas as HTMLCanvasElement).width > 0 && (canvas as HTMLCanvasElement).height > 0
+    )).toBe(true);
+
+    const loadedSources = await page.evaluate(() => (window as any).__sceneLoadedImageSources as string[]);
+    expect(loadedSources.some(source => source.includes('matching-real-image-512'))).toBe(false);
+    expect(loadedSources.some(source => source.startsWith('data:image/svg+xml') && source.includes('Scene%20512%20x%20512'))).toBe(true);
+
+    await page.locator('.node-preview-inspector-action-btn', { hasText: 'Annotated PNG' }).click();
+    await expect(page.locator('.node-preview-inspector-panel.scene')).toContainText('not the World2D Scene base');
   });
 
   test('does not save when flowRevision changes while the field variable chooser is open', async ({ page }) => {

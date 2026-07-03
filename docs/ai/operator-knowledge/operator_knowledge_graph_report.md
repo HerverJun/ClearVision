@@ -1,6 +1,6 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-06-25T01:00:55.8909961Z`
+GeneratedAtUtc: `2026-07-03T07:29:27.5427551Z`
 SchemaVersion: `2026-05.operator-knowledge-graph.v1`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 
@@ -9,7 +9,7 @@ Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 | Metric | Value |
 | --- | ---: |
 | Cards | 156 |
-| Edges | 1842 |
+| Edges | 1843 |
 
 ## Edge Types
 
@@ -20,7 +20,7 @@ Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 | COMMONLY_PRECEDES | 52 |
 | CONSUMES | 206 |
 | HAS_EVIDENCE | 156 |
-| PRODUCES | 404 |
+| PRODUCES | 405 |
 | REQUIRES_RESOURCE | 42 |
 | USED_IN_TEMPLATE | 86 |
 

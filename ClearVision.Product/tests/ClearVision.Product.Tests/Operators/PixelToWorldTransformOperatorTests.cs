@@ -75,7 +75,9 @@ public class PixelToWorldTransformOperatorTests
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         var report = Assert.IsType<Dictionary<string, object>>(result.OutputData!["AccuracyReport"]);
+        report["RoundTripFrame"].Should().Be("image.full");
         report["RoundTripUnit"].Should().Be("px");
+        report["RoundTripSpatialTransformCount"].Should().Be(0);
         Convert.ToDouble(report["RoundTripMax"]).Should().BeLessThan(1e-9);
         Convert.ToDouble(report["RoundTripRmse"]).Should().BeLessThan(1e-9);
         Assert.IsType<List<double>>(report["RoundTripErrors"]).Should().HaveCount(2);
@@ -158,7 +160,9 @@ public class PixelToWorldTransformOperatorTests
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         var report = Assert.IsType<Dictionary<string, object>>(result.OutputData!["AccuracyReport"]);
-        report["RoundTripUnit"].Should().Be("world_unit");
+        report["RoundTripFrame"].Should().Be("world.2d");
+        report["RoundTripUnit"].Should().Be("mm");
+        report["RoundTripSpatialTransformCount"].Should().Be(0);
         Convert.ToDouble(report["RoundTripMax"]).Should().BeLessThan(1e-9);
         Convert.ToDouble(report["RoundTripRmse"]).Should().BeLessThan(1e-9);
     }
@@ -587,6 +591,69 @@ public class PixelToWorldTransformOperatorTests
         chain.Should().ContainInOrder("world.2d->image.full", "image.full->roi.local.depth1");
     }
 
+    [Theory]
+    [InlineData("PixelToWorld", "Auto", "ImageFull")]
+    [InlineData("PixelToWorld", "Auto", "RoiLocal")]
+    [InlineData("WorldToPixel", "ImageFull", "Auto")]
+    public async Task ExecuteAsync_WithInvalidFrameDirection_ShouldFailClosed(string mode, string inputFrame, string outputFrame)
+    {
+        var op = CreatePixelToWorldOperator(mode);
+        op.Parameters.Add(TestHelpers.CreateParameter("InputFrame", inputFrame));
+        op.Parameters.Add(TestHelpers.CreateParameter("OutputFrame", outputFrame));
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = mode.Equals("PixelToWorld", StringComparison.Ordinal)
+            ? new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) }
+            : new List<Point3d> { new(0.30, 0.56, 0) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 2);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_FRAME_DIRECTION_INVALID");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPointsAndImageSpatialContexts_ShouldUsePointsForCoordinatesAndImageForImageSidecar()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+        inputs["PointsSpatialContext"] = CreateCropSpatialContext(op.Id, depth: 2);
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = SpatialContextV1.DefaultImageFull();
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.30, 1e-9);
+        point.Y.Should().BeApproximately(0.56, 1e-9);
+        var imageContext = Assert.IsType<SpatialContextV1>(result.OutputData[RoiManagerOperator.SpatialContextOutputKey]);
+        imageContext.CurrentFrame.Kind.Should().Be(SpatialFrameKindV1.ImageFull);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCentimeterWorldBundle_ShouldOutputCentimeterSpatialContext()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(unit: "cm");
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData!["TransformResult"]);
+        transformResult["OutputUnit"].Should().Be("cm");
+        var pointsContext = Assert.IsType<SpatialContextV1>(result.OutputData["TransformedPointsSpatialContext"]);
+        pointsContext.CurrentFrame.Unit.Should().Be(SpatialUnitV1.Centimeter);
+        pointsContext.CurrentFrame.UnitSymbol.Should().Be("cm");
+    }
+
     private static Operator CreatePixelToWorldOperator(string transformMode)
     {
         var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
@@ -654,7 +721,8 @@ public class PixelToWorldTransformOperatorTests
     private static string CreateAcceptedScaleOffsetBundleJson(
         string sourceFrame = "image",
         string targetFrame = "world",
-        string bundleId = "bundle-scale-offset")
+        string bundleId = "bundle-scale-offset",
+        string unit = "mm")
     {
         return $$"""
                  {
@@ -667,7 +735,7 @@ public class PixelToWorldTransformOperatorTests
                    "transformModel": "scaleOffset",
                    "sourceFrame": "{{sourceFrame}}",
                    "targetFrame": "{{targetFrame}}",
-                   "unit": "mm",
+                   "unit": "{{unit}}",
                    "transform2D": {
                      "model": "scaleOffset",
                      "matrix": [

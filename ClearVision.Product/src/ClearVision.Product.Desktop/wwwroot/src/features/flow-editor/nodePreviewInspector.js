@@ -538,6 +538,16 @@ function makeNeutralSceneImageSource(width, height) {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function sceneRequiresNeutralPlane(scene) {
+    const coordinateSpace = asString(readOwn(scene, 'coordinateSpace', 'CoordinateSpace')).trim().toLowerCase();
+    const frameKind = asString(readOwn(scene, 'frameKind', 'FrameKind')).trim().toLowerCase();
+    const frameId = asString(readOwn(scene, 'frameId', 'FrameId')).trim().toLowerCase();
+    return coordinateSpace === 'world.2d.neutral-plane' ||
+        frameKind === 'world2d' ||
+        frameId === 'world.2d' ||
+        frameId.startsWith('world.2d.');
+}
+
 function getSceneBaseImageCandidates(state) {
     return [
         state?.presenter?.inputImageSrc,
@@ -546,6 +556,32 @@ function getSceneBaseImageCandidates(state) {
     ]
         .map(normalizeImageSourceForCanvas)
         .filter(Boolean);
+}
+
+function formatSceneInfo(scene) {
+    const parts = [];
+    const frameId = asString(readOwn(scene, 'frameId', 'FrameId')).trim();
+    const unit = asString(readOwn(scene, 'unit', 'Unit')).trim();
+    const minX = readOwn(scene, 'worldMinX', 'WorldMinX');
+    const minY = readOwn(scene, 'worldMinY', 'WorldMinY');
+    const maxX = readOwn(scene, 'worldMaxX', 'WorldMaxX');
+    const maxY = readOwn(scene, 'worldMaxY', 'WorldMaxY');
+    const scale = readOwn(scene, 'worldToSceneScale', 'WorldToSceneScale');
+
+    if (frameId) {
+        parts.push(`FrameId ${frameId}`);
+    }
+    if (unit) {
+        parts.push(`Unit ${unit}`);
+    }
+    if ([minX, minY, maxX, maxY].every(value => Number.isFinite(Number(value)))) {
+        parts.push(`World bounds [${Number(minX).toFixed(3)}, ${Number(minY).toFixed(3)}]-[${Number(maxX).toFixed(3)}, ${Number(maxY).toFixed(3)}]`);
+    }
+    if (Number.isFinite(Number(scale))) {
+        parts.push(`WorldToSceneScale ${Number(scale).toFixed(6)}`);
+    }
+
+    return parts.join(' · ');
 }
 
 function normalizeScenePrimitive(primitive) {
@@ -1058,9 +1094,17 @@ export class NodePreviewInspector {
             toolbar.appendChild(button);
         });
         toolbar.appendChild(createElement('span', 'node-preview-inspector-limit-note', `${primitives.length} primitives`));
+        const sceneInfo = formatSceneInfo(scene);
+        if (sceneInfo) {
+            toolbar.appendChild(createElement('span', 'node-preview-inspector-limit-note', sceneInfo));
+        }
         panel.appendChild(toolbar);
 
         if (this.sceneMode === 'annotated') {
+            if (sceneRequiresNeutralPlane(scene)) {
+                panel.appendChild(createElement('div', 'node-preview-inspector-limit-note', 'Annotated PNG is an operator output image, not the World2D Scene base.'));
+            }
+
             const imageSource = getPrimaryImageSource(this.state);
             if (imageSource) {
                 const image = createElement('img', 'node-preview-inspector-annotated-image');
@@ -1087,7 +1131,8 @@ export class NodePreviewInspector {
                 this.pendingSceneRender = {
                     scene,
                     primitives,
-                    imageCandidates: getSceneBaseImageCandidates(this.state),
+                    imageCandidates: sceneRequiresNeutralPlane(scene) ? [] : getSceneBaseImageCandidates(this.state),
+                    requiresNeutralPlane: sceneRequiresNeutralPlane(scene),
                     sceneSize,
                     identitySignature: getObservationIdentitySignatureFromState(this.state)
                 };
@@ -1173,7 +1218,7 @@ export class NodePreviewInspector {
 
         const sceneSize = pending.sceneSize;
         const tryLoadCandidate = async () => {
-            if (!sceneSize) {
+            if (!sceneSize || pending.requiresNeutralPlane) {
                 return false;
             }
 

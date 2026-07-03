@@ -63,7 +63,7 @@ public static class SpatialCalibrationTransformService
         }
 
         if (!TryNormalizeBundleFrame(request.Bundle.SourceFrame, FrameRefV1.ImageFull(), out var sourceFrame, out var sourceDiagnostics, out error) ||
-            !TryNormalizeBundleFrame(request.Bundle.TargetFrame, FrameRefV1.World2D(), out var targetFrame, out var targetDiagnostics, out error))
+            !TryNormalizeBundleFrame(request.Bundle.TargetFrame, FrameRefV1.World2D(unit: ResolveWorldSpatialUnit(request.Bundle.Unit, request.UnitScale)), out var targetFrame, out var targetDiagnostics, out error))
         {
             return false;
         }
@@ -253,7 +253,7 @@ public static class SpatialCalibrationTransformService
             case "world2d":
             case "world":
             case "worldframe":
-                frame = FrameRefV1.World2D();
+                frame = FrameRefV1.World2D(unit: defaultFrame.Unit);
                 compatibility = !raw.Equals("world.2d", StringComparison.OrdinalIgnoreCase);
                 break;
             case "roilocal":
@@ -309,6 +309,20 @@ public static class SpatialCalibrationTransformService
         return Math.Abs(unitScale - 1.0) <= Epsilon ? "mm" : "world_unit";
     }
 
+    public static SpatialUnitV1 ResolveWorldSpatialUnit(string? rawUnit, double unitScale)
+    {
+        var token = string.IsNullOrWhiteSpace(rawUnit)
+            ? string.Empty
+            : rawUnit.Trim().ToLowerInvariant();
+        return token switch
+        {
+            "m" or "meter" or "meters" => SpatialUnitV1.Meter,
+            "cm" or "centimeter" or "centimeters" => SpatialUnitV1.Centimeter,
+            "um" or "micrometer" or "micrometers" => SpatialUnitV1.Micrometer,
+            _ => SpatialUnitV1.Millimeter
+        };
+    }
+
     public static IReadOnlyList<string> DescribeTransformChain(
         IReadOnlyList<SpatialTransform2DV1> spatialPath,
         FrameRefV1 calibrationSourceFrame,
@@ -355,6 +369,31 @@ public static class SpatialCalibrationTransformService
         }
 
         diagnostics.AddRange(inputDiagnostics);
+        if (inputFrame.Kind == SpatialFrameKindV1.World2D)
+        {
+            error = "SPATIAL_FRAME_DIRECTION_INVALID: PixelToWorld input frame cannot be World2D.";
+            return false;
+        }
+
+        if (!IsAutoFrame(request.RequestedOutputFrame))
+        {
+            if (!TryNormalizeRequestedFrame(
+                    request.RequestedOutputFrame,
+                    targetFrame,
+                    out var requestedOutputFrame,
+                    out var outputDiagnostics,
+                    out error))
+            {
+                return false;
+            }
+
+            diagnostics.AddRange(outputDiagnostics);
+            if (requestedOutputFrame.Kind != SpatialFrameKindV1.World2D)
+            {
+                error = $"SPATIAL_FRAME_DIRECTION_INVALID: PixelToWorld output frame must be World2D, got {requestedOutputFrame.Kind}.";
+                return false;
+            }
+        }
 
         if (inputFrame.Kind == SpatialFrameKindV1.RoiLocal && request.SpatialContext == null)
         {
@@ -440,7 +479,7 @@ public static class SpatialCalibrationTransformService
         diagnostics.AddRange(inputDiagnostics);
         if (inputFrame.Kind != SpatialFrameKindV1.World2D)
         {
-            error = $"WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
+            error = $"SPATIAL_FRAME_DIRECTION_INVALID: WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
             return false;
         }
 
@@ -612,10 +651,10 @@ public static class SpatialCalibrationTransformService
                 return true;
             case "world2d":
             case "world":
-                frame = FrameRefV1.World2D();
+                frame = FrameRefV1.World2D(unit: defaultFrame.Unit);
                 diagnostics = requestedFrame!.Trim().Equals("world.2d", StringComparison.OrdinalIgnoreCase)
                     ? Array.Empty<string>()
-                    : [$"Compatibility frame mapping: '{requestedFrame.Trim()}' -> 'world.2d' (World2D, mm)."];
+                    : [$"Compatibility frame mapping: '{requestedFrame.Trim()}' -> 'world.2d' (World2D, {frame.UnitSymbol})."];
                 return true;
             case "roilocal":
                 frame = FrameRefV1.RoiLocal("roi.local.requested", "image.full");

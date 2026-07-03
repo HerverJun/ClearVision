@@ -2192,7 +2192,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     private static bool RequiresSpatialContextBinding(Port targetPort) =>
-        targetPort.DataType == PortDataType.Image;
+        targetPort.DataType is PortDataType.Image or PortDataType.PointList;
 
     private static SpatialContextResolverOutcome ResolveSpatialContextForConnection(
         IReadOnlyDictionary<string, object> sourceOutputs,

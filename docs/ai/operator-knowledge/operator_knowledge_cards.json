@@ -15298,6 +15298,40 @@
         ]
       },
       {
+        "Name": "InputFrame",
+        "DisplayName": "Input Frame",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Auto",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u81EA\u52A8",
+          "Image Full",
+          "ROI Local",
+          "Undistorted",
+          "World 2D"
+        ]
+      },
+      {
+        "Name": "OutputFrame",
+        "DisplayName": "Output Frame",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Auto",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u81EA\u52A8",
+          "Image Full",
+          "ROI Local",
+          "Undistorted",
+          "World 2D"
+        ]
+      },
+      {
         "Name": "WorldPlaneZ",
         "DisplayName": "\u4E16\u754C\u5E73\u9762Z\uFF08mm\uFF09",
         "DataType": "double",

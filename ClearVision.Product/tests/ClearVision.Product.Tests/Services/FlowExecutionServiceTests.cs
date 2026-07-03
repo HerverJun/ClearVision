@@ -481,6 +481,60 @@ public class FlowExecutionServiceTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_ShouldPropagateSpatialContextAcrossPointListConnection()
+    {
+        var (sut, executor) = CreateSingleExecutorService(OperatorType.PixelToWorldTransform);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        Dictionary<string, object>? targetInputs = null;
+
+        var flow = new OperatorFlow("PointListSpatialTargetFlow");
+        var source = new Operator("PixelToWorldA", OperatorType.PixelToWorldTransform, 0, 0);
+        source.AddOutputPort("TransformedPoints", PortDataType.PointList);
+        source.AddOutputPort("TransformedPointsSpatialContext", PortDataType.Any);
+        var target = new Operator("PixelToWorldB", OperatorType.PixelToWorldTransform, 0, 0);
+        target.AddInputPort("Points", PortDataType.PointList);
+        var pointsPort = source.OutputPorts.Single(port => port.Name == "TransformedPoints");
+        var context = new SpatialContextV1(
+            FrameRefV1.World2D(),
+            [SpatialTransform2DV1.Identity(FrameRefV1.World2D())],
+            SpatialContextBindingV1.ForFlowOutput(source.Id, pointsPort.Id, "TransformedPoints"));
+
+        executor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var op = callInfo.Arg<Operator>();
+                if (op.Id == source.Id)
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Success(
+                        new Dictionary<string, object>
+                        {
+                            ["TransformedPoints"] = new List<Point3d> { new(1, 2, 0) },
+                            ["TransformedPointsSpatialContext"] = context
+                        },
+                        executionTimeMs: 5));
+                }
+
+                targetInputs = new Dictionary<string, object>(callInfo.ArgAt<Dictionary<string, object>?>(1)!);
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>(), executionTimeMs: 5));
+            });
+
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, pointsPort.Id, target.Id, target.InputPorts.Single().Id));
+
+        var result = await sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        targetInputs.Should().NotBeNull();
+        targetInputs!["PointsSpatialContext"].Should().BeSameAs(context);
+        targetInputs["Points"].Should().BeAssignableTo<List<Point3d>>();
+        targetInputs.Should().NotContainKey(RoiManagerOperator.ImageSpatialContextInputKey);
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_ShouldForwardDistinctSpatialContextsToMultipleImageInputs()
     {
         var (sut, executor) = CreateSingleExecutorService(OperatorType.Thresholding);

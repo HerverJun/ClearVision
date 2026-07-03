@@ -752,6 +752,63 @@ test('NodePreviewInspector shows controlled state instead of blank canvas when s
   }
 });
 
+test('NodePreviewInspector forces neutral plane for World2D scene even when image dimensions match', () => {
+  const restoreDocument = installFakeDocument();
+  try {
+    const state = {
+      activeNodeId: 'node-1',
+      nodeType: 'PixelToWorldTransform',
+      title: 'PixelToWorld',
+      status: 'success',
+      inputImageBase64: 'data:image/png;base64,MATCHING_512_IMAGE',
+      outputImageBase64: 'data:image/png;base64,MATCHING_512_OUTPUT',
+      observation: {
+        identity: identity(),
+        detail: node('dictionary', { pathHint: '$', addressable: false }),
+        visualScene: {
+          coordinateSpace: 'world.2d.neutral-plane',
+          frameId: 'world.2d',
+          frameKind: 'World2D',
+          unit: 'cm',
+          worldMinX: 1,
+          worldMinY: 2,
+          worldMaxX: 3,
+          worldMaxY: 4,
+          worldToSceneScale: 216,
+          imageWidth: 512,
+          imageHeight: 512,
+          primitives: [{
+            primitiveId: 'ptw:point:0',
+            kind: 'point',
+            selectable: false,
+            geometry: { x: 256, y: 256 },
+            style: {}
+          }],
+          diagnostics: []
+        }
+      },
+      artifacts: []
+    };
+
+    const { inspector } = createInspectorHarness({ state });
+    const panel = inspector.renderScene(state.observation);
+
+    assert.match(collectText(panel), /FrameId world\.2d/);
+    assert.match(collectText(panel), /Unit cm/);
+    assert.match(collectText(panel), /World bounds/);
+    assert.match(collectText(panel), /WorldToSceneScale/);
+    assert.equal(inspector.pendingSceneRender.requiresNeutralPlane, true);
+    assert.deepEqual(inspector.pendingSceneRender.imageCandidates, []);
+
+    inspector.sceneMode = 'annotated';
+    const annotatedPanel = inspector.renderScene(state.observation);
+    assert.match(collectText(annotatedPanel), /not the World2D Scene base/);
+    inspector.destroy();
+  } finally {
+    restoreDocument();
+  }
+});
+
 test('NodePreviewInspector does not invoke binding callback for a stale descriptor click', () => {
   const restoreDocument = installFakeDocument();
   try {
