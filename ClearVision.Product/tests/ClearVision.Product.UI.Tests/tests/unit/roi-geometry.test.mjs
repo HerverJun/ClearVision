@@ -723,6 +723,133 @@ test('RoiEditorPanel publishes loaded image bounds for image-center displays', (
   assert.equal(received, null);
 });
 
+test('RoiEditorPanel retains current image during same-node preview transitions', () => {
+  const panel = {
+    currentImageSource: 'data:image/png;base64,old',
+    previewState: {
+      activeNodeId: 'node-1',
+      status: 'loading',
+      presenter: {
+        inputImageSrc: null
+      }
+    },
+    getOperator() {
+      return { id: 'node-1' };
+    }
+  };
+
+  assert.equal(
+    RoiEditorPanel.prototype.resolveInputImageSrc.call(panel)
+      || (RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition.call(panel)
+        ? panel.currentImageSource
+        : null),
+    'data:image/png;base64,old'
+  );
+
+  panel.previewState.status = 'idle';
+  assert.equal(RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition.call(panel), true);
+
+  panel.previewState.status = 'success';
+  assert.equal(RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition.call(panel), false);
+
+  panel.previewState.activeNodeId = 'node-2';
+  panel.previewState.status = 'loading';
+  assert.equal(RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition.call(panel), false);
+});
+
+test('RoiEditorPanel does not resync overlay while retaining transition image', async () => {
+  let syncCount = 0;
+  let bounds = null;
+  const panel = {
+    container: { querySelector: () => null },
+    currentImageSource: 'data:image/png;base64,old',
+    currentConfig: { editable: true },
+    currentShape: 'Rectangle',
+    applyStateGeneration: 0,
+    previewState: {
+      activeNodeId: 'node-1',
+      status: 'idle',
+      presenter: {
+        inputImageSrc: null
+      }
+    },
+    imageCanvas: {
+      image: { width: 64, height: 48 },
+      clear() {
+        throw new Error('clear should not run while retaining transition image');
+      },
+      loadImage() {
+        throw new Error('loadImage should not run for retained transition image');
+      }
+    },
+    getOperator() {
+      return { id: 'node-1' };
+    },
+    getRoiConfig() {
+      return { editable: true, shape: 'Rectangle' };
+    },
+    resolveInputImageSrc: RoiEditorPanel.prototype.resolveInputImageSrc,
+    shouldRetainCurrentImageDuringPreviewTransition: RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition,
+    publishImageBounds: RoiEditorPanel.prototype.publishImageBounds,
+    syncOverlayFromOperator() {
+      syncCount += 1;
+    },
+    onImageBoundsChanged(nextBounds) {
+      bounds = nextBounds;
+    }
+  };
+
+  await RoiEditorPanel.prototype.applyState.call(panel);
+
+  assert.equal(panel.currentImageSource, 'data:image/png;base64,old');
+  assert.equal(syncCount, 0);
+  assert.deepEqual(bounds, { width: 64, height: 48 });
+});
+
+test('RoiEditorPanel can force overlay sync while retaining transition image', async () => {
+  let syncCount = 0;
+  const panel = {
+    container: { querySelector: () => null },
+    currentImageSource: 'data:image/png;base64,old',
+    currentConfig: { editable: true },
+    currentShape: 'Rectangle',
+    applyStateGeneration: 0,
+    previewState: {
+      activeNodeId: 'node-1',
+      status: 'loading',
+      presenter: {
+        inputImageSrc: null
+      }
+    },
+    imageCanvas: {
+      image: { width: 64, height: 48 },
+      clear() {
+        throw new Error('clear should not run while retaining transition image');
+      },
+      loadImage() {
+        throw new Error('loadImage should not run for retained transition image');
+      }
+    },
+    getOperator() {
+      return { id: 'node-1' };
+    },
+    getRoiConfig() {
+      return { editable: true, shape: 'Rectangle' };
+    },
+    resolveInputImageSrc: RoiEditorPanel.prototype.resolveInputImageSrc,
+    shouldRetainCurrentImageDuringPreviewTransition: RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition,
+    publishImageBounds: RoiEditorPanel.prototype.publishImageBounds,
+    syncOverlayFromOperator() {
+      syncCount += 1;
+    }
+  };
+
+  await RoiEditorPanel.prototype.applyState.call(panel, { forceSyncOverlay: true });
+
+  assert.equal(panel.currentImageSource, 'data:image/png;base64,old');
+  assert.equal(syncCount, 1);
+});
+
 test('ImageCanvas addOverlay accepts stable ids while preserving legacy generated ids', () => {
   const canvas = {
     overlays: [],

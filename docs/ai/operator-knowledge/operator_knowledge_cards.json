@@ -2838,6 +2838,13 @@
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CaliperProfileEvidence",
+        "DisplayName": "V2 profile evidence",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [

@@ -95,8 +95,8 @@ export class RoiEditorPanel {
         });
     }
 
-    refreshFromOperator() {
-        void this.applyState();
+    refreshFromOperator(options = {}) {
+        void this.applyState(options);
     }
 
     handleRectChanged(rect, phase) {
@@ -144,12 +144,15 @@ export class RoiEditorPanel {
         return Boolean(this.currentImageSource) && Boolean(this.currentConfig?.editable);
     }
 
-    async applyState() {
+    async applyState(options = {}) {
         const applyGeneration = ++this.applyStateGeneration;
+        const forceSyncOverlay = options.forceSyncOverlay === true;
         const operator = this.getOperator();
         this.currentConfig = this.getRoiConfig(operator);
         this.currentShape = this.currentConfig?.shape || 'Rectangle';
-        const inputImageSrc = this.resolveInputImageSrc();
+        const resolvedInputImageSrc = this.resolveInputImageSrc();
+        const retainCurrentImage = !resolvedInputImageSrc && this.shouldRetainCurrentImageDuringPreviewTransition();
+        const inputImageSrc = resolvedInputImageSrc || (retainCurrentImage ? this.currentImageSource : null);
         const imageChanged = inputImageSrc !== this.currentImageSource;
         this.currentImageSource = inputImageSrc;
 
@@ -217,6 +220,10 @@ export class RoiEditorPanel {
         }
 
         this.publishImageBounds();
+        if (retainCurrentImage && !forceSyncOverlay) {
+            return;
+        }
+
         this.syncOverlayFromOperator();
     }
 
@@ -240,6 +247,18 @@ export class RoiEditorPanel {
         }
 
         return this.previewState?.presenter?.inputImageSrc || null;
+    }
+
+    shouldRetainCurrentImageDuringPreviewTransition() {
+        const activeNodeId = this.previewState?.activeNodeId;
+        const operatorId = this.getOperator()?.id || null;
+        const status = this.previewState?.status;
+        return Boolean(
+            this.currentImageSource &&
+            operatorId &&
+            activeNodeId === operatorId &&
+            (status === 'idle' || status === 'loading')
+        );
     }
 
     readOperatorValue(operator, name, fallback = '') {

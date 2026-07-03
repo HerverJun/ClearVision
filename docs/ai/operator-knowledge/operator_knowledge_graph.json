@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-03T13:48:32.0920453Z",
+  "GeneratedAtUtc": "2026-07-03T20:08:34.4775136Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -2839,6 +2839,13 @@
         {
           "Name": "CaliperDiagnostics",
           "DisplayName": "V2 \u8BCA\u65AD",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "CaliperProfileEvidence",
+          "DisplayName": "V2 profile evidence",
           "DataType": "Any",
           "IsRequired": false,
           "Description": ""

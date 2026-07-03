@@ -1779,7 +1779,7 @@ class PropertyPanel {
     }
 
     syncRoiEditorFromParams() {
-        this.roiEditorPanel?.refreshFromOperator?.();
+        this.roiEditorPanel?.refreshFromOperator?.({ forceSyncOverlay: true });
     }
 
     async recommendParameters() {
