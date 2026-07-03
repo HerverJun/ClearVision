@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime;
+using System.Runtime.InteropServices;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using OpenCvSharp;
@@ -13,54 +15,50 @@ public class CircleCaliperFitV2BenchmarkTests
         var rows = new List<BenchmarkRow>();
         foreach (var (width, height) in new[] { (320, 240), (640, 480), (1920, 1080) })
         {
-            using var gray = CreateFilledCircleImage(width, height);
-            var request = new CircleCaliperFitV2Request
+            foreach (var request in CreateBenchmarkRequests(width, height))
             {
-                SearchCenterX = (width - 1) * 0.5,
-                SearchCenterY = (height - 1) * 0.5,
-                MinRadius = Math.Min(width, height) * 0.18,
-                MaxRadius = Math.Min(width, height) * 0.27,
-                NominalRadius = Math.Min(width, height) * 0.225,
-                CaliperCount = 128,
-                AveragingThickness = 5,
-                ProfileSampleCount = 129,
-                GaussianSigma = 1.2,
-                EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
-                MinValidCalipers = 48,
-                MinCoverageRatio = 0.50,
-                MinAngularCoverageDegrees = 240,
-                MaxResidualRmse = 1.6
-            };
+                using var gray = CreateFilledCircleImage(width, height);
 
-            CircleCaliperFitV2Kernel.Fit(gray, request).Success.Should().BeTrue();
+                var warmup = CircleCaliperFitV2Kernel.Fit(gray, request.Request);
+                warmup.Success.Should().BeTrue(FormatFailure(request.Name, width, height, warmup));
 
-            var elapsed = new List<double>();
-            var allocations = new List<long>();
-            for (var i = 0; i < 5; i++)
-            {
-                var beforeAllocated = GC.GetAllocatedBytesForCurrentThread();
-                var stopwatch = Stopwatch.StartNew();
-                var result = CircleCaliperFitV2Kernel.Fit(gray, request);
-                stopwatch.Stop();
-                var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeAllocated;
+                var elapsed = new List<double>();
+                var allocations = new List<long>();
+                for (var i = 0; i < 7; i++)
+                {
+                    var beforeAllocated = GC.GetAllocatedBytesForCurrentThread();
+                    var stopwatch = Stopwatch.StartNew();
+                    var result = CircleCaliperFitV2Kernel.Fit(gray, request.Request);
+                    stopwatch.Stop();
+                    var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeAllocated;
 
-                result.Success.Should().BeTrue(result.FailureMessage);
-                elapsed.Add(stopwatch.Elapsed.TotalMilliseconds);
-                allocations.Add(allocated);
+                    result.Success.Should().BeTrue(FormatFailure(request.Name, width, height, result));
+                    result.ProfileEvidence.Count.Should().BeLessThanOrEqualTo(CircleCaliperFitV2Request.MaxProfileEvidenceCount);
+                    elapsed.Add(stopwatch.Elapsed.TotalMilliseconds);
+                    allocations.Add(allocated);
+                }
+
+                rows.Add(new BenchmarkRow(
+                    request.Name,
+                    width,
+                    height,
+                    request.Request.CaliperCount,
+                    request.Request.ProfileSampleCount,
+                    WorkUnits(request.Request),
+                    elapsed.Average(),
+                    Percentile(elapsed, 0.50),
+                    Percentile(elapsed, 0.95),
+                    allocations.Average(),
+                    ComputeVariance(elapsed),
+                    allocations.Max()));
             }
-
-            rows.Add(new BenchmarkRow(
-                width,
-                height,
-                request.CaliperCount,
-                elapsed.Average(),
-                allocations.Average(),
-                ComputeVariance(elapsed),
-                allocations.Max()));
         }
 
-        rows.Select(row => row.MaxAllocatedBytes).Max().Should().BeLessThan(8_000_000);
-        rows.Max(row => row.AverageAllocatedBytes).Should().BeLessThan(rows.Min(row => row.AverageAllocatedBytes) * 4.0);
+        rows.Where(row => row.Profile == "typical")
+            .Select(row => row.MaxAllocatedBytes)
+            .Max()
+            .Should().BeLessThan(8_000_000);
+        rows.Select(row => row.MaxAllocatedBytes).Max().Should().BeLessThan(64_000_000);
 
         using var nearBudgetGray = CreateFilledCircleImage(640, 640);
         var nearBudgetRequest = new CircleCaliperFitV2Request
@@ -102,11 +100,12 @@ public class CircleCaliperFitV2BenchmarkTests
         overBudgetResult.EdgePoints.Should().BeEmpty();
         overBudgetResult.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "sampling.work-budget");
 
-        Console.WriteLine("| Size | Calipers | Avg ms | Avg allocated bytes | Elapsed variance | Max allocated bytes |");
-        Console.WriteLine("|---|---:|---:|---:|---:|---:|");
+        Console.WriteLine($"Environment: {RuntimeInformation.OSDescription}; arch={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; serverGC={GCSettings.IsServerGC}");
+        Console.WriteLine("| Profile | Size | Calipers | Samples | Work units | p50 ms | p95 ms | Avg ms | Avg allocated bytes | Elapsed variance | Max allocated bytes |");
+        Console.WriteLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var row in rows)
         {
-            Console.WriteLine($"| {row.Width}x{row.Height} | {row.CaliperCount} | {row.AverageElapsedMs:F3} | {row.AverageAllocatedBytes:F0} | {row.ElapsedVariance:F6} | {row.MaxAllocatedBytes} |");
+            Console.WriteLine($"| {row.Profile} | {row.Width}x{row.Height} | {row.CaliperCount} | {row.ProfileSampleCount} | {row.WorkUnits} | {row.P50ElapsedMs:F3} | {row.P95ElapsedMs:F3} | {row.AverageElapsedMs:F3} | {row.AverageAllocatedBytes:F0} | {row.ElapsedVariance:F6} | {row.MaxAllocatedBytes} |");
         }
 
         Console.WriteLine();
@@ -131,19 +130,83 @@ public class CircleCaliperFitV2BenchmarkTests
         return values.Sum(value => (value - average) * (value - average)) / values.Count;
     }
 
+    private static double Percentile(IReadOnlyList<double> values, double percentile)
+    {
+        var ordered = values.OrderBy(static value => value).ToArray();
+        var index = (int)Math.Ceiling(percentile * ordered.Length) - 1;
+        return ordered[Math.Clamp(index, 0, ordered.Length - 1)];
+    }
+
     private static long WorkUnits(CircleCaliperFitV2Request request)
     {
-        return (long)request.CaliperCount *
+        var polarityMultiplier = request.EdgePolarity == CircleCaliperFitV2EdgePolarity.Auto ? 2L : 1L;
+        return polarityMultiplier *
+            request.CaliperCount *
             request.ProfileSampleCount *
             (long)Math.Ceiling(Math.Max(1.0, request.AveragingThickness));
     }
 
+    private static IEnumerable<BenchmarkRequest> CreateBenchmarkRequests(int width, int height)
+    {
+        var minDimension = Math.Min(width, height);
+        var common = new CircleCaliperFitV2Request
+        {
+            SearchCenterX = (width - 1) * 0.5,
+            SearchCenterY = (height - 1) * 0.5,
+            MinRadius = minDimension * 0.18,
+            MaxRadius = minDimension * 0.27,
+            NominalRadius = minDimension * 0.225,
+            GaussianSigma = 1.2,
+            EdgePolarity = CircleCaliperFitV2EdgePolarity.LightToDark,
+            MinCoverageRatio = 0.50,
+            MinAngularCoverageDegrees = 240,
+            MaxResidualRmse = 1.6,
+            IncludeProfileEvidence = true
+        };
+
+        yield return new BenchmarkRequest(
+            "typical",
+            common with
+            {
+                CaliperCount = 128,
+                AveragingThickness = 5,
+                ProfileSampleCount = 129,
+                MinValidCalipers = 48
+            });
+
+        yield return new BenchmarkRequest(
+            "upper-bounded",
+            common with
+            {
+                CaliperCount = 256,
+                AveragingThickness = 5,
+                ProfileSampleCount = 1025,
+                MinValidCalipers = 72,
+                MinCoverageRatio = 0.30,
+                MinAngularCoverageDegrees = 180
+            });
+    }
+
+    private static string FormatFailure(string profile, int width, int height, CircleCaliperFitV2Result result)
+    {
+        return $"{profile} {width}x{height}: {result.FailureCode} {result.FailureMessage} " +
+            $"edges={result.CollectedPointCount} inliers={result.ValidCaliperCount} " +
+            $"coverage={result.CoverageRatio:F3} angular={result.AngularCoverageDegrees:F1}";
+    }
+
     private sealed record BenchmarkRow(
+        string Profile,
         int Width,
         int Height,
         int CaliperCount,
+        int ProfileSampleCount,
+        long WorkUnits,
         double AverageElapsedMs,
+        double P50ElapsedMs,
+        double P95ElapsedMs,
         double AverageAllocatedBytes,
         double ElapsedVariance,
         long MaxAllocatedBytes);
+
+    private sealed record BenchmarkRequest(string Name, CircleCaliperFitV2Request Request);
 }

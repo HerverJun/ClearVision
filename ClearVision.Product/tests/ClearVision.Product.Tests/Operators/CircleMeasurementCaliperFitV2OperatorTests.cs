@@ -1,3 +1,4 @@
+using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -7,6 +8,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
+using System.Text.Json;
 
 namespace ClearVision.Product.Tests.Operators;
 
@@ -269,6 +271,36 @@ public class CircleMeasurementCaliperFitV2OperatorTests
         });
     }
 
+    [Fact]
+    public void CircleMeasurementMethods_ShouldReloadFromSavedFlowJson()
+    {
+        var savedFlow = new OperatorFlowDto
+        {
+            Name = "circle-method-compat",
+            Operators =
+            [
+                ToDto(CreateMethodOperator("hough", "HoughCircle")),
+                ToDto(CreateMethodOperator("ellipse", "FitEllipse")),
+                ToDto(CreateV2Operator(centerX: 160.25, centerY: 120.75, radius: 55.4))
+            ]
+        };
+
+        var json = JsonSerializer.Serialize(savedFlow);
+        var reloadedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(json)!.ToEntity();
+        var operators = reloadedFlow.Operators;
+
+        operators.Should().HaveCount(3);
+        ReadParameterValue(operators[0], "Method").Should().Be("HoughCircle");
+        ReadParameterValue(operators[1], "Method").Should().Be("FitEllipse");
+        ReadParameterValue(operators[2], "Method").Should().Be("CaliperFitV2");
+        ReadParameterValue(operators[2], "SearchCenterMode").Should().Be("Explicit");
+        ReadParameterValue(operators[2], "EdgePolarity").Should().Be("LightToDark");
+        ReadParameterValue(operators[2], "OutlierMode").Should().Be("Mad");
+        ReadParameterValue(operators[2], "CaliperCount").Should().Be(96);
+        ReadParameterValue(operators[2], "ProfileSampleCount").Should().Be(129);
+        ReadParameterValue(operators[2], "MinCoverageRatio").Should().Be(0.35);
+    }
+
     private static Operator CreateV2Operator(double centerX, double centerY, double radius)
     {
         var op = new Operator("circle-v2", OperatorType.CircleMeasurement, 0, 0);
@@ -294,6 +326,68 @@ public class CircleMeasurementCaliperFitV2OperatorTests
         op.AddParameter(TestHelpers.CreateParameter("MaxOutlierIterations", 3, "int"));
         op.AddParameter(TestHelpers.CreateParameter("MaxResidualRmse", 1.4, "double"));
         return op;
+    }
+
+    private static Operator CreateMethodOperator(string name, string method)
+    {
+        var op = new Operator(name, OperatorType.CircleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Method", method, "enum"));
+        return op;
+    }
+
+    private static OperatorDto ToDto(Operator op)
+    {
+        return new OperatorDto
+        {
+            Id = op.Id,
+            Name = op.Name,
+            Type = op.Type,
+            X = op.Position.X,
+            Y = op.Position.Y,
+            IsEnabled = op.IsEnabled,
+            Parameters = op.Parameters.Select(parameter => new ParameterDto
+            {
+                Id = parameter.Id,
+                Name = parameter.Name,
+                DisplayName = parameter.DisplayName,
+                Description = parameter.Description,
+                DataType = parameter.DataType,
+                DefaultValue = parameter.DefaultValue,
+                Value = parameter.GetValue(),
+                MinValue = parameter.MinValue,
+                MaxValue = parameter.MaxValue,
+                IsRequired = parameter.IsRequired,
+                Options = parameter.Options
+            }).ToList()
+        };
+    }
+
+    private static object? ReadParameterValue(Operator op, string parameterName)
+    {
+        var value = op.Parameters.Single(parameter => parameter.Name == parameterName).GetValue();
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.String => jsonElement.GetString(),
+                JsonValueKind.Number => jsonElement.TryGetInt64(out var longValue)
+                    ? longValue
+                    : jsonElement.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                _ => jsonElement.GetRawText()
+            };
+        }
+
+        return value switch
+        {
+            int intValue => intValue,
+            long longValue => longValue,
+            double doubleValue => doubleValue,
+            string stringValue => stringValue,
+            _ => value
+        };
     }
 
     private static void EraseSector(Mat gray, double centerX, double centerY, double radius, double startDegrees, double endDegrees, byte color)

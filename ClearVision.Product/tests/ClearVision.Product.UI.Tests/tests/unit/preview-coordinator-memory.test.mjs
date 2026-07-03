@@ -34,7 +34,7 @@ function createCoordinator(options = {}) {
   };
   let executeCount = 0;
   const coordinator = new NodePreviewCoordinator({
-    getProjectId: () => 'project-1',
+    getProjectId: () => typeof options.projectId === 'function' ? options.projectId() : (options.projectId ?? 'project-1'),
     getFlowRevision: () => options.flowRevision ?? 1,
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
@@ -565,6 +565,135 @@ test('NodePreviewCoordinator releases artifact resources on cache replacement ev
     ]);
   } finally {
     globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator releases same-node method artifacts before debounced refresh', async () => {
+  const originalCreateObjectUrl = globalThis.URL.createObjectURL;
+  const originalRevokeObjectUrl = globalThis.URL.revokeObjectURL;
+  const revokedUrls = [];
+  const deletedArtifactIds = [];
+  let objectUrlSequence = 0;
+  globalThis.URL.createObjectURL = () => `blob:method-scope-${++objectUrlSequence}`;
+  globalThis.URL.revokeObjectURL = url => revokedUrls.push(url);
+
+  const node = {
+    id: 'circle-node',
+    type: 'CircleMeasurement',
+    parameters: [{ name: 'Method', value: 'CaliperFitV2' }],
+    outputs: [{ type: 'image' }]
+  };
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      return { blob: new Blob([artifactId], { type: 'image/png' }) };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+  const { coordinator } = createCoordinator({
+    node,
+    artifactClient,
+    previewResponse: (_count, executorOptions, nodeId) =>
+      buildArtifactPreviewResponse(nodeId, executorOptions, 'caliper')
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    assert.equal(coordinator.cache.size, 1);
+
+    node.parameters = [{ name: 'Method', value: 'HoughCircle' }];
+    coordinator.requestActivePreview({ immediate: false, debounceMs: 50, trigger: 'auto' });
+    await Promise.resolve();
+
+    assert.deepEqual(revokedUrls.sort(), ['blob:method-scope-1', 'blob:method-scope-2']);
+    assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-caliper', 'output-artifact-caliper']);
+    assert.equal(coordinator.cache.size, 0);
+    assert.equal(coordinator.getState().status, 'idle');
+    assert.equal(coordinator.getState().outputData, null);
+    assert.deepEqual(coordinator.getState().previewArtifactIds, []);
+  } finally {
+    globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator aborts same-node project switch and deletes late artifacts', async () => {
+  let projectId = 'project-1';
+  let callCount = 0;
+  let firstSignal = null;
+  let resolveFirst = null;
+  const deletedArtifactIds = [];
+  const readArtifactIds = [];
+  const node = {
+    id: 'node-1',
+    type: 'Thresholding',
+    parameters: [],
+    outputs: [{ type: 'image' }]
+  };
+  const artifactClient = {
+    async getPreviewArtifactBlob(artifactId) {
+      readArtifactIds.push(artifactId);
+      return { blob: new Blob([artifactId], { type: 'image/png' }) };
+    },
+    async deletePreviewArtifact(artifactId) {
+      deletedArtifactIds.push(artifactId);
+    }
+  };
+
+  const coordinator = new NodePreviewCoordinator({
+    getProjectId: () => projectId,
+    getFlowRevision: () => 1,
+    getNodeById: () => node,
+    getInputImageBase64: () => 'INPUT_IMAGE',
+    getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
+    artifactClient,
+    previewExecutor: async (nodeId, options) => {
+      callCount += 1;
+      const callProjectId = projectId;
+      if (callCount === 1) {
+        firstSignal = options.signal;
+        return new Promise(resolve => {
+          resolveFirst = () => {
+            const response = buildArtifactPreviewResponse(nodeId, options, 'late-project');
+            response.observation.identity.projectId = callProjectId;
+            resolve(response);
+          };
+        });
+      }
+
+      const response = buildArtifactPreviewResponse(nodeId, options, 'current-project');
+      response.observation.identity.projectId = callProjectId;
+      return response;
+    },
+    debounceMs: 0
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    await waitFor(() => assert.equal(callCount, 1));
+
+    projectId = 'project-2';
+    coordinator.requestActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    assert.equal(firstSignal.aborted, true);
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    assert.equal(coordinator.getState().observation.identity.projectId, 'project-2');
+
+    resolveFirst();
+    await waitFor(() => assert.deepEqual(deletedArtifactIds.sort(), [
+      'input-artifact-late-project',
+      'output-artifact-late-project'
+    ]));
+    assert.deepEqual(readArtifactIds, [
+      'input-artifact-current-project',
+      'output-artifact-current-project'
+    ]);
+    assert.equal(coordinator.getState().observation.identity.projectId, 'project-2');
+  } finally {
     coordinator.destroy();
   }
 });

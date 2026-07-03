@@ -592,6 +592,15 @@ function buildPreviewRequestKey({ projectId, nodeId, flowRevision, parameterSnap
     };
 }
 
+function buildPreviewScopeKey({ projectId, node }) {
+    return [
+        projectId || 'no-project',
+        node?.id || 'no-node',
+        node?.type || 'no-type',
+        hashString(buildParameterSnapshot(node?.parameters))
+    ].join(':');
+}
+
 function parsePreviewResponse(response) {
     const isSuccess = Boolean(readFirstDefined(response, ['success', 'Success']));
     return {
@@ -763,6 +772,7 @@ export class NodePreviewCoordinator {
         this.requestVersion = 0;
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
+        this.activeScopeKey = null;
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
@@ -1023,6 +1033,7 @@ export class NodePreviewCoordinator {
         this.releaseAllPreviewResources();
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
+        this.activeScopeKey = null;
     }
 
     getState() {
@@ -1074,26 +1085,46 @@ export class NodePreviewCoordinator {
             this.releaseArtifactResourcesForNodeSwitch();
             this.debugSessionId = null;
             this.debugSessionScopeKey = null;
+            this.activeScopeKey = null;
             this.updateState(createEmptyState());
             return;
         }
 
-        if (previousNodeId !== node.id) {
+        const nextScopeKey = buildPreviewScopeKey({
+            projectId: this.getProjectId(),
+            node
+        });
+        const scopeChanged = this.activeScopeKey !== nextScopeKey;
+        if (previousNodeId !== node.id || scopeChanged) {
             this.releaseArtifactResourcesForNodeSwitch();
+        }
+
+        if (previousNodeId !== node.id) {
             this.debugSessionId = null;
             this.debugSessionScopeKey = null;
         }
+        this.activeScopeKey = nextScopeKey;
 
         const metadata = this.getOperatorMetadata(node.type);
         const previewCost = getOperatorPreviewCostPolicy(node, metadata);
-        this.updateState({
-            ...createEmptyState(),
-            activeNodeId: node.id,
-            nodeType: node.type,
-            title: node.title || metadata?.displayName || node.type,
-            canvasEligibility: getCanvasPreviewEligibility(node, metadata),
-            previewCost
-        });
+        if (previousNodeId !== node.id || scopeChanged) {
+            this.updateState({
+                ...createEmptyState(),
+                activeNodeId: node.id,
+                nodeType: node.type,
+                title: node.title || metadata?.displayName || node.type,
+                canvasEligibility: getCanvasPreviewEligibility(node, metadata),
+                previewCost
+            });
+        } else {
+            this.updateState({
+                activeNodeId: node.id,
+                nodeType: node.type,
+                title: node.title || metadata?.displayName || node.type,
+                canvasEligibility: getCanvasPreviewEligibility(node, metadata),
+                previewCost
+            });
+        }
 
         this.requestActivePreview({ trigger: 'auto' });
     }
@@ -1115,6 +1146,37 @@ export class NodePreviewCoordinator {
         } = options;
         if (!this.state.activeNodeId) {
             return;
+        }
+
+        const scheduledNode = this.getNodeById(this.state.activeNodeId);
+        if (!scheduledNode) {
+            this.setActiveNode(null);
+            return;
+        }
+
+        const scheduledProjectId = this.getProjectId();
+        const scheduledScopeKey = buildPreviewScopeKey({
+            projectId: scheduledProjectId,
+            node: scheduledNode
+        });
+        if (this.activeScopeKey !== scheduledScopeKey) {
+            this.activeScopeKey = scheduledScopeKey;
+            this.releaseArtifactResourcesForNodeSwitch();
+            this.updateState(withClearedPreviewResources({
+                status: 'idle',
+                executionTimeMs: null,
+                errorMessage: null,
+                inputImageBase64: null,
+                outputImageBase64: null,
+                outputData: null,
+                request: buildPreviewRequestKey({
+                    projectId: scheduledProjectId,
+                    nodeId: scheduledNode.id,
+                    flowRevision: normalizeFlowRevision(this.getFlowRevision()),
+                    parameterSnapshot: buildParameterSnapshot(scheduledNode.parameters),
+                    inputImageBase64: null
+                })
+            }));
         }
 
         const scheduledVersion = ++this.requestVersion;
