@@ -1736,6 +1736,36 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             case byte[] bytes:
                 normalized = bytes;
                 return true;
+            case Position position:
+                normalized = new Dictionary<string, object>
+                {
+                    ["X"] = position.X,
+                    ["Y"] = position.Y
+                };
+                return true;
+            case Point2f point2f:
+                normalized = new Dictionary<string, object>
+                {
+                    ["X"] = (double)point2f.X,
+                    ["Y"] = (double)point2f.Y
+                };
+                return true;
+            case Point3f point3f:
+                normalized = new Dictionary<string, object>
+                {
+                    ["X"] = (double)point3f.X,
+                    ["Y"] = (double)point3f.Y,
+                    ["Z"] = (double)point3f.Z
+                };
+                return true;
+            case Point3d point3d:
+                normalized = new Dictionary<string, object>
+                {
+                    ["X"] = point3d.X,
+                    ["Y"] = point3d.Y,
+                    ["Z"] = point3d.Z
+                };
+                return true;
             case string or bool or char or sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal or DateTime or DateTimeOffset or TimeSpan or Guid:
                 normalized = value;
                 return true;

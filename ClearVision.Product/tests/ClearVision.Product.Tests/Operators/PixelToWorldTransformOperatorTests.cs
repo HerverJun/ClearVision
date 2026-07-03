@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Tests.TestData;
@@ -373,6 +374,7 @@ public class PixelToWorldTransformOperatorTests
         imageContext.Binding.SourceOperatorId.Should().Be(op.Id);
         imageContext.Binding.OutputPortId.Should().Be(op.OutputPorts.Single(port => port.Name == "Image").Id);
         imageContext.Binding.OutputName.Should().Be("Image");
+        AssertRoundTripReportIsNearZero(result, expectedCount: 1);
     }
 
     [Fact]
@@ -391,6 +393,7 @@ public class PixelToWorldTransformOperatorTests
         var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
         point.X.Should().BeApproximately(0.34, 1e-9);
         point.Y.Should().BeApproximately(0.68, 1e-9);
+        AssertRoundTripReportIsNearZero(result, expectedCount: 1);
     }
 
     [Fact]
@@ -416,6 +419,7 @@ public class PixelToWorldTransformOperatorTests
         Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(2);
         var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
         chain.Should().ContainInOrder("world.2d->image.full", "image.full->roi.local.depth1", "roi.local.depth1->roi.local.depth2");
+        AssertRoundTripReportIsNearZero(result, expectedCount: 1);
     }
 
     [Fact]
@@ -563,6 +567,7 @@ public class PixelToWorldTransformOperatorTests
         Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(1);
         var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
         chain.Should().ContainInOrder("roi.local.depth1->image.full", "image.full->world.2d");
+        AssertRoundTripReportIsNearZero(result, expectedCount: 1);
     }
 
     [Fact]
@@ -589,6 +594,7 @@ public class PixelToWorldTransformOperatorTests
         Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(1);
         var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
         chain.Should().ContainInOrder("world.2d->image.full", "image.full->roi.local.depth1");
+        AssertRoundTripReportIsNearZero(result, expectedCount: 1);
     }
 
     [Theory]
@@ -654,6 +660,128 @@ public class PixelToWorldTransformOperatorTests
         pointsContext.CurrentFrame.UnitSymbol.Should().Be("cm");
     }
 
+    [Theory]
+    [InlineData("mm", SpatialUnitV1.Millimeter)]
+    [InlineData("cm", SpatialUnitV1.Centimeter)]
+    [InlineData("m", SpatialUnitV1.Meter)]
+    public async Task ExecuteAsync_WorldToPixel_ShouldUsePointsSpatialContextWorldUnitAuthority(
+        string upstreamUnit,
+        SpatialUnitV1 expectedContextUnit)
+    {
+        var upstream = CreatePixelToWorldOperator("PixelToWorld");
+        var upstreamInputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(unit: upstreamUnit),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(100, 50) }
+        };
+
+        var upstreamResult = await _operator.ExecuteAsync(upstream, upstreamInputs);
+        upstreamResult.IsSuccess.Should().BeTrue(upstreamResult.ErrorMessage);
+        var upstreamPoints = Assert.IsType<List<Point3d>>(upstreamResult.OutputData!["TransformedPoints"]);
+        var upstreamContext = Assert.IsType<SpatialContextV1>(upstreamResult.OutputData["TransformedPointsSpatialContext"]);
+        upstreamContext.CurrentFrame.Unit.Should().Be(expectedContextUnit);
+
+        var downstream = CreatePixelToWorldOperator("WorldToPixel");
+        var downstreamInputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(unit: "mm", bundleId: $"bundle-downstream-{upstreamUnit}"),
+            ["Points"] = upstreamPoints,
+            ["PointsSpatialContext"] = upstreamContext
+        };
+
+        var downstreamResult = await _operator.ExecuteAsync(downstream, downstreamInputs);
+
+        downstreamResult.IsSuccess.Should().BeTrue(downstreamResult.ErrorMessage);
+        var pixels = Assert.IsType<List<ClearVision.Product.Core.ValueObjects.Position>>(downstreamResult.OutputData!["TransformedPoints"]);
+        pixels.Single().X.Should().BeApproximately(100, 1e-9);
+        pixels.Single().Y.Should().BeApproximately(50, 1e-9);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(downstreamResult.OutputData["TransformResult"]);
+        transformResult["InputUnit"].Should().Be(upstreamContext.CurrentFrame.UnitSymbol);
+        transformResult["InputFrame"].Should().Be(upstreamContext.CurrentFrame.FrameId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WorldToPixel_WithNonWorldPointsSpatialContext_ShouldFailClosed()
+    {
+        var op = CreatePixelToWorldOperator("WorldToPixel");
+        var inputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(unit: "mm"),
+            ["Points"] = new List<Point3d> { new(1, 1, 0) },
+            ["PointsSpatialContext"] = SpatialContextV1.DefaultImageFull()
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_FRAME_DIRECTION_INVALID");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithConflictingExplicitUnitScale_ShouldFailClosed()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        op.Parameters.Add(TestHelpers.CreateParameter("UnitScale", 1.0));
+        var inputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(unit: "cm"),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SPATIAL_UNIT_INCOMPATIBLE");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPointsContextAndMalformedImageContext_ShouldTransformPointsAndOmitImageSidecar()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        var inputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) },
+            ["PointsSpatialContext"] = CreateCropSpatialContext(op.Id, depth: 2),
+            [RoiManagerOperator.ImageSpatialContextInputKey] = "{not valid json"
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = Assert.IsType<List<Point3d>>(result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.30, 1e-9);
+        point.Y.Should().BeApproximately(0.56, 1e-9);
+        result.OutputData.Should().ContainKey("TransformedPointsSpatialContext");
+        result.OutputData.Should().NotContainKey(RoiManagerOperator.SpatialContextOutputKey);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        var diagnostics = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["Diagnostics"]).ToList();
+        diagnostics.Should().Contain(item => item.Contains("IMAGE_SPATIAL_CONTEXT_MALFORMED", StringComparison.Ordinal));
+        diagnostics.Should().Contain(item => item.Contains("SYNTHETIC_IMAGE_SPATIAL_CONTEXT_OMITTED", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutInputImage_ShouldNotEmitBusinessImageSpatialContextForSyntheticVisualization()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        var inputs = new Dictionary<string, object>
+        {
+            ["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var outputData = result.OutputData!;
+        outputData.Should().ContainKey("TransformedPoints");
+        outputData.Should().ContainKey("TransformedPointsSpatialContext");
+        outputData.Should().NotContainKey(RoiManagerOperator.SpatialContextOutputKey);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(outputData["TransformResult"]);
+        var diagnostics = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["Diagnostics"]).ToList();
+        diagnostics.Should().Contain(item => item.Contains("SYNTHETIC_IMAGE_SPATIAL_CONTEXT_OMITTED", StringComparison.Ordinal));
+    }
+
     private static Operator CreatePixelToWorldOperator(string transformMode)
     {
         var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
@@ -662,6 +790,14 @@ public class PixelToWorldTransformOperatorTests
         op.AddOutputPort("TransformResult", PortDataType.Any);
         op.Parameters.Add(TestHelpers.CreateParameter("TransformMode", transformMode));
         return op;
+    }
+
+    private static void AssertRoundTripReportIsNearZero(OperatorExecutionOutput result, int expectedCount)
+    {
+        var report = Assert.IsType<Dictionary<string, object>>(result.OutputData!["AccuracyReport"]);
+        Assert.IsType<List<double>>(report["RoundTripErrors"]).Should().HaveCount(expectedCount);
+        Convert.ToDouble(report["RoundTripMax"]).Should().BeLessThan(1e-6);
+        Convert.ToDouble(report["RoundTripRmse"]).Should().BeLessThan(1e-6);
     }
 
     private static SpatialContextV1 CreateCropSpatialContext(Guid operatorId, int depth)

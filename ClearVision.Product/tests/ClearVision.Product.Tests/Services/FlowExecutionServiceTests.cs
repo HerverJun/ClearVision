@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ClearVision.Product.Core.Entities;
@@ -1188,6 +1189,36 @@ public class FlowExecutionServiceTests
         pointsContext.Binding.OutputPortId.Should().Be(pixelToWorld.OutputPorts.Single(port => port.Name == "TransformedPoints").Id);
     }
 
+    [Theory]
+    [InlineData("cm")]
+    [InlineData("m")]
+    [InlineData("mm")]
+    public async Task ExecuteFlowAsync_ShouldPropagatePointListWorldUnitContextBetweenRealPixelToWorldOperators(string upstreamUnit)
+    {
+        var pixelToWorldExecutor = new PixelToWorldTransformOperator(Substitute.For<ILogger<PixelToWorldTransformOperator>>());
+        using var sut = new FlowExecutionService(
+            new IOperatorExecutor[] { pixelToWorldExecutor },
+            _logger,
+            _variableContext);
+        var (flow, downstream) = CreatePixelToWorldPointListChain(upstreamUnit);
+
+        var sequential = await sut.ExecuteFlowAsync(flow, null, FlowExecutionMode.Sequential);
+        AssertPixelToWorldPointListChainResult(sequential, downstream, upstreamUnit);
+
+        var autoSafeParallel = await sut.ExecuteFlowAsync(flow, null, FlowExecutionMode.AutoSafeParallel);
+        AssertPixelToWorldPointListChainResult(autoSafeParallel, downstream, upstreamUnit);
+
+        var debugOptions = new DebugOptions
+        {
+            DebugSessionId = Guid.NewGuid(),
+            EnableIntermediateCache = true
+        };
+        var firstDebug = await sut.ExecuteFlowDebugAsync(flow, debugOptions);
+        var secondDebug = await sut.ExecuteFlowDebugAsync(flow, debugOptions);
+        AssertPixelToWorldPointListChainResult(firstDebug, downstream, upstreamUnit);
+        AssertPixelToWorldPointListChainResult(secondDebug, downstream, upstreamUnit);
+    }
+
     [Fact]
     public async Task ExecuteFlowDebugAsync_ReusesCachedUpstreamOutputs_WhenOnlyTargetParametersChange()
     {
@@ -1752,6 +1783,138 @@ public class FlowExecutionServiceTests
             source.OutputPorts.First().Id,
             target.Id,
             target.InputPorts.First().Id);
+    }
+
+    private static (OperatorFlow Flow, Operator Downstream) CreatePixelToWorldPointListChain(string upstreamUnit)
+    {
+        var flow = new OperatorFlow($"PixelToWorldPointListUnit-{upstreamUnit}");
+        var upstream = new Operator("PixelToWorld-A", OperatorType.PixelToWorldTransform, 0, 0);
+        upstream.AddOutputPort("Image", PortDataType.Image);
+        upstream.AddOutputPort("TransformedPoints", PortDataType.PointList);
+        upstream.AddOutputPort("TransformResult", PortDataType.Any);
+        upstream.AddParameter(TestHelpers.CreateParameter("TransformMode", "PixelToWorld"));
+        upstream.AddParameter(TestHelpers.CreateParameter("InputPointX", 100.0));
+        upstream.AddParameter(TestHelpers.CreateParameter("InputPointY", 50.0));
+        upstream.AddParameter(TestHelpers.CreateParameter("CalibrationData", CreateScaleOffsetBundleJson($"bundle-upstream-{upstreamUnit}", upstreamUnit)));
+
+        var downstream = new Operator("PixelToWorld-B", OperatorType.PixelToWorldTransform, 0, 0);
+        downstream.AddInputPort("Points", PortDataType.PointList);
+        downstream.AddOutputPort("Image", PortDataType.Image);
+        downstream.AddOutputPort("TransformedPoints", PortDataType.PointList);
+        downstream.AddOutputPort("TransformResult", PortDataType.Any);
+        downstream.AddParameter(TestHelpers.CreateParameter("TransformMode", "WorldToPixel"));
+        downstream.AddParameter(TestHelpers.CreateParameter("CalibrationData", CreateScaleOffsetBundleJson("bundle-downstream-mm", "mm")));
+
+        flow.AddOperator(upstream);
+        flow.AddOperator(downstream);
+        flow.AddConnection(new OperatorConnection(
+            upstream.Id,
+            upstream.OutputPorts.Single(port => port.Name == "TransformedPoints").Id,
+            downstream.Id,
+            downstream.InputPorts.Single(port => port.Name == "Points").Id));
+
+        return (flow, downstream);
+    }
+
+    private static void AssertPixelToWorldPointListChainResult(
+        FlowExecutionResult result,
+        Operator downstream,
+        string upstreamUnit)
+    {
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var downstreamResult = result.OperatorResults.Single(item => item.OperatorId == downstream.Id);
+        downstreamResult.IsSuccess.Should().BeTrue(downstreamResult.ErrorMessage);
+        var pixels = ReadPositions(downstreamResult.OutputData!["TransformedPoints"]);
+        pixels.Single().X.Should().BeApproximately(100.0, 1e-9);
+        pixels.Single().Y.Should().BeApproximately(50.0, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(downstreamResult.OutputData["TransformResult"]);
+        transformResult["InputUnit"].Should().Be(upstreamUnit);
+        var diagnostics = ReadStrings(transformResult["Diagnostics"]);
+        diagnostics.Should().Contain(item => item.Contains("PointsSpatialContext", StringComparison.Ordinal));
+    }
+
+    private static List<string> ReadStrings(object raw)
+    {
+        return raw switch
+        {
+            IEnumerable<string> typed => typed.ToList(),
+            IEnumerable<object> objects => objects.Select(item => item?.ToString() ?? string.Empty).ToList(),
+            _ => throw new InvalidOperationException($"Unexpected string list type {raw.GetType().Name}.")
+        };
+    }
+
+    private static List<Position> ReadPositions(object raw)
+    {
+        return raw switch
+        {
+            List<Position> typed => typed,
+            IEnumerable<object> objects => objects.Select(ReadPosition).ToList(),
+            _ => throw new InvalidOperationException($"Unexpected point list type {raw.GetType().Name}.")
+        };
+    }
+
+    private static Position ReadPosition(object raw)
+    {
+        switch (raw)
+        {
+            case Position position:
+                return position;
+            case IDictionary<string, object> dictionary:
+                return new Position(
+                    Convert.ToDouble(dictionary["X"]),
+                    Convert.ToDouble(dictionary["Y"]));
+            case JsonElement element:
+                return new Position(
+                    element.GetProperty("X").GetDouble(),
+                    element.GetProperty("Y").GetDouble());
+            default:
+                var type = raw.GetType();
+                var x = type.GetProperty("X")?.GetValue(raw);
+                var y = type.GetProperty("Y")?.GetValue(raw);
+                if (x != null && y != null)
+                {
+                    return new Position(Convert.ToDouble(x), Convert.ToDouble(y));
+                }
+
+                throw new InvalidOperationException($"Unexpected point item type {raw.GetType().Name}.");
+        }
+    }
+
+    private static string CreateScaleOffsetBundleJson(string bundleId, string unit)
+    {
+        return $$"""
+                 {
+                   "schemaVersion": 2,
+                   "bundleId": "{{bundleId}}",
+                   "calibrationVersion": "v-test",
+                   "datasetFingerprint": "dataset-test",
+                   "checksumSha256": "0123456789abcdef",
+                   "calibrationKind": "rigidTransform2D",
+                   "transformModel": "scaleOffset",
+                   "sourceFrame": "image",
+                   "targetFrame": "world",
+                   "unit": "{{unit}}",
+                   "transform2D": {
+                     "model": "scaleOffset",
+                     "matrix": [
+                       [0.02, 0.0, 0.0],
+                       [0.0, 0.02, 0.0]
+                     ],
+                     "pixelSizeX": 0.02,
+                     "pixelSizeY": 0.02
+                   },
+                   "quality": {
+                     "accepted": true,
+                     "meanError": 0.05,
+                     "maxError": 0.09,
+                     "inlierCount": 8,
+                     "totalSampleCount": 8,
+                     "diagnostics": []
+                   },
+                   "producerOperator": "FlowExecutionServiceTests"
+                 }
+                 """;
     }
 
     private static async Task<OperatorExecutionOutput> WaitForOperatorCancellationAsync(

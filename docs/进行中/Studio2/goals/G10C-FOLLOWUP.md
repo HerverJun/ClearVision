@@ -75,7 +75,7 @@
 - publish asset/source/dev artifact audit - PASS, 144 files; no `.map`/`.ts`/`.tsx`/`.vue`, no package config, no `node_modules/tests`; `wwwroot/src` remains existing publish shape.
 - `git diff --check` - PASS.
 - `./scripts/scan-secrets.ps1` - PASS.
-- large-file audit - PASS for this change set; large cache/artifact files reported under `.dotnet_cli_home` and `artifacts/publish/test_build/Acme.Product.Desktop.exe` were pre-existing/unrelated.
+- large-file audit - PASS for this change set; large cache/artifact files reported under `.dotnet_cli_home` and `artifacts/publish/test_build/ClearVision.Product.Desktop.exe` were pre-existing/unrelated.
 - untracked/scratch audit - PASS; `.tmp/publish-check/g10c-followup` removed; Playwright report removed.
 - process audit - PASS after `dotnet build-server shutdown`; no residual `dotnet` or `testhost`; user Chrome processes remain unrelated.
 - 完整 GitHub CI：NOT RUN.

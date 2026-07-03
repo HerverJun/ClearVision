@@ -17,7 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
     Category = "Calibration",
     IconName = "coordinate-transform",
-    Keywords = new[] { "pixel", "world", "coordinate", "transform", "calibration", "ray-plane" }
+    Keywords = new[] { "pixel", "world", "coordinate", "transform", "calibration", "ray-plane" },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "Input Image (Optional)", PortDataType.Image, IsRequired = false)]
 [InputPort("Points", "Input Points", PortDataType.PointList, IsRequired = false)]
@@ -80,10 +81,17 @@ public class PixelToWorldTransformOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure(acceptedError));
         }
 
-        var unitScale = ResolveEffectiveUnitScale(
-            bundle.Unit,
-            configuredUnitScale,
-            IsParameterExplicitlyConfigured(@operator, "UnitScale"));
+        if (!SpatialCalibrationTransformService.TryResolveWorldUnitContract(
+                bundle.Unit,
+                configuredUnitScale,
+                IsParameterExplicitlyConfigured(@operator, "UnitScale"),
+                out var worldUnit,
+                out var unitError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(unitError));
+        }
+
+        var unitScale = worldUnit.MillimetersPerUnit;
 
         if (!TryGetInputPoints(@operator, inputs, out var inputPoints, out var pointError))
         {
@@ -95,6 +103,8 @@ public class PixelToWorldTransformOperator : OperatorBase
                 out var pointsSpatialContext,
                 out var imageSpatialContext,
                 out var spatialContextDiagnostics,
+                out var omitImageSpatialContextSidecar,
+                out var pointsSpatialContextProvided,
                 out var spatialContextError))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure(spatialContextError));
@@ -109,12 +119,14 @@ public class PixelToWorldTransformOperator : OperatorBase
                 inputPoints,
                 pointsSpatialContext,
                 imageSpatialContext,
+                omitImageSpatialContextSidecar,
+                pointsSpatialContextProvided,
                 spatialContextDiagnostics,
                 isPixelToWorld,
                 requestedInputFrame,
                 requestedOutputFrame,
                 worldPlaneZ,
-                unitScale,
+                worldUnit,
                 generateReport));
         }
 
@@ -125,12 +137,14 @@ public class PixelToWorldTransformOperator : OperatorBase
             inputPoints,
             pointsSpatialContext,
             imageSpatialContext,
+            omitImageSpatialContextSidecar,
+            pointsSpatialContextProvided,
             spatialContextDiagnostics,
             isPixelToWorld,
             requestedInputFrame,
             requestedOutputFrame,
             worldPlaneZ,
-            unitScale,
+            worldUnit,
             useDistortion,
             generateReport));
     }
@@ -152,36 +166,10 @@ public class PixelToWorldTransformOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private static double ResolveEffectiveUnitScale(string? bundleUnit, double configuredUnitScale, bool unitScaleExplicitlyConfigured)
-    {
-        if (unitScaleExplicitlyConfigured)
-        {
-            return configuredUnitScale;
-        }
-
-        return NormalizeUnitToken(bundleUnit) switch
-        {
-            "m" or "meter" or "meters" => 1000.0,
-            "cm" or "centimeter" or "centimeters" => 10.0,
-            "um" or "micrometer" or "micrometers" => 0.001,
-            _ => configuredUnitScale
-        };
-    }
-
     private static bool IsParameterExplicitlyConfigured(Operator @operator, string parameterName)
     {
         return @operator.Parameters.Any(parameter =>
             string.Equals(parameter.Name, parameterName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string NormalizeUnitToken(string? rawUnit)
-    {
-        if (string.IsNullOrWhiteSpace(rawUnit))
-        {
-            return string.Empty;
-        }
-
-        return rawUnit.Trim().ToLowerInvariant();
     }
 
     private OperatorExecutionOutput ExecutePlanarPath(
@@ -191,12 +179,14 @@ public class PixelToWorldTransformOperator : OperatorBase
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
         SpatialContextV1? imageSpatialContext,
+        bool omitImageSpatialContextSidecar,
+        bool pointsSpatialContextProvided,
         IReadOnlyList<string> spatialContextDiagnostics,
         bool isPixelToWorld,
         string? requestedInputFrame,
         string? requestedOutputFrame,
         double worldPlaneZ,
-        double unitScale,
+        WorldUnitContract worldUnit,
         bool generateReport)
     {
         if (!IsSupportedPlanarKind(bundle.CalibrationKind))
@@ -224,7 +214,8 @@ public class PixelToWorldTransformOperator : OperatorBase
                         ? SpatialCalibrationTransformMode.PixelToWorld
                         : SpatialCalibrationTransformMode.WorldToPixel,
                     worldPlaneZ,
-                    unitScale,
+                    worldUnit,
+                    pointsSpatialContextProvided,
                     requestedInputFrame,
                     requestedOutputFrame),
                 out var transformResult,
@@ -233,9 +224,21 @@ public class PixelToWorldTransformOperator : OperatorBase
             return OperatorExecutionOutput.Failure(transformError);
         }
 
-        var accuracyReport = generateReport
-            ? BuildPlanarAccuracyReport(runtime, inputPoints, transformResult.OutputPoints, isPixelToWorld, unitScale, transformResult, transformResult.Diagnostics)
-            : null;
+        Dictionary<string, object>? accuracyReport = null;
+        if (generateReport &&
+            !TryBuildPlanarAccuracyReport(
+                runtime,
+                spatialContext,
+                inputPoints,
+                transformResult.OutputPoints,
+                isPixelToWorld,
+                transformResult,
+                transformResult.Diagnostics,
+                out accuracyReport,
+                out var reportError))
+        {
+            return OperatorExecutionOutput.Failure(reportError);
+        }
         var outputDiagnostics = transformResult.Diagnostics.Concat(spatialContextDiagnostics).ToList();
 
         return BuildSuccessOutput(
@@ -249,8 +252,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             bundle,
             transformResult,
             imageSpatialContext,
+            omitImageSpatialContextSidecar,
             worldPlaneZ,
-            unitScale,
+            worldUnit.MillimetersPerUnit,
             generateReport,
             accuracyReport,
             outputDiagnostics);
@@ -263,12 +267,14 @@ public class PixelToWorldTransformOperator : OperatorBase
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
         SpatialContextV1? imageSpatialContext,
+        bool omitImageSpatialContextSidecar,
+        bool pointsSpatialContextProvided,
         IReadOnlyList<string> spatialContextDiagnostics,
         bool isPixelToWorld,
         string? requestedInputFrame,
         string? requestedOutputFrame,
         double worldPlaneZ,
-        double unitScale,
+        WorldUnitContract worldUnit,
         bool useDistortion,
         bool generateReport)
     {
@@ -310,8 +316,8 @@ public class PixelToWorldTransformOperator : OperatorBase
                 requestedInputFrame,
                 requestedOutputFrame,
                 worldPlaneZ,
-                unitScale,
-                bundle.Unit,
+                worldUnit,
+                pointsSpatialContextProvided,
                 diagnostics,
                 out var outputPoints,
                 out var frameResult,
@@ -320,9 +326,23 @@ public class PixelToWorldTransformOperator : OperatorBase
             return OperatorExecutionOutput.Failure(transformError);
         }
 
-        var accuracyReport = generateReport
-            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, frameResult, frameResult.Diagnostics)
-            : null;
+        Dictionary<string, object>? accuracyReport = null;
+        if (generateReport &&
+            !TryBuildRayPlaneAccuracyReport(
+                context,
+                distortion,
+                spatialContext,
+                inputPoints,
+                outputPoints,
+                isPixelToWorld,
+                worldPlaneZ,
+                frameResult,
+                frameResult.Diagnostics,
+                out accuracyReport,
+                out var reportError))
+        {
+            return OperatorExecutionOutput.Failure(reportError);
+        }
         var outputDiagnostics = frameResult.Diagnostics.Concat(spatialContextDiagnostics).ToList();
 
         return BuildSuccessOutput(
@@ -336,8 +356,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             bundle,
             frameResult,
             imageSpatialContext,
+            omitImageSpatialContextSidecar,
             worldPlaneZ,
-            unitScale,
+            worldUnit.MillimetersPerUnit,
             generateReport,
             accuracyReport,
             outputDiagnostics);
@@ -354,8 +375,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         string? requestedInputFrame,
         string? requestedOutputFrame,
         double worldPlaneZ,
-        double unitScale,
-        string? worldUnit,
+        WorldUnitContract worldUnit,
+        bool useSpatialContextAsWorldInput,
         IReadOnlyList<string> baseDiagnostics,
         out IReadOnlyList<Point3d> outputPoints,
         out SpatialCalibrationTransformResult frameResult,
@@ -387,8 +408,8 @@ public class PixelToWorldTransformOperator : OperatorBase
                 requestedInputFrame,
                 requestedOutputFrame,
                 worldPlaneZ,
-                unitScale,
                 worldUnit,
+                useSpatialContextAsWorldInput,
                 baseDiagnostics,
                 out outputPoints,
                 out frameResult,
@@ -403,8 +424,8 @@ public class PixelToWorldTransformOperator : OperatorBase
                 requestedInputFrame,
                 requestedOutputFrame,
                 worldPlaneZ,
-                unitScale,
                 worldUnit,
+                useSpatialContextAsWorldInput,
                 baseDiagnostics,
                 out outputPoints,
                 out frameResult,
@@ -421,8 +442,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         string? requestedInputFrame,
         string? requestedOutputFrame,
         double worldPlaneZ,
-        double unitScale,
-        string? worldUnit,
+        WorldUnitContract worldUnit,
+        bool useSpatialContextAsWorldInput,
         IReadOnlyList<string> baseDiagnostics,
         out IReadOnlyList<Point3d> outputPoints,
         out SpatialCalibrationTransformResult frameResult,
@@ -443,7 +464,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             return false;
         }
 
-        var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
+        var diagnostics = baseDiagnostics.Concat(worldUnit.Diagnostics).Concat(inputDiagnostics).ToList();
         if (inputFrame.Kind == SpatialFrameKindV1.World2D)
         {
             error = "SPATIAL_FRAME_DIRECTION_INVALID: PixelToWorld input frame cannot be World2D.";
@@ -495,9 +516,9 @@ public class PixelToWorldTransformOperator : OperatorBase
             }
 
             var worldPoint = new Point3d(
-                worldPointMm.X / unitScale,
-                worldPointMm.Y / unitScale,
-                worldPointMm.Z / unitScale);
+                worldPointMm.X / worldUnit.MillimetersPerUnit,
+                worldPointMm.Y / worldUnit.MillimetersPerUnit,
+                worldPointMm.Z / worldUnit.MillimetersPerUnit);
             if (!IsFinite(worldPoint))
             {
                 error = "Ray-plane PixelToWorld produced non-finite output.";
@@ -515,7 +536,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             calibrationTargetFrame,
             outputFrame,
             inputFrame.UnitSymbol,
-            SpatialCalibrationTransformService.NormalizeWorldUnit(worldUnit, unitScale),
+            worldUnit.UnitSymbol,
             spatialPath.Count,
             SpatialCalibrationTransformService.DescribeTransformChain(
                 spatialPath,
@@ -537,8 +558,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         string? requestedInputFrame,
         string? requestedOutputFrame,
         double worldPlaneZ,
-        double unitScale,
-        string? worldUnit,
+        WorldUnitContract worldUnit,
+        bool useSpatialContextAsWorldInput,
         IReadOnlyList<string> baseDiagnostics,
         out IReadOnlyList<Point3d> outputPoints,
         out SpatialCalibrationTransformResult frameResult,
@@ -548,8 +569,10 @@ public class PixelToWorldTransformOperator : OperatorBase
         frameResult = EmptyRayPlaneResult(baseDiagnostics, calibrationSourceFrame, calibrationTargetFrame);
         error = string.Empty;
 
-        if (!SpatialCalibrationTransformService.TryNormalizeRequestedFrame(
+        if (!TryResolveRayPlaneWorldToPixelInputFrame(
                 requestedInputFrame,
+                spatialContext,
+                useSpatialContextAsWorldInput,
                 calibrationTargetFrame,
                 out var inputFrame,
                 out var inputDiagnostics,
@@ -558,10 +581,15 @@ public class PixelToWorldTransformOperator : OperatorBase
             return false;
         }
 
-        var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
+        var diagnostics = baseDiagnostics.Concat(worldUnit.Diagnostics).Concat(inputDiagnostics).ToList();
         if (inputFrame.Kind != SpatialFrameKindV1.World2D)
         {
             error = $"SPATIAL_FRAME_DIRECTION_INVALID: WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
+            return false;
+        }
+
+        if (!SpatialCalibrationTransformService.TryGetMillimetersPerUnit(inputFrame.Unit, out var inputMillimetersPerUnit, out var inputUnitSymbol, out error))
+        {
             return false;
         }
 
@@ -593,8 +621,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         foreach (var point in inputPoints)
         {
             var hasExplicitZ = Math.Abs(point.Z) > Epsilon;
-            var worldZmm = hasExplicitZ ? point.Z * unitScale : worldPlaneZ;
-            var worldPointMm = new Point3d(point.X * unitScale, point.Y * unitScale, worldZmm);
+            var worldZmm = hasExplicitZ ? point.Z * inputMillimetersPerUnit : worldPlaneZ;
+            var worldPointMm = new Point3d(point.X * inputMillimetersPerUnit, point.Y * inputMillimetersPerUnit, worldZmm);
             if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var calibrationPixelPoint, out error))
             {
                 error = $"Ray-plane WorldToPixel failed: {error}";
@@ -624,7 +652,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             calibrationSourceFrame,
             calibrationTargetFrame,
             outputFrame,
-            SpatialCalibrationTransformService.NormalizeWorldUnit(worldUnit, unitScale),
+            inputUnitSymbol,
             outputFrame.UnitSymbol,
             spatialPath.Count,
             SpatialCalibrationTransformService.DescribeTransformChain(
@@ -636,6 +664,60 @@ public class PixelToWorldTransformOperator : OperatorBase
             diagnostics);
         return true;
     }
+
+    private static bool TryResolveRayPlaneWorldToPixelInputFrame(
+        string? requestedInputFrame,
+        SpatialContextV1? spatialContext,
+        bool useSpatialContextAsWorldInput,
+        FrameRefV1 calibrationTargetFrame,
+        out FrameRefV1 inputFrame,
+        out IReadOnlyList<string> diagnostics,
+        out string error)
+    {
+        if (spatialContext != null && useSpatialContextAsWorldInput)
+        {
+            inputFrame = spatialContext.CurrentFrame;
+            error = string.Empty;
+            var resolvedDiagnostics = new List<string>
+            {
+                $"WorldToPixel input frame resolved from PointsSpatialContext '{inputFrame.FrameId}' ({inputFrame.Kind}, {inputFrame.UnitSymbol})."
+            };
+            if (!IsAutoFrameToken(requestedInputFrame))
+            {
+                if (!SpatialCalibrationTransformService.TryNormalizeRequestedFrame(
+                        requestedInputFrame,
+                        calibrationTargetFrame,
+                        out var requested,
+                        out var requestedDiagnostics,
+                        out error))
+                {
+                    diagnostics = resolvedDiagnostics;
+                    return false;
+                }
+
+                resolvedDiagnostics.AddRange(requestedDiagnostics);
+                if (requested.Kind != SpatialFrameKindV1.World2D)
+                {
+                    diagnostics = resolvedDiagnostics;
+                    error = $"SPATIAL_FRAME_DIRECTION_INVALID: WorldToPixel input frame must be World2D, got {requested.Kind}.";
+                    return false;
+                }
+            }
+
+            diagnostics = resolvedDiagnostics;
+            return true;
+        }
+
+        return SpatialCalibrationTransformService.TryNormalizeRequestedFrame(
+            requestedInputFrame,
+            calibrationTargetFrame,
+            out inputFrame,
+            out diagnostics,
+            out error);
+    }
+
+    private static bool IsAutoFrameToken(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase);
 
     private static SpatialCalibrationTransformResult EmptyRayPlaneResult(
         IReadOnlyList<string> diagnostics,
@@ -665,6 +747,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         CalibrationBundleV2 bundle,
         SpatialCalibrationTransformResult? frameResult,
         SpatialContextV1? inputSpatialContext,
+        bool omitImageSpatialContextSidecar,
         double worldPlaneZ,
         double unitScale,
         bool generateReport,
@@ -676,6 +759,13 @@ public class PixelToWorldTransformOperator : OperatorBase
             ? outputPoints.Select(p => new Point3d(p.X, p.Y, p.Z)).ToList()
             : outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
         var transformedPlanarPoints = outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
+        var outputDiagnostics = additionalDiagnostics?.ToList() ?? new List<string>();
+        var hasRealInputImage = TryGetInputImage(inputs, "Image", out var imageWrapper) && imageWrapper != null;
+        if (!hasRealInputImage)
+        {
+            outputDiagnostics.Add("SYNTHETIC_IMAGE_SPATIAL_CONTEXT_OMITTED: visualization image is synthetic preview output and has no business ImageFull SpatialContext.");
+        }
+
         var transformResult = new Dictionary<string, object>
         {
             ["TransformMode"] = transformMode,
@@ -698,12 +788,12 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["CalibrationSourceFrame"] = frameResult?.CalibrationSourceFrame.FrameId ?? bundle.SourceFrame,
             ["CalibrationTargetFrame"] = frameResult?.CalibrationTargetFrame.FrameId ?? bundle.TargetFrame,
             ["OutputFrame"] = frameResult?.OutputFrame.FrameId ?? bundle.TargetFrame,
-            ["InputUnit"] = frameResult?.InputUnit ?? (isPixelToWorld ? "px" : SpatialCalibrationTransformService.NormalizeWorldUnit(bundle.Unit, unitScale)),
-            ["OutputUnit"] = frameResult?.OutputUnit ?? (isPixelToWorld ? SpatialCalibrationTransformService.NormalizeWorldUnit(bundle.Unit, unitScale) : "px"),
+            ["InputUnit"] = frameResult?.InputUnit ?? (isPixelToWorld ? "px" : "mm"),
+            ["OutputUnit"] = frameResult?.OutputUnit ?? (isPixelToWorld ? "mm" : "px"),
             ["AppliedSpatialTransformCount"] = frameResult?.AppliedSpatialTransformCount ?? 0,
             ["TransformChain"] = frameResult?.TransformChain.ToList() ?? new List<string>(),
             ["CompatibilityMode"] = frameResult?.CompatibilityMode ?? false,
-            ["Diagnostics"] = additionalDiagnostics?.ToList() ?? new List<string>()
+            ["Diagnostics"] = outputDiagnostics
         };
 
         var resultData = new Dictionary<string, object>
@@ -711,9 +801,13 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["TransformedPoints"] = transformedPoints,
             ["TransformedPlanarPoints"] = transformedPlanarPoints,
             ["TransformResult"] = transformResult,
-            ["TransformedPointsSpatialContext"] = BuildTransformedPointsSpatialContext(@operator, frameResult, transformMode, unitScale),
-            [RoiManagerOperator.SpatialContextOutputKey] = BuildImageSpatialContext(@operator, inputSpatialContext)
+            ["TransformedPointsSpatialContext"] = BuildTransformedPointsSpatialContext(@operator, frameResult, transformMode, unitScale)
         };
+
+        if (hasRealInputImage && !omitImageSpatialContextSidecar)
+        {
+            resultData[RoiManagerOperator.SpatialContextOutputKey] = BuildImageSpatialContext(@operator, inputSpatialContext);
+        }
 
         if (generateReport)
         {
@@ -721,9 +815,9 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         Mat visualization;
-        if (TryGetInputImage(inputs, "Image", out var imageWrapper) && imageWrapper != null)
+        if (hasRealInputImage)
         {
-            var image = imageWrapper.GetMat();
+            var image = imageWrapper!.GetMat();
             if (image.Empty())
             {
                 return OperatorExecutionOutput.Failure("Input image is invalid.");
@@ -785,61 +879,83 @@ public class PixelToWorldTransformOperator : OperatorBase
         out SpatialContextV1? pointsContext,
         out SpatialContextV1? imageContext,
         out IReadOnlyList<string> diagnostics,
+        out bool omitImageSpatialContextSidecar,
+        out bool pointsContextProvided,
         out string error)
     {
         pointsContext = null;
         imageContext = null;
         diagnostics = Array.Empty<string>();
+        omitImageSpatialContextSidecar = false;
+        pointsContextProvided = false;
         error = string.Empty;
         if (inputs == null || inputs.Count == 0)
         {
             return true;
         }
 
+        var diagnosticList = new List<string>();
         SpatialContextV1? legacyContext = null;
-        var parsedKeys = new List<string>();
-        foreach (var key in new[] { "PointsSpatialContext", RoiManagerOperator.ImageSpatialContextInputKey, RoiManagerOperator.SpatialContextOutputKey })
-        {
-            if (!TryGetInputValue(inputs, key, out var raw))
-            {
-                continue;
-            }
 
-            if (!SpatialCalibrationTransformService.TryReadSpatialContext(raw, out var parsed, out var parseError))
+        if (TryGetInputValue(inputs, "PointsSpatialContext", out var rawPointsContext))
+        {
+            if (!SpatialCalibrationTransformService.TryReadSpatialContext(rawPointsContext, out var parsed, out var parseError))
             {
-                error = $"Malformed SpatialContext input '{key}': {parseError}";
+                error = $"Malformed SpatialContext input 'PointsSpatialContext': {parseError}";
                 return false;
             }
 
-            parsedKeys.Add(key);
-            if (key.Equals("PointsSpatialContext", StringComparison.OrdinalIgnoreCase))
-            {
-                pointsContext = parsed;
-            }
-            else if (key.Equals(RoiManagerOperator.ImageSpatialContextInputKey, StringComparison.OrdinalIgnoreCase))
+            pointsContext = parsed;
+            pointsContextProvided = true;
+        }
+
+        var imageContextMalformed = false;
+        if (TryGetInputValue(inputs, RoiManagerOperator.ImageSpatialContextInputKey, out var rawImageContext))
+        {
+            if (SpatialCalibrationTransformService.TryReadSpatialContext(rawImageContext, out var parsed, out var parseError))
             {
                 imageContext = parsed;
             }
             else
             {
-                legacyContext = parsed;
+                imageContextMalformed = true;
+                omitImageSpatialContextSidecar = true;
+                diagnosticList.Add($"IMAGE_SPATIAL_CONTEXT_MALFORMED: Image SpatialContext was ignored for coordinate math and Image sidecar was omitted: {parseError}");
             }
         }
 
-        if (parsedKeys.Count == 0)
+        if (imageContextMalformed && pointsContext == null)
         {
-            return true;
+            error = "Malformed SpatialContext input 'ImageSpatialContext': no valid PointsSpatialContext is available to own coordinate math.";
+            return false;
+        }
+
+        if (TryGetInputValue(inputs, RoiManagerOperator.SpatialContextOutputKey, out var rawLegacyContext))
+        {
+            if (SpatialCalibrationTransformService.TryReadSpatialContext(rawLegacyContext, out var parsed, out var parseError))
+            {
+                legacyContext = parsed;
+            }
+            else if (pointsContext == null && imageContext == null)
+            {
+                error = $"Malformed SpatialContext input '{RoiManagerOperator.SpatialContextOutputKey}': {parseError}";
+                return false;
+            }
+            else
+            {
+                diagnosticList.Add($"LEGACY_SPATIAL_CONTEXT_MALFORMED: scoped SpatialContext was used and legacy fallback was ignored: {parseError}");
+            }
         }
 
         if (legacyContext != null)
         {
-            if (pointsContext != null && !SpatialContextsHaveSameFrame(pointsContext, legacyContext))
+            if (pointsContext != null && !SpatialContextsEquivalent(pointsContext, legacyContext))
             {
                 error = "SPATIAL_CONTEXT_SCOPE_CONFLICT: legacy SpatialContext conflicts with PointsSpatialContext.";
                 return false;
             }
 
-            if (imageContext != null && !SpatialContextsHaveSameFrame(imageContext, legacyContext))
+            if (imageContext != null && !SpatialContextsEquivalent(imageContext, legacyContext))
             {
                 error = "SPATIAL_CONTEXT_SCOPE_CONFLICT: legacy SpatialContext conflicts with ImageSpatialContext.";
                 return false;
@@ -852,14 +968,62 @@ public class PixelToWorldTransformOperator : OperatorBase
         if (pointsContext == null && imageContext != null)
         {
             pointsContext = imageContext;
-            diagnostics = ["Compatibility SpatialContext fallback: coordinates used ImageSpatialContext because PointsSpatialContext was absent."];
+            diagnosticList.Add("Compatibility SpatialContext fallback: coordinates used ImageSpatialContext because PointsSpatialContext was absent.");
+        }
+
+        diagnostics = diagnosticList;
+        return true;
+    }
+
+    private static bool SpatialContextsEquivalent(SpatialContextV1 left, SpatialContextV1 right)
+    {
+        if (!Equals(left.CurrentFrame, right.CurrentFrame) ||
+            !Equals(left.Binding, right.Binding) ||
+            left.Transforms.Count != right.Transforms.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Transforms.Count; i++)
+        {
+            var leftTransform = left.Transforms[i];
+            var rightTransform = right.Transforms[i];
+            if (!Equals(leftTransform.SourceFrame, rightTransform.SourceFrame) ||
+                !Equals(leftTransform.TargetFrame, rightTransform.TargetFrame) ||
+                !MatricesEqual(leftTransform.Matrix3x3, rightTransform.Matrix3x3))
+            {
+                return false;
+            }
         }
 
         return true;
     }
 
-    private static bool SpatialContextsHaveSameFrame(SpatialContextV1 left, SpatialContextV1 right) =>
-        Equals(left.CurrentFrame, right.CurrentFrame);
+    private static bool MatricesEqual(double[][] left, double[][] right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        for (var row = 0; row < left.Length; row++)
+        {
+            if (left[row].Length != right[row].Length)
+            {
+                return false;
+            }
+
+            for (var column = 0; column < left[row].Length; column++)
+            {
+                if (Math.Abs(left[row][column] - right[row][column]) > Epsilon)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private static bool TryGetInputValue(
         IReadOnlyDictionary<string, object> inputs,
@@ -879,45 +1043,117 @@ public class PixelToWorldTransformOperator : OperatorBase
         return false;
     }
 
-    private static Dictionary<string, object> BuildPlanarAccuracyReport(
+    private static bool TryBuildPlanarAccuracyReport(
         CalibrationPlanarTransformRuntime runtime,
+        SpatialContextV1? spatialContext,
         IReadOnlyList<Point3d> inputPoints,
         IReadOnlyList<Point3d> outputPoints,
         bool isPixelToWorld,
-        double unitScale,
         SpatialCalibrationTransformResult frameResult,
-        IReadOnlyList<string>? diagnostics)
+        IReadOnlyList<string>? diagnostics,
+        out Dictionary<string, object> report,
+        out string error)
     {
-        var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
-        for (var i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
+        report = new Dictionary<string, object>();
+        error = string.Empty;
+
+        if (inputPoints.Count != outputPoints.Count)
         {
-            if (isPixelToWorld)
+            error = "SPATIAL_ROUND_TRIP_INVALID: output point count must match input point count.";
+            return false;
+        }
+
+        var roundTripErrors = new List<double>(inputPoints.Count);
+        if (isPixelToWorld)
+        {
+            if (!SpatialCalibrationTransformService.TryGetMillimetersPerUnit(
+                    frameResult.OutputFrame.Unit,
+                    out var outputMillimetersPerUnit,
+                    out _,
+                    out error))
             {
-                var worldXmm = outputPoints[i].X * unitScale;
-                var worldYmm = outputPoints[i].Y * unitScale;
-                if (!runtime.TryApplyInverse(worldXmm, worldYmm, out var pixelX, out var pixelY, out _))
+                return false;
+            }
+
+            if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                    spatialContext,
+                    frameResult.CalibrationSourceFrame,
+                    frameResult.InputFrame,
+                    allowInverse: true,
+                    out var sourceToInput,
+                    out _,
+                    out error))
+            {
+                error = $"SPATIAL_ROUND_TRIP_INVALID: {error}";
+                return false;
+            }
+
+            for (var i = 0; i < inputPoints.Count; i++)
+            {
+                var worldXmm = outputPoints[i].X * outputMillimetersPerUnit;
+                var worldYmm = outputPoints[i].Y * outputMillimetersPerUnit;
+                if (!runtime.TryApplyInverse(worldXmm, worldYmm, out var sourceX, out var sourceY, out error))
                 {
-                    continue;
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Planar inverse transform failed: {error}";
+                    return false;
                 }
 
-                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, pixelX, pixelY));
-            }
-            else
-            {
-                if (!runtime.TryApplyForward(outputPoints[i].X, outputPoints[i].Y, out var worldXmm, out var worldYmm, out _))
+                if (!sourceToInput.TryApply(sourceX, sourceY, out var inputX, out var inputY, out error))
                 {
-                    continue;
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Spatial reverse transform failed: {error}";
+                    return false;
+                }
+
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, inputX, inputY));
+            }
+        }
+        else
+        {
+            if (!SpatialCalibrationTransformService.TryGetMillimetersPerUnit(
+                    frameResult.InputFrame.Unit,
+                    out var inputMillimetersPerUnit,
+                    out _,
+                    out error))
+            {
+                return false;
+            }
+
+            if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                    spatialContext,
+                    frameResult.OutputFrame,
+                    frameResult.CalibrationSourceFrame,
+                    allowInverse: true,
+                    out var outputToSource,
+                    out _,
+                    out error))
+            {
+                error = $"SPATIAL_ROUND_TRIP_INVALID: {error}";
+                return false;
+            }
+
+            for (var i = 0; i < inputPoints.Count; i++)
+            {
+                if (!outputToSource.TryApply(outputPoints[i].X, outputPoints[i].Y, out var sourceX, out var sourceY, out error))
+                {
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Spatial reverse transform failed: {error}";
+                    return false;
+                }
+
+                if (!runtime.TryApplyForward(sourceX, sourceY, out var worldXmm, out var worldYmm, out error))
+                {
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Planar forward transform failed: {error}";
+                    return false;
                 }
 
                 roundTripErrors.Add(MeasurementGeometryHelper.Distance(
                     inputPoints[i].X,
                     inputPoints[i].Y,
-                    worldXmm / unitScale,
-                    worldYmm / unitScale));
+                    worldXmm / inputMillimetersPerUnit,
+                    worldYmm / inputMillimetersPerUnit));
             }
         }
 
-        return BuildAccuracyReportPayload(
+        report = BuildAccuracyReportPayload(
             inputPoints,
             outputPoints,
             roundTripErrors,
@@ -925,54 +1161,127 @@ public class PixelToWorldTransformOperator : OperatorBase
             frameResult.InputFrame.FrameId,
             frameResult.AppliedSpatialTransformCount,
             diagnostics);
+        return true;
     }
 
-    private static Dictionary<string, object> BuildRayPlaneAccuracyReport(
+    private static bool TryBuildRayPlaneAccuracyReport(
         RayPlaneContext context,
         DistortionContext distortion,
+        SpatialContextV1? spatialContext,
         IReadOnlyList<Point3d> inputPoints,
         IReadOnlyList<Point3d> outputPoints,
         bool isPixelToWorld,
         double worldPlaneZ,
-        double unitScale,
         SpatialCalibrationTransformResult frameResult,
-        IReadOnlyList<string>? diagnostics)
+        IReadOnlyList<string>? diagnostics,
+        out Dictionary<string, object> report,
+        out string error)
     {
-        var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
-        for (var i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
+        report = new Dictionary<string, object>();
+        error = string.Empty;
+
+        if (inputPoints.Count != outputPoints.Count)
         {
-            if (isPixelToWorld)
+            error = "SPATIAL_ROUND_TRIP_INVALID: output point count must match input point count.";
+            return false;
+        }
+
+        var roundTripErrors = new List<double>(inputPoints.Count);
+        if (isPixelToWorld)
+        {
+            if (!SpatialCalibrationTransformService.TryGetMillimetersPerUnit(
+                    frameResult.OutputFrame.Unit,
+                    out var outputMillimetersPerUnit,
+                    out _,
+                    out error))
+            {
+                return false;
+            }
+
+            if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                    spatialContext,
+                    frameResult.CalibrationSourceFrame,
+                    frameResult.InputFrame,
+                    allowInverse: true,
+                    out var sourceToInput,
+                    out _,
+                    out error))
+            {
+                error = $"SPATIAL_ROUND_TRIP_INVALID: {error}";
+                return false;
+            }
+
+            for (var i = 0; i < inputPoints.Count; i++)
             {
                 var worldPointMm = new Point3d(
-                    outputPoints[i].X * unitScale,
-                    outputPoints[i].Y * unitScale,
-                    outputPoints[i].Z * unitScale);
-                if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var pixelPoint, out _))
+                    outputPoints[i].X * outputMillimetersPerUnit,
+                    outputPoints[i].Y * outputMillimetersPerUnit,
+                    outputPoints[i].Z * outputMillimetersPerUnit);
+                if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var sourcePoint, out error))
                 {
-                    continue;
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Ray-plane inverse projection failed: {error}";
+                    return false;
                 }
 
-                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, pixelPoint.X, pixelPoint.Y));
-            }
-            else
-            {
-                var planeZmm = Math.Abs(inputPoints[i].Z) > Epsilon
-                    ? inputPoints[i].Z * unitScale
-                    : worldPlaneZ;
-                if (!TryPixelToWorldByRayPlane(context, distortion, outputPoints[i].X, outputPoints[i].Y, planeZmm, out var worldPointMm, out _))
+                if (!sourceToInput.TryApply(sourcePoint.X, sourcePoint.Y, out var inputX, out var inputY, out error))
                 {
-                    continue;
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Spatial reverse transform failed: {error}";
+                    return false;
+                }
+
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, inputX, inputY));
+            }
+        }
+        else
+        {
+            if (!SpatialCalibrationTransformService.TryGetMillimetersPerUnit(
+                    frameResult.InputFrame.Unit,
+                    out var inputMillimetersPerUnit,
+                    out _,
+                    out error))
+            {
+                return false;
+            }
+
+            if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                    spatialContext,
+                    frameResult.OutputFrame,
+                    frameResult.CalibrationSourceFrame,
+                    allowInverse: true,
+                    out var outputToSource,
+                    out _,
+                    out error))
+            {
+                error = $"SPATIAL_ROUND_TRIP_INVALID: {error}";
+                return false;
+            }
+
+            for (var i = 0; i < inputPoints.Count; i++)
+            {
+                if (!outputToSource.TryApply(outputPoints[i].X, outputPoints[i].Y, out var sourceX, out var sourceY, out error))
+                {
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Spatial reverse transform failed: {error}";
+                    return false;
+                }
+
+                var planeZmm = Math.Abs(inputPoints[i].Z) > Epsilon
+                    ? inputPoints[i].Z * inputMillimetersPerUnit
+                    : worldPlaneZ;
+                if (!TryPixelToWorldByRayPlane(context, distortion, sourceX, sourceY, planeZmm, out var worldPointMm, out error))
+                {
+                    error = $"SPATIAL_ROUND_TRIP_INVALID: Ray-plane forward projection failed: {error}";
+                    return false;
                 }
 
                 roundTripErrors.Add(MeasurementGeometryHelper.Distance(
                     inputPoints[i].X,
                     inputPoints[i].Y,
-                    worldPointMm.X / unitScale,
-                    worldPointMm.Y / unitScale));
+                    worldPointMm.X / inputMillimetersPerUnit,
+                    worldPointMm.Y / inputMillimetersPerUnit));
             }
         }
 
-        return BuildAccuracyReportPayload(
+        report = BuildAccuracyReportPayload(
             inputPoints,
             outputPoints,
             roundTripErrors,
@@ -980,6 +1289,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             frameResult.InputFrame.FrameId,
             frameResult.AppliedSpatialTransformCount,
             diagnostics);
+        return true;
     }
 
     private static Dictionary<string, object> BuildAccuracyReportPayload(
@@ -1212,20 +1522,16 @@ public class PixelToWorldTransformOperator : OperatorBase
 
         if (rawPoints is IEnumerable enumerable)
         {
+            var index = 0;
             foreach (var item in enumerable)
             {
-                if (item is Position pos)
+                if (!TryAppendPointObject(item, output, out error))
                 {
-                    output.Add(new Point3d(pos.X, pos.Y, 0));
+                    error = $"Points[{index}]: {error}";
+                    return false;
                 }
-                else if (item is Point3d p3d)
-                {
-                    output.Add(p3d);
-                }
-                else if (item is Point2f p2f)
-                {
-                    output.Add(new Point3d(p2f.X, p2f.Y, 0));
-                }
+
+                index++;
             }
 
             return true;
@@ -1233,6 +1539,262 @@ public class PixelToWorldTransformOperator : OperatorBase
 
         error = $"Unsupported Points input type: {rawPoints.GetType().Name}.";
         return false;
+    }
+
+    private static bool TryAppendPointObject(object? item, ICollection<Point3d> output, out string error)
+    {
+        error = string.Empty;
+        switch (item)
+        {
+            case Position pos:
+                output.Add(new Point3d(pos.X, pos.Y, 0));
+                return true;
+            case Point3d p3d:
+                output.Add(p3d);
+                return true;
+            case Point2f p2f:
+                output.Add(new Point3d(p2f.X, p2f.Y, 0));
+                return true;
+            case Point3f p3f:
+                output.Add(new Point3d(p3f.X, p3f.Y, p3f.Z));
+                return true;
+            case JsonElement element:
+                return TryAppendPointFromJsonElement(element, output, out error);
+            case IDictionary<string, object> dictionary:
+                return TryAppendPointFromDictionary(dictionary, output, out error);
+            case null:
+                error = "Point item is null.";
+                return false;
+        }
+
+        if (item is IEnumerable numericTuple && item is not string)
+        {
+            var values = new List<double>();
+            var index = 0;
+            foreach (var coordinate in numericTuple)
+            {
+                try
+                {
+                    values.Add(Convert.ToDouble(coordinate, CultureInfo.InvariantCulture));
+                }
+                catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+                {
+                    error = $"Point coordinate [{index}] must be numeric: {ex.Message}";
+                    return false;
+                }
+
+                index++;
+            }
+
+            if (values.Count < 2)
+            {
+                error = "Point numeric sequence must contain at least X and Y.";
+                return false;
+            }
+
+            return TryAppendPointFromScalars(
+                values[0],
+                values[1],
+                values.Count >= 3 ? values[2] : null,
+                output,
+                out error);
+        }
+
+        var type = item.GetType();
+        var x = type.GetProperty("X")?.GetValue(item);
+        var y = type.GetProperty("Y")?.GetValue(item);
+        var z = type.GetProperty("Z")?.GetValue(item);
+        if (x == null || y == null)
+        {
+            error = $"Unsupported point item type '{type.Name}'.";
+            return false;
+        }
+
+        return TryAppendPointFromScalars(x, y, z, output, out error);
+    }
+
+    private static bool TryAppendPointFromDictionary(
+        IDictionary<string, object> dictionary,
+        ICollection<Point3d> output,
+        out string error)
+    {
+        error = string.Empty;
+        var x = TryGetDictionaryValue(dictionary, "X", out var rawX) ? rawX : null;
+        var y = TryGetDictionaryValue(dictionary, "Y", out var rawY) ? rawY : null;
+        var z = TryGetDictionaryValue(dictionary, "Z", out var rawZ) ? rawZ : null;
+        if (x == null || y == null)
+        {
+            error = "Point object must contain X and Y.";
+            return false;
+        }
+
+        return TryAppendPointFromScalars(x, y, z, output, out error);
+    }
+
+    private static bool TryGetDictionaryValue(IDictionary<string, object> dictionary, string key, out object? value)
+    {
+        foreach (var pair in dictionary)
+        {
+            if (pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = pair.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryAppendPointFromScalars(
+        object rawX,
+        object rawY,
+        object? rawZ,
+        ICollection<Point3d> output,
+        out string error)
+    {
+        error = string.Empty;
+        try
+        {
+            if (!TryConvertCoordinate(rawX, out var x, out var xError))
+            {
+                error = $"X {xError}";
+                return false;
+            }
+
+            if (!TryConvertCoordinate(rawY, out var y, out var yError))
+            {
+                error = $"Y {yError}";
+                return false;
+            }
+
+            var z = 0.0;
+            if (rawZ != null && !TryConvertCoordinate(rawZ, out z, out var zError))
+            {
+                error = $"Z {zError}";
+                return false;
+            }
+
+            if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+            {
+                error = "Point coordinates must be finite.";
+                return false;
+            }
+
+            output.Add(new Point3d(x, y, z));
+            return true;
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+        {
+            error = $"Point coordinates must be numeric: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryConvertCoordinate(object raw, out double value, out string error)
+    {
+        value = 0.0;
+        error = string.Empty;
+
+        if (raw is JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Number)
+            {
+                value = element.GetDouble();
+                return double.IsFinite(value) || Fail("must be finite.", out error);
+            }
+
+            if (element.ValueKind == JsonValueKind.String &&
+                double.TryParse(element.GetString(), NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var parsed) &&
+                double.IsFinite(parsed))
+            {
+                value = parsed;
+                return true;
+            }
+
+            error = "must be a valid number.";
+            return false;
+        }
+
+        try
+        {
+            value = Convert.ToDouble(raw, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+        {
+            error = $"must be numeric: {ex.Message}";
+            return false;
+        }
+
+        static bool Fail(string message, out string failure)
+        {
+            failure = message;
+            return false;
+        }
+    }
+
+    private static bool TryAppendPointFromJsonElement(
+        JsonElement item,
+        ICollection<Point3d> output,
+        out string error)
+    {
+        error = string.Empty;
+        if (item.ValueKind == JsonValueKind.Array)
+        {
+            var values = new List<double>();
+            foreach (var coordinate in item.EnumerateArray())
+            {
+                if (coordinate.ValueKind != JsonValueKind.Number)
+                {
+                    error = "Point array coordinates must be numbers.";
+                    return false;
+                }
+
+                values.Add(coordinate.GetDouble());
+            }
+
+            if (values.Count < 2)
+            {
+                error = "Point array must contain at least X and Y.";
+                return false;
+            }
+
+            return TryAppendPointFromScalars(
+                values[0],
+                values[1],
+                values.Count >= 3 ? values[2] : null,
+                output,
+                out error);
+        }
+
+        if (item.ValueKind != JsonValueKind.Object)
+        {
+            error = "Point item must be an object.";
+            return false;
+        }
+
+        if (!TryReadNumberAny(item, ["X", "Item0"], required: true, out var x, out var xError))
+        {
+            error = $"X {xError}";
+            return false;
+        }
+
+        if (!TryReadNumberAny(item, ["Y", "Item1"], required: true, out var y, out var yError))
+        {
+            error = $"Y {yError}";
+            return false;
+        }
+
+        var z = 0.0;
+        if (!TryReadNumberAny(item, ["Z", "Item2"], required: false, out z, out var zError))
+        {
+            error = $"Z {zError}";
+            return false;
+        }
+
+        output.Add(new Point3d(x, y, z));
+        return true;
     }
 
     private static bool TryAppendPointsFromJson(string json, ICollection<Point3d> output, out string error)
@@ -1256,26 +1818,12 @@ public class PixelToWorldTransformOperator : OperatorBase
                     return false;
                 }
 
-                if (!TryReadNumber(item, "X", required: true, out var x, out var xError))
+                if (!TryAppendPointFromJsonElement(item, output, out var itemError))
                 {
-                    error = $"Points[{index}].X {xError}";
+                    error = $"Points[{index}]: {itemError}";
                     return false;
                 }
 
-                if (!TryReadNumber(item, "Y", required: true, out var y, out var yError))
-                {
-                    error = $"Points[{index}].Y {yError}";
-                    return false;
-                }
-
-                var z = 0.0;
-                if (!TryReadNumber(item, "Z", required: false, out z, out var zError))
-                {
-                    error = $"Points[{index}].Z {zError}";
-                    return false;
-                }
-
-                output.Add(new Point3d(x, y, z));
                 index++;
             }
 
@@ -1342,6 +1890,33 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         return true;
+    }
+
+    private static bool TryReadNumberAny(
+        JsonElement obj,
+        IReadOnlyList<string> names,
+        bool required,
+        out double value,
+        out string error)
+    {
+        foreach (var name in names)
+        {
+            if (TryReadNumber(obj, name, required: true, out value, out error))
+            {
+                return true;
+            }
+
+            if (!error.Contains("is required", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        value = 0;
+        error = required
+            ? $"is required; expected one of {string.Join("/", names)}."
+            : string.Empty;
+        return !required;
     }
 
     private static bool TryResolveRayPlaneCalibrationFrames(

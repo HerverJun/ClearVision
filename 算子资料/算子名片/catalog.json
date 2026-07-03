@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T15:57:48.3660532+08:00",
+  "generatedAt": "2026-07-03T18:17:50.1111427+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -20229,7 +20229,7 @@
       "displayName": "Pixel To World Transform",
       "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
       "category": "标定",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -20294,6 +20294,70 @@
             {
               "value": "WorldToPixel",
               "label": "World to Pixel"
+            }
+          ]
+        },
+        {
+          "name": "InputFrame",
+          "displayName": "Input Frame",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "Auto"
+            },
+            {
+              "value": "ImageFull",
+              "label": "Image Full"
+            },
+            {
+              "value": "RoiLocal",
+              "label": "ROI Local"
+            },
+            {
+              "value": "Undistorted",
+              "label": "Undistorted"
+            },
+            {
+              "value": "World2D",
+              "label": "World 2D"
+            }
+          ]
+        },
+        {
+          "name": "OutputFrame",
+          "displayName": "Output Frame",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "Auto"
+            },
+            {
+              "value": "ImageFull",
+              "label": "Image Full"
+            },
+            {
+              "value": "RoiLocal",
+              "label": "ROI Local"
+            },
+            {
+              "value": "Undistorted",
+              "label": "Undistorted"
+            },
+            {
+              "value": "World2D",
+              "label": "World 2D"
             }
           ]
         },

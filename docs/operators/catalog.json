@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T09:00:36.7278448+08:00",
+  "generatedAt": "2026-07-03T18:17:50.1111427+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -5350,6 +5350,12 @@
           "displayName": "掩膜",
           "dataType": "Image",
           "isRequired": null
+        },
+        {
+          "name": "SpatialContext",
+          "displayName": "空间上下文",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -7406,7 +7412,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按…",
+      "algorithm": "当前元数据描述为：Sorts detections and compares the…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -8764,7 +8770,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于递增单次运行变量或项目全局 Int64 变量。运行时从声明输入端口读取数据…",
+      "algorithm": "该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -20223,7 +20229,7 @@
       "displayName": "Pixel To World Transform",
       "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
       "category": "标定",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -20288,6 +20294,70 @@
             {
               "value": "WorldToPixel",
               "label": "World to Pixel"
+            }
+          ]
+        },
+        {
+          "name": "InputFrame",
+          "displayName": "Input Frame",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "Auto"
+            },
+            {
+              "value": "ImageFull",
+              "label": "Image Full"
+            },
+            {
+              "value": "RoiLocal",
+              "label": "ROI Local"
+            },
+            {
+              "value": "Undistorted",
+              "label": "Undistorted"
+            },
+            {
+              "value": "World2D",
+              "label": "World 2D"
+            }
+          ]
+        },
+        {
+          "name": "OutputFrame",
+          "displayName": "Output Frame",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "Auto"
+            },
+            {
+              "value": "ImageFull",
+              "label": "Image Full"
+            },
+            {
+              "value": "RoiLocal",
+              "label": "ROI Local"
+            },
+            {
+              "value": "Undistorted",
+              "label": "Undistorted"
+            },
+            {
+              "value": "World2D",
+              "label": "World 2D"
             }
           ]
         },
@@ -22942,13 +23012,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     }

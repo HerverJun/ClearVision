@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-03 15:57:48 +08:00`
+> 生成时间 / Generated At: `2026-07-03 18:17:50 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 当前版本快照 / Current Snapshot
@@ -83,7 +83,7 @@
 | `OperatorType.HandEyeCalibration` | Hand-Eye Calibration | 标定 | `1.0.0` |
 | `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 标定 | `1.0.1` |
 | `OperatorType.NPointCalibration` | N Point Calibration | 标定 | `1.0.0` |
-| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 标定 | `1.0.0` |
+| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 标定 | `1.0.1` |
 | `OperatorType.StereoCalibration` | Stereo Calibration | 标定 | `1.0.0` |
 | `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 标定 | `1.0.0` |
 | `OperatorType.Undistort` | Undistort | 标定 | `1.0.0` |
@@ -1457,6 +1457,7 @@
 ### OperatorType.PixelToWorldTransform / Pixel To World Transform
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-07-03T17:48:32.1194342+08:00` | `8A3436BB59CA` |
 | `1.0.0` | `2026-07-03T15:57:48.3660532+08:00` | `B24753A04A85` |
 | `1.0.0` | `2026-07-03T14:28:34.0693635+08:00` | `65AE6421AE2F` |
 | `1.0.0` | `2026-06-25T11:35:53.9102407+08:00` | `14DE66586187` |

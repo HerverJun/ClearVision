@@ -59,9 +59,13 @@
 |------|------|------|------|
 | `Image` | ROI图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `Mask` | 掩膜 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `SpatialContext` | 空间上下文 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
-- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
+|------|------|------|
+| `ParentHeight` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `ParentWidth` | `Integer` | 源码输出字典初始化中可见字段。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
@@ -83,8 +87,9 @@
 ## 已知限制 / Known Limitations
 1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
 2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-02 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

@@ -16,9 +16,19 @@ public sealed record SpatialCalibrationTransformRequest(
     CalibrationPlanarTransformRuntime Runtime,
     SpatialCalibrationTransformMode Mode,
     double WorldPlaneZ,
-    double UnitScale,
+    WorldUnitContract WorldUnit,
+    bool UseSpatialContextAsWorldInput,
     string? RequestedInputFrame = null,
-    string? RequestedOutputFrame = null);
+    string? RequestedOutputFrame = null)
+{
+    public double UnitScale => WorldUnit.MillimetersPerUnit;
+}
+
+public sealed record WorldUnitContract(
+    SpatialUnitV1 SpatialUnit,
+    string UnitSymbol,
+    double MillimetersPerUnit,
+    IReadOnlyList<string> Diagnostics);
 
 public sealed record SpatialCalibrationTransformResult(
     IReadOnlyList<Point3d> OutputPoints,
@@ -50,9 +60,9 @@ public static class SpatialCalibrationTransformService
         result = EmptyResult();
         error = string.Empty;
 
-        if (request.UnitScale <= 0 || !double.IsFinite(request.UnitScale))
+        if (request.WorldUnit == null || request.UnitScale <= 0 || !double.IsFinite(request.UnitScale))
         {
-            error = "UnitScale must be a positive finite number.";
+            error = "WorldUnitContract must resolve to a positive finite millimeters-per-unit value.";
             return false;
         }
 
@@ -63,12 +73,13 @@ public static class SpatialCalibrationTransformService
         }
 
         if (!TryNormalizeBundleFrame(request.Bundle.SourceFrame, FrameRefV1.ImageFull(), out var sourceFrame, out var sourceDiagnostics, out error) ||
-            !TryNormalizeBundleFrame(request.Bundle.TargetFrame, FrameRefV1.World2D(unit: ResolveWorldSpatialUnit(request.Bundle.Unit, request.UnitScale)), out var targetFrame, out var targetDiagnostics, out error))
+            !TryNormalizeBundleFrame(request.Bundle.TargetFrame, FrameRefV1.World2D(unit: request.WorldUnit.SpatialUnit), out var targetFrame, out var targetDiagnostics, out error))
         {
             return false;
         }
 
         var diagnostics = new List<string>();
+        diagnostics.AddRange(request.WorldUnit.Diagnostics);
         diagnostics.AddRange(sourceDiagnostics);
         diagnostics.AddRange(targetDiagnostics);
 
@@ -281,46 +292,100 @@ public static class SpatialCalibrationTransformService
         return new string(frame.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     }
 
-    public static string NormalizeWorldUnit(string? rawUnit, double unitScale)
+    public static bool TryResolveWorldUnitContract(
+        string? bundleUnit,
+        double configuredUnitScale,
+        bool unitScaleExplicitlyConfigured,
+        out WorldUnitContract contract,
+        out string error)
     {
-        var token = string.IsNullOrWhiteSpace(rawUnit)
-            ? string.Empty
-            : rawUnit.Trim().ToLowerInvariant();
-        if (token is "mm" or "millimeter" or "millimeters")
+        contract = new WorldUnitContract(SpatialUnitV1.Millimeter, "mm", 1.0, Array.Empty<string>());
+        error = string.Empty;
+
+        if (configuredUnitScale <= 0 || !double.IsFinite(configuredUnitScale))
         {
-            return "mm";
+            error = "SPATIAL_UNIT_INCOMPATIBLE: UnitScale must be a positive finite number.";
+            return false;
         }
 
-        if (token is "m" or "meter" or "meters")
+        if (!TryResolveKnownWorldUnit(bundleUnit, out var spatialUnit, out var symbol, out var fixedMillimetersPerUnit))
         {
-            return "m";
+            error = $"SPATIAL_UNIT_INCOMPATIBLE: unsupported world unit '{bundleUnit}'.";
+            return false;
         }
 
-        if (token is "cm" or "centimeter" or "centimeters")
+        if (unitScaleExplicitlyConfigured &&
+            Math.Abs(configuredUnitScale - fixedMillimetersPerUnit) > Epsilon)
         {
-            return "cm";
+            error = $"SPATIAL_UNIT_INCOMPATIBLE: UnitScale {configuredUnitScale.ToString("R", System.Globalization.CultureInfo.InvariantCulture)} mm/unit conflicts with bundle unit '{symbol}' fixed ratio {fixedMillimetersPerUnit.ToString("R", System.Globalization.CultureInfo.InvariantCulture)} mm/unit.";
+            return false;
         }
 
-        if (token is "um" or "micrometer" or "micrometers")
+        var diagnostics = new List<string>
         {
-            return "um";
+            $"WorldUnitContract: bundle unit '{symbol}' => {fixedMillimetersPerUnit.ToString("R", System.Globalization.CultureInfo.InvariantCulture)} mm/unit."
+        };
+        if (unitScaleExplicitlyConfigured)
+        {
+            diagnostics.Add("WorldUnitContract: explicit UnitScale matches known physical unit ratio.");
         }
 
-        return Math.Abs(unitScale - 1.0) <= Epsilon ? "mm" : "world_unit";
+        contract = new WorldUnitContract(spatialUnit, symbol, fixedMillimetersPerUnit, diagnostics);
+        return true;
     }
 
-    public static SpatialUnitV1 ResolveWorldSpatialUnit(string? rawUnit, double unitScale)
+    public static string NormalizeWorldUnit(string? rawUnit, double unitScale)
+    {
+        return TryResolveKnownWorldUnit(rawUnit, out _, out var symbol, out _)
+            ? symbol
+            : throw new InvalidOperationException($"Unsupported world unit '{rawUnit}'.");
+    }
+
+    public static bool TryGetMillimetersPerUnit(
+        SpatialUnitV1 unit,
+        out double millimetersPerUnit,
+        out string unitSymbol,
+        out string error)
+    {
+        error = string.Empty;
+        (millimetersPerUnit, unitSymbol) = unit switch
+        {
+            SpatialUnitV1.Millimeter => (1.0, "mm"),
+            SpatialUnitV1.Centimeter => (10.0, "cm"),
+            SpatialUnitV1.Meter => (1000.0, "m"),
+            SpatialUnitV1.Micrometer => (0.001, "um"),
+            _ => (double.NaN, string.Empty)
+        };
+
+        if (double.IsFinite(millimetersPerUnit))
+        {
+            return true;
+        }
+
+        error = $"SPATIAL_UNIT_INCOMPATIBLE: World2D unit '{unit}' is not a supported physical unit.";
+        return false;
+    }
+
+    private static bool TryResolveKnownWorldUnit(
+        string? rawUnit,
+        out SpatialUnitV1 spatialUnit,
+        out string unitSymbol,
+        out double millimetersPerUnit)
     {
         var token = string.IsNullOrWhiteSpace(rawUnit)
             ? string.Empty
             : rawUnit.Trim().ToLowerInvariant();
-        return token switch
+
+        (spatialUnit, unitSymbol, millimetersPerUnit) = token switch
         {
-            "m" or "meter" or "meters" => SpatialUnitV1.Meter,
-            "cm" or "centimeter" or "centimeters" => SpatialUnitV1.Centimeter,
-            "um" or "micrometer" or "micrometers" => SpatialUnitV1.Micrometer,
-            _ => SpatialUnitV1.Millimeter
+            "mm" or "millimeter" or "millimeters" => (SpatialUnitV1.Millimeter, "mm", 1.0),
+            "cm" or "centimeter" or "centimeters" => (SpatialUnitV1.Centimeter, "cm", 10.0),
+            "m" or "meter" or "meters" => (SpatialUnitV1.Meter, "m", 1000.0),
+            "um" or "µm" or "μm" or "micrometer" or "micrometers" => (SpatialUnitV1.Micrometer, "um", 0.001),
+            _ => (SpatialUnitV1.Millimeter, string.Empty, double.NaN)
         };
+
+        return double.IsFinite(millimetersPerUnit);
     }
 
     public static IReadOnlyList<string> DescribeTransformChain(
@@ -447,7 +512,7 @@ public static class SpatialCalibrationTransformService
             targetFrame,
             targetFrame,
             inputFrame.UnitSymbol,
-            NormalizeWorldUnit(request.Bundle.Unit, request.UnitScale),
+            request.WorldUnit.UnitSymbol,
             spatialPath.Count,
             DescribeTransformChain(spatialPath, sourceFrame, targetFrame, SpatialCalibrationTransformMode.PixelToWorld),
             diagnostics.Count > 0,
@@ -466,8 +531,10 @@ public static class SpatialCalibrationTransformService
         result = EmptyResult();
         error = string.Empty;
 
-        if (!TryNormalizeRequestedFrame(
+        if (!TryResolveWorldToPixelInputFrame(
                 request.RequestedInputFrame,
+                request.SpatialContext,
+                request.UseSpatialContextAsWorldInput,
                 targetFrame,
                 out var inputFrame,
                 out var inputDiagnostics,
@@ -513,11 +580,22 @@ public static class SpatialCalibrationTransformService
             return false;
         }
 
+        if (!TryGetMillimetersPerUnit(inputFrame.Unit, out var inputMillimetersPerUnit, out var inputUnitSymbol, out error))
+        {
+            return false;
+        }
+
+        if (!Equals(inputFrame, targetFrame))
+        {
+            diagnostics.Add(
+                $"WorldToPixel input unit authority: PointsSpatialContext frame '{inputFrame.FrameId}' ({inputUnitSymbol}) => {inputMillimetersPerUnit.ToString("R", System.Globalization.CultureInfo.InvariantCulture)} mm/unit.");
+        }
+
         var outputPoints = new List<Point3d>(request.Points.Count);
         foreach (var point in request.Points)
         {
-            var worldXmm = point.X * request.UnitScale;
-            var worldYmm = point.Y * request.UnitScale;
+            var worldXmm = point.X * inputMillimetersPerUnit;
+            var worldYmm = point.Y * inputMillimetersPerUnit;
             if (!request.Runtime.TryApplyInverse(worldXmm, worldYmm, out var sourceX, out var sourceY, out error))
             {
                 error = $"Planar inverse transform failed: {error}";
@@ -545,13 +623,54 @@ public static class SpatialCalibrationTransformService
             sourceFrame,
             targetFrame,
             outputFrame,
-            NormalizeWorldUnit(request.Bundle.Unit, request.UnitScale),
+            inputUnitSymbol,
             outputFrame.UnitSymbol,
             spatialPath.Count,
             DescribeTransformChain(spatialPath, sourceFrame, targetFrame, SpatialCalibrationTransformMode.WorldToPixel),
             diagnostics.Count > 0,
             diagnostics);
         return true;
+    }
+
+    private static bool TryResolveWorldToPixelInputFrame(
+        string? requestedFrame,
+        SpatialContextV1? spatialContext,
+        bool useSpatialContextAsWorldInput,
+        FrameRefV1 defaultFrame,
+        out FrameRefV1 inputFrame,
+        out IReadOnlyList<string> diagnostics,
+        out string error)
+    {
+        if (spatialContext != null && useSpatialContextAsWorldInput)
+        {
+            inputFrame = spatialContext.CurrentFrame;
+            error = string.Empty;
+            var resolvedDiagnostics = new List<string>
+            {
+                $"WorldToPixel input frame resolved from PointsSpatialContext '{inputFrame.FrameId}' ({inputFrame.Kind}, {inputFrame.UnitSymbol})."
+            };
+            if (!IsAutoFrame(requestedFrame))
+            {
+                if (!TryNormalizeRequestedFrame(requestedFrame, defaultFrame, out var requested, out var requestedDiagnostics, out error))
+                {
+                    diagnostics = resolvedDiagnostics;
+                    return false;
+                }
+
+                resolvedDiagnostics.AddRange(requestedDiagnostics);
+                if (requested.Kind != SpatialFrameKindV1.World2D)
+                {
+                    diagnostics = resolvedDiagnostics;
+                    error = $"SPATIAL_FRAME_DIRECTION_INVALID: WorldToPixel input frame must be World2D, got {requested.Kind}.";
+                    return false;
+                }
+            }
+
+            diagnostics = resolvedDiagnostics;
+            return true;
+        }
+
+        return TryNormalizeRequestedFrame(requestedFrame, defaultFrame, out inputFrame, out diagnostics, out error);
     }
 
     public static bool TryResolveInputFrame(
