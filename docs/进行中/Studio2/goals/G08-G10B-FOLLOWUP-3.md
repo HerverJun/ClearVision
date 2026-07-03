@@ -60,8 +60,8 @@
 ## 完成回填
 
 - 完成时间: `2026-07-03 12:45:08 +08:00`
-- Final SHA: 见本轮最终报告三方 SHA
-- 远端 SHA: 见本轮最终报告三方 SHA
+- Final SHA: `915f97f79e6f299ff217afa927ae6b217cad6299`
+- 远端 SHA: `915f97f79e6f299ff217afa927ae6b217cad6299`
 - 修改文件:
   - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs`
   - `ClearVision.Product/src/ClearVision.Product.Desktop/Observation/ExecutionObservationProjector.cs`

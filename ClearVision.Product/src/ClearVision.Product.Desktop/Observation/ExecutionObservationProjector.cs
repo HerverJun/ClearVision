@@ -161,6 +161,14 @@ public static class ExecutionObservationProjector
         {
             SchemaVersion = visualScene.SchemaVersion,
             CoordinateSpace = visualScene.CoordinateSpace,
+            FrameId = visualScene.FrameId,
+            FrameKind = visualScene.FrameKind,
+            Unit = visualScene.Unit,
+            WorldMinX = visualScene.WorldMinX,
+            WorldMinY = visualScene.WorldMinY,
+            WorldMaxX = visualScene.WorldMaxX,
+            WorldMaxY = visualScene.WorldMaxY,
+            WorldToSceneScale = visualScene.WorldToSceneScale,
             ImageWidth = visualScene.ImageWidth,
             ImageHeight = visualScene.ImageHeight,
             Primitives = primitives,
@@ -265,7 +273,9 @@ public static class ExecutionObservationProjector
             Style = primitive.Style,
             OutputPortId = primitive.OutputPortId,
             ResultPathVersion = primitive.ResultPathVersion,
-            ResultPath = primitive.ResultPath
+            ResultPath = primitive.ResultPath,
+            FrameId = primitive.FrameId,
+            Unit = primitive.Unit
         };
 
     public static Dictionary<string, object> BuildLegacyOutputData(
@@ -1571,10 +1581,9 @@ public static class ExecutionObservationProjector
     private static bool LooksLikeMaskOrImagePayload(Type type)
     {
         var name = type.Name;
-        var fullName = type.FullName ?? name;
         return name.Contains("Mask", StringComparison.OrdinalIgnoreCase) ||
                name.Contains("ImageWrapper", StringComparison.OrdinalIgnoreCase) ||
-               fullName.Contains("OpenCvSharp", StringComparison.OrdinalIgnoreCase);
+               name.EndsWith("Mat", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsKnownGenericList(Type type) =>

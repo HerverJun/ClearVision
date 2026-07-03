@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T10:28:07.0087621\u002B08:00",
+  "generatedAt": "2026-07-03T14:28:34.0693635\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -5179,6 +5179,11 @@
           "version": "1.0.0",
           "sourceHash": "14DE665861878A5D950405D0715BBAF4813C969C5045851FE7838822A43FEE38",
           "recordedAt": "2026-06-25T11:35:53.9102407\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "65AE6421AE2F400F4070114CFF857DB38D8DAB1C5BA4135C1FF2B5BF19365CC4",
+          "recordedAt": "2026-07-03T14:28:34.0693635\u002B08:00"
         }
       ]
     },

@@ -17,9 +17,12 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Operators;
+using ClearVision.Product.Tests.TestData;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 using Xunit;
 
 namespace ClearVision.Product.Tests.Services;
@@ -1050,6 +1053,85 @@ public class FlowExecutionServiceTests
         middleInputs![RoiManagerOperator.ImageSpatialContextInputKey].Should().BeSameAs(sourceContext);
         targetInputs.Should().NotBeNull();
         targetInputs![RoiManagerOperator.ImageSpatialContextInputKey].Should().BeSameAs(relayedContext);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_ShouldPropagateRoiCropSpatialContextIntoPixelToWorldChain()
+    {
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.ImageAcquisition);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        sourceExecutor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(OperatorExecutionOutput.Success(
+                new Dictionary<string, object>
+                {
+                    ["Image"] = TestHelpers.CreateTestImage(width: 80, height: 80)
+                },
+                executionTimeMs: 5)));
+
+        var roiExecutor = new RoiManagerOperator(Substitute.For<ILogger<RoiManagerOperator>>());
+        var pixelToWorldExecutor = new PixelToWorldTransformOperator(Substitute.For<ILogger<PixelToWorldTransformOperator>>());
+        using var sut = new FlowExecutionService(
+            new IOperatorExecutor[] { sourceExecutor, roiExecutor, pixelToWorldExecutor },
+            _logger,
+            _variableContext);
+
+        var flow = new OperatorFlow("RoiCropToPixelToWorld");
+        var source = new Operator("ImageSource", OperatorType.ImageAcquisition, 0, 0);
+        source.AddOutputPort("Image", PortDataType.Image);
+
+        var roi = new Operator("Crop", OperatorType.RoiManager, 0, 0);
+        roi.AddInputPort("Image", PortDataType.Image);
+        roi.AddOutputPort("Image", PortDataType.Image);
+        roi.AddOutputPort(RoiManagerOperator.SpatialContextOutputKey, PortDataType.Any);
+        roi.AddParameter(TestHelpers.CreateParameter("Operation", "Crop"));
+        roi.AddParameter(TestHelpers.CreateParameter("Shape", "Rectangle"));
+        roi.AddParameter(TestHelpers.CreateParameter("X", 10));
+        roi.AddParameter(TestHelpers.CreateParameter("Y", 20));
+        roi.AddParameter(TestHelpers.CreateParameter("Width", 40));
+        roi.AddParameter(TestHelpers.CreateParameter("Height", 30));
+
+        var pixelToWorld = new Operator("PixelToWorld", OperatorType.PixelToWorldTransform, 0, 0);
+        pixelToWorld.AddInputPort("Image", PortDataType.Image, isRequired: false);
+        pixelToWorld.AddOutputPort("Image", PortDataType.Image);
+        pixelToWorld.AddOutputPort("TransformedPoints", PortDataType.PointList);
+        pixelToWorld.AddOutputPort("TransformResult", PortDataType.Any);
+        pixelToWorld.AddParameter(TestHelpers.CreateParameter("TransformMode", "PixelToWorld"));
+        pixelToWorld.AddParameter(TestHelpers.CreateParameter("InputPointX", 2.0));
+        pixelToWorld.AddParameter(TestHelpers.CreateParameter("InputPointY", 4.0));
+        pixelToWorld.AddParameter(TestHelpers.CreateParameter("CalibrationData", CalibrationBundleV2TestData.CreateAcceptedScaleOffsetBundleJson()));
+
+        flow.AddOperator(source);
+        flow.AddOperator(roi);
+        flow.AddOperator(pixelToWorld);
+        flow.AddConnection(new OperatorConnection(
+            source.Id,
+            source.OutputPorts.Single(port => port.Name == "Image").Id,
+            roi.Id,
+            roi.InputPorts.Single(port => port.Name == "Image").Id));
+        flow.AddConnection(new OperatorConnection(
+            roi.Id,
+            roi.OutputPorts.Single(port => port.Name == "Image").Id,
+            pixelToWorld.Id,
+            pixelToWorld.InputPorts.Single(port => port.Name == "Image").Id));
+
+        var result = await sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var pixelResult = result.OperatorResults.Single(item => item.OperatorId == pixelToWorld.Id);
+        pixelResult.IsSuccess.Should().BeTrue(pixelResult.ErrorMessage);
+        var worldPoint = ((List<Point3d>)pixelResult.OutputData!["TransformedPoints"]).Single();
+        worldPoint.X.Should().BeApproximately(0.24, 1e-9);
+        worldPoint.Y.Should().BeApproximately(0.48, 1e-9);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(pixelResult.OutputData["TransformResult"]);
+        transformResult["InputFrame"].Should().Be($"roi.local.{roi.Id:N}.image");
+        Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(1);
+        var pointsContext = Assert.IsType<SpatialContextV1>(pixelResult.OutputData["TransformedPointsSpatialContext"]);
+        pointsContext.Binding.SourceOperatorId.Should().Be(pixelToWorld.Id);
+        pointsContext.Binding.OutputPortId.Should().Be(pixelToWorld.OutputPorts.Single(port => port.Name == "TransformedPoints").Id);
     }
 
     [Fact]

@@ -894,6 +894,128 @@ public sealed class ExecutionObservationProjectorTests
         scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-primitive-limit");
     }
 
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectPixelToWorldPointsOnWorldNeutralPlane()
+    {
+        var targetOperator = CreateOperator(OperatorType.PixelToWorldTransform, []);
+        var transformedPortId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var outputPorts = new[]
+        {
+            new ExecutionObservationOutputPortV1
+            {
+                Id = transformedPortId,
+                Name = "TransformedPoints"
+            }
+        };
+        var worldPoints = new List<Point3d>
+        {
+            new(-12.5, 4.0, 0),
+            new(25.0, -8.0, 0)
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 320,
+                ["Height"] = 240,
+                ["TransformedPoints"] = worldPoints,
+                ["TransformResult"] = new Dictionary<string, object>
+                {
+                    ["TransformMode"] = "PixelToWorld",
+                    ["InputFrame"] = "roi.local.depth2",
+                    ["CalibrationSourceFrame"] = "image.full",
+                    ["CalibrationTargetFrame"] = "world.2d",
+                    ["OutputFrame"] = "world.2d",
+                    ["OutputUnit"] = "mm",
+                    ["BundleId"] = "bundle-world",
+                    ["Diagnostics"] = new List<string> { "Compatibility frame mapping: 'image' -> 'image.full' (ImageFull, px)." }
+                }
+            },
+            outputPorts,
+            targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.CoordinateSpace.Should().Be("world.2d.neutral-plane");
+        scene.FrameId.Should().Be("world.2d");
+        scene.FrameKind.Should().Be("World2D");
+        scene.Unit.Should().Be("mm");
+        scene.ImageWidth.Should().Be(512);
+        scene.ImageHeight.Should().Be(512);
+        scene.WorldMinX.Should().Be(-12.5);
+        scene.WorldMaxX.Should().Be(25.0);
+        scene.WorldMinY.Should().Be(-8.0);
+        scene.WorldMaxY.Should().Be(4.0);
+        scene.Diagnostics.Should().Contain(item =>
+            item.Code == "visual-scene-pixel-to-world-world2d" &&
+            item.Message.Contains("BundleId=bundle-world", StringComparison.Ordinal));
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-frame-compatibility");
+
+        var first = scene.Primitives.Should().ContainSingle(primitive => primitive.PrimitiveId == "pixel-to-world:world-point:0").Subject;
+        first.Selectable.Should().BeTrue();
+        first.OutputPortId.Should().Be(transformedPortId);
+        first.ResultPathVersion.Should().Be(1);
+        first.ResultPath.Should().Be("$[0]");
+        first.FrameId.Should().Be("world.2d");
+        first.Unit.Should().Be("mm");
+        first.Geometry.WorldX.Should().Be(-12.5);
+        first.Geometry.WorldY.Should().Be(4.0);
+        first.Geometry.X.Should().BeGreaterThanOrEqualTo(0);
+        first.Geometry.Y.Should().BeGreaterThanOrEqualTo(0);
+        first.Geometry.X.Should().BeLessThanOrEqualTo(512);
+        first.Geometry.Y.Should().BeLessThanOrEqualTo(512);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectWorldToPixelPointsInImageCoordinateSpace()
+    {
+        var targetOperator = CreateOperator(OperatorType.PixelToWorldTransform, []);
+        var transformedPortId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var outputPorts = new[]
+        {
+            new ExecutionObservationOutputPortV1
+            {
+                Id = transformedPortId,
+                Name = "TransformedPoints"
+            }
+        };
+        var pixelPoints = new List<Position> { new(42.0, 17.0) };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 320,
+                ["Height"] = 240,
+                ["TransformedPoints"] = pixelPoints,
+                ["TransformResult"] = new Dictionary<string, object>
+                {
+                    ["TransformMode"] = "WorldToPixel",
+                    ["InputFrame"] = "world.2d",
+                    ["CalibrationSourceFrame"] = "image.full",
+                    ["CalibrationTargetFrame"] = "world.2d",
+                    ["OutputFrame"] = "image.full",
+                    ["OutputUnit"] = "px",
+                    ["BundleId"] = "bundle-world-to-pixel"
+                }
+            },
+            outputPorts,
+            targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.CoordinateSpace.Should().Be("image.pixel");
+        scene.ImageWidth.Should().Be(320);
+        scene.ImageHeight.Should().Be(240);
+        scene.Diagnostics.Should().Contain(item => item.Code == "visual-scene-pixel-to-world-image-frame");
+        var primitive = scene.Primitives.Should().ContainSingle().Subject;
+        primitive.OutputPortId.Should().Be(transformedPortId);
+        primitive.ResultPath.Should().Be("$[0]");
+        primitive.FrameId.Should().Be("image.full");
+        primitive.Unit.Should().Be("px");
+        primitive.Geometry.X.Should().Be(42.0);
+        primitive.Geometry.Y.Should().Be(17.0);
+    }
+
     private static ExecutionObservationEnvelopeV1 CreateObservation(
         IReadOnlyDictionary<string, object> outputData,
         IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts = null,

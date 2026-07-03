@@ -50,9 +50,9 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G10C`
-- 当前卡片：`docs/进行中/Studio2/goals/G10C.md`
-- 当前阶段：`Geometry/Spatial`
+- 当前 Goal：`G11A`
+- 当前卡片：`docs/进行中/Studio2/goals/G11A.md`
+- 当前阶段：`Vertical Product`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
@@ -105,8 +105,8 @@
 | G08-G10B-FOLLOWUP | Geometry/Spatial | Visual Geometry 与 SpatialContext 联合收口 | DONE | G10B | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP.md` | 见 G08-G10B-FOLLOWUP 完成提交与最终报告 |
 | G08-G10B-FOLLOWUP-2 | Geometry/Spatial | Scene 定位与 Spatial fail-closed 最终收口 | DONE | G08-G10B-FOLLOWUP | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP-2.md` | 见本轮最终报告；未执行 G10C |
 | G08-G10B-FOLLOWUP-3 | Geometry/Spatial | Spatial 通用传播与 Scene 有界诊断收口 | DONE | G08-G10B-FOLLOWUP-2 | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP-3.md` | 见本轮最终报告；未执行 G10C |
-| G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | READY | G08-G10B-FOLLOWUP-3 | `docs/进行中/Studio2/goals/G10C.md` |  |
-| G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | LOCKED | G10C | `docs/进行中/Studio2/goals/G11A.md` |  |
+| G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | DONE | G08-G10B-FOLLOWUP-3 | `docs/进行中/Studio2/goals/G10C.md` | 见 G10C 完成提交与最终报告 |
+| G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | READY | G10C | `docs/进行中/Studio2/goals/G11A.md` |  |
 | G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | LOCKED | G11A | `docs/进行中/Studio2/goals/G11B.md` |  |
 | G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | LOCKED | G11B | `docs/进行中/Studio2/goals/G11C.md` |  |
 | G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | LOCKED | G11C | `docs/进行中/Studio2/goals/G12A.md` |  |
@@ -166,6 +166,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-03 | G10C | `915f97f79e6f299ff217afa927ae6b217cad6299` | 提交后核对 | Desktop Debug build PASS；Product focused PixelToWorld/FlowExecution PASS（54 tests）；Desktop focused ExecutionObservationProjector PASS（30 tests）；Phase42 regression PASS（116 tests）；Calibration regression PASS（99 tests）；Services regression PASS（61 tests）；`git diff --check` PASS；process audit PASS after build-server shutdown（no residual dotnet/testhost）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | PixelToWorld 使用统一 Spatial/Calibration resolver 接通 ROI local/ImageFull/Undistorted 到 World2D，planar 与 ray-plane 路径均 fail-closed 且输出 frame/unit/bundle traceability；Scene 增加 World2D neutral plane 与 frame-aware diagnostics；无新增 CalibrationArtifact，未在前端重复世界坐标计算；当前 Goal 已推进到 G11A READY。 |
 | 2026-07-03 | G08-G10B-FOLLOWUP-3 | `64235d6d925189b9d2fc2ebf153bdc53b0e4a872` | 见本轮最终报告 | Product focused sidecar 回归 PASS（199 tests）；Desktop focused Scene/Preview/Architecture PASS（90 tests）；Product full serial PASS（3164 passed, 4 skipped）；Desktop full serial PASS（464 tests）；UI `test:unit` PASS（610 tests）；`test:preview-smoke` PASS；Playwright `roi-editor.spec.ts` PASS（17 tests）与 `node-preview.spec.ts` PASS（12 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS（no source maps/TS/TSX/Vue/package config；`wwwroot/src` JS/CSS 与 PDB 保持现有发布形态）；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 SpatialContext 通用传播与 Scene 有界诊断：Image target 不再按目标 OperatorType 硬编码；sidecar 按当前源输出端口与 binding 隔离，其他端口 malformed 不污染当前连接；sequential/AutoSafeParallel/debug/cache 目标 executor 前 fail-closed；Scene diagnostics 最终上限 64 并输出 aggregate truncation diagnostic；ROI editor 未释放拖拽在 preview/节点/销毁切换时取消且迟到旧 preview 不覆盖新图；G10C 已置 READY，未执行 G10C。 |
 | 2026-07-03 | G08-G10B-FOLLOWUP | `6a0a18bdd398dda71849bdc7715e01737f8ea4a0` | 见 G08-G10B-FOLLOWUP 完成提交与最终报告 | UI `test:unit` PASS（605 tests）；`test:preview-smoke` PASS；Playwright node-preview + roi-editor PASS（24 tests）；Product focused ResultPath/ProjectVariables/Schema/FlowExecution/RoiManager/Spatial/NPoint/Polar PASS（147 tests）；Desktop focused Observation/Preview/Artifact/Continuous/Architecture PASS（85 tests）；Product full serial PASS（3150 passed, 4 skipped）；Desktop full serial PASS（459 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish asset/source/dev artifact audit PASS（0 prohibited）；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G08-G10B 之间的 Visual Geometry/SpatialContext 一致性缺口：Scene 底图按尺寸验证或 neutral plane fail-closed，RoiManager Scene 投影真实 Rectangle/Circle/Polygon 和独立 Crop Bounds，selectable primitive 必须有 canonical ResultPath；ResultPath V1 支持 canonical `[index]`；ROI pointer capture/cancel/destroy 生命周期只在 commit 写入；Circle/Annulus/Arc no-op round-trip 保留 raw 参数；PointSequence 不再空白新增或伪造 world 坐标；SpatialContext sidecar 按连接端口和 binding 精确传播到 input-scoped key；G10C 已置 READY，未执行 G10C。 |
 | 2026-07-03 | G10B | `68acaca16e8c0c71162bb8bb1bcc1c89372fa0eb` | 见 G10B 完成提交与最终报告 | Product focused RoiManager/SpatialContext PASS（18 tests）；Desktop focused ExecutionObservationProjector PASS（22 tests）；Product targeted RoiManager/SpatialContext/FlowExecution sidecar PASS（19 tests）；Product targeted SpatialContext/PixelToWorld/CalibrationV2/LegacyCalibration/FlowExecution PASS（39 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（84 tests）；`git diff --check` PASS；process audit PASS after compiler-server cleanup（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | RoiManager Rectangle/Circle/Polygon Crop 输出 clamped local→parent sidecar，Mask 保持 full-frame 语义，FlowExecutionService 既有 output propagation 传递 `SpatialContext` sidecar，Scene 可按 sidecar 将 Crop 结果投回 Full Image；当前 Goal 已推进到 G10C READY，未执行 G10C。 |

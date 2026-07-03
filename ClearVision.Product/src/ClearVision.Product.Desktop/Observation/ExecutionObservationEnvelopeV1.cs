@@ -246,18 +246,50 @@ public sealed class ExecutionVisualSceneV1
     public string CoordinateSpace { get; init; } = "image.pixel";
 
     [JsonPropertyOrder(2)]
-    public int ImageWidth { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FrameId { get; init; }
 
     [JsonPropertyOrder(3)]
-    public int ImageHeight { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FrameKind { get; init; }
 
     [JsonPropertyOrder(4)]
-    public List<ExecutionVisualScenePrimitiveV1> Primitives { get; init; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Unit { get; init; }
 
     [JsonPropertyOrder(5)]
-    public List<ExecutionVisualSceneDiagnosticV1> Diagnostics { get; init; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldMinX { get; init; }
 
     [JsonPropertyOrder(6)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldMinY { get; init; }
+
+    [JsonPropertyOrder(7)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldMaxX { get; init; }
+
+    [JsonPropertyOrder(8)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldMaxY { get; init; }
+
+    [JsonPropertyOrder(9)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldToSceneScale { get; init; }
+
+    [JsonPropertyOrder(10)]
+    public int ImageWidth { get; init; }
+
+    [JsonPropertyOrder(11)]
+    public int ImageHeight { get; init; }
+
+    [JsonPropertyOrder(12)]
+    public List<ExecutionVisualScenePrimitiveV1> Primitives { get; init; } = new();
+
+    [JsonPropertyOrder(13)]
+    public List<ExecutionVisualSceneDiagnosticV1> Diagnostics { get; init; } = new();
+
+    [JsonPropertyOrder(14)]
     public bool Truncated { get; init; }
 }
 
@@ -302,6 +334,14 @@ public sealed class ExecutionVisualScenePrimitiveV1
     [JsonPropertyOrder(11)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ResultPath { get; init; }
+
+    [JsonPropertyOrder(12)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FrameId { get; init; }
+
+    [JsonPropertyOrder(13)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Unit { get; init; }
 }
 
 public sealed class ExecutionVisualSceneGeometryV1
@@ -332,6 +372,15 @@ public sealed class ExecutionVisualSceneGeometryV1
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Text { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldX { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldY { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WorldZ { get; init; }
 }
 
 public sealed class ExecutionVisualScenePointV1

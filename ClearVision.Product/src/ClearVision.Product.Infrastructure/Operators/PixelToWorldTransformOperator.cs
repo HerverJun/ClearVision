@@ -26,6 +26,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("TransformedPoints", "Transformed Points", PortDataType.PointList)]
 [OutputPort("TransformResult", "Transform Result Details", PortDataType.Any)]
 [OperatorParam("TransformMode", "Transform Mode", "enum", DefaultValue = "PixelToWorld", Options = new[] { "PixelToWorld|Pixel to World", "WorldToPixel|World to Pixel" })]
+[OperatorParam("InputFrame", "Input Frame", "enum", DefaultValue = "Auto", Options = new[] { "Auto|Auto", "ImageFull|Image Full", "RoiLocal|ROI Local", "Undistorted|Undistorted", "World2D|World 2D" })]
+[OperatorParam("OutputFrame", "Output Frame", "enum", DefaultValue = "Auto", Options = new[] { "Auto|Auto", "ImageFull|Image Full", "RoiLocal|ROI Local", "Undistorted|Undistorted", "World2D|World 2D" })]
 [OperatorParam("WorldPlaneZ", "World Plane Z (mm)", "double", DefaultValue = 0.0)]
 [OperatorParam("UnitScale", "Unit Scale (mm per unit)", "double", DefaultValue = 1.0, Min = 0.0001, Max = 10000.0)]
 [OperatorParam("InputPointX", "Input Point X (Single Point Mode)", "double", DefaultValue = 0.0)]
@@ -58,6 +60,8 @@ public class PixelToWorldTransformOperator : OperatorBase
 
         var worldPlaneZ = GetDoubleParam(@operator, "WorldPlaneZ", 0.0);
         var configuredUnitScale = GetDoubleParam(@operator, "UnitScale", 1.0);
+        var requestedInputFrame = GetStringParam(@operator, "InputFrame", "Auto");
+        var requestedOutputFrame = GetStringParam(@operator, "OutputFrame", "Auto");
         var useDistortion = GetBoolParam(@operator, "UseDistortion", true);
         var generateReport = GetBoolParam(@operator, "GenerateReport", true);
 
@@ -86,23 +90,36 @@ public class PixelToWorldTransformOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure(pointError));
         }
 
+        if (!TryResolveInputSpatialContext(inputs, out var spatialContext, out var spatialContextError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(spatialContextError));
+        }
+
         if (bundle.Transform2D != null)
         {
             return Task.FromResult(ExecutePlanarPath(
+                @operator,
                 inputs,
                 bundle,
                 inputPoints,
+                spatialContext,
                 isPixelToWorld,
+                requestedInputFrame,
+                requestedOutputFrame,
                 worldPlaneZ,
                 unitScale,
                 generateReport));
         }
 
         return Task.FromResult(ExecuteRayPlanePath(
+            @operator,
             inputs,
             bundle,
             inputPoints,
+            spatialContext,
             isPixelToWorld,
+            requestedInputFrame,
+            requestedOutputFrame,
             worldPlaneZ,
             unitScale,
             useDistortion,
@@ -159,10 +176,14 @@ public class PixelToWorldTransformOperator : OperatorBase
     }
 
     private OperatorExecutionOutput ExecutePlanarPath(
+        Operator @operator,
         Dictionary<string, object>? inputs,
         CalibrationBundleV2 bundle,
         IReadOnlyList<Point3d> inputPoints,
+        SpatialContextV1? spatialContext,
         bool isPixelToWorld,
+        string? requestedInputFrame,
+        string? requestedOutputFrame,
         double worldPlaneZ,
         double unitScale,
         bool generateReport)
@@ -182,55 +203,56 @@ public class PixelToWorldTransformOperator : OperatorBase
             return OperatorExecutionOutput.Failure(runtimeError);
         }
 
-        var outputPoints = new List<Point3d>(inputPoints.Count);
-        foreach (var point in inputPoints)
+        if (!SpatialCalibrationTransformService.TryTransformPlanar(
+                new SpatialCalibrationTransformRequest(
+                    inputPoints,
+                    spatialContext,
+                    bundle,
+                    runtime,
+                    isPixelToWorld
+                        ? SpatialCalibrationTransformMode.PixelToWorld
+                        : SpatialCalibrationTransformMode.WorldToPixel,
+                    worldPlaneZ,
+                    unitScale,
+                    requestedInputFrame,
+                    requestedOutputFrame),
+                out var transformResult,
+                out var transformError))
         {
-            if (isPixelToWorld)
-            {
-                if (!runtime.TryApplyForward(point.X, point.Y, out var worldXmm, out var worldYmm, out var applyError))
-                {
-                    return OperatorExecutionOutput.Failure($"Planar forward transform failed: {applyError}");
-                }
-
-                outputPoints.Add(new Point3d(worldXmm / unitScale, worldYmm / unitScale, worldPlaneZ / unitScale));
-            }
-            else
-            {
-                var worldXmm = point.X * unitScale;
-                var worldYmm = point.Y * unitScale;
-                if (!runtime.TryApplyInverse(worldXmm, worldYmm, out var pixelX, out var pixelY, out var applyError))
-                {
-                    return OperatorExecutionOutput.Failure($"Planar inverse transform failed: {applyError}");
-                }
-
-                outputPoints.Add(new Point3d(pixelX, pixelY, 0));
-            }
+            return OperatorExecutionOutput.Failure(transformError);
         }
 
         var accuracyReport = generateReport
-            ? BuildPlanarAccuracyReport(runtime, inputPoints, outputPoints, isPixelToWorld, unitScale, null)
+            ? BuildPlanarAccuracyReport(runtime, inputPoints, transformResult.OutputPoints, isPixelToWorld, unitScale, transformResult.Diagnostics)
             : null;
 
         return BuildSuccessOutput(
+            @operator,
             inputs,
             inputPoints,
-            outputPoints,
+            transformResult.OutputPoints,
             isPixelToWorld ? "PixelToWorld" : "WorldToPixel",
             "PlanarTransform2D",
             runtime.Model.ToString(),
             bundle,
+            transformResult,
+            spatialContext,
             worldPlaneZ,
             unitScale,
             generateReport,
             accuracyReport,
-            additionalDiagnostics: null);
+            transformResult.Diagnostics);
     }
 
     private OperatorExecutionOutput ExecuteRayPlanePath(
+        Operator @operator,
         Dictionary<string, object>? inputs,
         CalibrationBundleV2 bundle,
         IReadOnlyList<Point3d> inputPoints,
+        SpatialContextV1? spatialContext,
         bool isPixelToWorld,
+        string? requestedInputFrame,
+        string? requestedOutputFrame,
         double worldPlaneZ,
         double unitScale,
         bool useDistortion,
@@ -247,45 +269,49 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         var diagnostics = new List<string>();
+        if (!TryResolveRayPlaneCalibrationFrames(
+                bundle,
+                out var calibrationSourceFrame,
+                out var calibrationTargetFrame,
+                out var frameDiagnostics,
+                out var frameError))
+        {
+            return OperatorExecutionOutput.Failure(frameError);
+        }
+
+        diagnostics.AddRange(frameDiagnostics);
         if (distortion.Enabled)
         {
             diagnostics.Add($"Distortion model applied in ray-plane PixelToWorld path: {distortion.Model}.");
         }
 
-        var outputPoints = new List<Point3d>(inputPoints.Count);
-        foreach (var point in inputPoints)
+        if (!TryExecuteRayPlaneTransform(
+                inputPoints,
+                spatialContext,
+                context,
+                distortion,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                isPixelToWorld,
+                requestedInputFrame,
+                requestedOutputFrame,
+                worldPlaneZ,
+                unitScale,
+                bundle.Unit,
+                diagnostics,
+                out var outputPoints,
+                out var frameResult,
+                out var transformError))
         {
-            if (isPixelToWorld)
-            {
-                if (!TryPixelToWorldByRayPlane(context, distortion, point.X, point.Y, worldPlaneZ, out var worldPointMm, out var error))
-                {
-                    return OperatorExecutionOutput.Failure($"Ray-plane PixelToWorld failed: {error}");
-                }
-
-                outputPoints.Add(new Point3d(
-                    worldPointMm.X / unitScale,
-                    worldPointMm.Y / unitScale,
-                    worldPointMm.Z / unitScale));
-            }
-            else
-            {
-                var hasExplicitZ = Math.Abs(point.Z) > Epsilon;
-                var worldZmm = hasExplicitZ ? point.Z * unitScale : worldPlaneZ;
-                var worldPointMm = new Point3d(point.X * unitScale, point.Y * unitScale, worldZmm);
-                if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var pixelPoint, out var error))
-                {
-                    return OperatorExecutionOutput.Failure($"Ray-plane WorldToPixel failed: {error}");
-                }
-
-                outputPoints.Add(new Point3d(pixelPoint.X, pixelPoint.Y, 0));
-            }
+            return OperatorExecutionOutput.Failure(transformError);
         }
 
         var accuracyReport = generateReport
-            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, diagnostics)
+            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, frameResult.Diagnostics)
             : null;
 
         return BuildSuccessOutput(
+            @operator,
             inputs,
             inputPoints,
             outputPoints,
@@ -293,14 +319,303 @@ public class PixelToWorldTransformOperator : OperatorBase
             "RayPlaneIntersection",
             "Projection",
             bundle,
+            frameResult,
+            spatialContext,
             worldPlaneZ,
             unitScale,
             generateReport,
             accuracyReport,
-            diagnostics);
+            frameResult.Diagnostics);
     }
 
+    private static bool TryExecuteRayPlaneTransform(
+        IReadOnlyList<Point3d> inputPoints,
+        SpatialContextV1? spatialContext,
+        RayPlaneContext context,
+        DistortionContext distortion,
+        FrameRefV1 calibrationSourceFrame,
+        FrameRefV1 calibrationTargetFrame,
+        bool isPixelToWorld,
+        string? requestedInputFrame,
+        string? requestedOutputFrame,
+        double worldPlaneZ,
+        double unitScale,
+        string? worldUnit,
+        IReadOnlyList<string> baseDiagnostics,
+        out IReadOnlyList<Point3d> outputPoints,
+        out SpatialCalibrationTransformResult frameResult,
+        out string error)
+    {
+        outputPoints = Array.Empty<Point3d>();
+        frameResult = new SpatialCalibrationTransformResult(
+            Array.Empty<Point3d>(),
+            calibrationSourceFrame,
+            calibrationSourceFrame,
+            calibrationTargetFrame,
+            calibrationTargetFrame,
+            calibrationSourceFrame.UnitSymbol,
+            calibrationTargetFrame.UnitSymbol,
+            0,
+            Array.Empty<string>(),
+            false,
+            baseDiagnostics);
+        error = string.Empty;
+
+        return isPixelToWorld
+            ? TryExecuteRayPlanePixelToWorld(
+                inputPoints,
+                spatialContext,
+                context,
+                distortion,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                requestedInputFrame,
+                worldPlaneZ,
+                unitScale,
+                worldUnit,
+                baseDiagnostics,
+                out outputPoints,
+                out frameResult,
+                out error)
+            : TryExecuteRayPlaneWorldToPixel(
+                inputPoints,
+                spatialContext,
+                context,
+                distortion,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                requestedInputFrame,
+                requestedOutputFrame,
+                worldPlaneZ,
+                unitScale,
+                worldUnit,
+                baseDiagnostics,
+                out outputPoints,
+                out frameResult,
+                out error);
+    }
+
+    private static bool TryExecuteRayPlanePixelToWorld(
+        IReadOnlyList<Point3d> inputPoints,
+        SpatialContextV1? spatialContext,
+        RayPlaneContext context,
+        DistortionContext distortion,
+        FrameRefV1 calibrationSourceFrame,
+        FrameRefV1 calibrationTargetFrame,
+        string? requestedInputFrame,
+        double worldPlaneZ,
+        double unitScale,
+        string? worldUnit,
+        IReadOnlyList<string> baseDiagnostics,
+        out IReadOnlyList<Point3d> outputPoints,
+        out SpatialCalibrationTransformResult frameResult,
+        out string error)
+    {
+        outputPoints = Array.Empty<Point3d>();
+        frameResult = EmptyRayPlaneResult(baseDiagnostics, calibrationSourceFrame, calibrationTargetFrame);
+        error = string.Empty;
+
+        if (!SpatialCalibrationTransformService.TryResolveInputFrame(
+                requestedInputFrame,
+                spatialContext,
+                calibrationSourceFrame,
+                out var inputFrame,
+                out var inputDiagnostics,
+                out error))
+        {
+            return false;
+        }
+
+        var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
+        if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                spatialContext,
+                inputFrame,
+                calibrationSourceFrame,
+                allowInverse: false,
+                out var inputToCalibration,
+                out var spatialPath,
+                out error))
+        {
+            return false;
+        }
+
+        var transformed = new List<Point3d>(inputPoints.Count);
+        foreach (var point in inputPoints)
+        {
+            if (!inputToCalibration.TryApply(point.X, point.Y, out var pixelX, out var pixelY, out error))
+            {
+                error = $"Spatial input transform failed: {error}";
+                return false;
+            }
+
+            if (!TryPixelToWorldByRayPlane(context, distortion, pixelX, pixelY, worldPlaneZ, out var worldPointMm, out error))
+            {
+                error = $"Ray-plane PixelToWorld failed: {error}";
+                return false;
+            }
+
+            var worldPoint = new Point3d(
+                worldPointMm.X / unitScale,
+                worldPointMm.Y / unitScale,
+                worldPointMm.Z / unitScale);
+            if (!IsFinite(worldPoint))
+            {
+                error = "Ray-plane PixelToWorld produced non-finite output.";
+                return false;
+            }
+
+            transformed.Add(worldPoint);
+        }
+
+        outputPoints = transformed;
+        frameResult = new SpatialCalibrationTransformResult(
+            transformed,
+            inputFrame,
+            calibrationSourceFrame,
+            calibrationTargetFrame,
+            calibrationTargetFrame,
+            inputFrame.UnitSymbol,
+            SpatialCalibrationTransformService.NormalizeWorldUnit(worldUnit, unitScale),
+            spatialPath.Count,
+            SpatialCalibrationTransformService.DescribeTransformChain(
+                spatialPath,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                SpatialCalibrationTransformMode.PixelToWorld),
+            diagnostics.Count > 0,
+            diagnostics);
+        return true;
+    }
+
+    private static bool TryExecuteRayPlaneWorldToPixel(
+        IReadOnlyList<Point3d> inputPoints,
+        SpatialContextV1? spatialContext,
+        RayPlaneContext context,
+        DistortionContext distortion,
+        FrameRefV1 calibrationSourceFrame,
+        FrameRefV1 calibrationTargetFrame,
+        string? requestedInputFrame,
+        string? requestedOutputFrame,
+        double worldPlaneZ,
+        double unitScale,
+        string? worldUnit,
+        IReadOnlyList<string> baseDiagnostics,
+        out IReadOnlyList<Point3d> outputPoints,
+        out SpatialCalibrationTransformResult frameResult,
+        out string error)
+    {
+        outputPoints = Array.Empty<Point3d>();
+        frameResult = EmptyRayPlaneResult(baseDiagnostics, calibrationSourceFrame, calibrationTargetFrame);
+        error = string.Empty;
+
+        if (!SpatialCalibrationTransformService.TryNormalizeRequestedFrame(
+                requestedInputFrame,
+                calibrationTargetFrame,
+                out var inputFrame,
+                out var inputDiagnostics,
+                out error))
+        {
+            return false;
+        }
+
+        var diagnostics = baseDiagnostics.Concat(inputDiagnostics).ToList();
+        if (inputFrame.Kind != SpatialFrameKindV1.World2D)
+        {
+            error = $"WorldToPixel input frame must be World2D, got {inputFrame.Kind}.";
+            return false;
+        }
+
+        if (!SpatialCalibrationTransformService.TryResolveOutputFrame(
+                requestedOutputFrame,
+                spatialContext,
+                calibrationSourceFrame,
+                out var outputFrame,
+                out var outputDiagnostics,
+                out error))
+        {
+            return false;
+        }
+
+        diagnostics.AddRange(outputDiagnostics);
+        if (!SpatialCalibrationTransformService.TryResolveSpatialPathForCalibration(
+                spatialContext,
+                calibrationSourceFrame,
+                outputFrame,
+                allowInverse: true,
+                out var calibrationToOutput,
+                out var spatialPath,
+                out error))
+        {
+            return false;
+        }
+
+        var transformed = new List<Point3d>(inputPoints.Count);
+        foreach (var point in inputPoints)
+        {
+            var hasExplicitZ = Math.Abs(point.Z) > Epsilon;
+            var worldZmm = hasExplicitZ ? point.Z * unitScale : worldPlaneZ;
+            var worldPointMm = new Point3d(point.X * unitScale, point.Y * unitScale, worldZmm);
+            if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var calibrationPixelPoint, out error))
+            {
+                error = $"Ray-plane WorldToPixel failed: {error}";
+                return false;
+            }
+
+            if (!calibrationToOutput.TryApply(calibrationPixelPoint.X, calibrationPixelPoint.Y, out var outputX, out var outputY, out error))
+            {
+                error = $"Spatial output transform failed: {error}";
+                return false;
+            }
+
+            var outputPoint = new Point3d(outputX, outputY, 0);
+            if (!IsFinite(outputPoint))
+            {
+                error = "Ray-plane WorldToPixel produced non-finite output.";
+                return false;
+            }
+
+            transformed.Add(outputPoint);
+        }
+
+        outputPoints = transformed;
+        frameResult = new SpatialCalibrationTransformResult(
+            transformed,
+            inputFrame,
+            calibrationSourceFrame,
+            calibrationTargetFrame,
+            outputFrame,
+            SpatialCalibrationTransformService.NormalizeWorldUnit(worldUnit, unitScale),
+            outputFrame.UnitSymbol,
+            spatialPath.Count,
+            SpatialCalibrationTransformService.DescribeTransformChain(
+                spatialPath,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                SpatialCalibrationTransformMode.WorldToPixel),
+            diagnostics.Count > 0,
+            diagnostics);
+        return true;
+    }
+
+    private static SpatialCalibrationTransformResult EmptyRayPlaneResult(
+        IReadOnlyList<string> diagnostics,
+        FrameRefV1 calibrationSourceFrame,
+        FrameRefV1 calibrationTargetFrame) =>
+        new(
+            Array.Empty<Point3d>(),
+            calibrationSourceFrame,
+            calibrationSourceFrame,
+            calibrationTargetFrame,
+            calibrationTargetFrame,
+            calibrationSourceFrame.UnitSymbol,
+            calibrationTargetFrame.UnitSymbol,
+            0,
+            Array.Empty<string>(),
+            diagnostics.Count > 0,
+            diagnostics);
+
     private OperatorExecutionOutput BuildSuccessOutput(
+        Operator @operator,
         Dictionary<string, object>? inputs,
         IReadOnlyList<Point3d> inputPoints,
         IReadOnlyList<Point3d> outputPoints,
@@ -308,6 +623,8 @@ public class PixelToWorldTransformOperator : OperatorBase
         string path,
         string model,
         CalibrationBundleV2 bundle,
+        SpatialCalibrationTransformResult? frameResult,
+        SpatialContextV1? inputSpatialContext,
         double worldPlaneZ,
         double unitScale,
         bool generateReport,
@@ -319,24 +636,43 @@ public class PixelToWorldTransformOperator : OperatorBase
             ? outputPoints.Select(p => new Point3d(p.X, p.Y, p.Z)).ToList()
             : outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
         var transformedPlanarPoints = outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
+        var transformResult = new Dictionary<string, object>
+        {
+            ["TransformMode"] = transformMode,
+            ["Path"] = path,
+            ["Model"] = model,
+            ["InputCount"] = inputPoints.Count,
+            ["OutputCount"] = outputPoints.Count,
+            ["OutputPointDimension"] = isPixelToWorld ? 3 : 2,
+            ["WorldPlaneZ"] = worldPlaneZ,
+            ["UnitScale"] = unitScale,
+            ["BundleId"] = bundle.BundleId,
+            ["CalibrationVersion"] = bundle.CalibrationVersion,
+            ["DatasetFingerprint"] = bundle.DatasetFingerprint,
+            ["ChecksumSha256"] = bundle.ChecksumSha256,
+            ["CalibrationKind"] = bundle.CalibrationKind.ToString(),
+            ["TransformModel"] = bundle.TransformModel.ToString(),
+            ["SourceFrame"] = bundle.SourceFrame,
+            ["TargetFrame"] = bundle.TargetFrame,
+            ["InputFrame"] = frameResult?.InputFrame.FrameId ?? bundle.SourceFrame,
+            ["CalibrationSourceFrame"] = frameResult?.CalibrationSourceFrame.FrameId ?? bundle.SourceFrame,
+            ["CalibrationTargetFrame"] = frameResult?.CalibrationTargetFrame.FrameId ?? bundle.TargetFrame,
+            ["OutputFrame"] = frameResult?.OutputFrame.FrameId ?? bundle.TargetFrame,
+            ["InputUnit"] = frameResult?.InputUnit ?? (isPixelToWorld ? "px" : SpatialCalibrationTransformService.NormalizeWorldUnit(bundle.Unit, unitScale)),
+            ["OutputUnit"] = frameResult?.OutputUnit ?? (isPixelToWorld ? SpatialCalibrationTransformService.NormalizeWorldUnit(bundle.Unit, unitScale) : "px"),
+            ["AppliedSpatialTransformCount"] = frameResult?.AppliedSpatialTransformCount ?? 0,
+            ["TransformChain"] = frameResult?.TransformChain.ToList() ?? new List<string>(),
+            ["CompatibilityMode"] = frameResult?.CompatibilityMode ?? false,
+            ["Diagnostics"] = additionalDiagnostics?.ToList() ?? new List<string>()
+        };
+
         var resultData = new Dictionary<string, object>
         {
             ["TransformedPoints"] = transformedPoints,
             ["TransformedPlanarPoints"] = transformedPlanarPoints,
-            ["TransformResult"] = new Dictionary<string, object>
-            {
-                ["TransformMode"] = transformMode,
-                ["Path"] = path,
-                ["Model"] = model,
-                ["InputCount"] = inputPoints.Count,
-                ["OutputCount"] = outputPoints.Count,
-                ["OutputPointDimension"] = isPixelToWorld ? 3 : 2,
-                ["WorldPlaneZ"] = worldPlaneZ,
-                ["UnitScale"] = unitScale,
-                ["CalibrationKind"] = bundle.CalibrationKind.ToString(),
-                ["SourceFrame"] = bundle.SourceFrame,
-                ["TargetFrame"] = bundle.TargetFrame
-            }
+            ["TransformResult"] = transformResult,
+            ["TransformedPointsSpatialContext"] = BuildTransformedPointsSpatialContext(@operator, frameResult, transformMode, unitScale),
+            [RoiManagerOperator.SpatialContextOutputKey] = BuildImageSpatialContext(@operator, inputSpatialContext)
         };
 
         if (generateReport)
@@ -361,6 +697,113 @@ public class PixelToWorldTransformOperator : OperatorBase
         }
 
         return OperatorExecutionOutput.Success(CreateImageOutput(visualization, resultData));
+    }
+
+    private static SpatialContextV1 BuildTransformedPointsSpatialContext(
+        Operator @operator,
+        SpatialCalibrationTransformResult? frameResult,
+        string transformMode,
+        double unitScale)
+    {
+        var outputFrame = frameResult?.OutputFrame ??
+            (transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase)
+                ? FrameRefV1.World2D()
+                : FrameRefV1.ImageFull());
+        if (outputFrame.Kind == SpatialFrameKindV1.World2D && Math.Abs(unitScale - 1.0) > Epsilon)
+        {
+            outputFrame = FrameRefV1.World2D(outputFrame.FrameId, SpatialUnitV1.Unitless);
+        }
+
+        return new SpatialContextV1(
+            outputFrame,
+            [SpatialTransform2DV1.Identity(outputFrame)],
+            CreateSpatialBinding(@operator, "TransformedPoints"));
+    }
+
+    private static SpatialContextV1 BuildImageSpatialContext(
+        Operator @operator,
+        SpatialContextV1? inputSpatialContext)
+    {
+        var source = inputSpatialContext ?? SpatialContextV1.DefaultImageFull();
+        return new SpatialContextV1(
+            source.CurrentFrame,
+            source.Transforms,
+            CreateSpatialBinding(@operator, "Image"));
+    }
+
+    private static SpatialContextBindingV1 CreateSpatialBinding(Operator @operator, string outputName)
+    {
+        var outputPortId = @operator.OutputPorts
+            .FirstOrDefault(port => port.Name.Equals(outputName, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
+        return new SpatialContextBindingV1
+        {
+            SourceOperatorId = @operator.Id,
+            OutputPortId = outputPortId,
+            OutputName = outputName
+        };
+    }
+
+    private static bool TryResolveInputSpatialContext(
+        IReadOnlyDictionary<string, object>? inputs,
+        out SpatialContextV1? context,
+        out string error)
+    {
+        context = null;
+        error = string.Empty;
+        if (inputs == null || inputs.Count == 0)
+        {
+            return true;
+        }
+
+        var candidates = new List<(string Key, SpatialContextV1 Context)>();
+        foreach (var key in new[] { "PointsSpatialContext", RoiManagerOperator.ImageSpatialContextInputKey, RoiManagerOperator.SpatialContextOutputKey })
+        {
+            if (!TryGetInputValue(inputs, key, out var raw))
+            {
+                continue;
+            }
+
+            if (!SpatialCalibrationTransformService.TryReadSpatialContext(raw, out var parsed, out var parseError))
+            {
+                error = $"Malformed SpatialContext input '{key}': {parseError}";
+                return false;
+            }
+
+            candidates.Add((key, parsed));
+        }
+
+        if (candidates.Count == 0)
+        {
+            return true;
+        }
+
+        if (candidates.Count > 1)
+        {
+            error = $"Ambiguous SpatialContext inputs: {string.Join(", ", candidates.Select(candidate => candidate.Key))}.";
+            return false;
+        }
+
+        context = candidates[0].Context;
+        return true;
+    }
+
+    private static bool TryGetInputValue(
+        IReadOnlyDictionary<string, object> inputs,
+        string key,
+        out object? value)
+    {
+        foreach (var pair in inputs)
+        {
+            if (pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = pair.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 
     private static Dictionary<string, object> BuildPlanarAccuracyReport(
@@ -816,6 +1259,83 @@ public class PixelToWorldTransformOperator : OperatorBase
         return true;
     }
 
+    private static bool TryResolveRayPlaneCalibrationFrames(
+        CalibrationBundleV2 bundle,
+        out FrameRefV1 calibrationSourceFrame,
+        out FrameRefV1 calibrationTargetFrame,
+        out IReadOnlyList<string> diagnostics,
+        out string error)
+    {
+        calibrationSourceFrame = FrameRefV1.ImageFull();
+        calibrationTargetFrame = FrameRefV1.World2D();
+        diagnostics = Array.Empty<string>();
+        error = string.Empty;
+
+        if (!TryMapRayPlaneFrame(bundle.SourceFrame, out var source))
+        {
+            error = $"Unsupported SourceFrame for ray-plane path: '{bundle.SourceFrame}'.";
+            return false;
+        }
+
+        if (!TryMapRayPlaneFrame(bundle.TargetFrame, out var target))
+        {
+            error = $"Unsupported TargetFrame for ray-plane path: '{bundle.TargetFrame}'.";
+            return false;
+        }
+
+        if (!((source == RayPlaneFrame.Camera && target == RayPlaneFrame.World) ||
+              (source == RayPlaneFrame.World && target == RayPlaneFrame.Camera)))
+        {
+            error = $"Unsupported SourceFrame/TargetFrame combination for ray-plane path: '{bundle.SourceFrame}' -> '{bundle.TargetFrame}'.";
+            return false;
+        }
+
+        var sourceToken = SpatialCalibrationTransformService.NormalizeFrameToken(bundle.SourceFrame);
+        var targetToken = SpatialCalibrationTransformService.NormalizeFrameToken(bundle.TargetFrame);
+        calibrationSourceFrame = sourceToken is "imageundistorted" or "undistorted" or "undistortedimage" ||
+                                 targetToken is "imageundistorted" or "undistorted" or "undistortedimage"
+            ? FrameRefV1.Undistorted()
+            : FrameRefV1.ImageFull();
+        calibrationTargetFrame = FrameRefV1.World2D();
+
+        var result = new List<string>();
+        var pixelFrameAlreadyExplicit =
+            calibrationSourceFrame.Kind == SpatialFrameKindV1.Undistorted
+                ? (bundle.SourceFrame?.Trim().Equals("image.undistorted", StringComparison.OrdinalIgnoreCase) == true ||
+                   bundle.TargetFrame?.Trim().Equals("image.undistorted", StringComparison.OrdinalIgnoreCase) == true)
+                : (bundle.SourceFrame?.Trim().Equals("image.full", StringComparison.OrdinalIgnoreCase) == true ||
+                   bundle.TargetFrame?.Trim().Equals("image.full", StringComparison.OrdinalIgnoreCase) == true);
+        if (!pixelFrameAlreadyExplicit)
+        {
+            result.Add($"Compatibility frame mapping: ray-plane camera/image frame '{SelectRayPlaneCameraFrameToken(bundle)}' -> '{calibrationSourceFrame.FrameId}' ({calibrationSourceFrame.Kind}, {calibrationSourceFrame.UnitSymbol}).");
+        }
+
+        var worldFrameAlreadyExplicit =
+            bundle.SourceFrame?.Trim().Equals("world.2d", StringComparison.OrdinalIgnoreCase) == true ||
+            bundle.TargetFrame?.Trim().Equals("world.2d", StringComparison.OrdinalIgnoreCase) == true;
+        if (!worldFrameAlreadyExplicit)
+        {
+            result.Add($"Compatibility frame mapping: ray-plane world frame '{SelectRayPlaneWorldFrameToken(bundle)}' -> '{calibrationTargetFrame.FrameId}' ({calibrationTargetFrame.Kind}, {calibrationTargetFrame.UnitSymbol}).");
+        }
+
+        diagnostics = result;
+        return true;
+    }
+
+    private static string SelectRayPlaneCameraFrameToken(CalibrationBundleV2 bundle)
+    {
+        return TryMapRayPlaneFrame(bundle.SourceFrame, out var source) && source == RayPlaneFrame.Camera
+            ? bundle.SourceFrame ?? string.Empty
+            : bundle.TargetFrame ?? string.Empty;
+    }
+
+    private static string SelectRayPlaneWorldFrameToken(CalibrationBundleV2 bundle)
+    {
+        return TryMapRayPlaneFrame(bundle.SourceFrame, out var source) && source == RayPlaneFrame.World
+            ? bundle.SourceFrame ?? string.Empty
+            : bundle.TargetFrame ?? string.Empty;
+    }
+
     private static bool TryCreateRayPlaneContext(
         CalibrationBundleV2 bundle,
         out RayPlaneContext context,
@@ -1265,10 +1785,17 @@ public class PixelToWorldTransformOperator : OperatorBase
             case "cam":
             case "cameraframe":
             case "image":
+            case "imagefull":
+            case "imagepixel":
+            case "imagepixels":
+            case "fullimage":
             case "imageundistorted":
+            case "undistorted":
+            case "undistortedimage":
                 mapped = RayPlaneFrame.Camera;
                 return true;
             case "world":
+            case "world2d":
             case "worldframe":
             case "base":
             case "robotbase":

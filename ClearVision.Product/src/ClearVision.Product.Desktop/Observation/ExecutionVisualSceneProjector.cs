@@ -62,6 +62,9 @@ public static class ExecutionVisualSceneProjector
                 case OperatorType.NPointCalibration:
                     ProjectNPointCalibration(input.TargetOperator, context);
                     break;
+                case OperatorType.PixelToWorldTransform:
+                    ProjectPixelToWorld(input.TargetOperator, context);
+                    break;
                 default:
                     context.AddDiagnostic("visual-scene-operator-unsupported", $"Operator type {input.TargetOperator.Type} has no visual-scene adapter.", null);
                     break;
@@ -673,6 +676,176 @@ public static class ExecutionVisualSceneProjector
         }
     }
 
+    private static void ProjectPixelToWorld(Operator @operator, SceneProjectionContext context)
+    {
+        if (!context.TryGetOutput("TransformedPoints", out var rawPoints) ||
+            !TryReadPoint3DList(rawPoints, out var points) ||
+            points.Count == 0)
+        {
+            context.AddDiagnostic("visual-scene-pixel-to-world-points-missing", "PixelToWorldTransform did not expose TransformedPoints for scene display.", null);
+            return;
+        }
+
+        var metadata = context.TryGetOutput("TransformResult", out var rawTransformResult) &&
+            TryReadObjectDictionary(rawTransformResult, out var transformResult)
+                ? transformResult
+                : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var mode = ReadDictionaryString(metadata, "TransformMode", "PixelToWorld");
+        var outputFrame = ReadDictionaryString(metadata, "OutputFrame", mode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase) ? "world.2d" : "image.full");
+        var outputUnit = ReadDictionaryString(metadata, "OutputUnit", mode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase) ? "mm" : "px");
+        var bundleId = ReadDictionaryString(metadata, "BundleId", string.Empty);
+        var inputFrame = ReadDictionaryString(metadata, "InputFrame", string.Empty);
+        var calibrationSourceFrame = ReadDictionaryString(metadata, "CalibrationSourceFrame", string.Empty);
+        var calibrationTargetFrame = ReadDictionaryString(metadata, "CalibrationTargetFrame", string.Empty);
+
+        if (SpatialCalibrationTransformService.NormalizeFrameToken(outputFrame) is "world2d" or "world")
+        {
+            ProjectPixelToWorldWorldScene(
+                context,
+                points,
+                outputFrame,
+                outputUnit,
+                bundleId,
+                inputFrame,
+                calibrationSourceFrame,
+                calibrationTargetFrame,
+                metadata);
+            return;
+        }
+
+        ProjectPixelToWorldImageScene(context, points, outputFrame, outputUnit, bundleId, inputFrame, calibrationSourceFrame, calibrationTargetFrame);
+    }
+
+    private static void ProjectPixelToWorldWorldScene(
+        SceneProjectionContext context,
+        IReadOnlyList<Point3d> worldPoints,
+        string outputFrame,
+        string outputUnit,
+        string bundleId,
+        string inputFrame,
+        string calibrationSourceFrame,
+        string calibrationTargetFrame,
+        IReadOnlyDictionary<string, object> metadata)
+    {
+        var plane = WorldNeutralPlane.Create(worldPoints);
+        context.SetSceneFrame(
+            "world.2d.neutral-plane",
+            string.IsNullOrWhiteSpace(outputFrame) ? "world.2d" : outputFrame,
+            "World2D",
+            outputUnit,
+            plane.MinX,
+            plane.MinY,
+            plane.MaxX,
+            plane.MaxY,
+            plane.Scale,
+            plane.Width,
+            plane.Height);
+        context.AddDiagnostic(
+            "visual-scene-pixel-to-world-world2d",
+            $"World2D scene uses a neutral plane; source={Clip(inputFrame)}, calibration={Clip(calibrationSourceFrame)}->{Clip(calibrationTargetFrame)}, unit={Clip(outputUnit)}, BundleId={Clip(bundleId)}.",
+            null);
+
+        foreach (var diagnostic in ReadStringList(metadata, "Diagnostics")
+                     .Where(item => item.Contains("Compatibility frame mapping", StringComparison.OrdinalIgnoreCase)))
+        {
+            context.AddDiagnostic("visual-scene-frame-compatibility", Clip(diagnostic), null);
+        }
+
+        for (var index = 0; index < worldPoints.Count && index < MaxPrimitives; index++)
+        {
+            var world = worldPoints[index];
+            if (!AreFinite(world.X, world.Y))
+            {
+                context.AddDiagnostic("visual-scene-pixel-to-world-non-finite", "World2D point contains non-finite coordinates and was skipped.", null);
+                continue;
+            }
+
+            var scenePoint = plane.ToScene(world.X, world.Y);
+            var primitive = new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = $"pixel-to-world:world-point:{index.ToString(CultureInfo.InvariantCulture)}",
+                Kind = "point",
+                Layer = "world",
+                ZOrder = 20 + index,
+                Visible = true,
+                Selectable = true,
+                Label = $"W({world.X.ToString("0.###", CultureInfo.InvariantCulture)}, {world.Y.ToString("0.###", CultureInfo.InvariantCulture)} {outputUnit})",
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    X = scenePoint.X,
+                    Y = scenePoint.Y,
+                    Radius = 4,
+                    WorldX = world.X,
+                    WorldY = world.Y,
+                    WorldZ = world.Z
+                },
+                Style = new ExecutionVisualSceneStyleV1
+                {
+                    Stroke = "#2563eb",
+                    Fill = "rgba(37,99,235,0.18)",
+                    StrokeWidth = 2
+                },
+                FrameId = outputFrame,
+                Unit = outputUnit
+            };
+
+            context.AddPrimitive(AttachResultPath(primitive, context, "TransformedPoints", $"$[{index.ToString(CultureInfo.InvariantCulture)}]", worldPoints));
+        }
+    }
+
+    private static void ProjectPixelToWorldImageScene(
+        SceneProjectionContext context,
+        IReadOnlyList<Point3d> imagePoints,
+        string outputFrame,
+        string outputUnit,
+        string bundleId,
+        string inputFrame,
+        string calibrationSourceFrame,
+        string calibrationTargetFrame)
+    {
+        context.AddDiagnostic(
+            "visual-scene-pixel-to-world-image-frame",
+            $"Image-frame PixelToWorld scene; source={Clip(inputFrame)}, calibration={Clip(calibrationTargetFrame)}->{Clip(calibrationSourceFrame)}, unit={Clip(outputUnit)}, BundleId={Clip(bundleId)}.",
+            null);
+
+        for (var index = 0; index < imagePoints.Count && index < MaxPrimitives; index++)
+        {
+            var point = imagePoints[index];
+            if (!AreFinite(point.X, point.Y))
+            {
+                context.AddDiagnostic("visual-scene-pixel-to-world-non-finite", "Image-frame point contains non-finite coordinates and was skipped.", null);
+                continue;
+            }
+
+            var primitive = new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = $"pixel-to-world:image-point:{index.ToString(CultureInfo.InvariantCulture)}",
+                Kind = "point",
+                Layer = "measurement",
+                ZOrder = 20 + index,
+                Visible = true,
+                Selectable = true,
+                Label = $"P({point.X.ToString("0.#", CultureInfo.InvariantCulture)}, {point.Y.ToString("0.#", CultureInfo.InvariantCulture)})",
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    X = point.X,
+                    Y = point.Y,
+                    Radius = 4
+                },
+                Style = new ExecutionVisualSceneStyleV1
+                {
+                    Stroke = "#16a34a",
+                    Fill = "rgba(22,163,74,0.18)",
+                    StrokeWidth = 2
+                },
+                FrameId = outputFrame,
+                Unit = outputUnit
+            };
+
+            context.AddPrimitive(AttachResultPath(primitive, context, "TransformedPoints", $"$[{index.ToString(CultureInfo.InvariantCulture)}]", imagePoints));
+        }
+    }
+
     private static ExecutionVisualScenePrimitiveV1 CreateCirclePrimitive(string primitiveId, CircleCandidate circle, string label, int zOrder) =>
         new()
         {
@@ -904,6 +1077,206 @@ public static class ExecutionVisualSceneProjector
         }
 
         return false;
+    }
+
+    private static bool TryReadPoint3DList(object? raw, out List<Point3d> points)
+    {
+        points = new List<Point3d>();
+        if (raw == null)
+        {
+            return false;
+        }
+
+        if (raw is string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(text);
+                return TryReadPoint3DList(document.RootElement, out points);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        if (raw is JsonElement { ValueKind: JsonValueKind.Array } array)
+        {
+            foreach (var item in array.EnumerateArray())
+            {
+                if (points.Count >= MaxPrimitives)
+                {
+                    break;
+                }
+
+                if (TryReadPoint3D(item, out var point))
+                {
+                    points.Add(point);
+                }
+            }
+
+            return points.Count > 0;
+        }
+
+        if (raw is IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                if (points.Count >= MaxPrimitives)
+                {
+                    break;
+                }
+
+                if (TryReadPoint3D(item, out var point))
+                {
+                    points.Add(point);
+                }
+            }
+
+            return points.Count > 0;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadPoint3D(object? raw, out Point3d point)
+    {
+        point = default;
+        switch (raw)
+        {
+            case Point3d p when AreFinite(p.X, p.Y, p.Z):
+                point = p;
+                return true;
+            case Point3f p when AreFinite(p.X, p.Y, p.Z):
+                point = new Point3d(p.X, p.Y, p.Z);
+                return true;
+            case Point2f p when AreFinite(p.X, p.Y):
+                point = new Point3d(p.X, p.Y, 0);
+                return true;
+            case Position p when AreFinite(p.X, p.Y):
+                point = new Point3d(p.X, p.Y, 0);
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.Object } element:
+                if (!TryGetNumberProperty(element, "X", out var x) ||
+                    !TryGetNumberProperty(element, "Y", out var y))
+                {
+                    return false;
+                }
+
+                var z = TryGetNumberProperty(element, "Z", out var parsedZ) ? parsedZ : 0;
+                if (!AreFinite(x, y, z))
+                {
+                    return false;
+                }
+
+                point = new Point3d(x, y, z);
+                return true;
+            case IDictionary dictionary:
+                var normalized = NormalizeDictionary(dictionary);
+                if (!TryGetDouble(normalized, "X", out x) ||
+                    !TryGetDouble(normalized, "Y", out y))
+                {
+                    return false;
+                }
+
+                z = TryGetDouble(normalized, "Z", out parsedZ) ? parsedZ : 0;
+                if (!AreFinite(x, y, z))
+                {
+                    return false;
+                }
+
+                point = new Point3d(x, y, z);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryReadObjectDictionary(object? raw, out Dictionary<string, object> dictionary)
+    {
+        dictionary = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        switch (raw)
+        {
+            case IDictionary source:
+                dictionary = NormalizeDictionary(source);
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.Object } element:
+                foreach (var property in element.EnumerateObject())
+                {
+                    dictionary[property.Name] = property.Value;
+                }
+
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static string ReadDictionaryString(
+        IReadOnlyDictionary<string, object> dictionary,
+        string key,
+        string fallback)
+    {
+        foreach (var pair in dictionary)
+        {
+            if (!pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return pair.Value switch
+            {
+                string text when !string.IsNullOrWhiteSpace(text) => text.Trim(),
+                JsonElement { ValueKind: JsonValueKind.String } element => element.GetString()?.Trim() ?? fallback,
+                null => fallback,
+                _ => pair.Value.ToString()?.Trim() ?? fallback
+            };
+        }
+
+        return fallback;
+    }
+
+    private static IReadOnlyList<string> ReadStringList(
+        IReadOnlyDictionary<string, object> dictionary,
+        string key)
+    {
+        foreach (var pair in dictionary)
+        {
+            if (!pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (pair.Value is IEnumerable<string> strings)
+            {
+                return strings.Where(item => !string.IsNullOrWhiteSpace(item)).ToList();
+            }
+
+            if (pair.Value is JsonElement { ValueKind: JsonValueKind.Array } array)
+            {
+                return array.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString() ?? string.Empty)
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToList();
+            }
+
+            if (pair.Value is IEnumerable enumerable && pair.Value is not string)
+            {
+                return enumerable
+                    .Cast<object?>()
+                    .Select(item => item?.ToString() ?? string.Empty)
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToList();
+            }
+        }
+
+        return Array.Empty<string>();
     }
 
     private static bool TryParsePointPair(object? raw, out PointPairCandidate pair)
@@ -1249,7 +1622,9 @@ public static class ExecutionVisualSceneProjector
             Style = style,
             OutputPortId = outputPortId,
             ResultPathVersion = resultPathVersion,
-            ResultPath = resultPath
+            ResultPath = resultPath,
+            FrameId = source.FrameId,
+            Unit = source.Unit
         };
 
     private sealed class SceneProjectionContext
@@ -1259,6 +1634,17 @@ public static class ExecutionVisualSceneProjector
         private readonly HashSet<string> _seenPrimitiveIds = new(StringComparer.Ordinal);
         private readonly List<ExecutionVisualScenePrimitiveV1> _primitives = new();
         private readonly List<ExecutionVisualSceneDiagnosticV1> _diagnostics = new();
+        private string _coordinateSpace = "image.pixel";
+        private string? _frameId;
+        private string? _frameKind;
+        private string? _unit;
+        private double? _worldMinX;
+        private double? _worldMinY;
+        private double? _worldMaxX;
+        private double? _worldMaxY;
+        private double? _worldToSceneScale;
+        private int? _sceneWidth;
+        private int? _sceneHeight;
         private bool _truncated;
 
         public SceneProjectionContext(ExecutionVisualSceneInput input)
@@ -1316,6 +1702,34 @@ public static class ExecutionVisualSceneProjector
             outputPortId = ports[0].Id;
             canonicalPath = resolved.Path.CanonicalPath;
             return true;
+        }
+
+        public void SetSceneFrame(
+            string coordinateSpace,
+            string frameId,
+            string frameKind,
+            string unit,
+            double? worldMinX,
+            double? worldMinY,
+            double? worldMaxX,
+            double? worldMaxY,
+            double? worldToSceneScale,
+            int? sceneWidth,
+            int? sceneHeight)
+        {
+            _coordinateSpace = string.IsNullOrWhiteSpace(coordinateSpace)
+                ? "image.pixel"
+                : Clip(coordinateSpace);
+            _frameId = string.IsNullOrWhiteSpace(frameId) ? null : Clip(frameId);
+            _frameKind = string.IsNullOrWhiteSpace(frameKind) ? null : Clip(frameKind);
+            _unit = string.IsNullOrWhiteSpace(unit) ? null : Clip(unit);
+            _worldMinX = worldMinX;
+            _worldMinY = worldMinY;
+            _worldMaxX = worldMaxX;
+            _worldMaxY = worldMaxY;
+            _worldToSceneScale = worldToSceneScale;
+            _sceneWidth = sceneWidth;
+            _sceneHeight = sceneHeight;
         }
 
         public bool TryResolveOutputImageSize(out int width, out int height)
@@ -1388,6 +1802,12 @@ public static class ExecutionVisualSceneProjector
         public ExecutionVisualSceneV1 Build()
         {
             var (width, height) = ResolveImageSize();
+            if (_sceneWidth is > 0 && _sceneHeight is > 0)
+            {
+                width = _sceneWidth.Value;
+                height = _sceneHeight.Value;
+            }
+
             var ordered = _primitives
                 .OrderBy(item => item.Layer, StringComparer.Ordinal)
                 .ThenBy(item => item.ZOrder)
@@ -1396,6 +1816,15 @@ public static class ExecutionVisualSceneProjector
 
             return new ExecutionVisualSceneV1
             {
+                CoordinateSpace = _coordinateSpace,
+                FrameId = _frameId,
+                FrameKind = _frameKind,
+                Unit = _unit,
+                WorldMinX = _worldMinX,
+                WorldMinY = _worldMinY,
+                WorldMaxX = _worldMaxX,
+                WorldMaxY = _worldMaxY,
+                WorldToSceneScale = _worldToSceneScale,
                 ImageWidth = width,
                 ImageHeight = height,
                 Primitives = ordered,
@@ -1599,6 +2028,57 @@ public static class ExecutionVisualSceneProjector
 
         private static string ClipPrimitiveId(string primitiveId) =>
             primitiveId.Length <= MaxPrimitiveIdChars ? primitiveId : primitiveId[..MaxPrimitiveIdChars];
+    }
+
+    private readonly record struct WorldNeutralPlane(
+        double MinX,
+        double MinY,
+        double MaxX,
+        double MaxY,
+        double Scale,
+        int Width,
+        int Height)
+    {
+        private const int DefaultSize = 512;
+        private const double Padding = 40.0;
+
+        public static WorldNeutralPlane Create(IReadOnlyList<Point3d> points)
+        {
+            var finite = points
+                .Where(point => double.IsFinite(point.X) && double.IsFinite(point.Y))
+                .ToList();
+            if (finite.Count == 0)
+            {
+                return new WorldNeutralPlane(0, 0, 1, 1, 1, DefaultSize, DefaultSize);
+            }
+
+            var minX = finite.Min(point => point.X);
+            var minY = finite.Min(point => point.Y);
+            var maxX = finite.Max(point => point.X);
+            var maxY = finite.Max(point => point.Y);
+            var spanX = Math.Max(maxX - minX, 1.0);
+            var spanY = Math.Max(maxY - minY, 1.0);
+            var scale = Math.Min((DefaultSize - Padding * 2) / spanX, (DefaultSize - Padding * 2) / spanY);
+            if (!double.IsFinite(scale) || scale <= 0)
+            {
+                scale = 1.0;
+            }
+
+            return new WorldNeutralPlane(minX, minY, maxX, maxY, scale, DefaultSize, DefaultSize);
+        }
+
+        public (double X, double Y) ToScene(double worldX, double worldY)
+        {
+            var spanX = Math.Max(MaxX - MinX, 1.0);
+            var spanY = Math.Max(MaxY - MinY, 1.0);
+            var drawnWidth = spanX * Scale;
+            var drawnHeight = spanY * Scale;
+            var left = (Width - drawnWidth) / 2.0;
+            var top = (Height - drawnHeight) / 2.0;
+            return (
+                left + (worldX - MinX) * Scale,
+                top + (MaxY - worldY) * Scale);
+        }
     }
 
     private readonly record struct PointCandidate(double X, double Y);

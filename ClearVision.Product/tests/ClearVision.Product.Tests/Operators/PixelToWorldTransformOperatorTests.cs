@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Tests.TestData;
 using FluentAssertions;
@@ -327,5 +328,408 @@ public class PixelToWorldTransformOperatorTests
         var report = Assert.IsType<Dictionary<string, object>>(pixelToWorld.OutputData["AccuracyReport"]);
         report["RoundTripUnit"].Should().Be("px");
         Convert.ToDouble(report["RoundTripMax"]).Should().BeLessThan(1e-6);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRoiLocalSpatialContext_ShouldComposeCropChainBeforePlanarPixelToWorld()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(bundleId: "bundle-roi-chain");
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 2);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.30, 1e-9);
+        point.Y.Should().BeApproximately(0.56, 1e-9);
+        point.Z.Should().BeApproximately(0.0, 1e-12);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["InputFrame"].Should().Be("roi.local.depth2");
+        transformResult["CalibrationSourceFrame"].Should().Be("image.full");
+        transformResult["CalibrationTargetFrame"].Should().Be("world.2d");
+        transformResult["OutputFrame"].Should().Be("world.2d");
+        Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(2);
+        var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
+        chain.Should().ContainInOrder("roi.local.depth2->roi.local.depth1", "roi.local.depth1->image.full", "image.full->world.2d");
+        transformResult["CompatibilityMode"].Should().Be(true);
+
+        var pointsContext = Assert.IsType<SpatialContextV1>(result.OutputData["TransformedPointsSpatialContext"]);
+        pointsContext.CurrentFrame.Kind.Should().Be(SpatialFrameKindV1.World2D);
+        pointsContext.Binding.SourceOperatorId.Should().Be(op.Id);
+        pointsContext.Binding.OutputPortId.Should().Be(op.OutputPorts.Single(port => port.Name == "TransformedPoints").Id);
+        pointsContext.Binding.OutputName.Should().Be("TransformedPoints");
+
+        var imageContext = Assert.IsType<SpatialContextV1>(result.OutputData[RoiManagerOperator.SpatialContextOutputKey]);
+        imageContext.CurrentFrame.FrameId.Should().Be("roi.local.depth2");
+        imageContext.Binding.SourceOperatorId.Should().Be(op.Id);
+        imageContext.Binding.OutputPortId.Should().Be(op.OutputPorts.Single(port => port.Name == "Image").Id);
+        imageContext.Binding.OutputName.Should().Be("Image");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithThreeLayerRoiLocalSpatialContext_ShouldNotDoubleCountCropOffsets()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(1, 1) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 3);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.34, 1e-9);
+        point.Y.Should().BeApproximately(0.68, 1e-9);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWorldToPixelAndRoiContext_ShouldReturnRoiLocalWhenContextCurrentFrameIsRoiLocal()
+    {
+        var op = CreatePixelToWorldOperator("WorldToPixel");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = new List<Point3d> { new(0.30, 0.56, 0) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 2);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<ClearVision.Product.Core.ValueObjects.Position>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(2.0, 1e-9);
+        point.Y.Should().BeApproximately(4.0, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["InputFrame"].Should().Be("world.2d");
+        transformResult["OutputFrame"].Should().Be("roi.local.depth2");
+        Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(2);
+        var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
+        chain.Should().ContainInOrder("world.2d->image.full", "image.full->roi.local.depth1", "roi.local.depth1->roi.local.depth2");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithExplicitRoiLocalButMissingSpatialContext_ShouldFailClosed()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        op.Parameters.Add(TestHelpers.CreateParameter("InputFrame", "RoiLocal"));
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RoiLocal");
+        result.ErrorMessage.Should().Contain("SpatialContext");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMalformedSpatialContext_ShouldFailClosed()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson();
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = "{not valid json";
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Malformed SpatialContext");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUndistortedSourceFrame_ShouldTransformWithoutImageFullAssumption()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(sourceFrame: "imageUndistorted", bundleId: "bundle-undistorted");
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.20, 1e-9);
+        point.Y.Should().BeApproximately(0.20, 1e-9);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["InputFrame"].Should().Be("image.undistorted");
+        transformResult["CalibrationSourceFrame"].Should().Be("image.undistorted");
+        transformResult["OutputFrame"].Should().Be("world.2d");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithFrameMismatch_ShouldFailClosed()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(sourceFrame: "imageUndistorted");
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = SpatialContextV1.DefaultImageFull();
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("No spatial transform path");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithExplicitRoiLocalInput_ShouldResolveCurrentSpatialContextFrame()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        op.Parameters.Add(TestHelpers.CreateParameter("InputFrame", "RoiLocal"));
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(bundleId: "bundle-explicit-roi-input");
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(2, 4) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 2);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(0.30, 1e-9);
+        point.Y.Should().BeApproximately(0.56, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["InputFrame"].Should().Be("roi.local.depth2");
+        var diagnostics = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["Diagnostics"]).ToList();
+        diagnostics.Should().Contain(item => item.Contains("Requested RoiLocal input frame", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithExplicitRoiLocalOutput_ShouldResolveCurrentSpatialContextFrame()
+    {
+        var op = CreatePixelToWorldOperator("WorldToPixel");
+        op.Parameters.Add(TestHelpers.CreateParameter("OutputFrame", "RoiLocal"));
+        using var image = TestHelpers.CreateTestImage(width: 120, height: 90);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedScaleOffsetBundleJson(bundleId: "bundle-explicit-roi-output");
+        inputs["Points"] = new List<Point3d> { new(0.30, 0.56, 0) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 2);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<ClearVision.Product.Core.ValueObjects.Position>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(2.0, 1e-9);
+        point.Y.Should().BeApproximately(4.0, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["OutputFrame"].Should().Be("roi.local.depth2");
+        var diagnostics = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["Diagnostics"]).ToList();
+        diagnostics.Should().Contain(item => item.Contains("Requested RoiLocal output frame", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRayPlaneRoiLocalInput_ShouldComposeSpatialChainBeforeIntrinsics()
+    {
+        var op = CreatePixelToWorldOperator("PixelToWorld");
+        using var image = TestHelpers.CreateTestImage(width: 320, height: 240);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedRayPlaneBundleJson();
+        inputs["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(160, 100) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 1);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<Point3d>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(2.0, 1e-9);
+        point.Y.Should().BeApproximately(0.0, 1e-9);
+        point.Z.Should().BeApproximately(0.0, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["Path"].Should().Be("RayPlaneIntersection");
+        transformResult["InputFrame"].Should().Be("roi.local.depth1");
+        transformResult["CalibrationSourceFrame"].Should().Be("image.full");
+        transformResult["CalibrationTargetFrame"].Should().Be("world.2d");
+        transformResult["OutputFrame"].Should().Be("world.2d");
+        Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(1);
+        var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
+        chain.Should().ContainInOrder("roi.local.depth1->image.full", "image.full->world.2d");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRayPlaneWorldToPixelAndRoiContext_ShouldReturnRoiLocalPixels()
+    {
+        var op = CreatePixelToWorldOperator("WorldToPixel");
+        using var image = TestHelpers.CreateTestImage(width: 320, height: 240);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CreateAcceptedRayPlaneBundleJson();
+        inputs["Points"] = new List<Point3d> { new(2.0, 0.0, 0.0) };
+        inputs[RoiManagerOperator.ImageSpatialContextInputKey] = CreateCropSpatialContext(op.Id, depth: 1);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = ((List<ClearVision.Product.Core.ValueObjects.Position>)result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(160.0, 1e-9);
+        point.Y.Should().BeApproximately(100.0, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["Path"].Should().Be("RayPlaneIntersection");
+        transformResult["InputFrame"].Should().Be("world.2d");
+        transformResult["OutputFrame"].Should().Be("roi.local.depth1");
+        Convert.ToInt32(transformResult["AppliedSpatialTransformCount"]).Should().Be(1);
+        var chain = Assert.IsAssignableFrom<IEnumerable<string>>(transformResult["TransformChain"]).ToList();
+        chain.Should().ContainInOrder("world.2d->image.full", "image.full->roi.local.depth1");
+    }
+
+    private static Operator CreatePixelToWorldOperator(string transformMode)
+    {
+        var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
+        op.AddOutputPort("Image", PortDataType.Image);
+        op.AddOutputPort("TransformedPoints", PortDataType.PointList);
+        op.AddOutputPort("TransformResult", PortDataType.Any);
+        op.Parameters.Add(TestHelpers.CreateParameter("TransformMode", transformMode));
+        return op;
+    }
+
+    private static SpatialContextV1 CreateCropSpatialContext(Guid operatorId, int depth)
+    {
+        depth.Should().BeInRange(1, 3);
+
+        var image = FrameRefV1.ImageFull();
+        var depth1 = FrameRefV1.RoiLocal("roi.local.depth1", image.FrameId);
+        var transforms = new List<SpatialTransform2DV1>
+        {
+            SpatialTransform2DV1.Identity(image),
+            new(
+                depth1,
+                image,
+                [
+                    [1, 0, 10],
+                    [0, 1, 20],
+                    [0, 0, 1]
+                ])
+        };
+
+        var current = depth1;
+        if (depth >= 2)
+        {
+            var depth2 = FrameRefV1.RoiLocal("roi.local.depth2", depth1.FrameId);
+            transforms.Add(new SpatialTransform2DV1(
+                depth2,
+                depth1,
+                [
+                    [1, 0, 3],
+                    [0, 1, 4],
+                    [0, 0, 1]
+                ]));
+            current = depth2;
+        }
+
+        if (depth >= 3)
+        {
+            var depth3 = FrameRefV1.RoiLocal("roi.local.depth3", current.FrameId);
+            transforms.Add(new SpatialTransform2DV1(
+                depth3,
+                current,
+                [
+                    [1, 0, 3],
+                    [0, 1, 9],
+                    [0, 0, 1]
+                ]));
+            current = depth3;
+        }
+
+        return new SpatialContextV1(
+            current,
+            transforms,
+            SpatialContextBindingV1.ForFlowOutput(operatorId, Guid.NewGuid(), "Image"));
+    }
+
+    private static string CreateAcceptedScaleOffsetBundleJson(
+        string sourceFrame = "image",
+        string targetFrame = "world",
+        string bundleId = "bundle-scale-offset")
+    {
+        return $$"""
+                 {
+                   "schemaVersion": 2,
+                   "bundleId": "{{bundleId}}",
+                   "calibrationVersion": "v-test",
+                   "datasetFingerprint": "dataset-test",
+                   "checksumSha256": "0123456789abcdef",
+                   "calibrationKind": "rigidTransform2D",
+                   "transformModel": "scaleOffset",
+                   "sourceFrame": "{{sourceFrame}}",
+                   "targetFrame": "{{targetFrame}}",
+                   "unit": "mm",
+                   "transform2D": {
+                     "model": "scaleOffset",
+                     "matrix": [
+                       [0.02, 0.0, 0.0],
+                       [0.0, 0.02, 0.0]
+                     ],
+                     "pixelSizeX": 0.02,
+                     "pixelSizeY": 0.02
+                   },
+                   "quality": {
+                     "accepted": true,
+                     "meanError": 0.05,
+                     "maxError": 0.09,
+                     "inlierCount": 8,
+                     "totalSampleCount": 8,
+                     "diagnostics": []
+                   },
+                   "producerOperator": "PixelToWorldTransformOperatorTests"
+                 }
+                 """;
+    }
+
+    private static string CreateAcceptedRayPlaneBundleJson()
+    {
+        return """
+               {
+                 "schemaVersion": 2,
+                 "bundleId": "bundle-ray-plane",
+                 "calibrationVersion": "v-test",
+                 "datasetFingerprint": "dataset-ray-plane-test",
+                 "checksumSha256": "abcdef0123456789",
+                 "calibrationKind": "cameraIntrinsics",
+                 "transformModel": "none",
+                 "sourceFrame": "camera",
+                 "targetFrame": "world",
+                 "unit": "mm",
+                 "intrinsics": {
+                   "cameraMatrix": [
+                     [500.0, 0.0, 160.0],
+                     [0.0, 500.0, 120.0],
+                     [0.0, 0.0, 1.0]
+                   ]
+                 },
+                 "transform3D": {
+                   "model": "rigid3D",
+                   "matrix": [
+                     [1.0, 0.0, 0.0, 0.0],
+                     [0.0, 1.0, 0.0, 0.0],
+                     [0.0, 0.0, 1.0, -100.0],
+                     [0.0, 0.0, 0.0, 1.0]
+                   ]
+                 },
+                 "quality": {
+                   "accepted": true,
+                   "meanError": 0.05,
+                   "maxError": 0.10,
+                   "inlierCount": 12,
+                   "totalSampleCount": 12,
+                   "diagnostics": []
+                 },
+                 "producerOperator": "PixelToWorldTransformOperatorTests"
+               }
+               """;
     }
 }
