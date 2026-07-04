@@ -677,7 +677,8 @@ public class InspectionService : IInspectionService
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
             await PersistResultImageAsync(result, CancellationToken.None);
             await CacheResultImageAsync(result);
-            await _resultRepository.AddAsync(result);
+            await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
+            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
 
             return result;
         }

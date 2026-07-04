@@ -417,7 +417,12 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var evidenceManifest = Substitute.For<IInspectionEvidenceManifestService>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        var cachedImageId = Guid.NewGuid();
         var explicitFlow = CreateFlow("client-flow");
+        InspectionResult? persistedResult = null;
+        InspectionResult? capturedEvidenceResult = null;
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -428,12 +433,108 @@ public class InspectionServiceSingleRunTests
                 OutputData = new Dictionary<string, object>
                 {
                     ["JudgmentResult"] = "NG",
-                    ["Image"] = outputImage
+                    ["Image"] = outputImage,
+                    ["CalibrationBundleId"] = "bundle-followup"
+                }
+            }));
+        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(cachedImageId));
+        resultRepository
+            .AddAsync(Arg.Do<InspectionResult>(item => persistedResult = item))
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+        evidenceManifest
+            .CaptureAsync(Arg.Do<InspectionResult>(item => capturedEvidenceResult = item), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            imageCache,
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance,
+            imagePersistence,
+            evidenceManifestService: evidenceManifest);
+
+        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+
+        result.Status.Should().Be(InspectionStatus.NG);
+        result.OutputImage.Should().Equal(outputImage);
+        result.ImageId.Should().Be(cachedImageId);
+        result.CalibrationBundleId.Should().Be("bundle-followup");
+        result.FlowVersionHash.Should().NotBeNullOrWhiteSpace();
+        result.SessionId.Should().NotBeNull();
+        result.OutputDataJson.Should().Contain("bundle-followup");
+
+        persistedResult.Should().NotBeNull();
+        persistedResult!.ProjectId.Should().Be(projectId);
+        persistedResult.Id.Should().Be(result.Id);
+        persistedResult.Status.Should().Be(InspectionStatus.NG);
+        persistedResult.OutputImage.Should().BeNull();
+        persistedResult.ImageId.Should().Be(cachedImageId);
+        persistedResult.OutputDataJson.Should().Be(result.OutputDataJson);
+        persistedResult.AnalysisDataJson.Should().Be(result.AnalysisDataJson);
+        persistedResult.FlowVersionHash.Should().Be(result.FlowVersionHash);
+        persistedResult.CalibrationBundleId.Should().Be("bundle-followup");
+        persistedResult.SessionId.Should().Be(result.SessionId);
+
+        capturedEvidenceResult.Should().BeSameAs(result);
+        capturedEvidenceResult!.OutputImage.Should().Equal(outputImage);
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item =>
+                item.Status == InspectionStatus.NG &&
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(outputImage)),
+            Arg.Any<CancellationToken>());
+        await evidenceManifest.Received(1).CaptureAsync(
+            Arg.Is<InspectionResult>(item =>
+                ReferenceEquals(item, result) &&
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(outputImage)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenEvidenceCaptureFails_ShouldStillPersistSummaryOnlyResult()
+    {
+        var projectId = Guid.NewGuid();
+        var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 8, 9, 10, 11 };
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var evidenceManifest = Substitute.For<IInspectionEvidenceManifestService>();
+        var explicitFlow = CreateFlow("client-flow");
+        InspectionResult? persistedResult = null;
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 16,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["Image"] = outputImage,
+                    ["CalibrationBundleId"] = "bundle-followup"
                 }
             }));
         resultRepository
-            .AddAsync(Arg.Any<InspectionResult>())
+            .AddAsync(Arg.Do<InspectionResult>(item => persistedResult = item))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+        evidenceManifest
+            .CaptureAsync(Arg.Any<InspectionResult>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("capture failed"));
 
         var service = new InspectionService(
             resultRepository,
@@ -447,15 +548,17 @@ public class InspectionServiceSingleRunTests
             new AnalysisDataBuilder(),
             flowStorage,
             NullLogger<InspectionService>.Instance,
-            imagePersistence);
+            imagePersistence,
+            evidenceManifestService: evidenceManifest);
 
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
 
-        result.Status.Should().Be(InspectionStatus.NG);
         result.OutputImage.Should().Equal(outputImage);
-        await imagePersistence.Received(1).PersistAsync(
+        persistedResult.Should().NotBeNull();
+        persistedResult!.OutputImage.Should().BeNull();
+        persistedResult.CalibrationBundleId.Should().Be("bundle-followup");
+        await evidenceManifest.Received(1).CaptureAsync(
             Arg.Is<InspectionResult>(item =>
-                item.Status == InspectionStatus.NG &&
                 item.OutputImage != null &&
                 item.OutputImage.SequenceEqual(outputImage)),
             Arg.Any<CancellationToken>());
