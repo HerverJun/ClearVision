@@ -1765,9 +1765,20 @@ class PropertyPanel {
         this.calibrationDraftWorkbench = new CalibrationDraftWorkbench(container, {
             getOperator: () => this.currentOperator,
             previewCoordinator: this.previewCoordinator,
+            getProject: () => projectManager.getCurrentProject?.() || null,
             getProjectId: () => projectManager.getCurrentProject?.()?.id || null,
             getFlowRevision: () => this.previewCoordinator?.getState?.()?.request?.flowRevision ?? 0,
-            getDebugSessionId: (projectId, nodeId) => this.previewCoordinator?.getDebugSessionId?.(projectId, nodeId) ?? null
+            getDebugSessionId: (projectId, nodeId) => this.previewCoordinator?.getDebugSessionId?.(projectId, nodeId) ?? null,
+            onFormalSaveSuccess: response => {
+                const currentProject = projectManager.getCurrentProject?.();
+                const responseProjectId = response?.projectId || response?.ProjectId;
+                if (!currentProject?.id || String(currentProject.id).toLowerCase() !== String(responseProjectId || '').toLowerCase()) {
+                    return;
+                }
+
+                currentProject.persistenceRevision = response?.persistenceRevision ?? response?.PersistenceRevision ?? currentProject.persistenceRevision;
+                currentProject.assets = response?.assets || response?.Assets || currentProject.assets || { calibrationAssets: [], spatialAssets: [] };
+            }
         });
     }
 

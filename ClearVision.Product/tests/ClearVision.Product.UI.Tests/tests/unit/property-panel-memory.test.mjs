@@ -5,6 +5,7 @@ globalThis.window = globalThis.window || {};
 
 const { PropertyPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
 const { CalibrationDraftWorkbench } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/calibrationDraftWorkbench.js');
+const httpClient = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js')).default;
 
 function createDeferred() {
   let resolve;
@@ -255,6 +256,103 @@ test('CalibrationDraftWorkbench initializes from legacy PointPairs as ephemeral 
       }
     ]
   );
+});
+
+test('CalibrationDraftWorkbench formal save posts candidate and records saved asset', async () => {
+  const originalPost = httpClient.post;
+  const calls = [];
+  let savedResponse = null;
+  const statusMessages = [];
+  const workbench = Object.create(CalibrationDraftWorkbench.prototype);
+  Object.assign(workbench, {
+    formalSaveInProgress: false,
+    session: {
+      sessionId: 'draft-1',
+      imageIdentity: 'image-hash',
+      candidateBundleJson: '{"schemaVersion":2}',
+      diagnostics: [],
+      status: 'Solved'
+    },
+    getProjectId: () => 'project-1',
+    getProject: () => ({ id: 'project-1', persistenceRevision: 11 }),
+    getOperator: () => ({ id: 'node-1' }),
+    renderStatus: message => statusMessages.push(message),
+    onFormalSaveSuccess: response => {
+      savedResponse = response;
+    }
+  });
+
+  httpClient.post = async (url, body) => {
+    calls.push({ url, body });
+    return {
+      projectId: 'project-1',
+      persistenceRevision: 12,
+      asset: {
+        assetId: 'asset-1',
+        projectRevision: 12,
+        contentHash: 'sha256:abc'
+      },
+      assets: {
+        calibrationAssets: [],
+        spatialAssets: []
+      }
+    };
+  };
+
+  try {
+    await CalibrationDraftWorkbench.prototype.formalSaveCandidate.call(workbench);
+  } finally {
+    httpClient.post = originalPost;
+  }
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, '/projects/project-1/calibration-assets/from-draft');
+  assert.equal(calls[0].body.expectedPersistenceRevision, 11);
+  assert.equal(calls[0].body.sessionId, 'draft-1');
+  assert.equal(calls[0].body.targetNodeId, 'node-1');
+  assert.equal(calls[0].body.candidateBundleJson, '{"schemaVersion":2}');
+  assert.equal(workbench.session.status, 'FormalSaved');
+  assert.equal(workbench.session.formalAssetId, 'asset-1');
+  assert.equal(workbench.session.formalAssetRevision, 12);
+  assert.equal(savedResponse.persistenceRevision, 12);
+  assert.ok(statusMessages.some(message => String(message || '').includes('Saved asset-1')));
+});
+
+test('CalibrationDraftWorkbench formal save displays backend failure reason', async () => {
+  const originalPost = httpClient.post;
+  const statusMessages = [];
+  const workbench = Object.create(CalibrationDraftWorkbench.prototype);
+  Object.assign(workbench, {
+    formalSaveInProgress: false,
+    session: {
+      sessionId: 'draft-1',
+      imageIdentity: 'image-hash',
+      candidateBundleJson: '{"schemaVersion":2}',
+      diagnostics: [],
+      status: 'Solved'
+    },
+    getProjectId: () => 'project-1',
+    getProject: () => ({ id: 'project-1', persistenceRevision: 11 }),
+    getOperator: () => ({ id: 'node-1' }),
+    renderStatus: message => statusMessages.push(message),
+    onFormalSaveSuccess: () => {
+      throw new Error('should not save');
+    }
+  });
+
+  httpClient.post = async () => {
+    throw new Error('PSV019: calibration candidate checksum mismatch.');
+  };
+
+  try {
+    await CalibrationDraftWorkbench.prototype.formalSaveCandidate.call(workbench);
+  } finally {
+    httpClient.post = originalPost;
+  }
+
+  assert.equal(workbench.session.status, 'FormalSaveFailed');
+  assert.equal(workbench.session.diagnostics[0], 'PSV019: calibration candidate checksum mismatch.');
+  assert.ok(statusMessages.includes('PSV019: calibration candidate checksum mismatch.'));
 });
 
 test('PropertyPanel groups CaliperFitV2 controls and locks image-center coordinates', () => {

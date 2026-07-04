@@ -200,9 +200,11 @@ export class CalibrationDraftWorkbench {
         this.container = container;
         this.getOperator = options.getOperator ?? (() => null);
         this.previewCoordinator = options.previewCoordinator ?? null;
+        this.getProject = options.getProject ?? (() => null);
         this.getProjectId = options.getProjectId ?? (() => null);
         this.getFlowRevision = options.getFlowRevision ?? (() => 0);
         this.getDebugSessionId = options.getDebugSessionId ?? (() => null);
+        this.onFormalSaveSuccess = options.onFormalSaveSuccess ?? (() => {});
         this.canvasId = `calibration-draft-canvas-${Math.random().toString(36).slice(2)}`;
         this.imageCanvas = null;
         this.unsubscribePreview = null;
@@ -211,6 +213,7 @@ export class CalibrationDraftWorkbench {
         this.imageBounds = null;
         this.solveAbort = null;
         this.solveSequence = 0;
+        this.formalSaveInProgress = false;
         this.selectedSampleId = null;
         this.session = this.createSessionFromOperator();
         this.render();
@@ -259,6 +262,9 @@ export class CalibrationDraftWorkbench {
             lastSolveResult: null,
             candidateBundle: null,
             candidateBundleJson: null,
+            formalAssetId: null,
+            formalAssetRevision: null,
+            formalAssetHash: null,
             artifacts: [],
             diagnostics: [],
             dirty: false,
@@ -355,7 +361,7 @@ export class CalibrationDraftWorkbench {
                     <div class="calibration-draft-actions">
                         <button type="button" class="btn btn-secondary btn-sm" data-action="apply-paste">Apply Paste</button>
                         <button type="button" class="btn btn-secondary btn-sm" data-action="copy">Copy Samples</button>
-                        <button type="button" class="btn btn-secondary btn-sm" data-action="formal-save" disabled title="G13A implements formal save">Formal Save (G13A)</button>
+                        <button type="button" class="btn btn-primary btn-sm" data-action="formal-save" disabled title="Save candidate as a Project asset">Formal Save</button>
                     </div>
                 </div>
             </section>
@@ -368,6 +374,7 @@ export class CalibrationDraftWorkbench {
         this.container.querySelector('[data-action="export"]')?.addEventListener('click', () => this.exportCandidateBundle());
         this.container.querySelector('[data-action="apply-paste"]')?.addEventListener('click', () => this.applyPastedSamples());
         this.container.querySelector('[data-action="copy"]')?.addEventListener('click', () => this.copySamples());
+        this.container.querySelector('[data-action="formal-save"]')?.addEventListener('click', () => this.formalSaveCandidate());
         this.renderOptions();
         this.renderStatus();
         this.renderTable();
@@ -439,7 +446,8 @@ export class CalibrationDraftWorkbench {
             ['Enabled', `${this.session.samples.filter(sample => sample.enabled !== false).length}`],
             ['Accepted', this.session.lastSolveResult ? String(this.session.lastSolveResult.accepted === true) : ''],
             ['Mean', formatNumber(this.session.lastSolveResult?.meanError)],
-            ['Max', formatNumber(this.session.lastSolveResult?.maxError)]
+            ['Max', formatNumber(this.session.lastSolveResult?.maxError)],
+            ['Asset', this.session.formalAssetId ? `${this.session.formalAssetId} / r${this.session.formalAssetRevision ?? '-'}` : '']
         ];
         metrics.forEach(([label, value]) => {
             const item = createElement('div', 'calibration-draft-metric');
@@ -451,6 +459,11 @@ export class CalibrationDraftWorkbench {
         const exportButton = this.container?.querySelector('[data-action="export"]');
         if (exportButton) {
             exportButton.disabled = !this.session.candidateBundleJson;
+        }
+        const formalSaveButton = this.container?.querySelector('[data-action="formal-save"]');
+        if (formalSaveButton) {
+            formalSaveButton.disabled = this.formalSaveInProgress || !this.session.candidateBundleJson;
+            formalSaveButton.textContent = this.formalSaveInProgress ? 'Saving...' : 'Formal Save';
         }
         const empty = this.container?.querySelector('.calibration-draft-empty');
         if (empty) {
@@ -561,6 +574,9 @@ export class CalibrationDraftWorkbench {
         this.session.lastSolveResult = null;
         this.session.candidateBundle = null;
         this.session.candidateBundleJson = null;
+        this.session.formalAssetId = null;
+        this.session.formalAssetRevision = null;
+        this.session.formalAssetHash = null;
         this.session.samples.forEach(sample => {
             sample.inlier = null;
             sample.reprojectionX = null;
@@ -771,6 +787,9 @@ export class CalibrationDraftWorkbench {
             this.session.lastSolveResult = response.lastSolveResult || null;
             this.session.candidateBundle = response.candidateBundle || null;
             this.session.candidateBundleJson = response.candidateBundleJson || null;
+            this.session.formalAssetId = null;
+            this.session.formalAssetRevision = null;
+            this.session.formalAssetHash = null;
             this.session.artifacts = response.artifacts || [];
             this.session.diagnostics = response.diagnostics || [];
             this.session.dirty = response.success !== true;
@@ -785,6 +804,53 @@ export class CalibrationDraftWorkbench {
             this.session.status = 'Failed';
             this.session.diagnostics = [error?.message || 'Draft solve failed.'];
             this.renderStatus(error?.message || 'Draft solve failed.');
+        }
+    }
+
+    async formalSaveCandidate() {
+        if (!this.session.candidateBundleJson) {
+            this.renderStatus('Recalc a draft candidate before Formal Save.');
+            return;
+        }
+
+        const projectId = this.getProjectId() || EMPTY_GUID;
+        if (!projectId || projectId === EMPTY_GUID) {
+            this.renderStatus('Open a project before Formal Save.');
+            return;
+        }
+
+        const project = this.getProject?.() || {};
+        const expectedRevision = Number(project.persistenceRevision ?? project.PersistenceRevision);
+        this.formalSaveInProgress = true;
+        this.session.status = 'Saving';
+        this.renderStatus('Saving formal asset...');
+
+        try {
+            const response = await httpClient.post(`/projects/${projectId}/calibration-assets/from-draft`, {
+                expectedPersistenceRevision: Number.isFinite(expectedRevision) ? expectedRevision : null,
+                sessionId: this.session.sessionId,
+                targetNodeId: this.getOperator()?.id || EMPTY_GUID,
+                imageIdentity: this.session.imageIdentity,
+                candidateBundleJson: this.session.candidateBundleJson
+            });
+            const asset = response?.asset || response?.Asset || {};
+            const revision = response?.persistenceRevision ?? response?.PersistenceRevision ?? asset.projectRevision ?? asset.ProjectRevision;
+            this.session.status = 'FormalSaved';
+            this.session.dirty = false;
+            this.session.formalAssetId = asset.assetId || asset.AssetId || '';
+            this.session.formalAssetRevision = revision ?? null;
+            this.session.formalAssetHash = asset.contentHash || asset.ContentHash || response?.assetsHash || response?.AssetsHash || '';
+            this.onFormalSaveSuccess?.(response);
+            this.renderStatus(`Saved ${this.session.formalAssetId || 'asset'} at revision ${this.session.formalAssetRevision ?? '-'}.`);
+        } catch (error) {
+            this.session.status = 'FormalSaveFailed';
+            this.session.diagnostics = [error?.message || 'Formal Save failed.'];
+            this.renderStatus(this.session.diagnostics[0]);
+        } finally {
+            this.formalSaveInProgress = false;
+            this.renderStatus(this.session.status === 'FormalSaveFailed'
+                ? (this.session.diagnostics?.[0] || 'Formal Save failed.')
+                : null);
         }
     }
 

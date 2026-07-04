@@ -26,6 +26,7 @@ public class ProjectService
     private readonly ILogger<ProjectService>? _logger;
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ProjectSaveCoordinator _saveCoordinator;
+    private readonly IProjectAssetStorage? _projectAssetStorage;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -55,14 +56,20 @@ public class ProjectService
         IOperatorFactory operatorFactory,
         ILogger<ProjectService>? logger,
         ProjectVariableSessionRegistry? projectVariableSessions,
-        ProjectSaveCoordinator? saveCoordinator = null)
+        ProjectSaveCoordinator? saveCoordinator = null,
+        IProjectAssetStorage? projectAssetStorage = null)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
         _operatorFactory = operatorFactory;
         _logger = logger;
         _projectVariableSessions = projectVariableSessions;
-        _saveCoordinator = saveCoordinator ?? new ProjectSaveCoordinator(projectRepository, flowStorage, projectVariableSessions);
+        _projectAssetStorage = projectAssetStorage;
+        _saveCoordinator = saveCoordinator ?? new ProjectSaveCoordinator(
+            projectRepository,
+            flowStorage,
+            projectVariableSessions,
+            projectAssetStorage: projectAssetStorage);
     }
 
     /// <summary>
@@ -102,6 +109,7 @@ public class ProjectService
             return null;
 
         var dto = MapToDto(project);
+        dto.Assets = await LoadProjectAssetsAsync(id);
 
         // 从文件加载流程数据覆盖 DB 数据 (如果有)
         var flowJson = await _flowStorage.LoadFlowJsonAsync(id);
@@ -220,7 +228,97 @@ public class ProjectService
 
         var dto = MapToDto(saveResult.Project);
         dto.Flow = nextFlow;
+        dto.Assets = await LoadProjectAssetsAsync(id);
         return dto;
+    }
+
+    public async Task<ProjectCalibrationAssetSaveResponse> SaveCalibrationAssetAsync(
+        Guid id,
+        ProjectCalibrationAssetSaveRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (_projectAssetStorage == null)
+        {
+            throw new InvalidOperationException("PSV017: project asset persistence is unavailable.");
+        }
+
+        var payload = request.Payload.Clone();
+        ValidateCalibrationAssetPayload(payload);
+        var contentHash = ProjectAssetJson.ComputePayloadHash(payload);
+        if (!string.IsNullOrWhiteSpace(request.ExpectedContentHash) &&
+            !string.Equals(request.ExpectedContentHash.Trim(), contentHash, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("PSV019: calibration candidate checksum mismatch.");
+        }
+
+        Project project;
+        ProjectGlobalVariableSchema previousGlobalVariables;
+        string? previousFlowJson;
+        ProjectAssetsDto currentAssets;
+        long expectedRevision;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+            expectedRevision = request.ExpectedPersistenceRevision ?? project.PersistenceRevision;
+            previousGlobalVariables = CloneSchema(project.GlobalVariables);
+            previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
+            currentAssets = await _projectAssetStorage.LoadAssetsAsync(id);
+        }
+
+        var assetId = NormalizeAssetId(request.AssetId, payload);
+        var now = DateTimeOffset.UtcNow;
+        var nextRevision = expectedRevision + 1;
+        var nextAssets = ProjectAssetJson.Clone(currentAssets);
+        var existingAsset = nextAssets.CalibrationAssets
+            .FirstOrDefault(asset => string.Equals(asset.AssetId, assetId, StringComparison.Ordinal));
+        nextAssets.CalibrationAssets.RemoveAll(asset =>
+            string.Equals(asset.AssetId, assetId, StringComparison.Ordinal));
+        nextAssets.CalibrationAssets.Add(new ProjectCalibrationAssetDto
+        {
+            AssetId = assetId,
+            Kind = "CalibrationBundleV2",
+            Version = NormalizeOptional(request.Version) ?? ReadPayloadString(payload, "calibrationVersion") ?? "1",
+            Producer = NormalizeOptional(request.Producer) ?? "NPointCalibrationDraftWorkbench",
+            SourceDraftSessionId = NormalizeOptional(request.SourceDraftSessionId) ?? string.Empty,
+            TargetNodeId = request.TargetNodeId,
+            ImageIdentity = NormalizeOptional(request.ImageIdentity) ?? string.Empty,
+            ContentHash = contentHash,
+            ProjectRevision = nextRevision,
+            CreatedAtUtc = existingAsset?.CreatedAtUtc == default ? now : existingAsset?.CreatedAtUtc ?? now,
+            UpdatedAtUtc = now,
+            Status = "authority",
+            Payload = payload
+        });
+
+        var assetCandidate = ProjectAssetSaveCandidate.Create(
+            nextAssets,
+            expectedRevision,
+            nextRevision,
+            "calibration-draft-formal-save");
+
+        var saved = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+            project,
+            expectedRevision,
+            project.Name,
+            project.Description,
+            previousGlobalVariables,
+            previousGlobalVariables,
+            previousFlowJson,
+            null,
+            null,
+            assetCandidate));
+
+        var savedAsset = assetCandidate.Assets.CalibrationAssets.Single(asset =>
+            string.Equals(asset.AssetId, assetId, StringComparison.Ordinal));
+        return new ProjectCalibrationAssetSaveResponse
+        {
+            ProjectId = saved.Project.Id,
+            PersistenceRevision = saved.Project.PersistenceRevision,
+            AssetsHash = assetCandidate.AssetsHash,
+            Asset = savedAsset,
+            Assets = assetCandidate.Assets
+        };
     }
 
     /// <summary>
@@ -364,6 +462,10 @@ public class ProjectService
         project.MarkAsDeleted();
         await _projectRepository.UpdateAsync(project);
         _projectVariableSessions?.Delete(id);
+        if (_projectAssetStorage != null)
+        {
+            await _projectAssetStorage.DeleteAssetsAsync(id);
+        }
     }
 
     /// <summary>
@@ -406,6 +508,77 @@ public class ProjectService
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(schema, _jsonOptions);
         return JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(bytes, _jsonOptions) ?? new ProjectGlobalVariableSchema();
+    }
+
+    private async Task<ProjectAssetsDto> LoadProjectAssetsAsync(Guid projectId) =>
+        _projectAssetStorage == null
+            ? new ProjectAssetsDto()
+            : await _projectAssetStorage.LoadAssetsAsync(projectId);
+
+    private static void ValidateCalibrationAssetPayload(JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("PSV025: calibration asset payload must be a JSON object.");
+        }
+
+        if (!TryGetPropertyIgnoreCase(payload, "schemaVersion", out var schemaVersion) ||
+            schemaVersion.ValueKind != JsonValueKind.Number ||
+            schemaVersion.GetInt32() != 2)
+        {
+            throw new InvalidOperationException("PSV025: calibration asset payload must be CalibrationBundleV2.");
+        }
+
+        if (!TryGetPropertyIgnoreCase(payload, "quality", out var quality) ||
+            quality.ValueKind != JsonValueKind.Object ||
+            !TryGetPropertyIgnoreCase(quality, "accepted", out var accepted) ||
+            accepted.ValueKind != JsonValueKind.True)
+        {
+            throw new InvalidOperationException("PSV025: calibration asset payload must be accepted before formal save.");
+        }
+    }
+
+    private static string NormalizeAssetId(string? raw, JsonElement payload)
+    {
+        var candidate = NormalizeOptional(raw) ?? ReadPayloadString(payload, "bundleId");
+        return string.IsNullOrWhiteSpace(candidate)
+            ? $"calibration-{Guid.NewGuid():N}"
+            : candidate;
+    }
+
+    private static string? NormalizeOptional(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+
+    private static string? ReadPayloadString(JsonElement payload, string propertyName)
+    {
+        if (!TryGetPropertyIgnoreCase(payload, propertyName, out var value) ||
+            value.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return NormalizeOptional(value.GetString());
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonElement element,
+        string propertyName,
+        out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private async Task<IReadOnlyList<ProjectDto>> MapProjectListWithAccessAsync(IEnumerable<Project> candidates)

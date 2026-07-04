@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G13A`
-- 当前卡片：`docs/进行中/Studio2/goals/G13A.md`
+- 当前 Goal：`G13B`
+- 当前卡片：`docs/进行中/Studio2/goals/G13B.md`
 - 当前阶段：`Vertical Product`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -115,8 +115,8 @@
 | G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | DONE | G11B-FOLLOWUP | `docs/进行中/Studio2/goals/G11C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | DONE | G11C | `docs/进行中/Studio2/goals/G12A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G12B | Vertical Product | N 点标定工作台 draft 与可视化 | DONE | G12A | `docs/进行中/Studio2/goals/G12B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13A | Vertical Product | Project 正式资产权威与保存恢复 | READY | G12B | `docs/进行中/Studio2/goals/G13A.md` |  |
-| G13B | Vertical Product | Runtime Package 可选 Calibration/Spatial 扩展 | LOCKED | G13A | `docs/进行中/Studio2/goals/G13B.md` |  |
+| G13A | Vertical Product | Project 正式资产权威与保存恢复 | DONE | G12B | `docs/进行中/Studio2/goals/G13A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
+| G13B | Vertical Product | Runtime Package 可选 Calibration/Spatial 扩展 | READY | G13A | `docs/进行中/Studio2/goals/G13B.md` |  |
 | G13C | Vertical Product | Station/Runtime 标定加载与 PixelToWorld E2E | LOCKED | G13B | `docs/进行中/Studio2/goals/G13C.md` |  |
 | G14A | Productization | 正式 Inspection 历史投影与分页 | LOCKED | G13C | `docs/进行中/Studio2/goals/G14A.md` |  |
 | G14B | Productization | 结果对比、基线与 Scene 回放 | LOCKED | G14A | `docs/进行中/Studio2/goals/G14B.md` |  |
@@ -170,6 +170,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-04 | G13A | `00797812407f949bb87fe1612272d40794c1634c` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused `ProjectSaveCoordinatorTests,ProjectServiceTests` PASS（39/39）；Desktop focused `CalibrationDraftEndpointsTests,Studio2ArchitectureGuardTests` PASS（19/19）；UI focused `property-panel-memory.test.mjs` PASS（12/12）；Product full serial PASS（3252 passed, 4 skipped）；Desktop full serial PASS（479/479）；UI unit full PASS（627/627）；Playwright `npoint-calibration-workbench.spec.ts` PASS（2/2）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 ProjectAssets DTO/JSON storage 与 `ProjectSaveCoordinator` `ProjectAssets` participant，formal `CalibrationBundleV2` draft candidate 通过 staging/hash/commit-intent/apply/recovery/rollback 成为 Project authority；Project DTO additive `assets` 缺省空集合；G12B Formal Save 接入正式入口并显示 asset id/revision；覆盖 stale、checksum mismatch、prepared rollback、asset write/apply recovery、tamper fail-closed、旧工程无资产、DTO roundtrip、architecture guard；未做 Runtime Package/Station/PLC/机器人；当前 Goal 推进到 G13B READY。 |
 | 2026-07-04 | G12B | `04ed17aafa97608fedc5bfc4374714d62f8c4ce5` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Desktop focused `CalibrationDraftEndpointsTests,ExecutionObservationProjectorTests,WebView2HostTests,Studio2ArchitectureGuardTests` PASS（61/61）；Product focused `NPointCalibrationSolverTests,NPointCalibrationOperatorTests` PASS（21/21）；Product full serial PASS（3242 passed, 4 skipped）；Desktop full serial PASS（476/476）；UI unit PASS（625/625）；Playwright `npoint-calibration-workbench.spec.ts` PASS（2/2）；calibration regression `-Gate all` PASS（111/111）；desktop endpoints PASS（40/40）；measurement accuracy PASS（122/122）；Station Debug/Release build PASS；Desktop Release publish PASS；`git diff --check` PASS；secret/large/process/scratch audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 NPoint draft workbench、draft solve endpoint、feature flag、preview artifacts、visual scene layers、candidate bundle export、flag-off generic fallback 与 tests/screenshots；draft remains ephemeral and no ProjectSave participant, Project schema migration, Runtime Package, Station calibration loading, PLC/robot provider, second solver, or frontend matrix math was added；current Goal advances to G13A READY. |
 | 2026-07-04 | G12A | `d2d247a30b4ff34fbc09832976dd2428e66e5275` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | `dotnet build ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --no-restore -v:minimal` PASS；NPoint focused `NPointCalibrationOperatorTests,NPointCalibrationSolverTests` PASS（21/21）；calibration regression `-Gate all` PASS（111/111）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 抽取唯一 `NPointCalibrationSolver`，覆盖 Affine/Perspective、RANSAC、误差统计、acceptance、退化/fail-closed 与 `CalibrationBundleV2` 生成；`NPointCalibrationOperator` 收敛为 PointPairs/参数适配、solver 调用、旧 outputs 映射、可选 SavePath 和图像标注 owner；新增 solver/operator parity、异常点集、无第二 OpenCV solve path 审计；未做 UI、正式资产保存、PLC/机器人 provider；当前 Goal 推进到 G12B READY。 |
 | 2026-07-04 | G11C | `38e9c1a19197556b316a4c93e95c19d9e8354748` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-coordinator-memory.test.mjs` PASS（17/17）；UI focused preview/property/ROI batch PASS（54/54）；Product focused Circle Search/preview/formal variable binding/ResultPath compatibility PASS（97/97）；Desktop focused Observation/Artifact/Architecture PASS（63/63）；`previewCoordinator.js` node check PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 Circle Search 连续预览同节点 Method/工程切换 scope invalidation、主动取消、latest-wins、迟到 artifact 删除与资源释放；补齐 typical/upper-bounded 320x240/640x480/1920x1080 p50/p95 benchmark 与 work-budget fail-closed 证据；验证 HoughCircle/FitEllipse/CaliperFitV2 JSON 保存重启兼容、preview/formal ResultPath 与变量绑定一致；未修改 Station、未引入 WebGL、未创建第二套 Preview owner；当前 Goal 推进到 G12A READY。 |

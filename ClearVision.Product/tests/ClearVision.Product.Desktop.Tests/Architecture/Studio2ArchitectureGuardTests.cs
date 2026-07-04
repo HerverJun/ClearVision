@@ -495,6 +495,39 @@ public sealed class Studio2ArchitectureGuardTests
         }
     }
 
+    [Fact]
+    public void ProjectAssets_ShouldUseProjectSaveCoordinatorAuthorityWithoutIndependentRevision()
+    {
+        var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/ProjectSaveCoordinator.cs");
+        var dtoText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/DTOs/ProjectAssetsDto.cs");
+        var endpointText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/CalibrationDraftEndpoints.cs");
+        var workbenchText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/calibrationDraftWorkbench.js");
+        var runtimeText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExporter.cs");
+        var stationText = string.Join(
+            "\n",
+            Directory.EnumerateFiles(
+                    Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Station"),
+                    "*.cs",
+                    SearchOption.AllDirectories)
+                .Select(File.ReadAllText));
+
+        coordinatorText.Should().Contain("ProjectSaveParticipant.ProjectAssets");
+        coordinatorText.Should().Contain("ProjectAssetsFileName");
+        coordinatorText.Should().Contain("ProjectAssetSaveCandidate");
+        coordinatorText.Should().NotContain("AssetSaveCoordinator");
+        coordinatorText.Should().NotContain("AssetRevision");
+        dtoText.Should().Contain("ProjectRevision");
+        dtoText.Should().NotContain("AssetRevision");
+        endpointText.Should().Contain("SaveCalibrationAssetAsync");
+        endpointText.Should().NotContain("JsonFileProjectAssetStorage");
+        workbenchText.Should().Contain("/calibration-assets/from-draft");
+        workbenchText.Should().NotContain("ProjectSaveCoordinator");
+        runtimeText.Should().NotContain("ProjectAssets");
+        runtimeText.Should().NotContain("CalibrationAssets");
+        stationText.Should().NotContain("ProjectAssets");
+        stationText.Should().NotContain("CalibrationAssets");
+    }
+
     private static IReadOnlyList<string> EnumerateFrontendV2SourceFiles()
     {
         var root = Path.Combine(Root, FrontendV2SourceRoot);

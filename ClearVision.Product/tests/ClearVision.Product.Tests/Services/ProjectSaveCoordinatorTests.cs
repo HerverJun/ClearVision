@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestData;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 
@@ -170,6 +171,284 @@ public sealed class ProjectSaveCoordinatorTests
         }
         finally
         {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenProjectAssetCandidateProvided_ShouldPersistAssetsAtProjectRevision()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                projectAssetStorage: assetStorage);
+            var assetCandidate = CreateAssetCandidate(0, 1);
+
+            var result = await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                assetCandidate));
+
+            result.Changed.Should().BeTrue();
+            project.PersistenceRevision.Should().Be(1);
+            assetStorage.Metadata.Should().NotBeNull();
+            assetStorage.Metadata!.PersistenceRevision.Should().Be(1);
+            assetStorage.Metadata.AssetsHash.Should().Be(assetCandidate.AssetsHash);
+            assetStorage.Assets.CalibrationAssets.Should().ContainSingle()
+                .Which.ProjectRevision.Should().Be(1);
+            Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenPreparedFailsWithProjectAssets_ShouldRollbackWithoutAuthorityPollution()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.AfterPrepared, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                failureInjector: failure,
+                projectAssetStorage: assetStorage);
+            var assetCandidate = CreateAssetCandidate(0, 1);
+
+            var act = async () => await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                assetCandidate));
+
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*injected*");
+            project.PersistenceRevision.Should().Be(0);
+            assetStorage.Metadata.Should().BeNull();
+            assetStorage.Assets.CalibrationAssets.Should().BeEmpty();
+            Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+            coordinator.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().NotThrow();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenProjectHasAssetsAndMetadataChanges_ShouldCarryAssetsForward()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                projectAssetStorage: assetStorage);
+            await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                CreateAssetCandidate(0, 1)));
+            var firstHash = assetStorage.Assets.CalibrationAssets.Single().ContentHash;
+
+            await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null));
+
+            project.PersistenceRevision.Should().Be(2);
+            assetStorage.Metadata!.PersistenceRevision.Should().Be(2);
+            var asset = assetStorage.Assets.CalibrationAssets.Single();
+            asset.ProjectRevision.Should().Be(2);
+            asset.ContentHash.Should().Be(firstHash);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenProjectAssetApplyFailsOnce_ShouldRecoverForward()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeProjectAssetsApply, failAlways: false);
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                failureInjector: failure,
+                projectAssetStorage: assetStorage);
+            var assetCandidate = CreateAssetCandidate(0, 1);
+
+            var result = await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                assetCandidate));
+
+            result.Changed.Should().BeTrue();
+            project.PersistenceRevision.Should().Be(1);
+            assetStorage.SaveCount.Should().Be(1);
+            assetStorage.Metadata!.PersistenceRevision.Should().Be(1);
+            Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenProjectAssetWriteFailsOnce_ShouldRecoverForward()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage { FailSaves = 1 };
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                projectAssetStorage: assetStorage);
+            var assetCandidate = CreateAssetCandidate(0, 1);
+
+            var result = await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                assetCandidate));
+
+            result.Changed.Should().BeTrue();
+            project.PersistenceRevision.Should().Be(1);
+            assetStorage.SaveAttempts.Should().Be(2);
+            assetStorage.Metadata!.PersistenceRevision.Should().Be(1);
+            Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task RecoverAllAsync_WhenProjectAssetsCandidateHashIsTampered_ShouldFenceProject()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                failureInjector: failure,
+                projectAssetStorage: assetStorage);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null,
+                CreateAssetCandidate(0, 1))));
+            var assetArtifact = Directory
+                .EnumerateFiles(Path.Combine(root, project.Id.ToString("D")), "project-assets.json", SearchOption.AllDirectories)
+                .Single();
+            File.WriteAllText(assetArtifact, "{\"schemaVersion\":1,\"calibrationAssets\":[],\"spatialAssets\":[]}", Encoding.UTF8);
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            var recovery = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                projectAssetStorage: assetStorage);
+
+            var summary = await recovery.RecoverAllAsync();
+
+            summary.RecoveredCount.Should().Be(0);
+            summary.RecoveryRequiredProjectIds.Should().Contain(project.Id);
+            summary.Failures.Should().ContainSingle(item =>
+                item.ProjectId == project.Id &&
+                item.Error.Contains("PSV010", StringComparison.Ordinal));
+            recovery.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
             DeleteDirectoryIfExists(root);
         }
     }
@@ -683,6 +962,39 @@ public sealed class ProjectSaveCoordinatorTests
         }
     }
 
+    private static ProjectAssetSaveCandidate CreateAssetCandidate(long fromRevision, long toRevision, string assetId = "calibration-a")
+    {
+        var payload = CreateCalibrationPayload();
+        var now = DateTimeOffset.UtcNow;
+        var assets = new ProjectAssetsDto
+        {
+            CalibrationAssets =
+            [
+                new ProjectCalibrationAssetDto
+                {
+                    AssetId = assetId,
+                    Kind = "CalibrationBundleV2",
+                    Version = "1",
+                    Producer = "ProjectSaveCoordinatorTests",
+                    SourceDraftSessionId = "draft-session",
+                    ContentHash = ProjectAssetJson.ComputePayloadHash(payload),
+                    ProjectRevision = toRevision,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    Status = "authority",
+                    Payload = payload
+                }
+            ]
+        };
+        return ProjectAssetSaveCandidate.Create(assets, fromRevision, toRevision, "test");
+    }
+
+    private static JsonElement CreateCalibrationPayload()
+    {
+        using var document = JsonDocument.Parse(CalibrationBundleV2TestData.CreateAcceptedScaleOffsetBundleJson());
+        return document.RootElement.Clone();
+    }
+
     private static OperatorFlowDto CreateFlow(string name) => new()
     {
         Name = name,
@@ -771,6 +1083,58 @@ public sealed class ProjectSaveCoordinatorTests
 
             _hit.TrySetResult();
             await _release.Task;
+        }
+    }
+
+    private sealed class InMemoryProjectAssetStorage : IProjectAssetStorage
+    {
+        public ProjectAssetsDto Assets { get; private set; } = new();
+
+        public ProjectAssetStorageMetadata? Metadata { get; private set; }
+
+        public int SaveCount { get; private set; }
+
+        public int SaveAttempts { get; private set; }
+
+        public int FailSaves { get; set; }
+
+        public Task<ProjectAssetsDto> LoadAssetsAsync(Guid projectId) =>
+            Task.FromResult(ProjectAssetJson.Clone(Assets));
+
+        public Task<ProjectAssetStorageMetadata?> LoadMetadataAsync(Guid projectId) =>
+            Task.FromResult(Metadata);
+
+        public Task SaveAssetsAsync(
+            Guid projectId,
+            ProjectAssetsDto assets,
+            long persistenceRevision,
+            Guid saveId,
+            string assetsHash)
+        {
+            SaveAttempts += 1;
+            if (FailSaves > 0)
+            {
+                FailSaves -= 1;
+                throw new IOException("asset save failed");
+            }
+
+            SaveCount += 1;
+            Assets = ProjectAssetJson.Clone(assets);
+            Metadata = new ProjectAssetStorageMetadata(
+                1,
+                projectId,
+                persistenceRevision,
+                assetsHash,
+                saveId,
+                DateTimeOffset.UtcNow);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAssetsAsync(Guid projectId)
+        {
+            Assets = new ProjectAssetsDto();
+            Metadata = null;
+            return Task.CompletedTask;
         }
     }
 

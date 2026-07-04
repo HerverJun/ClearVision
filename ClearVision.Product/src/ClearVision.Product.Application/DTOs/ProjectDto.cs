@@ -45,6 +45,8 @@ public class ProjectDto
 
     public ProjectGlobalVariableSchema GlobalVariables { get; set; } = new();
 
+    public ProjectAssetsDto Assets { get; set; } = new();
+
     /// <summary>
     /// 创建时间
     /// </summary>

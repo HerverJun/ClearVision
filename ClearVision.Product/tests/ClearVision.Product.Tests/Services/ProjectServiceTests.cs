@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestData;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using NSubstitute;
@@ -92,6 +93,109 @@ public class ProjectServiceTests
         logger.Entries.Should().Contain(entry =>
             entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
             entry.Message.Contains("Failed to deserialize flow JSON"));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenProjectHasNoAssets_ShouldReturnEmptyProjectAssets()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assets = new RecordingProjectAssetStorage();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+
+        var dto = await sut.GetByIdAsync(project.Id);
+
+        dto.Should().NotBeNull();
+        dto!.Assets.Should().NotBeNull();
+        dto.Assets.CalibrationAssets.Should().BeEmpty();
+        dto.Assets.SpatialAssets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ProjectJsonSerializer_WhenAssetsFieldIsMissing_ShouldDeserializeEmptyAssets()
+    {
+        var serializer = new ProjectJsonSerializer();
+        var bytes = Encoding.UTF8.GetBytes("""
+            {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "legacy",
+              "version": "1.0.0",
+              "persistenceRevision": 7,
+              "globalSettings": {},
+              "globalVariables": { "variables": [] },
+              "createdAt": "2026-07-04T00:00:00Z"
+            }
+            """);
+
+        var dto = await serializer.DeserializeAsync(bytes);
+
+        dto.Should().NotBeNull();
+        dto!.Assets.Should().NotBeNull();
+        dto.Assets.CalibrationAssets.Should().BeEmpty();
+        dto.Assets.SpatialAssets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SaveCalibrationAssetAsync_WhenDraftCandidateIsAccepted_ShouldPersistAuthorityAsset()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assetStorage = new RecordingProjectAssetStorage();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var coordinator = new ProjectSaveCoordinator(repository, storage, projectAssetStorage: assetStorage);
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, coordinator, assetStorage);
+        var payload = CreateCalibrationPayload();
+
+        var response = await sut.SaveCalibrationAssetAsync(project.Id, new ProjectCalibrationAssetSaveRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            SourceDraftSessionId = "draft-1",
+            TargetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            ImageIdentity = "image-hash",
+            Payload = payload
+        });
+
+        response.PersistenceRevision.Should().Be(1);
+        response.Asset.AssetId.Should().NotBeNullOrWhiteSpace();
+        response.Asset.SourceDraftSessionId.Should().Be("draft-1");
+        response.Asset.ContentHash.Should().Be(ProjectAssetJson.ComputePayloadHash(payload));
+        assetStorage.Metadata!.PersistenceRevision.Should().Be(1);
+        assetStorage.Assets.CalibrationAssets.Should().ContainSingle()
+            .Which.Status.Should().Be("authority");
+    }
+
+    [Fact]
+    public async Task SaveCalibrationAssetAsync_WhenChecksumDoesNotMatch_ShouldFailWithoutChangingAuthority()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assetStorage = new RecordingProjectAssetStorage();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var coordinator = new ProjectSaveCoordinator(repository, storage, projectAssetStorage: assetStorage);
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, coordinator, assetStorage);
+
+        var act = async () => await sut.SaveCalibrationAssetAsync(project.Id, new ProjectCalibrationAssetSaveRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            ExpectedContentHash = "sha256:0000",
+            Payload = CreateCalibrationPayload()
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV019*");
+        project.PersistenceRevision.Should().Be(0);
+        assetStorage.Metadata.Should().BeNull();
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
     }
 
     [Fact]
@@ -599,6 +703,12 @@ public class ProjectServiceTests
         };
     }
 
+    private static JsonElement CreateCalibrationPayload()
+    {
+        using var document = JsonDocument.Parse(CalibrationBundleV2TestData.CreateAcceptedScaleOffsetBundleJson());
+        return document.RootElement.Clone();
+    }
+
     private sealed class FailingProjectVariableStateStore : IProjectVariableStateStore
     {
         public IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema) => [];
@@ -610,6 +720,44 @@ public class ProjectServiceTests
 
         public void Delete(string scopeId)
         {
+        }
+    }
+
+    private sealed class RecordingProjectAssetStorage : IProjectAssetStorage
+    {
+        public ProjectAssetsDto Assets { get; private set; } = new();
+
+        public ProjectAssetStorageMetadata? Metadata { get; private set; }
+
+        public Task<ProjectAssetsDto> LoadAssetsAsync(Guid projectId) =>
+            Task.FromResult(ProjectAssetJson.Clone(Assets));
+
+        public Task<ProjectAssetStorageMetadata?> LoadMetadataAsync(Guid projectId) =>
+            Task.FromResult(Metadata);
+
+        public Task SaveAssetsAsync(
+            Guid projectId,
+            ProjectAssetsDto assets,
+            long persistenceRevision,
+            Guid saveId,
+            string assetsHash)
+        {
+            Assets = ProjectAssetJson.Clone(assets);
+            Metadata = new ProjectAssetStorageMetadata(
+                1,
+                projectId,
+                persistenceRevision,
+                assetsHash,
+                saveId,
+                DateTimeOffset.UtcNow);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAssetsAsync(Guid projectId)
+        {
+            Assets = new ProjectAssetsDto();
+            Metadata = null;
+            return Task.CompletedTask;
         }
     }
 

@@ -2,8 +2,11 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Observation;
@@ -44,6 +47,62 @@ public static class CalibrationDraftEndpoints
 
             var response = SolveDraft(request, artifactStore, cancellationToken);
             return Results.Ok(response);
+        });
+
+        app.MapPost("/api/projects/{projectId:guid}/calibration-assets/from-draft", async (
+            Guid projectId,
+            NPointCalibrationFormalSaveRequest request,
+            ProjectService projectService,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            IOptions<StudioOptions> studioOptions,
+            CancellationToken cancellationToken) =>
+        {
+            if (!studioOptions.Value.NPointCalibrationWorkbenchEnabled)
+            {
+                return Results.NotFound(new
+                {
+                    error = "NPoint calibration draft workbench is disabled.",
+                    featureFlag = NPointWorkbenchFeatureFlag
+                });
+            }
+
+            if (!TryBuildFormalSavePayload(request, out var payload, out var version, out var error))
+            {
+                return Results.BadRequest(new { Code = "PSV025", Error = error });
+            }
+
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(
+                projectId,
+                "calibration-asset-save",
+                cancellationToken);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
+            try
+            {
+                var response = await projectService.SaveCalibrationAssetAsync(
+                    projectId,
+                    new ProjectCalibrationAssetSaveRequest
+                    {
+                        ExpectedPersistenceRevision = request.ExpectedPersistenceRevision,
+                        AssetId = request.AssetId,
+                        Version = version,
+                        Producer = "NPointCalibrationDraftWorkbench",
+                        SourceDraftSessionId = request.SessionId,
+                        TargetNodeId = request.TargetNodeId,
+                        ImageIdentity = request.ImageIdentity,
+                        ExpectedContentHash = request.ExpectedContentHash,
+                        Payload = payload
+                    });
+
+                return Results.Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return ToProjectAssetFailure(ex);
+            }
         });
 
         return app;
@@ -152,6 +211,85 @@ public static class CalibrationDraftEndpoints
             Diagnostics = diagnostics.Take(MaxDiagnostics).ToList(),
             Observation = BuildObservation(request, draft, solve.Success, solve.ErrorMessage)
         };
+    }
+
+    private static bool TryBuildFormalSavePayload(
+        NPointCalibrationFormalSaveRequest request,
+        out JsonElement payload,
+        out string? version,
+        out string error)
+    {
+        payload = default;
+        version = null;
+        error = string.Empty;
+        CalibrationBundleV2 bundle;
+        if (!string.IsNullOrWhiteSpace(request.CandidateBundleJson))
+        {
+            if (!CalibrationBundleV2Json.TryDeserialize(request.CandidateBundleJson, out bundle, out error))
+            {
+                return false;
+            }
+        }
+        else if (request.CandidateBundle != null)
+        {
+            bundle = request.CandidateBundle;
+            if (!CalibrationBundleV2Json.TryValidateBase(bundle, out error))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            error = "Calibration candidate bundle is required.";
+            return false;
+        }
+
+        if (!CalibrationBundleV2Json.TryRequireAccepted(bundle, out error))
+        {
+            return false;
+        }
+
+        payload = JsonSerializer.SerializeToElement(bundle, CalibrationBundleV2Json.DefaultOptions);
+        version = string.IsNullOrWhiteSpace(bundle.CalibrationVersion)
+            ? null
+            : bundle.CalibrationVersion.Trim();
+        return true;
+    }
+
+    private static IResult ToProjectAssetFailure(Exception ex)
+    {
+        if (TryParseStableError(ex.Message, out var code, out var message))
+        {
+            return string.Equals(code, "PSV011", StringComparison.Ordinal)
+                ? Results.Conflict(new { Code = code, Error = message })
+                : Results.BadRequest(new { Code = code, Error = message });
+        }
+
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static bool TryParseStableError(string? message, out string code, out string error)
+    {
+        code = string.Empty;
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var separatorIndex = message.IndexOf(':', StringComparison.Ordinal);
+        var candidateCode = separatorIndex > 0 ? message[..separatorIndex] : message;
+        if (!candidateCode.StartsWith("GV", StringComparison.OrdinalIgnoreCase) &&
+            !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        code = candidateCode;
+        error = separatorIndex >= 0
+            ? message[(separatorIndex + 1)..].TrimStart()
+            : message;
+        return true;
     }
 
     private static NPointCalibrationDraftSolveResultDto BuildSolveResult(NPointCalibrationResult solve)
@@ -539,6 +677,25 @@ public sealed class NPointCalibrationDraftSolveRequest
     public string Unit { get; init; } = "mm";
     public NPointCalibrationDraftSolverOptionsDto SolverOptions { get; init; } = new();
     public List<NPointCalibrationDraftSampleDto> Samples { get; init; } = [];
+}
+
+public sealed class NPointCalibrationFormalSaveRequest
+{
+    public long? ExpectedPersistenceRevision { get; init; }
+
+    public string? AssetId { get; init; }
+
+    public string? SessionId { get; init; }
+
+    public Guid? TargetNodeId { get; init; }
+
+    public string? ImageIdentity { get; init; }
+
+    public string? CandidateBundleJson { get; init; }
+
+    public CalibrationBundleV2? CandidateBundle { get; init; }
+
+    public string? ExpectedContentHash { get; init; }
 }
 
 public sealed class NPointCalibrationDraftSolverOptionsDto
