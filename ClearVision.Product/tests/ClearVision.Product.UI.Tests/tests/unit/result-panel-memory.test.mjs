@@ -291,6 +291,7 @@ function createPanel() {
     serverAnalysisSource: 'local',
     comparisonLoader: null,
     previousSuccessLoader: null,
+    evidenceExportLoader: null,
     comparisonBaseline: null,
     comparisonSelection: { left: null, right: null },
     latestFormalResult: null,
@@ -343,6 +344,21 @@ function createComparisonContainer() {
   container.querySelectorAll = () => [];
 
   return { container, output, section };
+}
+
+function createEvidenceContainer() {
+  const output = createMockElement();
+  const container = createMockElement();
+  container.querySelector = selector => {
+    if (selector === '.history-evidence-output') {
+      return output;
+    }
+
+    return null;
+  };
+  container.querySelectorAll = () => [];
+
+  return { container, output };
 }
 
 test('live result history is bounded and old inline images are discarded', () => {
@@ -736,6 +752,11 @@ test('server history detail loads on demand and renders traceability warnings', 
         hasImage: true,
         imageMissing: true,
         imageMissingMessage: '图像文件不存在或已清理',
+        hasEvidenceManifest: true,
+        evidenceStatus: 'available',
+        evidenceManifestReference: '/api/inspection/history/project-1/history-1/evidence/manifest',
+        evidenceTotalBytes: 128,
+        retentionExpiresAtUtc: '2026-07-11T08:00:00Z',
         outputDataPreview: {
           value: { score: 42 },
           wasTruncated: true,
@@ -765,6 +786,9 @@ test('server history detail loads on demand and renders traceability warnings', 
     await new Promise(resolve => setTimeout(resolve, 0));
 
     assert.match(fixture.modalBody.innerHTML, /追溯信息/);
+    assert.match(fixture.modalBody.innerHTML, /证据清单/);
+    assert.match(fixture.modalBody.innerHTML, /available \/ 可用/);
+    assert.match(fixture.modalBody.innerHTML, /导出证据/);
     assert.match(fixture.modalBody.innerHTML, /旧数据未记录/);
     assert.match(fixture.modalBody.innerHTML, /图像缺失/);
     assert.match(fixture.modalBody.innerHTML, /图像文件不存在或已清理/);
@@ -779,6 +803,63 @@ test('server history detail loads on demand and renders traceability warnings', 
       delete globalThis.window.requestAnimationFrame;
     }
   }
+});
+
+test('history evidence section renders missing expired and disabled states fail-soft', () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  panel.serverPaged = true;
+
+  const missing = panel.renderHistoryEvidenceSection({
+    id: 'history-missing',
+    projectId: 'project-1',
+    evidenceStatus: 'missing',
+    evidenceMessage: '证据清单缺失或已清理'
+  });
+  const expired = panel.renderHistoryEvidenceSection({
+    id: 'history-expired',
+    projectId: 'project-1',
+    evidenceStatus: 'expired'
+  });
+  const disabled = panel.renderHistoryEvidenceSection({
+    id: 'history-disabled',
+    projectId: 'project-1',
+    evidenceStatus: 'disabled'
+  });
+
+  assert.match(missing, /missing \/ 缺失或已清理/);
+  assert.match(missing, /摘要仍可查看|证据清单缺失或已清理/);
+  assert.match(expired, /expired \/ 已过期/);
+  assert.match(disabled, /disabled \/ 未启用/);
+  assert.match(disabled, /disabled/);
+});
+
+test('history evidence export renders success and failure states', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createEvidenceContainer();
+  const downloads = [];
+  panel.evidenceExportLoader = async result => ({
+    blob: { size: 42 },
+    filename: `${result.id}.json`,
+    sha256: 'abc123'
+  });
+  panel.downloadEvidenceBlob = (blob, filename) => {
+    downloads.push({ blob, filename });
+  };
+
+  await panel.runEvidenceExport(fixture.container, { id: 'history-1' });
+
+  assert.deepEqual(downloads, [{ blob: { size: 42 }, filename: 'history-1.json' }]);
+  assert.match(fixture.output.innerHTML, /证据导出已生成/);
+  assert.match(fixture.output.innerHTML, /abc123/);
+
+  panel.evidenceExportLoader = async () => {
+    throw new Error('export failed');
+  };
+  await panel.runEvidenceExport(fixture.container, { id: 'history-1' });
+
+  assert.match(fixture.output.innerHTML, /export failed/);
 });
 
 test('history comparison section renders baseline and session-only controls', () => {

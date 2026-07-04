@@ -49,6 +49,19 @@ public sealed class ApiEndpointsInspectionHistoryTests
     }
 
     [Fact]
+    public async Task EvidenceManifestEndpoint_ShouldRequireDesktopAuthMiddleware()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var authService = Substitute.For<IAuthService>();
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService);
+
+        using var response = await host.Client.GetAsync($"/api/inspection/history/{Guid.NewGuid()}/{Guid.NewGuid()}/evidence/manifest");
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized, body);
+    }
+
+    [Fact]
     public async Task HistoryDetailEndpoint_ShouldScopeLookupByProjectAndResultId()
     {
         var service = Substitute.For<IInspectionService>();
@@ -154,6 +167,124 @@ public sealed class ApiEndpointsInspectionHistoryTests
         using var document = JsonDocument.Parse(body);
         document.RootElement.GetProperty("found").GetBoolean().Should().BeTrue();
         document.RootElement.GetProperty("referenceSummary").GetProperty("resultId").GetGuid().Should().Be(referenceId);
+    }
+
+    [Fact]
+    public async Task EvidenceManifestEndpoint_ShouldScopeLookupByProjectAndResultId()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var evidenceService = Substitute.For<IInspectionEvidenceManifestService>();
+        var authService = Substitute.For<IAuthService>();
+        var projectId = Guid.NewGuid();
+        var resultId = Guid.NewGuid();
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = "history-user",
+            Username = "history-user",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        evidenceService.GetManifestAsync(projectId, resultId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InspectionEvidenceManifestReadResult
+            {
+                Found = false,
+                Status = "missing",
+                ErrorCode = "EvidenceManifestMissing",
+                Message = "证据清单缺失或已清理",
+                Summary = new InspectionEvidenceSummary
+                {
+                    EvidenceStatus = "missing",
+                    Message = "证据清单缺失或已清理"
+                }
+            }));
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService, evidenceService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/history/{projectId}/{resultId}/evidence/manifest");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "desktop-token");
+        using var response = await host.Client.SendAsync(request);
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        _ = evidenceService.Received(1).GetManifestAsync(projectId, resultId, Arg.Any<CancellationToken>());
+
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("status").GetString().Should().Be("missing");
+        document.RootElement.GetProperty("errorCode").GetString().Should().Be("EvidenceManifestMissing");
+    }
+
+    [Fact]
+    public async Task EvidenceExportEndpoint_ShouldReturnBoundedPackageAndChecksumHeader()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var evidenceService = Substitute.For<IInspectionEvidenceManifestService>();
+        var authService = Substitute.For<IAuthService>();
+        var projectId = Guid.NewGuid();
+        var resultId = Guid.NewGuid();
+        var payload = """{"schemaVersion":1,"manifest":{"items":[]}}"""u8.ToArray();
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = "history-user",
+            Username = "history-user",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        evidenceService.ExportAsync(projectId, resultId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InspectionEvidenceExportResult
+            {
+                Success = true,
+                Status = "available",
+                FileName = "evidence.json",
+                ContentType = "application/json",
+                Content = payload,
+                TotalBytes = payload.Length,
+                Sha256 = "abc123"
+            }));
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService, evidenceService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/history/{projectId}/{resultId}/evidence/export");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "desktop-token");
+        using var response = await host.Client.SendAsync(request);
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
+        response.Headers.GetValues("X-Evidence-Export-Sha256").Should().ContainSingle().Which.Should().Be("abc123");
+        body.Should().Contain("schemaVersion");
+        _ = evidenceService.Received(1).ExportAsync(projectId, resultId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EvidenceExportEndpoint_WhenProjectScopeMisses_ShouldReturnNotFound()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var evidenceService = Substitute.For<IInspectionEvidenceManifestService>();
+        var authService = Substitute.For<IAuthService>();
+        var projectId = Guid.NewGuid();
+        var resultId = Guid.NewGuid();
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = "history-user",
+            Username = "history-user",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        evidenceService.ExportAsync(projectId, resultId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InspectionEvidenceExportResult
+            {
+                Success = false,
+                Status = "not-found",
+                ErrorCode = "InspectionResultNotFound",
+                Message = "Inspection history result was not found."
+            }));
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService, evidenceService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/history/{projectId}/{resultId}/evidence/export");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "desktop-token");
+        using var response = await host.Client.SendAsync(request);
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, body);
+        body.Should().Contain("InspectionResultNotFound");
     }
 
     [Fact]
@@ -495,7 +626,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
 
         public static async Task<HistoryEndpointTestHost> CreateAsync(
             IInspectionService service,
-            IAuthService authService)
+            IAuthService authService,
+            IInspectionEvidenceManifestService? evidenceService = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -506,6 +638,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
             builder.Services.AddLogging();
             builder.Services.AddSingleton(service);
             builder.Services.AddSingleton(authService);
+            builder.Services.AddSingleton(evidenceService ?? Substitute.For<IInspectionEvidenceManifestService>());
 
             var app = builder.Build();
             app.UseMiddleware<AuthMiddleware>();
@@ -541,6 +674,37 @@ public sealed class ApiEndpointsInspectionHistoryTests
                 return result == null
                     ? Results.NotFound(new { Error = "Inspection history result was not found." })
                     : Results.Ok(ApiEndpoints.ToInspectionPreviousSuccessResponse(result));
+            });
+            app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/evidence/manifest", async (
+                Guid projectId,
+                Guid resultId,
+                [FromServices] IInspectionEvidenceManifestService inspectionEvidenceService) =>
+            {
+                var result = await inspectionEvidenceService.GetManifestAsync(projectId, resultId);
+                return string.Equals(result.ErrorCode, "InspectionResultNotFound", StringComparison.Ordinal)
+                    ? Results.NotFound(new { result.ErrorCode, result.Message })
+                    : Results.Ok(ApiEndpoints.ToInspectionEvidenceManifestResponse(result));
+            });
+            app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/evidence/export", async (
+                Guid projectId,
+                Guid resultId,
+                HttpContext httpContext,
+                [FromServices] IInspectionEvidenceManifestService inspectionEvidenceService) =>
+            {
+                var result = await inspectionEvidenceService.ExportAsync(projectId, resultId);
+                if (!result.Success)
+                {
+                    return string.Equals(result.ErrorCode, "InspectionResultNotFound", StringComparison.Ordinal)
+                        ? Results.NotFound(new { result.ErrorCode, result.Message })
+                        : Results.Json(new { result.Status, result.ErrorCode, result.Message }, statusCode: StatusCodes.Status409Conflict);
+                }
+
+                if (!string.IsNullOrWhiteSpace(result.Sha256))
+                {
+                    httpContext.Response.Headers["X-Evidence-Export-Sha256"] = result.Sha256;
+                }
+
+                return Results.File(result.Content, result.ContentType, result.FileName);
             });
             await app.StartAsync();
 

@@ -661,7 +661,10 @@ public sealed class Studio2ArchitectureGuardTests
             ["InspectionResultRepository"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Infrastructure/Repositories/InspectionResultRepository.cs"),
             ["InspectionService.G14B"] = scopedServiceText,
             ["InspectionHistoryComparisonBuilder"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Analysis/InspectionHistoryComparisonBuilder.cs"),
-            ["resultPanel"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js"),
+            ["resultPanel"] = ExtractSection(
+                ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js"),
+                "    renderHistoryComparisonSection(result) {",
+                "    renderJsonPreviewNotice"),
             ["app.historyComparison"] = ExtractSection(
                 ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js"),
                 "async function loadInspectionHistoryComparison",
@@ -699,6 +702,82 @@ public sealed class Studio2ArchitectureGuardTests
         g14bTexts["InspectionHistoryComparisonBuilder"].Should().Contain("ResultPathFormatter.Format");
         g14bTexts["resultPanel"].Should().Contain("comparisonBaseline");
         g14bTexts["resultPanel"].Should().Contain("暂无 Scene evidence，已降级为摘要回放");
+    }
+
+    [Fact]
+    public void G14C_EvidenceManifest_ShouldStaySidecarBoundedAndAvoidPreviewRuntimeStation()
+    {
+        var apiText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs");
+        var evidenceApiText = ExtractSection(
+            apiText,
+            "app.MapGet(\"/api/inspection/history/{projectId:guid}/{resultId:guid}/evidence/manifest\"",
+            "        app.MapGet(\"/api/inspection/history/{projectId:guid}/{resultId:guid}/previous-success\"");
+        var evidenceTexts = new Dictionary<string, string>
+        {
+            ["InspectionEvidenceModels"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Interfaces/InspectionEvidenceModels.cs"),
+            ["IInspectionEvidenceManifestService"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/IInspectionEvidenceManifestService.cs"),
+            ["InspectionEvidenceManifestService"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/InspectionEvidenceManifestService.cs"),
+            ["ApiEndpoints.G14C"] = evidenceApiText,
+            ["resultPanel.evidence"] = ExtractSection(
+                ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js"),
+                "renderHistoryEvidenceSection",
+                "    renderHistoryComparisonSection"),
+            ["app.evidenceExport"] = ExtractSection(
+                ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js"),
+                "async function exportInspectionEvidence",
+                "async function loadStationResultHistory")
+        };
+
+        foreach (var (name, text) in evidenceTexts)
+        {
+            text.Should().NotContain("PreviewArtifact", name);
+            text.Should().NotContain("preview cache", name);
+            text.Should().NotContain("operatorResultViewModel", name);
+            text.Should().NotContain("ExecutionObservationEnvelopeV1", name);
+            text.Should().NotContain("RuntimePackageLoader", name);
+            text.Should().NotContain("RuntimePackageExporter", name);
+            text.Should().NotContain("PixelToWorld", name);
+            text.Should().NotContain("AgentRunEventStore", name);
+            text.Should().NotContain("EventStore", name);
+            text.Should().NotContain("new ImageCanvas", name);
+            text.Should().NotContain("createElement('canvas'", name);
+            text.Should().NotContain("document.createElement('canvas'", name);
+        }
+
+        evidenceTexts["InspectionEvidenceModels"].Should().Contain("InspectionEvidenceManifestV1");
+        evidenceTexts["InspectionEvidenceModels"].Should().Contain("RelativePath");
+        evidenceTexts["InspectionEvidenceModels"].Should().Contain("StudioEvidenceRetentionOptions");
+        evidenceTexts["InspectionEvidenceModels"].Should().Contain("StationEvidenceRetentionOptions");
+        evidenceTexts["InspectionEvidenceManifestService"].Should().Contain("ComputeManifestChecksum");
+        evidenceTexts["InspectionEvidenceManifestService"].Should().Contain("MaxExportBytes");
+        evidenceTexts["InspectionEvidenceManifestService"].Should().Contain("SafeJsonPreviewBuilder.Build");
+        evidenceTexts["InspectionEvidenceManifestService"].Should().Contain("binary-item-omitted-from-json-export");
+
+        ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Entities/InspectionResult.cs")
+            .Should().NotContain("EvidenceManifest", "G14C must not require a DB row expansion for formal evidence.");
+
+        var historyDtoText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Interfaces/IInspectionResultRepository.cs");
+        ExtractSection(historyDtoText, "public class InspectionHistoryItem", "public class InspectionHistoryDefectItem")
+            .Should().NotContain("byte[]", "history list/detail DTOs must not carry image bytes/base64.");
+
+        var runtimeStationAgentText = string.Join(
+            "\n",
+            new[]
+            {
+                "ClearVision.Product/src/ClearVision.Product.Runtime",
+                "ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions",
+                "ClearVision.Product/src/ClearVision.Product.Station",
+                "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+            }
+            .Select(root => Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar)))
+            .Where(Directory.Exists)
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                           path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            .Select(File.ReadAllText));
+
+        runtimeStationAgentText.Should().NotContain("InspectionEvidenceManifest");
+        runtimeStationAgentText.Should().NotContain("StudioEvidenceRetentionOptions");
     }
 
     [Fact]

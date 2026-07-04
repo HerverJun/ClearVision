@@ -247,6 +247,7 @@ public static class VisionRuntimeServiceCollectionExtensions
 
         services.AddScoped<ProjectService>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
+        services.AddScoped<IInspectionEvidenceManifestService, InspectionEvidenceManifestService>();
         services.AddScoped<IInspectionService, InspectionService>();
 
         // 共享 Runtime 核心（算子注册、FlowExecutionService 等）

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -243,7 +244,33 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
         {
             using var scope = _serviceProvider.CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IInspectionResultRepository>();
-            await repo.AddRangeAsync(results);
+            var persistenceResults = results
+                .Select(InspectionResultPersistenceSnapshot.WithoutOutputImage)
+                .ToList();
+            await repo.AddRangeAsync(persistenceResults);
+            var evidenceService = scope.ServiceProvider.GetService<IInspectionEvidenceManifestService>();
+            if (evidenceService != null)
+            {
+                foreach (var result in results)
+                {
+                    try
+                    {
+                        await evidenceService.CaptureAsync(result, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Evidence manifest capture failed without affecting InspectionResult batch persistence. ResultId={ResultId}",
+                            result.Id);
+                    }
+                }
+            }
+
             return true;
         }
         catch (Exception ex)

@@ -640,12 +640,62 @@ public static class ApiEndpoints
         app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}", async (
         Guid projectId,
         Guid resultId,
-        [FromServices] Core.Services.IInspectionService service) =>
+        [FromServices] Core.Services.IInspectionService service,
+        [FromServices] IInspectionEvidenceManifestService evidenceService) =>
         {
             var result = await service.GetInspectionHistoryDetailAsync(projectId, resultId);
-            return result == null
-                ? Results.NotFound(new { Error = "Inspection history result was not found." })
-                : Results.Ok(ToInspectionHistoryDetailResponse(result));
+            if (result == null)
+            {
+                return Results.NotFound(new { Error = "Inspection history result was not found." });
+            }
+
+            var evidenceSummary = await evidenceService.GetSummaryAsync(result);
+            return Results.Ok(ToInspectionHistoryDetailResponse(result, evidenceSummary));
+        });
+
+        app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/evidence/manifest", async (
+        Guid projectId,
+        Guid resultId,
+        [FromServices] IInspectionEvidenceManifestService evidenceService) =>
+        {
+            var manifest = await evidenceService.GetManifestAsync(projectId, resultId);
+            return string.Equals(manifest.ErrorCode, "InspectionResultNotFound", StringComparison.Ordinal)
+                ? Results.NotFound(new { manifest.ErrorCode, manifest.Message })
+                : Results.Ok(ToInspectionEvidenceManifestResponse(manifest));
+        });
+
+        app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/evidence/export", async (
+        Guid projectId,
+        Guid resultId,
+        HttpContext httpContext,
+        [FromServices] IInspectionEvidenceManifestService evidenceService) =>
+        {
+            var export = await evidenceService.ExportAsync(projectId, resultId);
+            if (!export.Success)
+            {
+                if (string.Equals(export.ErrorCode, "InspectionResultNotFound", StringComparison.Ordinal))
+                {
+                    return Results.NotFound(new { export.ErrorCode, export.Message });
+                }
+
+                var statusCode = string.Equals(export.ErrorCode, "EvidenceExportTooLarge", StringComparison.Ordinal)
+                    ? StatusCodes.Status413PayloadTooLarge
+                    : StatusCodes.Status409Conflict;
+                return Results.Json(new
+                {
+                    export.Status,
+                    export.ErrorCode,
+                    export.Message,
+                    export.TotalBytes
+                }, statusCode: statusCode);
+            }
+
+            if (!string.IsNullOrWhiteSpace(export.Sha256))
+            {
+                httpContext.Response.Headers["X-Evidence-Export-Sha256"] = export.Sha256;
+            }
+
+            return Results.File(export.Content, export.ContentType, export.FileName);
         });
 
         app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/previous-success", async (
@@ -1112,11 +1162,20 @@ public static class ApiEndpoints
         };
     }
 
-    internal static object ToInspectionHistoryDetailResponse(InspectionHistoryDetail result)
+    internal static object ToInspectionHistoryDetailResponse(
+        InspectionHistoryDetail result,
+        InspectionEvidenceSummary? evidenceSummary = null)
     {
         var outputPreview = SafeJsonPreviewBuilder.Build(result.OutputDataJson);
         var analysisPreview = SafeJsonPreviewBuilder.Build(result.AnalysisDataJson);
         var hasImageReference = result.ImageId.HasValue;
+        evidenceSummary ??= new InspectionEvidenceSummary
+        {
+            HasEvidenceManifest = false,
+            EvidenceStatus = "missing",
+            EvidenceManifestReference = $"/api/inspection/history/{result.ProjectId:D}/{result.Id:D}/evidence/manifest",
+            Message = "证据清单缺失或已清理"
+        };
 
         return new
         {
@@ -1156,12 +1215,32 @@ public static class ApiEndpoints
                 : null,
             hasOutputData = result.HasOutputData,
             hasAnalysisData = result.HasAnalysisData,
+            hasEvidenceManifest = evidenceSummary.HasEvidenceManifest,
+            evidenceStatus = evidenceSummary.EvidenceStatus,
+            evidenceManifestReference = evidenceSummary.EvidenceManifestReference,
+            evidenceTotalBytes = evidenceSummary.EvidenceTotalBytes,
+            retentionExpiresAtUtc = evidenceSummary.RetentionExpiresAtUtc,
+            evidenceMessage = evidenceSummary.Message,
             outputDataPreview = outputPreview,
             analysisDataPreview = analysisPreview,
             diagnosticCode = result.Status == InspectionStatus.Error ? "InspectionError" : null,
             diagnosticMessage = result.ErrorMessage,
             errorMessage = result.ErrorMessage,
             isHistoryDetail = true
+        };
+    }
+
+    internal static object ToInspectionEvidenceManifestResponse(InspectionEvidenceManifestReadResult result)
+    {
+        return new
+        {
+            found = result.Found,
+            status = result.Status,
+            errorCode = result.ErrorCode,
+            message = result.Message,
+            summary = result.Summary,
+            manifest = result.Manifest,
+            warnings = result.Warnings
         };
     }
 

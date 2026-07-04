@@ -96,6 +96,7 @@ class ResultPanel {
         this.historyDetailLoader = null;
         this.comparisonLoader = null;
         this.previousSuccessLoader = null;
+        this.evidenceExportLoader = null;
         this.comparisonBaseline = null;
         this.comparisonSelection = { left: null, right: null };
         this.latestFormalResult = null;
@@ -365,6 +366,10 @@ class ResultPanel {
 
     setPreviousSuccessLoader(loader) {
         this.previousSuccessLoader = typeof loader === 'function' ? loader : null;
+    }
+
+    setEvidenceExportLoader(loader) {
+        this.evidenceExportLoader = typeof loader === 'function' ? loader : null;
     }
 
     canRequestServerData() {
@@ -1984,6 +1989,7 @@ class ResultPanel {
                 </div>
                 ${this.renderHistoryTraceabilitySection(result)}
                 ${this.renderHistoryImageReferenceSection(result, imageSrc)}
+                ${this.renderHistoryEvidenceSection(result)}
                 ${this.renderHistoryComparisonSection(result)}
                 ${loadingHtml}
                 ${this.renderJsonPreviewNotice('输出数据', result?.outputDataPreview)}
@@ -2033,6 +2039,72 @@ class ResultPanel {
                 <div class="detail-item"><span class="detail-label">image</span><span class="detail-value">${this.escapeHtml(value)}</span></div>
             </div>
         `;
+    }
+
+    renderHistoryEvidenceSection(result) {
+        if (!this.serverPaged || !result || this.dataSource === RESULT_DATA_SOURCE_STATION) {
+            return '';
+        }
+
+        const status = result.evidenceStatus || (result.hasEvidenceManifest ? 'available' : 'missing');
+        const statusLabel = this.describeEvidenceStatus(status);
+        const message = result.evidenceMessage || this.describeEvidenceMessage(status);
+        const manifestReference = result.evidenceManifestReference || '证据清单缺失或已清理';
+        const totalBytes = Number.isFinite(Number(result.evidenceTotalBytes))
+            ? `${Number(result.evidenceTotalBytes).toLocaleString()} bytes`
+            : '--';
+        const expiresAt = result.retentionExpiresAtUtc
+            ? new Date(result.retentionExpiresAtUtc).toLocaleString()
+            : '--';
+        const canExport = typeof this.evidenceExportLoader === 'function' &&
+            (status === 'available' || status === 'partial');
+
+        return `
+            <div class="detail-section history-evidence-section">
+                <div class="detail-section-title">证据清单</div>
+                <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value">${this.escapeHtml(statusLabel)}</span></div>
+                <div class="detail-item"><span class="detail-label">manifest</span><span class="detail-value">${this.escapeHtml(manifestReference)}</span></div>
+                <div class="detail-item"><span class="detail-label">totalBytes</span><span class="detail-value">${this.escapeHtml(totalBytes)}</span></div>
+                <div class="detail-item"><span class="detail-label">expires</span><span class="detail-value">${this.escapeHtml(expiresAt)}</span></div>
+                <div class="detail-item type-null"><span class="detail-label">message</span><span class="detail-value">${this.escapeHtml(message)}</span></div>
+                <div class="history-comparison-actions">
+                    <button type="button" class="btn btn-sm" data-evidence-export-action="export" ${canExport ? '' : 'disabled'}>导出证据</button>
+                </div>
+                <div class="history-evidence-output" aria-live="polite"></div>
+            </div>
+        `;
+    }
+
+    describeEvidenceStatus(status) {
+        switch (String(status || '').toLowerCase()) {
+            case 'available':
+                return 'available / 可用';
+            case 'partial':
+                return 'partial / 部分缺失';
+            case 'expired':
+                return 'expired / 已过期';
+            case 'disabled':
+                return 'disabled / 未启用';
+            case 'missing':
+            default:
+                return 'missing / 缺失或已清理';
+        }
+    }
+
+    describeEvidenceMessage(status) {
+        switch (String(status || '').toLowerCase()) {
+            case 'available':
+                return '证据清单可用';
+            case 'partial':
+                return '部分证据文件缺失，摘要仍可查看';
+            case 'expired':
+                return '证据已过期或被留存策略清理，摘要仍可查看';
+            case 'disabled':
+                return '证据采集未启用';
+            case 'missing':
+            default:
+                return '证据清单缺失或已清理，摘要仍可查看';
+        }
     }
 
     renderHistoryComparisonSection(result) {
@@ -2110,12 +2182,71 @@ class ResultPanel {
             return;
         }
 
+        container.querySelectorAll('[data-evidence-export-action]').forEach(button => {
+            button.addEventListener('click', () => {
+                this.runEvidenceExport(container, result);
+            });
+        });
+
         container.querySelectorAll('[data-history-compare-action]').forEach(button => {
             button.addEventListener('click', () => {
                 const action = button.dataset.historyCompareAction;
                 this.handleHistoryComparisonAction(container, result, action);
             });
         });
+    }
+
+    async runEvidenceExport(container, result) {
+        const output = container?.querySelector?.('.history-evidence-output');
+        const resultId = this.getResultComparisonId(result);
+        if (!resultId) {
+            if (output) {
+                output.innerHTML = '<div class="history-comparison-error">缺少证据导出上下文</div>';
+            }
+            return;
+        }
+
+        if (typeof this.evidenceExportLoader !== 'function') {
+            if (output) {
+                output.innerHTML = '<div class="history-comparison-error">证据导出服务未接入</div>';
+            }
+            return;
+        }
+
+        if (output) {
+            output.innerHTML = '<div class="history-comparison-loading">正在导出证据...</div>';
+        }
+
+        try {
+            const exported = await this.evidenceExportLoader(result);
+            if (exported?.blob) {
+                this.downloadEvidenceBlob(exported.blob, exported.filename || `inspection-evidence-${resultId}.json`);
+            }
+
+            if (output) {
+                const checksum = exported?.sha256 ? ` SHA-256: ${exported.sha256}` : '';
+                output.innerHTML = `<div class="history-comparison-message is-ok">证据导出已生成。${this.escapeHtml(checksum)}</div>`;
+            }
+        } catch (error) {
+            if (output) {
+                output.innerHTML = `<div class="history-comparison-error">${this.escapeHtml(error?.message || '证据导出失败')}</div>`;
+            }
+        }
+    }
+
+    downloadEvidenceBlob(blob, filename) {
+        if (typeof URL === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     handleHistoryComparisonAction(container, result, action) {
@@ -3061,6 +3192,7 @@ class ResultPanel {
         this.historyDetailLoader = null;
         this.comparisonLoader = null;
         this.previousSuccessLoader = null;
+        this.evidenceExportLoader = null;
         this.comparisonBaseline = null;
         this.comparisonSelection = { left: null, right: null };
         this.latestFormalResult = null;

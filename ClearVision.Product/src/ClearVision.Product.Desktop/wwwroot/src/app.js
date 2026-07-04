@@ -1255,6 +1255,27 @@ async function loadInspectionPreviousSuccess(result, { limit = 50 } = {}) {
     });
 }
 
+async function exportInspectionEvidence(result) {
+    const project = getCurrentProject();
+    const resultId = result?.id ?? result?.resultId ?? result?.Id ?? result?.ResultId;
+    if (!project || !resultId) {
+        throw new Error('缺少证据导出上下文');
+    }
+
+    const response = await httpClient.getForBlob(`/inspection/history/${project.id}/${resultId}/evidence/export`);
+    const disposition = response?.headers?.get?.('content-disposition') || '';
+    const fileNameMatch = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
+    const filename = fileNameMatch
+        ? decodeURIComponent(fileNameMatch[1].replace(/"/g, ''))
+        : `inspection-evidence-${resultId}.json`;
+
+    return {
+        blob: response.blob,
+        filename,
+        sha256: response?.headers?.get?.('x-evidence-export-sha256') || null
+    };
+}
+
 async function loadStationResultHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1600,6 +1621,7 @@ async function ensureResultPanel() {
     resultPanel.setHistoryDetailLoader(loadInspectionHistoryDetail);
     resultPanel.setComparisonLoader(loadInspectionHistoryComparison);
     resultPanel.setPreviousSuccessLoader(loadInspectionPreviousSuccess);
+    resultPanel.setEvidenceExportLoader(exportInspectionEvidence);
 
     resultPanel.onResultClick = (result) => {
         debugLogger.debug('[App] 点击结果:', result);

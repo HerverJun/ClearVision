@@ -43,6 +43,7 @@ public class InspectionService : IInspectionService
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IInspectionImagePersistenceService? _imagePersistenceService;
+    private readonly IInspectionEvidenceManifestService? _evidenceManifestService;
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
     private readonly ILogger<InspectionService> _logger;
@@ -66,7 +67,8 @@ public class InspectionService : IInspectionService
         ILogger<InspectionService> logger,
         IInspectionImagePersistenceService? imagePersistenceService = null,
         ProjectVariableSessionRegistry? projectVariableSessions = null,
-        ProjectSaveCoordinator? projectSaveCoordinator = null)
+        ProjectSaveCoordinator? projectSaveCoordinator = null,
+        IInspectionEvidenceManifestService? evidenceManifestService = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -81,6 +83,7 @@ public class InspectionService : IInspectionService
         _analysisDataBuilder = analysisDataBuilder;
         _flowStorage = flowStorage;
         _imagePersistenceService = imagePersistenceService;
+        _evidenceManifestService = evidenceManifestService;
         _projectVariableSessions = projectVariableSessions;
         _projectSaveCoordinator = projectSaveCoordinator;
         _logger = logger;
@@ -243,7 +246,8 @@ public class InspectionService : IInspectionService
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
             await PersistResultImageAsync(result, CancellationToken.None);
             await CacheResultImageAsync(result);
-            await _resultRepository.AddAsync(result);
+            await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
+            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
 
             return result;
         }
@@ -682,7 +686,8 @@ public class InspectionService : IInspectionService
             _logger.LogError(ex, "[InspectionService] 检测异常: {ErrorMessage}", ex.Message);
             result.MarkAsError(ex.Message);
             result.SetTraceability(ComputeFlowVersionHash(actualFlow), null, sessionId);
-            await _resultRepository.AddAsync(result);
+            await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
+            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
             return result;
         }
     }
@@ -717,7 +722,8 @@ public class InspectionService : IInspectionService
             var result = new InspectionResult(projectId);
             result.MarkAsError($"相机采集或检测失败: {ex.Message}");
             result.SetTraceability(null, null, sessionId);
-            await _resultRepository.AddAsync(result);
+            await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
+            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
             return result;
         }
         finally
@@ -1097,6 +1103,30 @@ public class InspectionService : IInspectionService
         {
             cancellationToken.ThrowIfCancellationRequested();
             _logger.LogWarning(ex, "[InspectionService] 检测图像落盘失败");
+        }
+    }
+
+    private async Task CaptureEvidenceManifestAsync(InspectionResult result, CancellationToken cancellationToken)
+    {
+        if (_evidenceManifestService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _evidenceManifestService.CaptureAsync(result, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[InspectionService] Evidence manifest capture failed without affecting InspectionResult summary. ResultId={ResultId}",
+                result.Id);
         }
     }
 
