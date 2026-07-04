@@ -468,6 +468,63 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void OperatorResultPanel_ShouldReusePreviewCoordinatorAndAvoidNewRuntimeAuthorities()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var propertyPanelText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js");
+        var previewPanelText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanel.js");
+        var viewModelText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorResultViewModel.mjs");
+        var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js");
+
+        propertyPanelText.Should().Contain("operator-preview-container");
+        propertyPanelText.Should().Contain("new PreviewPanel");
+        propertyPanelText.Should().Contain("getFlowRevision");
+        propertyPanelText.Should().Contain("getLiveNode");
+        propertyPanelText.Should().Contain("onSelectNode");
+        appText.Should().Contain("disabled: node.disabled === true");
+
+        previewPanelText.Should().Contain("buildOperatorResultViewModel");
+        previewPanelText.Should().Contain("readArtifactForCurrentState");
+        previewPanelText.Should().NotMatchRegex(@"\bfetch\s*\(", "G13X must read artifacts through NodePreviewCoordinator.");
+        previewPanelText.Should().NotContain("httpClient", "G13X must not create a second Artifact endpoint client.");
+        coordinatorText.Should().Contain("readArtifactForCurrentState");
+        coordinatorText.Should().Contain("artifactMode: 'references'");
+
+        var g13xFrontendText = string.Join("\n", propertyPanelText, previewPanelText, viewModelText);
+        g13xFrontendText.Should().NotContain("new ImageCanvas", "G13X must not instantiate a second ImageCanvas.");
+        g13xFrontendText.Should().NotContain("createElement('canvas'", "G13X must not add a second scene/image renderer.");
+        g13xFrontendText.Should().NotContain("document.createElement('canvas'", "G13X must not add a second scene/image renderer.");
+        g13xFrontendText.Should().NotContain("localStorage", "Preview result data must not become persistent history.");
+        g13xFrontendText.Should().NotContain("IndexedDB", "Preview result data must not become persistent history.");
+        g13xFrontendText.Should().NotContain("saveProject", "Preview result panel must not write Project authority.");
+        g13xFrontendText.Should().NotContain("ProjectSave", "Preview result panel must not write Project authority.");
+        g13xFrontendText.Should().NotContain("InspectionHistory", "G13X must not implement formal Inspection history.");
+        g13xFrontendText.Should().NotContain("Evidence ZIP", "G13X must not implement evidence retention/export.");
+
+        var forbiddenRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Station",
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+        };
+
+        foreach (var root in forbiddenRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar));
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.*", SearchOption.AllDirectories)
+                         .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                                        path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+            {
+                var text = File.ReadAllText(file);
+                var relativePath = ToRelativePath(file);
+                text.Should().NotContain("operatorResultViewModel", relativePath);
+                text.Should().NotContain("operator-result-panel", relativePath);
+                text.Should().NotContain("VM 式算子模块结果面板", relativePath);
+            }
+        }
+    }
+
+    [Fact]
     public void Station_ShouldNotDependOnVueNodeOrStudioFrontend()
     {
         var stationRoot = Path.Combine(Root, "ClearVision.Product/src/ClearVision.Product.Station");

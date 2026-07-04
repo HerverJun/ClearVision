@@ -407,6 +407,10 @@ function buildParameterSnapshot(parameters) {
     return stableSerialize(normalized);
 }
 
+export function buildPreviewParameterSnapshot(parameters) {
+    return buildParameterSnapshot(parameters);
+}
+
 function hashString(input) {
     const text = String(input || '');
     let hash = 5381;

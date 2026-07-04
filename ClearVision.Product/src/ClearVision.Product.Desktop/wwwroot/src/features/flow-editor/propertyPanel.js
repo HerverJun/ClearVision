@@ -231,7 +231,11 @@ class PropertyPanel {
         }
         this.inputImageBase64Load = null;
         this.currentOperator = null;
-        this.container.innerHTML = '<p class="empty-text">选择一个算子查看属性</p>';
+        this.container.innerHTML = `
+            <p class="empty-text">选择一个算子查看属性</p>
+            <div id="operator-preview-container"></div>
+        `;
+        this.initPreviewPanel();
     }
 
     /**
@@ -1710,6 +1714,47 @@ class PropertyPanel {
             onOpenImage: this.onOpenPreviewImage,
             onAnalyzePreview: async payload => this.handleWireSequenceAnalyze(payload),
             onAutoTune: async payload => this.handleWireSequenceAutoTune(payload),
+            getFlowRevision: () => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                return flowCanvas?.getFlowRevision?.() ?? flowCanvas?.getRevision?.() ?? 0;
+            },
+            getNodes: () => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                const nodes = flowCanvas?.nodes;
+                if (nodes instanceof Map) {
+                    return Array.from(nodes.values());
+                }
+                if (Array.isArray(nodes)) {
+                    return nodes;
+                }
+                return [];
+            },
+            getLiveNode: nodeId => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                return flowCanvas?.nodes?.get?.(nodeId) || null;
+            },
+            onSelectNode: nodeId => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                if (flowCanvas?.selectNode?.(nodeId)) {
+                    return;
+                }
+
+                const rawCanvas = serviceRegistry.get('flowCanvas');
+                const node = rawCanvas?.nodes?.get?.(nodeId);
+                if (!node) {
+                    return;
+                }
+
+                rawCanvas.selectedNode = nodeId;
+                rawCanvas.selectedConnection = null;
+                rawCanvas.markSelectionChanged?.('operator-result-panel');
+                rawCanvas.onNodeSelected?.(node);
+                rawCanvas.render?.();
+            },
+            subscribeStructureState: listener => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                return flowCanvas?.subscribeStructureState?.(listener) || (() => {});
+            },
             validateBeforePreview: options => this.validateCurrentOperator({
                 showToast: options?.showToast === true,
                 markFields: options?.showToast === true,

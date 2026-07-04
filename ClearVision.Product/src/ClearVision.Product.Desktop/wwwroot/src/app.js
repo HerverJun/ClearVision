@@ -1266,6 +1266,7 @@ function initializeFlowEditor() {
                 displayName: operatorDef?.displayName || node.title || node.type,
                 iconPath: node.iconPath || operatorDef?.iconPath || null,
                 color: node.color || null,
+                disabled: node.disabled === true,
                 inputPorts: node.inputs || operatorDef?.inputPorts || [],
                 outputPorts: node.outputs || operatorDef?.outputPorts || [],
                 parameters: mergeParameters(operatorDef?.parameters, node.parameters)

@@ -3,6 +3,17 @@ import {
     formatPreviewOutputValue,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
+import {
+    MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
+    MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES,
+    buildOperatorResultViewModel,
+    buildSafeJsonPreview,
+    formatByteLength,
+    formatResultArtifactMetadata,
+    isTextArtifactForResultPanel,
+    normalizeArtifactReference,
+    redactLocalAbsolutePaths
+} from './operatorResultViewModel.mjs';
 
 const MAX_ANALYSIS_IMAGE_BASE64_CHARS = 24 * 1024 * 1024;
 
@@ -36,6 +47,10 @@ export class PreviewPanel {
         this.onAnalyzePreview = options.onAnalyzePreview ?? null;
         this.onAutoTune = options.onAutoTune ?? null;
         this.validateBeforePreview = options.validateBeforePreview ?? (() => true);
+        this.getFlowRevision = options.getFlowRevision ?? (() => this.state?.request?.flowRevision ?? 0);
+        this.getNodes = options.getNodes ?? (() => []);
+        this.getLiveNode = options.getLiveNode ?? (() => null);
+        this.onSelectNode = options.onSelectNode ?? null;
         this.debounceMs = options.debounceMs ?? 500;
         this.maxAnalysisImageBase64Chars = Number.isFinite(options.maxAnalysisImageBase64Chars)
             ? options.maxAnalysisImageBase64Chars
@@ -46,20 +61,34 @@ export class PreviewPanel {
         this.analysisResult = null;
         this.isAnalyzing = false;
         this.isAutoTuning = false;
+        this.artifactReadAbort = null;
+        this.artifactReadToken = 0;
+        this.artifactReadState = new Map();
+        this.resultIdentitySignature = '';
         this.state = this.previewCoordinator?.getState?.() ?? null;
+        this.resultIdentitySignature = this._getStateIdentitySignature(this.state);
         this.unsubscribePreview = this.previewCoordinator?.subscribe?.(state => {
             this.state = state;
             this.applyPreviewState();
         }) || null;
+        this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
+            ? options.subscribeStructureState(() => {
+                this.applyPreviewState();
+            })
+            : null;
 
         this.render();
         this.applyPreviewState();
     }
 
     destroy() {
+        this.cancelArtifactRead();
         this.unsubscribePreview?.();
+        this.unsubscribeStructure?.();
         this.unsubscribePreview = null;
+        this.unsubscribeStructure = null;
         this.analysisResult = null;
+        this.artifactReadState.clear();
         this._setImage('before', null);
         this._setImage('after', null);
     }
@@ -118,6 +147,8 @@ export class PreviewPanel {
                         <div class="operator-preview-outputs" id="preview-output-list">暂无输出摘要</div>
                         <div class="operator-preview-diagnostics" id="preview-diagnostics-panel"></div>
                     </div>
+
+                    <div class="operator-result-panel" id="operator-result-panel"></div>
                 </div>
             </section>
         `;
@@ -157,10 +188,16 @@ export class PreviewPanel {
                 }
             });
         });
+
+        this._bindResultPanelEvents();
     }
 
     scheduleAutoPreview(options = {}) {
         if (!this.autoPreviewEnabled || this.collapsed) {
+            return;
+        }
+
+        if (this._isCurrentOperatorDisabled()) {
             return;
         }
 
@@ -179,6 +216,11 @@ export class PreviewPanel {
     }
 
     refresh() {
+        if (this._isCurrentOperatorDisabled()) {
+            this.applyPreviewState();
+            return;
+        }
+
         if (this.validateBeforePreview({ trigger: 'manual', showToast: true }) === false) {
             return;
         }
@@ -192,12 +234,23 @@ export class PreviewPanel {
     }
 
     applyPreviewState() {
+        this._resetArtifactReadsIfIdentityChanged();
         const operator = this.getOperator();
         if (!operator || !this.state || this.state.activeNodeId !== operator.id) {
-            this._setStatus(operator ? '等待预览' : '未选中算子');
+            this._setStatus(operator ? '该算子暂无预览结果' : '请选择一个算子节点查看模块结果');
             this._setImage('before', null);
             this._setImage('after', null);
             this._renderOutputs(null);
+            this._renderOperatorResultPanel();
+            return;
+        }
+
+        if (this._isCurrentOperatorDisabled()) {
+            this._setStatus('节点已禁用');
+            this._setImage('before', this.state.presenter?.inputImageSrc || null);
+            this._setImage('after', this.state.presenter?.outputImageSrc || null);
+            this._renderOutputs(this.state.outputData);
+            this._renderOperatorResultPanel();
             return;
         }
 
@@ -213,14 +266,17 @@ export class PreviewPanel {
             this._setImage('before', analysisResult.inputImageSrc || this.state.presenter.inputImageSrc);
             this._setImage('after', analysisResult.previewImageSrc || this.state.presenter.outputImageSrc);
             this._renderOutputs(analysisResult.outputs || this.state.outputData);
+            this._renderOperatorResultPanel();
             return;
         }
 
         const presenter = this.state.presenter;
-        this._setStatus(presenter.statusText);
+        const resultViewModel = this._buildResultViewModel();
+        this._setStatus(resultViewModel?.stale ? '结果已过期，请重新预览' : presenter.statusText);
         this._setImage('before', presenter.inputImageSrc);
         this._setImage('after', presenter.outputImageSrc);
-        this._renderOutputs(this.state.outputData);
+        this._renderOutputs(this.state.status === 'loading' ? null : this.state.outputData);
+        this._renderOperatorResultPanel(resultViewModel);
     }
 
     _setStatus(text) {
@@ -310,6 +366,481 @@ export class PreviewPanel {
                 compact: true,
                 containerClass: 'analysis-cards-container ac-diagnostics-inline ac-diagnostics-preview'
             });
+        }
+    }
+
+    _buildResultViewModel() {
+        const operator = this.getOperator();
+        const liveNode = operator?.id ? this.getLiveNode(operator.id) : null;
+        return buildOperatorResultViewModel(operator, this.state, {
+            liveNode,
+            flowRevision: this.getFlowRevision(),
+            getNodes: () => this._getFlowNodes()
+        });
+    }
+
+    _getFlowNodes() {
+        const nodes = this.getNodes();
+        if (Array.isArray(nodes)) {
+            return nodes;
+        }
+
+        if (nodes instanceof Map) {
+            return Array.from(nodes.values());
+        }
+
+        if (nodes?.values && typeof nodes.values === 'function') {
+            return Array.from(nodes.values());
+        }
+
+        return [];
+    }
+
+    _isCurrentOperatorDisabled() {
+        const operator = this.getOperator();
+        const liveNode = operator?.id ? this.getLiveNode(operator.id) : null;
+        return Boolean(liveNode?.disabled ?? liveNode?.Disabled ?? operator?.disabled ?? operator?.Disabled);
+    }
+
+    _renderOperatorResultPanel(viewModel = null) {
+        const container = this.container?.querySelector('#operator-result-panel');
+        if (!container) {
+            return;
+        }
+
+        const model = viewModel || this._buildResultViewModel();
+        container.innerHTML = `
+            <section class="operator-result-surface" data-status="${escapeHtml(model.status)}">
+                <header class="operator-result-surface-header">
+                    <div>
+                        <div class="operator-result-title">模块结果</div>
+                        <div class="operator-result-subtitle">${escapeHtml(model.operatorName || '未选择算子')}</div>
+                    </div>
+                    <span class="operator-result-status" data-status="${escapeHtml(model.status)}">${escapeHtml(model.statusText)}</span>
+                </header>
+                <div class="operator-result-state" data-status="${escapeHtml(model.status)}">${escapeHtml(model.stateMessage)}</div>
+                ${this._renderNodeResultList(model)}
+                ${this._renderOverview(model)}
+                ${this._renderOutputSections(model)}
+                ${this._renderSceneSection(model)}
+                ${this._renderArtifacts(model)}
+                ${this._renderDiagnostics(model)}
+                ${this._renderRawJson(model)}
+            </section>
+        `;
+        this._bindResultPanelEvents();
+    }
+
+    _renderOverview(model) {
+        const rows = model.overviewItems
+            .filter(([, value]) => value !== null && value !== undefined && value !== '')
+            .map(([label, value]) => `
+                <div class="operator-result-kv">
+                    <span>${escapeHtml(label)}</span>
+                    <strong>${escapeHtml(value)}</strong>
+                </div>
+            `)
+            .join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>概览</h5>
+                <div class="operator-result-kv-grid">${rows}</div>
+            </section>
+        `;
+    }
+
+    _renderNodeResultList(model) {
+        if (!Array.isArray(model.nodeResults) || model.nodeResults.length === 0) {
+            return `
+                <section class="operator-result-section">
+                    <h5>节点结果</h5>
+                    <div class="operator-result-empty">暂无流程节点</div>
+                </section>
+            `;
+        }
+
+        const items = model.nodeResults.map(item => `
+            <button type="button"
+                    class="operator-result-node-item"
+                    data-node-select="${escapeHtml(item.nodeId)}"
+                    data-selected="${item.selected ? 'true' : 'false'}"
+                    data-status="${escapeHtml(item.statusKind)}">
+                <span class="operator-result-node-index">${String(item.index + 1).padStart(2, '0')}</span>
+                <span class="operator-result-node-main">
+                    <span class="operator-result-node-title">${escapeHtml(item.title)}</span>
+                    <span class="operator-result-node-type">${escapeHtml(item.type || '-')}</span>
+                </span>
+                <span class="operator-result-node-status">${escapeHtml(item.statusText)}</span>
+            </button>
+        `).join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>节点结果</h5>
+                <div class="operator-result-node-list">${items}</div>
+            </section>
+        `;
+    }
+
+    _renderOutputSections(model) {
+        if (model.status === 'loading') {
+            return `
+                <section class="operator-result-section">
+                    <h5>输出</h5>
+                    <div class="operator-result-empty">预览运行中...</div>
+                </section>
+            `;
+        }
+
+        if (!Array.isArray(model.outputSections) || model.outputSections.length === 0) {
+            return `
+                <section class="operator-result-section">
+                    <h5>输出</h5>
+                    <div class="operator-result-empty">暂无可解析输出</div>
+                </section>
+            `;
+        }
+
+        const labels = {
+            scalar: 'Scalar / Key-value',
+            table: 'Table / List',
+            geometry: 'Geometry',
+            artifact: 'Image / Artifact',
+            json: 'JSON'
+        };
+        const sections = model.outputSections.map(section => `
+            <div class="operator-result-output-group" data-output-group="${escapeHtml(section.kind)}">
+                <div class="operator-result-output-heading">${escapeHtml(labels[section.kind] || section.kind)}</div>
+                ${section.items.map(item => `
+                    <div class="operator-result-output-row">
+                        <span class="operator-result-output-key">${escapeHtml(item.key || item.pathHint || '-')}</span>
+                        <span class="operator-result-output-value">${escapeHtml(item.value || '-')}</span>
+                        <span class="operator-result-output-meta">${escapeHtml(item.resultPath || item.meta || item.pathHint || '')}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>输出</h5>
+                ${sections}
+            </section>
+        `;
+    }
+
+    _renderSceneSection(model) {
+        const scene = model.sceneSummary || {};
+        if (!scene.available) {
+            return `
+                <section class="operator-result-section">
+                    <h5>图像与叠加</h5>
+                    <div class="operator-result-empty">${escapeHtml(scene.message || '该算子暂无可视化叠加')}</div>
+                </section>
+            `;
+        }
+
+        const summary = [
+            ['CoordinateSpace', scene.coordinateSpace || '-'],
+            ['FrameId', scene.frameId || '-'],
+            ['Unit', scene.unit || '-'],
+            ['ImageSize', scene.imageSize || '-'],
+            ['Primitive', scene.primitiveCount ?? scene.primitives?.length ?? 0],
+            ['Truncated', scene.truncated ? 'yes' : 'no']
+        ].map(([label, value]) => `
+            <div class="operator-result-kv">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(value)}</strong>
+            </div>
+        `).join('');
+        const primitives = (scene.primitives || []).map(item => `
+            <div class="operator-result-scene-row">
+                <span>${escapeHtml(item.label || item.primitiveId || item.kind)}</span>
+                <span>${escapeHtml(item.kind || '-')}</span>
+                <span>${escapeHtml(item.resultPath || item.layer || '')}</span>
+            </div>
+        `).join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>图像与叠加</h5>
+                <div class="operator-result-kv-grid">${summary}</div>
+                <div class="operator-result-scene-list">${primitives}</div>
+            </section>
+        `;
+    }
+
+    _renderArtifacts(model) {
+        if (!Array.isArray(model.artifacts) || model.artifacts.length === 0) {
+            return `
+                <section class="operator-result-section">
+                    <h5>证据</h5>
+                    <div class="operator-result-empty">暂无 Artifact</div>
+                </section>
+            `;
+        }
+
+        const rows = model.artifacts.map(artifact => {
+            const readState = this.artifactReadState.get(artifact.artifactId);
+            const dimensions = artifact.width && artifact.height
+                ? `${artifact.width} x ${artifact.height}${artifact.channels ? ` x ${artifact.channels}` : ''}`
+                : '';
+            return `
+                <div class="operator-result-artifact" data-artifact-id="${escapeHtml(artifact.artifactId)}">
+                    <div class="operator-result-artifact-main">
+                        <strong>${escapeHtml(artifact.role || artifact.kind || 'artifact')}</strong>
+                        <span>${escapeHtml(artifact.kind || '-')} · ${escapeHtml(artifact.contentType || '-')} · ${escapeHtml(formatByteLength(artifact.length))}</span>
+                        <span>${escapeHtml(dimensions || artifact.createdAtUtc || artifact.expiresAtUtc || '')}</span>
+                    </div>
+                    <button type="button"
+                            class="operator-result-artifact-read"
+                            data-artifact-read="${escapeHtml(artifact.artifactId)}"
+                            ${readState?.status === 'loading' ? 'disabled' : ''}>
+                        ${readState?.status === 'loading' ? '读取中' : '查看摘要'}
+                    </button>
+                    ${readState ? `<pre class="operator-result-artifact-preview ${escapeHtml(readState.status)}">${escapeHtml(readState.text)}</pre>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>证据</h5>
+                <div class="operator-result-artifact-list">${rows}</div>
+            </section>
+        `;
+    }
+
+    _renderDiagnostics(model) {
+        if (!Array.isArray(model.diagnostics) || model.diagnostics.length === 0) {
+            return `
+                <section class="operator-result-section">
+                    <h5>诊断</h5>
+                    <div class="operator-result-empty">暂无 diagnostics / warnings / errors</div>
+                </section>
+            `;
+        }
+
+        const rows = model.diagnostics.map(item => `
+            <div class="operator-result-diagnostic">
+                <span>${escapeHtml(item.code || item.source || 'diagnostic')}</span>
+                <strong>${escapeHtml(item.message || '')}</strong>
+                <small>${escapeHtml(item.pathHint || item.source || '')}</small>
+            </div>
+        `).join('');
+
+        return `
+            <section class="operator-result-section">
+                <h5>诊断</h5>
+                <div class="operator-result-diagnostic-list">${rows}</div>
+            </section>
+        `;
+    }
+
+    _renderRawJson(model) {
+        const text = model.rawJsonPreview?.text || '';
+        if (!text) {
+            return `
+                <section class="operator-result-section">
+                    <h5>Raw JSON</h5>
+                    <div class="operator-result-empty">暂无 raw JSON</div>
+                </section>
+            `;
+        }
+
+        return `
+            <section class="operator-result-section">
+                <h5>Raw JSON</h5>
+                <pre class="operator-result-raw-json">${escapeHtml(text)}</pre>
+            </section>
+        `;
+    }
+
+    _bindResultPanelEvents() {
+        const container = this.container?.querySelector('#operator-result-panel');
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[data-node-select]').forEach(button => {
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                const nodeId = event.currentTarget.getAttribute('data-node-select');
+                if (nodeId && typeof this.onSelectNode === 'function') {
+                    this.onSelectNode(nodeId);
+                }
+            });
+        });
+
+        container.querySelectorAll('[data-artifact-read]').forEach(button => {
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                const artifactId = event.currentTarget.getAttribute('data-artifact-read');
+                void this.readArtifactPreview(artifactId);
+            });
+        });
+    }
+
+    _findArtifact(artifactId) {
+        const safeArtifactId = String(artifactId || '');
+        const artifacts = Array.isArray(this.state?.artifacts) ? this.state.artifacts : [];
+        return artifacts.find(artifact => artifact?.artifactId === safeArtifactId) || null;
+    }
+
+    _getObservationIdentity() {
+        const observation = this.state?.observation;
+        const identity = observation?.identity || observation?.Identity;
+        return identity && typeof identity === 'object' ? identity : null;
+    }
+
+    _getStateIdentitySignature(state) {
+        const observation = state?.observation;
+        const identity = observation?.identity || observation?.Identity || {};
+        return [
+            state?.activeNodeId || '',
+            state?.status || '',
+            state?.request?.requestKey || '',
+            identity.projectId || identity.ProjectId || '',
+            identity.targetNodeId || identity.TargetNodeId || '',
+            identity.debugSessionId || identity.DebugSessionId || '',
+            identity.clientRequestSequence || identity.ClientRequestSequence || '',
+            identity.flowRevision || identity.FlowRevision || ''
+        ].join('|');
+    }
+
+    _resetArtifactReadsIfIdentityChanged() {
+        const nextSignature = this._getStateIdentitySignature(this.state);
+        if (nextSignature === this.resultIdentitySignature) {
+            return;
+        }
+
+        this.resultIdentitySignature = nextSignature;
+        this.artifactReadState.clear();
+        this.cancelArtifactRead();
+    }
+
+    cancelArtifactRead() {
+        this.artifactReadAbort?.abort?.();
+        this.artifactReadAbort = null;
+        this.artifactReadToken += 1;
+    }
+
+    _isArtifactReadCurrent(token, identity, abortController = null) {
+        return token === this.artifactReadToken &&
+            abortController?.signal?.aborted !== true &&
+            JSON.stringify(this._getObservationIdentity() || {}) === JSON.stringify(identity || {});
+    }
+
+    _isArtifactUnavailableError(error) {
+        return error?.status === 404 ||
+            error?.statusCode === 404 ||
+            error?.name === 'PreviewArtifactUnavailableError' ||
+            /过期|不可用|stale|missing|not found|404/i.test(String(error?.message || ''));
+    }
+
+    async readArtifactPreview(artifactId) {
+        const artifact = normalizeArtifactReference(this._findArtifact(artifactId));
+        const identity = this._getObservationIdentity();
+        if (!artifact?.artifactId || !identity) {
+            return;
+        }
+
+        this.cancelArtifactRead();
+        const token = this.artifactReadToken;
+
+        if (!isTextArtifactForResultPanel(artifact)) {
+            this.artifactReadState.set(artifact.artifactId, {
+                status: 'success',
+                text: formatResultArtifactMetadata(artifact, '非文本 Artifact，仅展示元数据')
+            });
+            this._renderOperatorResultPanel();
+            return;
+        }
+
+        if (artifact.length > MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES) {
+            this.artifactReadState.set(artifact.artifactId, {
+                status: 'success',
+                text: formatResultArtifactMetadata(artifact, '内容过大，仅展示元数据')
+            });
+            this._renderOperatorResultPanel();
+            return;
+        }
+
+        const abortController = typeof AbortController !== 'undefined'
+            ? new AbortController()
+            : null;
+        this.artifactReadAbort = abortController;
+        this.artifactReadState.set(artifact.artifactId, {
+            status: 'loading',
+            text: '正在按需读取 Artifact...'
+        });
+        this._renderOperatorResultPanel();
+
+        try {
+            const result = await this.previewCoordinator?.readArtifactForCurrentState?.(
+                artifact.artifactId,
+                identity,
+                { signal: abortController?.signal });
+            if (!this._isArtifactReadCurrent(token, identity, abortController)) {
+                return;
+            }
+
+            const artifactMetadata = normalizeArtifactReference(result?.artifact) || artifact;
+            const blob = result?.blob;
+            if (!blob || typeof blob.slice !== 'function') {
+                throw new Error('Artifact Blob 不支持有界文本预览');
+            }
+
+            const actualSize = Number(blob.size ?? artifactMetadata.length ?? 0);
+            const actualTextTooLarge = Number.isFinite(actualSize) &&
+                actualSize > MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES;
+            const previewBlob = blob.slice(0, MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES);
+            const rawText = await previewBlob.text();
+            if (!this._isArtifactReadCurrent(token, identity, abortController)) {
+                return;
+            }
+
+            let previewText = rawText;
+            if (String(artifactMetadata.contentType || '').toLowerCase().includes('json')) {
+                try {
+                    previewText = buildSafeJsonPreview(JSON.parse(rawText), {
+                        maxChars: MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS
+                    }).text;
+                } catch {
+                    previewText = redactLocalAbsolutePaths(rawText);
+                }
+            } else {
+                previewText = redactLocalAbsolutePaths(rawText);
+            }
+
+            const displayTruncated = actualTextTooLarge ||
+                previewText.length > MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS;
+            const boundedText = displayTruncated
+                ? `${previewText.slice(0, MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS)}\n已截断。`
+                : previewText;
+
+            this.artifactReadState.set(artifact.artifactId, {
+                status: 'success',
+                text: boundedText || formatResultArtifactMetadata(artifactMetadata, `已读取 ${formatByteLength(actualSize)}。`)
+            });
+            this._renderOperatorResultPanel();
+        } catch (error) {
+            if (!this._isArtifactReadCurrent(token, identity, abortController) || error?.name === 'AbortError') {
+                return;
+            }
+
+            this.artifactReadState.set(artifact.artifactId, {
+                status: 'error',
+                text: this._isArtifactUnavailableError(error)
+                    ? '资源已过期或不可用'
+                    : (error?.message || 'Artifact 读取失败')
+            });
+            this._renderOperatorResultPanel();
+        } finally {
+            if (this.artifactReadAbort === abortController) {
+                this.artifactReadAbort = null;
+            }
         }
     }
 
