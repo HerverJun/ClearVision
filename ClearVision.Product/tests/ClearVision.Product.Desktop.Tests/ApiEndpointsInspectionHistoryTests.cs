@@ -36,6 +36,19 @@ public sealed class ApiEndpointsInspectionHistoryTests
     }
 
     [Fact]
+    public async Task HistoryCompareEndpoint_ShouldRequireDesktopAuthMiddleware()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var authService = Substitute.For<IAuthService>();
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService);
+
+        using var response = await host.Client.GetAsync($"/api/inspection/history/{Guid.NewGuid()}/compare?leftId={Guid.NewGuid()}&rightId={Guid.NewGuid()}");
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized, body);
+    }
+
+    [Fact]
     public async Task HistoryDetailEndpoint_ShouldScopeLookupByProjectAndResultId()
     {
         var service = Substitute.For<IInspectionService>();
@@ -60,6 +73,87 @@ public sealed class ApiEndpointsInspectionHistoryTests
         var body = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.NotFound, body);
         _ = service.Received(1).GetInspectionHistoryDetailAsync(projectId, resultId);
+    }
+
+    [Fact]
+    public async Task HistoryCompareEndpoint_ShouldScopeLookupByProjectAndResultIds()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var authService = Substitute.For<IAuthService>();
+        var projectId = Guid.NewGuid();
+        var leftId = Guid.NewGuid();
+        var rightId = Guid.NewGuid();
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = "history-user",
+            Username = "history-user",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        service.CompareInspectionHistoryAsync(projectId, leftId, rightId)
+            .Returns(Task.FromResult<InspectionHistoryComparison?>(null));
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/history/{projectId}/compare?leftId={leftId}&rightId={rightId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "desktop-token");
+        using var response = await host.Client.SendAsync(request);
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, body);
+        _ = service.Received(1).CompareInspectionHistoryAsync(projectId, leftId, rightId);
+    }
+
+    [Fact]
+    public async Task PreviousSuccessEndpoint_ShouldScopeLookupByProjectAndResultId()
+    {
+        var service = Substitute.For<IInspectionService>();
+        var authService = Substitute.For<IAuthService>();
+        var projectId = Guid.NewGuid();
+        var resultId = Guid.NewGuid();
+        var referenceId = Guid.NewGuid();
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = "history-user",
+            Username = "history-user",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        service.FindPreviousSuccessfulInspectionAsync(projectId, resultId, 25)
+            .Returns(new InspectionPreviousSuccessReference
+            {
+                Found = true,
+                QueryLimit = 25,
+                Message = "已找到失败前成功参考",
+                CurrentSummary = new InspectionHistoryComparisonSummary
+                {
+                    ResultId = resultId,
+                    ProjectId = projectId,
+                    Status = InspectionStatus.NG,
+                    InspectionTime = DateTime.UtcNow,
+                    FlowVersionHash = "FLOW-A"
+                },
+                ReferenceSummary = new InspectionHistoryComparisonSummary
+                {
+                    ResultId = referenceId,
+                    ProjectId = projectId,
+                    Status = InspectionStatus.OK,
+                    InspectionTime = DateTime.UtcNow.AddMinutes(-1),
+                    FlowVersionHash = "FLOW-A"
+                }
+            });
+        await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/history/{projectId}/{resultId}/previous-success?limit=25");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "desktop-token");
+        using var response = await host.Client.SendAsync(request);
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        _ = service.Received(1).FindPreviousSuccessfulInspectionAsync(projectId, resultId, 25);
+
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("found").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("referenceSummary").GetProperty("resultId").GetGuid().Should().Be(referenceId);
     }
 
     [Fact]
@@ -301,6 +395,92 @@ public sealed class ApiEndpointsInspectionHistoryTests
         root.GetProperty("analysisDataPreview").GetProperty("wasRedacted").GetBoolean().Should().BeTrue();
     }
 
+    [Fact]
+    public void ToInspectionHistoryComparisonResponse_ShouldExposeBoundedDiffContract()
+    {
+        var projectId = Guid.NewGuid();
+        var leftId = Guid.NewGuid();
+        var rightId = Guid.NewGuid();
+        var comparison = new InspectionHistoryComparison
+        {
+            LeftSummary = new InspectionHistoryComparisonSummary
+            {
+                ResultId = leftId,
+                ProjectId = projectId,
+                Status = InspectionStatus.OK,
+                InspectionTime = DateTime.UtcNow,
+                FlowVersionHash = "FLOW-A",
+                CalibrationBundleId = "BUNDLE-A",
+                HasImage = true,
+                ImageId = Guid.NewGuid(),
+                ImageReference = "/api/images/left"
+            },
+            RightSummary = new InspectionHistoryComparisonSummary
+            {
+                ResultId = rightId,
+                ProjectId = projectId,
+                Status = InspectionStatus.NG,
+                InspectionTime = DateTime.UtcNow,
+                FlowVersionHash = "FLOW-B",
+                CalibrationBundleId = "BUNDLE-B",
+                HasImage = true
+            },
+            Compatibility = new InspectionHistoryCompatibility
+            {
+                FlowVersionCompatible = false,
+                CalibrationBundleCompatible = false,
+                OnlySafePreviewComparison = true,
+                HasUnknownFields = true
+            },
+            Warnings = ["流程版本不一致，对比仅供参考", "仅比较安全预览字段"],
+            FieldDiffs =
+            [
+                new InspectionHistoryFieldDiff
+                {
+                    Path = """$["outputDataPreview"]["score"]""",
+                    Label = "score",
+                    LeftValuePreview = "42",
+                    RightValuePreview = "45",
+                    DiffType = "Changed",
+                    Severity = "info"
+                }
+            ],
+            SceneReplayAvailability = new InspectionHistoryReplayAvailability
+            {
+                Kind = "scene",
+                Mode = "summary-only",
+                Message = "暂无 Scene evidence，已降级为摘要回放"
+            },
+            ImageReplayAvailability = new InspectionHistoryReplayAvailability
+            {
+                Kind = "image",
+                Mode = "image-reference",
+                LeftReference = "/api/images/left",
+                Message = "图像引用可用"
+            }
+        };
+
+        var response = ApiEndpoints.ToInspectionHistoryComparisonResponse(comparison);
+        var json = JsonSerializer.Serialize(response, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        json.Should().NotContain("outputImage");
+        json.Should().NotContain("imageBase64");
+        json.Should().NotContain("artifactPayload");
+        json.Should().NotContain("VisualScene");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        root.GetProperty("leftSummary").GetProperty("resultId").GetGuid().Should().Be(leftId);
+        root.GetProperty("compatibility").GetProperty("onlySafePreviewComparison").GetBoolean().Should().BeTrue();
+        root.GetProperty("warnings")[0].GetString().Should().Contain("流程版本不一致");
+        root.GetProperty("sceneReplayAvailability").GetProperty("message").GetString().Should().Be("暂无 Scene evidence，已降级为摘要回放");
+        root.GetProperty("fieldDiffs")[0].GetProperty("diffType").GetString().Should().Be("Changed");
+        root.GetProperty("imageReplayAvailability").GetProperty("leftReference").GetString().Should().Be("/api/images/left");
+    }
+
     private sealed class HistoryEndpointTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -330,6 +510,17 @@ public sealed class ApiEndpointsInspectionHistoryTests
             var app = builder.Build();
             app.UseMiddleware<AuthMiddleware>();
             app.MapGet("/api/inspection/history/{projectId:guid}", () => Results.Ok(new InspectionHistoryPage()));
+            app.MapGet("/api/inspection/history/{projectId:guid}/compare", async (
+                Guid projectId,
+                Guid leftId,
+                Guid rightId,
+                [FromServices] IInspectionService inspectionService) =>
+            {
+                var result = await inspectionService.CompareInspectionHistoryAsync(projectId, leftId, rightId);
+                return result == null
+                    ? Results.NotFound(new { Error = "Inspection history comparison result was not found." })
+                    : Results.Ok(ApiEndpoints.ToInspectionHistoryComparisonResponse(result));
+            });
             app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}", async (
                 Guid projectId,
                 Guid resultId,
@@ -339,6 +530,17 @@ public sealed class ApiEndpointsInspectionHistoryTests
                 return result == null
                     ? Results.NotFound(new { Error = "Inspection history result was not found." })
                     : Results.Ok(ApiEndpoints.ToInspectionHistoryDetailResponse(result));
+            });
+            app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/previous-success", async (
+                Guid projectId,
+                Guid resultId,
+                int limit,
+                [FromServices] IInspectionService inspectionService) =>
+            {
+                var result = await inspectionService.FindPreviousSuccessfulInspectionAsync(projectId, resultId, limit);
+                return result == null
+                    ? Results.NotFound(new { Error = "Inspection history result was not found." })
+                    : Results.Ok(ApiEndpoints.ToInspectionPreviousSuccessResponse(result));
             });
             await app.StartAsync();
 

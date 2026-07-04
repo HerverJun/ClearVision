@@ -1229,6 +1229,32 @@ async function loadInspectionHistoryDetail(result) {
     }, project.id);
 }
 
+async function loadInspectionHistoryComparison({ left, right, leftId, rightId } = {}) {
+    const project = getCurrentProject();
+    const resolvedLeftId = leftId ?? left?.resultId ?? left?.id ?? left?.ResultId ?? left?.Id;
+    const resolvedRightId = rightId ?? right?.resultId ?? right?.id ?? right?.ResultId ?? right?.Id;
+    if (!project || !resolvedLeftId || !resolvedRightId) {
+        throw new Error('缺少结果对比上下文');
+    }
+
+    return await httpClient.get(`/inspection/history/${project.id}/compare`, {
+        leftId: resolvedLeftId,
+        rightId: resolvedRightId
+    });
+}
+
+async function loadInspectionPreviousSuccess(result, { limit = 50 } = {}) {
+    const project = getCurrentProject();
+    const resultId = result?.id ?? result?.resultId ?? result?.Id ?? result?.ResultId;
+    if (!project || !resultId) {
+        throw new Error('缺少失败前成功查询上下文');
+    }
+
+    return await httpClient.get(`/inspection/history/${project.id}/${resultId}/previous-success`, {
+        limit
+    });
+}
+
 async function loadStationResultHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1572,6 +1598,8 @@ async function ensureResultPanel() {
     resultPanel.setProjectContext(getCurrentProject()?.id || null);
     resultPanel.setHistoryLoader(loadInspectionHistory);
     resultPanel.setHistoryDetailLoader(loadInspectionHistoryDetail);
+    resultPanel.setComparisonLoader(loadInspectionHistoryComparison);
+    resultPanel.setPreviousSuccessLoader(loadInspectionPreviousSuccess);
 
     resultPanel.onResultClick = (result) => {
         debugLogger.debug('[App] 点击结果:', result);

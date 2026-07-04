@@ -620,6 +620,23 @@ public static class ApiEndpoints
             return Results.Ok(ToInspectionHistoryListResponse(results));
         });
 
+        app.MapGet("/api/inspection/history/{projectId:guid}/compare", async (
+        Guid projectId,
+        Guid? leftId,
+        Guid? rightId,
+        [FromServices] Core.Services.IInspectionService service) =>
+        {
+            if (!leftId.HasValue || !rightId.HasValue || leftId.Value == Guid.Empty || rightId.Value == Guid.Empty)
+            {
+                return Results.BadRequest(new { Error = "leftId and rightId are required." });
+            }
+
+            var comparison = await service.CompareInspectionHistoryAsync(projectId, leftId.Value, rightId.Value);
+            return comparison == null
+                ? Results.NotFound(new { Error = "Inspection history comparison result was not found." })
+                : Results.Ok(ToInspectionHistoryComparisonResponse(comparison));
+        });
+
         app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}", async (
         Guid projectId,
         Guid resultId,
@@ -629,6 +646,18 @@ public static class ApiEndpoints
             return result == null
                 ? Results.NotFound(new { Error = "Inspection history result was not found." })
                 : Results.Ok(ToInspectionHistoryDetailResponse(result));
+        });
+
+        app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}/previous-success", async (
+        Guid projectId,
+        Guid resultId,
+        [FromServices] Core.Services.IInspectionService service,
+        int limit = 50) =>
+        {
+            var reference = await service.FindPreviousSuccessfulInspectionAsync(projectId, resultId, limit <= 0 ? 50 : limit);
+            return reference == null
+                ? Results.NotFound(new { Error = "Inspection history result was not found." })
+                : Results.Ok(ToInspectionPreviousSuccessResponse(reference));
         });
 
         // 获取统计信息
@@ -1133,6 +1162,101 @@ public static class ApiEndpoints
             diagnosticMessage = result.ErrorMessage,
             errorMessage = result.ErrorMessage,
             isHistoryDetail = true
+        };
+    }
+
+    internal static object ToInspectionHistoryComparisonResponse(InspectionHistoryComparison comparison)
+    {
+        return new
+        {
+            leftSummary = ToInspectionHistoryComparisonSummary(comparison.LeftSummary),
+            rightSummary = ToInspectionHistoryComparisonSummary(comparison.RightSummary),
+            compatibility = new
+            {
+                flowVersionCompatible = comparison.Compatibility.FlowVersionCompatible,
+                calibrationBundleCompatible = comparison.Compatibility.CalibrationBundleCompatible,
+                onlySafePreviewComparison = comparison.Compatibility.OnlySafePreviewComparison,
+                hasUnknownFields = comparison.Compatibility.HasUnknownFields
+            },
+            warnings = comparison.Warnings,
+            fieldDiffs = comparison.FieldDiffs.Select(ToInspectionHistoryFieldDiff).ToList(),
+            traceabilityDiff = comparison.TraceabilityDiff.Select(ToInspectionHistoryFieldDiff).ToList(),
+            sceneReplayAvailability = ToInspectionHistoryReplayAvailability(comparison.SceneReplayAvailability),
+            imageReplayAvailability = ToInspectionHistoryReplayAvailability(comparison.ImageReplayAvailability)
+        };
+    }
+
+    internal static object ToInspectionPreviousSuccessResponse(InspectionPreviousSuccessReference reference)
+    {
+        return new
+        {
+            currentSummary = ToInspectionHistoryComparisonSummary(reference.CurrentSummary),
+            referenceSummary = reference.ReferenceSummary == null
+                ? null
+                : ToInspectionHistoryComparisonSummary(reference.ReferenceSummary),
+            found = reference.Found,
+            isFlowVersionFallback = reference.IsFlowVersionFallback,
+            queryLimit = reference.QueryLimit,
+            warnings = reference.Warnings,
+            message = reference.Message
+        };
+    }
+
+    private static object ToInspectionHistoryComparisonSummary(InspectionHistoryComparisonSummary summary)
+    {
+        return new
+        {
+            resultId = summary.ResultId,
+            id = summary.ResultId,
+            projectId = summary.ProjectId,
+            status = summary.Status.ToString(),
+            timestamp = summary.InspectionTime,
+            inspectionTime = summary.InspectionTime,
+            defectCount = summary.DefectCount,
+            processingTimeMs = summary.ProcessingTimeMs,
+            processingTime = summary.ProcessingTimeMs,
+            executionTimeMs = summary.ProcessingTimeMs,
+            confidenceScore = summary.ConfidenceScore,
+            flowVersionHash = summary.FlowVersionHash,
+            calibrationBundleId = summary.CalibrationBundleId,
+            sessionId = summary.SessionId,
+            runId = summary.RunId,
+            imageId = summary.ImageId,
+            imageReference = summary.ImageReference,
+            hasImage = summary.HasImage,
+            hasOutputData = summary.HasOutputData,
+            hasAnalysisData = summary.HasAnalysisData
+        };
+    }
+
+    private static object ToInspectionHistoryFieldDiff(InspectionHistoryFieldDiff diff)
+    {
+        return new
+        {
+            path = diff.Path,
+            label = diff.Label,
+            leftValuePreview = diff.LeftValuePreview,
+            rightValuePreview = diff.RightValuePreview,
+            diffType = diff.DiffType,
+            severity = diff.Severity,
+            message = diff.Message
+        };
+    }
+
+    private static object ToInspectionHistoryReplayAvailability(InspectionHistoryReplayAvailability availability)
+    {
+        return new
+        {
+            kind = availability.Kind,
+            mode = availability.Mode,
+            isAvailable = availability.IsAvailable,
+            leftAvailable = availability.LeftAvailable,
+            rightAvailable = availability.RightAvailable,
+            leftReference = availability.LeftReference,
+            rightReference = availability.RightReference,
+            leftSummary = availability.LeftSummary,
+            rightSummary = availability.RightSummary,
+            message = availability.Message
         };
     }
 

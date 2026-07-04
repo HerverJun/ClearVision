@@ -35,6 +35,7 @@ const RESULT_DETAIL_MAX_RAW_OUTPUT_ROWS = 64;
 const RESULT_DETAIL_MAX_DEFECT_ROWS = 50;
 const RESULT_DETAIL_MAX_FIELD_VALUE_CHARS = 240;
 const RESULT_DETAIL_REMOVE_DELAY_MS = 200;
+const RESULT_COMPARISON_MAX_DIFF_ROWS = 80;
 const INLINE_RESULT_IMAGE_KEYS = [
     'imageData',
     'ImageData',
@@ -93,6 +94,11 @@ class ResultPanel {
         this.serverPaged = false;
         this.historyLoader = null;
         this.historyDetailLoader = null;
+        this.comparisonLoader = null;
+        this.previousSuccessLoader = null;
+        this.comparisonBaseline = null;
+        this.comparisonSelection = { left: null, right: null };
+        this.latestFormalResult = null;
         
         // 筛选
         this.filters = {
@@ -246,6 +252,9 @@ class ResultPanel {
         this.totalResultCount = 0;
         this.serverPageIndex = 0;
         this.serverPaged = true;
+        this.comparisonBaseline = null;
+        this.comparisonSelection = { left: null, right: null };
+        this.latestFormalResult = null;
 
         if (this.dataSource === RESULT_DATA_SOURCE_STATION) {
             this.disconnectResultsStream();
@@ -333,6 +342,9 @@ class ResultPanel {
             this.totalResultCount = 0;
             this.serverPageIndex = 0;
             this.serverPaged = false;
+            this.comparisonBaseline = null;
+            this.comparisonSelection = { left: null, right: null };
+            this.latestFormalResult = null;
             if (this.projectId && this.dataSource !== RESULT_DATA_SOURCE_STATION) {
                 this.connectResultsHub();
             }
@@ -345,6 +357,14 @@ class ResultPanel {
 
     setHistoryDetailLoader(loader) {
         this.historyDetailLoader = typeof loader === 'function' ? loader : null;
+    }
+
+    setComparisonLoader(loader) {
+        this.comparisonLoader = typeof loader === 'function' ? loader : null;
+    }
+
+    setPreviousSuccessLoader(loader) {
+        this.previousSuccessLoader = typeof loader === 'function' ? loader : null;
     }
 
     canRequestServerData() {
@@ -746,6 +766,11 @@ class ResultPanel {
             return;
         }
 
+        const preparedResult = this.prepareResultForLocalHistory(result, 0);
+        if (this.dataSource !== RESULT_DATA_SOURCE_STATION && preparedResult) {
+            this.latestFormalResult = preparedResult;
+        }
+
         if (this.serverPaged) {
             if (this.projectId) {
                 const isRealtime = options?.isRealtime === true;
@@ -755,7 +780,7 @@ class ResultPanel {
             return;
         }
 
-        this.results.unshift(this.prepareResultForLocalHistory(result, 0));
+        this.results.unshift(preparedResult);
         this.pruneLocalResultHistory();
         this.applyFilters();
         this.calculateStatistics();
@@ -776,6 +801,9 @@ class ResultPanel {
         this.results = Array.isArray(results)
             ? results.map((result, index) => this.prepareResultForLocalHistory(result, isServerPaged ? 0 : index))
             : [];
+        if (this.dataSource !== RESULT_DATA_SOURCE_STATION) {
+            this.latestFormalResult = this.results[0] || null;
+        }
         this.serverPaged = isServerPaged;
         if (!this.serverPaged) {
             this.pruneLocalResultHistory();
@@ -1838,6 +1866,7 @@ class ResultPanel {
         let removeTimer = null;
         let closed = false;
         let listenersAttached = true;
+        let currentDetailResult = result;
 
         const cleanupListeners = () => {
             if (!listenersAttached) {
@@ -1886,6 +1915,7 @@ class ResultPanel {
         this._activeDetailModals.add(detailModalHandle);
         closeButton?.addEventListener?.('click', closeModal);
         overlay?.addEventListener?.('click', closeModal);
+        this.attachHistoryComparisonControls(body, currentDetailResult);
 
         if (shouldLoadHistoryDetail) {
             this.historyDetailLoader(result)
@@ -1897,7 +1927,9 @@ class ResultPanel {
                     const loadedResult = detail && typeof detail === 'object'
                         ? { ...result, ...detail, historyDetailLoaded: true }
                         : { ...result, historyDetailLoaded: true };
+                    currentDetailResult = loadedResult;
                     body.innerHTML = this.renderResultDetailBody(loadedResult);
+                    this.attachHistoryComparisonControls(body, currentDetailResult);
                 })
                 .catch(error => {
                     if (closed || this._isDisposed || !body) {
@@ -1952,6 +1984,7 @@ class ResultPanel {
                 </div>
                 ${this.renderHistoryTraceabilitySection(result)}
                 ${this.renderHistoryImageReferenceSection(result, imageSrc)}
+                ${this.renderHistoryComparisonSection(result)}
                 ${loadingHtml}
                 ${this.renderJsonPreviewNotice('输出数据', result?.outputDataPreview)}
                 ${this.renderJsonPreviewNotice('分析数据', result?.analysisDataPreview)}
@@ -2000,6 +2033,423 @@ class ResultPanel {
                 <div class="detail-item"><span class="detail-label">image</span><span class="detail-value">${this.escapeHtml(value)}</span></div>
             </div>
         `;
+    }
+
+    renderHistoryComparisonSection(result) {
+        if (this.dataSource === RESULT_DATA_SOURCE_STATION) {
+            return '';
+        }
+
+        const resultId = this.getResultComparisonId(result);
+        const hasResult = !!resultId;
+        const hasComparisonLoader = typeof this.comparisonLoader === 'function';
+        const hasPreviousSuccessLoader = typeof this.previousSuccessLoader === 'function';
+        const baseline = this.comparisonBaseline;
+        const current = this.getLatestFormalComparisonResult();
+        const hasCurrent = !!(current && this.getResultComparisonId(current));
+        const hasBaseline = !!(baseline && this.getResultComparisonId(baseline));
+        const selectedLeft = this.comparisonSelection?.left;
+        const selectedRight = this.comparisonSelection?.right;
+        const hasSelectionPair = !!(
+            selectedLeft &&
+            selectedRight &&
+            this.getResultComparisonId(selectedLeft) &&
+            this.getResultComparisonId(selectedRight)
+        );
+        const isBaselineThisResult = hasBaseline &&
+            resultId &&
+            this.getResultComparisonId(baseline) === resultId;
+        const failureLike = this.isFailureLikeResult(result);
+
+        const baselineRows = hasBaseline
+            ? [
+                ['resultId', baseline.resultId || baseline.id || '--'],
+                ['时间', this.formatComparisonTime(baseline.timestamp || baseline.inspectionTime)],
+                ['status', baseline.status || '--'],
+                ['FlowVersionHash', baseline.flowVersionHash || '旧数据未记录'],
+                ['CalibrationBundleId', baseline.calibrationBundleId || '旧数据未记录']
+            ].map(([label, value]) =>
+                `<div class="history-comparison-meta-row"><span>${this.escapeHtml(label)}</span><strong>${this.escapeHtml(value)}</strong></div>`
+            ).join('')
+            : '<div class="history-comparison-empty">无基线</div>';
+
+        const selectionText = [
+            `左侧：${this.escapeHtml(this.describeComparisonAnchor(selectedLeft))}`,
+            `右侧：${this.escapeHtml(this.describeComparisonAnchor(selectedRight))}`
+        ].join(' / ');
+
+        return `
+            <div class="detail-section history-comparison-section">
+                <div class="detail-section-title">结果对比</div>
+                ${!hasResult ? '<div class="detail-item type-null"><span class="detail-label">state</span><span class="detail-value">未选择结果</span></div>' : ''}
+                <div class="history-comparison-toolbar">
+                    <button type="button" class="history-compare-btn" data-history-compare-action="${isBaselineThisResult ? 'clear-baseline' : 'set-baseline'}" ${hasResult ? '' : 'disabled'}>
+                        ${isBaselineThisResult ? '取消基线' : '固定为基线'}
+                    </button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="compare-baseline" ${hasResult && hasBaseline && hasComparisonLoader ? '' : 'disabled'}>与基线对比</button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="compare-current" ${hasResult && hasCurrent && hasComparisonLoader ? '' : 'disabled'}>与当前结果对比</button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="previous-success" ${hasResult && failureLike && hasPreviousSuccessLoader ? '' : 'disabled'}>查找失败前成功</button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="select-left" ${hasResult ? '' : 'disabled'}>作为左侧</button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="select-right" ${hasResult ? '' : 'disabled'}>作为右侧</button>
+                    <button type="button" class="history-compare-btn" data-history-compare-action="compare-selected" ${hasSelectionPair && hasComparisonLoader ? '' : 'disabled'}>对比选中结果</button>
+                </div>
+                <div class="history-comparison-meta">
+                    <div class="history-comparison-meta-title">固定基线</div>
+                    ${baselineRows}
+                    <div class="history-comparison-selection">${selectionText}</div>
+                </div>
+                <div class="history-comparison-output" aria-live="polite">
+                    <div class="history-comparison-empty">选择一个对比动作</div>
+                </div>
+            </div>
+        `;
+    }
+
+    attachHistoryComparisonControls(container, result) {
+        if (!container || typeof container.querySelectorAll !== 'function') {
+            return;
+        }
+
+        container.querySelectorAll('[data-history-compare-action]').forEach(button => {
+            button.addEventListener('click', () => {
+                const action = button.dataset.historyCompareAction;
+                this.handleHistoryComparisonAction(container, result, action);
+            });
+        });
+    }
+
+    handleHistoryComparisonAction(container, result, action) {
+        if (!result || !action) {
+            this.setHistoryComparisonOutput(container, '<div class="history-comparison-empty">未选择结果</div>');
+            return;
+        }
+
+        switch (action) {
+            case 'set-baseline':
+                this.comparisonBaseline = this.toComparisonAnchor(result);
+                this.replaceHistoryComparisonSection(container, result);
+                return;
+            case 'clear-baseline':
+                this.comparisonBaseline = null;
+                this.replaceHistoryComparisonSection(container, result);
+                return;
+            case 'select-left':
+                this.comparisonSelection = {
+                    ...this.comparisonSelection,
+                    left: this.toComparisonAnchor(result)
+                };
+                this.replaceHistoryComparisonSection(container, result);
+                return;
+            case 'select-right':
+                this.comparisonSelection = {
+                    ...this.comparisonSelection,
+                    right: this.toComparisonAnchor(result)
+                };
+                this.replaceHistoryComparisonSection(container, result);
+                return;
+            case 'compare-baseline':
+                this.runHistoryComparison(container, result, this.comparisonBaseline, result, '与基线对比');
+                return;
+            case 'compare-current':
+                this.runHistoryComparison(container, result, this.getLatestFormalComparisonResult(), result, '与当前结果对比');
+                return;
+            case 'compare-selected':
+                this.runHistoryComparison(
+                    container,
+                    result,
+                    this.comparisonSelection?.left,
+                    this.comparisonSelection?.right,
+                    '历史结果对比');
+                return;
+            case 'previous-success':
+                this.runPreviousSuccessComparison(container, result);
+                return;
+            default:
+                this.setHistoryComparisonOutput(container, '<div class="history-comparison-empty">未选择结果</div>');
+        }
+    }
+
+    replaceHistoryComparisonSection(container, result) {
+        const section = container?.querySelector?.('.history-comparison-section');
+        if (!section) {
+            return;
+        }
+
+        section.outerHTML = this.renderHistoryComparisonSection(result);
+        this.attachHistoryComparisonControls(container, result);
+    }
+
+    async runHistoryComparison(container, contextResult, left, right, title) {
+        const leftId = this.getResultComparisonId(left);
+        const rightId = this.getResultComparisonId(right);
+        if (!leftId || !rightId) {
+            this.setHistoryComparisonOutput(container, '<div class="history-comparison-empty">未选择结果</div>');
+            return;
+        }
+
+        if (typeof this.comparisonLoader !== 'function') {
+            this.setHistoryComparisonOutput(container, '<div class="history-comparison-error">结果对比服务未接入</div>');
+            return;
+        }
+
+        this.setHistoryComparisonOutput(container, '<div class="history-comparison-loading">正在加载结果对比...</div>');
+
+        try {
+            const comparison = await this.comparisonLoader({
+                left,
+                right,
+                leftId,
+                rightId,
+                contextResult
+            });
+            this.setHistoryComparisonOutput(container, this.renderHistoryComparisonResult(comparison, title));
+        } catch (error) {
+            this.setHistoryComparisonOutput(
+                container,
+                `<div class="history-comparison-error">${this.escapeHtml(error?.message || '结果对比加载失败')}</div>`
+            );
+        }
+    }
+
+    async runPreviousSuccessComparison(container, result) {
+        if (typeof this.previousSuccessLoader !== 'function') {
+            this.setHistoryComparisonOutput(container, '<div class="history-comparison-error">失败前成功查询未接入</div>');
+            return;
+        }
+
+        if (!this.isFailureLikeResult(result)) {
+            this.setHistoryComparisonOutput(container, '<div class="history-comparison-empty">当前结果不是失败/NG</div>');
+            return;
+        }
+
+        this.setHistoryComparisonOutput(container, '<div class="history-comparison-loading">正在查找失败前成功...</div>');
+
+        try {
+            const reference = await this.previousSuccessLoader(result);
+            let html = this.renderPreviousSuccessReference(reference);
+            const referenceSummary = reference?.referenceSummary || reference?.ReferenceSummary;
+            if (reference?.found === true && referenceSummary && typeof this.comparisonLoader === 'function') {
+                try {
+                    const comparison = await this.comparisonLoader({
+                        left: referenceSummary,
+                        right: result,
+                        leftId: this.getResultComparisonId(referenceSummary),
+                        rightId: this.getResultComparisonId(result),
+                        contextResult: result
+                    });
+                    html += this.renderHistoryComparisonResult(comparison, '失败结果 vs 失败前最近一次成功结果');
+                } catch (compareError) {
+                    html += `<div class="history-comparison-error">${this.escapeHtml(compareError?.message || '失败前成功对比加载失败')}</div>`;
+                }
+            }
+
+            this.setHistoryComparisonOutput(container, html);
+        } catch (error) {
+            this.setHistoryComparisonOutput(
+                container,
+                `<div class="history-comparison-error">${this.escapeHtml(error?.message || '查找失败前成功失败')}</div>`
+            );
+        }
+    }
+
+    setHistoryComparisonOutput(container, html) {
+        const output = container?.querySelector?.('.history-comparison-output');
+        if (output) {
+            output.innerHTML = html;
+        }
+    }
+
+    renderPreviousSuccessReference(reference) {
+        if (!reference || typeof reference !== 'object') {
+            return '<div class="history-comparison-empty">未找到失败前成功参考</div>';
+        }
+
+        const found = reference.found === true || reference.Found === true;
+        const message = reference.message || reference.Message || (found ? '已找到失败前成功参考' : '未找到失败前成功参考');
+        const warnings = this.normalizeComparisonWarnings(reference.warnings || reference.Warnings);
+        const summary = reference.referenceSummary || reference.ReferenceSummary;
+        const fallback = reference.isFlowVersionFallback === true || reference.IsFlowVersionFallback === true;
+
+        return `
+            <div class="history-comparison-reference">
+                <div class="history-comparison-subtitle">查找失败前成功</div>
+                <div class="history-comparison-message ${found ? 'is-ok' : 'is-empty'}">${this.escapeHtml(message)}</div>
+                ${fallback ? '<div class="history-comparison-warning">流程版本不一致，对比仅供参考</div>' : ''}
+                ${warnings.map(warning => `<div class="history-comparison-warning">${this.escapeHtml(warning)}</div>`).join('')}
+                ${summary ? this.renderComparisonSummaryPair(summary, null) : ''}
+            </div>
+        `;
+    }
+
+    renderHistoryComparisonResult(comparison, title = '结果对比') {
+        if (!comparison || typeof comparison !== 'object') {
+            return '<div class="history-comparison-empty">暂无对比结果</div>';
+        }
+
+        const warnings = this.getComparisonWarningMessages(comparison);
+        const traceabilityDiff = comparison.traceabilityDiff || comparison.TraceabilityDiff || [];
+        const fieldDiffs = comparison.fieldDiffs || comparison.FieldDiffs || [];
+        const diffs = [...traceabilityDiff, ...fieldDiffs];
+        const visibleDiffs = diffs.slice(0, RESULT_COMPARISON_MAX_DIFF_ROWS);
+        const hiddenCount = Math.max(0, diffs.length - visibleDiffs.length);
+        const scene = comparison.sceneReplayAvailability || comparison.SceneReplayAvailability || null;
+        const image = comparison.imageReplayAvailability || comparison.ImageReplayAvailability || null;
+
+        return `
+            <div class="history-comparison-result">
+                <div class="history-comparison-subtitle">${this.escapeHtml(title)}</div>
+                ${this.renderComparisonSummaryPair(comparison.leftSummary || comparison.LeftSummary, comparison.rightSummary || comparison.RightSummary)}
+                ${warnings.map(warning => `<div class="history-comparison-warning">${this.escapeHtml(warning)}</div>`).join('')}
+                ${scene ? this.renderReplayAvailability(scene, 'Scene replay') : ''}
+                ${image ? this.renderReplayAvailability(image, '图像回放') : ''}
+                ${visibleDiffs.length > 0 ? `
+                    <div class="history-comparison-diff-list">
+                        ${visibleDiffs.map(diff => this.renderComparisonDiffRow(diff)).join('')}
+                        ${hiddenCount > 0 ? `<div class="history-comparison-empty">Hidden ${hiddenCount} more diff rows</div>` : ''}
+                    </div>
+                ` : '<div class="history-comparison-empty">暂无字段差异</div>'}
+            </div>
+        `;
+    }
+
+    renderComparisonSummaryPair(left, right) {
+        if (!left && !right) {
+            return '';
+        }
+
+        const columns = [
+            ['左侧', left],
+            ['右侧', right]
+        ].filter(([, summary]) => !!summary);
+
+        return `
+            <div class="history-comparison-summary-grid">
+                ${columns.map(([label, summary]) => `
+                    <div class="history-comparison-summary">
+                        <div class="history-comparison-meta-title">${this.escapeHtml(label)}</div>
+                        <div>${this.escapeHtml(this.describeComparisonAnchor(summary))}</div>
+                        <div>${this.escapeHtml(summary?.status || summary?.Status || '--')} · ${this.escapeHtml(this.formatComparisonTime(summary?.timestamp || summary?.inspectionTime || summary?.InspectionTime))}</div>
+                        <div>FlowVersionHash: ${this.escapeHtml(summary?.flowVersionHash || summary?.FlowVersionHash || '旧数据未记录')}</div>
+                        <div>CalibrationBundleId: ${this.escapeHtml(summary?.calibrationBundleId || summary?.CalibrationBundleId || '旧数据未记录')}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    renderReplayAvailability(availability, label) {
+        const message = availability.message || availability.Message || '';
+        const mode = availability.mode || availability.Mode || 'summary-only';
+        const left = availability.leftSummary || availability.LeftSummary || availability.leftReference || availability.LeftReference || '--';
+        const right = availability.rightSummary || availability.RightSummary || availability.rightReference || availability.RightReference || '--';
+
+        return `
+            <div class="history-comparison-replay">
+                <strong>${this.escapeHtml(label)}</strong>
+                <span>${this.escapeHtml(mode)}</span>
+                <div>${this.escapeHtml(message || '暂无 Scene evidence，已降级为摘要回放')}</div>
+                <div>左侧：${this.escapeHtml(left)}</div>
+                <div>右侧：${this.escapeHtml(right)}</div>
+            </div>
+        `;
+    }
+
+    renderComparisonDiffRow(diff) {
+        const diffType = diff?.diffType || diff?.DiffType || 'Unknown';
+        const severity = diff?.severity || diff?.Severity || 'info';
+        const path = diff?.path || diff?.Path || '';
+        const label = diff?.label || diff?.Label || path || '--';
+        const left = diff?.leftValuePreview ?? diff?.LeftValuePreview ?? '--';
+        const right = diff?.rightValuePreview ?? diff?.RightValuePreview ?? '--';
+        const message = diff?.message || diff?.Message || '';
+
+        return `
+            <div class="history-comparison-diff-row history-diff-${this.toCssToken(diffType)} severity-${this.toCssToken(severity)}">
+                <div class="history-comparison-diff-head">
+                    <span>${this.escapeHtml(diffType)}</span>
+                    <code>${this.escapeHtml(path)}</code>
+                </div>
+                <div class="history-comparison-diff-label">${this.escapeHtml(label)}</div>
+                <div class="history-comparison-diff-values">
+                    <span>${this.escapeHtml(left)}</span>
+                    <span>${this.escapeHtml(right)}</span>
+                </div>
+                ${message ? `<div class="history-comparison-diff-message">${this.escapeHtml(message)}</div>` : ''}
+            </div>
+        `;
+    }
+
+    getComparisonWarningMessages(comparison) {
+        const compatibility = comparison.compatibility || comparison.Compatibility || {};
+        const warnings = this.normalizeComparisonWarnings(comparison.warnings || comparison.Warnings);
+        if (compatibility.flowVersionCompatible === false || compatibility.FlowVersionCompatible === false) {
+            warnings.push('流程版本不一致，对比仅供参考');
+        }
+        if (compatibility.calibrationBundleCompatible === false || compatibility.CalibrationBundleCompatible === false) {
+            warnings.push('标定资产不一致，空间坐标对比可能无效');
+        }
+        if (compatibility.onlySafePreviewComparison === true || compatibility.OnlySafePreviewComparison === true) {
+            warnings.push('仅比较安全预览字段');
+        }
+
+        return Array.from(new Set(warnings.filter(Boolean)));
+    }
+
+    normalizeComparisonWarnings(warnings) {
+        return Array.isArray(warnings)
+            ? warnings.map(warning => String(warning || '')).filter(Boolean)
+            : [];
+    }
+
+    getLatestFormalComparisonResult() {
+        return this.latestFormalResult || this.results?.[0] || null;
+    }
+
+    toComparisonAnchor(result) {
+        if (!result || typeof result !== 'object') {
+            return null;
+        }
+
+        return {
+            id: this.getResultComparisonId(result),
+            resultId: this.getResultComparisonId(result),
+            projectId: result.projectId || result.ProjectId || this.projectId || null,
+            status: result.status || result.Status || '--',
+            timestamp: result.timestamp || result.inspectionTime || result.InspectionTime || result.Timestamp || null,
+            processingTimeMs: result.processingTimeMs || result.processingTime || result.ProcessingTimeMs || result.ExecutionTimeMs || null,
+            flowVersionHash: result.flowVersionHash || result.FlowVersionHash || result.traceability?.flowVersionHash || null,
+            calibrationBundleId: result.calibrationBundleId || result.CalibrationBundleId || result.traceability?.calibrationBundleId || null,
+            sessionId: result.sessionId || result.runId || result.SessionId || result.RunId || null
+        };
+    }
+
+    getResultComparisonId(result) {
+        return result?.resultId || result?.id || result?.ResultId || result?.Id || null;
+    }
+
+    describeComparisonAnchor(result) {
+        const resultId = this.getResultComparisonId(result);
+        if (!resultId) {
+            return '未选择结果';
+        }
+
+        const status = result?.status || result?.Status || '--';
+        const time = this.formatComparisonTime(result?.timestamp || result?.inspectionTime || result?.InspectionTime);
+        return `${resultId} · ${status} · ${time}`;
+    }
+
+    formatComparisonTime(value) {
+        if (!value) {
+            return '--';
+        }
+
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    }
+
+    isFailureLikeResult(result) {
+        const status = String(result?.status || result?.Status || '').toLowerCase();
+        return status === 'ng' || status === 'error' || status === 'failed' || status === 'fail';
     }
 
     renderJsonPreviewNotice(title, preview) {
@@ -2609,6 +3059,11 @@ class ResultPanel {
         this.closeActiveDetailModals({ immediate: true });
         this.historyLoader = null;
         this.historyDetailLoader = null;
+        this.comparisonLoader = null;
+        this.previousSuccessLoader = null;
+        this.comparisonBaseline = null;
+        this.comparisonSelection = { left: null, right: null };
+        this.latestFormalResult = null;
         this.onResultClick = null;
     }
 

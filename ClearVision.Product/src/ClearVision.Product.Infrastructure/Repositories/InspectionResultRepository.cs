@@ -84,6 +84,34 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
             .SingleOrDefaultAsync();
     }
 
+    public async Task<InspectionHistoryDetail?> FindPreviousSuccessfulInspectionAsync(
+        Guid projectId,
+        DateTime beforeTime,
+        string? flowVersionHash = null,
+        int limit = 50)
+    {
+        limit = Math.Clamp(limit, 1, 200);
+
+        var query = _dbSet
+            .Where(r =>
+                r.ProjectId == projectId &&
+                !r.IsDeleted &&
+                r.Status == InspectionStatus.OK &&
+                r.InspectionTime < beforeTime);
+
+        if (!string.IsNullOrWhiteSpace(flowVersionHash))
+        {
+            var normalizedFlowHash = flowVersionHash.Trim();
+            query = query.Where(r => r.FlowVersionHash == normalizedFlowHash);
+        }
+
+        return await SelectHistoryDetails(query)
+            .OrderByDescending(r => r.InspectionTime)
+            .ThenByDescending(r => r.Id)
+            .Take(limit)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<IEnumerable<InspectionResult>> GetByTimeRangeAsync(
         Guid projectId,
         DateTime startTime,

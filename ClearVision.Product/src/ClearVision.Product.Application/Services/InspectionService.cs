@@ -468,6 +468,82 @@ public class InspectionService : IInspectionService
         }
     }
 
+    public async Task<InspectionHistoryComparison?> CompareInspectionHistoryAsync(Guid projectId, Guid leftId, Guid rightId)
+    {
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
+            var left = await _resultRepository.GetHistoryDetailAsync(projectId, leftId);
+            var right = await _resultRepository.GetHistoryDetailAsync(projectId, rightId);
+            return left == null || right == null
+                ? null
+                : InspectionHistoryComparisonBuilder.Build(left, right);
+        }
+    }
+
+    public async Task<InspectionPreviousSuccessReference?> FindPreviousSuccessfulInspectionAsync(
+        Guid projectId,
+        Guid resultId,
+        int limit = 50)
+    {
+        limit = Math.Clamp(limit, 1, 200);
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
+            var current = await _resultRepository.GetHistoryDetailAsync(projectId, resultId);
+            if (current == null)
+            {
+                return null;
+            }
+
+            if (current.Status == InspectionStatus.OK)
+            {
+                return InspectionHistoryComparisonBuilder.BuildPreviousSuccessReference(
+                    current,
+                    reference: null,
+                    limit,
+                    isFlowVersionFallback: false);
+            }
+
+            InspectionHistoryDetail? reference = null;
+            if (!string.IsNullOrWhiteSpace(current.FlowVersionHash))
+            {
+                reference = await _resultRepository.FindPreviousSuccessfulInspectionAsync(
+                    projectId,
+                    current.InspectionTime,
+                    current.FlowVersionHash,
+                    limit);
+            }
+
+            if (reference != null)
+            {
+                return InspectionHistoryComparisonBuilder.BuildPreviousSuccessReference(
+                    current,
+                    reference,
+                    limit,
+                    isFlowVersionFallback: false);
+            }
+
+            reference = await _resultRepository.FindPreviousSuccessfulInspectionAsync(
+                projectId,
+                current.InspectionTime,
+                flowVersionHash: null,
+                limit);
+
+            var isFallback = reference != null &&
+                !string.Equals(reference.FlowVersionHash, current.FlowVersionHash, StringComparison.Ordinal);
+            return InspectionHistoryComparisonBuilder.BuildPreviousSuccessReference(
+                current,
+                reference,
+                limit,
+                isFallback);
+        }
+    }
+
     public async Task<InspectionStatistics> GetStatisticsAsync(
         Guid projectId,
         DateTime? startTime,

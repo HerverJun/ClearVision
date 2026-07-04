@@ -1038,6 +1038,153 @@
 .type-null .detail-value { color: var(--r-text-muted); font-style: italic; }
 .type-object .detail-value { color: #7c3aed; font-family: var(--font-mono); font-size: 10px; }
 
+.history-comparison-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.history-compare-btn {
+    min-height: 30px;
+    border: 1px solid var(--r-border);
+    border-radius: 6px;
+    background: var(--r-surface);
+    color: var(--r-text);
+    font-size: 12px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.history-compare-btn:hover:not(:disabled) {
+    border-color: var(--r-primary);
+    color: var(--r-primary);
+}
+
+.history-compare-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.history-comparison-meta,
+.history-comparison-reference,
+.history-comparison-result {
+    display: grid;
+    gap: 8px;
+}
+
+.history-comparison-meta {
+    margin-bottom: 10px;
+}
+
+.history-comparison-meta-title,
+.history-comparison-subtitle {
+    color: var(--r-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.history-comparison-meta-row,
+.history-comparison-selection,
+.history-comparison-message,
+.history-comparison-warning,
+.history-comparison-empty,
+.history-comparison-loading,
+.history-comparison-error,
+.history-comparison-replay {
+    color: var(--r-text);
+    font-size: 12px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.history-comparison-meta-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.history-comparison-meta-row strong {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.history-comparison-warning,
+.history-comparison-error {
+    border-left: 3px solid var(--r-error);
+    padding-left: 8px;
+}
+
+.history-comparison-empty,
+.history-comparison-loading {
+    color: var(--r-text-muted);
+}
+
+.history-comparison-output {
+    max-height: 360px;
+    overflow: auto;
+}
+
+.history-comparison-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.history-comparison-summary,
+.history-comparison-replay,
+.history-comparison-diff-row {
+    border: 1px solid var(--r-border-light);
+    border-radius: 6px;
+    padding: 8px;
+    background: var(--r-surface);
+}
+
+.history-comparison-diff-list {
+    display: grid;
+    gap: 8px;
+}
+
+.history-comparison-diff-head,
+.history-comparison-diff-values {
+    display: grid;
+    grid-template-columns: minmax(80px, 0.3fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+}
+
+.history-comparison-diff-head code {
+    color: var(--r-text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.history-comparison-diff-label,
+.history-comparison-diff-message {
+    color: var(--r-text-muted);
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.history-comparison-diff-values span {
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    word-break: break-word;
+}
+
+.history-diff-incompatible {
+    border-color: rgba(248, 113, 113, 0.45);
+}
+
+.history-diff-changed {
+    border-color: rgba(231, 76, 60, 0.35);
+}
+
 /* --------------------------------------------------------------------------
    Light Theme — 结果视图在 Light 模式下保持当前风格
    在 Dark 模式下需要颜色反转

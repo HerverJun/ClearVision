@@ -97,6 +97,19 @@ public interface IInspectionService
     Task<InspectionHistoryDetail?> GetInspectionHistoryDetailAsync(Guid projectId, Guid resultId);
 
     /// <summary>
+    /// 比较两条正式检测历史详情。
+    /// </summary>
+    Task<InspectionHistoryComparison?> CompareInspectionHistoryAsync(Guid projectId, Guid leftId, Guid rightId);
+
+    /// <summary>
+    /// 查找失败结果之前最近的 OK 正式检测参考。
+    /// </summary>
+    Task<InspectionPreviousSuccessReference?> FindPreviousSuccessfulInspectionAsync(
+        Guid projectId,
+        Guid resultId,
+        int limit = 50);
+
+    /// <summary>
     /// 获取统计信息
     /// </summary>
     /// <param name="projectId">工程ID</param>

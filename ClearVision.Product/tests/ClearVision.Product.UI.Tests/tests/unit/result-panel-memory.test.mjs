@@ -289,6 +289,11 @@ function createPanel() {
     totalPages: 1,
     totalResultCount: 0,
     serverAnalysisSource: 'local',
+    comparisonLoader: null,
+    previousSuccessLoader: null,
+    comparisonBaseline: null,
+    comparisonSelection: { left: null, right: null },
+    latestFormalResult: null,
     _renderFrameHandle: null,
     _renderFrameCancel: null,
     resultsSseMaxFrameChars: 2 * 1024 * 1024,
@@ -318,6 +323,26 @@ function createResult(index) {
     analysisData: { cards: [] },
     defects: []
   };
+}
+
+function createComparisonContainer() {
+  const output = createMockElement();
+  const section = createMockElement();
+  const container = createMockElement();
+  container.querySelector = selector => {
+    if (selector === '.history-comparison-output') {
+      return output;
+    }
+
+    if (selector === '.history-comparison-section') {
+      return section;
+    }
+
+    return null;
+  };
+  container.querySelectorAll = () => [];
+
+  return { container, output, section };
 }
 
 test('live result history is bounded and old inline images are discarded', () => {
@@ -754,4 +779,239 @@ test('server history detail loads on demand and renders traceability warnings', 
       delete globalThis.window.requestAnimationFrame;
     }
   }
+});
+
+test('history comparison section renders baseline and session-only controls', () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  panel.serverPaged = true;
+  panel.comparisonLoader = async () => ({});
+  panel.previousSuccessLoader = async () => ({});
+  panel.comparisonBaseline = {
+    resultId: 'baseline-1',
+    status: 'OK',
+    timestamp: '2026-07-04T08:00:00Z',
+    flowVersionHash: 'FLOW-A',
+    calibrationBundleId: 'BUNDLE-A'
+  };
+
+  const html = panel.renderHistoryComparisonSection({
+    id: 'history-1',
+    projectId: 'project-1',
+    status: 'NG',
+    timestamp: '2026-07-04T08:05:00Z'
+  });
+
+  assert.match(html, /结果对比/);
+  assert.match(html, /固定为基线/);
+  assert.match(html, /取消基线|固定为基线/);
+  assert.match(html, /与基线对比/);
+  assert.match(html, /与当前结果对比/);
+  assert.match(html, /查找失败前成功/);
+  assert.match(html, /FLOW-A/);
+  assert.match(html, /BUNDLE-A/);
+});
+
+test('history comparison actions pin and clear the UI baseline without persistence', () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+  const result = {
+    id: 'history-1',
+    projectId: 'project-1',
+    status: 'OK',
+    timestamp: '2026-07-04T08:00:00Z',
+    flowVersionHash: 'FLOW-A',
+    calibrationBundleId: 'BUNDLE-A'
+  };
+
+  panel.handleHistoryComparisonAction(fixture.container, result, 'set-baseline');
+  assert.equal(panel.comparisonBaseline.resultId, 'history-1');
+  assert.equal(panel.comparisonBaseline.flowVersionHash, 'FLOW-A');
+
+  panel.handleHistoryComparisonAction(fixture.container, result, 'clear-baseline');
+  assert.equal(panel.comparisonBaseline, null);
+});
+
+test('history comparison renders current-vs-history warnings, diff rows, and replay fallback', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+  const calls = [];
+  panel.comparisonLoader = async ({ leftId, rightId }) => {
+    calls.push({ leftId, rightId });
+    return {
+      leftSummary: {
+        resultId: leftId,
+        status: 'OK',
+        timestamp: '2026-07-04T08:00:00Z',
+        flowVersionHash: 'FLOW-A',
+        calibrationBundleId: 'BUNDLE-A'
+      },
+      rightSummary: {
+        resultId: rightId,
+        status: 'NG',
+        timestamp: '2026-07-04T08:05:00Z',
+        flowVersionHash: 'FLOW-B',
+        calibrationBundleId: 'BUNDLE-B'
+      },
+      compatibility: {
+        flowVersionCompatible: false,
+        calibrationBundleCompatible: false,
+        onlySafePreviewComparison: true
+      },
+      warnings: ['流程版本不一致，对比仅供参考'],
+      traceabilityDiff: [{
+        path: '$["traceability"]["flowVersionHash"]',
+        label: 'FlowVersionHash',
+        leftValuePreview: 'FLOW-A',
+        rightValuePreview: 'FLOW-B',
+        diffType: 'Incompatible',
+        severity: 'warning'
+      }],
+      fieldDiffs: [{
+        path: '$["outputDataPreview"]["score"]',
+        label: 'score',
+        leftValuePreview: '42',
+        rightValuePreview: '45',
+        diffType: 'Changed',
+        severity: 'info'
+      }],
+      sceneReplayAvailability: {
+        mode: 'summary-only',
+        message: '暂无 Scene evidence，已降级为摘要回放',
+        leftSummary: '暂无 Scene evidence，已降级为摘要回放',
+        rightSummary: '暂无 Scene evidence，已降级为摘要回放'
+      },
+      imageReplayAvailability: {
+        mode: 'summary-only',
+        message: '图像缺失，已降级为摘要回放',
+        leftSummary: 'image missing',
+        rightSummary: 'no image'
+      }
+    };
+  };
+
+  const current = { id: 'current-1', status: 'OK' };
+  const history = { id: 'history-1', status: 'NG' };
+  await panel.runHistoryComparison(fixture.container, history, current, history, '与当前结果对比');
+
+  assert.deepEqual(calls, [{ leftId: 'current-1', rightId: 'history-1' }]);
+  assert.match(fixture.output.innerHTML, /与当前结果对比/);
+  assert.match(fixture.output.innerHTML, /流程版本不一致/);
+  assert.match(fixture.output.innerHTML, /标定资产不一致/);
+  assert.match(fixture.output.innerHTML, /仅比较安全预览字段/);
+  assert.match(fixture.output.innerHTML, /暂无 Scene evidence，已降级为摘要回放/);
+  assert.match(fixture.output.innerHTML, /图像缺失/);
+  assert.match(fixture.output.innerHTML, /Changed/);
+  assert.match(fixture.output.innerHTML, /score/);
+});
+
+test('history-vs-history comparison uses selected left and right results', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+  const calls = [];
+  panel.comparisonLoader = async ({ leftId, rightId }) => {
+    calls.push(`${leftId}:${rightId}`);
+    return {
+      leftSummary: { resultId: leftId, status: 'OK' },
+      rightSummary: { resultId: rightId, status: 'NG' },
+      compatibility: {},
+      warnings: [],
+      fieldDiffs: []
+    };
+  };
+  panel.comparisonSelection = {
+    left: { resultId: 'history-left', status: 'OK' },
+    right: { resultId: 'history-right', status: 'NG' }
+  };
+
+  await panel.runHistoryComparison(
+    fixture.container,
+    panel.comparisonSelection.right,
+    panel.comparisonSelection.left,
+    panel.comparisonSelection.right,
+    '历史结果对比');
+
+  assert.deepEqual(calls, ['history-left:history-right']);
+  assert.match(fixture.output.innerHTML, /历史结果对比/);
+});
+
+test('previous-success entry fail-softs when no OK reference exists', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+  panel.previousSuccessLoader = async () => ({
+    found: false,
+    message: '未找到失败前成功参考',
+    warnings: []
+  });
+
+  await panel.runPreviousSuccessComparison(fixture.container, {
+    id: 'failed-1',
+    status: 'NG'
+  });
+
+  assert.match(fixture.output.innerHTML, /查找失败前成功/);
+  assert.match(fixture.output.innerHTML, /未找到失败前成功参考/);
+});
+
+test('previous-success entry compares fallback reference and shows flow warning', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+  let compareCalls = 0;
+  panel.previousSuccessLoader = async () => ({
+    found: true,
+    isFlowVersionFallback: true,
+    message: '流程版本不一致，对比仅供参考',
+    warnings: ['流程版本不一致，对比仅供参考'],
+    referenceSummary: {
+      resultId: 'ok-before',
+      status: 'OK',
+      flowVersionHash: 'FLOW-B'
+    }
+  });
+  panel.comparisonLoader = async ({ leftId, rightId }) => {
+    compareCalls += 1;
+    return {
+      leftSummary: { resultId: leftId, status: 'OK' },
+      rightSummary: { resultId: rightId, status: 'NG' },
+      compatibility: { flowVersionCompatible: false },
+      warnings: ['流程版本不一致，对比仅供参考'],
+      fieldDiffs: []
+    };
+  };
+
+  await panel.runPreviousSuccessComparison(fixture.container, {
+    id: 'failed-1',
+    status: 'Error'
+  });
+
+  assert.equal(compareCalls, 1);
+  assert.match(fixture.output.innerHTML, /失败结果 vs 失败前最近一次成功结果/);
+  assert.match(fixture.output.innerHTML, /流程版本不一致/);
+});
+
+test('history comparison exposes loading, empty, and error states', async () => {
+  const panel = createPanel();
+  panel.escapeHtml = value => String(value ?? '');
+  const fixture = createComparisonContainer();
+
+  await panel.runHistoryComparison(fixture.container, {}, null, { id: 'right' }, '结果对比');
+  assert.match(fixture.output.innerHTML, /未选择结果/);
+
+  panel.comparisonLoader = async () => {
+    throw new Error('compare failed');
+  };
+  const pending = panel.runHistoryComparison(
+    fixture.container,
+    { id: 'right' },
+    { id: 'left' },
+    { id: 'right' },
+    '结果对比');
+  assert.match(fixture.output.innerHTML, /正在加载结果对比/);
+  await pending;
+  assert.match(fixture.output.innerHTML, /compare failed/);
 });

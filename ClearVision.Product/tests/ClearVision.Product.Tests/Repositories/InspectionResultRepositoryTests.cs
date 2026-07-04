@@ -207,6 +207,95 @@ public sealed class InspectionResultRepositoryTests
     }
 
     [Fact]
+    public async Task FindPreviousSuccessfulInspectionAsync_ShouldReturnLatestProjectScopedOkBeforeTime()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await using var db = CreateContext(root);
+            await db.Database.EnsureCreatedAsync();
+            var repository = new InspectionResultRepository(db);
+            var projectId = Guid.NewGuid();
+            var otherProjectId = Guid.NewGuid();
+            var timestamp = new DateTime(2026, 7, 4, 8, 30, 0, DateTimeKind.Utc);
+            var latestSameFlow = CreateResult(projectId, InspectionStatus.OK, 10);
+            latestSameFlow.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000111"),
+                timestamp.AddMinutes(-1),
+                timestamp.AddMinutes(-1),
+                null);
+            latestSameFlow.SetTraceability("FLOW-A", "bundle-a", Guid.NewGuid());
+            var olderSameFlow = CreateResult(projectId, InspectionStatus.OK, 11);
+            olderSameFlow.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000112"),
+                timestamp.AddMinutes(-5),
+                timestamp.AddMinutes(-5),
+                null);
+            olderSameFlow.SetTraceability("FLOW-A", "bundle-a", Guid.NewGuid());
+            var otherFlow = CreateResult(projectId, InspectionStatus.OK, 12);
+            otherFlow.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000113"),
+                timestamp.AddMinutes(-30),
+                timestamp.AddMinutes(-30),
+                null);
+            otherFlow.SetTraceability("FLOW-B", "bundle-b", Guid.NewGuid());
+            var afterFailure = CreateResult(projectId, InspectionStatus.OK, 13);
+            afterFailure.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000114"),
+                timestamp.AddMinutes(1),
+                timestamp.AddMinutes(1),
+                null);
+            afterFailure.SetTraceability("FLOW-A", "bundle-a", Guid.NewGuid());
+            var notOk = CreateResult(projectId, InspectionStatus.NG, 14);
+            notOk.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000115"),
+                timestamp.AddMinutes(-1),
+                timestamp.AddMinutes(-1),
+                null);
+            notOk.SetTraceability("FLOW-A", "bundle-a", Guid.NewGuid());
+            var otherProject = CreateResult(otherProjectId, InspectionStatus.OK, 15);
+            otherProject.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000116"),
+                timestamp.AddMinutes(-1),
+                timestamp.AddMinutes(-1),
+                null);
+            otherProject.SetTraceability("FLOW-A", "bundle-a", Guid.NewGuid());
+
+            await repository.AddRangeAsync([latestSameFlow, olderSameFlow, otherFlow, afterFailure, notOk, otherProject]);
+            db.ChangeTracker.Clear();
+
+            var sameFlow = await repository.FindPreviousSuccessfulInspectionAsync(
+                projectId,
+                timestamp,
+                flowVersionHash: "FLOW-A",
+                limit: 5);
+            var fallback = await repository.FindPreviousSuccessfulInspectionAsync(
+                projectId,
+                timestamp,
+                flowVersionHash: null,
+                limit: 5);
+            var notFound = await repository.FindPreviousSuccessfulInspectionAsync(
+                otherProjectId,
+                timestamp.AddMinutes(-10),
+                flowVersionHash: "FLOW-A",
+                limit: 5);
+
+            sameFlow.Should().NotBeNull();
+            sameFlow!.Id.Should().Be(latestSameFlow.Id);
+            sameFlow.ProjectId.Should().Be(projectId);
+            sameFlow.Status.Should().Be(InspectionStatus.OK);
+            sameFlow.FlowVersionHash.Should().Be("FLOW-A");
+            fallback.Should().NotBeNull();
+            fallback!.Id.Should().Be(latestSameFlow.Id);
+            notFound.Should().BeNull();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
     public async Task GetByTimeRangeAsync_ShouldReturnAnalysisItemsWithoutOutputImage()
     {
         var root = CreateTempPath();

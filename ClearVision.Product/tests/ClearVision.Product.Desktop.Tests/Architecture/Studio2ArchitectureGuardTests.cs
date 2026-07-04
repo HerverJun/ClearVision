@@ -624,8 +624,6 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotContain("preview debug cache", name);
             text.Should().NotContain("Evidence ZIP", name);
             text.Should().NotContain("EvidenceZip", name);
-            text.Should().NotMatchRegex(@"\bbaseline\b", name);
-            text.Should().NotMatchRegex(@"\breplay\b", name);
             text.Should().NotContain("new ImageCanvas", name);
             text.Should().NotContain("createElement('canvas'", name);
             text.Should().NotContain("document.createElement('canvas'", name);
@@ -639,6 +637,68 @@ public sealed class Studio2ArchitectureGuardTests
         historyTexts["ApiEndpoints.history"].Should().Contain("GetInspectionHistoryDetailAsync");
         historyTexts["InspectionResultRepository"].Should().Contain("GetHistoryDetailAsync");
         historyTexts["InspectionResultRepository"].Should().Contain("SelectHistoryListItems");
+    }
+
+    [Fact]
+    public void G14B_FormalInspectionComparison_ShouldStayWithinHistoryReplayBoundaries()
+    {
+        var apiText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs");
+        var serviceText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/InspectionService.cs");
+        var scopedApiText = ExtractSection(
+            apiText,
+            "app.MapGet(\"/api/inspection/history/{projectId:guid}/compare\"",
+            "        // 获取统计信息");
+        var scopedServiceText = ExtractSection(
+            serviceText,
+            "public async Task<InspectionHistoryComparison?> CompareInspectionHistoryAsync",
+            "    public async Task<InspectionStatistics> GetStatisticsAsync");
+
+        var g14bTexts = new Dictionary<string, string>
+        {
+            ["ApiEndpoints.G14B"] = scopedApiText,
+            ["IInspectionResultRepository"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Interfaces/IInspectionResultRepository.cs"),
+            ["IInspectionService"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Services/IInspectionService.cs"),
+            ["InspectionResultRepository"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Infrastructure/Repositories/InspectionResultRepository.cs"),
+            ["InspectionService.G14B"] = scopedServiceText,
+            ["InspectionHistoryComparisonBuilder"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Analysis/InspectionHistoryComparisonBuilder.cs"),
+            ["resultPanel"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js"),
+            ["app.historyComparison"] = ExtractSection(
+                ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js"),
+                "async function loadInspectionHistoryComparison",
+                "async function loadStationResultHistory")
+        };
+
+        foreach (var (name, text) in g14bTexts)
+        {
+            text.Should().NotContain("PreviewArtifact", name);
+            text.Should().NotContain("ExecutionObservationEnvelopeV1", name);
+            text.Should().NotContain("ExecutionObservation", name);
+            text.Should().NotContain("preview debug cache", name);
+            text.Should().NotContain("Evidence ZIP", name);
+            text.Should().NotContain("EvidenceZip", name);
+            text.Should().NotContain("Evidence manifest", name);
+            text.Should().NotContain("retention", name);
+            text.Should().NotContain("RuntimeHost", name);
+            text.Should().NotContain("ExecuteFlowAsync", name);
+            text.Should().NotContain("new ImageCanvas", name);
+            text.Should().NotContain("createElement('canvas'", name);
+            text.Should().NotContain("document.createElement('canvas'", name);
+            text.Should().NotContain("RuntimePackageLoader", name);
+            text.Should().NotContain("RuntimePackageExporter", name);
+            text.Should().NotContain("StationResultMapper", name);
+            text.Should().NotContain("AgentRunEventStore", name);
+            text.Should().NotContain("EventStore", name);
+            text.Should().NotContain("FrontendV2", name);
+        }
+
+        g14bTexts["InspectionResultRepository"].Should().Contain("FindPreviousSuccessfulInspectionAsync");
+        g14bTexts["InspectionResultRepository"].Should().Contain("Take(limit)");
+        g14bTexts["InspectionService.G14B"].Should().Contain("CompareInspectionHistoryAsync");
+        g14bTexts["InspectionService.G14B"].Should().Contain("FindPreviousSuccessfulInspectionAsync");
+        g14bTexts["InspectionHistoryComparisonBuilder"].Should().Contain("SafeJsonPreviewBuilder.Build");
+        g14bTexts["InspectionHistoryComparisonBuilder"].Should().Contain("ResultPathFormatter.Format");
+        g14bTexts["resultPanel"].Should().Contain("comparisonBaseline");
+        g14bTexts["resultPanel"].Should().Contain("暂无 Scene evidence，已降级为摘要回放");
     }
 
     [Fact]

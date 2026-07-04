@@ -41,6 +41,15 @@ public interface IInspectionResultRepository : IRepository<InspectionResult>
     Task<InspectionHistoryDetail?> GetHistoryDetailAsync(Guid projectId, Guid resultId);
 
     /// <summary>
+    /// 获取同工程、指定时间之前最近的 OK 检测详情，查询数量受 limit 限制。
+    /// </summary>
+    Task<InspectionHistoryDetail?> FindPreviousSuccessfulInspectionAsync(
+        Guid projectId,
+        DateTime beforeTime,
+        string? flowVersionHash = null,
+        int limit = 50);
+
+    /// <summary>
     /// 根据时间范围获取结果
     /// </summary>
     Task<IEnumerable<InspectionResult>> GetByTimeRangeAsync(

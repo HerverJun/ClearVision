@@ -340,6 +340,15 @@ public sealed class InspectionResultBackgroundServiceTests
             return Task.FromResult<InspectionHistoryDetail?>(null);
         }
 
+        public Task<InspectionHistoryDetail?> FindPreviousSuccessfulInspectionAsync(
+            Guid projectId,
+            DateTime beforeTime,
+            string? flowVersionHash = null,
+            int limit = 50)
+        {
+            return Task.FromResult<InspectionHistoryDetail?>(null);
+        }
+
         public Task<IEnumerable<InspectionResult>> GetByTimeRangeAsync(Guid projectId, DateTime startTime, DateTime endTime, string? status = null, string? defectType = null)
         {
             return Task.FromResult<IEnumerable<InspectionResult>>(Added.Where(result => result.ProjectId == projectId));
