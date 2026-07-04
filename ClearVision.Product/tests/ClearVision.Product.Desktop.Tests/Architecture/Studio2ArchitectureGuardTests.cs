@@ -503,6 +503,7 @@ public sealed class Studio2ArchitectureGuardTests
         var endpointText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/CalibrationDraftEndpoints.cs");
         var workbenchText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/calibrationDraftWorkbench.js");
         var runtimeText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExporter.cs");
+        var runtimeContractsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/RuntimeContracts.cs");
         var stationText = string.Join(
             "\n",
             Directory.EnumerateFiles(
@@ -522,8 +523,14 @@ public sealed class Studio2ArchitectureGuardTests
         endpointText.Should().NotContain("JsonFileProjectAssetStorage");
         workbenchText.Should().Contain("/calibration-assets/from-draft");
         workbenchText.Should().NotContain("ProjectSaveCoordinator");
-        runtimeText.Should().NotContain("ProjectAssets");
-        runtimeText.Should().NotContain("CalibrationAssets");
+        runtimeText.Should().Contain("PrepareProjectAssets");
+        runtimeText.Should().Contain("ProjectAssetStorageMetadata");
+        runtimeText.Should().NotContain("PreviewArtifact");
+        runtimeText.Should().NotContain("CalibrationDraft");
+        runtimeText.Should().NotContain("DraftCandidate");
+        runtimeText.Should().NotContain("ProjectAssetIndex");
+        runtimeContractsText.Should().Contain("RuntimePackageAssets");
+        runtimeContractsText.Should().NotContain("ProjectAssetIndex");
         stationText.Should().NotContain("ProjectAssets");
         stationText.Should().NotContain("CalibrationAssets");
     }

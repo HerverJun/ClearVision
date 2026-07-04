@@ -113,110 +113,133 @@ public sealed class RuntimePackageExporter
                 string.Join("\n- ", globalVariableValidationErrors));
         }
 
+        var packagedProjectAssets = PrepareProjectAssets(
+            project,
+            request.ProjectAssetStorageMetadata,
+            request.RequireProjectAssetStorageMetadata);
         var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
 
         var safeProjectName = RuntimePathGuard.SanitizeFileName(project.Name, "runtime-package");
         var packageRoot = Path.Combine(targetRoot, $"{safeProjectName}-{packageId}");
-        Directory.CreateDirectory(packageRoot);
-        Directory.CreateDirectory(Path.Combine(packageRoot, "quality"));
-        Directory.CreateDirectory(Path.Combine(packageRoot, "field"));
-
-        var packagedFlow = CloneFlow(flow);
-        var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
-        var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
-        var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
-        var profile = new RuntimeProfile();
-        var manifest = new RuntimePackageManifest
+        var packageRootCreated = false;
+        try
         {
-            PackageId = packageId,
-            PackageName = string.IsNullOrWhiteSpace(project.Name) ? packageId : project.Name.Trim(),
-            RuntimeApiVersion = profile.RuntimeApiVersion,
-            MinStationVersion = "0.1.0",
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = request.CreatedBy,
-            SourceProjectId = project.Id,
-            EntryFlow = "flow.json",
-            FlowHash = flowHash,
-            OperatorCatalogVersion = BuildOperatorCatalogVersion(),
-            ExportAllowed = true,
-            PendingParameters = parameterValidationErrors,
-            MissingResources = missingResources,
-            FieldExtensions = new RuntimeFieldExtensions
+            Directory.CreateDirectory(packageRoot);
+            packageRootCreated = true;
+            Directory.CreateDirectory(Path.Combine(packageRoot, "quality"));
+            Directory.CreateDirectory(Path.Combine(packageRoot, "field"));
+
+            var packagedFlow = CloneFlow(flow);
+            var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
+            await WriteProjectAssetFilesAsync(packageRoot, packagedProjectAssets.Files, cancellationToken);
+            var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
+            var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
+            var profile = new RuntimeProfile();
+            var manifest = new RuntimePackageManifest
             {
-                StationProfile = "field/station-profile.json",
-                TriggerProfile = "field/trigger-profile.json",
-                ResultMappingProfile = "field/result-mapping-profile.json",
-                ModelAssets = "field/model-assets.json",
-                RuntimeParameters = "field/runtime-parameters.json",
-                DefaultSiteProfile = "field/station-profile.default.json",
-                GlobalVariables = "field/global-variables.json"
+                PackageId = packageId,
+                PackageName = string.IsNullOrWhiteSpace(project.Name) ? packageId : project.Name.Trim(),
+                RuntimeApiVersion = profile.RuntimeApiVersion,
+                MinStationVersion = "0.1.0",
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = request.CreatedBy,
+                SourceProjectId = project.Id,
+                EntryFlow = "flow.json",
+                FlowHash = flowHash,
+                OperatorCatalogVersion = BuildOperatorCatalogVersion(),
+                ExportAllowed = true,
+                PendingParameters = parameterValidationErrors,
+                MissingResources = missingResources,
+                FieldExtensions = new RuntimeFieldExtensions
+                {
+                    StationProfile = "field/station-profile.json",
+                    TriggerProfile = "field/trigger-profile.json",
+                    ResultMappingProfile = "field/result-mapping-profile.json",
+                    ModelAssets = "field/model-assets.json",
+                    RuntimeParameters = "field/runtime-parameters.json",
+                    DefaultSiteProfile = "field/station-profile.default.json",
+                    GlobalVariables = "field/global-variables.json",
+                    ProjectAssets = packagedProjectAssets.Manifest == null ? null : "assets"
+                },
+                Assets = packagedProjectAssets.Manifest
+            };
+            var parameterSchema = BuildRuntimeParameterSchema(packageId, flowHash, packagedFlow);
+            RuntimeProjectVariableConflictValidator.ThrowIfAnySiteProfileConflicts(
+                project.GlobalVariables,
+                parameterSchema,
+                packagedFlow);
+            var defaultSiteProfile = new RuntimeSiteProfile
+            {
+                ProfileId = "package-default",
+                PackageId = packageId,
+                FlowHash = flowHash,
+                Revision = 0,
+                UpdatedAtUtc = manifest.CreatedAt,
+                UpdatedBy = string.IsNullOrWhiteSpace(manifest.CreatedBy) ? "ClearVision Studio" : manifest.CreatedBy,
+                Overrides = []
+            };
+
+            var validationReport = new RuntimeValidationReport
+            {
+                GeneratedAtUtc = DateTimeOffset.UtcNow,
+                IsValid = true,
+                FlowHash = flowHash,
+                Notes =
+                [
+                    $"ProjectId={project.Id:D}",
+                    $"OperatorCount={flow.Operators.Count}",
+                    $"ConnectionCount={flow.Connections.Count}",
+                    $"CalibrationAssetCount={packagedProjectAssets.Manifest?.CalibrationAssets.Count ?? 0}",
+                    $"SpatialAssetCount={packagedProjectAssets.Manifest?.SpatialAssets.Count ?? 0}"
+                ]
+            };
+
+            var packageBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, RuntimeJson.SerializerOptions);
+            var profileBytes = JsonSerializer.SerializeToUtf8Bytes(profile, RuntimeJson.SerializerOptions);
+            var validationBytes = JsonSerializer.SerializeToUtf8Bytes(validationReport, RuntimeJson.SerializerOptions);
+
+            await File.WriteAllBytesAsync(Path.Combine(packageRoot, "package.json"), packageBytes, cancellationToken);
+            await File.WriteAllBytesAsync(Path.Combine(packageRoot, "flow.json"), flowBytes, cancellationToken);
+            await File.WriteAllBytesAsync(Path.Combine(packageRoot, "runtime-profile.json"), profileBytes, cancellationToken);
+            await File.WriteAllBytesAsync(
+                Path.Combine(packageRoot, "quality", "validation-report.json"),
+                validationBytes,
+                cancellationToken);
+
+            await WriteFieldSchemaDraftsAsync(
+                packageRoot,
+                bundledAssets,
+                parameterSchema,
+                defaultSiteProfile,
+                project.GlobalVariables,
+                cancellationToken);
+
+            var readmePath = Path.Combine(packageRoot, "README.runtime.md");
+            await File.WriteAllTextAsync(readmePath, BuildReadme(manifest, validationReport), cancellationToken);
+
+            _logger.LogInformation(
+                "Exported runtime package {PackageId} for project {ProjectId} to {PackageRoot}",
+                SanitizeLogValue(manifest.PackageId),
+                SanitizeLogValue(project.Id),
+                SanitizeLogValue(packageRoot));
+
+            return new RuntimePackageExportResult
+            {
+                PackageRootPath = packageRoot,
+                Manifest = manifest,
+                ValidationReport = validationReport,
+                ReadmePath = readmePath
+            };
+        }
+        catch
+        {
+            if (packageRootCreated)
+            {
+                TryDeleteDirectory(packageRoot);
             }
-        };
-        var parameterSchema = BuildRuntimeParameterSchema(packageId, flowHash, packagedFlow);
-        RuntimeProjectVariableConflictValidator.ThrowIfAnySiteProfileConflicts(
-            project.GlobalVariables,
-            parameterSchema,
-            packagedFlow);
-        var defaultSiteProfile = new RuntimeSiteProfile
-        {
-            ProfileId = "package-default",
-            PackageId = packageId,
-            FlowHash = flowHash,
-            Revision = 0,
-            UpdatedAtUtc = manifest.CreatedAt,
-            UpdatedBy = string.IsNullOrWhiteSpace(manifest.CreatedBy) ? "ClearVision Studio" : manifest.CreatedBy,
-            Overrides = []
-        };
 
-        var validationReport = new RuntimeValidationReport
-        {
-            GeneratedAtUtc = DateTimeOffset.UtcNow,
-            IsValid = true,
-            FlowHash = flowHash,
-            Notes =
-            [
-                $"ProjectId={project.Id:D}",
-                $"OperatorCount={flow.Operators.Count}",
-                $"ConnectionCount={flow.Connections.Count}"
-            ]
-        };
-
-        var packageBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, RuntimeJson.SerializerOptions);
-        var profileBytes = JsonSerializer.SerializeToUtf8Bytes(profile, RuntimeJson.SerializerOptions);
-        var validationBytes = JsonSerializer.SerializeToUtf8Bytes(validationReport, RuntimeJson.SerializerOptions);
-
-        await File.WriteAllBytesAsync(Path.Combine(packageRoot, "package.json"), packageBytes, cancellationToken);
-        await File.WriteAllBytesAsync(Path.Combine(packageRoot, "flow.json"), flowBytes, cancellationToken);
-        await File.WriteAllBytesAsync(Path.Combine(packageRoot, "runtime-profile.json"), profileBytes, cancellationToken);
-        await File.WriteAllBytesAsync(
-            Path.Combine(packageRoot, "quality", "validation-report.json"),
-            validationBytes,
-            cancellationToken);
-
-        await WriteFieldSchemaDraftsAsync(
-            packageRoot,
-            bundledAssets,
-            parameterSchema,
-            defaultSiteProfile,
-            project.GlobalVariables,
-            cancellationToken);
-
-        var readmePath = Path.Combine(packageRoot, "README.runtime.md");
-        await File.WriteAllTextAsync(readmePath, BuildReadme(manifest, validationReport), cancellationToken);
-
-        _logger.LogInformation(
-            "Exported runtime package {PackageId} for project {ProjectId} to {PackageRoot}",
-            SanitizeLogValue(manifest.PackageId),
-            SanitizeLogValue(project.Id),
-            SanitizeLogValue(packageRoot));
-
-        return new RuntimePackageExportResult
-        {
-            PackageRootPath = packageRoot,
-            Manifest = manifest,
-            ValidationReport = validationReport,
-            ReadmePath = readmePath
-        };
+            throw;
+        }
     }
 
     private string BuildOperatorCatalogVersion()
@@ -228,6 +251,230 @@ public sealed class RuntimePackageExporter
         var payload = string.Join("|", names);
         var hash = RuntimePathGuard.ComputeSha256(Encoding.UTF8.GetBytes(payload));
         return $"{payload.Count(ch => ch == '|') + 1}+{hash[7..19]}";
+    }
+
+    private static RuntimePackagedProjectAssets PrepareProjectAssets(
+        ProjectDto project,
+        ProjectAssetStorageMetadata? storageMetadata,
+        bool requireStorageMetadata)
+    {
+        var assets = ProjectAssetJson.Normalize(ProjectAssetJson.Clone(project.Assets ?? new ProjectAssetsDto()));
+        if (!ProjectAssetJson.HasAssets(assets))
+        {
+            return RuntimePackagedProjectAssets.Empty;
+        }
+
+        ValidateProjectAssetStorageMetadata(project, assets, storageMetadata, requireStorageMetadata);
+
+        var manifest = new RuntimePackageAssets
+        {
+            SchemaVersion = assets.SchemaVersion <= 0 ? 1 : assets.SchemaVersion
+        };
+        var files = new List<RuntimeProjectAssetFile>();
+        var usedRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var asset in assets.CalibrationAssets.OrderBy(asset => asset.AssetId, StringComparer.Ordinal))
+        {
+            ValidateCalibrationAuthorityAsset(project, asset);
+            var relativePath = BuildProjectAssetRelativePath("calibration", asset.AssetId, usedRelativePaths);
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(asset, ProjectAssetJson.Options);
+            var fileHash = RuntimePathGuard.ComputeSha256(bytes);
+            manifest.CalibrationAssets.Add(ToRuntimeAsset(asset, relativePath, fileHash));
+            files.Add(new RuntimeProjectAssetFile(relativePath, bytes, fileHash));
+        }
+
+        foreach (var asset in assets.SpatialAssets.OrderBy(asset => asset.AssetId, StringComparer.Ordinal))
+        {
+            ValidateSpatialAuthorityAsset(project, asset);
+            var relativePath = BuildProjectAssetRelativePath("spatial", asset.AssetId, usedRelativePaths);
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(asset, ProjectAssetJson.Options);
+            var fileHash = RuntimePathGuard.ComputeSha256(bytes);
+            manifest.SpatialAssets.Add(ToRuntimeAsset(asset, relativePath, fileHash));
+            files.Add(new RuntimeProjectAssetFile(relativePath, bytes, fileHash));
+        }
+
+        return new RuntimePackagedProjectAssets(manifest, files);
+    }
+
+    private static void ValidateProjectAssetStorageMetadata(
+        ProjectDto project,
+        ProjectAssetsDto assets,
+        ProjectAssetStorageMetadata? storageMetadata,
+        bool requireStorageMetadata)
+    {
+        if (requireStorageMetadata && storageMetadata == null)
+        {
+            throw new RuntimePackageException("RPA001: project asset storage metadata is required for runtime package export.");
+        }
+
+        if (storageMetadata == null)
+        {
+            return;
+        }
+
+        if (storageMetadata.ProjectId != project.Id)
+        {
+            throw new RuntimePackageException("RPA002: project asset storage metadata belongs to a different project.");
+        }
+
+        if (storageMetadata.PersistenceRevision != project.PersistenceRevision)
+        {
+            throw new RuntimePackageException(
+                $"RPA003: project asset storage revision {storageMetadata.PersistenceRevision} does not match project revision {project.PersistenceRevision}.");
+        }
+
+        var assetsHash = ProjectAssetJson.ComputeAssetsHash(assets);
+        if (!string.Equals(storageMetadata.AssetsHash, assetsHash, StringComparison.Ordinal))
+        {
+            throw new RuntimePackageException("RPA004: project asset storage hash does not match the Project DTO assets.");
+        }
+    }
+
+    private static void ValidateCalibrationAuthorityAsset(ProjectDto project, ProjectCalibrationAssetDto asset)
+    {
+        ValidateCommonAuthorityAsset(
+            project,
+            asset.AssetId,
+            asset.Kind,
+            asset.ProjectRevision,
+            asset.Status,
+            asset.ContentHash,
+            asset.Payload);
+
+        if (!string.Equals(asset.Kind, "CalibrationBundleV2", StringComparison.Ordinal))
+        {
+            throw new RuntimePackageException($"RPA005: calibration asset '{asset.AssetId}' must be CalibrationBundleV2.");
+        }
+    }
+
+    private static void ValidateSpatialAuthorityAsset(ProjectDto project, ProjectSpatialAssetDto asset)
+    {
+        ValidateCommonAuthorityAsset(
+            project,
+            asset.AssetId,
+            asset.Kind,
+            asset.ProjectRevision,
+            asset.Status,
+            asset.ContentHash,
+            asset.Payload);
+    }
+
+    private static void ValidateCommonAuthorityAsset(
+        ProjectDto project,
+        string assetId,
+        string kind,
+        long projectRevision,
+        string status,
+        string contentHash,
+        JsonElement payload)
+    {
+        if (string.IsNullOrWhiteSpace(assetId))
+        {
+            throw new RuntimePackageException("RPA006: project asset id is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            throw new RuntimePackageException($"RPA007: project asset '{assetId}' kind is required.");
+        }
+
+        if (!string.Equals(status, "authority", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RuntimePackageException($"RPA008: project asset '{assetId}' is not an authority asset.");
+        }
+
+        if (projectRevision != project.PersistenceRevision)
+        {
+            throw new RuntimePackageException(
+                $"RPA009: project asset '{assetId}' revision {projectRevision} does not match project revision {project.PersistenceRevision}.");
+        }
+
+        string payloadHash;
+        try
+        {
+            payloadHash = ProjectAssetJson.ComputePayloadHash(payload);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new RuntimePackageException($"RPA013: project asset '{assetId}' payload is invalid: {ex.Message}", ex);
+        }
+
+        if (!string.Equals(contentHash, payloadHash, StringComparison.Ordinal))
+        {
+            throw new RuntimePackageException($"RPA010: project asset '{assetId}' content hash does not match its payload.");
+        }
+
+        if (!IsSha256Hash(contentHash))
+        {
+            throw new RuntimePackageException($"RPA011: project asset '{assetId}' content hash is not a sha256 hash.");
+        }
+    }
+
+    private static RuntimePackageProjectAsset ToRuntimeAsset(
+        ProjectCalibrationAssetDto asset,
+        string relativePath,
+        string fileHash) =>
+        new()
+        {
+            AssetId = asset.AssetId,
+            Kind = asset.Kind,
+            Version = asset.Version,
+            ProjectRevision = asset.ProjectRevision,
+            ContentHash = asset.ContentHash,
+            FileHash = fileHash,
+            RelativePath = relativePath,
+            Required = false,
+            Status = asset.Status
+        };
+
+    private static RuntimePackageProjectAsset ToRuntimeAsset(
+        ProjectSpatialAssetDto asset,
+        string relativePath,
+        string fileHash) =>
+        new()
+        {
+            AssetId = asset.AssetId,
+            Kind = asset.Kind,
+            Version = asset.Version,
+            ProjectRevision = asset.ProjectRevision,
+            ContentHash = asset.ContentHash,
+            FileHash = fileHash,
+            RelativePath = relativePath,
+            Required = false,
+            Status = asset.Status
+        };
+
+    private static string BuildProjectAssetRelativePath(
+        string category,
+        string assetId,
+        HashSet<string> usedRelativePaths)
+    {
+        var sanitizedAssetId = RuntimePathGuard.SanitizeFileName(assetId, $"{category}-asset")
+            .Replace("..", "-", StringComparison.Ordinal)
+            .Trim('.', ' ');
+        if (string.IsNullOrWhiteSpace(sanitizedAssetId))
+        {
+            sanitizedAssetId = $"{category}-asset";
+        }
+
+        if (sanitizedAssetId.Length > 80)
+        {
+            sanitizedAssetId = sanitizedAssetId[..80];
+        }
+
+        var idHash = RuntimePathGuard.ComputeSha256(Encoding.UTF8.GetBytes(assetId));
+        var suffix = idHash[7..19];
+        var fileName = $"{sanitizedAssetId}-{suffix}.json";
+        var relativePath = ToPackageRelativePath(Path.Combine("assets", category, fileName));
+        var collision = 1;
+        while (!usedRelativePaths.Add(relativePath))
+        {
+            relativePath = ToPackageRelativePath(Path.Combine("assets", category, $"{sanitizedAssetId}-{suffix}-{collision}.json"));
+            collision += 1;
+        }
+
+        RuntimePathGuard.ValidateStrictRelativeAssetPath(relativePath);
+        return relativePath;
     }
 
     private static RuntimeParameterSchema BuildRuntimeParameterSchema(
@@ -555,6 +802,29 @@ public sealed class RuntimePackageExporter
         }
 
         return assets;
+    }
+
+    private static async Task WriteProjectAssetFilesAsync(
+        string packageRoot,
+        IReadOnlyList<RuntimeProjectAssetFile> files,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in files)
+        {
+            var targetPath = RuntimePathGuard.ResolveAssetPath(packageRoot, file.RelativePath);
+            var targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            await File.WriteAllBytesAsync(targetPath, file.Bytes, cancellationToken);
+            var writtenHash = await ComputeFileSha256Async(targetPath, cancellationToken);
+            if (!string.Equals(writtenHash, file.FileHash, StringComparison.Ordinal))
+            {
+                throw new RuntimePackageException($"RPA012: packaged project asset checksum changed while writing '{file.RelativePath}'.");
+            }
+        }
     }
 
     private static async Task BundleDeepLearningAutoLabelsAsync(
@@ -1003,6 +1273,36 @@ public sealed class RuntimePackageExporter
         return path.Replace('\\', '/');
     }
 
+    private static bool IsSha256Hash(string? value)
+    {
+        const string prefix = "sha256:";
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.Length != prefix.Length + 64 ||
+            !value.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return value[prefix.Length..].All(ch =>
+            ch is >= '0' and <= '9' ||
+            ch is >= 'a' and <= 'f');
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch
+        {
+            // Export callers receive the original failure; cleanup best-effort avoids masking it.
+        }
+    }
+
     private static async Task WriteFieldSchemaDraftsAsync(
         string packageRoot,
         IReadOnlyList<RuntimeBundledAsset> bundledAssets,
@@ -1102,4 +1402,16 @@ public sealed class RuntimePackageExporter
 
         public string Notes { get; init; } = "Bundled resources required by this runtime package.";
     }
+
+    private sealed record RuntimePackagedProjectAssets(
+        RuntimePackageAssets? Manifest,
+        IReadOnlyList<RuntimeProjectAssetFile> Files)
+    {
+        public static RuntimePackagedProjectAssets Empty { get; } = new(null, []);
+    }
+
+    private sealed record RuntimeProjectAssetFile(
+        string RelativePath,
+        byte[] Bytes,
+        string FileHash);
 }

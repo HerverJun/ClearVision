@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -345,6 +346,270 @@ public class RuntimePackageExporterValidationTests
         }
     }
 
+    [Fact]
+    public async Task ExportAsync_WhenProjectHasCalibrationAuthorityAsset_ShouldPackageRelativeAssetWithHashes()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectWithCalibrationAsset("project-assets", "calibration-main", projectRevision: 12);
+            var metadata = CreateAssetMetadata(project);
+            var exporter = CreateExporter();
+
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root,
+                ProjectAssetStorageMetadata = metadata,
+                RequireProjectAssetStorageMetadata = true
+            });
+
+            export.Manifest.Assets.Should().NotBeNull();
+            export.Manifest.FieldExtensions.ProjectAssets.Should().Be("assets");
+            var manifestAsset = export.Manifest.Assets!.CalibrationAssets.Should().ContainSingle().Subject;
+            manifestAsset.AssetId.Should().Be("calibration-main");
+            manifestAsset.Kind.Should().Be("CalibrationBundleV2");
+            manifestAsset.ProjectRevision.Should().Be(12);
+            manifestAsset.Required.Should().BeFalse();
+            Path.IsPathFullyQualified(manifestAsset.RelativePath).Should().BeFalse();
+            manifestAsset.RelativePath.Should().StartWith("assets/calibration/");
+            manifestAsset.RelativePath.Should().NotContain("..");
+            manifestAsset.RelativePath.Should().NotContain("\\");
+            manifestAsset.ContentHash.Should().Be(project.Assets.CalibrationAssets.Single().ContentHash);
+
+            var assetPath = Path.Combine(export.PackageRootPath, manifestAsset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            File.Exists(assetPath).Should().BeTrue();
+            RuntimePathGuard.ComputeSha256(await File.ReadAllBytesAsync(assetPath)).Should().Be(manifestAsset.FileHash);
+
+            var packagedAsset = JsonSerializer.Deserialize<ProjectCalibrationAssetDto>(
+                await File.ReadAllTextAsync(assetPath),
+                ProjectAssetJson.Options)!;
+            packagedAsset.AssetId.Should().Be("calibration-main");
+            packagedAsset.ProjectRevision.Should().Be(12);
+            packagedAsset.Status.Should().Be("authority");
+            packagedAsset.ContentHash.Should().Be(manifestAsset.ContentHash);
+            ProjectAssetJson.ComputePayloadHash(packagedAsset.Payload).Should().Be(manifestAsset.ContentHash);
+
+            var manifestText = await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "package.json"));
+            manifestText.Should().Contain("\"assets\"");
+            manifestText.Should().NotContain(root.Replace("\\", "\\\\"));
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var package = await loader.LoadAsync(export.PackageRootPath);
+            package.Manifest.Assets!.CalibrationAssets.Should().ContainSingle();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenManifestOmitsAssetsSection_ShouldRemainCompatible()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = CreateExporter();
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateMinimalProject("old-no-assets"),
+                TargetRootDirectory = root
+            });
+
+            var manifestText = await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "package.json"));
+            manifestText.Should().NotContain("\"assets\"");
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var package = await loader.LoadAsync(export.PackageRootPath);
+
+            package.Manifest.Assets.Should().BeNull();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenAssetsSectionIsEmpty_ShouldRemainCompatible()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = CreateExporter();
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateMinimalProject("empty-assets"),
+                TargetRootDirectory = root
+            });
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = await ReadManifestAsync(manifestPath);
+            manifest.Assets = new RuntimePackageAssets();
+            await WriteManifestAsync(manifestPath, manifest);
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var package = await loader.LoadAsync(export.PackageRootPath);
+
+            package.Manifest.Assets.Should().NotBeNull();
+            package.Manifest.Assets!.CalibrationAssets.Should().BeEmpty();
+            package.Manifest.Assets.SpatialAssets.Should().BeEmpty();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("checksum")]
+    [InlineData("traversal")]
+    [InlineData("absolute")]
+    [InlineData("malformed")]
+    [InlineData("payloadHash")]
+    [InlineData("schemaVersion")]
+    public async Task LoadAsync_WhenProjectAssetPackageIsTampered_ShouldFailClosed(string scenario)
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectWithCalibrationAsset("tamper-assets", "asset-tamper", projectRevision: 7);
+            var exporter = CreateExporter();
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = await ReadManifestAsync(manifestPath);
+            var manifestAsset = manifest.Assets!.CalibrationAssets.Single();
+            var assetPath = Path.Combine(export.PackageRootPath, manifestAsset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            var expectedCode = scenario switch
+            {
+                "missing" => "ProjectAssetFileMissing",
+                "checksum" => "ProjectAssetFileHashMismatch",
+                "traversal" => "ProjectAssetPathInvalid",
+                "absolute" => "ProjectAssetPathInvalid",
+                "malformed" => "ProjectAssetJsonMalformed",
+                "payloadHash" => "ProjectAssetContentHashMismatch",
+                "schemaVersion" => "ProjectAssetsSchemaVersionUnsupported",
+                _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
+            };
+
+            switch (scenario)
+            {
+                case "missing":
+                    File.Delete(assetPath);
+                    break;
+                case "checksum":
+                    await File.WriteAllTextAsync(assetPath, "{}");
+                    break;
+                case "traversal":
+                    manifestAsset.RelativePath = "assets/../calibration.json";
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+                case "absolute":
+                    manifestAsset.RelativePath = Path.Combine(export.PackageRootPath, "assets", "calibration.json");
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+                case "malformed":
+                    await File.WriteAllTextAsync(assetPath, "{");
+                    manifestAsset.FileHash = RuntimePathGuard.ComputeSha256(await File.ReadAllBytesAsync(assetPath));
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+                case "payloadHash":
+                    var asset = JsonSerializer.Deserialize<ProjectCalibrationAssetDto>(
+                        await File.ReadAllTextAsync(assetPath),
+                        ProjectAssetJson.Options)!;
+                    asset.Payload = CreateCalibrationPayload("mutated-payload");
+                    var bytes = JsonSerializer.SerializeToUtf8Bytes(asset, ProjectAssetJson.Options);
+                    await File.WriteAllBytesAsync(assetPath, bytes);
+                    manifestAsset.FileHash = RuntimePathGuard.ComputeSha256(bytes);
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+                case "schemaVersion":
+                    manifest.Assets!.SchemaVersion = 99;
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+            }
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var act = () => loader.LoadAsync(export.PackageRootPath);
+
+            await act.Should()
+                .ThrowAsync<RuntimePackageException>()
+                .WithMessage($"*{expectedCode}*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExportAsync_WhenProjectAssetStorageMetadataMismatches_ShouldRejectBeforeCreatingPackageDirectory()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectWithCalibrationAsset("metadata-mismatch", "asset-mismatch", projectRevision: 5);
+            var metadata = CreateAssetMetadata(project) with { PersistenceRevision = 4 };
+            var exporter = CreateExporter();
+
+            var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root,
+                ProjectAssetStorageMetadata = metadata,
+                RequireProjectAssetStorageMetadata = true
+            });
+
+            await act.Should()
+                .ThrowAsync<RuntimePackageException>()
+                .WithMessage("*RPA003*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
+            project.Assets.CalibrationAssets.Should().ContainSingle(asset =>
+                asset.AssetId == "asset-mismatch" &&
+                asset.ProjectRevision == 5 &&
+                asset.Status == "authority");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExportAsync_WhenAuthorityAssetPayloadHashMismatches_ShouldRejectWithoutPollutingProjectAuthority()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectWithCalibrationAsset("bad-asset", "asset-bad", projectRevision: 3);
+            var originalHash = project.Assets.CalibrationAssets.Single().ContentHash;
+            project.Assets.CalibrationAssets.Single().ContentHash = "sha256:" + new string('0', 64);
+            var exporter = CreateExporter();
+
+            var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await act.Should()
+                .ThrowAsync<RuntimePackageException>()
+                .WithMessage("*RPA010*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
+            ProjectAssetJson.ComputePayloadHash(project.Assets.CalibrationAssets.Single().Payload).Should().Be(originalHash);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private static RuntimePackageExporter CreateExporter()
     {
         var cameraManager = Substitute.For<ICameraManager>();
@@ -383,6 +648,79 @@ public class RuntimePackageExporterValidationTests
             }
         };
     }
+
+    private static ProjectDto CreateProjectWithCalibrationAsset(
+        string name,
+        string assetId,
+        long projectRevision)
+    {
+        var payload = CreateCalibrationPayload(assetId);
+        var contentHash = ProjectAssetJson.ComputePayloadHash(payload);
+        var project = CreateMinimalProject(name);
+        project.PersistenceRevision = projectRevision;
+        project.Assets = new ProjectAssetsDto
+        {
+            CalibrationAssets =
+            [
+                new ProjectCalibrationAssetDto
+                {
+                    AssetId = assetId,
+                    Kind = "CalibrationBundleV2",
+                    Version = "2.0",
+                    Producer = "test",
+                    SourceDraftSessionId = "draft-session",
+                    ImageIdentity = "image:test",
+                    ContentHash = contentHash,
+                    ProjectRevision = projectRevision,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                    Status = "authority",
+                    Payload = payload
+                }
+            ]
+        };
+
+        return project;
+    }
+
+    private static JsonElement CreateCalibrationPayload(string bundleId) =>
+        JsonSerializer.SerializeToElement(
+            new
+            {
+                schemaVersion = 2,
+                bundleId,
+                calibrationVersion = "2.0",
+                quality = new
+                {
+                    accepted = true,
+                    rmsErrorPx = 0.12
+                },
+                transform2D = new
+                {
+                    kind = "Affine",
+                    matrix = new[] { 1d, 0d, 0d, 0d, 1d, 0d }
+                }
+            },
+            ProjectAssetJson.Options);
+
+    private static ProjectAssetStorageMetadata CreateAssetMetadata(ProjectDto project) =>
+        new(
+            SchemaVersion: 1,
+            ProjectId: project.Id,
+            PersistenceRevision: project.PersistenceRevision,
+            AssetsHash: ProjectAssetJson.ComputeAssetsHash(project.Assets),
+            SaveId: Guid.NewGuid(),
+            SavedAtUtc: DateTimeOffset.UtcNow);
+
+    private static async Task<RuntimePackageManifest> ReadManifestAsync(string manifestPath) =>
+        JsonSerializer.Deserialize<RuntimePackageManifest>(
+            await File.ReadAllTextAsync(manifestPath),
+            CreateJsonOptions())!;
+
+    private static async Task WriteManifestAsync(string manifestPath, RuntimePackageManifest manifest) =>
+        await File.WriteAllTextAsync(
+            manifestPath,
+            JsonSerializer.Serialize(manifest, CreateJsonOptions()));
 
     private static ProjectDto CreateProjectWithGlobalVariableCycle(string name)
     {

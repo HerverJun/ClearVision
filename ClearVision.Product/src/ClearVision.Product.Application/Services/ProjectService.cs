@@ -515,6 +515,11 @@ public class ProjectService
             ? new ProjectAssetsDto()
             : await _projectAssetStorage.LoadAssetsAsync(projectId);
 
+    public async Task<ProjectAssetStorageMetadata?> GetProjectAssetStorageMetadataUnderProjectAccessAsync(Guid projectId) =>
+        _projectAssetStorage == null
+            ? null
+            : await _projectAssetStorage.LoadMetadataAsync(projectId);
+
     private static void ValidateCalibrationAssetPayload(JsonElement payload)
     {
         if (payload.ValueKind != JsonValueKind.Object)

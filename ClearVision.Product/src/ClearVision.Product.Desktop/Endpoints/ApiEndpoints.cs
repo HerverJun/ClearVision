@@ -477,6 +477,7 @@ public static class ApiEndpoints
             RuntimePackageExporter exporter,
             StationPackageStore packageStore,
             IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -493,7 +494,10 @@ public static class ApiEndpoints
                     return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
                 }
 
-                var project = await service.GetByIdAsync(id);
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id, cancellationToken);
+                var project = projectAccess == null
+                    ? await service.GetByIdAsync(id)
+                    : await service.GetByIdUnderProjectAccessAsync(id);
                 if (project == null)
                 {
                     return Results.NotFound(new { Error = "Project not found." });
@@ -504,11 +508,14 @@ public static class ApiEndpoints
                     project.Flow = request.Flow;
                 }
 
+                var assetStorageMetadata = await service.GetProjectAssetStorageMetadataUnderProjectAccessAsync(id);
                 var exportResult = await exporter.ExportAsync(
                     new RuntimePackageExportRequest
                     {
                         Project = project,
-                        TargetRootDirectory = request?.TargetRootDirectory
+                        TargetRootDirectory = request?.TargetRootDirectory,
+                        ProjectAssetStorageMetadata = assetStorageMetadata,
+                        RequireProjectAssetStorageMetadata = ProjectAssetJson.HasAssets(project.Assets)
                     },
                     cancellationToken);
                 StationPackageManifestDto? stationPackage = null;

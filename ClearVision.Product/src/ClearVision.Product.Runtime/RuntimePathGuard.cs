@@ -29,6 +29,48 @@ internal static class RuntimePathGuard
         return candidate;
     }
 
+    public static string ResolveAssetPath(string rootPath, string relativePath)
+    {
+        ValidateStrictRelativeAssetPath(relativePath);
+        return ResolveChildPath(rootPath, relativePath);
+    }
+
+    public static void ValidateStrictRelativeAssetPath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new RuntimePackageException("Package asset path is empty.");
+        }
+
+        if (Path.IsPathFullyQualified(relativePath) || Path.IsPathRooted(relativePath))
+        {
+            throw new RuntimePackageException($"Package asset path must be relative: {relativePath}");
+        }
+
+        if (relativePath.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new RuntimePackageException($"Package asset path must use '/' separators: {relativePath}");
+        }
+
+        var invalidPathChars = Path.GetInvalidPathChars();
+        if (relativePath.IndexOfAny(invalidPathChars) >= 0)
+        {
+            throw new RuntimePackageException($"Package asset path contains invalid characters: {relativePath}");
+        }
+
+        var invalidFileNameChars = Path.GetInvalidFileNameChars();
+        foreach (var segment in relativePath.Split('/'))
+        {
+            if (string.IsNullOrWhiteSpace(segment) ||
+                segment.Equals(".", StringComparison.Ordinal) ||
+                segment.Contains("..", StringComparison.Ordinal) ||
+                segment.IndexOfAny(invalidFileNameChars) >= 0)
+            {
+                throw new RuntimePackageException($"Package asset path contains an invalid segment: {relativePath}");
+            }
+        }
+    }
+
     public static string GetDefaultStudioExportRoot()
     {
         return Path.Combine(

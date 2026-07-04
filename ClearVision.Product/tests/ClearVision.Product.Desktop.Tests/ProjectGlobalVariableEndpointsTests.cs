@@ -381,6 +381,36 @@ public sealed class ProjectGlobalVariableEndpointsTests
         body.GetProperty("code").GetString().Should().Be("GV031");
     }
 
+    [Fact]
+    public async Task RuntimePackageExport_WhenProjectAssetMetadataRevisionMismatches_ShouldReturnBadRequest()
+    {
+        var variableId = Guid.NewGuid();
+        var assetStorage = new MutableProjectAssetStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            storedFlowJson: CreateResultOnlyFlowJson(),
+            assetStorage: assetStorage);
+        assetStorage.Assets = CreateProjectAssets("endpoint-calibration", host.Project.PersistenceRevision);
+        assetStorage.Metadata = new ProjectAssetStorageMetadata(
+            SchemaVersion: 1,
+            ProjectId: host.Project.Id,
+            PersistenceRevision: host.Project.PersistenceRevision + 1,
+            AssetsHash: ProjectAssetJson.ComputeAssetsHash(assetStorage.Assets),
+            SaveId: Guid.NewGuid(),
+            SavedAtUtc: DateTimeOffset.UtcNow);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/runtime-package/export",
+            new ApiEndpoints.ExportRuntimePackageRequest
+            {
+                RegisterForStationDeployment = false
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetString().Should().Contain("RPA003");
+    }
+
     [Theory]
     [InlineData(RuntimeStatus.Starting)]
     [InlineData(RuntimeStatus.Running)]
@@ -632,6 +662,109 @@ public sealed class ProjectGlobalVariableEndpointsTests
         };
     }
 
+    private static ProjectAssetsDto CreateProjectAssets(string assetId, long projectRevision)
+    {
+        var payload = CreateCalibrationPayload(assetId);
+        return new ProjectAssetsDto
+        {
+            CalibrationAssets =
+            [
+                new ProjectCalibrationAssetDto
+                {
+                    AssetId = assetId,
+                    Kind = "CalibrationBundleV2",
+                    Version = "2.0",
+                    Producer = "test",
+                    ContentHash = ProjectAssetJson.ComputePayloadHash(payload),
+                    ProjectRevision = projectRevision,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                    Status = "authority",
+                    Payload = payload
+                }
+            ]
+        };
+    }
+
+    private static JsonElement CreateCalibrationPayload(string bundleId) =>
+        JsonSerializer.SerializeToElement(
+            new
+            {
+                schemaVersion = 2,
+                bundleId,
+                calibrationVersion = "2.0",
+                quality = new
+                {
+                    accepted = true
+                }
+            },
+            ProjectAssetJson.Options);
+
+    private static string CreateResultOnlyFlowJson() =>
+        JsonSerializer.Serialize(
+            new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "main",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "ResultOutput",
+                        Type = OperatorType.ResultOutput,
+                        X = 0,
+                        Y = 0
+                    }
+                ]
+            },
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters =
+                {
+                    new System.Text.Json.Serialization.JsonStringEnumConverter()
+                }
+            });
+
+    private sealed class MutableProjectAssetStorage : IProjectAssetStorage
+    {
+        public ProjectAssetsDto Assets { get; set; } = new();
+
+        public ProjectAssetStorageMetadata? Metadata { get; set; }
+
+        public Task<ProjectAssetsDto> LoadAssetsAsync(Guid projectId) =>
+            Task.FromResult(ProjectAssetJson.Clone(Assets));
+
+        public Task<ProjectAssetStorageMetadata?> LoadMetadataAsync(Guid projectId) =>
+            Task.FromResult(Metadata);
+
+        public Task SaveAssetsAsync(
+            Guid projectId,
+            ProjectAssetsDto assets,
+            long persistenceRevision,
+            Guid saveId,
+            string assetsHash)
+        {
+            Assets = ProjectAssetJson.Clone(assets);
+            Metadata = new ProjectAssetStorageMetadata(
+                1,
+                projectId,
+                persistenceRevision,
+                assetsHash,
+                saveId,
+                DateTimeOffset.UtcNow);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAssetsAsync(Guid projectId)
+        {
+            Assets = new ProjectAssetsDto();
+            Metadata = null;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class ProjectGlobalVariableEndpointHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -669,7 +802,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
             string? storedFlowJson = null,
             RuntimeStatus? status = null,
             IProjectVariableStateStore? stateStore = null,
-            IProjectFlowStorage? flowStorage = null)
+            IProjectFlowStorage? flowStorage = null,
+            IProjectAssetStorage? assetStorage = null)
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
@@ -720,6 +854,11 @@ public sealed class ProjectGlobalVariableEndpointsTests
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton(repository);
             builder.Services.AddSingleton(storage);
+            if (assetStorage != null)
+            {
+                builder.Services.AddSingleton(assetStorage);
+            }
+
             builder.Services.AddSingleton<IOperatorFactory>(new OperatorFactory());
             builder.Services.AddSingleton(registry);
             builder.Services.AddSingleton(coordinator);

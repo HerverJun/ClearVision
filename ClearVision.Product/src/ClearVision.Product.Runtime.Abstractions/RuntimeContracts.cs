@@ -43,6 +43,39 @@ public sealed class RuntimeFieldExtensions
     public string? DefaultSiteProfile { get; set; }
 
     public string? GlobalVariables { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProjectAssets { get; set; }
+}
+
+public sealed class RuntimePackageAssets
+{
+    public int SchemaVersion { get; set; } = 1;
+
+    public List<RuntimePackageProjectAsset> CalibrationAssets { get; set; } = [];
+
+    public List<RuntimePackageProjectAsset> SpatialAssets { get; set; } = [];
+}
+
+public sealed class RuntimePackageProjectAsset
+{
+    public string AssetId { get; set; } = string.Empty;
+
+    public string Kind { get; set; } = string.Empty;
+
+    public string Version { get; set; } = string.Empty;
+
+    public long ProjectRevision { get; set; }
+
+    public string ContentHash { get; set; } = string.Empty;
+
+    public string FileHash { get; set; } = string.Empty;
+
+    public string RelativePath { get; set; } = string.Empty;
+
+    public bool Required { get; set; }
+
+    public string Status { get; set; } = "authority";
 }
 
 public enum RuntimeParameterValueType
@@ -167,6 +200,9 @@ public sealed class RuntimePackageManifest
     public List<string> MissingResources { get; set; } = [];
 
     public RuntimeFieldExtensions FieldExtensions { get; set; } = new();
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RuntimePackageAssets? Assets { get; set; }
 }
 
 public sealed class RuntimeProfile
