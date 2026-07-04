@@ -60,6 +60,8 @@ function getInlineResultImageBase64(result) {
  * @property {() => Promise<any>} ensureStationMonitorView
  * @property {() => Promise<any>} ensureProjectView
  * @property {() => Promise<any>} ensureAiPanel
+ * @property {() => Promise<any>} ensureSettingsView
+ * @property {() => any} getSettingsView
  */
 
 /**
@@ -82,7 +84,9 @@ export function createViewManager(options) {
         loadInspectionHistory,
         ensureStationMonitorView,
         ensureProjectView,
-        ensureAiPanel
+        ensureAiPanel,
+        ensureSettingsView,
+        getSettingsView
     } = options;
 
     function syncActiveNavButton(view) {
@@ -113,7 +117,7 @@ export function createViewManager(options) {
 
         const containers = getViewContainers(documentRef);
         if (view !== 'settings') {
-            globalThis.cvSettingsView?.deactivate?.();
+            getSettingsView?.()?.deactivate?.();
         }
         hideAllViews(containers);
 
@@ -183,10 +187,9 @@ export function createViewManager(options) {
             }
             case 'settings':
                 containers.settings?.classList.remove('hidden');
-                if (globalThis.cvSettingsView) {
-                    globalThis.cvSettingsView.refresh();
-                } else if (typeof globalThis.initializeSettingsView === 'function') {
-                    globalThis.initializeSettingsView();
+                {
+                    const viewInstance = await ensureSettingsView?.();
+                    await viewInstance?.refresh?.();
                 }
                 break;
             default:

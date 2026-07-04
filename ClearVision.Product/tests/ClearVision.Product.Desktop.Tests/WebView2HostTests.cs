@@ -42,7 +42,13 @@ public class WebView2HostTests
             cssVersion: "123",
             nodePreviewInspectorEnabled: true,
             propertyPanelCapabilityEnabled: true,
-            previewPanelCapabilityEnabled: true);
+            previewPanelCapabilityEnabled: true,
+            globalVariablesCapabilityEnabled: true,
+            settingsCapabilityEnabled: true,
+            projectPageCapabilityEnabled: true,
+            inspectionCapabilityEnabled: true,
+            resultsReviewCapabilityEnabled: true,
+            aiPanelCapabilityEnabled: true);
 
         script.Should().Contain("const featureFlags = Object.freeze");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
@@ -55,6 +61,12 @@ public class WebView2HostTests
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"Studio2.PropertyPanel\":true");
         script.Should().Contain("\"Studio2.PreviewPanel\":true");
+        script.Should().Contain("\"Studio2.GlobalVariables\":true");
+        script.Should().Contain("\"Studio2.Settings\":true");
+        script.Should().Contain("\"Studio2.ProjectPage\":true");
+        script.Should().Contain("\"Studio2.Inspection\":true");
+        script.Should().Contain("\"Studio2.ResultsReview\":true");
+        script.Should().Contain("\"Studio2.AiPanel\":true");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
@@ -76,6 +88,12 @@ public class WebView2HostTests
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":false");
         script.Should().Contain("\"Studio2.PropertyPanel\":false");
         script.Should().Contain("\"Studio2.PreviewPanel\":false");
+        script.Should().Contain("\"Studio2.GlobalVariables\":false");
+        script.Should().Contain("\"Studio2.Settings\":false");
+        script.Should().Contain("\"Studio2.ProjectPage\":false");
+        script.Should().Contain("\"Studio2.Inspection\":false");
+        script.Should().Contain("\"Studio2.ResultsReview\":false");
+        script.Should().Contain("\"Studio2.AiPanel\":false");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");

@@ -24,6 +24,7 @@ import { aiPanelApplyPreviewMixin } from './aiPanelApplyPreview.js';
 import { aiPanelTopologySummaryMixin } from './aiPanelTopologySummary.js';
 import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
 import { aiPanelLiveEventsMixin } from './aiPanelLiveEvents.js';
+import { aiPanelLifecycleMixin } from './aiPanelLifecycle.js';
 import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
@@ -160,6 +161,9 @@ export class AiPanel {
         this._scrollBottomBadge = null;
         this._scrollStateRaf = 0;
         this._inputResizeObserver = null;
+        this._messageUnsubscribes = [];
+        this._chatScrollHandler = null;
+        this._composerResizeHandler = null;
         this.userHasScrolledUp = false;
         this.unreadStreamCount = 0;
 
@@ -673,16 +677,19 @@ export class AiPanel {
     }
 
     _setupMessageListeners() {
-        webMessageBridge.on('GenerateFlowProgress', (data) => this._updateProgress(data));
-        webMessageBridge.on('GenerateFlowStreamChunk', (data) => this._handleStreamChunk(data));
-        webMessageBridge.on('AiFirewallBlocked', (data) => this._handleFirewallBlocked(data));
-        webMessageBridge.on('GenerateFlowResult', (data) => this._handleResult(data));
-        webMessageBridge.on('CancelGenerateFlowResult', (data) => this._handleCancelResult(data));
-        webMessageBridge.on('FilePickedEvent', this._handleFilePickedEvent);
-        webMessageBridge.on('GenerateFlowAttachmentReport', this._handleAttachmentReport);
-        webMessageBridge.on('ListAiSessionsResult', (data) => this._handleListAiSessionsResult(data));
-        webMessageBridge.on('GetAiSessionResult', (data) => this._handleGetAiSessionResult(data));
-        webMessageBridge.on('DeleteAiSessionResult', (data) => this._handleDeleteAiSessionResult(data));
+        this._messageUnsubscribes.forEach(unsubscribe => unsubscribe?.());
+        this._messageUnsubscribes = [
+            webMessageBridge.on('GenerateFlowProgress', (data) => this._updateProgress(data)),
+            webMessageBridge.on('GenerateFlowStreamChunk', (data) => this._handleStreamChunk(data)),
+            webMessageBridge.on('AiFirewallBlocked', (data) => this._handleFirewallBlocked(data)),
+            webMessageBridge.on('GenerateFlowResult', (data) => this._handleResult(data)),
+            webMessageBridge.on('CancelGenerateFlowResult', (data) => this._handleCancelResult(data)),
+            webMessageBridge.on('FilePickedEvent', this._handleFilePickedEvent),
+            webMessageBridge.on('GenerateFlowAttachmentReport', this._handleAttachmentReport),
+            webMessageBridge.on('ListAiSessionsResult', (data) => this._handleListAiSessionsResult(data)),
+            webMessageBridge.on('GetAiSessionResult', (data) => this._handleGetAiSessionResult(data)),
+            webMessageBridge.on('DeleteAiSessionResult', (data) => this._handleDeleteAiSessionResult(data))
+        ];
     }
 
     _getCurrentFlowJson() {
@@ -2287,13 +2294,14 @@ export class AiPanel {
         if (!container) return;
         this._chatContainer = container;
 
-        container.addEventListener('scroll', () => {
+        this._chatScrollHandler = () => {
             if (this._scrollStateRaf) return;
             this._scrollStateRaf = window.requestAnimationFrame(() => {
                 this._scrollStateRaf = 0;
                 this._syncScrollFollowState();
             });
-        }, { passive: true });
+        };
+        container.addEventListener('scroll', this._chatScrollHandler, { passive: true });
 
         this._createScrollBottomBtn();
     }
@@ -2306,7 +2314,8 @@ export class AiPanel {
         this._syncComposerOffset();
 
         if (typeof ResizeObserver === 'undefined') {
-            window.addEventListener('resize', () => this._syncComposerOffset(), { passive: true });
+            this._composerResizeHandler = () => this._syncComposerOffset();
+            window.addEventListener('resize', this._composerResizeHandler, { passive: true });
             return;
         }
 
@@ -2444,6 +2453,7 @@ export class AiPanel {
 
         toggle.addEventListener('click', toggleExamples);
     }
+
 }
 
 Object.assign(
@@ -2456,6 +2466,7 @@ Object.assign(
     aiPanelGenerateRequestMixin,
     aiPanelAgentWorkspaceMixin,
     aiPanelLiveEventsMixin,
+    aiPanelLifecycleMixin,
     aiPanelAgentRunMixin,
     aiPanelRequirementBriefMixin,
     aiPanelAttachmentsMixin,

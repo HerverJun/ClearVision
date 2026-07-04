@@ -986,6 +986,170 @@ public sealed class Studio2ArchitectureGuardTests
         stationText.Should().NotContain("CalibrationAssets");
     }
 
+    [Fact]
+    public void G15X_RemainingCapabilities_ShouldUseFlaggedOwnersAndKeepAuthorities()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var indexText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html");
+        var viewManagerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/app/viewManager.js");
+        var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var webViewHostText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs");
+        var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+
+        var capabilities = new[]
+        {
+            (
+                Flag: "Studio2.GlobalVariables",
+                Option: "GlobalVariablesCapabilityEnabled",
+                Owner: "GlobalVariablesCapabilityOwner",
+                Adapter: "GlobalVariablesCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablesCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+module\.default\(\s*'global-variable-panel'\s*\)"
+            ),
+            (
+                Flag: "Studio2.Settings",
+                Option: "SettingsCapabilityEnabled",
+                Owner: "SettingsCapabilityOwner",
+                Adapter: "SettingsCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs",
+                LegacyConstructor: @"createLegacySettingsView\(\s*'settings-view'\s*\)"
+            ),
+            (
+                Flag: "Studio2.ProjectPage",
+                Option: "ProjectPageCapabilityEnabled",
+                Owner: "ProjectPageCapabilityOwner",
+                Adapter: "ProjectPageCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectPageCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+ProjectView\(\s*'project-view'\s*\)"
+            ),
+            (
+                Flag: "Studio2.Inspection",
+                Option: "InspectionCapabilityEnabled",
+                Owner: "InspectionCapabilityOwner",
+                Adapter: "InspectionCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+InspectionPanel\(\s*'inspection-control-panel'\s*\)"
+            ),
+            (
+                Flag: "Studio2.ResultsReview",
+                Option: "ResultsReviewCapabilityEnabled",
+                Owner: "ResultsReviewCapabilityOwner",
+                Adapter: "ResultsReviewCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+ResultPanel\(\s*'results-list-container'\s*\)"
+            ),
+            (
+                Flag: "Studio2.AiPanel",
+                Option: "AiPanelCapabilityEnabled",
+                Owner: "AiPanelCapabilityOwner",
+                Adapter: "AiPanelCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+AiPanel\(\s*'ai-view'"
+            )
+        };
+
+        foreach (var capability in capabilities)
+        {
+            studioOptionsText.Should().Contain(capability.Option);
+            webViewHostText.Should().Contain(capability.Option);
+            webViewHostText.Should().Contain($"[\"{capability.Flag}\"]");
+            appSettingsText.Should().Contain($"\"{capability.Option}\": false");
+            appText.Should().Contain(capability.Flag);
+            appText.Should().Contain(capability.Owner);
+            appText.Should().Contain(capability.Adapter);
+
+            var ownerText = ReadRepoText(capability.Path);
+            ownerText.Should().Contain($"class {capability.Adapter}");
+            ownerText.Should().Contain("dispose()");
+            ownerText.Should().NotContain("ProjectSaveCoordinator");
+            ownerText.Should().NotContain("new FlowCanvas");
+            ownerText.Should().NotContain("new ImageCanvas");
+
+            Regex.Matches(appText, $@"new\s+{capability.Owner}\s*\(")
+                .Should().ContainSingle($"{capability.Flag} must create exactly one V2 owner path.");
+            Regex.Matches(appText, capability.LegacyConstructor)
+                .Should().ContainSingle($"{capability.Flag} must keep exactly one legacy flag-off path.");
+        }
+
+        appText.Should().Contain("const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel'");
+        appText.Should().Contain("const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel'");
+        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": false");
+        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": false");
+
+        indexText.Should().NotContain("src/features/inspection/inspectionPanel.js");
+        indexText.Should().NotContain("src/features/results/resultPanel.js");
+        indexText.Should().NotContain("src/features/ai/aiPanel.js");
+        indexText.Should().NotContain("src/features/settings/settingsView.js");
+        viewManagerText.Should().Contain("ensureSettingsView");
+        viewManagerText.Should().NotContain("initializeSettingsView");
+        viewManagerText.Should().NotContain("cvSettingsView");
+
+        var globalVariablesOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablesCapabilityOwner.mjs");
+        globalVariablesOwner.Should().Contain("projectManagerRef");
+        globalVariablesOwner.Should().Contain("saveGlobalVariables");
+        globalVariablesOwner.Should().Contain("bindPreviewField");
+        globalVariablesOwner.Should().NotContain("localStorage");
+        globalVariablesOwner.Should().NotContain("indexedDB");
+
+        var settingsOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs");
+        settingsOwner.Should().Contain("saveCurrentTab");
+        settingsOwner.Should().Contain("settingsApiRef = settingsApi");
+        settingsOwner.Should().NotContain("settings schema");
+
+        var projectOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectPageCapabilityOwner.mjs");
+        projectOwner.Should().Contain("projectManagerRef");
+        projectOwner.Should().NotContain("fetch(");
+        projectOwner.Should().NotContain("localStorage.setItem");
+
+        var inspectionOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs");
+        inspectionOwner.Should().Contain("inspectionControllerRef");
+        inspectionOwner.Should().NotContain("EvidenceManifest");
+        inspectionOwner.Should().NotContain("retention");
+
+        var resultsOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs");
+        resultsOwner.Should().Contain("loadHistory");
+        resultsOwner.Should().Contain("loadComparison");
+        resultsOwner.Should().Contain("loadPreviousSuccess");
+        resultsOwner.Should().Contain("exportEvidence");
+        resultsOwner.Should().NotContain("PreviewArtifact");
+        resultsOwner.Should().NotContain("previewCache");
+
+        var aiOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs");
+        aiOwner.Should().Contain("/ai/agent-runs/latest");
+        aiOwner.Should().Contain("cancelRun");
+        aiOwner.Should().Contain("closeEventStream");
+        aiOwner.Should().NotContain("AgentRunEventStore");
+        aiOwner.Should().NotContain("resolveAgentRunTerminal");
+
+        var forbiddenAuthorityRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Station",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+        };
+        foreach (var root in forbiddenAuthorityRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar));
+            if (!Directory.Exists(absoluteRoot))
+            {
+                continue;
+            }
+
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.*", SearchOption.AllDirectories)
+                         .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                                        path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+            {
+                var text = File.ReadAllText(file);
+                text.Should().NotContain("GlobalVariablesCapability", ToRelativePath(file));
+                text.Should().NotContain("SettingsCapability", ToRelativePath(file));
+                text.Should().NotContain("ProjectPageCapability", ToRelativePath(file));
+                text.Should().NotContain("InspectionCapability", ToRelativePath(file));
+                text.Should().NotContain("ResultsReviewCapability", ToRelativePath(file));
+                text.Should().NotContain("AiPanelCapability", ToRelativePath(file));
+            }
+        }
+    }
+
     private static IReadOnlyList<string> EnumerateFrontendV2SourceFiles()
     {
         var root = Path.Combine(Root, FrontendV2SourceRoot);

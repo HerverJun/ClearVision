@@ -91,6 +91,24 @@ import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './featur
 import PreviewPanelCapabilityOwner, {
     createPreviewPanelCapabilityAdapter
 } from './features/flow-editor/previewPanelCapabilityOwner.mjs';
+import GlobalVariablesCapabilityOwner, {
+    createGlobalVariablesCapabilityAdapter
+} from './features/global-variables/globalVariablesCapabilityOwner.mjs';
+import SettingsCapabilityOwner, {
+    createSettingsCapabilityAdapter
+} from './features/settings/settingsCapabilityOwner.mjs';
+import ProjectPageCapabilityOwner, {
+    createProjectPageCapabilityAdapter
+} from './features/project/projectPageCapabilityOwner.mjs';
+import InspectionCapabilityOwner, {
+    createInspectionCapabilityAdapter
+} from './features/inspection/inspectionCapabilityOwner.mjs';
+import ResultsReviewCapabilityOwner, {
+    createResultsReviewCapabilityAdapter
+} from './features/results/resultsReviewCapabilityOwner.mjs';
+import AiPanelCapabilityOwner, {
+    createAiPanelCapabilityAdapter
+} from './features/ai/aiPanelCapabilityOwner.mjs';
 import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js';
 import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js';
 import { createNodePreviewSelectionStore } from './features/flow-editor/nodePreviewSelectionStore.js';
@@ -102,6 +120,12 @@ import projectManager, {
 const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
 const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel';
 const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel';
+const GLOBAL_VARIABLES_CAPABILITY_FLAG_KEY = 'Studio2.GlobalVariables';
+const SETTINGS_CAPABILITY_FLAG_KEY = 'Studio2.Settings';
+const PROJECT_PAGE_CAPABILITY_FLAG_KEY = 'Studio2.ProjectPage';
+const INSPECTION_CAPABILITY_FLAG_KEY = 'Studio2.Inspection';
+const RESULTS_REVIEW_CAPABILITY_FLAG_KEY = 'Studio2.ResultsReview';
+const AI_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.AiPanel';
 
 function readStartupFeatureFlagOnce(flagKey) {
     const startup = window.__CLEARVISION_STARTUP__;
@@ -131,9 +155,39 @@ function readPreviewPanelCapabilityFlagOnce() {
     return readStartupFeatureFlagOnce(PREVIEW_PANEL_CAPABILITY_FLAG_KEY);
 }
 
+function readGlobalVariablesCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(GLOBAL_VARIABLES_CAPABILITY_FLAG_KEY);
+}
+
+function readSettingsCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(SETTINGS_CAPABILITY_FLAG_KEY);
+}
+
+function readProjectPageCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(PROJECT_PAGE_CAPABILITY_FLAG_KEY);
+}
+
+function readInspectionCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(INSPECTION_CAPABILITY_FLAG_KEY);
+}
+
+function readResultsReviewCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(RESULTS_REVIEW_CAPABILITY_FLAG_KEY);
+}
+
+function readAiPanelCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(AI_PANEL_CAPABILITY_FLAG_KEY);
+}
+
 const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce();
 const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce();
 const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce();
+const GLOBAL_VARIABLES_CAPABILITY_ENABLED = readGlobalVariablesCapabilityFlagOnce();
+const SETTINGS_CAPABILITY_ENABLED = readSettingsCapabilityFlagOnce();
+const PROJECT_PAGE_CAPABILITY_ENABLED = readProjectPageCapabilityFlagOnce();
+const INSPECTION_CAPABILITY_ENABLED = readInspectionCapabilityFlagOnce();
+const RESULTS_REVIEW_CAPABILITY_ENABLED = readResultsReviewCapabilityFlagOnce();
+const AI_PANEL_CAPABILITY_ENABLED = readAiPanelCapabilityFlagOnce();
 
 // 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
@@ -160,6 +214,12 @@ let propertyPanelOwner = null;
 let propertyPanelCapabilityAdapter = null;
 let previewPanelCapabilityOwner = null;
 let previewPanelCapabilityAdapter = null;
+let globalVariablesCapabilityAdapter = null;
+let settingsCapabilityAdapter = null;
+let projectPageCapabilityAdapter = null;
+let inspectionCapabilityAdapter = null;
+let resultsReviewCapabilityAdapter = null;
+let aiPanelCapabilityAdapter = null;
 let propertySidebarController = null;
 let nodePreviewCoordinator = null;
 let nodePreviewOverlay = null;
@@ -172,6 +232,7 @@ let inspectionPanel = null;
 let stationMonitorView = null;
 let aiPanel = null;
 let globalVariablePanel = null;
+let settingsView = null;
 let viewManager = null;
 let toolbarCommandDisposer = null;
 let aiGenerationController = null;
@@ -189,6 +250,7 @@ let resultPanelModulePromise = null;
 let inspectionPanelModulePromise = null;
 let stationMonitorModulePromise = null;
 let globalVariablePanelModulePromise = null;
+let settingsViewModulePromise = null;
 let resultPanelAnalyticsRefreshTimer = null;
 let resultPanelAnalyticsRefreshProjectId = null;
 const RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS = 5000;
@@ -316,6 +378,14 @@ function loadGlobalVariablePanelModule() {
     return globalVariablePanelModulePromise;
 }
 
+function loadSettingsViewModule() {
+    if (!settingsViewModulePromise) {
+        settingsViewModulePromise = import('./features/settings/settingsView.js');
+    }
+
+    return settingsViewModulePromise;
+}
+
 function loadInspectionPanelModule() {
     if (!inspectionPanelModulePromise) {
         inspectionPanelModulePromise = import('./features/inspection/inspectionPanel.js');
@@ -359,7 +429,9 @@ function getViewManager() {
             loadInspectionHistory,
             ensureStationMonitorView,
             ensureProjectView,
-            ensureAiPanel
+            ensureAiPanel,
+            ensureSettingsView,
+            getSettingsView: () => settingsView
         });
     }
 
@@ -1138,6 +1210,30 @@ function isPropertyPanelCapabilityEnabled() {
     return PROPERTY_PANEL_CAPABILITY_ENABLED;
 }
 
+function isGlobalVariablesCapabilityEnabled() {
+    return GLOBAL_VARIABLES_CAPABILITY_ENABLED;
+}
+
+function isSettingsCapabilityEnabled() {
+    return SETTINGS_CAPABILITY_ENABLED;
+}
+
+function isProjectPageCapabilityEnabled() {
+    return PROJECT_PAGE_CAPABILITY_ENABLED;
+}
+
+function isInspectionCapabilityEnabled() {
+    return INSPECTION_CAPABILITY_ENABLED;
+}
+
+function isResultsReviewCapabilityEnabled() {
+    return RESULTS_REVIEW_CAPABILITY_ENABLED;
+}
+
+function isAiPanelCapabilityEnabled() {
+    return AI_PANEL_CAPABILITY_ENABLED;
+}
+
 function disposePreviewPanelCapabilityOwner() {
     previewPanelCapabilityOwner?.dispose?.();
     serviceRegistry.unregister('previewPanelCapabilityOwner', previewPanelCapabilityOwner);
@@ -1299,9 +1395,43 @@ function initializePropertySidebarController() {
     });
 }
 
+function disposeGlobalVariablePanelOwner() {
+    if (globalVariablePanel) {
+        if (typeof globalVariablePanel.dispose === 'function') {
+            globalVariablePanel.dispose();
+        } else {
+            globalVariablePanel.destroy?.();
+        }
+    }
+
+    serviceRegistry.unregister('globalVariablesCapabilityOwner', globalVariablePanel);
+    serviceRegistry.unregister('globalVariablesCapabilityAdapter', globalVariablesCapabilityAdapter);
+    serviceRegistry.unregister('globalVariablePanel', globalVariablePanel);
+    globalVariablePanel = null;
+    globalVariablesCapabilityAdapter = null;
+}
+
 async function initializeGlobalVariablePanel() {
     const container = document.getElementById('global-variable-panel');
     if (!container) {
+        return;
+    }
+
+    disposeGlobalVariablePanelOwner();
+
+    if (isGlobalVariablesCapabilityEnabled()) {
+        globalVariablesCapabilityAdapter = createGlobalVariablesCapabilityAdapter({
+            projectManagerRef: projectManager,
+            inspectionControllerRef: inspectionController
+        });
+        globalVariablePanel = new GlobalVariablesCapabilityOwner(container, {
+            adapter: globalVariablesCapabilityAdapter,
+            showToast
+        });
+        serviceRegistry.register('globalVariablesCapabilityAdapter', globalVariablesCapabilityAdapter);
+        serviceRegistry.register('globalVariablesCapabilityOwner', globalVariablePanel);
+        serviceRegistry.register('globalVariablePanel', globalVariablePanel);
+        await globalVariablePanel.setProject(getCurrentProject());
         return;
     }
 
@@ -1759,11 +1889,76 @@ async function ensureProjectView() {
         return null;
     }
 
+    if (isProjectPageCapabilityEnabled()) {
+        projectPageCapabilityAdapter = createProjectPageCapabilityAdapter({
+            projectManagerRef: projectManager
+        });
+        projectView = new ProjectPageCapabilityOwner(container, {
+            adapter: projectPageCapabilityAdapter,
+            showToast
+        });
+        serviceRegistry.register('projectPageCapabilityAdapter', projectPageCapabilityAdapter);
+        serviceRegistry.register('projectPageCapabilityOwner', projectView);
+        serviceRegistry.register('projectView', projectView);
+        debugLogger.debug('[App] Project Page capability owner 初始化完成');
+        return projectView;
+    }
+
     const { ProjectView } = await loadProjectViewModule();
     projectView = new ProjectView('project-view');
+    serviceRegistry.register('projectView', projectView);
 
     debugLogger.debug('[App] 工程视图初始化完成');
     return projectView;
+}
+
+function disposeSettingsViewOwner() {
+    if (settingsView) {
+        if (typeof settingsView.dispose === 'function') {
+            settingsView.dispose();
+        } else {
+            settingsView.destroy?.();
+        }
+    }
+
+    serviceRegistry.unregister('settingsCapabilityOwner', settingsView);
+    serviceRegistry.unregister('settingsCapabilityAdapter', settingsCapabilityAdapter);
+    serviceRegistry.unregister('settingsView', settingsView);
+    settingsView = null;
+    settingsCapabilityAdapter = null;
+}
+
+async function ensureSettingsView() {
+    if (settingsView) {
+        return settingsView;
+    }
+
+    const container = document.getElementById('settings-view');
+    if (!container) {
+        debugLogger.warn('[App] 设置视图容器未找到');
+        return null;
+    }
+
+    disposeSettingsViewOwner();
+
+    if (isSettingsCapabilityEnabled()) {
+        settingsCapabilityAdapter = createSettingsCapabilityAdapter();
+        settingsView = new SettingsCapabilityOwner(container, {
+            adapter: settingsCapabilityAdapter,
+            showToast
+        });
+        serviceRegistry.register('settingsCapabilityAdapter', settingsCapabilityAdapter);
+        serviceRegistry.register('settingsCapabilityOwner', settingsView);
+        serviceRegistry.register('settingsView', settingsView);
+        debugLogger.debug('[App] Settings capability owner 初始化完成');
+        return settingsView;
+    }
+
+    const { createLegacySettingsView } = await loadSettingsViewModule();
+    settingsView = createLegacySettingsView('settings-view');
+    serviceRegistry.register('settingsView', settingsView);
+    debugLogger.debug('[App] 设置视图初始化完成');
+    return settingsView;
 }
 
 async function ensureResultPanel() {
@@ -1775,6 +1970,28 @@ async function ensureResultPanel() {
     if (!container) {
         debugLogger.warn('[App] 结果视图容器未找到');
         return null;
+    }
+
+    if (isResultsReviewCapabilityEnabled()) {
+        const existingResultPanel = serviceRegistry.get('resultPanel');
+        existingResultPanel?.dispose?.();
+        resultsReviewCapabilityAdapter = createResultsReviewCapabilityAdapter({
+            loadHistory: loadInspectionHistory,
+            loadDetail: loadInspectionHistoryDetail,
+            loadComparison: loadInspectionHistoryComparison,
+            loadPreviousSuccess: loadInspectionPreviousSuccess,
+            exportEvidence: exportInspectionEvidence
+        });
+        resultPanel = new ResultsReviewCapabilityOwner(container, {
+            adapter: resultsReviewCapabilityAdapter,
+            showToast
+        });
+        serviceRegistry.register('resultsReviewCapabilityAdapter', resultsReviewCapabilityAdapter);
+        serviceRegistry.register('resultsReviewCapabilityOwner', resultPanel);
+        serviceRegistry.register('resultPanel', resultPanel);
+        resultPanel.setProjectContext(getCurrentProject()?.id || null);
+        debugLogger.debug('[App] Results/Review capability owner 初始化完成');
+        return resultPanel;
     }
 
     const { ResultPanel } = await loadResultPanelModule();
@@ -1828,6 +2045,36 @@ async function ensureInspectionPanelReady() {
         return inspectionPanel;
     }
 
+    if (isInspectionCapabilityEnabled()) {
+        const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
+        existingInspectionPanel?.dispose?.();
+        inspectionCapabilityAdapter = createInspectionCapabilityAdapter({
+            inspectionControllerRef: inspectionController
+        });
+        inspectionPanel = new InspectionCapabilityOwner(container, {
+            adapter: inspectionCapabilityAdapter,
+            showToast,
+            imageSink: result => {
+                const outputImage = getInlineResultImageBase64(result);
+                if (outputImage) {
+                    serviceRegistry.register('lastInspectionImageBase64', outputImage);
+                }
+            }
+        });
+        serviceRegistry.register('inspectionCapabilityAdapter', inspectionCapabilityAdapter);
+        serviceRegistry.register('inspectionCapabilityOwner', inspectionPanel);
+        serviceRegistry.register('inspectionPanel', inspectionPanel);
+        inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
+
+        const lastResult = inspectionController.getLastResult?.();
+        if (lastResult) {
+            inspectionPanel.handleInspectionResult(lastResult);
+        }
+
+        debugLogger.debug('[App] Inspection capability owner 初始化完成');
+        return inspectionPanel;
+    }
+
     const { InspectionPanel } = await loadInspectionPanelModule();
 
     const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
@@ -1869,6 +2116,29 @@ async function ensureStationMonitorView() {
 
 async function ensureAiPanel() {
     if (aiPanel) {
+        return aiPanel;
+    }
+
+    if (isAiPanelCapabilityEnabled()) {
+        const container = document.getElementById('ai-view');
+        if (!container) {
+            debugLogger.warn('[App] AI 视图容器未找到');
+            return null;
+        }
+
+        const existingAiPanel = serviceRegistry.get('aiPanel');
+        existingAiPanel?.dispose?.();
+        aiPanelCapabilityAdapter = createAiPanelCapabilityAdapter({
+            httpClientRef: httpClient
+        });
+        aiPanel = new AiPanelCapabilityOwner(container, {
+            adapter: aiPanelCapabilityAdapter,
+            showToast
+        });
+        serviceRegistry.register('aiPanelCapabilityAdapter', aiPanelCapabilityAdapter);
+        serviceRegistry.register('aiPanelCapabilityOwner', aiPanel);
+        serviceRegistry.register('aiPanel', aiPanel);
+        debugLogger.debug('[App] AI Panel capability owner 初始化完成');
         return aiPanel;
     }
 

@@ -60,6 +60,12 @@ public sealed class WebView2Host : IAsyncDisposable
         bool nodePreviewInspectorEnabled = false,
         bool propertyPanelCapabilityEnabled = false,
         bool previewPanelCapabilityEnabled = false,
+        bool globalVariablesCapabilityEnabled = false,
+        bool settingsCapabilityEnabled = false,
+        bool projectPageCapabilityEnabled = false,
+        bool inspectionCapabilityEnabled = false,
+        bool resultsReviewCapabilityEnabled = false,
+        bool aiPanelCapabilityEnabled = false,
         bool circleSearchV2ToolEnabled = true,
         bool nPointCalibrationWorkbenchEnabled = true)
     {
@@ -78,6 +84,12 @@ public sealed class WebView2Host : IAsyncDisposable
                 ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
                 ["Studio2.PropertyPanel"] = propertyPanelCapabilityEnabled,
                 ["Studio2.PreviewPanel"] = previewPanelCapabilityEnabled,
+                ["Studio2.GlobalVariables"] = globalVariablesCapabilityEnabled,
+                ["Studio2.Settings"] = settingsCapabilityEnabled,
+                ["Studio2.ProjectPage"] = projectPageCapabilityEnabled,
+                ["Studio2.Inspection"] = inspectionCapabilityEnabled,
+                ["Studio2.ResultsReview"] = resultsReviewCapabilityEnabled,
+                ["Studio2.AiPanel"] = aiPanelCapabilityEnabled,
                 ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled,
                 ["Studio:NPointCalibrationWorkbenchEnabled"] = nPointCalibrationWorkbenchEnabled
             }
@@ -257,6 +269,12 @@ public sealed class WebView2Host : IAsyncDisposable
             _studioOptions.NodePreviewInspectorEnabled,
             _studioOptions.PropertyPanelCapabilityEnabled,
             _studioOptions.PreviewPanelCapabilityEnabled,
+            _studioOptions.GlobalVariablesCapabilityEnabled,
+            _studioOptions.SettingsCapabilityEnabled,
+            _studioOptions.ProjectPageCapabilityEnabled,
+            _studioOptions.InspectionCapabilityEnabled,
+            _studioOptions.ResultsReviewCapabilityEnabled,
+            _studioOptions.AiPanelCapabilityEnabled,
             _studioOptions.CircleSearchV2ToolEnabled,
             _studioOptions.NPointCalibrationWorkbenchEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);

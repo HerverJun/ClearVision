@@ -10,7 +10,7 @@ import { installRuntimePreviewPilotConsole } from './tabs/runtimePreviewPilotCon
 import { installStationTab } from './tabs/stationTab.js';
 import { installSystemTabs } from './tabs/systemTabs.js';
 
-class SettingsView {
+export class SettingsView {
     constructor(containerId) {
         this.containerId = containerId;
         this.container = document.getElementById(containerId);
@@ -544,3 +544,7 @@ window.initializeSettingsView = function() {
     window.cvSettingsView = new SettingsView('settings-view');
     window.cvSettingsView.refresh();
 };
+
+export function createLegacySettingsView(containerId = 'settings-view') {
+    return new SettingsView(containerId);
+}
