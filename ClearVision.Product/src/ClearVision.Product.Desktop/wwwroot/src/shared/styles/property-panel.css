@@ -428,6 +428,84 @@
     font-size: var(--font-size-xs);
 }
 
+/* Capability owner shell -------------------------------------------------- */
+.property-capability-owner {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.property-capability-title {
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.property-capability-empty {
+    min-height: 220px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.property-capability-empty-title {
+    margin: 0;
+    color: var(--text-color);
+    font-size: var(--font-size-md);
+    font-weight: 600;
+}
+
+.property-capability-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 2px;
+}
+
+.property-capability-meta {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+}
+
+.property-capability-meta div {
+    min-width: 0;
+}
+
+.property-capability-meta dt {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.property-capability-meta dd {
+    margin: 2px 0 0;
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+.property-capability-form {
+    gap: 8px;
+}
+
+.property-capability-status {
+    min-height: 18px;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.property-capability-status.is-success {
+    color: #7bd88f;
+}
+
+.property-capability-status.is-error {
+    color: #ff8a80;
+}
+
 /* ==========================================================================
    Light Theme Overrides
    ========================================================================== */

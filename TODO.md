@@ -50,8 +50,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G15.1`
-- 当前卡片：`docs/进行中/Studio2/goals/G15_1.md`
+- 当前 Goal：`G15.2`
+- 当前卡片：`docs/进行中/Studio2/goals/G15_2.md`
 - 当前阶段：`Productization`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -122,8 +122,8 @@
 | G14A | Productization | 正式 Inspection 历史投影与分页 | DONE | G13C | `docs/进行中/Studio2/goals/G14A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G14B | Productization | 结果对比、基线与 Scene 回放 | DONE | G14A | `docs/进行中/Studio2/goals/G14B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G14C | Productization | Evidence manifest、导出与留存策略 | DONE | G14B | `docs/进行中/Studio2/goals/G14C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.1 | Productization | Property Panel capability 迁移 | READY | G14C | `docs/进行中/Studio2/goals/G15_1.md` |  |
-| G15.2 | Productization | Preview Panel capability 迁移 | LOCKED | G15.1 | `docs/进行中/Studio2/goals/G15_2.md` |  |
+| G15.1 | Productization | Property Panel capability 迁移 | DONE | G14C | `docs/进行中/Studio2/goals/G15_1.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
+| G15.2 | Productization | Preview Panel capability 迁移 | READY | G15.1 | `docs/进行中/Studio2/goals/G15_2.md` |  |
 | G15.3 | Productization | Global Variables capability 迁移 | LOCKED | G15.2 | `docs/进行中/Studio2/goals/G15_3.md` |  |
 | G15.5 | Productization | Settings capability 迁移 | LOCKED | G15.3 | `docs/进行中/Studio2/goals/G15_5.md` |  |
 | G15.8 | Productization | Project 页面 capability 迁移 | LOCKED | G15.5 | `docs/进行中/Studio2/goals/G15_8.md` |  |
@@ -171,6 +171,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-04 | G15.1 | `eb26224b97c6c05b6da54eab7057334d17307d15` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `property-sidebar-controller,property-panel-capability-owner,property-panel-memory,app-infrastructure` PASS（40/40）；Desktop focused `WebView2HostTests,Studio2ArchitectureGuardTests` PASS（31/31）；`node --check` for `propertyPanel.js`/`propertySidebarController.mjs`/`propertyPanelCapabilityOwner.mjs`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Playwright NOT RUN；真实 WebView2 NOT PERFORMED；GitHub CI NOT RUN；Release publish NOT RUN | 新增默认关闭 `Studio2.PropertyPanel` / `Studio:PropertyPanelCapabilityEnabled=false`；flag off 保持 legacy `PropertyPanel` 为唯一 owner；flag on 只挂载 `PropertyPanelCapabilityOwner`，legacy 不构造、不 mounted、不订阅、不运行 timer、不写参数；V2 owner 通过 `PropertyPanelCapabilityAdapter -> FlowCanvasAdapter.patchNodeParameters()` 唯一写入，支持空状态、基础信息、参数编辑和校验；旧实现作为 flag-off legacy library 保留至 G15.1 follow-up 或 G16。 |
 | 2026-07-04 | G14C-FOLLOWUP | `8c450a73a314b1170c8ed963fec771646ae5d724` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionServiceSingleRunTests,InspectionResultPersistenceSnapshotTests,InspectionEvidenceManifestServiceTests` PASS（21/21）；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 修复 `InspectionService.ExecuteSingleCoreAsync` 单次检测成功路径：正式 DB 写入改为 `InspectionResultPersistenceSnapshot.WithoutOutputImage(result)`，随后用原始 result 调用 `CaptureEvidenceManifestAsync(result)`；返回给调用方的 result 仍保留即时 `OutputImage`/ImageId/traceability，repository 收到的 persisted result 无 `OutputImage`，evidence capture 收到的 result 保留 `OutputImage`；未修改 Runtime/Station/AgentRun/G14A/G14B/Evidence schema/export/retention/UI。 |
 | 2026-07-04 | G14C | `527433e0d5bebad666a5f73309f2ba191c43a3a8` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionEvidenceManifestServiceTests,InspectionResultPersistenceSnapshotTests,InspectionImagePersistenceServiceTests,InspectionImagePersistencePolicyTests,InspectionServiceSingleRunTests` PASS（40/40）；Desktop build PASS；Desktop focused `ApiEndpointsInspectionHistoryTests,Studio2ArchitectureGuardTests` PASS（36/36）；UI focused `result-panel-memory.test.mjs` PASS（21/21）；`node --check` for `resultPanel.js`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Station Release build NOT RUN；GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 新增可选 `InspectionEvidenceManifestV1` sidecar manifest、bounded JSON export、OK/NG/Error 分级留存与容量淘汰；manifest/items 只使用相对路径和 SHA-256，manifest checksum 排除 checksum 字段；缺失/损坏/过期 fail-soft，不破坏正式 Inspection summary/detail；正式 DB persistence 使用 summary-only snapshot 不保存 `OutputImage` 大对象；导出复用 safe JSON 脱敏并省略二进制项，ZIP NOT IMPLEMENTED；未混入 PreviewArtifact/preview cache，未修改 G14A/G14B 语义，未改 Runtime/Station/AgentRun。 |
 | 2026-07-04 | G14B | `45c2eca2723f3fea53d43074e08a154cd3637101` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionResultRepositoryTests,InspectionServiceHistoryComparisonTests,GetInspectionHistoryQueryHandlerTests,InspectionServiceSingleRunTests` PASS（26/26）；Desktop build PASS；Desktop focused `ApiEndpointsInspectionHistoryTests,Studio2ArchitectureGuardTests` PASS（31/31）；UI focused `result-panel-memory.test.mjs` PASS（19/19）；`node --check` for `resultPanel.js`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 正式 Inspection history 增加 project-scoped compare 与 previous-success 契约；对比仅消费 `InspectionResult`/G14A detail safe preview，输出 traceability、diagnostics、defect summary、output/analysis preview 结构化 diff 与 FlowVersionHash/CalibrationBundleId warning；baseline/left-right selection 只为 `ResultPanel` UI session 状态；缺 Scene/图像 fail-soft 为摘要/引用回放；未重新执行历史 flow，未混入 preview cache/PreviewArtifact，未新增 Evidence manifest/ZIP/retention，未修改 G13X / Runtime / Station / AgentRun。 |

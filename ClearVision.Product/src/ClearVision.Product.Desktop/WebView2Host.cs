@@ -58,6 +58,7 @@ public sealed class WebView2Host : IAsyncDisposable
         string apiBaseUrl,
         string cssVersion,
         bool nodePreviewInspectorEnabled = false,
+        bool propertyPanelCapabilityEnabled = false,
         bool circleSearchV2ToolEnabled = true,
         bool nPointCalibrationWorkbenchEnabled = true)
     {
@@ -74,6 +75,7 @@ public sealed class WebView2Host : IAsyncDisposable
             featureFlags = new Dictionary<string, bool>
             {
                 ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
+                ["Studio2.PropertyPanel"] = propertyPanelCapabilityEnabled,
                 ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled,
                 ["Studio:NPointCalibrationWorkbenchEnabled"] = nPointCalibrationWorkbenchEnabled
             }
@@ -251,6 +253,7 @@ public sealed class WebView2Host : IAsyncDisposable
             apiBaseUrl,
             cssVersion,
             _studioOptions.NodePreviewInspectorEnabled,
+            _studioOptions.PropertyPanelCapabilityEnabled,
             _studioOptions.CircleSearchV2ToolEnabled,
             _studioOptions.NPointCalibrationWorkbenchEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);

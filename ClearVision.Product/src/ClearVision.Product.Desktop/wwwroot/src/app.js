@@ -83,7 +83,10 @@ import {
     syncThemeWithSettings
 } from './core/theme/theme.js';
 import { PropertyPanel } from './features/flow-editor/propertyPanel.js';
-import PropertySidebarController from './features/flow-editor/propertySidebarController.mjs';
+import PropertySidebarController, {
+    createPropertyPanelCapabilityAdapter
+} from './features/flow-editor/propertySidebarController.mjs';
+import PropertyPanelCapabilityOwner from './features/flow-editor/propertyPanelCapabilityOwner.mjs';
 import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
 import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js';
 import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js';
@@ -94,6 +97,17 @@ import projectManager, {
 } from './features/project/projectManager.js';
 
 const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
+const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel';
+
+function readStartupFeatureFlagOnce(flagKey) {
+    const startup = window.__CLEARVISION_STARTUP__;
+    const featureFlags = startup && typeof startup === 'object' &&
+        startup.featureFlags && typeof startup.featureFlags === 'object'
+        ? startup.featureFlags
+        : null;
+
+    return featureFlags?.[flagKey] === true;
+}
 
 function readNodePreviewInspectorFlagOnce() {
     const startup = window.__CLEARVISION_STARTUP__;
@@ -105,7 +119,12 @@ function readNodePreviewInspectorFlagOnce() {
     return featureFlags?.[NODE_PREVIEW_INSPECTOR_FLAG_KEY] === true;
 }
 
+function readPropertyPanelCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(PROPERTY_PANEL_CAPABILITY_FLAG_KEY);
+}
+
 const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce();
+const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce();
 
 // 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
@@ -128,6 +147,8 @@ let operatorLibraryPanel = null;
 let flowCanvas = null;
 let flowEditorInteraction = null;
 let propertyPanel = null;
+let propertyPanelOwner = null;
+let propertyPanelCapabilityAdapter = null;
 let propertySidebarController = null;
 let nodePreviewCoordinator = null;
 let nodePreviewOverlay = null;
@@ -1081,29 +1102,53 @@ function initializeInspectionController() {
     debugLogger.debug('[App] 检测控制器初始化完成');
 }
 
-function initializePropertyPanel() {
-    const container = document.getElementById('property-panel');
-    if (!container) {
-        console.error('[App] 找不到属性面板容器');
-        return;
+function isPropertyPanelCapabilityEnabled() {
+    return PROPERTY_PANEL_CAPABILITY_ENABLED;
+}
+
+function disposePropertyPanelOwner() {
+    const owner = propertyPanelOwner || propertyPanel;
+    if (owner) {
+        if (typeof owner.dispose === 'function') {
+            owner.dispose();
+        } else {
+            owner.destroy?.();
+        }
     }
 
-    propertyPanel = new PropertyPanel('property-panel', {
+    serviceRegistry.unregister('propertyPanelCapabilityOwner', propertyPanelOwner);
+    serviceRegistry.unregister('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
+    serviceRegistry.unregister('propertyPanel', propertyPanel);
+    propertyPanelOwner = null;
+    propertyPanelCapabilityAdapter = null;
+    propertyPanel = null;
+}
+
+function createLegacyPropertyPanelOwner() {
+    const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview
     });
-    serviceRegistry.register('propertyPanel', propertyPanel);
+    let disposed = false;
 
-    trackedSubscribe(subscribeSelectedOperator, (operator) => {
+    const unsubscribeSelectedOperator = subscribeSelectedOperator((operator) => {
+        if (disposed) {
+            return;
+        }
+
         if (operator) {
             debugLogger.debug('[App] 选中算子变化:', operator.title || operator.type);
-            propertyPanel.setOperator(operator);
+            panel.setOperator(operator);
         } else {
-            propertyPanel.clear();
+            panel.clear();
         }
     });
 
-    propertyPanel.onChange((values) => {
+    panel.onChange((values) => {
+        if (disposed) {
+            return;
+        }
+
         debugLogger.debug('[App] 算子参数变更:', values);
         const operator = getSelectedOperator();
         if (operator && flowCanvas) {
@@ -1115,6 +1160,52 @@ function initializePropertyPanel() {
             }
         }
     });
+
+    return {
+        kind: 'legacy-property-panel',
+        panel,
+        dispose() {
+            if (disposed) {
+                return;
+            }
+
+            disposed = true;
+            unsubscribeSelectedOperator?.();
+            panel.destroy?.();
+        }
+    };
+}
+
+function initializePropertyPanel() {
+    const container = document.getElementById('property-panel');
+    if (!container) {
+        console.error('[App] 找不到属性面板容器');
+        return;
+    }
+
+    disposePropertyPanelOwner();
+
+    if (isPropertyPanelCapabilityEnabled()) {
+        const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+        propertyPanelCapabilityAdapter = createPropertyPanelCapabilityAdapter({
+            flowCanvasAdapter,
+            getOperatorMetadata: type => findOperatorDefinition(type)
+        });
+        propertyPanel = new PropertyPanelCapabilityOwner(container, {
+            propertyAdapter: propertyPanelCapabilityAdapter,
+            showToast
+        });
+        propertyPanelOwner = propertyPanel;
+        serviceRegistry.register('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
+        serviceRegistry.register('propertyPanelCapabilityOwner', propertyPanelOwner);
+        serviceRegistry.register('propertyPanel', propertyPanel);
+        debugLogger.debug('[App] Property Panel capability owner 初始化完成');
+        return;
+    }
+
+    propertyPanelOwner = createLegacyPropertyPanelOwner();
+    propertyPanel = propertyPanelOwner.panel;
+    serviceRegistry.register('propertyPanel', propertyPanel);
 
     debugLogger.debug('[App] 属性面板初始化完成');
 }

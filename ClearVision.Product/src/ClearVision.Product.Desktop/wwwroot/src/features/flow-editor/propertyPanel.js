@@ -130,14 +130,14 @@ class PropertyPanel {
             'BlobAnalysis',
             'SharpnessEvaluation'
         ]);
-        this.bindGlobalEvents();
+        this.disposeGlobalEvents = this.bindGlobalEvents();
     }
 
     /**
      * 绑定全局事件
      */
     bindGlobalEvents() {
-        webMessageBridge.on('FilePickedEvent', (event) => {
+        return webMessageBridge.on('FilePickedEvent', (event) => {
             const payload = event?.payload || event?.data || event || {};
             const isCancelled = Boolean(payload.IsCancelled ?? payload.isCancelled);
             if (isCancelled) return;
@@ -236,6 +236,29 @@ class PropertyPanel {
             <div id="operator-preview-container"></div>
         `;
         this.initPreviewPanel();
+    }
+
+    destroy() {
+        this.disposeGlobalEvents?.();
+        this.disposeGlobalEvents = null;
+        if (this.previewPanel) {
+            this.previewPanel.destroy();
+            this.previewPanel = null;
+        }
+        if (this.roiEditorPanel) {
+            this.roiEditorPanel.destroy();
+            this.roiEditorPanel = null;
+        }
+        if (this.calibrationDraftWorkbench) {
+            this.calibrationDraftWorkbench.destroy();
+            this.calibrationDraftWorkbench = null;
+        }
+        this.currentOperator = null;
+        this.onChangeCallback = null;
+        this.inputImageBase64Load = null;
+        if (this.container) {
+            this.container.innerHTML = '';
+        }
     }
 
     /**

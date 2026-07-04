@@ -468,6 +468,71 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void PropertyPanelCapability_ShouldUseSingleOwnerFlagAndAvoidOtherCapabilityMigration()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var ownerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanelCapabilityOwner.mjs");
+        var sidebarControllerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertySidebarController.mjs");
+        var adapterText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js");
+        var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var webViewHostText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs");
+        var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+        var ledgerText = ReadRepoText("docs/进行中/Studio2/architecture/Studio2-capability-迁移台账.md");
+
+        appText.Should().Contain("const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel'");
+        appText.Should().Contain("const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce()");
+        appText.Should().Contain("if (isPropertyPanelCapabilityEnabled())");
+        Regex.Matches(appText, @"new\s+PropertyPanelCapabilityOwner\s*\(")
+            .Should().ContainSingle("flag on must create one V2 Property Panel owner.");
+        Regex.Matches(appText, @"new\s+PropertyPanel\s*\(\s*'property-panel'")
+            .Should().ContainSingle("flag off must keep one legacy PropertyPanel owner.");
+        appText.Should().Contain("disposePropertyPanelOwner();");
+        appText.Should().Contain("serviceRegistry.register('propertyPanelCapabilityOwner'");
+        appText.Should().Contain("serviceRegistry.register('propertyPanelCapabilityAdapter'");
+        appText.Should().NotContain("trackedSubscribe(subscribeSelectedOperator", "legacy selected-operator subscription must be owner-disposable.");
+
+        studioOptionsText.Should().Contain("PropertyPanelCapabilityEnabled");
+        webViewHostText.Should().Contain("[\"Studio2.PropertyPanel\"] = propertyPanelCapabilityEnabled");
+        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": false");
+        ledgerText.Should().Contain("`Studio2.PropertyPanel`");
+        ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_1");
+
+        sidebarControllerText.Should().Contain("class PropertyPanelCapabilityAdapter");
+        sidebarControllerText.Should().Contain("writeParameters");
+        adapterText.Should().Contain("allowCreateParameters");
+        ownerText.Should().Contain("subscribeSelectedNode");
+        ownerText.Should().Contain("writeParameters");
+        ownerText.Should().Contain("参数已更新");
+        ownerText.Should().Contain("参数校验失败");
+
+        ownerText.Should().NotContain("PreviewPanel", "G15.1 must not migrate Preview Panel.");
+        ownerText.Should().NotContain("NodePreviewOverlay", "G15.1 must not migrate Preview Panel.");
+        ownerText.Should().NotContain("operatorResultViewModel", "G15.1 must not migrate G13X result panel.");
+        ownerText.Should().NotContain("globalVariablePanel", "G15.1 must not migrate Global Variables.");
+        ownerText.Should().NotContain("ResultPanel", "G15.1 must not migrate Results/Review.");
+        ownerText.Should().NotContain("ImageCanvas", "G15.1 must not add another scene/image renderer.");
+        ownerText.Should().NotContain("PersistenceRevision", "Property Panel must not confuse flowRevision with backend persistence authority.");
+
+        var forbiddenRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Station",
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+        };
+
+        foreach (var root in forbiddenRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar));
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.*", SearchOption.AllDirectories)
+                         .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                                        path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.ReadAllText(file).Should().NotContain("PropertyPanelCapability", ToRelativePath(file));
+            }
+        }
+    }
+
+    [Fact]
     public void OperatorResultPanel_ShouldReusePreviewCoordinatorAndAvoidNewRuntimeAuthorities()
     {
         var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");

@@ -23,8 +23,51 @@ function getParameterName(parameter) {
     return parameter?.name ?? parameter?.Name ?? '';
 }
 
+function inferParameterDataType(value) {
+    if (typeof value === 'boolean') {
+        return 'boolean';
+    }
+
+    if (Number.isInteger(value)) {
+        return 'int';
+    }
+
+    if (typeof value === 'number') {
+        return 'double';
+    }
+
+    return 'string';
+}
+
 function hasOwn(object, key) {
     return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function createParameterFromDefinition(name, value, definitions = []) {
+    const definition = Array.isArray(definitions)
+        ? definitions.find(item =>
+            String(getParameterName(item)).toLowerCase() === String(name).toLowerCase())
+        : null;
+    const parameter = definition
+        ? deepClone(definition)
+        : {
+            name,
+            displayName: name,
+            dataType: inferParameterDataType(value),
+            defaultValue: value
+        };
+
+    if (!hasOwn(parameter, 'name') && !hasOwn(parameter, 'Name')) {
+        parameter.name = name;
+    }
+    if (hasOwn(parameter, 'value') || !hasOwn(parameter, 'Value')) {
+        parameter.value = deepClone(value);
+    }
+    if (hasOwn(parameter, 'Value')) {
+        parameter.Value = deepClone(value);
+    }
+
+    return parameter;
 }
 
 class FlowCanvasAdapter {
@@ -116,7 +159,7 @@ class FlowCanvasAdapter {
         return true;
     }
 
-    patchNodeParameters(nodeId, parameterPatch = {}) {
+    patchNodeParameters(nodeId, parameterPatch = {}, options = {}) {
         const node = this.canvas.nodes?.get?.(nodeId);
         if (!node) {
             return {
@@ -127,15 +170,25 @@ class FlowCanvasAdapter {
         }
 
         const parameters = Array.isArray(node.parameters) ? node.parameters : [];
+        if (!Array.isArray(node.parameters)) {
+            node.parameters = parameters;
+        }
         const entries = Object.entries(parameterPatch);
         const resolvedEntries = [];
         const missingParameters = [];
+        const allowCreateParameters = options.allowCreateParameters === true;
         let changed = false;
 
         for (const [name, value] of entries) {
             const parameter = parameters.find(item =>
                 String(getParameterName(item)).toLowerCase() === String(name).toLowerCase());
             if (!parameter) {
+                if (allowCreateParameters) {
+                    parameters.push(createParameterFromDefinition(name, value, options.parameterDefinitions));
+                    changed = true;
+                    continue;
+                }
+
                 missingParameters.push(name);
                 continue;
             }

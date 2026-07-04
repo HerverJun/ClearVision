@@ -10,6 +10,54 @@ const DRAGGING_HANDLE_CLASS = 'is-dragging';
 const KEYBOARD_STEP = 16;
 const KEYBOARD_STEP_LARGE = 32;
 
+function deepClone(value) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+    }
+
+    return JSON.parse(JSON.stringify(value));
+}
+
+function getParameterName(parameter) {
+    return String(parameter?.name ?? parameter?.Name ?? '').trim();
+}
+
+function getParameterValue(parameter) {
+    return parameter?.value ?? parameter?.Value ?? parameter?.defaultValue ?? parameter?.DefaultValue ?? null;
+}
+
+function mergeParameters(definitionParameters = [], nodeParameters = []) {
+    const nodeList = Array.isArray(nodeParameters) ? nodeParameters : [];
+    const definitionList = Array.isArray(definitionParameters) ? definitionParameters : [];
+    const usedNodeParameters = new Set();
+
+    const merged = definitionList.map(definition => {
+        const definitionName = getParameterName(definition);
+        const nodeParameter = nodeList.find(parameter =>
+            getParameterName(parameter).toLowerCase() === definitionName.toLowerCase());
+        if (nodeParameter) {
+            usedNodeParameters.add(nodeParameter);
+        }
+
+        return {
+            ...deepClone(definition),
+            value: nodeParameter ? getParameterValue(nodeParameter) : getParameterValue(definition)
+        };
+    });
+
+    nodeList.forEach(parameter => {
+        if (!usedNodeParameters.has(parameter)) {
+            merged.push(deepClone(parameter));
+        }
+    });
+
+    return merged;
+}
+
 function getGlobalWindow() {
     return typeof window !== 'undefined' ? window : null;
 }
@@ -357,6 +405,91 @@ export class PropertySidebarController {
             this.handle.setAttribute('tabindex', '-1');
         }
     }
+}
+
+export class PropertyPanelCapabilityAdapter {
+    constructor({
+        flowCanvasAdapter,
+        getOperatorMetadata = () => null
+    } = {}) {
+        if (!flowCanvasAdapter) {
+            throw new Error('PropertyPanelCapabilityAdapter requires a FlowCanvasAdapter.');
+        }
+
+        this.flowCanvasAdapter = flowCanvasAdapter;
+        this.getOperatorMetadata = typeof getOperatorMetadata === 'function'
+            ? getOperatorMetadata
+            : () => null;
+    }
+
+    getSelectedNodeId() {
+        return this.flowCanvasAdapter?.selectedNode || null;
+    }
+
+    getNode(nodeId) {
+        if (!nodeId) {
+            return null;
+        }
+
+        return this.flowCanvasAdapter?.nodes?.get?.(nodeId) || null;
+    }
+
+    getSelectedOperatorSnapshot(nodeId = this.getSelectedNodeId()) {
+        const node = this.getNode(nodeId);
+        if (!node) {
+            return null;
+        }
+
+        const metadata = this.getOperatorMetadata(node.type) || {};
+        const displayName = metadata.displayName || metadata.DisplayName || node.title || node.type || '算子';
+
+        return {
+            id: node.id,
+            type: node.type,
+            title: node.title || displayName,
+            displayName,
+            iconPath: node.iconPath || metadata.iconPath || metadata.IconPath || null,
+            color: node.color || null,
+            disabled: node.disabled === true,
+            inputPorts: node.inputs || metadata.inputPorts || metadata.InputPorts || [],
+            outputPorts: node.outputs || metadata.outputPorts || metadata.OutputPorts || [],
+            parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || [])
+        };
+    }
+
+    subscribeSelectedNode(listener) {
+        if (typeof listener !== 'function') {
+            return () => {};
+        }
+
+        return this.flowCanvasAdapter?.subscribeSelection?.((state = {}) => {
+            listener(this.getSelectedOperatorSnapshot(state.selectedNodeId), state);
+        }) || (() => {});
+    }
+
+    subscribeFlowChanges(listener) {
+        if (typeof listener !== 'function') {
+            return () => {};
+        }
+
+        return this.flowCanvasAdapter?.subscribeStructureState?.(listener) || (() => {});
+    }
+
+    writeParameters(nodeId, values = {}) {
+        const snapshot = this.getSelectedOperatorSnapshot(nodeId);
+        return this.flowCanvasAdapter.patchNodeParameters(nodeId, values, {
+            allowCreateParameters: true,
+            parameterDefinitions: snapshot?.parameters || []
+        });
+    }
+
+    selectNode(nodeId) {
+        return this.flowCanvasAdapter?.selectNode?.(nodeId) === true;
+    }
+}
+
+export function createPropertyPanelCapabilityAdapter(options = {}) {
+    return new PropertyPanelCapabilityAdapter(options);
 }
 
 export default PropertySidebarController;

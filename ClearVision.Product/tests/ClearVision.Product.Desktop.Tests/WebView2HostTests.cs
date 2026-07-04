@@ -40,7 +40,8 @@ public class WebView2HostTests
             workspaceV2Enabled: true,
             apiBaseUrl: "http://localhost:5000/api",
             cssVersion: "123",
-            nodePreviewInspectorEnabled: true);
+            nodePreviewInspectorEnabled: true,
+            propertyPanelCapabilityEnabled: true);
 
         script.Should().Contain("const featureFlags = Object.freeze");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
@@ -51,6 +52,7 @@ public class WebView2HostTests
         script.Should().Contain("\"workspaceV2Enabled\":true");
         script.Should().Contain("\"nodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":true");
+        script.Should().Contain("\"Studio2.PropertyPanel\":true");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
@@ -70,6 +72,7 @@ public class WebView2HostTests
 
         script.Should().Contain("\"nodePreviewInspectorEnabled\":false");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":false");
+        script.Should().Contain("\"Studio2.PropertyPanel\":false");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
         script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
