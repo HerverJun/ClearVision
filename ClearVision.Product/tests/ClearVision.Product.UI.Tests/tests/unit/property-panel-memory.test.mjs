@@ -138,6 +138,36 @@ test('PropertyPanel releases cached image in-flight state after loader failure',
   assert.equal(panel.inputImageBase64Load, null);
 });
 
+test('PropertyPanel preview resource opt-out destroys legacy PreviewPanel and ROI instances', () => {
+  const destroyed = [];
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    previewResourcesEnabled: false,
+    previewPanel: {
+      destroy() {
+        destroyed.push('preview');
+      }
+    },
+    roiEditorPanel: {
+      destroy() {
+        destroyed.push('roi');
+      }
+    },
+    container: {
+      querySelector() {
+        throw new Error('disabled preview resources must not query mount containers');
+      }
+    }
+  });
+
+  PropertyPanel.prototype.initPreviewPanel.call(panel);
+  PropertyPanel.prototype.initRoiEditorPanel.call(panel);
+
+  assert.deepEqual(destroyed, ['preview', 'roi']);
+  assert.equal(panel.previewPanel, null);
+  assert.equal(panel.roiEditorPanel, null);
+});
+
 test('PropertyPanel gates CircleMeasurement parameters by Method without deleting hidden values', () => {
   const { panel, parameters } = createCircleMeasurementPanel('CaliperFitV2');
   const v2Names = panel.getParametersForRender('CircleMeasurement', parameters).map(param => param.name);

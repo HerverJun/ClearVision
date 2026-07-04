@@ -85,7 +85,7 @@ const IMAGE_NODE_TYPE_FALLBACKS = new Set([
  *   activeNodeId: string | null,
  *   nodeType: string | null,
  *   title: string,
- *   status: 'idle' | 'loading' | 'success' | 'error',
+ *   status: 'idle' | 'loading' | 'success' | 'error' | 'canceled',
  *   executionTimeMs: number | null,
  *   errorMessage: string | null,
  *   canvasEligibility: PreviewEligibility,
@@ -432,6 +432,8 @@ function createPresenterState(state) {
         statusText = typeof state.executionTimeMs === 'number'
             ? `预览完成 (${state.executionTimeMs} ms)`
             : '预览完成';
+    } else if (state.status === 'canceled') {
+        statusText = '预览已取消';
     } else if (state.status === 'error') {
         statusText = `预览失败: ${state.errorMessage || '未知错误'}`;
     }
@@ -791,6 +793,27 @@ export class NodePreviewCoordinator {
         this.activeAbortController = null;
     }
 
+    cancelPreview(reason = '预览已取消') {
+        if (this.pendingTimer) {
+            clearTimeout(this.pendingTimer);
+            this.pendingTimer = null;
+        }
+
+        this.requestVersion += 1;
+        this.cancelActivePreviewRequest();
+        if (!this.state.activeNodeId) {
+            return;
+        }
+
+        this.replacePreviewState(withClearedPreviewResources({
+            status: 'canceled',
+            executionTimeMs: null,
+            errorMessage: reason,
+            outputImageBase64: null,
+            outputData: null
+        }));
+    }
+
     releasePreviewResources(value) {
         if (!value || value.previewArtifactReleased) {
             return;
@@ -1075,7 +1098,7 @@ export class NodePreviewCoordinator {
         this.updateState(patch);
     }
 
-    setActiveNode(node) {
+    setActiveNode(node, options = {}) {
         if (this.pendingTimer) {
             clearTimeout(this.pendingTimer);
             this.pendingTimer = null;
@@ -1130,7 +1153,9 @@ export class NodePreviewCoordinator {
             });
         }
 
-        this.requestActivePreview({ trigger: 'auto' });
+        if (options.autoPreview !== false) {
+            this.requestActivePreview({ trigger: 'auto' });
+        }
     }
 
     invalidateActivePreview(options = {}) {

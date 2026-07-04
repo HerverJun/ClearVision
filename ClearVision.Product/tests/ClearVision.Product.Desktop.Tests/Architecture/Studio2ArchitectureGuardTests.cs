@@ -533,6 +533,107 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void PreviewPanelCapability_ShouldUseSingleOwnerFlagAndAvoidLegacyPreviewResources()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var ownerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs");
+        var propertyPanelText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js");
+        var previewPanelText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanel.js");
+        var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js");
+        var overlayText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/nodePreviewOverlay.js");
+        var roiEditorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiEditorPanel.js");
+        var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var webViewHostText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs");
+        var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+        var ledgerText = ReadRepoText("docs/进行中/Studio2/architecture/Studio2-capability-迁移台账.md");
+        var indexText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html");
+
+        appText.Should().Contain("const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel'");
+        appText.Should().Contain("const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce()");
+        appText.Should().Contain("if (isPreviewPanelCapabilityEnabled())");
+        appText.Should().Contain("disposeLegacyNodePreviewSurfaces();");
+        appText.Should().Contain("previewResourcesEnabled: !isPreviewPanelCapabilityEnabled()");
+        appText.Should().Contain("serviceRegistry.register('previewPanelCapabilityOwner'");
+        appText.Should().Contain("serviceRegistry.register('previewPanelCapabilityAdapter'");
+        appText.Should().Contain("if (!isPreviewPanelCapabilityEnabled())");
+        Regex.Matches(appText, @"new\s+PreviewPanelCapabilityOwner\s*\(")
+            .Should().ContainSingle("flag on must create one V2 Preview Panel owner.");
+        Regex.Matches(appText, @"new\s+NodePreviewCoordinator\s*\(")
+            .Should().ContainSingle("Preview capability must reuse the single existing coordinator.");
+        appText.IndexOf("if (isPreviewPanelCapabilityEnabled())", StringComparison.Ordinal)
+            .Should().BeLessThan(appText.IndexOf("new NodePreviewOverlay(", StringComparison.Ordinal));
+
+        studioOptionsText.Should().Contain("PreviewPanelCapabilityEnabled");
+        webViewHostText.Should().Contain("[\"Studio2.PreviewPanel\"] = previewPanelCapabilityEnabled");
+        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": false");
+        ledgerText.Should().Contain("`Studio2.PreviewPanel`");
+        ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_2");
+        indexText.Should().Contain("id=\"preview-panel\"");
+        indexText.Should().Contain("data-preview-panel-host");
+
+        ownerText.Should().Contain("class PreviewPanelCapabilityAdapter");
+        ownerText.Should().Contain("class PreviewPanelCapabilityOwner");
+        ownerText.Should().Contain("PreviewPanelCapabilityOwner -> PreviewPanelCapabilityAdapter -> NodePreviewCoordinator");
+        ownerText.Should().Contain("requestPreview");
+        ownerText.Should().Contain("cancelPreview");
+        ownerText.Should().Contain("readArtifactForCurrentState");
+        ownerText.Should().Contain("buildOperatorResultViewModel");
+        ownerText.Should().Contain("预览面板");
+        ownerText.Should().Contain("请选择一个算子");
+        ownerText.Should().Contain("当前算子");
+        ownerText.Should().Contain("手动预览");
+        ownerText.Should().Contain("自动预览");
+        ownerText.Should().Contain("取消预览");
+        ownerText.Should().Contain("预览中");
+        ownerText.Should().Contain("预览完成");
+        ownerText.Should().Contain("预览失败");
+        ownerText.Should().Contain("预览已取消");
+        ownerText.Should().Contain("节点已删除");
+        ownerText.Should().Contain("预览结果");
+        ownerText.Should().Contain("模块结果");
+
+        propertyPanelText.Should().Contain("previewResourcesEnabled");
+        propertyPanelText.Should().Contain("this.previewResourcesEnabled ? '<div id=\"operator-preview-container\"></div>' : ''");
+        propertyPanelText.Should().Contain("if (!this.previewResourcesEnabled)");
+
+        ownerText.Should().NotMatchRegex(@"\bfetch\s*\(", "V2 Preview owner must not bypass the coordinator.");
+        ownerText.Should().NotContain("httpClient", "V2 Preview owner must not create a second artifact endpoint client.");
+        ownerText.Should().NotContain("localStorage", "Preview data must not become formal or durable history.");
+        ownerText.Should().NotContain("IndexedDB", "Preview data must not become formal or durable history.");
+        ownerText.Should().NotContain("InspectionHistory", "Preview data must not become Inspection history.");
+        ownerText.Should().NotContain("Evidence", "Preview data must not become evidence manifest/export state.");
+        ownerText.Should().NotContain("PersistenceRevision", "Preview Panel must not confuse flowRevision with backend persistence authority.");
+        ownerText.Should().NotContain("new ImageCanvas", "V2 Preview owner must not create another ImageCanvas.");
+        ownerText.Should().NotContain("createElement('canvas'", "V2 Preview owner must not create another scene renderer.");
+        ownerText.Should().NotContain("document.createElement('canvas'", "V2 Preview owner must not create another scene renderer.");
+
+        previewPanelText.Should().NotMatchRegex(@"\bfetch\s*\(", "G13X must still read artifacts through NodePreviewCoordinator.");
+        previewPanelText.Should().NotContain("httpClient", "G13X must not create a second Artifact endpoint client.");
+        coordinatorText.Should().Contain("readArtifactForCurrentState");
+        coordinatorText.Should().Contain("artifactMode: 'references'");
+        overlayText.Should().NotContain("httpClient");
+        roiEditorText.Should().Contain("ImageCanvas");
+
+        var forbiddenRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Station",
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent"
+        };
+
+        foreach (var root in forbiddenRoots)
+        {
+            var absoluteRoot = Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar));
+            foreach (var file in Directory.EnumerateFiles(absoluteRoot, "*.*", SearchOption.AllDirectories)
+                         .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                                        path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.ReadAllText(file).Should().NotContain("PreviewPanelCapability", ToRelativePath(file));
+            }
+        }
+    }
+
+    [Fact]
     public void OperatorResultPanel_ShouldReusePreviewCoordinatorAndAvoidNewRuntimeAuthorities()
     {
         var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");

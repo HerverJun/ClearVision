@@ -88,6 +88,9 @@ import PropertySidebarController, {
 } from './features/flow-editor/propertySidebarController.mjs';
 import PropertyPanelCapabilityOwner from './features/flow-editor/propertyPanelCapabilityOwner.mjs';
 import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
+import PreviewPanelCapabilityOwner, {
+    createPreviewPanelCapabilityAdapter
+} from './features/flow-editor/previewPanelCapabilityOwner.mjs';
 import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js';
 import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js';
 import { createNodePreviewSelectionStore } from './features/flow-editor/nodePreviewSelectionStore.js';
@@ -98,6 +101,7 @@ import projectManager, {
 
 const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
 const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel';
+const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel';
 
 function readStartupFeatureFlagOnce(flagKey) {
     const startup = window.__CLEARVISION_STARTUP__;
@@ -123,8 +127,13 @@ function readPropertyPanelCapabilityFlagOnce() {
     return readStartupFeatureFlagOnce(PROPERTY_PANEL_CAPABILITY_FLAG_KEY);
 }
 
+function readPreviewPanelCapabilityFlagOnce() {
+    return readStartupFeatureFlagOnce(PREVIEW_PANEL_CAPABILITY_FLAG_KEY);
+}
+
 const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce();
 const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce();
+const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce();
 
 // 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
@@ -149,6 +158,8 @@ let flowEditorInteraction = null;
 let propertyPanel = null;
 let propertyPanelOwner = null;
 let propertyPanelCapabilityAdapter = null;
+let previewPanelCapabilityOwner = null;
+let previewPanelCapabilityAdapter = null;
 let propertySidebarController = null;
 let nodePreviewCoordinator = null;
 let nodePreviewOverlay = null;
@@ -953,6 +964,22 @@ function isNodePreviewInspectorEnabled() {
     return NODE_PREVIEW_INSPECTOR_ENABLED;
 }
 
+function isPreviewPanelCapabilityEnabled() {
+    return PREVIEW_PANEL_CAPABILITY_ENABLED;
+}
+
+function disposeLegacyNodePreviewSurfaces() {
+    nodePreviewOverlay?.destroy?.();
+    nodePreviewInspector?.destroy?.();
+    nodePreviewSelectionStore?.clear?.();
+    serviceRegistry.unregister('nodePreviewOverlay', nodePreviewOverlay);
+    serviceRegistry.unregister('nodePreviewInspector', nodePreviewInspector);
+    serviceRegistry.unregister('nodePreviewSelectionStore', nodePreviewSelectionStore);
+    nodePreviewOverlay = null;
+    nodePreviewInspector = null;
+    nodePreviewSelectionStore = null;
+}
+
 function initializeNodePreviewExperience() {
     if (!flowCanvas) {
         return;
@@ -970,6 +997,11 @@ function initializeNodePreviewExperience() {
             debounceMs: 500
         });
         serviceRegistry.register('nodePreviewCoordinator', nodePreviewCoordinator);
+    }
+
+    if (isPreviewPanelCapabilityEnabled()) {
+        disposeLegacyNodePreviewSurfaces();
+        return;
     }
 
     const inspectorEnabled = isNodePreviewInspectorEnabled();
@@ -1106,6 +1138,47 @@ function isPropertyPanelCapabilityEnabled() {
     return PROPERTY_PANEL_CAPABILITY_ENABLED;
 }
 
+function disposePreviewPanelCapabilityOwner() {
+    previewPanelCapabilityOwner?.dispose?.();
+    serviceRegistry.unregister('previewPanelCapabilityOwner', previewPanelCapabilityOwner);
+    serviceRegistry.unregister('previewPanelCapabilityAdapter', previewPanelCapabilityAdapter);
+    previewPanelCapabilityOwner = null;
+    previewPanelCapabilityAdapter = null;
+}
+
+function initializePreviewPanelCapability() {
+    const hostPanel = document.querySelector('[data-preview-panel-host]');
+    const container = document.getElementById('preview-panel');
+    if (!container) {
+        debugLogger.warn('[App] Preview Panel capability host not found');
+        return;
+    }
+
+    disposePreviewPanelCapabilityOwner();
+
+    if (!isPreviewPanelCapabilityEnabled()) {
+        hostPanel?.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+
+    const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+    previewPanelCapabilityAdapter = createPreviewPanelCapabilityAdapter({
+        flowCanvasAdapter,
+        previewCoordinator: nodePreviewCoordinator,
+        getOperatorMetadata: type => findOperatorDefinition(type)
+    });
+    previewPanelCapabilityOwner = new PreviewPanelCapabilityOwner(container, {
+        previewAdapter: previewPanelCapabilityAdapter,
+        showToast
+    });
+
+    hostPanel?.classList.remove('hidden');
+    serviceRegistry.register('previewPanelCapabilityAdapter', previewPanelCapabilityAdapter);
+    serviceRegistry.register('previewPanelCapabilityOwner', previewPanelCapabilityOwner);
+    debugLogger.debug('[App] Preview Panel capability owner 初始化完成');
+}
+
 function disposePropertyPanelOwner() {
     const owner = propertyPanelOwner || propertyPanel;
     if (owner) {
@@ -1127,7 +1200,8 @@ function disposePropertyPanelOwner() {
 function createLegacyPropertyPanelOwner() {
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
-        onOpenPreviewImage: openImageViewerFromPreview
+        onOpenPreviewImage: openImageViewerFromPreview,
+        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled()
     });
     let disposed = false;
 
@@ -1478,16 +1552,22 @@ function initializeFlowEditor() {
                 outputPorts: node.outputs || operatorDef?.outputPorts || [],
                 parameters: mergeParameters(operatorDef?.parameters, node.parameters)
             });
-            nodePreviewCoordinator?.setActiveNode(node);
+            if (!isPreviewPanelCapabilityEnabled()) {
+                nodePreviewCoordinator?.setActiveNode(node);
+            }
         } else {
             setSelectedOperator(null);
-            nodePreviewCoordinator?.setActiveNode(null);
+            if (!isPreviewPanelCapabilityEnabled()) {
+                nodePreviewCoordinator?.setActiveNode(null);
+            }
         }
     };
 
     flowCanvas.onNodeDoubleClicked = (node) => {
         if (node) {
-            nodePreviewCoordinator?.setActiveNode(node);
+            if (!isPreviewPanelCapabilityEnabled()) {
+                nodePreviewCoordinator?.setActiveNode(node);
+            }
             openSubgraphBreadcrumb(node);
         }
     };
@@ -1881,6 +1961,7 @@ async function initializeApp() {
     initializeImageViewer();
     initializeInspectionController();
     initializePropertyPanel();
+    initializePreviewPanelCapability();
     initializePropertySidebarController();
     await initializeGlobalVariablePanel();
     initializeTheme();

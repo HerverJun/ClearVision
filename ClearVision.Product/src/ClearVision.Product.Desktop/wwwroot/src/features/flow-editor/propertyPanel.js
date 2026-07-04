@@ -114,6 +114,7 @@ class PropertyPanel {
         this.calibrationDraftWorkbench = null;
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
+        this.previewResourcesEnabled = options.previewResourcesEnabled !== false;
         this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
         this.circleSearchV2ToolEnabled = options.circleSearchV2ToolEnabled;
         this.nPointCalibrationWorkbenchEnabled = options.nPointCalibrationWorkbenchEnabled;
@@ -233,7 +234,7 @@ class PropertyPanel {
         this.currentOperator = null;
         this.container.innerHTML = `
             <p class="empty-text">选择一个算子查看属性</p>
-            <div id="operator-preview-container"></div>
+            ${this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : ''}
         `;
         this.initPreviewPanel();
     }
@@ -284,7 +285,7 @@ class PropertyPanel {
             nPointCalibrationWorkbenchEnabled: this.isNPointCalibrationWorkbenchFeatureEnabled()
         });
         const shouldMountCalibrationDraftWorkbench = this.shouldMountNPointCalibrationWorkbench();
-        const shouldMountRoiEditor = roiEditorConfig.supported && !shouldMountCalibrationDraftWorkbench;
+        const shouldMountRoiEditor = this.previewResourcesEnabled && roiEditorConfig.supported && !shouldMountCalibrationDraftWorkbench;
         const parametersForRenderBase = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
             : parameters;
@@ -360,7 +361,7 @@ class PropertyPanel {
         html += `
                 ${shouldMountCalibrationDraftWorkbench ? '<div id="calibration-draft-workbench-container"></div>' : ''}
                 ${shouldMountRoiEditor ? '<div id="roi-editor-container"></div>' : ''}
-                <div id="operator-preview-container"></div>
+                ${this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : ''}
             </div>
         `;
         this.container.innerHTML = html;
@@ -1718,6 +1719,14 @@ class PropertyPanel {
     }
 
     initPreviewPanel() {
+        if (!this.previewResourcesEnabled) {
+            if (this.previewPanel) {
+                this.previewPanel.destroy();
+                this.previewPanel = null;
+            }
+            return;
+        }
+
         const container = this.container.querySelector('#operator-preview-container');
         if (!container) {
             if (this.previewPanel) {
@@ -1790,6 +1799,14 @@ class PropertyPanel {
     }
 
     initRoiEditorPanel() {
+        if (!this.previewResourcesEnabled) {
+            if (this.roiEditorPanel) {
+                this.roiEditorPanel.destroy();
+                this.roiEditorPanel = null;
+            }
+            return;
+        }
+
         const container = this.container.querySelector('#roi-editor-container');
         if (!container) {
             if (this.roiEditorPanel) {

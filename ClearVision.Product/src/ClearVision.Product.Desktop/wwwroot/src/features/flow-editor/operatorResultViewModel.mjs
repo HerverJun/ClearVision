@@ -634,6 +634,14 @@ function getStatusInfo({
         };
     }
 
+    if (status === 'canceled') {
+        return {
+            kind: 'canceled',
+            label: '已取消',
+            message: '预览已取消'
+        };
+    }
+
     if (stale) {
         return {
             kind: 'stale',

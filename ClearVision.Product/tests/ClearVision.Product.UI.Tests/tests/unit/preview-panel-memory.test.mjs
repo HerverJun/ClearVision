@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   buildPreviewParameterSnapshot
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
@@ -7,10 +8,18 @@ import {
   PreviewPanel
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanel.js';
 import {
+  PreviewPanelCapabilityOwner,
+  createPreviewPanelCapabilityAdapter
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs';
+import {
   MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
   buildOperatorResultViewModel,
   buildSafeJsonPreview
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorResultViewModel.mjs';
+
+function readRepoText(relativeUrl) {
+  return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
+}
 
 function identity(overrides = {}) {
   return {
@@ -185,6 +194,182 @@ function createCoordinatorHarness(initialState, options = {}) {
   };
 
   return coordinator;
+}
+
+function createPreviewCapabilityHarness(options = {}) {
+  const listeners = {
+    selection: new Set(),
+    structure: new Set(),
+    preview: new Set()
+  };
+  const node = options.node ?? {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }],
+    outputs: [{ type: 'image' }]
+  };
+  const nodes = new Map([[node.id, node]]);
+  const flowCanvasAdapter = {
+    selectedNode: options.selectedNodeId ?? node.id,
+    nodes,
+    getFlowRevision: () => options.flowRevision ?? 3,
+    subscribeSelection(listener) {
+      listeners.selection.add(listener);
+      listener({
+        selectedNodeId: this.selectedNode,
+        reason: 'initial',
+        flowRevision: options.flowRevision ?? 3
+      });
+      return () => listeners.selection.delete(listener);
+    },
+    subscribeStructureState(listener) {
+      listeners.structure.add(listener);
+      return () => listeners.structure.delete(listener);
+    },
+    selectNode(nodeId) {
+      if (!nodes.has(nodeId)) {
+        return false;
+      }
+      this.selectedNode = nodeId;
+      listeners.selection.forEach(listener => listener({
+        selectedNodeId: nodeId,
+        reason: 'selectNode',
+        flowRevision: options.flowRevision ?? 3
+      }));
+      return true;
+    }
+  };
+  const calls = {
+    setActiveNode: [],
+    requestPreview: [],
+    cancelPreview: 0,
+    artifactReads: []
+  };
+  let previewState = options.previewState ?? {
+    ...successState({ activeNodeId: null }),
+    status: 'idle',
+    activeNodeId: null,
+    presenter: {
+      statusText: '等待预览',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  };
+  const previewCoordinator = {
+    getState: () => previewState,
+    subscribe(listener) {
+      listeners.preview.add(listener);
+      listener(previewState);
+      return () => listeners.preview.delete(listener);
+    },
+    setActiveNode(activeNode, setOptions = {}) {
+      calls.setActiveNode.push({ nodeId: activeNode?.id || null, options: setOptions });
+      previewState = {
+        ...previewState,
+        activeNodeId: activeNode?.id || null,
+        nodeType: activeNode?.type || null,
+        title: activeNode?.title || '',
+        presenter: {
+          statusText: activeNode ? '等待预览' : '请选择一个算子',
+          inputImageSrc: null,
+          outputImageSrc: null
+        }
+      };
+      listeners.preview.forEach(listener => listener(previewState));
+    },
+    requestActivePreview(requestOptions) {
+      calls.requestPreview.push(requestOptions);
+      previewState = {
+        ...successState(),
+        status: 'loading',
+        presenter: {
+          statusText: '预览中',
+          inputImageSrc: null,
+          outputImageSrc: null
+        }
+      };
+      listeners.preview.forEach(listener => listener(previewState));
+    },
+    cancelPreview() {
+      calls.cancelPreview += 1;
+      previewState = {
+        ...previewState,
+        status: 'canceled',
+        presenter: {
+          statusText: '预览已取消',
+          inputImageSrc: null,
+          outputImageSrc: null
+        }
+      };
+      listeners.preview.forEach(listener => listener(previewState));
+    },
+    readArtifactForCurrentState: async (artifactId, expectedIdentity, readOptions) => {
+      calls.artifactReads.push({ artifactId, expectedIdentity, readOptions });
+      if (typeof options.readArtifactForCurrentState === 'function') {
+        return options.readArtifactForCurrentState(artifactId, expectedIdentity, readOptions);
+      }
+      return {
+        artifact: {
+          artifactId,
+          kind: 'profile',
+          role: 'profile',
+          contentType: 'application/json',
+          length: 20
+        },
+        blob: {
+          size: 20,
+          slice(start, end) {
+            return {
+              async text() {
+                return JSON.stringify({ score: 1, token: 'secret-token', range: [start, end] });
+              }
+            };
+          }
+        }
+      };
+    }
+  };
+  const adapter = createPreviewPanelCapabilityAdapter({
+    flowCanvasAdapter,
+    previewCoordinator,
+    getOperatorMetadata: () => ({
+      displayName: '阈值',
+      parameters: [{ name: 'Threshold', value: 10, dataType: 'int' }]
+    })
+  });
+  const container = {
+    innerHTML: '',
+    dataset: {},
+    listeners: new Map(),
+    addEventListener(type, listener) {
+      this.listeners.set(type, listener);
+    },
+    removeEventListener(type, listener) {
+      if (this.listeners.get(type) === listener) {
+        this.listeners.delete(type);
+      }
+    }
+  };
+
+  return {
+    adapter,
+    container,
+    calls,
+    listeners,
+    nodes,
+    flowCanvasAdapter,
+    emitPreview(nextState) {
+      previewState = nextState;
+      listeners.preview.forEach(listener => listener(previewState));
+    },
+    emitStructure() {
+      listeners.structure.forEach(listener => listener({
+        flowRevision: options.flowRevision ?? 3,
+        reason: 'test'
+      }));
+    }
+  };
 }
 
 test('PreviewPanel analysis results avoid retaining input images and oversized previews', () => {
@@ -542,4 +727,221 @@ test('PreviewPanel destroy unsubscribes preview and structure listeners', () => 
 
   assert.equal(coordinator.listenerCount(), 0);
   assert.equal(structureListeners.size, 0);
+});
+
+test('PreviewPanelCapabilityAdapter projects selected node and routes preview requests through coordinator once', () => {
+  const harness = createPreviewCapabilityHarness();
+  let selectedOperator = null;
+  const unsubscribe = harness.adapter.subscribeSelectedNode(operator => {
+    selectedOperator = operator;
+  });
+
+  assert.equal(selectedOperator.id, 'node-1');
+  assert.equal(selectedOperator.displayName, '阈值');
+  assert.deepEqual(
+    selectedOperator.parameters.map(parameter => [parameter.name, parameter.value]),
+    [['Threshold', 128]]
+  );
+
+  harness.adapter.setActiveNode('node-1', { autoPreview: false });
+  harness.adapter.requestPreview({ immediate: true, force: true, trigger: 'manual' });
+  harness.adapter.cancelPreview();
+
+  assert.deepEqual(harness.calls.setActiveNode.at(-1), {
+    nodeId: 'node-1',
+    options: { autoPreview: false }
+  });
+  assert.deepEqual(harness.calls.requestPreview, [{ immediate: true, force: true, trigger: 'manual' }]);
+  assert.equal(harness.calls.cancelPreview, 1);
+
+  unsubscribe();
+});
+
+test('PreviewPanelCapabilityOwner renders required states and uses one active preview request entry', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  assert.match(harness.container.innerHTML, /预览面板/);
+  assert.match(harness.container.innerHTML, /当前算子/);
+  assert.match(harness.container.innerHTML, /手动预览/);
+  assert.match(harness.container.innerHTML, /自动预览/);
+  assert.match(harness.container.innerHTML, /取消预览/);
+  assert.equal(harness.calls.setActiveNode.length, 1);
+  assert.deepEqual(harness.calls.setActiveNode[0], {
+    nodeId: 'node-1',
+    options: { autoPreview: true }
+  });
+
+  owner.requestManualPreview();
+  assert.deepEqual(harness.calls.requestPreview.at(-1), {
+    immediate: true,
+    force: true,
+    trigger: 'manual'
+  });
+  assert.match(harness.container.innerHTML, /预览中/);
+
+  harness.emitPreview({
+    ...successState(),
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+  assert.match(harness.container.innerHTML, /预览完成/);
+  assert.match(harness.container.innerHTML, /预览结果/);
+  assert.match(harness.container.innerHTML, /模块结果/);
+
+  harness.emitPreview({
+    ...successState(),
+    status: 'error',
+    errorMessage: 'boom',
+    presenter: {
+      statusText: '预览失败',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+  assert.match(harness.container.innerHTML, /预览失败/);
+
+  harness.adapter.cancelPreview();
+  assert.match(harness.container.innerHTML, /预览已取消/);
+
+  owner.dispose();
+  assert.equal(harness.listeners.preview.size, 0);
+  assert.equal(harness.listeners.selection.size, 0);
+  assert.equal(harness.listeners.structure.size, 0);
+  assert.equal(harness.container.innerHTML, '');
+});
+
+test('PreviewPanelCapabilityOwner honors auto toggle and clears UI after node deletion', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  owner.handleChange({
+    target: {
+      checked: false,
+      dataset: { previewAuto: 'true' }
+    }
+  });
+  harness.flowCanvasAdapter.selectNode('node-1');
+
+  assert.deepEqual(harness.calls.setActiveNode.at(-1), {
+    nodeId: 'node-1',
+    options: { autoPreview: false }
+  });
+
+  harness.nodes.delete('node-1');
+  harness.emitStructure();
+
+  assert.match(harness.container.innerHTML, /节点已删除/);
+  assert.deepEqual(harness.calls.setActiveNode.at(-1), {
+    nodeId: null,
+    options: { autoPreview: false }
+  });
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner reads artifacts only through coordinator with bounded slices', async () => {
+  const sliceCalls = [];
+  const harness = createPreviewCapabilityHarness({
+    readArtifactForCurrentState: async (artifactId, expectedIdentity) => ({
+      artifact: {
+        artifactId,
+        kind: 'profile',
+        role: 'profile',
+        contentType: 'application/json',
+        length: 20
+      },
+      blob: {
+        size: 20,
+        text() {
+          throw new Error('full blob text must not be called');
+        },
+        slice(start, end) {
+          sliceCalls.push([start, end, expectedIdentity.targetNodeId]);
+          return {
+            async text() {
+              return JSON.stringify({
+                token: 'secret-token',
+                path: 'C:\\Users\\A\\Desktop\\ClearVision\\artifact.json',
+                score: 1
+              });
+            }
+          };
+        }
+      }
+    })
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  harness.emitPreview({
+    ...successState(),
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  await owner.readArtifactPreview('json-artifact');
+
+  assert.equal(harness.calls.artifactReads.length, 1);
+  assert.equal(harness.calls.artifactReads[0].artifactId, 'json-artifact');
+  assert.deepEqual(sliceCalls, [[0, 64 * 1024, 'node-1']]);
+  const readState = owner.artifactReadState.get('json-artifact');
+  assert.equal(readState.status, 'success');
+  assert.ok(!readState.text.includes('secret-token'));
+  assert.ok(!readState.text.includes('C:\\Users\\A'));
+  assert.ok(readState.text.includes('[redacted-secret]'));
+  assert.ok(readState.text.includes('[redacted-path]'));
+
+  owner.dispose();
+});
+
+test('Preview Panel capability source and app composition keep legacy resources behind active owner flag', () => {
+  const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
+  const ownerSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs');
+  const propertyPanelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
+  const indexSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/index.html');
+
+  assert.match(appSource, /const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2\.PreviewPanel'/);
+  assert.match(appSource, /const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce\(\);/);
+  assert.match(appSource, /if \(isPreviewPanelCapabilityEnabled\(\)\) \{[\s\S]*disposeLegacyNodePreviewSurfaces\(\);[\s\S]*return;/);
+  assert.match(appSource, /new PreviewPanelCapabilityOwner\(/);
+  assert.match(appSource, /previewResourcesEnabled: !isPreviewPanelCapabilityEnabled\(\)/);
+  assert.equal((appSource.match(/new PreviewPanelCapabilityOwner\(/g) || []).length, 1);
+  assert.equal((appSource.match(/new NodePreviewCoordinator\(/g) || []).length, 1);
+  assert.ok(appSource.indexOf('if (isPreviewPanelCapabilityEnabled())') < appSource.indexOf('new NodePreviewOverlay('));
+  assert.ok(appSource.indexOf('if (!isPreviewPanelCapabilityEnabled())') < appSource.indexOf('nodePreviewCoordinator?.setActiveNode(node);'));
+
+  assert.match(indexSource, /id="preview-panel"/);
+  assert.match(ownerSource, /PreviewPanelCapabilityAdapter/);
+  assert.match(ownerSource, /requestPreview/);
+  assert.match(ownerSource, /readArtifactForCurrentState/);
+  assert.match(ownerSource, /buildOperatorResultViewModel/);
+  assert.match(ownerSource, /预览面板/);
+  assert.match(ownerSource, /请选择一个算子/);
+  assert.match(ownerSource, /当前算子/);
+  assert.match(ownerSource, /手动预览/);
+  assert.match(ownerSource, /自动预览/);
+  assert.match(ownerSource, /取消预览/);
+  assert.match(ownerSource, /预览中/);
+  assert.match(ownerSource, /预览完成/);
+  assert.match(ownerSource, /预览失败/);
+  assert.match(ownerSource, /预览已取消/);
+  assert.match(ownerSource, /节点已删除/);
+  assert.match(ownerSource, /预览结果/);
+  assert.match(ownerSource, /模块结果/);
+  assert.doesNotMatch(ownerSource, /\bfetch\s*\(/);
+  assert.doesNotMatch(ownerSource, /httpClient/);
+  assert.doesNotMatch(ownerSource, /localStorage|IndexedDB|InspectionHistory|Evidence/);
+  assert.doesNotMatch(ownerSource, /new ImageCanvas|createElement\('canvas'|document\.createElement\('canvas'/);
+  assert.match(propertyPanelSource, /previewResourcesEnabled/);
 });
