@@ -1,6 +1,7 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Tests.TestData;
@@ -60,6 +61,83 @@ public class PixelToWorldTransformOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().ContainKey("TransformedPoints");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRuntimeAssetContext_ShouldResolveSingleAuthorityBundle()
+    {
+        var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("TransformMode", "PixelToWorld"));
+        var inputs = new Dictionary<string, object>
+        {
+            [RuntimeAssetInputKeys.RuntimeAssetContext] = CreateRuntimeAssetContext(("asset-runtime", "bundle-runtime")),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(160, 120) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var point = Assert.IsType<List<Point3d>>(result.OutputData!["TransformedPoints"]).Single();
+        point.X.Should().BeApproximately(3.2, 1e-9);
+        point.Y.Should().BeApproximately(2.4, 1e-9);
+
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData["TransformResult"]);
+        transformResult["CalibrationDataSource"].Should().Be("RuntimePackageAsset");
+        transformResult["CalibrationAssetId"].Should().Be("asset-runtime");
+        transformResult["CalibrationBundleId"].Should().Be("bundle-runtime");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRuntimeBundleIdParameter_ShouldResolveMatchingBundle()
+    {
+        var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("TransformMode", "PixelToWorld"));
+        op.Parameters.Add(TestHelpers.CreateParameter("CalibrationBundleId", "bundle-b"));
+        var inputs = new Dictionary<string, object>
+        {
+            [RuntimeAssetInputKeys.RuntimeAssetContext] = CreateRuntimeAssetContext(("asset-a", "bundle-a"), ("asset-b", "bundle-b")),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var transformResult = Assert.IsType<Dictionary<string, object>>(result.OutputData!["TransformResult"]);
+        transformResult["CalibrationAssetId"].Should().Be("asset-b");
+        transformResult["CalibrationBundleId"].Should().Be("bundle-b");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMissingRuntimeBundleId_ShouldFailClosed()
+    {
+        var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("CalibrationBundleId", "missing-bundle"));
+        var inputs = new Dictionary<string, object>
+        {
+            [RuntimeAssetInputKeys.RuntimeAssetContext] = CreateRuntimeAssetContext(("asset-a", "bundle-a")),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RUNTIME_CALIBRATION_BUNDLE_MISSING");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMultipleRuntimeBundlesAndNoSelector_ShouldFailClosed()
+    {
+        var op = new Operator("PixelToWorldTransform", OperatorType.PixelToWorldTransform, 0, 0);
+        var inputs = new Dictionary<string, object>
+        {
+            [RuntimeAssetInputKeys.RuntimeAssetContext] = CreateRuntimeAssetContext(("asset-a", "bundle-a"), ("asset-b", "bundle-b")),
+            ["Points"] = new List<ClearVision.Product.Core.ValueObjects.Position> { new(10, 10) }
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RUNTIME_CALIBRATION_BUNDLE_AMBIGUOUS");
     }
 
     [Fact]
@@ -936,4 +1014,16 @@ public class PixelToWorldTransformOperatorTests
                }
                """;
     }
+
+    private static RuntimeAssetContext CreateRuntimeAssetContext(params (string AssetId, string BundleId)[] assets) =>
+        new(assets.Select(asset => new RuntimeCalibrationBundleAsset(
+            asset.AssetId,
+            asset.BundleId,
+            "CalibrationBundleV2",
+            "2.0",
+            12,
+            "sha256:" + new string('1', 64),
+            "sha256:" + new string('2', 64),
+            $"assets/calibration/{asset.AssetId}.json",
+            CreateAcceptedScaleOffsetBundleJson(bundleId: asset.BundleId))));
 }

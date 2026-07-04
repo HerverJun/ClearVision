@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ResultPaths;
+using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
@@ -1674,6 +1675,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         foreach (var kvp in outputData)
         {
+            if (IsAmbientRuntimeInputKey(kvp.Key))
+            {
+                continue;
+            }
+
             if (TryNormalizeOutputValue(kvp.Value, out var normalized))
             {
                 result[kvp.Key] = normalized!;
@@ -2185,8 +2191,27 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
+        PropagateAmbientRuntimeInputs(operatorOutputs, inputs);
+
         return inputs;
     }
+
+    private static void PropagateAmbientRuntimeInputs(
+        IDictionary<Guid, Dictionary<string, object>> operatorOutputs,
+        Dictionary<string, object> inputs)
+    {
+        if (!operatorOutputs.TryGetValue(Guid.Empty, out var initialInputs) ||
+            !initialInputs.TryGetValue(RuntimeAssetInputKeys.RuntimeAssetContext, out var assetContext) ||
+            inputs.ContainsKey(RuntimeAssetInputKeys.RuntimeAssetContext))
+        {
+            return;
+        }
+
+        inputs[RuntimeAssetInputKeys.RuntimeAssetContext] = assetContext;
+    }
+
+    private static bool IsAmbientRuntimeInputKey(string key) =>
+        key.Equals(RuntimeAssetInputKeys.RuntimeAssetContext, StringComparison.OrdinalIgnoreCase);
 
     private void PropagateSpatialContextForConnection(
         IReadOnlyDictionary<string, object> sourceOutputs,

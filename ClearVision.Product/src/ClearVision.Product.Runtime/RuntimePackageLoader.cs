@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -89,6 +90,8 @@ public sealed class RuntimePackageLoader
                 };
             }
 
+            package.AssetContext = await LoadAssetContextAsync(manifest, normalizedRoot, cancellationToken);
+
             RebasePackageRelativeFileParameters(package.Flow, normalizedRoot);
 
             _logger.LogInformation(
@@ -117,6 +120,54 @@ public sealed class RuntimePackageLoader
 
         await using var stream = File.OpenRead(path);
         return await JsonSerializer.DeserializeAsync<T>(stream, RuntimeJson.SerializerOptions, cancellationToken);
+    }
+
+    private static async Task<IRuntimeAssetContext> LoadAssetContextAsync(
+        RuntimePackageManifest manifest,
+        string packageRoot,
+        CancellationToken cancellationToken)
+    {
+        var calibrationAssets = manifest.Assets?.CalibrationAssets;
+        if (calibrationAssets == null || calibrationAssets.Count == 0)
+        {
+            return RuntimeAssetContext.Empty;
+        }
+
+        var bundles = new List<RuntimeCalibrationBundleAsset>(calibrationAssets.Count);
+        foreach (var manifestAsset in calibrationAssets)
+        {
+            var assetPath = RuntimePathGuard.ResolveAssetPath(packageRoot, manifestAsset.RelativePath);
+            var bytes = await File.ReadAllBytesAsync(assetPath, cancellationToken);
+            var projectAsset = JsonSerializer.Deserialize<ProjectCalibrationAssetDto>(bytes, ProjectAssetJson.Options)
+                ?? throw new RuntimePackageException($"RuntimeAssetLoadFailed: calibration asset JSON could not be parsed ({manifestAsset.RelativePath}).");
+
+            var bundleId = ReadPayloadString(projectAsset.Payload, "bundleId");
+            bundles.Add(new RuntimeCalibrationBundleAsset(
+                manifestAsset.AssetId,
+                bundleId ?? string.Empty,
+                manifestAsset.Kind,
+                manifestAsset.Version,
+                manifestAsset.ProjectRevision,
+                manifestAsset.ContentHash,
+                manifestAsset.FileHash,
+                manifestAsset.RelativePath,
+                projectAsset.Payload.GetRawText()));
+        }
+
+        return new RuntimeAssetContext(bundles);
+    }
+
+    private static string? ReadPayloadString(JsonElement payload, string propertyName)
+    {
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var value = property.GetString()?.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static string ResolveOptionalFieldPath(string packageRoot, string? manifestPath, string fallbackPath)

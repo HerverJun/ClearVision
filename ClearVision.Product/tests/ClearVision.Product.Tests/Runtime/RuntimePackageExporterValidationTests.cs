@@ -397,6 +397,16 @@ public class RuntimePackageExporterValidationTests
             var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
             var package = await loader.LoadAsync(export.PackageRootPath);
             package.Manifest.Assets!.CalibrationAssets.Should().ContainSingle();
+            package.AssetContext.IsEmpty.Should().BeFalse();
+            var loadedAsset = package.AssetContext.CalibrationBundles.Should().ContainSingle().Subject;
+            loadedAsset.AssetId.Should().Be("calibration-main");
+            loadedAsset.BundleId.Should().Be("calibration-main");
+            loadedAsset.Kind.Should().Be("CalibrationBundleV2");
+            loadedAsset.ContentHash.Should().Be(manifestAsset.ContentHash);
+            package.AssetContext.TryGetCalibrationBundleByAssetId("calibration-main", out var byAssetId).Should().BeTrue();
+            byAssetId.BundleId.Should().Be("calibration-main");
+            package.AssetContext.TryGetCalibrationBundleByBundleId("calibration-main", out var byBundleId).Should().BeTrue();
+            byBundleId.AssetId.Should().Be("calibration-main");
         }
         finally
         {
@@ -469,6 +479,7 @@ public class RuntimePackageExporterValidationTests
     [InlineData("malformed")]
     [InlineData("payloadHash")]
     [InlineData("schemaVersion")]
+    [InlineData("bundleSchemaVersion")]
     public async Task LoadAsync_WhenProjectAssetPackageIsTampered_ShouldFailClosed(string scenario)
     {
         var root = CreateTempDirectory();
@@ -495,6 +506,7 @@ public class RuntimePackageExporterValidationTests
                 "malformed" => "ProjectAssetJsonMalformed",
                 "payloadHash" => "ProjectAssetContentHashMismatch",
                 "schemaVersion" => "ProjectAssetsSchemaVersionUnsupported",
+                "bundleSchemaVersion" => "ProjectCalibrationBundleSchemaUnsupported",
                 _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
             };
 
@@ -531,6 +543,18 @@ public class RuntimePackageExporterValidationTests
                     break;
                 case "schemaVersion":
                     manifest.Assets!.SchemaVersion = 99;
+                    await WriteManifestAsync(manifestPath, manifest);
+                    break;
+                case "bundleSchemaVersion":
+                    var schemaAsset = JsonSerializer.Deserialize<ProjectCalibrationAssetDto>(
+                        await File.ReadAllTextAsync(assetPath),
+                        ProjectAssetJson.Options)!;
+                    schemaAsset.Payload = CreateCalibrationPayload("asset-tamper", schemaVersion: 1);
+                    schemaAsset.ContentHash = ProjectAssetJson.ComputePayloadHash(schemaAsset.Payload);
+                    var schemaBytes = JsonSerializer.SerializeToUtf8Bytes(schemaAsset, ProjectAssetJson.Options);
+                    await File.WriteAllBytesAsync(assetPath, schemaBytes);
+                    manifestAsset.ContentHash = schemaAsset.ContentHash;
+                    manifestAsset.FileHash = RuntimePathGuard.ComputeSha256(schemaBytes);
                     await WriteManifestAsync(manifestPath, manifest);
                     break;
             }
@@ -683,11 +707,11 @@ public class RuntimePackageExporterValidationTests
         return project;
     }
 
-    private static JsonElement CreateCalibrationPayload(string bundleId) =>
+    private static JsonElement CreateCalibrationPayload(string bundleId, int schemaVersion = 2) =>
         JsonSerializer.SerializeToElement(
             new
             {
-                schemaVersion = 2,
+                schemaVersion,
                 bundleId,
                 calibrationVersion = "2.0",
                 quality = new

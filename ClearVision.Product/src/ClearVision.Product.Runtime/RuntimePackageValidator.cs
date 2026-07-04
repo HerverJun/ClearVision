@@ -328,6 +328,17 @@ public sealed partial class RuntimePackageValidator
         {
             AddIssue(result, RuntimeIssueSeverity.Error, "ProjectAssetKindMismatch", "Calibration asset file must be CalibrationBundleV2.", manifestAsset.RelativePath);
         }
+
+        if (!TryReadPayloadInt32(asset.Payload, "schemaVersion", out var schemaVersion) ||
+            schemaVersion != 2)
+        {
+            AddIssue(
+                result,
+                RuntimeIssueSeverity.Error,
+                "ProjectCalibrationBundleSchemaUnsupported",
+                $"CalibrationBundleV2 payload schemaVersion must be 2, got '{schemaVersion?.ToString() ?? "missing"}'.",
+                manifestAsset.RelativePath);
+        }
     }
 
     private static void ValidateSpatialAssetFile(
@@ -442,6 +453,20 @@ public sealed partial class RuntimePackageValidator
         return value[prefix.Length..].All(ch =>
             ch is >= '0' and <= '9' ||
             ch is >= 'a' and <= 'f');
+    }
+
+    private static bool TryReadPayloadInt32(JsonElement payload, string propertyName, out int? value)
+    {
+        value = null;
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty(propertyName, out var property) ||
+            !property.TryGetInt32(out var parsed))
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
     }
 
     private static void AddIssue(

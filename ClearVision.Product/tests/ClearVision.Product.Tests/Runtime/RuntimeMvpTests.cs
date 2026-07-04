@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
 using FluentAssertions;
@@ -162,6 +163,90 @@ public class RuntimeMvpTests
             result.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("4");
             result.SourceImageBytes.Should().BeNull();
             result.OutputImageBytes.Should().Equal([4, 2, 1]);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_WithCalibrationPackageAsset_ShouldRunPixelToWorldWithoutStudio()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            const string assetId = "asset-station-p2w";
+            const string bundleId = "bundle-station-p2w";
+            var project = CreatePixelToWorldRuntimeAssetProject("station-pixel-to-world", includeAsset: true, assetId, bundleId);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance)),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            var package = await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            package.AssetContext.TryGetCalibrationBundleByAssetId(assetId, out var loadedAsset).Should().BeTrue();
+            loadedAsset.BundleId.Should().Be(bundleId);
+
+            var result = await runtimeHost.RunPackageConfiguredSingleAsync();
+
+            result.FlowHash.Should().Be(export.Manifest.FlowHash);
+            result.PrimaryOutputs.Should().NotContainKey("Image");
+            result.PrimaryOutputs.Should().NotContainKey("Scene");
+
+            var transformedPoints = Assert.IsAssignableFrom<IEnumerable<object?>>(result.PrimaryOutputs["TransformedPoints"]).ToList();
+            var transformedPoint = Assert.IsAssignableFrom<IDictionary<string, object?>>(transformedPoints.Single()!);
+            Convert.ToDouble(transformedPoint["X"], System.Globalization.CultureInfo.InvariantCulture).Should().BeApproximately(3.2, 1e-9);
+            Convert.ToDouble(transformedPoint["Y"], System.Globalization.CultureInfo.InvariantCulture).Should().BeApproximately(2.4, 1e-9);
+            Convert.ToDouble(transformedPoint["Z"], System.Globalization.CultureInfo.InvariantCulture).Should().BeApproximately(0.0, 1e-12);
+
+            var transformResult = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.PrimaryOutputs["TransformResult"]!);
+            transformResult["CalibrationDataSource"].Should().Be("RuntimePackageAsset");
+            transformResult["CalibrationAssetId"].Should().Be(assetId);
+            transformResult["CalibrationBundleId"].Should().Be(bundleId);
+            transformResult["CalibrationContentHash"].Should().Be(project.Assets.CalibrationAssets.Single().ContentHash);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_WithPixelToWorldAndMissingRuntimeBundle_ShouldFailClosed()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreatePixelToWorldRuntimeAssetProject("station-pixel-to-world-missing", includeAsset: false);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance)),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var result = await runtimeHost.RunPackageConfiguredSingleAsync();
+
+            result.Outcome.Should().Be(RuntimeRunOutcome.Error);
+            result.DiagnosticMessage.Should().Contain("CalibrationBundleV2 data is required");
+            result.PrimaryOutputs.Should().NotContainKey("Image");
+            result.PrimaryOutputs.Should().NotContainKey("Scene");
         }
         finally
         {
@@ -1048,6 +1133,145 @@ public class RuntimeMvpTests
             }
         };
     }
+
+    private static ProjectDto CreatePixelToWorldRuntimeAssetProject(
+        string name,
+        bool includeAsset,
+        string assetId = "asset-pixel-to-world",
+        string bundleId = "bundle-pixel-to-world")
+    {
+        var projectRevision = includeAsset ? 22 : 0;
+        var project = new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            PersistenceRevision = projectRevision,
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "pixel-to-world-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "PixelToWorld",
+                        Type = OperatorType.PixelToWorldTransform,
+                        Parameters =
+                        [
+                            CreateParameterDto("TransformMode", "enum", "PixelToWorld"),
+                            CreateParameterDto("InputPointX", "double", 160d),
+                            CreateParameterDto("InputPointY", "double", 120d),
+                            CreateParameterDto("GenerateReport", "bool", true)
+                        ],
+                        OutputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "Image",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.Image
+                            },
+                            new PortDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "TransformedPoints",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.PointList
+                            },
+                            new PortDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "TransformResult",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.Any
+                            }
+                        ]
+                    }
+                ],
+                Connections = []
+            }
+        };
+
+        if (!includeAsset)
+        {
+            return project;
+        }
+
+        var payload = CreateRuntimeCalibrationPayload(bundleId);
+        project.Assets = new ProjectAssetsDto
+        {
+            CalibrationAssets =
+            [
+                new ProjectCalibrationAssetDto
+                {
+                    AssetId = assetId,
+                    Kind = "CalibrationBundleV2",
+                    Version = "2.0",
+                    Producer = "RuntimeMvpTests",
+                    SourceDraftSessionId = "station-e2e",
+                    ImageIdentity = "image:none",
+                    ContentHash = ProjectAssetJson.ComputePayloadHash(payload),
+                    ProjectRevision = projectRevision,
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                    Status = "authority",
+                    Payload = payload
+                }
+            ]
+        };
+
+        return project;
+    }
+
+    private static ParameterDto CreateParameterDto(string name, string dataType, object? value) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            DisplayName = name,
+            DataType = dataType,
+            Value = value
+        };
+
+    private static JsonElement CreateRuntimeCalibrationPayload(string bundleId) =>
+        JsonSerializer.SerializeToElement(
+            new
+            {
+                schemaVersion = 2,
+                bundleId,
+                calibrationVersion = "v-runtime-e2e",
+                datasetFingerprint = "dataset-runtime-e2e",
+                checksumSha256 = "abcdef0123456789",
+                calibrationKind = "rigidTransform2D",
+                transformModel = "scaleOffset",
+                sourceFrame = "image",
+                targetFrame = "world",
+                unit = "mm",
+                transform2D = new
+                {
+                    model = "scaleOffset",
+                    matrix = new[]
+                    {
+                        new[] { 0.02d, 0.0d, 0.0d },
+                        new[] { 0.0d, 0.02d, 0.0d }
+                    },
+                    pixelSizeX = 0.02d,
+                    pixelSizeY = 0.02d
+                },
+                quality = new
+                {
+                    accepted = true,
+                    meanError = 0.05d,
+                    maxError = 0.09d,
+                    inlierCount = 8,
+                    totalSampleCount = 8,
+                    diagnostics = Array.Empty<string>()
+                },
+                producerOperator = "RuntimeMvpTests"
+            },
+            CreateJsonOptions());
 
     private static ProjectGlobalVariableSchema CreateSingleInt64GlobalVariableSchema(
         Guid variableId,

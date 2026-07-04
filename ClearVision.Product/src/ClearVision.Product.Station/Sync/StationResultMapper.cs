@@ -38,7 +38,7 @@ public static class StationResultMapper
         var preview = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in outputs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
         {
-            if (LooksLikeImageKey(key) || value is byte[])
+            if (LooksLikeImageKey(key) || LooksLikeSceneOrArtifactPayloadKey(key) || value is byte[])
             {
                 continue;
             }
@@ -59,6 +59,15 @@ public static class StationResultMapper
                key.Contains("bitmap", StringComparison.OrdinalIgnoreCase) ||
                key.Contains("thumbnail", StringComparison.OrdinalIgnoreCase) ||
                key.Contains("base64", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeSceneOrArtifactPayloadKey(string key)
+    {
+        return key.Equals("Scene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("VisualScene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("OutputScene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("ArtifactPayload", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("LargeArtifactPayload", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? FormatValue(object? value)

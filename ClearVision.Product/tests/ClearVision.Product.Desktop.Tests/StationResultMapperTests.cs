@@ -29,6 +29,9 @@ public sealed class StationResultMapperTests
                 ["thumbnail"] = "base64-image-data",
                 ["outputImage"] = "should-not-leave-station",
                 ["binaryBlob"] = new byte[] { 7, 8, 9 },
+                ["Scene"] = new { layers = new[] { "full-scene" } },
+                ["OutputScene"] = "should-not-leave-station",
+                ["ArtifactPayload"] = "large-payload",
                 ["measurements"] = new[] { 1, 2, 3 }
             }
         };
@@ -48,6 +51,8 @@ public sealed class StationResultMapperTests
             key.Contains("image", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("thumbnail", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("base64", StringComparison.OrdinalIgnoreCase) ||
-            key.Contains("binaryBlob", StringComparison.OrdinalIgnoreCase));
+            key.Contains("binaryBlob", StringComparison.OrdinalIgnoreCase) ||
+            key.Contains("scene", StringComparison.OrdinalIgnoreCase) ||
+            key.Contains("artifactPayload", StringComparison.OrdinalIgnoreCase));
     }
 }

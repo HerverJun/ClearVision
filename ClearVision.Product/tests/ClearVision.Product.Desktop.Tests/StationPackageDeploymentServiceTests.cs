@@ -274,6 +274,60 @@ public sealed class StationPackageDeploymentServiceTests
         }
     }
 
+    [Fact]
+    public async Task LoadPackageWithLocalProfileAsync_ShouldLoadRuntimePackageCalibrationAssets()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionPackageAssetLoadTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            const string assetId = "asset-station-load";
+            const string bundleId = "bundle-station-load";
+            var exporter = new RuntimePackageExporter(
+                new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                TargetRootDirectory = root,
+                Project = CreateProjectWithCalibrationAsset("station-asset-load", assetId, bundleId)
+            });
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            await using var runtimeHost = new RuntimeHost(
+                Substitute.For<IFlowExecutionService>(),
+                loader,
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            var service = new StationPackageDeploymentService(
+                Options.Create(new StationSyncOptions
+                {
+                    PackageDirectory = Path.Combine(root, "packages"),
+                    StudioHubUrl = "http://localhost/hubs/station-ingest"
+                }),
+                runtimeHost,
+                new StationLocalSettingsStore(Path.Combine(root, "settings")),
+                new StationSiteProfileStore(Path.Combine(root, "station")),
+                NullLogger<StationPackageDeploymentService>.Instance);
+
+            var method = typeof(StationPackageDeploymentService).GetMethod(
+                "LoadPackageWithLocalProfileAsync",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            method.Should().NotBeNull();
+            await ((Task)method!.Invoke(service, [export.PackageRootPath, CancellationToken.None])!);
+
+            runtimeHost.LoadedPackage.Should().NotBeNull();
+            runtimeHost.LoadedPackage!.AssetContext.TryGetCalibrationBundleByAssetId(assetId, out var asset).Should().BeTrue();
+            asset.BundleId.Should().Be(bundleId);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static void InvokeRollBack(string activeRoot, string lastKnownGoodRoot)
     {
         var method = typeof(StationPackageDeploymentService).GetMethod(
@@ -282,4 +336,83 @@ public sealed class StationPackageDeploymentServiceTests
         method.Should().NotBeNull();
         method!.Invoke(null, [activeRoot, lastKnownGoodRoot]);
     }
+
+    private static ProjectDto CreateProjectWithCalibrationAsset(string name, string assetId, string bundleId)
+    {
+        var revision = 3;
+        var payload = CreateCalibrationPayload(bundleId);
+        return new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            PersistenceRevision = revision,
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "asset-load-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Result",
+                        Type = OperatorType.ResultOutput
+                    }
+                ]
+            },
+            Assets = new ProjectAssetsDto
+            {
+                CalibrationAssets =
+                [
+                    new ProjectCalibrationAssetDto
+                    {
+                        AssetId = assetId,
+                        Kind = "CalibrationBundleV2",
+                        Version = "2.0",
+                        Producer = "StationPackageDeploymentServiceTests",
+                        SourceDraftSessionId = "station-load",
+                        ImageIdentity = "image:none",
+                        ContentHash = ProjectAssetJson.ComputePayloadHash(payload),
+                        ProjectRevision = revision,
+                        CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                        UpdatedAtUtc = DateTimeOffset.UtcNow,
+                        Status = "authority",
+                        Payload = payload
+                    }
+                ]
+            }
+        };
+    }
+
+    private static JsonElement CreateCalibrationPayload(string bundleId) =>
+        JsonSerializer.SerializeToElement(
+            new
+            {
+                schemaVersion = 2,
+                bundleId,
+                calibrationKind = "rigidTransform2D",
+                transformModel = "scaleOffset",
+                sourceFrame = "image",
+                targetFrame = "world",
+                unit = "mm",
+                transform2D = new
+                {
+                    model = "scaleOffset",
+                    matrix = new[]
+                    {
+                        new[] { 0.02d, 0.0d, 0.0d },
+                        new[] { 0.0d, 0.02d, 0.0d }
+                    }
+                },
+                quality = new
+                {
+                    accepted = true,
+                    meanError = 0.05d,
+                    maxError = 0.09d,
+                    inlierCount = 8,
+                    totalSampleCount = 8,
+                    diagnostics = Array.Empty<string>()
+                },
+                producerOperator = "StationPackageDeploymentServiceTests"
+            });
 }

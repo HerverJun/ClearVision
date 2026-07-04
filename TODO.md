@@ -50,9 +50,9 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G13C`
-- 当前卡片：`docs/进行中/Studio2/goals/G13C.md`
-- 当前阶段：`Vertical Product`
+- 当前 Goal：`G14A`
+- 当前卡片：`docs/进行中/Studio2/goals/G14A.md`
+- 当前阶段：`Productization`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
@@ -118,8 +118,8 @@
 | G13A | Vertical Product | Project 正式资产权威与保存恢复 | DONE | G12B | `docs/进行中/Studio2/goals/G13A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G13B | Vertical Product | Runtime Package 可选 Calibration/Spatial 扩展 | DONE | G13A | `docs/进行中/Studio2/goals/G13B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G13X | Vertical Product | VM 式算子模块结果面板 MVP | DONE | G13B | `docs/进行中/Studio2/goals/G13X.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13C | Vertical Product | Station/Runtime 标定加载与 PixelToWorld E2E | READY | G13X | `docs/进行中/Studio2/goals/G13C.md` |  |
-| G14A | Productization | 正式 Inspection 历史投影与分页 | LOCKED | G13C | `docs/进行中/Studio2/goals/G14A.md` |  |
+| G13C | Vertical Product | Station/Runtime 标定加载与 PixelToWorld E2E | DONE | G13X | `docs/进行中/Studio2/goals/G13C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
+| G14A | Productization | 正式 Inspection 历史投影与分页 | READY | G13C | `docs/进行中/Studio2/goals/G14A.md` |  |
 | G14B | Productization | 结果对比、基线与 Scene 回放 | LOCKED | G14A | `docs/进行中/Studio2/goals/G14B.md` |  |
 | G14C | Productization | Evidence manifest、导出与留存策略 | LOCKED | G14B | `docs/进行中/Studio2/goals/G14C.md` |  |
 | G15.1 | Productization | Property Panel capability 迁移 | LOCKED | G14C | `docs/进行中/Studio2/goals/G15_1.md` |  |
@@ -171,6 +171,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-04 | G13C | `5752a68fe3b20f0ac57edcf03bdd88a7c49344fb` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `RuntimePackageExporterValidationTests,PixelToWorldTransformOperatorTests,RuntimeMvpTests` PASS（79/79）；Product extra focused `RuntimePackageLoaderTests,RuntimePackageExporterTests,FlowExecutionServiceTests` PASS（38/38）；Desktop build PASS；Desktop focused `StationResultMapperTests,StationPackageDeploymentServiceTests,Studio2ArchitectureGuardTests` PASS（27/27）；Desktop extra `StationPackageStoreTests` PASS（3/3）；Station Debug build PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 Station 进程 E2E NOT PERFORMED；真实 WebView2 NOT PERFORMED | Station/Runtime package loader 在 G13B optional assets 通过 validator 后构建只读 runtime asset context，RuntimeHost 以 ambient input 传入 FlowExecutionService，PixelToWorld 可按 assetId/bundleId/kind 解析正式 `CalibrationBundleV2` 并输出 `CalibrationBundleId`/`FlowHash`/坐标摘要；缺失/歧义 bundle fail closed，Station result/Runtime primary output 默认剥离 Image/Scene/artifact payload；Station 不依赖 Studio/Vue/Node/WebView2，未修改或弱化 G13X 模块结果面板，未新增第二 Runtime manifest、ProjectAssetIndex 或 preview candidate 读取。 |
 | 2026-07-04 | G13X | `fe0c23bf4d6bb8ba1dd88ba1b9b843321dba27cb` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-panel-memory.test.mjs` PASS（10/10）；UI focused `property-panel-memory.test.mjs` PASS（12/12）；Desktop focused `Studio2ArchitectureGuardTests` PASS（17/17）；UI unit full PASS（636/636）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 在既有 Property/Preview 右侧区域新增 VM 式当前算子模块结果面板：覆盖未选择、未运行、loading、失败、stale、disabled，展示 overview、scalar/table/list/geometry/artifact/Scene 摘要、diagnostics 与脱敏截断 raw JSON；Artifact 仅经 `previewCoordinator.readArtifactForCurrentState()` 有界读取并 fail-soft；节点结果列表通过既有 FlowCanvasAdapter 同步选择；未重写 FlowCanvas，未新增第二 ImageCanvas/Scene renderer，未做 Runtime/Station/AgentRun/Inspection history/Evidence ZIP。 |
 | 2026-07-04 | G13B | `1a86837d3efce57f45de716888f7a8536b87bd8f` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused `RuntimePackageExporterValidationTests,RuntimeParameterContractsTests,RuntimePackageLoaderTests` PASS（21/21）；Product affected `ProjectSaveCoordinatorTests,ProjectServiceTests,RuntimeMvpTests` PASS（56/56）；Desktop focused `ProjectGlobalVariableEndpointsTests,Studio2ArchitectureGuardTests` PASS（42/42）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | Runtime exporter confirmed directory package output and now packages G13A Project authority Calibration/Spatial assets into additive optional `assets` manifest section with relative asset files, `contentHash` payload authority hash and `fileHash` package file hash; loader/validator fail closed for missing file, checksum mismatch, traversal, absolute path, malformed asset JSON, bad payload hash and unsupported assets schema; old packages missing assets section and empty assets section remain compatible；未做 Station 消费/Station UI/PixelToWorld E2E/PLC/机器人；当前 Goal 推进到 G13C READY。 |
 | 2026-07-04 | G13A | `00797812407f949bb87fe1612272d40794c1634c` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused `ProjectSaveCoordinatorTests,ProjectServiceTests` PASS（39/39）；Desktop focused `CalibrationDraftEndpointsTests,Studio2ArchitectureGuardTests` PASS（19/19）；UI focused `property-panel-memory.test.mjs` PASS（12/12）；Product full serial PASS（3252 passed, 4 skipped）；Desktop full serial PASS（479/479）；UI unit full PASS（627/627）；Playwright `npoint-calibration-workbench.spec.ts` PASS（2/2）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 ProjectAssets DTO/JSON storage 与 `ProjectSaveCoordinator` `ProjectAssets` participant，formal `CalibrationBundleV2` draft candidate 通过 staging/hash/commit-intent/apply/recovery/rollback 成为 Project authority；Project DTO additive `assets` 缺省空集合；G12B Formal Save 接入正式入口并显示 asset id/revision；覆盖 stale、checksum mismatch、prepared rollback、asset write/apply recovery、tamper fail-closed、旧工程无资产、DTO roundtrip、architecture guard；未做 Runtime Package/Station/PLC/机器人；当前 Goal 推进到 G13B READY。 |

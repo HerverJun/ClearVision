@@ -345,6 +345,13 @@ public sealed class RuntimePackageExporter
         {
             throw new RuntimePackageException($"RPA005: calibration asset '{asset.AssetId}' must be CalibrationBundleV2.");
         }
+
+        if (!TryReadPayloadInt32(asset.Payload, "schemaVersion", out var schemaVersion) ||
+            schemaVersion != 2)
+        {
+            throw new RuntimePackageException(
+                $"RPA014: calibration asset '{asset.AssetId}' payload schemaVersion must be 2.");
+        }
     }
 
     private static void ValidateSpatialAuthorityAsset(ProjectDto project, ProjectSpatialAssetDto asset)
@@ -1286,6 +1293,14 @@ public sealed class RuntimePackageExporter
         return value[prefix.Length..].All(ch =>
             ch is >= '0' and <= '9' ||
             ch is >= 'a' and <= 'f');
+    }
+
+    private static bool TryReadPayloadInt32(JsonElement payload, string propertyName, out int value)
+    {
+        value = 0;
+        return payload.ValueKind == JsonValueKind.Object &&
+               payload.TryGetProperty(propertyName, out var property) &&
+               property.TryGetInt32(out value);
     }
 
     private static void TryDeleteDirectory(string path)

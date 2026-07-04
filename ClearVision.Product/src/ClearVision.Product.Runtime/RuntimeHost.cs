@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -659,7 +660,7 @@ public sealed class RuntimeHost : IAsyncDisposable
 
             var flowResult = await _flowExecutionService.ExecuteFlowAsync(
                 flow,
-                BuildFlowInputData(sourceImageBytes),
+                BuildFlowInputData(sourceImageBytes, package.AssetContext),
                 variableContext,
                 cancellationToken: timeoutCts.Token);
             var resultVariableSession = _projectVariableSession ?? variableSession;
@@ -1017,17 +1018,22 @@ public sealed class RuntimeHost : IAsyncDisposable
         return $"package-configured-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}";
     }
 
-    private static Dictionary<string, object>? BuildFlowInputData(byte[]? sourceImageBytes)
+    private static Dictionary<string, object>? BuildFlowInputData(
+        byte[]? sourceImageBytes,
+        IRuntimeAssetContext assetContext)
     {
-        if (sourceImageBytes is not { Length: > 0 })
+        var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        if (sourceImageBytes is { Length: > 0 })
         {
-            return null;
+            inputs["Image"] = sourceImageBytes;
         }
 
-        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        if (!assetContext.IsEmpty)
         {
-            ["Image"] = sourceImageBytes
-        };
+            inputs[RuntimeAssetInputKeys.RuntimeAssetContext] = assetContext;
+        }
+
+        return inputs.Count == 0 ? null : inputs;
     }
 
     private static IEnumerable<string> EnumerateReplayFiles(string folderPath, RuntimeProfile profile)
@@ -1341,7 +1347,7 @@ public sealed class RuntimeResultNormalizer
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in outputData.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
         {
-            if (key.Equals("Image", StringComparison.OrdinalIgnoreCase))
+            if (ShouldSkipPrimaryOutput(key))
             {
                 continue;
             }
@@ -1396,6 +1402,16 @@ public sealed class RuntimeResultNormalizer
                 normalized = value.ToString();
                 return true;
         }
+    }
+
+    private static bool ShouldSkipPrimaryOutput(string key)
+    {
+        return key.Equals("Image", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("Scene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("VisualScene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("OutputScene", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals("ArtifactPayload", StringComparison.OrdinalIgnoreCase) ||
+               key.Equals(RuntimeAssetInputKeys.RuntimeAssetContext, StringComparison.OrdinalIgnoreCase);
     }
 
     private static byte[]? TryExtractOutputImage(Dictionary<string, object> outputData)

@@ -553,6 +553,52 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void G13C_RuntimeAndStation_ShouldConsumePackageAssetsWithoutStudioPreviewDependencies()
+    {
+        var runtimeAndStationRoots = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Runtime",
+            "ClearVision.Product/src/ClearVision.Product.Station"
+        };
+
+        var files = runtimeAndStationRoots
+            .Select(root => Path.Combine(Root, root.Replace('/', Path.DirectorySeparatorChar)))
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                           path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        files.Should().NotBeEmpty();
+
+        var bannedPatterns = new[]
+        {
+            "operatorResultViewModel",
+            "operator-result-panel",
+            "wwwroot/src",
+            "FrontendV2",
+            "Microsoft.Web.WebView2",
+            "PreviewArtifact",
+            "CalibrationDraft",
+            "DraftCandidate",
+            "ProjectAssetIndex",
+            "new ImageCanvas",
+            "SceneRenderer",
+            "createElement('canvas'",
+            "document.createElement('canvas'"
+        };
+
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            var relativePath = ToRelativePath(file);
+            foreach (var bannedPattern in bannedPatterns)
+            {
+                text.Should().NotContain(bannedPattern, relativePath);
+            }
+        }
+    }
+
+    [Fact]
     public void ProjectAssets_ShouldUseProjectSaveCoordinatorAuthorityWithoutIndependentRevision()
     {
         var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/ProjectSaveCoordinator.cs");

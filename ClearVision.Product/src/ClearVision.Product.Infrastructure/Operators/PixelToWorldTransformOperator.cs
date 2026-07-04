@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 using Microsoft.Extensions.Logging;
@@ -33,6 +34,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("UnitScale", "Unit Scale (mm per unit)", "double", DefaultValue = 1.0, Min = 0.0001, Max = 10000.0)]
 [OperatorParam("InputPointX", "Input Point X (Single Point Mode)", "double", DefaultValue = 0.0)]
 [OperatorParam("InputPointY", "Input Point Y (Single Point Mode)", "double", DefaultValue = 0.0)]
+[OperatorParam("CalibrationAssetId", "Runtime Calibration Asset Id", "string", DefaultValue = "")]
+[OperatorParam("CalibrationBundleId", "Runtime Calibration Bundle Id", "string", DefaultValue = "")]
 [OperatorParam("UseDistortion", "Use Distortion Model", "bool", DefaultValue = true)]
 [OperatorParam("GenerateReport", "Generate Accuracy Report", "bool", DefaultValue = true)]
 public class PixelToWorldTransformOperator : OperatorBase
@@ -66,9 +69,9 @@ public class PixelToWorldTransformOperator : OperatorBase
         var useDistortion = GetBoolParam(@operator, "UseDistortion", true);
         var generateReport = GetBoolParam(@operator, "GenerateReport", true);
 
-        if (!TryResolveCalibrationData(@operator, inputs, out var calibrationJson))
+        if (!TryResolveCalibrationData(@operator, inputs, out var calibrationJson, out var runtimeCalibrationAsset, out var calibrationResolveError))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("CalibrationBundleV2 data is required."));
+            return Task.FromResult(OperatorExecutionOutput.Failure(calibrationResolveError ?? "CalibrationBundleV2 data is required."));
         }
 
         if (!CalibrationBundleV2Json.TryDeserialize(calibrationJson!, out var bundle, out var parseError))
@@ -116,6 +119,7 @@ public class PixelToWorldTransformOperator : OperatorBase
                 @operator,
                 inputs,
                 bundle,
+                runtimeCalibrationAsset,
                 inputPoints,
                 pointsSpatialContext,
                 imageSpatialContext,
@@ -134,6 +138,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             @operator,
             inputs,
             bundle,
+            runtimeCalibrationAsset,
             inputPoints,
             pointsSpatialContext,
             imageSpatialContext,
@@ -176,6 +181,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         Operator @operator,
         Dictionary<string, object>? inputs,
         CalibrationBundleV2 bundle,
+        RuntimeCalibrationBundleAsset? runtimeCalibrationAsset,
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
         SpatialContextV1? imageSpatialContext,
@@ -250,6 +256,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             "PlanarTransform2D",
             runtime.Model.ToString(),
             bundle,
+            runtimeCalibrationAsset,
             transformResult,
             imageSpatialContext,
             omitImageSpatialContextSidecar,
@@ -264,6 +271,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         Operator @operator,
         Dictionary<string, object>? inputs,
         CalibrationBundleV2 bundle,
+        RuntimeCalibrationBundleAsset? runtimeCalibrationAsset,
         IReadOnlyList<Point3d> inputPoints,
         SpatialContextV1? spatialContext,
         SpatialContextV1? imageSpatialContext,
@@ -354,6 +362,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             "RayPlaneIntersection",
             "Projection",
             bundle,
+            runtimeCalibrationAsset,
             frameResult,
             imageSpatialContext,
             omitImageSpatialContextSidecar,
@@ -745,6 +754,7 @@ public class PixelToWorldTransformOperator : OperatorBase
         string path,
         string model,
         CalibrationBundleV2 bundle,
+        RuntimeCalibrationBundleAsset? runtimeCalibrationAsset,
         SpatialCalibrationTransformResult? frameResult,
         SpatialContextV1? inputSpatialContext,
         bool omitImageSpatialContextSidecar,
@@ -777,9 +787,11 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["WorldPlaneZ"] = worldPlaneZ,
             ["UnitScale"] = unitScale,
             ["BundleId"] = bundle.BundleId,
+            ["CalibrationBundleId"] = bundle.BundleId,
             ["CalibrationVersion"] = bundle.CalibrationVersion,
             ["DatasetFingerprint"] = bundle.DatasetFingerprint,
             ["ChecksumSha256"] = bundle.ChecksumSha256,
+            ["CalibrationDataSource"] = runtimeCalibrationAsset == null ? "InlineCalibrationData" : "RuntimePackageAsset",
             ["CalibrationKind"] = bundle.CalibrationKind.ToString(),
             ["TransformModel"] = bundle.TransformModel.ToString(),
             ["SourceFrame"] = bundle.SourceFrame,
@@ -795,6 +807,17 @@ public class PixelToWorldTransformOperator : OperatorBase
             ["CompatibilityMode"] = frameResult?.CompatibilityMode ?? false,
             ["Diagnostics"] = outputDiagnostics
         };
+
+        if (runtimeCalibrationAsset != null)
+        {
+            transformResult["CalibrationAssetId"] = runtimeCalibrationAsset.AssetId;
+            transformResult["CalibrationAssetKind"] = runtimeCalibrationAsset.Kind;
+            transformResult["CalibrationAssetVersion"] = runtimeCalibrationAsset.Version;
+            transformResult["CalibrationAssetProjectRevision"] = runtimeCalibrationAsset.ProjectRevision;
+            transformResult["CalibrationContentHash"] = runtimeCalibrationAsset.ContentHash;
+            transformResult["CalibrationFileHash"] = runtimeCalibrationAsset.FileHash;
+            transformResult["CalibrationAssetRelativePath"] = runtimeCalibrationAsset.RelativePath;
+        }
 
         var resultData = new Dictionary<string, object>
         {
@@ -1412,11 +1435,18 @@ public class PixelToWorldTransformOperator : OperatorBase
         return kind == CalibrationKindV2.PlanarTransform2D || kind == CalibrationKindV2.RigidTransform2D;
     }
 
-    private bool TryResolveCalibrationData(Operator @operator, Dictionary<string, object>? inputs, out string? calibrationData)
+    private bool TryResolveCalibrationData(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        out string? calibrationData,
+        out RuntimeCalibrationBundleAsset? runtimeCalibrationAsset,
+        out string? error)
     {
         calibrationData = null;
+        runtimeCalibrationAsset = null;
+        error = null;
         if (inputs != null &&
-            inputs.TryGetValue("CalibrationData", out var dataObj) &&
+            TryGetInputValue(inputs, "CalibrationData", out var dataObj) &&
             dataObj is string inlineData &&
             !string.IsNullOrWhiteSpace(inlineData))
         {
@@ -1431,7 +1461,119 @@ public class PixelToWorldTransformOperator : OperatorBase
             return true;
         }
 
+        if (!TryGetRuntimeAssetContext(inputs, out var assetContext) || assetContext.IsEmpty)
+        {
+            error = "CalibrationBundleV2 data is required.";
+            return false;
+        }
+
+        var requestedAssetId = ReadStringInputOrParameter(@operator, inputs, "CalibrationAssetId", "CalibrationAssetID");
+        if (!string.IsNullOrWhiteSpace(requestedAssetId))
+        {
+            if (assetContext.TryGetCalibrationBundleByAssetId(requestedAssetId, out var asset))
+            {
+                return SelectRuntimeCalibrationAsset(asset, out calibrationData, out runtimeCalibrationAsset);
+            }
+
+            error = $"RUNTIME_CALIBRATION_BUNDLE_MISSING: Calibration asset '{requestedAssetId}' was not found in runtime package assets.";
+            return false;
+        }
+
+        var requestedBundleId = ReadStringInputOrParameter(@operator, inputs, "CalibrationBundleId", "BundleId");
+        if (!string.IsNullOrWhiteSpace(requestedBundleId))
+        {
+            if (assetContext.TryGetCalibrationBundleByBundleId(requestedBundleId, out var asset))
+            {
+                return SelectRuntimeCalibrationAsset(asset, out calibrationData, out runtimeCalibrationAsset);
+            }
+
+            error = $"RUNTIME_CALIBRATION_BUNDLE_MISSING: Calibration bundle '{requestedBundleId}' was not found in runtime package assets.";
+            return false;
+        }
+
+        var candidates = assetContext.FindCalibrationBundlesByKind("CalibrationBundleV2");
+        if (candidates.Count == 1)
+        {
+            return SelectRuntimeCalibrationAsset(candidates[0], out calibrationData, out runtimeCalibrationAsset);
+        }
+
+        if (candidates.Count == 0)
+        {
+            error = "RUNTIME_CALIBRATION_BUNDLE_MISSING: no CalibrationBundleV2 runtime package asset is available.";
+            return false;
+        }
+
+        error = $"RUNTIME_CALIBRATION_BUNDLE_AMBIGUOUS: {candidates.Count} CalibrationBundleV2 runtime package assets are available; configure CalibrationAssetId or CalibrationBundleId.";
         return false;
+    }
+
+    private static bool SelectRuntimeCalibrationAsset(
+        RuntimeCalibrationBundleAsset asset,
+        out string? calibrationData,
+        out RuntimeCalibrationBundleAsset? runtimeCalibrationAsset)
+    {
+        calibrationData = asset.PayloadJson;
+        runtimeCalibrationAsset = asset;
+        return !string.IsNullOrWhiteSpace(calibrationData);
+    }
+
+    private static bool TryGetRuntimeAssetContext(
+        Dictionary<string, object>? inputs,
+        out IRuntimeAssetContext assetContext)
+    {
+        assetContext = RuntimeAssetContext.Empty;
+        if (inputs == null ||
+            !TryGetInputValue(inputs, RuntimeAssetInputKeys.RuntimeAssetContext, out var rawContext) ||
+            rawContext is not IRuntimeAssetContext typedContext)
+        {
+            return false;
+        }
+
+        assetContext = typedContext;
+        return true;
+    }
+
+    private string ReadStringInputOrParameter(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        params string[] names)
+    {
+        if (inputs != null)
+        {
+            foreach (var name in names)
+            {
+                if (TryGetInputValue(inputs, name, out var value) &&
+                    TryReadNonEmptyString(value, out var text))
+                {
+                    return text;
+                }
+            }
+        }
+
+        foreach (var name in names)
+        {
+            var value = GetStringParam(@operator, name, string.Empty);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static bool TryReadNonEmptyString(object? value, out string text)
+    {
+        text = value switch
+        {
+            null => string.Empty,
+            string raw => raw.Trim(),
+            JsonElement { ValueKind: JsonValueKind.String } element => element.GetString()?.Trim() ?? string.Empty,
+            JsonElement { ValueKind: JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False } element => element.ToString().Trim(),
+            _ => value.ToString()?.Trim() ?? string.Empty
+        };
+
+        return !string.IsNullOrWhiteSpace(text);
     }
 
     private bool TryGetInputPoints(
