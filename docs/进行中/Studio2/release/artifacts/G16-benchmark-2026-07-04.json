@@ -1,0 +1,84 @@
+{
+  "startedAtUtc": "2026-07-04T16:01:42.282Z",
+  "environment": {
+    "node": "v22.17.0",
+    "platform": "win32",
+    "release": "10.0.22631",
+    "arch": "x64",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13600KF",
+    "logicalCores": 20,
+    "totalMemoryMB": 32581
+  },
+  "display": {
+    "Status": "PERFORMED",
+    "DpiX": 96,
+    "DpiY": 96,
+    "ScalePercent": 100,
+    "Screens": [
+      {
+        "DeviceName": "\\\\.\\DISPLAY1",
+        "Width": 1152,
+        "Height": 2048,
+        "Primary": false
+      },
+      {
+        "DeviceName": "\\\\.\\DISPLAY2",
+        "Width": 2194,
+        "Height": 1234,
+        "Primary": true
+      },
+      {
+        "DeviceName": "\\\\.\\DISPLAY3",
+        "Width": 1920,
+        "Height": 1200,
+        "Primary": false
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "primitiveCount": 300,
+      "iterations": 180,
+      "p95FrameTimeMs": 0.079,
+      "p95UpdateTimeMs": 0.057,
+      "averageFrameTimeMs": 0.025,
+      "maxFrameTimeMs": 0.245,
+      "previewNotifications": 18,
+      "previewNotificationsPerSecond": 4038.047,
+      "subscriptionNotifications": 1260,
+      "subscriptionNotificationsPerSecond": 282663.317,
+      "checksum": 24912696.487,
+      "heapDeltaMB": 1.286
+    },
+    {
+      "primitiveCount": 1000,
+      "iterations": 180,
+      "p95FrameTimeMs": 0.054,
+      "p95UpdateTimeMs": 0.049,
+      "averageFrameTimeMs": 0.05,
+      "maxFrameTimeMs": 0.334,
+      "previewNotifications": 18,
+      "previewNotificationsPerSecond": 2002.002,
+      "subscriptionNotifications": 1260,
+      "subscriptionNotificationsPerSecond": 140140.14,
+      "checksum": 112210872.742,
+      "heapDeltaMB": 2.106
+    }
+  ],
+  "dpiResolutionMatrix": {
+    "status": "NOT_PERFORMED",
+    "requestedDpi": [
+      "100%",
+      "125%",
+      "150%",
+      "200%"
+    ],
+    "requestedResolutions": [
+      "1366x768",
+      "1920x1080",
+      "2560x1440",
+      "3840x2160"
+    ],
+    "note": "The script records the current display when available, but does not mutate OS DPI or resolution settings."
+  }
+}

@@ -486,6 +486,8 @@ public sealed class Studio2ArchitectureGuardTests
             .Should().ContainSingle("flag on must create one V2 Property Panel owner.");
         Regex.Matches(appText, @"new\s+PropertyPanel\s*\(\s*'property-panel'")
             .Should().ContainSingle("flag off must keep one legacy PropertyPanel owner.");
+        appText.Should().NotContain("import { PropertyPanel } from './features/flow-editor/propertyPanel.js'");
+        appText.Should().Contain("legacyPropertyPanelModulePromise = import('./features/flow-editor/propertyPanel.js')");
         appText.Should().Contain("disposePropertyPanelOwner();");
         appText.Should().Contain("serviceRegistry.register('propertyPanelCapabilityOwner'");
         appText.Should().Contain("serviceRegistry.register('propertyPanelCapabilityAdapter'");
@@ -493,7 +495,7 @@ public sealed class Studio2ArchitectureGuardTests
 
         studioOptionsText.Should().Contain("PropertyPanelCapabilityEnabled");
         webViewHostText.Should().Contain("[\"Studio2.PropertyPanel\"] = propertyPanelCapabilityEnabled");
-        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": false");
+        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": true");
         ledgerText.Should().Contain("`Studio2.PropertyPanel`");
         ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_1");
 
@@ -556,6 +558,10 @@ public sealed class Studio2ArchitectureGuardTests
         appText.Should().Contain("serviceRegistry.register('previewPanelCapabilityOwner'");
         appText.Should().Contain("serviceRegistry.register('previewPanelCapabilityAdapter'");
         appText.Should().Contain("if (!isPreviewPanelCapabilityEnabled())");
+        appText.Should().NotContain("import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js'");
+        appText.Should().NotContain("import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js'");
+        appText.Should().Contain("nodePreviewOverlayModulePromise = import('./features/flow-editor/nodePreviewOverlay.js')");
+        appText.Should().Contain("nodePreviewInspectorModulePromise = import('./features/flow-editor/nodePreviewInspector.js')");
         Regex.Matches(appText, @"new\s+PreviewPanelCapabilityOwner\s*\(")
             .Should().ContainSingle("flag on must create one V2 Preview Panel owner.");
         Regex.Matches(appText, @"new\s+NodePreviewCoordinator\s*\(")
@@ -565,7 +571,7 @@ public sealed class Studio2ArchitectureGuardTests
 
         studioOptionsText.Should().Contain("PreviewPanelCapabilityEnabled");
         webViewHostText.Should().Contain("[\"Studio2.PreviewPanel\"] = previewPanelCapabilityEnabled");
-        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": false");
+        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": true");
         ledgerText.Should().Contain("`Studio2.PreviewPanel`");
         ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_2");
         indexText.Should().Contain("id=\"preview-panel\"");
@@ -1053,7 +1059,7 @@ public sealed class Studio2ArchitectureGuardTests
             studioOptionsText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain($"[\"{capability.Flag}\"]");
-            appSettingsText.Should().Contain($"\"{capability.Option}\": false");
+            appSettingsText.Should().Contain($"\"{capability.Option}\": true");
             appText.Should().Contain(capability.Flag);
             appText.Should().Contain(capability.Owner);
             appText.Should().Contain(capability.Adapter);
@@ -1073,8 +1079,8 @@ public sealed class Studio2ArchitectureGuardTests
 
         appText.Should().Contain("const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel'");
         appText.Should().Contain("const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel'");
-        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": false");
-        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": false");
+        appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": true");
+        appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": true");
 
         indexText.Should().NotContain("src/features/inspection/inspectionPanel.js");
         indexText.Should().NotContain("src/features/results/resultPanel.js");
@@ -1148,6 +1154,81 @@ public sealed class Studio2ArchitectureGuardTests
                 text.Should().NotContain("AiPanelCapability", ToRelativePath(file));
             }
         }
+    }
+
+    [Fact]
+    public void G16_ReleaseCutover_ShouldDefaultBusinessCapabilitiesOnAndKeepLegacyLibrariesFlagOffOnly()
+    {
+        var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
+        var indexText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html");
+        var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+        var resultsOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs");
+        var aiOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs");
+        var previewOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs");
+        var globalVariablesOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablesCapabilityOwner.mjs");
+
+        foreach (var option in new[]
+                 {
+                     "PropertyPanelCapabilityEnabled",
+                     "PreviewPanelCapabilityEnabled",
+                     "GlobalVariablesCapabilityEnabled",
+                     "SettingsCapabilityEnabled",
+                     "ProjectPageCapabilityEnabled",
+                     "InspectionCapabilityEnabled",
+                     "ResultsReviewCapabilityEnabled",
+                     "AiPanelCapabilityEnabled"
+                 })
+        {
+            appSettingsText.Should().Contain($"\"{option}\": true");
+        }
+
+        appSettingsText.Should().Contain("\"WorkspaceV2Enabled\": false");
+        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+
+        foreach (var legacyModule in new[]
+                 {
+                     "src/features/flow-editor/propertyPanel.js",
+                     "src/features/flow-editor/nodePreviewOverlay.js",
+                     "src/features/flow-editor/nodePreviewInspector.js",
+                     "src/features/global-variables/globalVariablePanel.js",
+                     "src/features/settings/settingsView.js",
+                     "src/features/project/projectView.js",
+                     "src/features/inspection/inspectionPanel.js",
+                     "src/features/results/resultPanel.js",
+                     "src/features/ai/aiPanel.js"
+                 })
+        {
+            indexText.Should().NotContain(legacyModule, "legacy business libraries must not be top-level script tags in release.");
+        }
+
+        appText.Should().Contain("legacyPropertyPanelModulePromise = import('./features/flow-editor/propertyPanel.js')");
+        appText.Should().Contain("nodePreviewOverlayModulePromise = import('./features/flow-editor/nodePreviewOverlay.js')");
+        appText.Should().Contain("nodePreviewInspectorModulePromise = import('./features/flow-editor/nodePreviewInspector.js')");
+        appText.Should().Contain("loadGlobalVariablePanelModule()");
+        appText.Should().Contain("loadSettingsViewModule()");
+        appText.Should().Contain("loadProjectViewModule()");
+        appText.Should().Contain("loadInspectionPanelModule()");
+        appText.Should().Contain("loadResultPanelModule()");
+        appText.Should().Contain("loadAiPanelModule()");
+
+        Regex.Matches(appText, @"new\s+PropertyPanelCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+PreviewPanelCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+GlobalVariablesCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+SettingsCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+ProjectPageCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+InspectionCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+ResultsReviewCapabilityOwner\s*\(").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+AiPanelCapabilityOwner\s*\(").Should().ContainSingle();
+
+        appText.Should().Contain("disposeLegacyNodePreviewSurfaces();");
+        appText.Should().Contain("previewResourcesEnabled: !isPreviewPanelCapabilityEnabled()");
+        appText.Should().Contain("if (!resultPanel.serverPaged)");
+        resultsOwnerText.Should().Contain("this.serverPaged = true");
+        aiOwnerText.Should().Contain("closeEventStream()");
+        aiOwnerText.Should().Contain("window.clearTimeout");
+        previewOwnerText.Should().Contain("this.previewAdapter.subscribePreviewState");
+        previewOwnerText.Should().Contain("this.unsubscribes.forEach");
+        globalVariablesOwnerText.Should().Contain("this.unsubscribes.forEach");
     }
 
     private static IReadOnlyList<string> EnumerateFrontendV2SourceFiles()

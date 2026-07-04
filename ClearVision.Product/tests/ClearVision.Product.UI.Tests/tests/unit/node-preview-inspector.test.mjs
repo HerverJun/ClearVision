@@ -1062,5 +1062,7 @@ test('app node preview cutover creates selectionStore only in inspector-enabled 
   assert.match(appSource, /const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce\(\);/);
   assert.match(appSource, /featureFlags\?\.\[NODE_PREVIEW_INSPECTOR_FLAG_KEY\] === true/);
   assert.equal(appSource.includes('startup.nodePreviewInspectorEnabled === true'), false);
+  assert.doesNotMatch(appSource, /import\s+\{\s*createNodePreviewSelectionStore\s*\}\s+from\s+'\.\/features\/flow-editor\/nodePreviewSelectionStore\.js'/);
+  assert.match(appSource, /nodePreviewSelectionStoreModulePromise = import\('\.\/features\/flow-editor\/nodePreviewSelectionStore\.js'\)/);
   assert.match(appSource, /if \(inspectorEnabled\) \{[\s\S]*createNodePreviewSelectionStore\(\)[\s\S]*new NodePreviewInspector/);
 });

@@ -82,7 +82,6 @@ import {
     bootstrapTheme,
     syncThemeWithSettings
 } from './core/theme/theme.js';
-import { PropertyPanel } from './features/flow-editor/propertyPanel.js';
 import PropertySidebarController, {
     createPropertyPanelCapabilityAdapter
 } from './features/flow-editor/propertySidebarController.mjs';
@@ -109,9 +108,6 @@ import ResultsReviewCapabilityOwner, {
 import AiPanelCapabilityOwner, {
     createAiPanelCapabilityAdapter
 } from './features/ai/aiPanelCapabilityOwner.mjs';
-import NodePreviewInspector from './features/flow-editor/nodePreviewInspector.js';
-import NodePreviewOverlay from './features/flow-editor/nodePreviewOverlay.js';
-import { createNodePreviewSelectionStore } from './features/flow-editor/nodePreviewSelectionStore.js';
 import projectManager, {
     getCurrentProject,
     subscribeProject
@@ -251,6 +247,10 @@ let inspectionPanelModulePromise = null;
 let stationMonitorModulePromise = null;
 let globalVariablePanelModulePromise = null;
 let settingsViewModulePromise = null;
+let legacyPropertyPanelModulePromise = null;
+let nodePreviewInspectorModulePromise = null;
+let nodePreviewOverlayModulePromise = null;
+let nodePreviewSelectionStoreModulePromise = null;
 let resultPanelAnalyticsRefreshTimer = null;
 let resultPanelAnalyticsRefreshProjectId = null;
 const RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS = 5000;
@@ -384,6 +384,38 @@ function loadSettingsViewModule() {
     }
 
     return settingsViewModulePromise;
+}
+
+function loadLegacyPropertyPanelModule() {
+    if (!legacyPropertyPanelModulePromise) {
+        legacyPropertyPanelModulePromise = import('./features/flow-editor/propertyPanel.js');
+    }
+
+    return legacyPropertyPanelModulePromise;
+}
+
+function loadNodePreviewInspectorModule() {
+    if (!nodePreviewInspectorModulePromise) {
+        nodePreviewInspectorModulePromise = import('./features/flow-editor/nodePreviewInspector.js');
+    }
+
+    return nodePreviewInspectorModulePromise;
+}
+
+function loadNodePreviewOverlayModule() {
+    if (!nodePreviewOverlayModulePromise) {
+        nodePreviewOverlayModulePromise = import('./features/flow-editor/nodePreviewOverlay.js');
+    }
+
+    return nodePreviewOverlayModulePromise;
+}
+
+function loadNodePreviewSelectionStoreModule() {
+    if (!nodePreviewSelectionStoreModulePromise) {
+        nodePreviewSelectionStoreModulePromise = import('./features/flow-editor/nodePreviewSelectionStore.js');
+    }
+
+    return nodePreviewSelectionStoreModulePromise;
 }
 
 function loadInspectionPanelModule() {
@@ -1052,7 +1084,7 @@ function disposeLegacyNodePreviewSurfaces() {
     nodePreviewSelectionStore = null;
 }
 
-function initializeNodePreviewExperience() {
+async function initializeNodePreviewExperience() {
     if (!flowCanvas) {
         return;
     }
@@ -1079,6 +1111,7 @@ function initializeNodePreviewExperience() {
     const inspectorEnabled = isNodePreviewInspectorEnabled();
     if (inspectorEnabled) {
         if (!nodePreviewSelectionStore) {
+            const { createNodePreviewSelectionStore } = await loadNodePreviewSelectionStoreModule();
             nodePreviewSelectionStore = createNodePreviewSelectionStore();
             serviceRegistry.register('nodePreviewSelectionStore', nodePreviewSelectionStore);
         }
@@ -1086,6 +1119,7 @@ function initializeNodePreviewExperience() {
         if (!nodePreviewInspector) {
             const container = document.querySelector('.flow-editor-container');
             if (container) {
+                const { default: NodePreviewInspector } = await loadNodePreviewInspectorModule();
                 nodePreviewInspector = new NodePreviewInspector(container, flowCanvas, nodePreviewCoordinator, {
                     selectionStore: nodePreviewSelectionStore,
                     onOpenImage: openImageViewerFromPreview,
@@ -1103,6 +1137,7 @@ function initializeNodePreviewExperience() {
     if (!nodePreviewOverlay) {
         const container = document.querySelector('.flow-editor-container');
         if (container) {
+            const { default: NodePreviewOverlay } = await loadNodePreviewOverlayModule();
             nodePreviewOverlay = new NodePreviewOverlay(container, flowCanvas, nodePreviewCoordinator, {
                 onOpenImage: openImageViewerFromPreview
             });
@@ -1293,7 +1328,8 @@ function disposePropertyPanelOwner() {
     propertyPanel = null;
 }
 
-function createLegacyPropertyPanelOwner() {
+async function createLegacyPropertyPanelOwner() {
+    const { PropertyPanel } = await loadLegacyPropertyPanelModule();
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
@@ -1346,7 +1382,7 @@ function createLegacyPropertyPanelOwner() {
     };
 }
 
-function initializePropertyPanel() {
+async function initializePropertyPanel() {
     const container = document.getElementById('property-panel');
     if (!container) {
         console.error('[App] 找不到属性面板容器');
@@ -1373,7 +1409,7 @@ function initializePropertyPanel() {
         return;
     }
 
-    propertyPanelOwner = createLegacyPropertyPanelOwner();
+    propertyPanelOwner = await createLegacyPropertyPanelOwner();
     propertyPanel = propertyPanelOwner.panel;
     serviceRegistry.register('propertyPanel', propertyPanel);
 
@@ -1634,7 +1670,7 @@ async function loadStationResultHistory({
     }
 }
 
-function initializeFlowEditor() {
+async function initializeFlowEditor() {
     const canvas = document.getElementById('flow-canvas');
     if (!canvas) {
         console.error('[App] 找不到流程编辑器画布');
@@ -1664,7 +1700,7 @@ function initializeFlowEditor() {
             loadViewerImageSilently(serviceRegistry.get('imageViewer'), imageData);
         }
     ]);
-    initializeNodePreviewExperience();
+    await initializeNodePreviewExperience();
     bindSubgraphBreadcrumb();
 
     flowCanvas.onNodeSelected = (node) => {
@@ -2227,10 +2263,10 @@ async function initializeApp() {
     updateAuthenticatedUserDisplay();
     initializeNavigation();
     initializeOperatorLibraryPanel();
-    initializeFlowEditor();
+    await initializeFlowEditor();
     initializeImageViewer();
     initializeInspectionController();
-    initializePropertyPanel();
+    await initializePropertyPanel();
     initializePreviewPanelCapability();
     initializePropertySidebarController();
     await initializeGlobalVariablePanel();

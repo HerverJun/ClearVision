@@ -102,9 +102,11 @@ test('app composition root switches between legacy and V2 Property Panel owners 
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2\.PropertyPanel'/);
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce\(\);/);
   assert.match(appSource, /if \(isPropertyPanelCapabilityEnabled\(\)\) \{[\s\S]*new PropertyPanelCapabilityOwner/);
-  assert.match(appSource, /propertyPanelOwner = createLegacyPropertyPanelOwner\(\);/);
+  assert.match(appSource, /propertyPanelOwner = await createLegacyPropertyPanelOwner\(\);/);
   assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 1);
   assert.equal((appSource.match(/new PropertyPanel\('property-panel'/g) || []).length, 1);
+  assert.doesNotMatch(appSource, /import\s+\{\s*PropertyPanel\s*\}\s+from\s+'\.\/features\/flow-editor\/propertyPanel\.js'/);
+  assert.match(appSource, /legacyPropertyPanelModulePromise = import\('\.\/features\/flow-editor\/propertyPanel\.js'\)/);
   assert.doesNotMatch(appSource, /trackedSubscribe\(subscribeSelectedOperator/);
   assert.match(appSource, /disposePropertyPanelOwner\(\);/);
 });

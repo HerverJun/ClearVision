@@ -918,6 +918,10 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(appSource, /previewResourcesEnabled: !isPreviewPanelCapabilityEnabled\(\)/);
   assert.equal((appSource.match(/new PreviewPanelCapabilityOwner\(/g) || []).length, 1);
   assert.equal((appSource.match(/new NodePreviewCoordinator\(/g) || []).length, 1);
+  assert.doesNotMatch(appSource, /import\s+NodePreviewOverlay\s+from\s+'\.\/features\/flow-editor\/nodePreviewOverlay\.js'/);
+  assert.doesNotMatch(appSource, /import\s+NodePreviewInspector\s+from\s+'\.\/features\/flow-editor\/nodePreviewInspector\.js'/);
+  assert.match(appSource, /nodePreviewOverlayModulePromise = import\('\.\/features\/flow-editor\/nodePreviewOverlay\.js'\)/);
+  assert.match(appSource, /nodePreviewInspectorModulePromise = import\('\.\/features\/flow-editor\/nodePreviewInspector\.js'\)/);
   assert.ok(appSource.indexOf('if (isPreviewPanelCapabilityEnabled())') < appSource.indexOf('new NodePreviewOverlay('));
   assert.ok(appSource.indexOf('if (!isPreviewPanelCapabilityEnabled())') < appSource.indexOf('nodePreviewCoordinator?.setActiveNode(node);'));
 
