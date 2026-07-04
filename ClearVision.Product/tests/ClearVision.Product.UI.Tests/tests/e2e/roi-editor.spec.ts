@@ -581,6 +581,56 @@ async function getPointSequenceState(page: Page) {
   });
 }
 
+async function waitForCalibrationDraftWorkbenchReady(page: Page) {
+  await expect(page.locator('[data-testid="npoint-calibration-workbench"]')).toBeVisible();
+  await expect(page.locator('.roi-editor-panel')).toHaveCount(0);
+  await page.waitForFunction(() => {
+    const workbench = (window as any).propertyPanel?.calibrationDraftWorkbench;
+    return Boolean(workbench?.currentImageSource && workbench?.imageCanvas?.image && workbench?.session?.samples?.length);
+  });
+}
+
+async function getCalibrationDraftState(page: Page) {
+  return page.evaluate(() => {
+    const workbench = (window as any).propertyPanel?.calibrationDraftWorkbench;
+    const overlay = workbench?.imageCanvas?.getPrimaryEditableOverlay?.();
+
+    return {
+      roiEditorMounted: Boolean((window as any).propertyPanel?.roiEditorPanel),
+      samples: (workbench?.session?.samples || []).map((sample: any) => ({
+        pixelX: Math.round(Number(sample.pixelX)),
+        pixelY: Math.round(Number(sample.pixelY)),
+        worldX: sample.worldX,
+        worldY: sample.worldY,
+        enabled: sample.enabled !== false,
+      })),
+      overlay: overlay
+        ? {
+            type: overlay.type,
+            points: (overlay.points || []).map((point: any) => ({
+              x: Math.round(point.x),
+              y: Math.round(point.y),
+              enabled: point.enabled !== false,
+            })),
+          }
+        : null,
+    };
+  });
+}
+
+async function setCalibrationDraftNumberCell(page: Page, rowIndex: number, numberInputIndex: number, value: number) {
+  await page.evaluate(({ rowIndex: targetRow, numberInputIndex: targetInput, value: nextValue }) => {
+    const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('.calibration-draft-table tbody tr'));
+    const input = rows[targetRow]?.querySelectorAll<HTMLInputElement>('input[type="number"]')?.[targetInput];
+    if (!input) {
+      throw new Error(`Calibration draft input not found: row=${targetRow}, input=${targetInput}`);
+    }
+
+    input.value = String(nextValue);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { rowIndex, numberInputIndex, value });
+}
+
 async function dispatchRoiDragWithoutMouseUp(
   page: Page,
   from: { x: number; y: number },
@@ -1279,7 +1329,7 @@ test.describe('ROI Editor', () => {
     expect(polygonState.params.length).toBe(4);
   });
 
-  test('NPoint point sequence drag toggle reorder and delete updates PointPairs draft history', async ({ page }) => {
+  test('NPoint draft workbench edits samples while ROI editor stays unmounted', async ({ page }) => {
     await page.route('**/api/flows/preview-node', async route => {
       await route.fulfill({
         status: 200,
@@ -1295,40 +1345,40 @@ test.describe('ROI Editor', () => {
     });
 
     await addAndSelectNPointNode(page);
-    await waitForRoiEditorReady(page);
+    await waitForCalibrationDraftWorkbenchReady(page);
 
-    let sequenceState = await getPointSequenceState(page);
-    expect(sequenceState.overlay?.type).toBe('pointSequence');
-    expect(sequenceState.params.length).toBe(3);
+    let draftState = await getCalibrationDraftState(page);
+    expect(draftState.roiEditorMounted).toBe(false);
+    expect(draftState.overlay?.type).toBe('pointSequence');
+    expect(draftState.samples.length).toBe(3);
 
-    const initialPointPairsJson = JSON.stringify(sequenceState.params);
-    await dispatchRoiDrag(page, { x: 56, y: 56 }, { x: 58, y: 58 });
-    sequenceState = await getPointSequenceState(page);
-    expect(JSON.stringify(sequenceState.params)).toBe(initialPointPairsJson);
+    await setCalibrationDraftNumberCell(page, 0, 0, 12);
+    await setCalibrationDraftNumberCell(page, 0, 1, 22);
+    await page.locator('.calibration-draft-table tbody tr').nth(0).locator('input[type="checkbox"]').uncheck();
 
-    await dispatchRoiDrag(page, { x: 10, y: 20 }, { x: 12, y: 22 });
-    sequenceState = await getPointSequenceState(page);
-    expect(Math.round(sequenceState.params[0].ImageX)).toBe(12);
-    expect(Math.round(sequenceState.params[0].ImageY)).toBe(22);
-    expect(sequenceState.params[0]).toMatchObject({ WorldX: 1, WorldY: 2, Enabled: true });
+    draftState = await getCalibrationDraftState(page);
+    expect(draftState.samples[0]).toMatchObject({
+      pixelX: 12,
+      pixelY: 22,
+      worldX: 1,
+      worldY: 2,
+      enabled: false,
+    });
 
-    await page.locator('.roi-editor-canvas').focus();
-    await page.keyboard.press('Space');
-    sequenceState = await getPointSequenceState(page);
-    expect(Math.round(sequenceState.params[0].ImageX)).toBe(12);
-    expect(Math.round(sequenceState.params[0].ImageY)).toBe(22);
-    expect(sequenceState.params[0]).toMatchObject({ Enabled: false });
+    await page.locator('.calibration-draft-table tbody tr').nth(0).locator('button', { hasText: '↓' }).click();
+    draftState = await getCalibrationDraftState(page);
+    expect(draftState.samples[1]).toMatchObject({
+      pixelX: 12,
+      pixelY: 22,
+      worldX: 1,
+      worldY: 2,
+      enabled: false,
+    });
 
-    await page.keyboard.press(']');
-    sequenceState = await getPointSequenceState(page);
-    expect(Math.round(sequenceState.params[1].ImageX)).toBe(12);
-    expect(Math.round(sequenceState.params[1].ImageY)).toBe(22);
-    expect(sequenceState.params[1]).toMatchObject({ Enabled: false });
-
-    await page.keyboard.press('Delete');
-    sequenceState = await getPointSequenceState(page);
-    expect(sequenceState.params.length).toBe(2);
-    expect(sequenceState.params.some((item: any) => item.Enabled === false)).toBe(false);
+    await page.locator('.calibration-draft-table tbody tr').nth(1).locator('button', { hasText: '×' }).click();
+    draftState = await getCalibrationDraftState(page);
+    expect(draftState.samples.length).toBe(2);
+    expect(draftState.samples.some((item: any) => item.enabled === false)).toBe(false);
   });
 
   test('pointer movement stays local draft until mouseup commit', async ({ page }) => {

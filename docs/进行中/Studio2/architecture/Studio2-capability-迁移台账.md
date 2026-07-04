@@ -53,6 +53,7 @@
 
 - 当前真实状态为 B：旧 `app.js` 仍是 release 阶段 production composition root；G15 owners 是默认启用的唯一 business owner，但还没有把 `/v2/index.html` 收敛成唯一 production frontend root。
 - G16 已补强 release guard：`appsettings.json` 默认打开八个 G15 capability flags；legacy Property Panel、Preview Overlay/Inspector/selection store 仅在 owner 分支 lazy import；G15X legacy libraries 继续仅由 flag-off dynamic import 进入。
+- G15 runtime evidence token 保留：Property Panel = `RUNTIME_IMPLEMENTED_G15_1`，Preview Panel = `RUNTIME_IMPLEMENTED_G15_2`；G16 当前状态叠加记录为 `PRODUCTION_DEFAULT_ON_G16_PARTIAL`。
 - legacy 删除门禁：至少需要 clean CI / Playwright / 真实 WebView2 / no-Node 目标机 / DPI 分辨率矩阵验收通过后，才能删除 flag-off legacy libraries。AI Panel、Project、Inspection、Results、Settings、GlobalVariables legacy libraries 在此之前保留。
 
 ## 非阻断技术债

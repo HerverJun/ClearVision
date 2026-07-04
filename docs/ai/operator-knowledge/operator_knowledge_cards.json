@@ -15629,6 +15629,28 @@
         "AllowedValues": []
       },
       {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Runtime Calibration Asset Id",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "CalibrationBundleId",
+        "DisplayName": "Runtime Calibration Bundle Id",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
         "Name": "UseDistortion",
         "DisplayName": "\u4F7F\u7528\u7578\u53D8\u6A21\u578B",
         "DataType": "bool",

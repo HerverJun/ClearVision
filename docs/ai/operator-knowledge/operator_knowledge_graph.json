@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-03T20:08:34.4775136Z",
+  "GeneratedAtUtc": "2026-07-04T17:09:06.1794821Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -15627,6 +15627,28 @@
           "DataType": "double",
           "Description": "",
           "DefaultValue": "0",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "CalibrationAssetId",
+          "DisplayName": "Runtime Calibration Asset Id",
+          "DataType": "string",
+          "Description": "",
+          "DefaultValue": "",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "CalibrationBundleId",
+          "DisplayName": "Runtime Calibration Bundle Id",
+          "DataType": "string",
+          "Description": "",
+          "DefaultValue": "",
           "MinValue": null,
           "MaxValue": null,
           "IsRequired": true,

@@ -1,5 +1,5 @@
 {
-  "startedAtUtc": "2026-07-04T16:01:42.282Z",
+  "startedAtUtc": "2026-07-04T17:15:00.619Z",
   "environment": {
     "node": "v22.17.0",
     "platform": "win32",
@@ -14,55 +14,41 @@
     "DpiX": 96,
     "DpiY": 96,
     "ScalePercent": 100,
-    "Screens": [
-      {
-        "DeviceName": "\\\\.\\DISPLAY1",
-        "Width": 1152,
-        "Height": 2048,
-        "Primary": false
-      },
-      {
-        "DeviceName": "\\\\.\\DISPLAY2",
-        "Width": 2194,
-        "Height": 1234,
-        "Primary": true
-      },
-      {
-        "DeviceName": "\\\\.\\DISPLAY3",
-        "Width": 1920,
-        "Height": 1200,
-        "Primary": false
-      }
-    ]
+    "Screens": {
+      "DeviceName": "\\\\.\\DISPLAY2",
+      "Width": 1920,
+      "Height": 1200,
+      "Primary": true
+    }
   },
   "scenarios": [
     {
       "primitiveCount": 300,
       "iterations": 180,
-      "p95FrameTimeMs": 0.079,
-      "p95UpdateTimeMs": 0.057,
-      "averageFrameTimeMs": 0.025,
-      "maxFrameTimeMs": 0.245,
+      "p95FrameTimeMs": 0.078,
+      "p95UpdateTimeMs": 0.051,
+      "averageFrameTimeMs": 0.021,
+      "maxFrameTimeMs": 0.171,
       "previewNotifications": 18,
-      "previewNotificationsPerSecond": 4038.047,
+      "previewNotificationsPerSecond": 4747.837,
       "subscriptionNotifications": 1260,
-      "subscriptionNotificationsPerSecond": 282663.317,
+      "subscriptionNotificationsPerSecond": 332348.597,
       "checksum": 24912696.487,
-      "heapDeltaMB": 1.286
+      "heapDeltaMB": 0.317
     },
     {
       "primitiveCount": 1000,
       "iterations": 180,
-      "p95FrameTimeMs": 0.054,
-      "p95UpdateTimeMs": 0.049,
-      "averageFrameTimeMs": 0.05,
-      "maxFrameTimeMs": 0.334,
+      "p95FrameTimeMs": 0.164,
+      "p95UpdateTimeMs": 0.16,
+      "averageFrameTimeMs": 0.051,
+      "maxFrameTimeMs": 0.264,
       "previewNotifications": 18,
-      "previewNotificationsPerSecond": 2002.002,
+      "previewNotificationsPerSecond": 1941.852,
       "subscriptionNotifications": 1260,
-      "subscriptionNotificationsPerSecond": 140140.14,
+      "subscriptionNotificationsPerSecond": 135929.662,
       "checksum": 112210872.742,
-      "heapDeltaMB": 2.106
+      "heapDeltaMB": 1.355
     }
   ],
   "dpiResolutionMatrix": {
