@@ -31,6 +31,7 @@ public class InspectionServiceSingleRunTests
         var explicitFlow = CreateFlow("client-flow");
         OperatorFlow? executedFlow = null;
         Dictionary<string, object>? executedInputs = null;
+        InspectionResult? persistedResult = null;
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -42,12 +43,20 @@ public class InspectionServiceSingleRunTests
                 {
                     IsSuccess = true,
                     ExecutionTimeMs = 12,
-                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                    OutputData = new Dictionary<string, object>
+                    {
+                        ["JudgmentResult"] = "OK",
+                        ["CalibrationBundleId"] = "bundle-single-run"
+                    }
                 });
             });
         resultRepository
             .AddAsync(Arg.Any<InspectionResult>())
-            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+            .Returns(callInfo =>
+            {
+                persistedResult = callInfo.Arg<InspectionResult>();
+                return Task.FromResult(persistedResult);
+            });
 
         var service = new InspectionService(
             resultRepository,
@@ -68,6 +77,11 @@ public class InspectionServiceSingleRunTests
         executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "client-flow");
         executedInputs.Should().NotBeNull();
         executedInputs!.Should().ContainKey("Image");
+        persistedResult.Should().NotBeNull();
+        persistedResult!.FlowVersionHash.Should().NotBeNullOrWhiteSpace();
+        persistedResult.CalibrationBundleId.Should().Be("bundle-single-run");
+        persistedResult.SessionId.Should().NotBeNull();
+        persistedResult.OutputDataJson.Should().Contain("Traceability");
         _ = projectRepository.DidNotReceive().GetWithFlowAsync(Arg.Any<Guid>());
         _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(Arg.Any<Guid>());
     }

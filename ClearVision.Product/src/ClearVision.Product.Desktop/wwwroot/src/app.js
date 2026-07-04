@@ -517,6 +517,31 @@ function normalizeOutputData(result) {
         || {};
 }
 
+function getPreviewValue(preview) {
+    if (!preview || typeof preview !== 'object') {
+        return null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(preview, 'value')) {
+        return preview.value;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(preview, 'Value')) {
+        return preview.Value;
+    }
+
+    return null;
+}
+
+function normalizeHistoryImageUrl(result) {
+    const reference = result?.imageReference ?? result?.ImageReference;
+    if (typeof reference === 'string' && reference.trim().length > 0) {
+        return httpClient.buildRequestUrl(reference);
+    }
+
+    return null;
+}
+
 function getInlineResultImageBase64(result) {
     if (!result || typeof result !== 'object') {
         return null;
@@ -731,6 +756,13 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
         ?? new Date().toISOString();
     normalized.confidenceScore = normalized.confidenceScore ?? normalized.ConfidenceScore;
     normalized.imageId = normalized.imageId || normalized.ImageId;
+    normalized.imageReference = normalized.imageReference ?? normalized.ImageReference ?? null;
+    normalized.imageUrl = normalized.imageUrl || normalizeHistoryImageUrl(normalized);
+    normalized.hasImage = normalized.hasImage ?? normalized.HasImage ?? !!normalized.imageId;
+    normalized.imageMissing = normalized.imageMissing ?? normalized.ImageMissing ?? false;
+    normalized.imageMissingMessage = normalized.imageMissingMessage
+        ?? normalized.ImageMissingMessage
+        ?? (normalized.imageMissing ? '图像文件不存在或已清理' : '');
     normalized.imageData = getInlineResultImageBase64(normalized);
     normalized.ImageData = null;
     normalized.outputImage = null;
@@ -739,8 +771,30 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
     normalized.OutputImageBase64 = null;
     normalized.resultImageBase64 = null;
     normalized.ResultImageBase64 = null;
-    normalized.outputData = normalizeOutputData(normalized);
-    normalized.analysisData = normalizeAnalysisData(normalized);
+    normalized.outputDataPreview = normalized.outputDataPreview ?? normalized.OutputDataPreview ?? null;
+    normalized.analysisDataPreview = normalized.analysisDataPreview ?? normalized.AnalysisDataPreview ?? null;
+    normalized.outputData = getPreviewValue(normalized.outputDataPreview) || normalizeOutputData(normalized);
+    normalized.analysisData = getPreviewValue(normalized.analysisDataPreview) || normalizeAnalysisData(normalized);
+    normalized.hasOutputData = normalized.hasOutputData ?? normalized.HasOutputData ?? Object.keys(normalized.outputData || {}).length > 0;
+    normalized.hasAnalysisData = normalized.hasAnalysisData ?? normalized.HasAnalysisData ?? !!normalized.analysisData;
+    normalized.flowVersionHash = normalized.flowVersionHash
+        ?? normalized.FlowVersionHash
+        ?? normalized.traceability?.flowVersionHash
+        ?? normalized.Traceability?.FlowVersionHash
+        ?? null;
+    normalized.calibrationBundleId = normalized.calibrationBundleId
+        ?? normalized.CalibrationBundleId
+        ?? normalized.traceability?.calibrationBundleId
+        ?? normalized.Traceability?.CalibrationBundleId
+        ?? null;
+    normalized.sessionId = normalized.sessionId
+        ?? normalized.SessionId
+        ?? normalized.runId
+        ?? normalized.RunId
+        ?? normalized.traceability?.sessionId
+        ?? normalized.Traceability?.SessionId
+        ?? null;
+    normalized.runId = normalized.runId ?? normalized.RunId ?? normalized.sessionId;
     normalized.errorMessage = normalized.errorMessage ?? normalized.ErrorMessage ?? '';
 
     return normalized;
@@ -1160,6 +1214,21 @@ async function loadInspectionHistory({
     }
 }
 
+async function loadInspectionHistoryDetail(result) {
+    const project = getCurrentProject();
+    const resultId = result?.id ?? result?.resultId ?? result?.Id ?? result?.ResultId;
+    if (!project || !resultId) {
+        throw new Error('缺少历史详情上下文');
+    }
+
+    const response = await httpClient.get(`/inspection/history/${project.id}/${resultId}`);
+    return normalizeInspectionResultRecord({
+        ...result,
+        ...response,
+        historyDetailLoaded: true
+    }, project.id);
+}
+
 async function loadStationResultHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1502,6 +1571,7 @@ async function ensureResultPanel() {
     serviceRegistry.register('resultPanel', resultPanel);
     resultPanel.setProjectContext(getCurrentProject()?.id || null);
     resultPanel.setHistoryLoader(loadInspectionHistory);
+    resultPanel.setHistoryDetailLoader(loadInspectionHistoryDetail);
 
     resultPanel.onResultClick = (result) => {
         debugLogger.debug('[App] 点击结果:', result);

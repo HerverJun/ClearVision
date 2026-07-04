@@ -34,9 +34,10 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
 
     public async Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20)
     {
-        var items = await SelectHistoryItems(_dbSet
+        var items = await SelectHistoryItemsWithPayload(_dbSet
                 .Where(r => r.ProjectId == projectId && !r.IsDeleted))
             .OrderByDescending(r => r.InspectionTime)
+            .ThenByDescending(r => r.Id)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -51,16 +52,18 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         string? status = null,
         string? defectType = null,
         int pageIndex = 0,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? flowVersionHash = null)
     {
         pageIndex = Math.Max(0, pageIndex);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
-        var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
+        var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType, flowVersionHash);
 
         var totalCount = await query.CountAsync();
-        var items = await SelectHistoryItems(query)
+        var items = await SelectHistoryListItems(query)
             .OrderByDescending(r => r.InspectionTime)
+            .ThenByDescending(r => r.Id)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -74,6 +77,13 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         };
     }
 
+    public async Task<InspectionHistoryDetail?> GetHistoryDetailAsync(Guid projectId, Guid resultId)
+    {
+        return await SelectHistoryDetails(_dbSet
+                .Where(r => r.ProjectId == projectId && r.Id == resultId && !r.IsDeleted))
+            .SingleOrDefaultAsync();
+    }
+
     public async Task<IEnumerable<InspectionResult>> GetByTimeRangeAsync(
         Guid projectId,
         DateTime startTime,
@@ -81,8 +91,9 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         string? status = null,
         string? defectType = null)
     {
-        var items = await SelectHistoryItems(BuildFilteredQuery(projectId, startTime, endTime, status, defectType))
+        var items = await SelectHistoryItemsWithPayload(BuildFilteredQuery(projectId, startTime, endTime, status, defectType))
             .OrderByDescending(r => r.InspectionTime)
+            .ThenByDescending(r => r.Id)
             .ToListAsync();
 
         return items.Select(ToInspectionResultWithoutOutputImage).ToList();
@@ -140,7 +151,8 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         DateTime? startTime,
         DateTime? endTime,
         string? status,
-        string? defectType)
+        string? defectType,
+        string? flowVersionHash = null)
     {
         var query = _dbSet
             .Where(r => r.ProjectId == projectId && !r.IsDeleted)
@@ -170,10 +182,16 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 (d.Description != null && d.Description == normalizedDefectType)));
         }
 
+        if (!string.IsNullOrWhiteSpace(flowVersionHash))
+        {
+            var normalizedFlowHash = flowVersionHash.Trim();
+            query = query.Where(r => r.FlowVersionHash == normalizedFlowHash);
+        }
+
         return query;
     }
 
-    private static IQueryable<InspectionHistoryItem> SelectHistoryItems(IQueryable<InspectionResult> query)
+    private static IQueryable<InspectionHistoryItem> SelectHistoryListItems(IQueryable<InspectionResult> query)
     {
         return query
             .AsNoTracking()
@@ -199,6 +217,88 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 ConfidenceScore = r.ConfidenceScore,
                 ErrorMessage = r.ErrorMessage,
                 InspectionTime = r.InspectionTime,
+                FlowVersionHash = r.FlowVersionHash,
+                CalibrationBundleId = r.CalibrationBundleId,
+                SessionId = r.SessionId,
+                HasImage = r.ImageId != null || r.OutputImage != null,
+                HasOutputData = r.OutputDataJson != null && r.OutputDataJson != "",
+                HasAnalysisData = r.AnalysisDataJson != null && r.AnalysisDataJson != "",
+                CreatedAt = r.CreatedAt,
+                ModifiedAt = r.ModifiedAt
+            });
+    }
+
+    private static IQueryable<InspectionHistoryItem> SelectHistoryItemsWithPayload(IQueryable<InspectionResult> query)
+    {
+        return query
+            .AsNoTracking()
+            .Select(r => new InspectionHistoryItem
+            {
+                Id = r.Id,
+                ProjectId = r.ProjectId,
+                Status = r.Status,
+                Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
+                {
+                    Id = d.Id,
+                    Type = d.Type,
+                    X = d.X,
+                    Y = d.Y,
+                    Width = d.Width,
+                    Height = d.Height,
+                    ConfidenceScore = d.ConfidenceScore,
+                    Description = d.Description,
+                    AnnotationData = d.AnnotationData
+                }).ToList(),
+                ProcessingTimeMs = r.ProcessingTimeMs,
+                ImageId = r.ImageId,
+                ConfidenceScore = r.ConfidenceScore,
+                ErrorMessage = r.ErrorMessage,
+                InspectionTime = r.InspectionTime,
+                FlowVersionHash = r.FlowVersionHash,
+                CalibrationBundleId = r.CalibrationBundleId,
+                SessionId = r.SessionId,
+                HasImage = r.ImageId != null || r.OutputImage != null,
+                HasOutputData = r.OutputDataJson != null && r.OutputDataJson != "",
+                HasAnalysisData = r.AnalysisDataJson != null && r.AnalysisDataJson != "",
+                OutputDataJson = r.OutputDataJson,
+                AnalysisDataJson = r.AnalysisDataJson,
+                CreatedAt = r.CreatedAt,
+                ModifiedAt = r.ModifiedAt
+            });
+    }
+
+    private static IQueryable<InspectionHistoryDetail> SelectHistoryDetails(IQueryable<InspectionResult> query)
+    {
+        return query
+            .AsNoTracking()
+            .Select(r => new InspectionHistoryDetail
+            {
+                Id = r.Id,
+                ProjectId = r.ProjectId,
+                Status = r.Status,
+                Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
+                {
+                    Id = d.Id,
+                    Type = d.Type,
+                    X = d.X,
+                    Y = d.Y,
+                    Width = d.Width,
+                    Height = d.Height,
+                    ConfidenceScore = d.ConfidenceScore,
+                    Description = d.Description,
+                    AnnotationData = d.AnnotationData
+                }).ToList(),
+                ProcessingTimeMs = r.ProcessingTimeMs,
+                ImageId = r.ImageId,
+                ConfidenceScore = r.ConfidenceScore,
+                ErrorMessage = r.ErrorMessage,
+                InspectionTime = r.InspectionTime,
+                FlowVersionHash = r.FlowVersionHash,
+                CalibrationBundleId = r.CalibrationBundleId,
+                SessionId = r.SessionId,
+                HasImage = r.ImageId != null || r.OutputImage != null,
+                HasOutputData = r.OutputDataJson != null && r.OutputDataJson != "",
+                HasAnalysisData = r.AnalysisDataJson != null && r.AnalysisDataJson != "",
                 OutputDataJson = r.OutputDataJson,
                 AnalysisDataJson = r.AnalysisDataJson,
                 CreatedAt = r.CreatedAt,
@@ -220,6 +320,8 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         {
             result.SetAnalysisDataJson(item.AnalysisDataJson);
         }
+
+        result.SetTraceability(item.FlowVersionHash, item.CalibrationBundleId, item.SessionId);
 
         foreach (var defect in item.Defects)
         {

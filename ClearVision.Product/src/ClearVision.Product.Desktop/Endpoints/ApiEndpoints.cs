@@ -23,6 +23,7 @@ using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -606,16 +607,28 @@ public static class ApiEndpoints
         // 获取检测历史
         app.MapGet("/api/inspection/history/{projectId:guid}", async (
         Guid projectId,
-        Core.Services.IInspectionService service,
+        [FromServices] Core.Services.IInspectionService service,
         DateTime? startTime,
         DateTime? endTime,
         string? status,
         string? defectType,
+        string? flowVersionHash,
         int pageIndex = 0,
         int pageSize = 20) =>
         {
-            var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize);
+            var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize, flowVersionHash);
             return Results.Ok(ToInspectionHistoryListResponse(results));
+        });
+
+        app.MapGet("/api/inspection/history/{projectId:guid}/{resultId:guid}", async (
+        Guid projectId,
+        Guid resultId,
+        [FromServices] Core.Services.IInspectionService service) =>
+        {
+            var result = await service.GetInspectionHistoryDetailAsync(projectId, resultId);
+            return result == null
+                ? Results.NotFound(new { Error = "Inspection history result was not found." })
+                : Results.Ok(ToInspectionHistoryDetailResponse(result));
         });
 
         // 获取统计信息
@@ -1042,20 +1055,92 @@ public static class ApiEndpoints
         return new
         {
             id = result.Id,
+            resultId = result.Id,
+            projectId = result.ProjectId,
+            status = result.Status.ToString(),
+            defectCount = result.Defects.Count,
+            processingTime = result.ProcessingTimeMs,
+            processingTimeMs = result.ProcessingTimeMs,
+            executionTimeMs = result.ProcessingTimeMs,
+            timestamp = result.InspectionTime,
+            inspectionTime = result.InspectionTime,
+            startedAt = result.CreatedAt,
+            completedAt = result.InspectionTime,
+            confidenceScore = result.ConfidenceScore,
+            flowVersionHash = result.FlowVersionHash,
+            calibrationBundleId = result.CalibrationBundleId,
+            sessionId = result.SessionId,
+            runId = result.SessionId,
+            imageId = result.ImageId,
+            hasImage = result.HasImage,
+            imageReference = BuildImageReference(result.ImageId),
+            hasOutputData = result.HasOutputData,
+            hasAnalysisData = result.HasAnalysisData,
+            diagnosticCode = result.Status == InspectionStatus.Error ? "InspectionError" : null,
+            diagnosticMessage = result.ErrorMessage,
+            errorMessage = result.ErrorMessage,
+            isHistoryListItem = true
+        };
+    }
+
+    internal static object ToInspectionHistoryDetailResponse(InspectionHistoryDetail result)
+    {
+        var outputPreview = SafeJsonPreviewBuilder.Build(result.OutputDataJson);
+        var analysisPreview = SafeJsonPreviewBuilder.Build(result.AnalysisDataJson);
+        var hasImageReference = result.ImageId.HasValue;
+
+        return new
+        {
+            id = result.Id,
+            resultId = result.Id,
             projectId = result.ProjectId,
             status = result.Status.ToString(),
             defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
             processingTimeMs = result.ProcessingTimeMs,
+            executionTimeMs = result.ProcessingTimeMs,
             timestamp = result.InspectionTime,
             inspectionTime = result.InspectionTime,
+            startedAt = result.CreatedAt,
+            completedAt = result.InspectionTime,
             confidenceScore = result.ConfidenceScore,
+            flowVersionHash = result.FlowVersionHash,
+            calibrationBundleId = result.CalibrationBundleId,
+            sessionId = result.SessionId,
+            runId = result.SessionId,
+            traceability = new
+            {
+                flowVersionHash = result.FlowVersionHash,
+                calibrationBundleId = result.CalibrationBundleId,
+                sessionId = result.SessionId,
+                runId = result.SessionId,
+                packageId = (string?)null,
+                stationId = (string?)null
+            },
             imageId = result.ImageId,
-            outputData = TryDeserializeOutputData(result.OutputDataJson),
-            analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
-            errorMessage = result.ErrorMessage
+            hasImage = result.HasImage,
+            imageReference = BuildImageReference(result.ImageId),
+            imageMissing = result.HasImage && !hasImageReference,
+            imageMissingMessage = result.HasImage && !hasImageReference
+                ? "图像文件不存在或已清理"
+                : null,
+            hasOutputData = result.HasOutputData,
+            hasAnalysisData = result.HasAnalysisData,
+            outputDataPreview = outputPreview,
+            analysisDataPreview = analysisPreview,
+            diagnosticCode = result.Status == InspectionStatus.Error ? "InspectionError" : null,
+            diagnosticMessage = result.ErrorMessage,
+            errorMessage = result.ErrorMessage,
+            isHistoryDetail = true
         };
+    }
+
+    private static string? BuildImageReference(Guid? imageId)
+    {
+        return imageId.HasValue
+            ? $"/api/images/{imageId.Value:D}"
+            : null;
     }
 
     private static object ToInspectionDefectListItem(InspectionHistoryDefectItem defect)

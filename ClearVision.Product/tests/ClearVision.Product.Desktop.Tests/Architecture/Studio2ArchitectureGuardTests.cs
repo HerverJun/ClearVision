@@ -599,6 +599,49 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
+    public void G14A_FormalInspectionHistory_ShouldStayIsolatedFromPreviewReplayEvidenceAndRuntimeStation()
+    {
+        var apiText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs");
+        var scopedHistoryText = string.Join(
+            "\n",
+            ExtractSection(apiText, "app.MapGet(\"/api/inspection/history/{projectId:guid}\"", "        // 获取统计信息"),
+            ExtractSection(apiText, "internal static object ToInspectionHistoryListResponse", "    internal static object ToInspectionExecutionResponse"));
+
+        var historyTexts = new Dictionary<string, string>
+        {
+            ["ApiEndpoints.history"] = scopedHistoryText,
+            ["IInspectionResultRepository"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Core/Interfaces/IInspectionResultRepository.cs"),
+            ["InspectionResultRepository"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Infrastructure/Repositories/InspectionResultRepository.cs"),
+            ["InspectionService"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/InspectionService.cs"),
+            ["SafeJsonPreviewBuilder"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Analysis/SafeJsonPreviewBuilder.cs"),
+            ["resultPanel"] = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js")
+        };
+
+        foreach (var (name, text) in historyTexts)
+        {
+            text.Should().NotContain("ExecutionObservationEnvelopeV1", name);
+            text.Should().NotContain("PreviewArtifact", name);
+            text.Should().NotContain("preview debug cache", name);
+            text.Should().NotContain("Evidence ZIP", name);
+            text.Should().NotContain("EvidenceZip", name);
+            text.Should().NotMatchRegex(@"\bbaseline\b", name);
+            text.Should().NotMatchRegex(@"\breplay\b", name);
+            text.Should().NotContain("new ImageCanvas", name);
+            text.Should().NotContain("createElement('canvas'", name);
+            text.Should().NotContain("document.createElement('canvas'", name);
+            text.Should().NotContain("RuntimePackageLoader", name);
+            text.Should().NotContain("RuntimePackageExporter", name);
+            text.Should().NotContain("StationResultMapper", name);
+            text.Should().NotContain("AgentRunEventStore", name);
+            text.Should().NotContain("EventStore", name);
+        }
+
+        historyTexts["ApiEndpoints.history"].Should().Contain("GetInspectionHistoryDetailAsync");
+        historyTexts["InspectionResultRepository"].Should().Contain("GetHistoryDetailAsync");
+        historyTexts["InspectionResultRepository"].Should().Contain("SelectHistoryListItems");
+    }
+
+    [Fact]
     public void ProjectAssets_ShouldUseProjectSaveCoordinatorAuthorityWithoutIndependentRevision()
     {
         var coordinatorText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Application/Services/ProjectSaveCoordinator.cs");
@@ -690,6 +733,15 @@ public sealed class Studio2ArchitectureGuardTests
 
     private static string ReadRepoText(string relativePath) =>
         File.ReadAllText(Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+    private static string ExtractSection(string text, string startMarker, string endMarker)
+    {
+        var start = text.IndexOf(startMarker, StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0, $"section start marker '{startMarker}' should exist.");
+        var end = text.IndexOf(endMarker, start, StringComparison.Ordinal);
+        end.Should().BeGreaterThan(start, $"section end marker '{endMarker}' should exist after '{startMarker}'.");
+        return text[start..end];
+    }
 
     private static string FindRepositoryRoot([CallerFilePath] string sourceFile = "")
     {

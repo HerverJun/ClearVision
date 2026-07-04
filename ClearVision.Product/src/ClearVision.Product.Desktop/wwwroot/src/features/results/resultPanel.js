@@ -92,6 +92,7 @@ class ResultPanel {
         this.serverPageIndex = 0;
         this.serverPaged = false;
         this.historyLoader = null;
+        this.historyDetailLoader = null;
         
         // 筛选
         this.filters = {
@@ -342,6 +343,10 @@ class ResultPanel {
         this.historyLoader = typeof loader === 'function' ? loader : null;
     }
 
+    setHistoryDetailLoader(loader) {
+        this.historyDetailLoader = typeof loader === 'function' ? loader : null;
+    }
+
     canRequestServerData() {
         return this.dataSource === RESULT_DATA_SOURCE_STATION || !!this.projectId;
     }
@@ -373,7 +378,7 @@ class ResultPanel {
         }
 
         if (this.serverPaged) {
-            return `当前页 ${pageResults.length} 条 / 共 ${this.totalResultCount} 条记录`;
+            return `历史列表：当前页 ${pageResults.length} 条 / 共 ${this.totalResultCount} 条记录`;
         }
 
         return `共 ${this.filteredResults.length} 条记录`;
@@ -1437,7 +1442,7 @@ class ResultPanel {
         if (pageResults.length === 0) {
             const emptyText = this.isClientFilteringServerPage()
                 ? '当前页未命中筛选条件。当前筛选只作用于已加载页，可调整时间范围后重新翻页加载。'
-                : '暂无检测结果';
+                : (this.serverPaged ? '暂无历史记录' : '暂无检测结果');
             gridContainer.innerHTML = `<p class="empty-text">${emptyText}</p>`;
             return;
         }
@@ -1448,6 +1453,9 @@ class ResultPanel {
             const time = result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : '--:--:--';
             const processingTime = result.processingTime || result.executionTimeMs || '--';
             const outputDataHtml = this.renderAnalysisDataPreview(result.analysisData);
+            const historyHint = this.serverPaged
+                ? `<span class="result-defect-count">${result.hasOutputData || result.hasAnalysisData ? '检测详情' : '运行摘要'}</span>`
+                : '';
 
             return `
                 <div class="result-card result-${statusClass}" data-index="${index}" style="cursor:pointer;">
@@ -1458,6 +1466,7 @@ class ResultPanel {
                     <div class="result-card-body">
                         <span class="result-processing-time">${this.escapeHtml(processingTime)}ms</span>
                         ${result.defects?.length > 0 ? `<span class="result-defect-count">${result.defects.length} 缺陷</span>` : ''}
+                        ${historyHint}
                         ${outputDataHtml}
                     </div>
                 </div>
@@ -1799,29 +1808,18 @@ class ResultPanel {
         const time = result.timestamp ? new Date(result.timestamp).toLocaleString() : '--';
         const processingTime = result.processingTime || result.executionTimeMs || '--';
         const imageSrc = this.getResultImageSrc(result);
+        const shouldLoadHistoryDetail = this.shouldLoadHistoryDetail(result);
         
         modal.innerHTML = `
             <div class="result-detail-overlay"></div>
             <div class="result-detail-content">
                 <div class="result-detail-header">
-                    <h3>检测结果详情</h3>
+                    <h3>${this.serverPaged ? '正式检测历史 · 检测详情' : '检测详情'}</h3>
                     <span class="result-status-badge ${statusClass}" style="font-size:12px;padding:4px 12px;">${statusText}</span>
                     <button class="result-detail-close">✕</button>
                 </div>
                 <div class="result-detail-body">
-                    ${imageSrc ? `<div class="result-detail-image"><img src="${imageSrc}" alt="检测结果图像" /></div>` : ''}
-                    <div class="result-detail-data">
-                        <div class="detail-section">
-                            <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${this.escapeHtml(result.status || '--')}</span></div>
-                            <div class="detail-item"><span class="detail-label">时间</span><span class="detail-value">${time}</span></div>
-                            <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${this.escapeHtml(processingTime)}ms</span></div>
-                        </div>
-                        ${this.renderAnalysisDataSection(result.analysisData)}
-                        ${this.renderStructuredOutputSection(result.outputData, result.status)}
-                        ${this.renderDiagnosticsSection(result.outputData, result.status)}
-                        ${this.renderOutputDataTable(result.outputData)}
-                        ${this.renderDefectsSection(result.defects)}
-                    </div>
+                    ${this.renderResultDetailBody(result, { imageSrc, statusClass, time, processingTime, isLoading: shouldLoadHistoryDetail })}
                 </div>
             </div>
         `;
@@ -1836,6 +1834,7 @@ class ResultPanel {
 
         const closeButton = modal.querySelector('.result-detail-close');
         const overlay = modal.querySelector('.result-detail-overlay');
+        const body = modal.querySelector('.result-detail-body');
         let removeTimer = null;
         let closed = false;
         let listenersAttached = true;
@@ -1887,6 +1886,155 @@ class ResultPanel {
         this._activeDetailModals.add(detailModalHandle);
         closeButton?.addEventListener?.('click', closeModal);
         overlay?.addEventListener?.('click', closeModal);
+
+        if (shouldLoadHistoryDetail) {
+            this.historyDetailLoader(result)
+                .then(detail => {
+                    if (closed || this._isDisposed || !body) {
+                        return;
+                    }
+
+                    const loadedResult = detail && typeof detail === 'object'
+                        ? { ...result, ...detail, historyDetailLoaded: true }
+                        : { ...result, historyDetailLoaded: true };
+                    body.innerHTML = this.renderResultDetailBody(loadedResult);
+                })
+                .catch(error => {
+                    if (closed || this._isDisposed || !body) {
+                        return;
+                    }
+
+                    body.innerHTML = this.renderResultDetailBody(result, {
+                        errorMessage: error?.message || '检测详情加载失败'
+                    });
+                });
+        }
+    }
+
+    shouldLoadHistoryDetail(result) {
+        return this.serverPaged &&
+            this.dataSource !== RESULT_DATA_SOURCE_STATION &&
+            typeof this.historyDetailLoader === 'function' &&
+            result?.historyDetailLoaded !== true &&
+            !!(result?.id || result?.resultId) &&
+            !!result?.projectId;
+    }
+
+    renderResultDetailBody(result, options = {}) {
+        const statusClass = options.statusClass || this.toCssToken(result?.status || 'unknown');
+        const time = options.time || (result?.timestamp ? new Date(result.timestamp).toLocaleString() : '--');
+        const processingTime = options.processingTime || result?.processingTime || result?.executionTimeMs || '--';
+        const imageSrc = options.imageSrc !== undefined ? options.imageSrc : this.getResultImageSrc(result);
+
+        if (options.errorMessage) {
+            return `
+                <div class="result-detail-data">
+                    <div class="detail-section">
+                        <div class="detail-section-title">检测详情</div>
+                        <div class="detail-item type-null"><span class="detail-label">error</span><span class="detail-value">${this.escapeHtml(options.errorMessage)}</span></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        const loadingHtml = options.isLoading
+            ? `<div class="detail-section"><div class="detail-section-title">检测详情</div><div class="detail-item type-null"><span class="detail-label">loading</span><span class="detail-value">正在加载检测详情...</span></div></div>`
+            : '';
+
+        return `
+            ${imageSrc ? `<div class="result-detail-image"><img src="${imageSrc}" alt="检测结果图像" /></div>` : ''}
+            <div class="result-detail-data">
+                <div class="detail-section">
+                    <div class="detail-section-title">运行摘要</div>
+                    <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${this.escapeHtml(result?.status || '--')}</span></div>
+                    <div class="detail-item"><span class="detail-label">时间</span><span class="detail-value">${this.escapeHtml(time)}</span></div>
+                    <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${this.escapeHtml(processingTime)}ms</span></div>
+                </div>
+                ${this.renderHistoryTraceabilitySection(result)}
+                ${this.renderHistoryImageReferenceSection(result, imageSrc)}
+                ${loadingHtml}
+                ${this.renderJsonPreviewNotice('输出数据', result?.outputDataPreview)}
+                ${this.renderJsonPreviewNotice('分析数据', result?.analysisDataPreview)}
+                ${this.renderAnalysisDataSection(result?.analysisData)}
+                ${this.renderStructuredOutputSection(result?.outputData, result?.status)}
+                ${this.renderDiagnosticsSection(result?.outputData, result?.status)}
+                ${this.renderOutputDataTable(result?.outputData)}
+                ${this.renderDefectsSection(result?.defects)}
+            </div>
+        `;
+    }
+
+    renderHistoryTraceabilitySection(result) {
+        if (!this.serverPaged || !result) {
+            return '';
+        }
+
+        const legacy = '旧数据未记录';
+        const rows = [
+            ['FlowVersionHash', result.flowVersionHash || legacy],
+            ['CalibrationBundleId', result.calibrationBundleId || legacy],
+            ['SessionId / RunId', result.sessionId || result.runId || legacy]
+        ];
+
+        return `
+            <div class="detail-section">
+                <div class="detail-section-title">追溯信息</div>
+                ${rows.map(([label, value]) => `<div class="detail-item"><span class="detail-label">${this.escapeHtml(label)}</span><span class="detail-value">${this.escapeHtml(value)}</span></div>`).join('')}
+            </div>
+        `;
+    }
+
+    renderHistoryImageReferenceSection(result, imageSrc) {
+        if (!this.serverPaged || !result) {
+            return '';
+        }
+
+        const missing = result.imageMissing || (result.hasImage && !imageSrc && !result.imageId && !result.imageReference);
+        const value = missing
+            ? (result.imageMissingMessage || '图像文件不存在或已清理')
+            : (result.imageReference || result.imageId || '本次结果未记录');
+
+        return `
+            <div class="detail-section">
+                <div class="detail-section-title">${missing ? '图像缺失' : '图像引用'}</div>
+                <div class="detail-item"><span class="detail-label">image</span><span class="detail-value">${this.escapeHtml(value)}</span></div>
+            </div>
+        `;
+    }
+
+    renderJsonPreviewNotice(title, preview) {
+        if (!preview || typeof preview !== 'object') {
+            return '';
+        }
+
+        const wasTruncated = preview.wasTruncated === true || preview.WasTruncated === true;
+        const wasRedacted = preview.wasRedacted === true || preview.WasRedacted === true;
+        const error = preview.error || preview.Error || '';
+        const message = preview.message || preview.Message || '';
+        if (!wasTruncated && !wasRedacted && !error && !message) {
+            return '';
+        }
+
+        const parts = [];
+        if (wasTruncated) {
+            parts.push('大 JSON 已截断');
+        }
+        if (wasRedacted) {
+            parts.push('敏感字段已脱敏');
+        }
+        if (error) {
+            parts.push(error);
+        }
+        if (message) {
+            parts.push(message);
+        }
+
+        return `
+            <div class="detail-section">
+                <div class="detail-section-title">${this.escapeHtml(title)}</div>
+                <div class="detail-item type-null"><span class="detail-label">preview</span><span class="detail-value">${this.escapeHtml(parts.join('；'))}</span></div>
+            </div>
+        `;
     }
     
     renderAnalysisDataPreview(analysisData) {
@@ -1979,7 +2127,7 @@ class ResultPanel {
             ? `<div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenCount} output fields</span></div>`
             : '';
 
-        return `<div class="detail-section"><div class="detail-section-title">原始输出数据（调试）</div>${rows.join('')}${hiddenNotice}</div>`;
+        return `<div class="detail-section"><div class="detail-section-title">输出数据</div>${rows.join('')}${hiddenNotice}</div>`;
     }
 
     renderAnalysisDataSection(analysisData) {
@@ -2004,7 +2152,7 @@ class ResultPanel {
 
             return `
                 <div class="detail-section">
-                    <div class="detail-section-title">${this.escapeHtml(card.title || card.category || '分析卡片')}</div>
+                    <div class="detail-section-title">${this.escapeHtml(card.title || card.category || '分析数据')}</div>
                     ${rows || '<div class="detail-item"><span class="detail-label">内容</span><span class="detail-value">--</span></div>'}
                     ${hiddenFieldsHint}
                 </div>
@@ -2460,6 +2608,7 @@ class ResultPanel {
 
         this.closeActiveDetailModals({ immediate: true });
         this.historyLoader = null;
+        this.historyDetailLoader = null;
         this.onResultClick = null;
     }
 

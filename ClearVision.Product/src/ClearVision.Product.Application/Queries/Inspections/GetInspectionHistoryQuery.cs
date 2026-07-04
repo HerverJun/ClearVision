@@ -2,8 +2,6 @@
 // GetInspectionHistory查询
 // 作者：蘅芜君
 
-using System.Text.Json;
-using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Interfaces;
 using MediatR;
@@ -48,8 +46,8 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
             ErrorMessage = item.ErrorMessage,
             InspectionTime = item.InspectionTime,
             OutputImage = null,
-            OutputData = TryDeserializeOutputData(item.OutputDataJson),
-            AnalysisData = TryDeserializeAnalysisData(item.AnalysisDataJson)
+            OutputData = null,
+            AnalysisData = null
         };
     }
 
@@ -69,35 +67,4 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
         };
     }
 
-    private static Dictionary<string, object>? TryDeserializeOutputData(string? json)
-    {
-        try
-        {
-            return AnalysisPayloadSerialization.DeserializeJsonDictionary(json);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
-    }
-
-    private static AnalysisDataDto? TryDeserializeAnalysisData(string? json)
-    {
-        try
-        {
-            return AnalysisPayloadSerialization.DeserializeAnalysisData(json);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
-    }
 }

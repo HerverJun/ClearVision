@@ -5,6 +5,8 @@
 // 作者：蘅芜君 + 架构修复方案 v2
 
 using System.Collections;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
@@ -28,6 +30,8 @@ namespace ClearVision.Product.Application.Services;
 /// </summary>
 public class InspectionService : IInspectionService
 {
+    private const string TraceabilityFieldName = "Traceability";
+
     private readonly IInspectionResultRepository _resultRepository;
     private readonly IProjectRepository _projectRepository;
     private readonly IFlowExecutionService _flowExecutionService;
@@ -167,7 +171,7 @@ public class InspectionService : IInspectionService
     {
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            () => ExecuteSingleCoreAsync(projectId, imageData, flow));
+            sessionId => ExecuteSingleCoreAsync(projectId, imageData, flow, sessionId));
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
         if (flow != null)
@@ -283,7 +287,7 @@ public class InspectionService : IInspectionService
     {
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            () => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow));
+            sessionId => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow, sessionId));
     }
 
     #endregion
@@ -433,9 +437,35 @@ public class InspectionService : IInspectionService
         string? status,
         string? defectType,
         int pageIndex,
-        int pageSize)
+        int pageSize,
+        string? flowVersionHash = null)
     {
-        return await _resultRepository.GetHistoryPageAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize);
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
+            return await _resultRepository.GetHistoryPageAsync(
+                projectId,
+                startTime,
+                endTime,
+                status,
+                defectType,
+                pageIndex,
+                pageSize,
+                flowVersionHash);
+        }
+    }
+
+    public async Task<InspectionHistoryDetail?> GetInspectionHistoryDetailAsync(Guid projectId, Guid resultId)
+    {
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
+            return await _resultRepository.GetHistoryDetailAsync(projectId, resultId);
+        }
     }
 
     public async Task<InspectionStatistics> GetStatisticsAsync(
@@ -454,7 +484,7 @@ public class InspectionService : IInspectionService
 
     private async Task<InspectionResult> ExecuteSingleWithCoordinatorAsync(
         Guid projectId,
-        Func<Task<InspectionResult>> executeAsync)
+        Func<Guid, Task<InspectionResult>> executeAsync)
     {
         var sessionId = Guid.NewGuid();
         var startResult = await _coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
@@ -468,7 +498,7 @@ public class InspectionService : IInspectionService
         try
         {
             _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
-            return await executeAsync();
+            return await executeAsync(sessionId);
         }
         catch (Exception ex)
         {
@@ -481,7 +511,7 @@ public class InspectionService : IInspectionService
         }
     }
 
-    private async Task<InspectionResult> ExecuteSingleCoreAsync(Guid projectId, byte[]? imageData, OperatorFlow? flow)
+    private async Task<InspectionResult> ExecuteSingleCoreAsync(Guid projectId, byte[]? imageData, OperatorFlow? flow, Guid sessionId)
     {
         var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(projectId, flow);
         var result = new InspectionResult(projectId);
@@ -529,6 +559,10 @@ public class InspectionService : IInspectionService
                 : (status == InspectionStatus.Error ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage);
 
             result.SetResult(status, flowResult.ExecutionTimeMs, null, errorMessage);
+            result.SetTraceability(
+                ComputeFlowVersionHash(actualFlow),
+                TryResolveCalibrationBundleId(flowResult.OutputData),
+                sessionId);
 
             if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
                 && outputImage is byte[] imageBytes)
@@ -558,7 +592,8 @@ public class InspectionService : IInspectionService
             }
 
             var analysisData = _analysisDataBuilder.Build(actualFlow, flowResult, status);
-            AnalysisPayloadSerialization.TrySetOutputDataJson(result, flowResult.OutputData, _logger);
+            var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
+            AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputPayload, _logger);
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
             await PersistResultImageAsync(result, CancellationToken.None);
             await CacheResultImageAsync(result);
@@ -570,12 +605,13 @@ public class InspectionService : IInspectionService
         {
             _logger.LogError(ex, "[InspectionService] 检测异常: {ErrorMessage}", ex.Message);
             result.MarkAsError(ex.Message);
+            result.SetTraceability(ComputeFlowVersionHash(actualFlow), null, sessionId);
             await _resultRepository.AddAsync(result);
             return result;
         }
     }
 
-    private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(Guid projectId, string cameraId, OperatorFlow? flow)
+    private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(Guid projectId, string cameraId, OperatorFlow? flow, Guid sessionId)
     {
         ImageDto? imageDto = null;
         try
@@ -587,7 +623,7 @@ public class InspectionService : IInspectionService
                     "[InspectionService] 图像采集算子使用本地文件输入，跳过相机预采集: ProjectId={ProjectId}, CameraId={CameraId}",
                     projectId,
                     cameraId);
-                return await ExecuteSingleCoreAsync(projectId, imageData: null, actualFlow);
+                return await ExecuteSingleCoreAsync(projectId, imageData: null, flow: actualFlow, sessionId: sessionId);
             }
 
             imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId);
@@ -598,12 +634,13 @@ public class InspectionService : IInspectionService
             }
 
             var imageData = Convert.FromBase64String(imageDto.DataBase64);
-            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow);
+            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow, sessionId);
         }
         catch (Exception ex)
         {
             var result = new InspectionResult(projectId);
             result.MarkAsError($"相机采集或检测失败: {ex.Message}");
+            result.SetTraceability(null, null, sessionId);
             await _resultRepository.AddAsync(result);
             return result;
         }
@@ -741,6 +778,188 @@ public class InspectionService : IInspectionService
         outputData["MissingJudgmentSignal"] = evaluation.MissingJudgmentSignal;
         outputData["JudgmentSource"] = evaluation.JudgmentSource;
         outputData["StatusReason"] = evaluation.StatusReason;
+    }
+
+    private Dictionary<string, object>? EnsureTraceabilityPayload(
+        Dictionary<string, object>? payload,
+        InspectionResult result)
+    {
+        var traceability = BuildTraceabilityPayload(result);
+        if (traceability.Count == 0)
+        {
+            return payload;
+        }
+
+        var merged = payload != null
+            ? new Dictionary<string, object>(payload, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        merged[TraceabilityFieldName] = traceability;
+        return merged;
+    }
+
+    private static Dictionary<string, object> BuildTraceabilityPayload(InspectionResult result)
+    {
+        var payload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(result.FlowVersionHash))
+        {
+            payload["FlowVersionHash"] = result.FlowVersionHash;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.CalibrationBundleId))
+        {
+            payload["CalibrationBundleId"] = result.CalibrationBundleId;
+        }
+
+        if (result.SessionId.HasValue)
+        {
+            payload["SessionId"] = result.SessionId.Value.ToString("D");
+        }
+
+        return payload;
+    }
+
+    private string? ComputeFlowVersionHash(OperatorFlow flow)
+    {
+        try
+        {
+            var serialized = JsonSerializer.Serialize(flow, FlowJsonOptions);
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
+            return Convert.ToHexString(hashBytes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionService] Failed to compute flow version hash.");
+            return null;
+        }
+    }
+
+    private static string? TryResolveCalibrationBundleId(Dictionary<string, object>? outputData)
+    {
+        if (outputData == null)
+        {
+            return null;
+        }
+
+        if (TryResolveBundleIdFromDictionary(outputData, out var directId))
+        {
+            return directId;
+        }
+
+        foreach (var containerKey in new[] { TraceabilityFieldName, "Calibration", "CalibrationBundle", "CalibrationInfo", "TransformResult" })
+        {
+            if (!outputData.TryGetValue(containerKey, out var nested) || nested == null)
+            {
+                continue;
+            }
+
+            if (TryResolveBundleIdFromObject(nested, out var nestedId))
+            {
+                return nestedId;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryResolveBundleIdFromDictionary(
+        IReadOnlyDictionary<string, object> data,
+        out string? bundleId)
+    {
+        bundleId = null;
+        if (TryReadStringValue(data, "CalibrationBundleId", out var calibrationBundleId))
+        {
+            bundleId = calibrationBundleId;
+            return true;
+        }
+
+        if (TryReadStringValue(data, "BundleId", out var legacyBundleId))
+        {
+            bundleId = legacyBundleId;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadStringValue(
+        IReadOnlyDictionary<string, object> data,
+        string key,
+        out string? value)
+    {
+        value = null;
+        if (!data.TryGetValue(key, out var raw))
+        {
+            return false;
+        }
+
+        return TryResolveBundleIdFromObject(raw, out value);
+    }
+
+    private static bool TryResolveBundleIdFromObject(object value, out string? bundleId)
+    {
+        bundleId = null;
+        switch (value)
+        {
+            case string text when !string.IsNullOrWhiteSpace(text):
+                bundleId = text.Trim();
+                return true;
+            case Guid guid when guid != Guid.Empty:
+                bundleId = guid.ToString("D");
+                return true;
+            case Dictionary<string, object> dictionary:
+                return TryResolveBundleIdFromDictionary(dictionary, out bundleId);
+            case IReadOnlyDictionary<string, object> dictionary:
+                return TryResolveBundleIdFromDictionary(dictionary, out bundleId);
+            case JsonElement element:
+                return TryResolveBundleIdFromJsonElement(element, out bundleId);
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryResolveBundleIdFromJsonElement(JsonElement element, out string? bundleId)
+    {
+        bundleId = null;
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                var raw = element.GetString();
+                if (!string.IsNullOrWhiteSpace(raw))
+                {
+                    bundleId = raw.Trim();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!property.Name.Equals("CalibrationBundleId", StringComparison.OrdinalIgnoreCase)
+                && !property.Name.Equals("BundleId", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (property.Value.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var raw = property.Value.GetString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            bundleId = raw.Trim();
+            return true;
+        }
+
+        return false;
     }
 
     private async Task PersistResultImageAsync(InspectionResult result, CancellationToken cancellationToken)

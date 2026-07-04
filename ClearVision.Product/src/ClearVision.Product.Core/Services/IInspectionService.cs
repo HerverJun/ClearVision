@@ -88,7 +88,13 @@ public interface IInspectionService
         string? status = null,
         string? defectType = null,
         int pageIndex = 0,
-        int pageSize = 20);
+        int pageSize = 20,
+        string? flowVersionHash = null);
+
+    /// <summary>
+    /// 获取检测历史详情。
+    /// </summary>
+    Task<InspectionHistoryDetail?> GetInspectionHistoryDetailAsync(Guid projectId, Guid resultId);
 
     /// <summary>
     /// 获取统计信息

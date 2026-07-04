@@ -74,9 +74,131 @@ public sealed class InspectionResultRepositoryTests
             item.Status.Should().Be(InspectionStatus.NG);
             item.ImageId.Should().Be(imageId);
             item.ProcessingTimeMs.Should().Be(42);
-            item.OutputDataJson.Should().Contain("score");
+            item.HasImage.Should().BeTrue();
+            item.HasOutputData.Should().BeTrue();
+            item.HasAnalysisData.Should().BeTrue();
+            item.OutputDataJson.Should().BeNull();
+            item.AnalysisDataJson.Should().BeNull();
             item.Defects.Should().ContainSingle();
             item.GetType().GetProperty("OutputImage").Should().BeNull();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task GetHistoryPageAsync_ShouldUseStableOrderClampAndFilters()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await using var db = CreateContext(root);
+            await db.Database.EnsureCreatedAsync();
+            var repository = new InspectionResultRepository(db);
+            var projectId = Guid.NewGuid();
+            var otherProjectId = Guid.NewGuid();
+            var timestamp = new DateTime(2026, 7, 4, 8, 0, 0, DateTimeKind.Utc);
+            var older = CreateResult(projectId, InspectionStatus.OK, 10);
+            older.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000009"),
+                timestamp.AddMinutes(-10),
+                timestamp.AddMinutes(-10),
+                null);
+            older.SetTraceability("FLOW-A", null, null);
+            var first = CreateResult(projectId, InspectionStatus.NG, 20);
+            first.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000001"),
+                timestamp,
+                timestamp,
+                null);
+            first.SetTraceability("FLOW-A", null, null);
+            var second = CreateResult(projectId, InspectionStatus.NG, 30);
+            second.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000002"),
+                timestamp,
+                timestamp,
+                null);
+            second.SetTraceability("FLOW-A", null, null);
+            var otherFlow = CreateResult(projectId, InspectionStatus.NG, 40);
+            otherFlow.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000003"),
+                timestamp,
+                timestamp,
+                null);
+            otherFlow.SetTraceability("FLOW-B", null, null);
+            var otherProject = CreateResult(otherProjectId, InspectionStatus.NG, 50);
+            otherProject.RestorePersistenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-000000000004"),
+                timestamp,
+                timestamp,
+                null);
+            otherProject.SetTraceability("FLOW-A", null, null);
+
+            await repository.AddRangeAsync([older, first, second, otherFlow, otherProject]);
+            db.ChangeTracker.Clear();
+
+            var page = await repository.GetHistoryPageAsync(
+                projectId,
+                startTime: timestamp.AddMinutes(-1),
+                endTime: timestamp.AddMinutes(1),
+                status: "NG",
+                pageIndex: 0,
+                pageSize: 500,
+                flowVersionHash: "FLOW-A");
+
+            page.PageSize.Should().Be(200);
+            page.TotalCount.Should().Be(2);
+            page.Items.Select(item => item.Id).Should().Equal(second.Id, first.Id);
+            page.Items.Should().OnlyContain(item => item.ProjectId == projectId);
+            page.Items.Should().OnlyContain(item => item.Status == InspectionStatus.NG);
+            page.Items.Should().OnlyContain(item => item.FlowVersionHash == "FLOW-A");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task GetHistoryDetailAsync_ShouldReturnProjectScopedPayloadWithoutOutputImage()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await using var db = CreateContext(root);
+            await db.Database.EnsureCreatedAsync();
+            var repository = new InspectionResultRepository(db);
+            var projectId = Guid.NewGuid();
+            var otherProjectId = Guid.NewGuid();
+            var sessionId = Guid.NewGuid();
+            var result = CreateResult(projectId, InspectionStatus.Error, 99);
+            result.SetOutputImage([1, 2, 3, 4]);
+            result.SetOutputDataJson("""{"score":99}""");
+            result.SetAnalysisDataJson("""{"cards":[]}""");
+            result.SetTraceability("FLOW-DETAIL", "bundle-detail", sessionId);
+            var otherProject = CreateResult(otherProjectId, InspectionStatus.OK, 10);
+
+            await repository.AddRangeAsync([result, otherProject]);
+            db.ChangeTracker.Clear();
+
+            var detail = await repository.GetHistoryDetailAsync(projectId, result.Id);
+            var notFoundForOtherProject = await repository.GetHistoryDetailAsync(otherProjectId, result.Id);
+            var notFoundMissing = await repository.GetHistoryDetailAsync(projectId, Guid.NewGuid());
+
+            detail.Should().NotBeNull();
+            detail!.Id.Should().Be(result.Id);
+            detail.ProjectId.Should().Be(projectId);
+            detail.OutputDataJson.Should().Contain("score");
+            detail.AnalysisDataJson.Should().Contain("cards");
+            detail.FlowVersionHash.Should().Be("FLOW-DETAIL");
+            detail.CalibrationBundleId.Should().Be("bundle-detail");
+            detail.SessionId.Should().Be(sessionId);
+            detail.HasImage.Should().BeTrue();
+            detail.GetType().GetProperty("OutputImage").Should().BeNull();
+            notFoundForOtherProject.Should().BeNull();
+            notFoundMissing.Should().BeNull();
         }
         finally
         {

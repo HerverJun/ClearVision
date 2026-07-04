@@ -75,8 +75,8 @@ public sealed class GetInspectionHistoryQueryHandlerTests
         dto.Status.Should().Be(InspectionStatus.NG);
         dto.ImageId.Should().Be(imageId);
         dto.OutputImage.Should().BeNull();
-        dto.OutputData.Should().ContainKey("score");
-        dto.AnalysisData.Should().NotBeNull();
+        dto.OutputData.Should().BeNull();
+        dto.AnalysisData.Should().BeNull();
         dto.Defects.Should().ContainSingle();
 
         _ = repository.Received(1).GetHistoryPageAsync(projectId, startTime, endTime, null, null, 0, 50);

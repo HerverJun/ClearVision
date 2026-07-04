@@ -32,7 +32,13 @@ public interface IInspectionResultRepository : IRepository<InspectionResult>
         string? status = null,
         string? defectType = null,
         int pageIndex = 0,
-        int pageSize = 20);
+        int pageSize = 20,
+        string? flowVersionHash = null);
+
+    /// <summary>
+    /// 获取工程范围内的单条检测历史详情。
+    /// </summary>
+    Task<InspectionHistoryDetail?> GetHistoryDetailAsync(Guid projectId, Guid resultId);
 
     /// <summary>
     /// 根据时间范围获取结果
@@ -97,6 +103,35 @@ public class InspectionHistoryItem
     public double? ConfidenceScore { get; set; }
     public string? ErrorMessage { get; set; }
     public DateTime InspectionTime { get; set; }
+    public string? FlowVersionHash { get; set; }
+    public string? CalibrationBundleId { get; set; }
+    public Guid? SessionId { get; set; }
+    public bool HasImage { get; set; }
+    public bool HasOutputData { get; set; }
+    public bool HasAnalysisData { get; set; }
+    public string? OutputDataJson { get; set; }
+    public string? AnalysisDataJson { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+}
+
+public class InspectionHistoryDetail
+{
+    public Guid Id { get; set; }
+    public Guid ProjectId { get; set; }
+    public InspectionStatus Status { get; set; }
+    public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
+    public long ProcessingTimeMs { get; set; }
+    public Guid? ImageId { get; set; }
+    public double? ConfidenceScore { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime InspectionTime { get; set; }
+    public string? FlowVersionHash { get; set; }
+    public string? CalibrationBundleId { get; set; }
+    public Guid? SessionId { get; set; }
+    public bool HasImage { get; set; }
+    public bool HasOutputData { get; set; }
+    public bool HasAnalysisData { get; set; }
     public string? OutputDataJson { get; set; }
     public string? AnalysisDataJson { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -187,6 +187,7 @@ function createResultPanelDomFixture() {
 function createDetailModalDomFixture() {
   const body = createMockElement();
   const modal = createMockElement();
+  const modalBody = createMockElement();
   const closeButton = createMockElement();
   const overlay = createMockElement();
   const created = [];
@@ -203,6 +204,10 @@ function createDetailModalDomFixture() {
 
     if (selector === '.result-detail-overlay') {
       return overlay;
+    }
+
+    if (selector === '.result-detail-body') {
+      return modalBody;
     }
 
     return null;
@@ -251,6 +256,7 @@ function createDetailModalDomFixture() {
       body
     },
     modal,
+    modalBody,
     overlay
   };
 }
@@ -668,6 +674,78 @@ test('dispose removes active result detail modal listeners and DOM', () => {
     assert.equal(fixture.closeButton.listenerCount('click'), 0);
     assert.equal(fixture.overlay.listenerCount('click'), 0);
     assert.equal(panel._activeDetailModals.size, 0);
+  } finally {
+    globalThis.document = previousDocument;
+    if (previousRequestAnimationFrame) {
+      globalThis.window.requestAnimationFrame = previousRequestAnimationFrame;
+    } else {
+      delete globalThis.window.requestAnimationFrame;
+    }
+  }
+});
+
+test('server history detail loads on demand and renders traceability warnings', async () => {
+  const previousDocument = globalThis.document;
+  const previousRequestAnimationFrame = globalThis.window.requestAnimationFrame;
+  const fixture = createDetailModalDomFixture();
+  globalThis.document = fixture.document;
+  globalThis.window.requestAnimationFrame = callback => {
+    callback();
+    return 1;
+  };
+
+  try {
+    const panel = createPanel();
+    Object.assign(panel, {
+      _eventDisposers: [],
+      _isDisposed: false,
+      _activeDetailModals: new Set(),
+      serverPaged: true,
+      projectId: 'project-1',
+      historyDetailLoader: async () => ({
+        id: 'history-1',
+        projectId: 'project-1',
+        status: 'NG',
+        timestamp: '2026-07-04T08:00:00Z',
+        processingTime: 45,
+        hasImage: true,
+        imageMissing: true,
+        imageMissingMessage: '图像文件不存在或已清理',
+        outputDataPreview: {
+          value: { score: 42 },
+          wasTruncated: true,
+          wasRedacted: true,
+          message: 'JSON preview truncated.'
+        },
+        outputData: { score: 42 },
+        analysisData: { cards: [] },
+        defects: []
+      })
+    });
+
+    panel.showResultDetail({
+      id: 'history-1',
+      projectId: 'project-1',
+      status: 'NG',
+      timestamp: '2026-07-04T08:00:00Z',
+      processingTime: 45,
+      hasOutputData: true,
+      hasAnalysisData: false,
+      defects: []
+    });
+
+    assert.match(fixture.modal.innerHTML, /正式检测历史/);
+    assert.match(fixture.modal.innerHTML, /正在加载检测详情/);
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.match(fixture.modalBody.innerHTML, /追溯信息/);
+    assert.match(fixture.modalBody.innerHTML, /旧数据未记录/);
+    assert.match(fixture.modalBody.innerHTML, /图像缺失/);
+    assert.match(fixture.modalBody.innerHTML, /图像文件不存在或已清理/);
+    assert.match(fixture.modalBody.innerHTML, /大 JSON 已截断/);
+    assert.match(fixture.modalBody.innerHTML, /敏感字段已脱敏/);
+    assert.match(fixture.modalBody.innerHTML, /输出数据/);
   } finally {
     globalThis.document = previousDocument;
     if (previousRequestAnimationFrame) {
