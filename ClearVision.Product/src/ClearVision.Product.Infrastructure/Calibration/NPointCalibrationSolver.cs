@@ -62,6 +62,8 @@ public sealed class NPointCalibrationResult
 
     public NPointCalibrationErrorStats ErrorStats { get; private init; }
 
+    public IReadOnlyList<bool> InlierFlags { get; private init; } = Array.Empty<bool>();
+
     public CalibrationBundleV2 Bundle { get; private init; } = new();
 
     public static NPointCalibrationResult Fail(string message) => new()
@@ -77,6 +79,7 @@ public sealed class NPointCalibrationResult
         double? pixelSizeX,
         double? pixelSizeY,
         NPointCalibrationErrorStats errorStats,
+        IReadOnlyList<bool> inlierFlags,
         CalibrationBundleV2 bundle) => new()
     {
         Success = true,
@@ -86,6 +89,7 @@ public sealed class NPointCalibrationResult
         PixelSizeX = pixelSizeX,
         PixelSizeY = pixelSizeY,
         ErrorStats = errorStats,
+        InlierFlags = inlierFlags.ToArray(),
         Bundle = bundle
     };
 }
@@ -256,6 +260,7 @@ public sealed class NPointCalibrationSolver
             pixelSizeX,
             pixelSizeY,
             errorStats,
+            inlierFlags,
             bundle);
     }
 
@@ -332,6 +337,7 @@ public sealed class NPointCalibrationSolver
             pixelSizeX: null,
             pixelSizeY: null,
             errorStats,
+            inlierFlags,
             bundle);
     }
 

@@ -1169,7 +1169,8 @@ public static class PreviewNodeEndpoints
     private static IReadOnlyDictionary<string, bool> BuildObservationFeatureFlags(StudioOptions studioOptions) =>
         new Dictionary<string, bool>(StringComparer.Ordinal)
         {
-            ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled
+            ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled,
+            ["Studio:NPointCalibrationWorkbenchEnabled"] = studioOptions.NPointCalibrationWorkbenchEnabled
         };
 
     private static byte[]? ResolveInputImageBytes(

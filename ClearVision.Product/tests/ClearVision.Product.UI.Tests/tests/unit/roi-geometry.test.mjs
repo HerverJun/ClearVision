@@ -594,6 +594,19 @@ test('point sequence adapter preserves order enabled state and legacy PointPairs
   assert.equal(config.editable, true);
   assert.deepEqual(config.geometryAdapter.paramKeys, POINT_PAIRS_PARAM_KEYS);
 
+  const flagOffConfig = getOperatorRoiConfig({
+    type: 'NPointCalibration',
+    parameters: [
+      {
+        name: 'PointPairs',
+        value: '[]'
+      }
+    ]
+  }, { nPointCalibrationWorkbenchEnabled: false });
+  assert.equal(flagOffConfig.supported, false);
+  assert.equal(flagOffConfig.editable, false);
+  assert.equal(flagOffConfig.geometryAdapter.kind, 'pointSequence');
+
   let sequence = geometryFromParams({
     PointPairs: JSON.stringify([
       { ImageX: 10, ImageY: 20, WorldX: 1, WorldY: 2 },

@@ -226,7 +226,8 @@ public sealed class Studio2ArchitectureGuardTests
         var allowedObservationPaths = new[]
         {
             "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/",
-            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs"
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/CalibrationDraftEndpoints.cs"
         };
 
         foreach (var file in sourceFiles)
@@ -316,6 +317,7 @@ public sealed class Studio2ArchitectureGuardTests
             "ClearVision.Product/src/ClearVision.Product.Desktop/PreviewArtifacts/",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewArtifactEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/CalibrationDraftEndpoints.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"
@@ -397,13 +399,16 @@ public sealed class Studio2ArchitectureGuardTests
 
         studioOptionsText.Should().Contain("NodePreviewInspectorEnabled");
         studioOptionsText.Should().Contain("CircleSearchV2ToolEnabled");
+        studioOptionsText.Should().Contain("NPointCalibrationWorkbenchEnabled");
         webViewHostText.Should().Contain("const featureFlags = Object.freeze");
         webViewHostText.Should().Contain("Studio:CircleSearchV2ToolEnabled");
+        webViewHostText.Should().Contain("Studio:NPointCalibrationWorkbenchEnabled");
         webViewHostText.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
         webViewHostText.Should().Contain("Object.freeze(startup)");
         webViewHostText.Should().Contain("configurable: false");
         appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
         appSettingsText.Should().Contain("\"CircleSearchV2ToolEnabled\": true");
+        appSettingsText.Should().Contain("\"NPointCalibrationWorkbenchEnabled\": true");
         adrText.Should().Contain("Studio:NodePreviewInspectorEnabled");
         adrText.Should().Contain("G15.2/G16");
 

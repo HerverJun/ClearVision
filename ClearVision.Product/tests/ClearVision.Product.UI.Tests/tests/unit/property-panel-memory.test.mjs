@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 globalThis.window = globalThis.window || {};
 
 const { PropertyPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
+const { CalibrationDraftWorkbench } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/calibrationDraftWorkbench.js');
 
 function createDeferred() {
   let resolve;
@@ -52,6 +53,27 @@ function createCircleMeasurementPanel(method = 'CaliperFitV2', searchCenterMode 
     escapeAttribute: PropertyPanel.prototype.escapeAttribute
   });
   return { panel, parameters };
+}
+
+function createNPointPanel(nPointCalibrationWorkbenchEnabled = undefined) {
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    currentOperator: {
+      id: 'npoint-node',
+      type: 'NPointCalibration',
+      parameters: [
+        {
+          name: 'PointPairs',
+          value: '[{"ImageX":10,"ImageY":20,"WorldX":1,"WorldY":2,"Enabled":true}]',
+          dataType: 'string'
+        }
+      ]
+    },
+    nPointCalibrationWorkbenchEnabled,
+    escapeHtml: PropertyPanel.prototype.escapeHtml,
+    escapeAttribute: PropertyPanel.prototype.escapeAttribute
+  });
+  return panel;
 }
 
 test('PropertyPanel deduplicates concurrent cached image base64 loads', async () => {
@@ -164,6 +186,75 @@ test('PropertyPanel honors startup Circle Search V2 feature flag off', () => {
   } finally {
     globalThis.window.__CLEARVISION_STARTUP__ = previousStartup;
   }
+});
+
+test('PropertyPanel mounts NPoint draft workbench only when the feature flag is enabled', () => {
+  const previousStartup = globalThis.window.__CLEARVISION_STARTUP__;
+  try {
+    globalThis.window.__CLEARVISION_STARTUP__ = {
+      featureFlags: {
+        'Studio:NPointCalibrationWorkbenchEnabled': true
+      }
+    };
+    assert.equal(createNPointPanel(true).shouldMountNPointCalibrationWorkbench(), true);
+
+    globalThis.window.__CLEARVISION_STARTUP__ = {
+      featureFlags: {
+        'Studio:NPointCalibrationWorkbenchEnabled': false
+      }
+    };
+    assert.equal(createNPointPanel(true).shouldMountNPointCalibrationWorkbench(), false);
+    assert.equal(createNPointPanel(false).shouldMountNPointCalibrationWorkbench(), false);
+  } finally {
+    globalThis.window.__CLEARVISION_STARTUP__ = previousStartup;
+  }
+});
+
+test('CalibrationDraftWorkbench initializes from legacy PointPairs as ephemeral draft state', () => {
+  const workbench = Object.create(CalibrationDraftWorkbench.prototype);
+  Object.assign(workbench, {
+    getProjectId: () => 'project-1',
+    getOperator: () => ({
+      id: 'node-1',
+      type: 'NPointCalibration',
+      parameters: [
+        { name: 'CalibrationMode', value: 'Perspective' },
+        { name: 'CalibrationUnit', value: 'um' },
+        { name: 'PointPairs', value: '[{"ImageX":10,"ImageY":20,"WorldX":1,"WorldY":2,"Enabled":false}]' }
+      ]
+    })
+  });
+
+  const session = CalibrationDraftWorkbench.prototype.createSessionFromOperator.call(workbench);
+
+  assert.match(session.sessionId, /^calibration-draft-/);
+  assert.equal(session.projectId, 'project-1');
+  assert.equal(session.targetNodeId, 'node-1');
+  assert.equal(session.mode, 'Perspective');
+  assert.equal(session.unit, 'um');
+  assert.equal(session.dirty, false);
+  assert.equal(session.status, 'Draft');
+  assert.equal(session.candidateBundle, null);
+  assert.deepEqual(
+    session.samples.map(sample => ({
+      pixelX: sample.pixelX,
+      pixelY: sample.pixelY,
+      worldX: sample.worldX,
+      worldY: sample.worldY,
+      enabled: sample.enabled,
+      source: sample.source
+    })),
+    [
+      {
+        pixelX: 10,
+        pixelY: 20,
+        worldX: 1,
+        worldY: 2,
+        enabled: false,
+        source: 'Imported'
+      }
+    ]
+  );
 });
 
 test('PropertyPanel groups CaliperFitV2 controls and locks image-center coordinates', () => {

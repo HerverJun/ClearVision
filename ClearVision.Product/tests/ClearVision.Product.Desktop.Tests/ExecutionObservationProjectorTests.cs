@@ -870,6 +870,105 @@ public sealed class ExecutionObservationProjectorTests
     }
 
     [Fact]
+    public void CreatePreviewObservation_ShouldProjectNPointDraftSceneLayersAndResultPaths()
+    {
+        var draftPortId = Guid.Parse("aaaaaaaa-1111-1111-1111-111111111111");
+        var targetOperator = CreateOperator(OperatorType.NPointCalibration, []);
+        var draft = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["SchemaVersion"] = "calibration-draft-session.v1",
+            ["SessionId"] = "session-scene",
+            ["Mode"] = "Affine",
+            ["Unit"] = "mm",
+            ["Status"] = "Solved",
+            ["LastSolveResult"] = new Dictionary<string, object>
+            {
+                ["Accepted"] = true,
+                ["InlierCount"] = 1,
+                ["MeanError"] = 0.25,
+                ["MaxError"] = 4.2
+            },
+            ["Samples"] = new List<Dictionary<string, object>>
+            {
+                new()
+                {
+                    ["SampleId"] = "s1",
+                    ["Order"] = 1,
+                    ["PixelX"] = 10d,
+                    ["PixelY"] = 20d,
+                    ["WorldX"] = 1d,
+                    ["WorldY"] = 2d,
+                    ["Enabled"] = true,
+                    ["Inlier"] = true,
+                    ["ReprojectionX"] = 10.5d,
+                    ["ReprojectionY"] = 20.25d,
+                    ["Error"] = 0.56d
+                },
+                new()
+                {
+                    ["SampleId"] = "s2",
+                    ["Order"] = 2,
+                    ["PixelX"] = 30d,
+                    ["PixelY"] = 40d,
+                    ["WorldX"] = 3d,
+                    ["WorldY"] = 4d,
+                    ["Enabled"] = false,
+                    ["Inlier"] = false,
+                    ["ReprojectionX"] = 33d,
+                    ["ReprojectionY"] = 43d,
+                    ["Error"] = 4.2d
+                }
+            }
+        };
+
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["Width"] = 320,
+                ["Height"] = 240,
+                ["CalibrationDraft"] = draft
+            },
+            [
+                new ExecutionObservationOutputPortV1
+                {
+                    Id = draftPortId,
+                    Name = "CalibrationDraft"
+                }
+            ],
+            targetOperator);
+
+        observation.VisualScene.Should().NotBeNull();
+        var scene = observation.VisualScene!;
+        scene.Primitives.Select(primitive => primitive.Layer).Should().Contain(new[]
+        {
+            "calibration-samples",
+            "calibration-disabled",
+            "calibration-inliers",
+            "calibration-outliers",
+            "calibration-reprojection",
+            "calibration-error-vectors",
+            "calibration-labels",
+            "calibration-quality"
+        });
+
+        var firstSample = scene.Primitives.Should()
+            .ContainSingle(primitive => primitive.PrimitiveId == "calibration-draft:session-scene:s1:calibration-samples")
+            .Subject;
+        firstSample.OutputPortId.Should().Be(draftPortId);
+        firstSample.ResultPathVersion.Should().Be(1);
+        firstSample.ResultPath.Should().Be("$[\"Samples\"][0]");
+        firstSample.Selectable.Should().BeTrue();
+
+        scene.Primitives.Should().Contain(primitive =>
+            primitive.PrimitiveId == "calibration-draft:session-scene:s2:calibration-error-vectors" &&
+            primitive.ResultPath == "$[\"Samples\"][1]");
+        scene.Primitives.Should().ContainSingle(primitive =>
+            primitive.Layer == "calibration-quality" &&
+            primitive.Selectable == false &&
+            primitive.Geometry.Text!.Contains("accepted=true", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CreatePreviewObservation_ShouldFailSoftAndTruncateInvalidVisualScenePrimitives()
     {
         var targetOperator = CreateOperator(OperatorType.CircleMeasurement, []);

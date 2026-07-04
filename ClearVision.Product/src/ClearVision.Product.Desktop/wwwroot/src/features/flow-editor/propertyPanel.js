@@ -8,11 +8,13 @@ import inspectionController, {
 } from '../inspection/inspectionController.js';
 import PreviewPanel from './previewPanel.js';
 import RoiEditorPanel from './roiEditorPanel.js';
+import CalibrationDraftWorkbench from './calibrationDraftWorkbench.js';
 import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
 import { buildWireSequenceFollowupHint, createWireSequenceParameterPatch } from './wireSequenceAssist.js';
 import {
     getOperatorRoiConfig,
-    isCircleSearchV2ToolEnabled
+    isCircleSearchV2ToolEnabled,
+    isNPointCalibrationWorkbenchEnabled
 } from './roiEditorSupport.mjs';
 import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
 import {
@@ -109,10 +111,12 @@ class PropertyPanel {
         this.onChangeCallback = null;
         this.previewPanel = null;
         this.roiEditorPanel = null;
+        this.calibrationDraftWorkbench = null;
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
         this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
         this.circleSearchV2ToolEnabled = options.circleSearchV2ToolEnabled;
+        this.nPointCalibrationWorkbenchEnabled = options.nPointCalibrationWorkbenchEnabled;
         this.pendingRecommendation = null;
         this.recommendedFieldNames = new Set();
         this.cameraBindingsCache = [];
@@ -221,6 +225,10 @@ class PropertyPanel {
             this.roiEditorPanel.destroy();
             this.roiEditorPanel = null;
         }
+        if (this.calibrationDraftWorkbench) {
+            this.calibrationDraftWorkbench.destroy();
+            this.calibrationDraftWorkbench = null;
+        }
         this.inputImageBase64Load = null;
         this.currentOperator = null;
         this.container.innerHTML = '<p class="empty-text">选择一个算子查看属性</p>';
@@ -245,8 +253,11 @@ class PropertyPanel {
         const { type, parameters = [], iconPath, icon } = this.currentOperator;
         const typeDisplay = getOperatorTypeDisplayName(type, { includeType: true });
         const roiEditorConfig = getOperatorRoiConfig(this.currentOperator, {
-            featureEnabled: this.isCircleSearchV2ToolFeatureEnabled()
+            circleSearchV2ToolEnabled: this.isCircleSearchV2ToolFeatureEnabled(),
+            nPointCalibrationWorkbenchEnabled: this.isNPointCalibrationWorkbenchFeatureEnabled()
         });
+        const shouldMountCalibrationDraftWorkbench = this.shouldMountNPointCalibrationWorkbench();
+        const shouldMountRoiEditor = roiEditorConfig.supported && !shouldMountCalibrationDraftWorkbench;
         const parametersForRenderBase = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
             : parameters;
@@ -320,7 +331,8 @@ class PropertyPanel {
         }
 
         html += `
-                ${roiEditorConfig.supported ? '<div id="roi-editor-container"></div>' : ''}
+                ${shouldMountCalibrationDraftWorkbench ? '<div id="calibration-draft-workbench-container"></div>' : ''}
+                ${shouldMountRoiEditor ? '<div id="roi-editor-container"></div>' : ''}
                 <div id="operator-preview-container"></div>
             </div>
         `;
@@ -329,6 +341,7 @@ class PropertyPanel {
         // 绑定事件
         this.bindEvents();
         this.initSliders();
+        this.initCalibrationDraftWorkbench();
         this.initRoiEditorPanel();
         this.initPreviewPanel();
 
@@ -345,6 +358,10 @@ class PropertyPanel {
         if (this.roiEditorPanel) {
             this.roiEditorPanel.destroy();
             this.roiEditorPanel = null;
+        }
+        if (this.calibrationDraftWorkbench) {
+            this.calibrationDraftWorkbench.destroy();
+            this.calibrationDraftWorkbench = null;
         }
 
         const operator = this.currentOperator || {};
@@ -549,7 +566,19 @@ class PropertyPanel {
     }
 
     isCircleSearchV2ToolFeatureEnabled() {
-        return isCircleSearchV2ToolEnabled({ featureEnabled: this.circleSearchV2ToolEnabled });
+        return isCircleSearchV2ToolEnabled({ circleSearchV2ToolEnabled: this.circleSearchV2ToolEnabled });
+    }
+
+    isNPointCalibrationOperator() {
+        return String(this.currentOperator?.type || this.currentOperator?.operatorType || '').trim() === 'NPointCalibration';
+    }
+
+    isNPointCalibrationWorkbenchFeatureEnabled() {
+        return isNPointCalibrationWorkbenchEnabled({ nPointCalibrationWorkbenchEnabled: this.nPointCalibrationWorkbenchEnabled });
+    }
+
+    shouldMountNPointCalibrationWorkbench() {
+        return this.isNPointCalibrationOperator() && this.isNPointCalibrationWorkbenchFeatureEnabled();
     }
 
     getCircleMeasurementMethod(parameters = this.currentOperator?.parameters || []) {
@@ -1709,12 +1738,36 @@ class PropertyPanel {
         this.roiEditorPanel = new RoiEditorPanel(container, {
             getOperator: () => this.currentOperator,
             getRoiConfig: operator => getOperatorRoiConfig(operator, {
-                featureEnabled: this.isCircleSearchV2ToolFeatureEnabled()
+                circleSearchV2ToolEnabled: this.isCircleSearchV2ToolFeatureEnabled(),
+                nPointCalibrationWorkbenchEnabled: this.isNPointCalibrationWorkbenchFeatureEnabled()
             }),
             previewCoordinator: this.previewCoordinator,
             onRectChanged: (values, phase) => this.handleRoiRectChanged(values, phase),
             onImageBoundsChanged: bounds => this.handleRoiImageBoundsChanged(bounds),
             onRequestSyncFromParams: () => this.syncRoiEditorFromParams()
+        });
+    }
+
+    initCalibrationDraftWorkbench() {
+        const container = this.container.querySelector('#calibration-draft-workbench-container');
+        if (!container) {
+            if (this.calibrationDraftWorkbench) {
+                this.calibrationDraftWorkbench.destroy();
+                this.calibrationDraftWorkbench = null;
+            }
+            return;
+        }
+
+        if (this.calibrationDraftWorkbench) {
+            this.calibrationDraftWorkbench.destroy();
+        }
+
+        this.calibrationDraftWorkbench = new CalibrationDraftWorkbench(container, {
+            getOperator: () => this.currentOperator,
+            previewCoordinator: this.previewCoordinator,
+            getProjectId: () => projectManager.getCurrentProject?.()?.id || null,
+            getFlowRevision: () => this.previewCoordinator?.getState?.()?.request?.flowRevision ?? 0,
+            getDebugSessionId: (projectId, nodeId) => this.previewCoordinator?.getDebugSessionId?.(projectId, nodeId) ?? null
         });
     }
 

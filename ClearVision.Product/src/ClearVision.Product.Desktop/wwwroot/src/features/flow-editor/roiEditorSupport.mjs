@@ -29,6 +29,8 @@ import { isFeatureEnabled } from '../../shared/featureRegistry.js';
 
 export const CIRCLE_SEARCH_V2_TOOL_FEATURE_ID = 'operator.circleSearchV2Tool';
 export const CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG = 'Studio:CircleSearchV2ToolEnabled';
+export const NPOINT_CALIBRATION_WORKBENCH_FEATURE_ID = 'operator.nPointCalibrationWorkbench';
+export const NPOINT_CALIBRATION_WORKBENCH_STARTUP_FLAG = 'Studio:NPointCalibrationWorkbenchEnabled';
 
 export function isCircleSearchV2ToolEnabled(options = {}) {
     const startupFlags = globalThis?.window?.__CLEARVISION_STARTUP__?.featureFlags;
@@ -36,11 +38,32 @@ export function isCircleSearchV2ToolEnabled(options = {}) {
         return startupFlags[CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG] === true;
     }
 
+    if (typeof options?.circleSearchV2ToolEnabled === 'boolean') {
+        return options.circleSearchV2ToolEnabled;
+    }
+
     if (typeof options?.featureEnabled === 'boolean') {
         return options.featureEnabled;
     }
 
     return isFeatureEnabled(CIRCLE_SEARCH_V2_TOOL_FEATURE_ID);
+}
+
+export function isNPointCalibrationWorkbenchEnabled(options = {}) {
+    const startupFlags = globalThis?.window?.__CLEARVISION_STARTUP__?.featureFlags;
+    if (startupFlags && Object.prototype.hasOwnProperty.call(startupFlags, NPOINT_CALIBRATION_WORKBENCH_STARTUP_FLAG)) {
+        return startupFlags[NPOINT_CALIBRATION_WORKBENCH_STARTUP_FLAG] === true;
+    }
+
+    if (typeof options?.nPointCalibrationWorkbenchEnabled === 'boolean') {
+        return options.nPointCalibrationWorkbenchEnabled;
+    }
+
+    if (typeof options?.featureEnabled === 'boolean') {
+        return options.featureEnabled;
+    }
+
+    return isFeatureEnabled(NPOINT_CALIBRATION_WORKBENCH_FEATURE_ID);
 }
 
 function readOperatorValue(operator, name, fallback = '') {
@@ -314,6 +337,18 @@ export function getOperatorRoiConfig(operator, options = {}) {
     }
 
     if (type === 'NPointCalibration') {
+        if (!isNPointCalibrationWorkbenchEnabled(options)) {
+            return {
+                supported: false,
+                editable: false,
+                shape: 'PointSequence',
+                geometryAdapter: { kind: 'pointSequence', paramKeys: POINT_PAIRS_PARAM_KEYS },
+                rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
+                subtitle: 'N Point draft workbench is disabled.',
+                readonlyMessage: 'N Point draft workbench is disabled; use the generic PointPairs parameter.'
+            };
+        }
+
         const sequence = parsePointPairs(readOperatorValue(operator, 'PointPairs', '[]')) ||
             { kind: 'pointSequence', points: [] };
         const validation = validatePointSequenceGeometry(sequence);

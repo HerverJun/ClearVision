@@ -41,6 +41,15 @@ const FEATURE_REGISTRY = Object.freeze({
         title: 'Circle Search V2 参数区与图上几何编辑已开放',
         description: 'CircleMeasurement 在 CaliperFitV2 方法下启用结构化参数区、搜索环几何编辑和同源 Scene 显示。'
     }),
+    'operator.nPointCalibrationWorkbench': Object.freeze({
+        id: 'operator.nPointCalibrationWorkbench',
+        state: FEATURE_STATES.AVAILABLE,
+        enabled: true,
+        badge: 'Draft',
+        buttonLabel: 'N Point Draft',
+        title: 'N 点标定 draft 工作台已开放',
+        description: 'NPointCalibration 启用内存态采点、求解、误差可视化和候选 Bundle 导出；正式保存由后续 Goal 接管。'
+    }),
     'project.demoCreation': Object.freeze({
         id: 'project.demoCreation',
         state: FEATURE_STATES.AVAILABLE,

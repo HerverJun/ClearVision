@@ -58,7 +58,8 @@ public sealed class WebView2Host : IAsyncDisposable
         string apiBaseUrl,
         string cssVersion,
         bool nodePreviewInspectorEnabled = false,
-        bool circleSearchV2ToolEnabled = true)
+        bool circleSearchV2ToolEnabled = true,
+        bool nPointCalibrationWorkbenchEnabled = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
@@ -73,7 +74,8 @@ public sealed class WebView2Host : IAsyncDisposable
             featureFlags = new Dictionary<string, bool>
             {
                 ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
-                ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled
+                ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled,
+                ["Studio:NPointCalibrationWorkbenchEnabled"] = nPointCalibrationWorkbenchEnabled
             }
         };
 
@@ -249,7 +251,8 @@ public sealed class WebView2Host : IAsyncDisposable
             apiBaseUrl,
             cssVersion,
             _studioOptions.NodePreviewInspectorEnabled,
-            _studioOptions.CircleSearchV2ToolEnabled);
+            _studioOptions.CircleSearchV2ToolEnabled,
+            _studioOptions.NPointCalibrationWorkbenchEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] 已注入 API 配置脚本: {apiBaseUrl}");
         System.Diagnostics.Debug.WriteLine($"[WebView2Host] CSS版本号: {cssVersion}");

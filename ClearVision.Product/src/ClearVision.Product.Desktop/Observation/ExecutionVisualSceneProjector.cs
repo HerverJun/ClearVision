@@ -982,6 +982,14 @@ public static class ExecutionVisualSceneProjector
 
     private static void ProjectNPointCalibration(Operator @operator, SceneProjectionContext context)
     {
+        if (context.TryGetOutput("CalibrationDraft", out var rawDraft) &&
+            TryReadCalibrationDraft(rawDraft, out var draft) &&
+            draft.Samples.Count > 0)
+        {
+            ProjectNPointCalibrationDraft(draft, rawDraft!, context);
+            return;
+        }
+
         var raw = ReadParameterValue(@operator, "PointPairs");
         if (!TryParsePointPairs(raw, out var pointPairs) || pointPairs.Count == 0)
         {
@@ -1060,6 +1068,420 @@ public static class ExecutionVisualSceneProjector
                     FontSize = 13
                 }
             });
+        }
+    }
+
+    private static void ProjectNPointCalibrationDraft(
+        CalibrationDraftSceneData draft,
+        object rootValue,
+        SceneProjectionContext context)
+    {
+        const int maxDraftSamples = 60;
+        var selected = SelectCalibrationDraftSamples(draft.Samples, maxDraftSamples);
+        if (draft.Samples.Count > selected.Count)
+        {
+            context.MarkTruncated();
+            context.AddDiagnostic("visual-scene-calibration-draft-truncated", $"Calibration draft samples were deterministically downsampled from {draft.Samples.Count.ToString(CultureInfo.InvariantCulture)} to {selected.Count.ToString(CultureInfo.InvariantCulture)}.", null);
+        }
+
+        foreach (var sample in selected)
+        {
+            var sampleLayer = sample.Enabled ? "calibration-samples" : "calibration-disabled";
+            var sampleStyle = sample.Enabled
+                ? new ExecutionVisualSceneStyleV1 { Stroke = "#15803d", Fill = "rgba(34,197,94,0.72)", StrokeWidth = 2 }
+                : new ExecutionVisualSceneStyleV1 { Stroke = "#64748b", Fill = "rgba(148,163,184,0.36)", StrokeWidth = 1.5 };
+            context.AddPrimitive(AttachCalibrationDraftPath(new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, sample.SampleId, sampleLayer),
+                Kind = "point",
+                Layer = sampleLayer,
+                ZOrder = sample.Enabled ? 20 + sample.Ordinal : 10 + sample.Ordinal,
+                Visible = true,
+                Selectable = true,
+                Label = sample.Order.ToString(CultureInfo.InvariantCulture),
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    X = sample.PixelX,
+                    Y = sample.PixelY,
+                    Radius = sample.Enabled ? 4 : 3.5
+                },
+                Style = sampleStyle,
+                Unit = "px"
+            }, context, rootValue, sample.Ordinal));
+
+            if (sample.Inlier.HasValue)
+            {
+                var layer = sample.Inlier.Value ? "calibration-inliers" : "calibration-outliers";
+                context.AddPrimitive(AttachCalibrationDraftPath(new ExecutionVisualScenePrimitiveV1
+                {
+                    PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, sample.SampleId, layer),
+                    Kind = "point",
+                    Layer = layer,
+                    ZOrder = sample.Inlier.Value ? 90 + sample.Ordinal : 100 + sample.Ordinal,
+                    Visible = true,
+                    Selectable = true,
+                    Label = sample.Inlier.Value ? "inlier" : "outlier",
+                    Geometry = new ExecutionVisualSceneGeometryV1
+                    {
+                        X = sample.PixelX,
+                        Y = sample.PixelY,
+                        Radius = sample.Inlier.Value ? 5 : 5.5
+                    },
+                    Style = sample.Inlier.Value
+                        ? new ExecutionVisualSceneStyleV1 { Stroke = "#22c55e", Fill = "rgba(34,197,94,0.12)", StrokeWidth = 2 }
+                        : new ExecutionVisualSceneStyleV1 { Stroke = "#dc2626", Fill = "rgba(220,38,38,0.12)", StrokeWidth = 2 },
+                    Unit = "px"
+                }, context, rootValue, sample.Ordinal));
+            }
+
+            if (sample.HasReprojection)
+            {
+                context.AddPrimitive(AttachCalibrationDraftPath(new ExecutionVisualScenePrimitiveV1
+                {
+                    PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, sample.SampleId, "calibration-reprojection"),
+                    Kind = "point",
+                    Layer = "calibration-reprojection",
+                    ZOrder = 130 + sample.Ordinal,
+                    Visible = true,
+                    Selectable = true,
+                    Label = "reprojection",
+                    Geometry = new ExecutionVisualSceneGeometryV1
+                    {
+                        X = sample.ReprojectionX!.Value,
+                        Y = sample.ReprojectionY!.Value,
+                        Radius = 3
+                    },
+                    Style = new ExecutionVisualSceneStyleV1
+                    {
+                        Stroke = "#2563eb",
+                        Fill = "rgba(37,99,235,0.72)",
+                        StrokeWidth = 1.5
+                    },
+                    Unit = "px"
+                }, context, rootValue, sample.Ordinal));
+
+                context.AddPrimitive(AttachCalibrationDraftPath(new ExecutionVisualScenePrimitiveV1
+                {
+                    PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, sample.SampleId, "calibration-error-vectors"),
+                    Kind = "polyline",
+                    Layer = "calibration-error-vectors",
+                    ZOrder = 120 + sample.Ordinal,
+                    Visible = true,
+                    Selectable = true,
+                    Label = sample.Error.HasValue
+                        ? $"error {sample.Error.Value.ToString("0.###", CultureInfo.InvariantCulture)} px"
+                        : "error vector",
+                    Geometry = new ExecutionVisualSceneGeometryV1
+                    {
+                        Points =
+                        [
+                            new ExecutionVisualScenePointV1 { X = sample.PixelX, Y = sample.PixelY },
+                            new ExecutionVisualScenePointV1 { X = sample.ReprojectionX.Value, Y = sample.ReprojectionY.Value }
+                        ]
+                    },
+                    Style = new ExecutionVisualSceneStyleV1
+                    {
+                        Stroke = sample.Inlier == false ? "#dc2626" : "#0ea5e9",
+                        StrokeWidth = 1
+                    },
+                    Unit = "px"
+                }, context, rootValue, sample.Ordinal));
+            }
+
+            context.AddPrimitive(AttachCalibrationDraftPath(new ExecutionVisualScenePrimitiveV1
+            {
+                PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, sample.SampleId, "calibration-labels"),
+                Kind = "text",
+                Layer = "calibration-labels",
+                ZOrder = 220 + sample.Ordinal,
+                Visible = true,
+                Selectable = true,
+                Label = sample.Order.ToString(CultureInfo.InvariantCulture),
+                Geometry = new ExecutionVisualSceneGeometryV1
+                {
+                    X = sample.PixelX + 6,
+                    Y = sample.PixelY - 6,
+                    Text = sample.Order.ToString(CultureInfo.InvariantCulture)
+                },
+                Style = new ExecutionVisualSceneStyleV1
+                {
+                    Stroke = sample.Enabled ? "#a16207" : "#64748b",
+                    FontSize = 13
+                },
+                Unit = "px"
+            }, context, rootValue, sample.Ordinal));
+        }
+
+        var anchor = selected.FirstOrDefault();
+        var qualityX = anchor == null ? 8 : Math.Max(0, anchor.PixelX + 12);
+        var qualityY = anchor == null ? 24 : Math.Max(0, anchor.PixelY - 24);
+        context.AddPrimitive(new ExecutionVisualScenePrimitiveV1
+        {
+            PrimitiveId = CalibrationDraftPrimitiveId(draft.SessionId, "quality", "calibration-quality"),
+            Kind = "text",
+            Layer = "calibration-quality",
+            ZOrder = 260,
+            Visible = true,
+            Selectable = false,
+            Label = "Calibration draft quality",
+            Geometry = new ExecutionVisualSceneGeometryV1
+            {
+                X = qualityX,
+                Y = qualityY,
+                Text = draft.QualityText
+            },
+            Style = new ExecutionVisualSceneStyleV1
+            {
+                Stroke = draft.Accepted == true ? "#166534" : "#991b1b",
+                FontSize = 13
+            }
+        });
+    }
+
+    private static ExecutionVisualScenePrimitiveV1 AttachCalibrationDraftPath(
+        ExecutionVisualScenePrimitiveV1 primitive,
+        SceneProjectionContext context,
+        object rootValue,
+        int sampleIndex)
+    {
+        var index = sampleIndex.ToString(CultureInfo.InvariantCulture);
+        var pascal = AttachResultPath(primitive, context, "CalibrationDraft", $"$[\"Samples\"][{index}]", rootValue);
+        return pascal.OutputPortId.HasValue
+            ? pascal
+            : AttachResultPath(primitive, context, "CalibrationDraft", $"$[\"samples\"][{index}]", rootValue);
+    }
+
+    private static string CalibrationDraftPrimitiveId(string sessionId, string sampleId, string layer) =>
+        $"calibration-draft:{sessionId}:{sampleId}:{layer}";
+
+    private static List<CalibrationDraftSceneSample> SelectCalibrationDraftSamples(
+        IReadOnlyList<CalibrationDraftSceneSample> samples,
+        int maxSamples)
+    {
+        if (samples.Count <= maxSamples)
+        {
+            return samples.ToList();
+        }
+
+        var selected = new List<CalibrationDraftSceneSample>(maxSamples);
+        for (var slot = 0; slot < maxSamples; slot++)
+        {
+            var index = (int)Math.Floor(slot * samples.Count / (double)maxSamples);
+            selected.Add(samples[Math.Min(index, samples.Count - 1)]);
+        }
+
+        return selected;
+    }
+
+    private static bool TryReadCalibrationDraft(object? raw, out CalibrationDraftSceneData draft)
+    {
+        draft = new CalibrationDraftSceneData();
+        if (!TryReadObjectDictionary(raw, out var dictionary))
+        {
+            return false;
+        }
+
+        if (!TryGetDictionaryValue(dictionary, "Samples", out var samplesRaw))
+        {
+            return false;
+        }
+
+        var samples = new List<CalibrationDraftSceneSample>();
+        var ordinal = 0;
+        foreach (var item in EnumerateValues(samplesRaw))
+        {
+            if (TryReadCalibrationDraftSample(item, ordinal, out var sample))
+            {
+                samples.Add(sample);
+            }
+
+            ordinal++;
+            if (samples.Count >= MaxPoints)
+            {
+                break;
+            }
+        }
+
+        if (samples.Count == 0)
+        {
+            return false;
+        }
+
+        var mode = ReadDictionaryString(dictionary, "Mode", "Affine");
+        var unit = ReadDictionaryString(dictionary, "Unit", "mm");
+        var status = ReadDictionaryString(dictionary, "Status", "Draft");
+        var sessionId = ReadDictionaryString(dictionary, "SessionId", "ephemeral");
+        bool? accepted = TryReadNestedBool(dictionary, "LastSolveResult", "Accepted", out var acceptedValue)
+            ? acceptedValue
+            : (bool?)null;
+        var inlierCount = TryReadNestedDouble(dictionary, "LastSolveResult", "InlierCount", out var inliers)
+            ? (int)Math.Round(inliers)
+            : samples.Count(sample => sample.Inlier == true);
+        var meanError = TryReadNestedDouble(dictionary, "LastSolveResult", "MeanError", out var mean)
+            ? mean
+            : double.NaN;
+        var maxError = TryReadNestedDouble(dictionary, "LastSolveResult", "MaxError", out var max)
+            ? max
+            : double.NaN;
+        var qualityParts = new List<string>
+        {
+            $"{status} {mode}",
+            $"{samples.Count.ToString(CultureInfo.InvariantCulture)} samples",
+            $"{samples.Count(sample => sample.Enabled).ToString(CultureInfo.InvariantCulture)} enabled"
+        };
+        if (accepted.HasValue)
+        {
+            qualityParts.Add($"accepted={accepted.Value.ToString(CultureInfo.InvariantCulture).ToLowerInvariant()}");
+        }
+
+        if (inlierCount > 0)
+        {
+            qualityParts.Add($"inliers={inlierCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (double.IsFinite(meanError))
+        {
+            qualityParts.Add($"mean={meanError.ToString("0.###", CultureInfo.InvariantCulture)} {unit}");
+        }
+
+        if (double.IsFinite(maxError))
+        {
+            qualityParts.Add($"max={maxError.ToString("0.###", CultureInfo.InvariantCulture)} {unit}");
+        }
+
+        draft = new CalibrationDraftSceneData(
+            sessionId,
+            mode,
+            unit,
+            accepted,
+            string.Join(" | ", qualityParts),
+            samples);
+        return true;
+    }
+
+    private static bool TryReadCalibrationDraftSample(object? raw, int ordinal, out CalibrationDraftSceneSample sample)
+    {
+        sample = default!;
+        if (!TryReadObjectDictionary(raw, out var dictionary) ||
+            !TryGetDouble(dictionary, "PixelX", out var pixelX) ||
+            !TryGetDouble(dictionary, "PixelY", out var pixelY))
+        {
+            return false;
+        }
+
+        if (!AreFinite(pixelX, pixelY))
+        {
+            return false;
+        }
+
+        var sampleId = ReadDictionaryString(dictionary, "SampleId", $"sample-{ordinal.ToString(CultureInfo.InvariantCulture)}");
+        var order = TryGetDouble(dictionary, "Order", out var orderValue)
+            ? (int)Math.Round(orderValue)
+            : ordinal + 1;
+        var enabled = !TryReadDictionaryBool(dictionary, "Enabled", out var enabledValue) || enabledValue;
+        bool? inlier = TryReadDictionaryBool(dictionary, "Inlier", out var inlierValue) ? inlierValue : null;
+        double? reprojectionX = TryGetDouble(dictionary, "ReprojectionX", out var rx) && double.IsFinite(rx) ? rx : null;
+        double? reprojectionY = TryGetDouble(dictionary, "ReprojectionY", out var ry) && double.IsFinite(ry) ? ry : null;
+        double? error = TryGetDouble(dictionary, "Error", out var errorValue) && double.IsFinite(errorValue) ? errorValue : null;
+
+        sample = new CalibrationDraftSceneSample(
+            ordinal,
+            sampleId,
+            order,
+            pixelX,
+            pixelY,
+            enabled,
+            inlier,
+            reprojectionX,
+            reprojectionY,
+            error);
+        return true;
+    }
+
+    private static IEnumerable<object?> EnumerateValues(object? raw)
+    {
+        switch (raw)
+        {
+            case JsonElement { ValueKind: JsonValueKind.Array } array:
+                foreach (var item in array.EnumerateArray())
+                {
+                    yield return item;
+                }
+
+                yield break;
+            case IEnumerable enumerable and not string:
+                foreach (var item in enumerable)
+                {
+                    yield return item;
+                }
+
+                yield break;
+        }
+    }
+
+    private static bool TryReadNestedDouble(
+        IDictionary<string, object> dictionary,
+        string objectKey,
+        string valueKey,
+        out double value)
+    {
+        value = 0;
+        return TryGetDictionaryValue(dictionary, objectKey, out var raw) &&
+            TryReadObjectDictionary(raw, out var nested) &&
+            TryGetDouble(nested, valueKey, out value);
+    }
+
+    private static bool TryReadNestedBool(
+        IDictionary<string, object> dictionary,
+        string objectKey,
+        string valueKey,
+        out bool value)
+    {
+        value = false;
+        return TryGetDictionaryValue(dictionary, objectKey, out var raw) &&
+            TryReadObjectDictionary(raw, out var nested) &&
+            TryReadDictionaryBool(nested, valueKey, out value);
+    }
+
+    private static bool TryReadDictionaryBool(
+        IDictionary<string, object> dictionary,
+        string key,
+        out bool value)
+    {
+        value = false;
+        if (!TryGetDictionaryValue(dictionary, key, out var raw) || raw == null)
+        {
+            return false;
+        }
+
+        switch (raw)
+        {
+            case bool boolean:
+                value = boolean;
+                return true;
+            case string text when bool.TryParse(text, out var parsedText):
+                value = parsedText;
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.True }:
+                value = true;
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.False }:
+                value = false;
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.String } element when bool.TryParse(element.GetString(), out var parsedJson):
+                value = parsedJson;
+                return true;
+            case int number:
+                value = number != 0;
+                return true;
+            case long number:
+                value = number != 0;
+                return true;
+            case double number when double.IsFinite(number):
+                value = Math.Abs(number) > double.Epsilon;
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -2557,4 +2979,53 @@ public static class ExecutionVisualSceneProjector
     private readonly record struct CaliperScenePoint(double X, double Y, int CaliperIndex, double AngleDegrees, int Ordinal);
 
     private readonly record struct PointPairCandidate(PointCandidate ImagePoint);
+
+    private sealed class CalibrationDraftSceneData
+    {
+        public CalibrationDraftSceneData()
+        {
+        }
+
+        public CalibrationDraftSceneData(
+            string sessionId,
+            string mode,
+            string unit,
+            bool? accepted,
+            string qualityText,
+            List<CalibrationDraftSceneSample> samples)
+        {
+            SessionId = string.IsNullOrWhiteSpace(sessionId) ? "ephemeral" : sessionId;
+            Mode = mode;
+            Unit = unit;
+            Accepted = accepted;
+            QualityText = qualityText;
+            Samples = samples;
+        }
+
+        public string SessionId { get; init; } = "ephemeral";
+        public string Mode { get; init; } = "Affine";
+        public string Unit { get; init; } = "mm";
+        public bool? Accepted { get; init; }
+        public string QualityText { get; init; } = "Draft";
+        public List<CalibrationDraftSceneSample> Samples { get; init; } = [];
+    }
+
+    private sealed record CalibrationDraftSceneSample(
+        int Ordinal,
+        string SampleId,
+        int Order,
+        double PixelX,
+        double PixelY,
+        bool Enabled,
+        bool? Inlier,
+        double? ReprojectionX,
+        double? ReprojectionY,
+        double? Error)
+    {
+        public bool HasReprojection =>
+            ReprojectionX.HasValue &&
+            ReprojectionY.HasValue &&
+            double.IsFinite(ReprojectionX.Value) &&
+            double.IsFinite(ReprojectionY.Value);
+    }
 }

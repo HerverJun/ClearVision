@@ -24,6 +24,8 @@ public class NPointCalibrationSolverTests
 
         var solverResult = solver.Solve(new NPointCalibrationRequest(mode, pairs, options));
         solverResult.Success.Should().BeTrue(solverResult.ErrorMessage);
+        solverResult.InlierFlags.Should().HaveCount(pairs.Count);
+        solverResult.InlierFlags.Count(flag => flag).Should().Be(solverResult.ErrorStats.InlierCount);
 
         var operatorExecutor = new NPointCalibrationOperator(Substitute.For<ILogger<NPointCalibrationOperator>>());
         var op = CreateOperator(new Dictionary<string, object>

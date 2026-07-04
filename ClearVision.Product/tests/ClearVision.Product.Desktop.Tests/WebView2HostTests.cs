@@ -52,6 +52,7 @@ public class WebView2HostTests
         script.Should().Contain("\"nodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":true");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
+        script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
         script.Should().Contain("\"hostKind\":\"desktop-webview2\"");
         script.Should().Contain("\"frontendV2BasePath\":\"/v2\"");
@@ -70,6 +71,7 @@ public class WebView2HostTests
         script.Should().Contain("\"nodePreviewInspectorEnabled\":false");
         script.Should().Contain("\"Studio:NodePreviewInspectorEnabled\":false");
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":true");
+        script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":true");
         script.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
         script.Should().Contain("writable: false");
         script.Should().Contain("configurable: false");
@@ -83,9 +85,11 @@ public class WebView2HostTests
             apiBaseUrl: "http://localhost:5000/api",
             cssVersion: "123",
             nodePreviewInspectorEnabled: false,
-            circleSearchV2ToolEnabled: false);
+            circleSearchV2ToolEnabled: false,
+            nPointCalibrationWorkbenchEnabled: false);
 
         script.Should().Contain("\"Studio:CircleSearchV2ToolEnabled\":false");
+        script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":false");
         script.Should().Contain("Object.freeze(startup)");
     }
 }
