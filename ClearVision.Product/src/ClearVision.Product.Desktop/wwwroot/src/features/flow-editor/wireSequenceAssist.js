@@ -20,6 +20,32 @@ function readOperatorType(operator) {
     return String(operator?.type ?? operator?.Type ?? '').trim();
 }
 
+function hasParameter(finalParameters, key) {
+    return Object.prototype.hasOwnProperty.call(finalParameters, key);
+}
+
+function findRelevantOperator(flowData, relevantIds, operatorType) {
+    return getOperators(flowData).find(operator =>
+        relevantIds.has(String(readOperatorId(operator) || '')) &&
+        readOperatorType(operator) === operatorType);
+}
+
+function collectPrefixedParameters(finalParameters, prefix) {
+    const parameters = {};
+    Object.entries(finalParameters || {}).forEach(([key, value]) => {
+        if (!key.startsWith(prefix)) {
+            return;
+        }
+
+        const parameterName = key.slice(prefix.length);
+        if (parameterName) {
+            parameters[parameterName] = value;
+        }
+    });
+
+    return parameters;
+}
+
 function readSourceOperatorId(connection) {
     return connection?.sourceOperatorId
         ?? connection?.SourceOperatorId
@@ -66,11 +92,9 @@ function collectRelevantOperatorIds(flowData, targetNodeId) {
 
 export function createWireSequenceParameterPatch(flowData, targetNodeId, finalParameters = {}) {
     const relevantIds = collectRelevantOperatorIds(flowData, targetNodeId);
-    const deepLearning = getOperators(flowData).find(operator =>
-        relevantIds.has(String(readOperatorId(operator) || '')) &&
-        readOperatorType(operator) === 'DeepLearning');
+    const deepLearning = findRelevantOperator(flowData, relevantIds, 'DeepLearning');
 
-    if (Object.prototype.hasOwnProperty.call(finalParameters, 'DeepLearning.Confidence')) {
+    if (hasParameter(finalParameters, 'DeepLearning.Confidence')) {
         if (!deepLearning) {
             return null;
         }
@@ -80,6 +104,19 @@ export function createWireSequenceParameterPatch(flowData, targetNodeId, finalPa
             parameters: {
                 Confidence: finalParameters['DeepLearning.Confidence']
             }
+        };
+    }
+
+    const boxNmsParameters = collectPrefixedParameters(finalParameters, 'BoxNms.');
+    if (Object.keys(boxNmsParameters).length > 0) {
+        const boxNms = findRelevantOperator(flowData, relevantIds, 'BoxNms');
+        if (!boxNms) {
+            return null;
+        }
+
+        return {
+            operatorId: readOperatorId(boxNms),
+            parameters: boxNmsParameters
         };
     }
 
@@ -109,7 +146,7 @@ export function buildWireSequenceFollowupHint({
     }
 
     const parameterEntries = Object.entries(finalParameters || {}).filter(([key]) =>
-        key === 'DeepLearning.Confidence');
+        key === 'DeepLearning.Confidence' || key.startsWith('BoxNms.'));
     if (parameterEntries.length > 0) {
         lines.push('建议直接修改以下参数：');
         parameterEntries.forEach(([key, value]) => {

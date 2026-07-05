@@ -296,8 +296,15 @@ let aiPanelModulePromise = null;
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
 const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
+const PROJECT_FLOW_SYNC_DEBOUNCE_MS = 250;
+const PROJECT_FLOW_SYNC_IDLE_TIMEOUT_MS = 1500;
 const promptedLocalDraftKeys = new Set();
 let lastLocalDraftBackupSignature = null;
+let pendingProjectFlowSyncTimer = null;
+let pendingProjectFlowSyncIdleCancel = null;
+let pendingProjectFlowSyncProjectId = null;
+let pendingProjectFlowSyncRevision = null;
+let pendingProjectFlowSyncReason = null;
 
 function getLocalDraftBackupSignature(project, flow) {
     const projectId = project?.id || '';
@@ -582,6 +589,79 @@ function promptLocalDraftRestore(project) {
     showToast('已恢复本机草稿；请点击“保存工程”写入正式工程库。', 'warning');
 }
 
+function scheduleIdleWork(callback, timeout = PROJECT_FLOW_SYNC_IDLE_TIMEOUT_MS) {
+    if (typeof window.requestIdleCallback === 'function') {
+        const handle = window.requestIdleCallback(callback, { timeout });
+        return () => window.cancelIdleCallback?.(handle);
+    }
+
+    const handle = window.setTimeout(callback, 0);
+    return () => window.clearTimeout(handle);
+}
+
+function clearPendingProjectFlowSyncSchedule() {
+    if (pendingProjectFlowSyncTimer !== null) {
+        window.clearTimeout(pendingProjectFlowSyncTimer);
+        pendingProjectFlowSyncTimer = null;
+    }
+
+    if (pendingProjectFlowSyncIdleCancel) {
+        pendingProjectFlowSyncIdleCancel();
+        pendingProjectFlowSyncIdleCancel = null;
+    }
+}
+
+function resetPendingProjectFlowSync() {
+    clearPendingProjectFlowSyncSchedule();
+    pendingProjectFlowSyncProjectId = null;
+    pendingProjectFlowSyncRevision = null;
+    pendingProjectFlowSyncReason = null;
+}
+
+function runPendingProjectFlowSyncWhenIdle() {
+    pendingProjectFlowSyncTimer = null;
+    pendingProjectFlowSyncIdleCancel = scheduleIdleWork(() => {
+        pendingProjectFlowSyncIdleCancel = null;
+        flushPendingProjectFlowSync();
+    });
+}
+
+function scheduleProjectFlowSyncFromCanvas(payload = {}) {
+    if (projectFlowSyncSuppressionDepth > 0) {
+        return;
+    }
+
+    const project = getCurrentProject();
+    if (!project || !flowCanvas || typeof flowCanvas.serialize !== 'function') {
+        return;
+    }
+
+    pendingProjectFlowSyncProjectId = project.id || null;
+    pendingProjectFlowSyncRevision = payload.flowRevision ?? flowCanvas.getFlowRevision?.() ?? null;
+    pendingProjectFlowSyncReason = payload.reason || 'structure-change';
+    projectManager.markFlowDirty?.();
+
+    clearPendingProjectFlowSyncSchedule();
+    pendingProjectFlowSyncTimer = window.setTimeout(
+        runPendingProjectFlowSyncWhenIdle,
+        PROJECT_FLOW_SYNC_DEBOUNCE_MS);
+}
+
+function flushPendingProjectFlowSync() {
+    if (pendingProjectFlowSyncProjectId === null && pendingProjectFlowSyncRevision === null) {
+        return null;
+    }
+
+    const expectedProjectId = pendingProjectFlowSyncProjectId;
+    const reason = pendingProjectFlowSyncReason || 'flush';
+    clearPendingProjectFlowSyncSchedule();
+    return syncCurrentProjectFlowFromCanvas({
+        expectedProjectId,
+        force: true,
+        reason
+    });
+}
+
 function initializeProjectFlowCanvasSync() {
     if (!flowCanvas || typeof flowCanvas.subscribeStructureState !== 'function') {
         return;
@@ -592,7 +672,7 @@ function initializeProjectFlowCanvasSync() {
             return;
         }
 
-        syncCurrentProjectFlowFromCanvas();
+        scheduleProjectFlowSyncFromCanvas(payload);
     });
     subscriptions.push(unsubscribe);
 }
@@ -2400,8 +2480,8 @@ async function handleProjectChange(project) {
     await switchView('flow');
 }
 
-function syncCurrentProjectFlowFromCanvas() {
-    if (projectFlowSyncSuppressionDepth > 0) {
+function syncCurrentProjectFlowFromCanvas(options = {}) {
+    if (projectFlowSyncSuppressionDepth > 0 && options.force !== true) {
         return null;
     }
 
@@ -2410,10 +2490,29 @@ function syncCurrentProjectFlowFromCanvas() {
         return null;
     }
 
+    if (options.expectedProjectId &&
+        String(project.id || '').toLowerCase() !== String(options.expectedProjectId).toLowerCase()) {
+        resetPendingProjectFlowSync();
+        return null;
+    }
+
     const flow = flowCanvas.serialize();
     projectManager.updateFlow(flow);
+    if (!options.expectedProjectId ||
+        String(project.id || '').toLowerCase() === String(options.expectedProjectId).toLowerCase()) {
+        resetPendingProjectFlowSync();
+    }
     return flow;
 }
+
+function getCurrentFlowSnapshotForPersistence() {
+    return flushPendingProjectFlowSync() ||
+        syncCurrentProjectFlowFromCanvas({ force: true, reason: 'persistence' }) ||
+        getCurrentProject()?.flow ||
+        null;
+}
+
+projectManager.setFlowSnapshotProvider?.(() => getCurrentFlowSnapshotForPersistence());
 
 async function ensureProjectForAppliedFlow(flow, options = {}) {
     if (getCurrentProject()?.id || getFlowNodeCount(flow) === 0) {
@@ -2478,7 +2577,9 @@ function startAutoSave() {
         const project = getCurrentProject();
         if (project && projectManager.hasUnsavedChanges?.()) {
             try {
-                const flow = project.flow || (flowCanvas && typeof flowCanvas.serialize === 'function' ? flowCanvas.serialize() : null);
+                const flow = flushPendingProjectFlowSync() ||
+                    project.flow ||
+                    (flowCanvas && typeof flowCanvas.serialize === 'function' ? flowCanvas.serialize() : null);
                 if (!flow) {
                     return;
                 }
@@ -2518,7 +2619,11 @@ async function triggerAutoSave() {
     if (project && flowCanvas) {
         try {
             syncCurrentPropertyDraftForPersistence();
-            project.flow = flowCanvas.serialize();
+            project.flow = getCurrentFlowSnapshotForPersistence();
+            if (!project.flow) {
+                return;
+            }
+
             saveLocalDraftBackup(project, project.flow, 'manual');
             debugLogger.debug('[LocalDraftBackup] 手动触发本机草稿备份完成');
             showToast('本机草稿已更新；正式工程仍需点击“保存工程”。', 'success');
@@ -2564,7 +2669,7 @@ async function resolveProjectExportSource(projectId = null) {
     if (currentProject && currentProject.id === targetProjectId) {
         return {
             project: currentProject,
-            flow: flowCanvas ? flowCanvas.serialize() : currentProject.flow,
+            flow: getCurrentFlowSnapshotForPersistence(),
             isCurrentProject: true
         };
     }
@@ -2632,7 +2737,7 @@ async function exportRuntimePackage(projectId = null) {
     try {
         const requestBody = {};
         if (currentProject && currentProject.id === targetProjectId) {
-            const flow = flowCanvas ? flowCanvas.serialize() : currentProject.flow;
+            const flow = getCurrentFlowSnapshotForPersistence();
             await projectManager.saveProject({
                 ...currentProject,
                 flow

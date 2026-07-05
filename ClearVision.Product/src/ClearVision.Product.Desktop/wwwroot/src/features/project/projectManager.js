@@ -18,6 +18,25 @@ class ProjectManager {
         this.unsavedChanges = false;
         this.openProjectRequestId = 0;
         this.savedGlobalVariablesSignature = '';
+        this.flowSnapshotProvider = null;
+    }
+
+    setFlowSnapshotProvider(provider) {
+        this.flowSnapshotProvider = typeof provider === 'function' ? provider : null;
+    }
+
+    syncFlowSnapshotForPersistence() {
+        if (!this.currentProject || !this.flowSnapshotProvider) {
+            return null;
+        }
+
+        const flow = this.flowSnapshotProvider(this.currentProject);
+        if (!flow) {
+            return null;
+        }
+
+        this.currentProject.flow = flow;
+        return flow;
     }
 
     invalidateOpenProjectRequests() {
@@ -216,9 +235,10 @@ class ProjectManager {
             throw new Error('No project is open.');
         }
 
+        const syncedFlow = this.syncFlowSnapshotForPersistence();
         const targetProjectId = this.currentProject.id;
         const data = projectData || this.currentProject;
-        const flow = data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null;
+        const flow = syncedFlow || data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null;
         const globalVariables = data.globalVariables || data.GlobalVariables || this.currentProject.globalVariables || this.currentProject.GlobalVariables;
         const globalVariablesChanged = this.haveGlobalVariablesChanged(globalVariables);
 
@@ -333,6 +353,13 @@ class ProjectManager {
         if (!this.currentProject) return;
 
         this.currentProject.flow = flowData;
+        this.unsavedChanges = true;
+        this.updateTitle();
+    }
+
+    markFlowDirty() {
+        if (!this.currentProject) return;
+
         this.unsavedChanges = true;
         this.updateTitle();
     }

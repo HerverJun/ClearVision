@@ -366,8 +366,13 @@ const CATEGORY_ICON_BLOCKS = [
     `
 3D|M12 2l7 4v12l-7 4-7-4V6l7-4zm0 2.3L7 6.8l5 2.9 5-2.9-5-2.5zm-5 5v5.8l4 2.3V12L7 9.3zm6 8.1l4-2.3V9.3L13 12v5.4z
 AI Inspection|M12 2l7 4v5c0 5-3.4 9.74-7 11-3.6-1.26-7-6-7-11V6l7-4zm-1 12l-2-2-1.4 1.4L11 17l5-5-1.4-1.4L11 14z
+AI Detection|M12 2l7 4v5c0 5-3.4 9.74-7 11-3.6-1.26-7-6-7-11V6l7-4zm-1 12l-2-2-1.4 1.4L11 17l5-5-1.4-1.4L11 14z
 AI检测|M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6v-2h12v2z
+AI 检测|M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6v-2h12v2z
 Analysis|M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7zM3 21h18v-2H3v2z
+Communication|M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z
+Detection|M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z
+Flow Control|M20 12l-4-4v3H4v2h12v3l4-4zM4 6h16v2H4V6zm0 12h16v-2H4v2z
 Frequency|M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0v2c-2-4-4-4-6 0s-4 4-6 0-4-4-6 0v-2z
 频域|M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0v2c-2-4-4-4-6 0s-4 4-6 0-4-4-6 0v-2z
 Morphology|M12 2l-5 5h3v6h-3l5 5 5-5h-3V7h3l-5-5z M12 10v4h-2v-4h2z M10 12h4v-2h-4v2z
@@ -432,8 +437,13 @@ const CATEGORY_COLOR_BLOCKS = [
     `
 3D|#64748b
 AI Inspection|#a0d911
+AI Detection|#a0d911
 AI检测|#a0d911
+AI 检测|#a0d911
 Analysis|#38bdf8
+Communication|#13c2c2
+Detection|#f5222d
+Flow Control|#faad14
 Frequency|#0ea5e9
 频域|#0ea5e9
 Morphology|#fa8c16

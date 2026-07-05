@@ -8,7 +8,7 @@ import httpClient from '../../core/messaging/httpClient.js';
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { createSignal } from '../../core/state/store.js';
 import { getStoredToken } from '../auth/authStorage.js';
-import { buildSseHeaders, parseSseFrame } from './inspectionSseClient.mjs';
+import { buildSseHeaders, buildSseUrl, parseSseFrame } from './inspectionSseClient.mjs';
 
 // 检测状态
 const [getInspectionState, setInspectionState, subscribeInspectionState] = createSignal({
@@ -488,7 +488,7 @@ class InspectionController {
     async openSseStream(eventUrl, token, signal) {
         const headers = buildSseHeaders(token, this.lastSseEventId);
 
-        const response = await fetch(eventUrl, {
+        const response = await fetch(buildSseUrl(eventUrl, this.lastSseEventId), {
             method: 'GET',
             headers,
             signal

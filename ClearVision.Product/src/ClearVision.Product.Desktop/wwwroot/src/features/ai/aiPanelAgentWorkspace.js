@@ -2300,6 +2300,10 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         this._closeAgentRunEventSource?.();
+        if (this.activePlanRunId === completion.runId) {
+            this.activePlanRunId = null;
+            this.activePlanRunRequestId = null;
+        }
         this.activePlanRunCompletion = null;
         completion.resolve(result);
     },
@@ -2370,8 +2374,13 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _rejectActivePlanRun(error, { cancelled = false } = {}) {
         const completion = this.activePlanRunCompletion;
+        const runId = String(completion?.runId || '').trim();
         this._closeAgentRunEventSource?.();
         this.activePlanRunCompletion = null;
+        if (!runId || this.activePlanRunId === runId) {
+            this.activePlanRunId = null;
+            this.activePlanRunRequestId = null;
+        }
         this._setGeneratingState?.(false);
         if (cancelled) {
             this._clearActivePlanRequest(this.activePlanRunRequestId);

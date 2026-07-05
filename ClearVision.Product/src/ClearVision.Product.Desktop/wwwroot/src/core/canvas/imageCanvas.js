@@ -820,7 +820,7 @@ class ImageCanvas {
                 command.overlay.visible = false;
             }
         });
-        
+
         this.ctx.restore();
     }
 

@@ -471,17 +471,41 @@ class HttpClient {
      * 发送 DELETE 请求
      */
     async delete(url, options = {}) {
-        const fullUrl = this.buildRequestUrl(url);
+        let fullUrl = this.buildRequestUrl(url);
+        console.log(`[HttpClient] DELETE ${fullUrl}`);
         const signal = options?.signal;
-        const response = await fetch(fullUrl, {
-            method: 'DELETE',
-            headers: this.defaultHeaders,
-            signal
-        });
-        if (options?.ignoreNotFound && response.status === 404) {
-            return null;
+
+        try {
+            const response = await fetch(fullUrl, {
+                method: 'DELETE',
+                headers: this.defaultHeaders,
+                signal
+            });
+            this.saveSuccessfulPort(fullUrl);
+            if (options?.ignoreNotFound && response.status === 404) {
+                return null;
+            }
+            return this.handleResponse(response);
+        } catch (error) {
+            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+                const discoveredPort = await this.discoverPort();
+                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
+                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试 DELETE...`);
+                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
+                    const response = await fetch(fullUrl, {
+                        method: 'DELETE',
+                        headers: this.defaultHeaders,
+                        signal
+                    });
+                    this.saveSuccessfulPort(fullUrl);
+                    if (options?.ignoreNotFound && response.status === 404) {
+                        return null;
+                    }
+                    return this.handleResponse(response);
+                }
+            }
+            throw this.handleNetworkError(error, fullUrl);
         }
-        return this.handleResponse(response);
     }
 
     async getPreviewArtifactBlob(artifactId, options = {}) {

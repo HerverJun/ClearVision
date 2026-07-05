@@ -1,6 +1,6 @@
 ﻿import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
-import { buildSseHeaders, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
+import { buildSseHeaders, buildSseUrl, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
 import {
     buildResultCardsFromOutputData,
     renderResultCardHtml
@@ -48,6 +48,7 @@ class StationMonitorView {
         this._stationRenderSnapshot = null;
         this._onlineCache = new Map();
         this._relativeTimeCache = new Map();
+        this._summaryRenderSignature = '';
         this.renderShell();
         this.bindEvents();
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
@@ -475,7 +476,7 @@ class StationMonitorView {
 
     async openSseStream(eventUrl, token, signal) {
         const headers = buildSseHeaders(token, this.lastSseEventId);
-        const response = await fetch(eventUrl, {
+        const response = await fetch(buildSseUrl(eventUrl, this.lastSseEventId), {
             method: 'GET',
             headers,
             signal
@@ -1071,6 +1072,14 @@ class StationMonitorView {
             { label: '平均节拍', value: this.formatMilliseconds(avgExecutionTime), meta: `${this.offlineThresholdSeconds} 秒后判定超时`, tone: 'info' }
         ];
 
+        const signature = cards
+            .map((card) => `${card.label}:${card.value}:${card.meta}:${card.tone}`)
+            .join('|');
+        if (signature === this._summaryRenderSignature) {
+            return;
+        }
+
+        this._summaryRenderSignature = signature;
         this.summaryGrid.innerHTML = cards.map((card) => `
             <article class="sm-kpi sm-kpi--${card.tone}">
                 <div class="sm-kpi-inner">

@@ -6,7 +6,7 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
 import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
-import { buildSseHeaders, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
+import { buildSseHeaders, buildSseUrl, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
 import debugLogger from '../../core/logging/debugLogger.js';
 import { t } from '../../core/i18n/resources.js';
 import {
@@ -3017,7 +3017,7 @@ class ResultPanel {
     }
 
     async openResultsStream(url, token, signal) {
-        const response = await fetch(url, {
+        const response = await fetch(buildSseUrl(url, this._resultsLastEventId), {
             method: 'GET',
             headers: buildSseHeaders(token, this._resultsLastEventId),
             signal

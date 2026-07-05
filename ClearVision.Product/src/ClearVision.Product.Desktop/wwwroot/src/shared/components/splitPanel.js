@@ -22,6 +22,10 @@ export class SplitPanel {
         this.startPos = 0;
         this.startRatio = 0;
         this.currentRatio = this.options.initialRatio;
+        this.dragContainerSize = 1;
+        this.pendingRatio = null;
+        this.resizeFrameId = null;
+        this.resizeFrameIsTimeout = false;
 
         // AbortController 用于统一管理事件监听
         this._abortController = new AbortController();
@@ -68,6 +72,11 @@ export class SplitPanel {
             this.isDragging = true;
             this.startPos = this.options.direction === 'horizontal' ? e.clientX : e.clientY;
             this.startRatio = this.currentRatio;
+            this.dragContainerSize = Math.max(
+                1,
+                this.options.direction === 'horizontal'
+                    ? this.container.clientWidth
+                    : this.container.clientHeight);
 
             // 添加拖动样式
             this.splitter.classList.add('dragging');
@@ -83,25 +92,17 @@ export class SplitPanel {
 
             const currentPos = this.options.direction === 'horizontal' ? e.clientX : e.clientY;
             const delta = currentPos - this.startPos;
-            const containerSize = this.options.direction === 'horizontal'
-                ? this.container.clientWidth
-                : this.container.clientHeight;
 
             // 计算新比例
-            const deltaRatio = delta / containerSize;
+            const deltaRatio = delta / this.dragContainerSize;
             let newRatio = this.startRatio + deltaRatio;
 
             // 限制最小尺寸
-            const minRatio = this.options.minSize / containerSize;
+            const minRatio = this.options.minSize / this.dragContainerSize;
             const maxRatio = 1 - minRatio;
             newRatio = Math.max(minRatio, Math.min(maxRatio, newRatio));
 
-            this.currentRatio = newRatio;
-            this.applyRatio(newRatio);
-
-            if (this.options.onResize) {
-                this.options.onResize(this.currentRatio, this.firstPanel, this.secondPanel);
-            }
+            this.scheduleRatioUpdate(newRatio);
         }, { signal: this._signal });
 
         // 鼠标释放 - 使用AbortController管理
@@ -111,6 +112,7 @@ export class SplitPanel {
                 this.splitter.classList.remove('dragging');
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
+                this.flushPendingRatio();
             }
         }, { signal: this._signal });
 
@@ -126,12 +128,91 @@ export class SplitPanel {
     destroy() {
         // 中止所有通过AbortController注册的事件监听
         this._abortController.abort();
+        this.cancelPendingFrame();
 
         // 清理DOM引用
         this.firstPanel = null;
         this.secondPanel = null;
         this.splitter = null;
         this.container = null;
+    }
+
+    scheduleRatioUpdate(ratio) {
+        this.currentRatio = ratio;
+        this.pendingRatio = ratio;
+
+        if (this.resizeFrameId !== null) {
+            return;
+        }
+
+        if (typeof window.requestAnimationFrame === 'function') {
+            this.resizeFrameIsTimeout = false;
+            this.resizeFrameId = window.requestAnimationFrame(() => {
+                this.resizeFrameId = null;
+                this.applyPendingRatio();
+            });
+            return;
+        }
+
+        const scheduleTimeout = typeof window.setTimeout === 'function'
+            ? window.setTimeout.bind(window)
+            : setTimeout;
+        this.resizeFrameIsTimeout = true;
+        this.resizeFrameId = scheduleTimeout(() => {
+            this.resizeFrameId = null;
+            this.applyPendingRatio();
+        }, 16);
+    }
+
+    cancelPendingFrame() {
+        if (this.resizeFrameId === null) {
+            return;
+        }
+
+        if (this.resizeFrameIsTimeout) {
+            const clearScheduledTimeout = typeof window.clearTimeout === 'function'
+                ? window.clearTimeout.bind(window)
+                : clearTimeout;
+            clearScheduledTimeout(this.resizeFrameId);
+        } else if (typeof window.cancelAnimationFrame === 'function') {
+            window.cancelAnimationFrame(this.resizeFrameId);
+        } else {
+            const clearScheduledTimeout = typeof window.clearTimeout === 'function'
+                ? window.clearTimeout.bind(window)
+                : clearTimeout;
+            clearScheduledTimeout(this.resizeFrameId);
+        }
+
+        this.resizeFrameId = null;
+        this.resizeFrameIsTimeout = false;
+    }
+
+    clearPendingRatio() {
+        this.cancelPendingFrame();
+        this.pendingRatio = null;
+    }
+
+    flushPendingRatio() {
+        if (this.pendingRatio === null) {
+            return;
+        }
+
+        this.cancelPendingFrame();
+        this.applyPendingRatio();
+    }
+
+    applyPendingRatio() {
+        if (this.pendingRatio === null) {
+            return;
+        }
+
+        const ratio = this.pendingRatio;
+        this.pendingRatio = null;
+        this.applyRatio(ratio);
+
+        if (this.options.onResize) {
+            this.options.onResize(this.currentRatio, this.firstPanel, this.secondPanel);
+        }
     }
 
     applyRatio(ratio) {
@@ -158,6 +239,7 @@ export class SplitPanel {
      * 设置分割比例
      */
     setRatio(ratio) {
+        this.clearPendingRatio();
         this.currentRatio = Math.max(0.1, Math.min(0.9, ratio));
         this.applyRatio(this.currentRatio);
     }
@@ -197,7 +279,9 @@ export class SplitPanel {
      * 折叠第一个面板
      */
     collapseFirst() {
-        this.applyRatio(0.05);
+        this.clearPendingRatio();
+        this.currentRatio = 0.05;
+        this.applyRatio(this.currentRatio);
         this.firstPanel.classList.add('collapsed');
     }
 
@@ -205,7 +289,9 @@ export class SplitPanel {
      * 折叠第二个面板
      */
     collapseSecond() {
-        this.applyRatio(0.95);
+        this.clearPendingRatio();
+        this.currentRatio = 0.95;
+        this.applyRatio(this.currentRatio);
         this.secondPanel.classList.add('collapsed');
     }
 
@@ -213,6 +299,7 @@ export class SplitPanel {
      * 展开面板
      */
     expand() {
+        this.clearPendingRatio();
         this.currentRatio = this.options.initialRatio;
         this.applyRatio(this.currentRatio);
         this.firstPanel.classList.remove('collapsed');

@@ -7,6 +7,16 @@ export function buildSseHeaders(token, lastEventId = null) {
     return headers;
 }
 
+export function buildSseUrl(url, lastEventId = null) {
+    const cursor = String(lastEventId ?? '').trim();
+    if (!cursor) {
+        return url;
+    }
+
+    const separator = String(url || '').includes('?') ? '&' : '?';
+    return `${url}${separator}lastEventId=${encodeURIComponent(cursor)}`;
+}
+
 export function parseSseFrame(frame) {
     if (!frame || !frame.trim()) {
         return null;
