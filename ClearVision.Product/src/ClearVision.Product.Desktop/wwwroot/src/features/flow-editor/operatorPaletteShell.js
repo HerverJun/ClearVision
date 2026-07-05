@@ -231,7 +231,6 @@ export class OperatorPaletteShell {
                             title="${escapeHtml(group.label)}">
                         <span class="operator-rail-icon" data-rail-icon="${escapeHtml(group.key)}"></span>
                         <span class="operator-rail-label">${escapeHtml(group.label)}</span>
-                        ${group.operators.length > 0 ? `<span class="operator-rail-count">${group.operators.length}</span>` : ''}
                     </button>
                 `).join('')}
             </div>
