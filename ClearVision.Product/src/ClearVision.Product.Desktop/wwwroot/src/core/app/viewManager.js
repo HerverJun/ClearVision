@@ -125,13 +125,20 @@ export function createViewManager(options) {
         const rightSidebar = documentRef.querySelector('.sidebar.right');
         const operatorRail = documentRef.querySelector('.operator-rail');
         const operatorFlyout = documentRef.querySelector('.operator-group-flyout');
+        const mainContent = documentRef.getElementById('main-content');
+        const sidebarResizer = documentRef.querySelector('[data-sidebar-resizer="property"]');
         const isFlowView = view === 'flow';
+        mainContent?.classList.toggle('flow-editor-shell', isFlowView);
         leftSidebar?.classList.toggle('hidden', !isFlowView);
         rightSidebar?.classList.toggle('hidden', !isFlowView);
         operatorRail?.classList.toggle('hidden', !isFlowView);
+        sidebarResizer?.classList.toggle('hidden', !isFlowView);
         if (!isFlowView) {
             operatorFlyout?.classList.add('hidden');
             operatorFlyout?.setAttribute('aria-hidden', 'true');
+            sidebarResizer?.setAttribute('aria-hidden', 'true');
+        } else {
+            sidebarResizer?.removeAttribute('aria-hidden');
         }
 
         getPropertySidebarController()?.sync?.(view);

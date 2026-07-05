@@ -1429,7 +1429,8 @@ function isGlobalVariablesCapabilityEnabled() {
 }
 
 function isSettingsCapabilityEnabled() {
-    return SETTINGS_CAPABILITY_ENABLED;
+    return SETTINGS_CAPABILITY_ENABLED
+        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true;
 }
 
 function isProjectPageCapabilityEnabled() {
@@ -1446,7 +1447,8 @@ function isResultsReviewCapabilityEnabled() {
 }
 
 function isAiPanelCapabilityEnabled() {
-    return AI_PANEL_CAPABILITY_ENABLED;
+    return AI_PANEL_CAPABILITY_ENABLED
+        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true;
 }
 
 function disposePreviewPanelCapabilityOwner() {
@@ -2171,6 +2173,7 @@ function initializeNavigation() {
     });
 
     syncActiveNavButton(getCurrentView());
+    void switchView(getCurrentView()).catch(error => handleFeatureLoadError('视图切换', error));
 }
 
 async function ensureProjectView() {

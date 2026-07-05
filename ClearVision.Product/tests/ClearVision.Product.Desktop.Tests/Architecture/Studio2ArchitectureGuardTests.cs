@@ -1059,7 +1059,10 @@ public sealed class Studio2ArchitectureGuardTests
             studioOptionsText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain($"[\"{capability.Flag}\"]");
-            appSettingsText.Should().Contain($"\"{capability.Option}\": true");
+            var expectedDefault = capability.Option is "SettingsCapabilityEnabled" or "AiPanelCapabilityEnabled"
+                ? "false"
+                : "true";
+            appSettingsText.Should().Contain($"\"{capability.Option}\": {expectedDefault}");
             appText.Should().Contain(capability.Flag);
             appText.Should().Contain(capability.Owner);
             appText.Should().Contain(capability.Adapter);
@@ -1172,15 +1175,25 @@ public sealed class Studio2ArchitectureGuardTests
                      "PropertyPanelCapabilityEnabled",
                      "PreviewPanelCapabilityEnabled",
                      "GlobalVariablesCapabilityEnabled",
-                     "SettingsCapabilityEnabled",
                      "ProjectPageCapabilityEnabled",
                      "InspectionCapabilityEnabled",
-                     "ResultsReviewCapabilityEnabled",
-                     "AiPanelCapabilityEnabled"
+                     "ResultsReviewCapabilityEnabled"
                  })
         {
             appSettingsText.Should().Contain($"\"{option}\": true");
         }
+
+        foreach (var option in new[]
+                 {
+                     "SettingsCapabilityEnabled",
+                     "AiPanelCapabilityEnabled"
+                 })
+        {
+            appSettingsText.Should().Contain($"\"{option}\": false");
+        }
+
+        appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true");
+        appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true");
 
         appSettingsText.Should().Contain("\"WorkspaceV2Enabled\": false");
         appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");

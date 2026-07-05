@@ -7,6 +7,7 @@ function readRepoText(relativeUrl) {
 }
 
 const appSource = () => readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
+const appSettingsSource = () => readRepoText('../../../../src/ClearVision.Product.Desktop/appsettings.json');
 
 test('G15X app composition reads all remaining capability flags once and defaults to legacy paths', () => {
   const source = appSource();
@@ -83,6 +84,23 @@ test('Settings capability saves only the active tab through the existing setting
   assert.match(source, /nextConfig\[tab\.configKey\] = parsed/);
   assert.match(source, /settingsApiRef = settingsApi/);
   assert.doesNotMatch(source, /localStorage\.setItem|indexedDB/);
+});
+
+test('Settings and AI capability gates fail closed behind explicit experimental window switches', () => {
+  const source = appSource();
+  const appSettings = JSON.parse(appSettingsSource());
+
+  assert.equal(appSettings.Studio.SettingsCapabilityEnabled, false);
+  assert.equal(appSettings.Studio.AiPanelCapabilityEnabled, false);
+
+  assert.match(
+    source,
+    /function isSettingsCapabilityEnabled\(\) \{[\s\S]*return SETTINGS_CAPABILITY_ENABLED\s*&&\s*window\.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true;[\s\S]*\}/
+  );
+  assert.match(
+    source,
+    /function isAiPanelCapabilityEnabled\(\) \{[\s\S]*return AI_PANEL_CAPABILITY_ENABLED\s*&&\s*window\.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true;[\s\S]*\}/
+  );
 });
 
 test('Project Page capability routes list, search, create, open, save, import and export through project manager or existing globals', () => {
