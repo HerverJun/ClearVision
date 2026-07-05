@@ -3,7 +3,8 @@ param(
     [Alias("MaxJsonMB")]
     [double]$MaxReportMB = 1,
     [string]$AllowlistPath = "quality/evals/reports/quality-report-size-allowlist.txt",
-    [string[]]$ReportExtensions = @("*.json", "*.csv")
+    [string[]]$ReportExtensions = @("*.json", "*.csv"),
+    [int]$MinimumReportFiles = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,6 +50,18 @@ if (-not (Test-Path -LiteralPath $resolvedReportsRoot)) {
     throw "Quality report directory not found: $ReportsRoot"
 }
 
+if ($MaxReportMB -le 0) {
+    throw "MaxReportMB must be greater than 0."
+}
+
+if ($MinimumReportFiles -lt 0) {
+    throw "MinimumReportFiles must be greater than or equal to 0."
+}
+
+if ($ReportExtensions.Count -eq 0) {
+    throw "At least one report extension must be configured."
+}
+
 $maxBytes = [int64]($MaxReportMB * 1MB)
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -56,8 +69,12 @@ $reportFiles = foreach ($extension in $ReportExtensions) {
     Get-ChildItem -LiteralPath $resolvedReportsRoot -Filter $extension -File -Recurse
 }
 
-$reportFiles |
-    Sort-Object FullName -Unique |
+$uniqueReportFiles = @($reportFiles | Sort-Object FullName -Unique)
+if ($uniqueReportFiles.Count -lt $MinimumReportFiles) {
+    throw "Quality report size guard found $($uniqueReportFiles.Count) report file(s); expected at least $MinimumReportFiles under $ReportsRoot."
+}
+
+$uniqueReportFiles |
     ForEach-Object {
         if ($_.Length -le $maxBytes) {
             return
@@ -81,4 +98,4 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Quality report size guard passed. MaxReportMB=$MaxReportMB, Extensions=$($ReportExtensions -join ','), Allowlisted=$($allowed.Count)"
+Write-Host "Quality report size guard passed. Files=$($uniqueReportFiles.Count), MaxReportMB=$MaxReportMB, Extensions=$($ReportExtensions -join ','), Allowlisted=$($allowed.Count)"

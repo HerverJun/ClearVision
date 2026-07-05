@@ -152,18 +152,31 @@ function Start-VirtualPlcProcesses {
 
 $parameters = @{
     Project = $project
-    Filter = "FullyQualifiedName~PlcComm"
+    Filter = "FullyQualifiedName~PlcComm&Category!=VirtualPLC"
     Verbosity = $Verbosity
 }
+
+$defaultMinimumTotalTests = 70
 
 if ($Virtual) {
     Start-VirtualPlcProcesses
     $parameters.Filter = "FullyQualifiedName~PlcComm|FullyQualifiedName~ModbusCommunicationOperatorVirtualPlcTests"
+    $defaultMinimumTotalTests = 80
 
     if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
         $ResultsDirectory = Join-Path $repoRoot (".tmp\plc-regression\{0:yyyyMMdd-HHmmss}" -f (Get-Date))
     }
 }
+
+if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
+    $ResultsDirectory = Join-Path $repoRoot ".tmp\test_results\plc-regression"
+}
+
+if ([string]::IsNullOrWhiteSpace($LogFileName)) {
+    $LogFileName = if ($Virtual) { "plc-regression-virtual.trx" } else { "plc-regression.trx" }
+}
+
+$effectiveMinimumTotalTests = [Math]::Max($MinimumTotalTests, $defaultMinimumTotalTests)
 
 if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $parameters.ResultsDirectory = $ResultsDirectory
@@ -173,8 +186,8 @@ if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
     $parameters.LogFileName = $LogFileName
 }
 
-if ($MinimumTotalTests -gt 0) {
-    $parameters.MinimumTotalTests = $MinimumTotalTests
+if ($effectiveMinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $effectiveMinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {

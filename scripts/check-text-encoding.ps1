@@ -51,6 +51,7 @@ param(
 
     [switch]$IncludeArchives,
     [string]$BaseRef,
+    [int]$MinimumFiles = -1,
     [switch]$SelfTest
 )
 
@@ -222,17 +223,34 @@ function Test-BinaryBytes {
     return $false
 }
 
+function Invoke-Git {
+    param([string[]]$Arguments)
+
+    $output = & git -C $repoRoot -c core.quotepath=false @Arguments 2>&1
+    return @{
+        ExitCode = $LASTEXITCODE
+        Output = @($output)
+    }
+}
+
 function Get-ChangedFiles {
     param([string]$Ref)
 
-    $mergeBase = (& git -C $repoRoot -c core.quotepath=false merge-base $Ref HEAD).Trim()
-    if ([string]::IsNullOrWhiteSpace($mergeBase)) {
-        throw "Unable to resolve merge-base for '$Ref' and HEAD."
+    $mergeBaseResult = Invoke-Git @("merge-base", $Ref, "HEAD")
+    if ($mergeBaseResult.ExitCode -ne 0 -or $mergeBaseResult.Output.Count -eq 0) {
+        $details = ($mergeBaseResult.Output -join [Environment]::NewLine)
+        throw "Unable to resolve merge-base for '$Ref' and HEAD. $details"
     }
 
-    $paths = & git -C $repoRoot -c core.quotepath=false diff --name-only --diff-filter=ACMR "$mergeBase...HEAD"
+    $mergeBase = [string]$mergeBaseResult.Output[0]
+    $diffResult = Invoke-Git @("diff", "--name-only", "--diff-filter=ACMR", "$mergeBase...HEAD")
+    if ($diffResult.ExitCode -ne 0) {
+        $details = ($diffResult.Output -join [Environment]::NewLine)
+        throw "Unable to read changed files for '$mergeBase...HEAD'. $details"
+    }
+
     $files = New-Object System.Collections.Generic.List[string]
-    foreach ($path in $paths) {
+    foreach ($path in $diffResult.Output) {
         if ([string]::IsNullOrWhiteSpace($path)) {
             continue
         }
@@ -259,7 +277,7 @@ function Get-RootFiles {
     foreach ($root in $Roots) {
         $resolved = Resolve-CandidatePath -Path $root
         if (-not (Test-Path -LiteralPath $resolved)) {
-            continue
+            throw "Text encoding root not found: $root"
         }
 
         $item = Get-Item -LiteralPath $resolved
@@ -464,9 +482,25 @@ if ($SelfTest) {
 }
 
 if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-    $files = Get-RootFiles
+    $files = @(Get-RootFiles)
 } else {
-    $files = Get-ChangedFiles -Ref $BaseRef
+    $files = @(Get-ChangedFiles -Ref $BaseRef)
+}
+
+if ($MinimumFiles -lt -1) {
+    throw "MinimumFiles must be greater than or equal to -1."
+}
+
+$effectiveMinimumFiles = if ($MinimumFiles -ge 0) {
+    $MinimumFiles
+} elseif ([string]::IsNullOrWhiteSpace($BaseRef)) {
+    1
+} else {
+    0
+}
+
+if ($files.Count -lt $effectiveMinimumFiles) {
+    throw "Text encoding scan found $($files.Count) candidate file(s); expected at least $effectiveMinimumFiles."
 }
 
 $failures = New-Object System.Collections.Generic.List[object]

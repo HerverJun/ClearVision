@@ -2,6 +2,7 @@
 param(
     [string]$Path = ".",
     [string]$BaseRef,
+    [int]$MinimumFiles = 1,
     [switch]$IncludeUntracked,
     [switch]$SelfTest
 )
@@ -543,7 +544,15 @@ $findingKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringC
 $scanFailures = [System.Collections.Generic.List[object]]::new()
 $scanFailureKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 
-$files = Get-GitPathList -RepoRoot $root -IncludeUntrackedFiles:$IncludeUntracked
+if ($MinimumFiles -lt 0) {
+    throw "MinimumFiles must be greater than or equal to 0."
+}
+
+$files = @(Get-GitPathList -RepoRoot $root -IncludeUntrackedFiles:$IncludeUntracked)
+if ($files.Count -lt $MinimumFiles) {
+    throw "Secret scan found $($files.Count) candidate file(s); expected at least $MinimumFiles."
+}
+
 foreach ($file in $files) {
     Scan-File -RepoRoot $root -RelativePath $file -Findings $findings -FindingKeys $findingKeys -ScanFailures $scanFailures -ScanFailureKeys $scanFailureKeys
 }

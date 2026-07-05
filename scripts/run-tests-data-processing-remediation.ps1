@@ -9,7 +9,17 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = -1,
+
+    [switch]$SkipDockerIntegration,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +28,10 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
+$defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\data-processing-remediation-$Gate"
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$defaultLogFileName = "data-processing-remediation-$Gate-$timestamp.trx"
+$dockerIntegrationTestClass = "DatabaseWriteOperatorMultiDbIntegrationTests"
 
 $phase1TestClasses = @(
     "Sprint2_JsonExtractorTests",
@@ -29,7 +43,7 @@ $phase1TestClasses = @(
     "PointAlignmentOperatorTests",
     "PointCorrectionOperatorTests",
     "DatabaseWriteOperatorTests",
-    "DatabaseWriteOperatorMultiDbIntegrationTests",
+    $dockerIntegrationTestClass,
     "OperatorContractReconciliationTests",
     "Sprint5_AIWorkflowServiceTests"
 )
@@ -43,6 +57,18 @@ $selectedTestClasses = switch ($Gate) {
     "phase2" { $phase2TestClasses }
     default { throw "Unsupported gate '$Gate'." }
 }
+
+if ($SkipDockerIntegration -and $selectedTestClasses -contains $dockerIntegrationTestClass) {
+    $selectedTestClasses = @($selectedTestClasses | Where-Object { $_ -ne $dockerIntegrationTestClass })
+}
+
+$defaultMinimumTotalTests = switch ($Gate) {
+    "phase1" { 140 }
+    "phase2" { 150 }
+    default { 0 }
+}
+
+$effectiveMinimumTotalTests = if ($MinimumTotalTests -ge 0) { $MinimumTotalTests } else { $defaultMinimumTotalTests }
 
 function Test-DockerAccessible {
     try {
@@ -81,9 +107,9 @@ function Ensure-DockerImageAvailable {
     }
 }
 
-if ($selectedTestClasses -contains "DatabaseWriteOperatorMultiDbIntegrationTests") {
+if ($selectedTestClasses -contains $dockerIntegrationTestClass) {
     if (-not (Test-DockerAccessible)) {
-        throw "Docker access is required for DatabaseWriteOperatorMultiDbIntegrationTests. Start Docker Desktop (or expose a reachable daemon) before running gate '$Gate'."
+        throw "Docker access is required for $dockerIntegrationTestClass. Start Docker Desktop (or expose a reachable daemon) before running gate '$Gate', or pass -SkipDockerIntegration to run the non-Docker remediation subset."
     }
 
     Ensure-DockerImageAvailable -Image "mcr.microsoft.com/mssql/server:2022-latest"
@@ -91,12 +117,19 @@ if ($selectedTestClasses -contains "DatabaseWriteOperatorMultiDbIntegrationTests
 }
 
 Write-Host "[data-processing-remediation] Gate=$Gate"
+Write-Host "[data-processing-remediation] SkipDockerIntegration=$SkipDockerIntegration"
 Write-Host "[data-processing-remediation] Selected test classes: $($selectedTestClasses -join ', ')"
 
 $parameters = @{
     Project = $project
     FullyQualifiedName = $selectedTestClasses
     Verbosity = $Verbosity
+    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
+    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
+}
+
+if ($effectiveMinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $effectiveMinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
@@ -111,4 +144,14 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+$parameters.ReturnExitCode = $true
+
 & $runner @parameters
+$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+$global:LASTEXITCODE = $exitCode
+
+if ($ReturnExitCode) {
+    return
+}
+
+exit $exitCode

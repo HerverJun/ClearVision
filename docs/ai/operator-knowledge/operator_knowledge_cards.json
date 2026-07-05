@@ -13670,18 +13670,19 @@
     "Aliases": [
       "\u5F62\u6001\u5B66\uFF08\u65E7\u7248\uFF09",
       "Morphology",
-      "Erode",
-      "Dilate",
-      "Open",
-      "Close",
-      "Legacy",
-      "ImageOnly"
+      "\u5F62\u6001\u5B66",
+      "\u8150\u8680",
+      "\u81A8\u80C0",
+      "\u5F00\u8FD0\u7B97",
+      "\u95ED\u8FD0\u7B97",
+      "\u65E7\u7248",
+      "Legacy"
     ],
     "IntentTags": [
       "legacy",
       "deprecated",
       "compatibility",
-      "imageonly",
+      "image-only",
       "preprocess"
     ],
     "ScenarioTags": [
@@ -20170,6 +20171,17 @@
         "Description": "",
         "DefaultValue": "3000",
         "MinValue": "100",
+        "MaxValue": "30000",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "ResponseWaitMs",
+        "DisplayName": "\u54CD\u5E94\u7B49\u5F85(\u6BEB\u79D2)",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "100",
+        "MinValue": "0",
         "MaxValue": "30000",
         "IsRequired": true,
         "AllowedValues": []

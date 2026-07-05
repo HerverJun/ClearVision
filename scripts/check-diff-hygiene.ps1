@@ -35,6 +35,11 @@ foreach ($line in $whitespaceResult.Output) {
     }
 }
 
+if ($whitespaceResult.ExitCode -ne 0 -and $failures.Count -eq 0) {
+    $details = ($whitespaceResult.Output -join [Environment]::NewLine)
+    throw "Unable to run git diff --check for '$range'. $details"
+}
+
 $diffResult = Invoke-Git @("diff", "--unified=0", "--no-ext-diff", $range)
 if ($diffResult.ExitCode -ne 0) {
     $details = ($diffResult.Output -join [Environment]::NewLine)

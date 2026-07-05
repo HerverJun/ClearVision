@@ -61,6 +61,7 @@ jobs:
         if: always()
         with:
           name: vision-agent-quality-suite
+          if-no-files-found: error
           path: |
             quality/evals/reports/VisionAgent_business_benchmark_baseline.json
             quality/evals/reports/VisionAgent_business_benchmark_baseline.md

@@ -15,10 +15,32 @@ using CvSize = OpenCvSharp.Size;
 using DetectionList = ClearVision.Product.Core.ValueObjects.DetectionList;
 using DetectionResult = ClearVision.Product.Core.ValueObjects.DetectionResult;
 
-var options = BaselineOptions.Parse(args);
+BaselineOptions options;
+try
+{
+    options = BaselineOptions.Parse(args);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine(ex.Message);
+    return 2;
+}
+
 var repoRoot = ResolveRepoRoot();
 var dataDirectory = options.DataDirectory ?? Path.Combine(repoRoot, "ClearVision.Product", "tests", "TestData");
 var outputPath = options.OutputPath ?? Path.Combine(repoRoot, "docs", "reports", "baseline_performance.json");
+
+if (options.IterationsPerImage <= 0)
+{
+    Console.Error.WriteLine("--iterations must be an integer greater than 0.");
+    return 2;
+}
+
+if (options.WarmupIterations < 0)
+{
+    Console.Error.WriteLine("--warmup must be an integer greater than or equal to 0.");
+    return 2;
+}
 
 if (!Directory.Exists(dataDirectory))
 {
@@ -130,9 +152,33 @@ var jsonOptions = new JsonSerializerOptions
 File.WriteAllText(outputPath, JsonSerializer.Serialize(report, jsonOptions));
 Console.WriteLine($"Baseline report written: {outputPath}");
 
+var expectedSamplesPerOperator = images.Count * options.IterationsPerImage;
+var failedResults = results
+    .Where(result =>
+        !string.Equals(result.Status, "OK", StringComparison.OrdinalIgnoreCase) ||
+        result.Samples < expectedSamplesPerOperator ||
+        !string.IsNullOrWhiteSpace(result.Error))
+    .ToList();
+
 foreach (var image in images)
 {
     image.Mat.Dispose();
+}
+
+if (failedResults.Count > 0)
+{
+    Console.Error.WriteLine(
+        $"Baseline benchmark validation failed: {failedResults.Count} operator(s) did not produce " +
+        $"{expectedSamplesPerOperator} successful samples.");
+
+    foreach (var result in failedResults)
+    {
+        Console.Error.WriteLine(
+            $"- {result.OperatorType}: status={result.Status}, samples={result.Samples}, " +
+            $"expectedSamples={expectedSamplesPerOperator}, error={result.Error ?? "-"}");
+    }
+
+    return 4;
 }
 
 return 0;
@@ -394,21 +440,50 @@ sealed record BaselineOptions(int IterationsPerImage, int WarmupIterations, stri
         {
             switch (args[i])
             {
-                case "--iterations" when i + 1 < args.Length:
-                    iterations = int.TryParse(args[++i], out var parsedIterations) ? parsedIterations : iterations;
+                case "--iterations":
+                    iterations = ParseIntegerArgument(args[i], ReadRequiredValue(args, ref i));
                     break;
-                case "--warmup" when i + 1 < args.Length:
-                    warmup = int.TryParse(args[++i], out var parsedWarmup) ? parsedWarmup : warmup;
+                case "--warmup":
+                    warmup = ParseIntegerArgument(args[i], ReadRequiredValue(args, ref i));
                     break;
-                case "--data-dir" when i + 1 < args.Length:
-                    dataDir = args[++i];
+                case "--data-dir":
+                    dataDir = ReadRequiredValue(args, ref i);
                     break;
-                case "--output" when i + 1 < args.Length:
-                    output = args[++i];
+                case "--output":
+                    output = ReadRequiredValue(args, ref i);
                     break;
+                default:
+                    throw new ArgumentException($"Unknown argument: {args[i]}");
             }
         }
 
         return new BaselineOptions(iterations, warmup, dataDir, output);
+    }
+
+    private static string ReadRequiredValue(string[] args, ref int index)
+    {
+        var option = args[index];
+        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"Missing value for {option}.");
+        }
+
+        var value = args[++index];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException($"Missing value for {option}.");
+        }
+
+        return value;
+    }
+
+    private static int ParseIntegerArgument(string option, string value)
+    {
+        if (!int.TryParse(value, out var parsed))
+        {
+            throw new ArgumentException($"{option} must be an integer.");
+        }
+
+        return parsed;
     }
 }

@@ -15,7 +15,7 @@ param(
 
     [string]$LogFileName,
 
-    [int]$MinimumTotalTests = 0,
+    [int]$MinimumTotalTests = -1,
 
     [switch]$ReturnExitCode
 )
@@ -26,7 +26,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
-$defaultResultsDirectory = Join-Path $repoRoot "test_results"
+$defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\calibration-$Gate"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $defaultLogFileName = "calibration-$Gate-$timestamp.trx"
 $repoDotnetHome = Join-Path $repoRoot ".dotnet-home"
@@ -77,6 +77,15 @@ $selectedTestClasses = switch ($Gate) {
 Write-Host "[calibration-regression] Gate=$Gate"
 Write-Host "[calibration-regression] Selected test classes: $($selectedTestClasses -join ', ')"
 
+$defaultMinimumTotalTests = switch ($Gate) {
+    "regression" { 105 }
+    "integration" { 7 }
+    "all" { 115 }
+    default { 0 }
+}
+
+$effectiveMinimumTotalTests = if ($MinimumTotalTests -ge 0) { $MinimumTotalTests } else { $defaultMinimumTotalTests }
+
 $parameters = @{
     Project = $project
     FullyQualifiedName = $selectedTestClasses
@@ -85,10 +94,9 @@ $parameters = @{
     LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
 }
 
-if ($MinimumTotalTests -gt 0) {
-    $parameters.MinimumTotalTests = $MinimumTotalTests
+if ($effectiveMinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $effectiveMinimumTotalTests
 }
-
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
     $parameters.Configuration = $Configuration
 }
@@ -101,12 +109,15 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
-if ($ReturnExitCode) {
-    $parameters.ReturnExitCode = $true
-}
+$parameters.ReturnExitCode = $true
 
 & $runner @parameters
+
+$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+$global:LASTEXITCODE = $exitCode
 
 if ($ReturnExitCode) {
     return
 }
+
+exit $exitCode

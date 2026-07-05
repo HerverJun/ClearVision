@@ -12,7 +12,7 @@ param(
 
     [string]$LogFileName,
 
-    [int]$MinimumTotalTests = 0,
+    [int]$MinimumTotalTests = 15,
 
     [switch]$ReturnExitCode
 )
@@ -23,6 +23,9 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
+$defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\measurement-stability"
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$defaultLogFileName = "measurement-stability-$timestamp.trx"
 
 $testClasses = @(
     "MeasurementStabilityIntegrationTests"
@@ -34,14 +37,8 @@ $parameters = @{
     Project = $project
     FullyQualifiedName = $testClasses
     Verbosity = $Verbosity
-}
-
-if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-    $parameters.ResultsDirectory = $ResultsDirectory
-}
-
-if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
-    $parameters.LogFileName = $LogFileName
+    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
+    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
 }
 
 if ($MinimumTotalTests -gt 0) {
@@ -60,12 +57,15 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
-if ($ReturnExitCode) {
-    $parameters.ReturnExitCode = $true
-}
+$parameters.ReturnExitCode = $true
 
 & $runner @parameters
+
+$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+$global:LASTEXITCODE = $exitCode
 
 if ($ReturnExitCode) {
     return
 }
+
+exit $exitCode

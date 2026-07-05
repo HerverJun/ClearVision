@@ -109,6 +109,7 @@ jobs:
         if: always()
         with:
           name: operator-catalog
+          if-no-files-found: error
           path: |
             ./算子资料/算子目录.json
             ./算子资料/算子目录.md
@@ -146,8 +147,8 @@ jobs:
             -Verbosity normal `
             -ResultsDirectory TestResults/product `
             -LogFileName product.trx `
-            -MinimumTotalTests 1 `
-            -MinimumPassedTests 1 `
+            -MinimumTotalTests 3300 `
+            -MinimumPassedTests 3300 `
             -Filter "Category!=PerformanceBudget" `
             -Collect "XPlat Code Coverage"
 
@@ -162,9 +163,33 @@ jobs:
             -Verbosity normal `
             -ResultsDirectory TestResults/product-performance `
             -LogFileName product-performance.trx `
-            -MinimumTotalTests 1 `
-            -MinimumPassedTests 1 `
+            -MinimumTotalTests 10 `
+            -MinimumPassedTests 10 `
             -Filter "Category=PerformanceBudget"
+
+      - name: Run Measurement Performance Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-tests-measurement-performance.ps1" `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity minimal `
+            -ResultsDirectory TestResults/measurement-performance `
+            -LogFileName measurement-performance.trx `
+            -ReportDirectory ClearVision.Product/test_results
+
+      - name: Run Data Processing Remediation Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-tests-data-processing-remediation.ps1" `
+            -Gate phase2 `
+            -SkipDockerIntegration `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity minimal `
+            -ResultsDirectory TestResults/data-processing-remediation `
+            -LogFileName data-processing-remediation.trx `
+            -MinimumTotalTests 150
 
       - name: Run Desktop Tests with Coverage
         shell: pwsh
@@ -176,28 +201,36 @@ jobs:
             -Verbosity normal `
             -ResultsDirectory TestResults/desktop `
             -LogFileName desktop.trx `
-            -MinimumTotalTests 1 `
-            -MinimumPassedTests 1 `
+            -MinimumTotalTests 500 `
+            -MinimumPassedTests 500 `
             -Collect "XPlat Code Coverage"
 
       - name: Write Coverage Summary
         shell: pwsh
         if: always()
         run: |
+          $requiredCoverageRoots = @("TestResults/product", "TestResults/desktop")
+          foreach ($root in $requiredCoverageRoots) {
+            $rootFiles = Get-ChildItem -Path $root -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
+            if ($rootFiles.Count -eq 0) {
+              throw "Expected at least one Cobertura coverage file under $root."
+            }
+          }
+
           $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
           $lines = @("# Coverage Summary", "")
-          if ($files.Count -eq 0) {
-            $lines += "No Cobertura coverage files were found."
-          } else {
-            $lines += "| File | Line rate | Branch rate |"
-            $lines += "| --- | ---: | ---: |"
-            foreach ($file in $files) {
-              [xml]$xml = Get-Content -LiteralPath $file.FullName
-              $lineRate = [double]$xml.coverage.'line-rate'
-              $branchRate = [double]$xml.coverage.'branch-rate'
-              $relative = Resolve-Path -LiteralPath $file.FullName -Relative
-              $lines += "| $relative | $([Math]::Round($lineRate * 100, 2))% | $([Math]::Round($branchRate * 100, 2))% |"
+          $lines += "| File | Line rate | Branch rate |"
+          $lines += "| --- | ---: | ---: |"
+          foreach ($file in $files) {
+            [xml]$xml = Get-Content -LiteralPath $file.FullName
+            if ($null -eq $xml.coverage -or $null -eq $xml.coverage.'line-rate' -or $null -eq $xml.coverage.'branch-rate') {
+              throw "Cobertura coverage file is missing line-rate or branch-rate: $($file.FullName)"
             }
+
+            $lineRate = [double]$xml.coverage.'line-rate'
+            $branchRate = [double]$xml.coverage.'branch-rate'
+            $relative = Resolve-Path -LiteralPath $file.FullName -Relative
+            $lines += "| $relative | $([Math]::Round($lineRate * 100, 2))% | $([Math]::Round($branchRate * 100, 2))% |"
           }
           New-Item -ItemType Directory -Force -Path TestResults | Out-Null
           $lines | Set-Content -Path TestResults/coverage-summary.md -Encoding UTF8
@@ -241,6 +274,9 @@ jobs:
             NoBuild = $true
             NoRestore = $true
             Verbosity = "minimal"
+            ResultsDirectory = "TestResults/detection-performance"
+            LogFileName = "detection-performance.trx"
+            ReportDirectory = "ClearVision.Product/test_results"
           }
           if (-not [string]::IsNullOrWhiteSpace($env:DETECTION_TIGHTEN_FROM_UTC)) {
             $parameters.TightenFromUtc = $env:DETECTION_TIGHTEN_FROM_UTC
@@ -252,16 +288,28 @@ jobs:
         if: always()
         with:
           name: detection-performance-report
+          if-no-files-found: error
           path: |
             ClearVision.Product/test_results/detection_performance_budget_report.md
             ClearVision.Product/test_results/detection_performance_budget_report.json
             ClearVision.Product/test_results/archive/detection_performance_failures/**
+
+      - name: Upload Measurement Performance Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: measurement-performance-report
+          if-no-files-found: error
+          path: |
+            ClearVision.Product/test_results/measurement_performance_budget_report.md
+            ClearVision.Product/test_results/measurement_performance_budget_report.json
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
+          if-no-files-found: error
           path: |
             TestResults/**/*.trx
             TestResults/**/coverage.cobertura.xml
@@ -304,8 +352,8 @@ jobs:
             -Verbosity normal `
             -ResultsDirectory TestResults/operator-library `
             -LogFileName operator-library.trx `
-            -MinimumTotalTests 1 `
-            -MinimumPassedTests 1 `
+            -MinimumTotalTests 40 `
+            -MinimumPassedTests 40 `
             -Collect "Code Coverage" `
             -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
 
@@ -314,6 +362,7 @@ jobs:
         if: always()
         with:
           name: operator-library-package
+          if-no-files-found: error
           path: |
             ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.nupkg
             ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.snupkg
@@ -324,20 +373,68 @@ jobs:
             ClearVision.OperatorLibrary/THIRD-PARTY-NOTICES.md
 
       - name: Run Operator Performance Benchmark Smoke
-        run: >
-          dotnet run --project ${{ env.OPERATOR_BENCHMARK_PROJECT }} --configuration Release --
-          --mode smoke
-          --output artifacts/operator-performance-benchmark.json
-          --report artifacts/operator-performance-benchmark.md
+        shell: pwsh
+        run: |
+          $startedAtUtc = [DateTime]::UtcNow
+          $outputPath = "artifacts/operator-performance-benchmark.json"
+          $reportPath = "artifacts/operator-performance-benchmark.md"
+          dotnet run --project $env:OPERATOR_BENCHMARK_PROJECT --configuration Release -- `
+            --mode smoke `
+            --output $outputPath `
+            --report $reportPath
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          foreach ($path in @($outputPath, $reportPath)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Operator performance benchmark artifact was not produced: $path"
+            }
+
+            $artifact = Get-Item -LiteralPath $path
+            if ($artifact.LastWriteTimeUtc -lt $startedAtUtc) {
+              throw "Operator performance benchmark artifact is stale: $path"
+            }
+          }
+
+          $benchmark = Get-Content -LiteralPath $outputPath -Raw | ConvertFrom-Json
+          if ($benchmark.summary.mode -ne "smoke") {
+            throw "Operator performance benchmark mode mismatch: $($benchmark.summary.mode)"
+          }
+          if ([int]$benchmark.summary.caseCount -lt 4 -or [int]$benchmark.summary.passed -lt 4 -or [int]$benchmark.summary.failed -ne 0) {
+            throw "Operator performance benchmark smoke coverage regressed: caseCount=$($benchmark.summary.caseCount), passed=$($benchmark.summary.passed), failed=$($benchmark.summary.failed)"
+          }
+          Write-Host "Operator performance benchmark artifact validation passed."
 
       - name: Upload Operator Performance Benchmark
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: operator-performance-benchmark
+          if-no-files-found: error
           path: |
             artifacts/operator-performance-benchmark.json
             artifacts/operator-performance-benchmark.md
+
+      - name: Run Quick Contract Quality Suite
+        shell: pwsh
+        run: python quality/tools/run_quality_suite.py --suite quick_contract_suite --run
+
+      - name: Upload Quick Contract Quality Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quick-contract-quality-suite
+          if-no-files-found: error
+          path: |
+            quality/evals/reports/*_contract_baseline.json
+            quality/evals/reports/*_contract_baseline.md
+            quality/evals/reports/P3CoreContracts_baseline.json
+            quality/evals/reports/P3CoreContracts_baseline.md
+            quality/evals/reports/G1P3ContractBatch1_baseline.json
+            quality/evals/reports/G1P3ContractBatch1_baseline.md
+            quality/evals/reports/G1P3ContractBatch2_baseline.json
+            quality/evals/reports/G1P3ContractBatch2_baseline.md
 
       - name: Install UI Test Dependencies
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
@@ -364,6 +461,7 @@ jobs:
         if: always()
         with:
           name: vision-agent-quality-suite
+          if-no-files-found: error
           path: |
             quality/evals/reports/VisionAgent_business_benchmark_baseline.json
             quality/evals/reports/VisionAgent_business_benchmark_baseline.md
@@ -440,6 +538,7 @@ jobs:
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
           npm run test:unit
+          npm run test:preview-smoke
           npx playwright test
 
       - name: Upload UI Test Results
@@ -447,6 +546,7 @@ jobs:
         if: always()
         with:
           name: ui-test-results
+          if-no-files-found: error
           path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/test-results/
@@ -521,6 +621,7 @@ jobs:
         if: always()
         with:
           name: operator-industrial-gate
+          if-no-files-found: error
           path: |
             test_results/operator-library-industrial-gate/**/summary.json
             test_results/operator-library-industrial-gate/**/summary.md
@@ -611,6 +712,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ClearVision-Build-${{ steps.version.outputs.VERSION }}
+          if-no-files-found: error
           path: ${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}-win-x64.zip
           retention-days: 30
 

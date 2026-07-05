@@ -17,9 +17,13 @@ param(
 
     [string]$LogFileName,
 
-    [int]$MinimumTotalTests = 0,
+    [int]$MinimumTotalTests = 1,
+
+    [int]$MinimumReportEntries = 17,
 
     [string]$ReportDirectory,
+
+    [switch]$ValidateReportOnly,
 
     [switch]$ReturnExitCode
 )
@@ -30,6 +34,156 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
+$defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\measurement-performance"
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$defaultLogFileName = "measurement-performance-$timestamp.trx"
+$expectedPerformanceEntries = @(
+    "AngleMeasurement",
+    "CaliperTool",
+    "CircleMeasurement",
+    "ContourMeasurement",
+    "ColorMeasurement",
+    "GapMeasurement",
+    "GeoMeasurement",
+    "GeometricFitting",
+    "GeometricTolerance",
+    "HistogramAnalysis",
+    "LineLineDistance",
+    "LineMeasurement",
+    "MeasureDistance",
+    "PixelStatistics",
+    "PointLineDistance",
+    "SharpnessEvaluation",
+    "WidthMeasurement"
+)
+
+function Resolve-RepoRelativePath {
+    param(
+        [string]$PathValue
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PathValue)) {
+        return $PathValue
+    }
+
+    if ([System.IO.Path]::IsPathRooted($PathValue)) {
+        return [System.IO.Path]::GetFullPath($PathValue)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
+}
+
+function Resolve-MeasurementPerformanceReportDirectory {
+    if (-not [string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_REPORT_DIR)) {
+        return $env:CV_MEASUREMENT_PERF_REPORT_DIR
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:CV_PERF_REPORT_DIR)) {
+        return $env:CV_PERF_REPORT_DIR
+    }
+
+    return Join-Path $repoRoot "ClearVision.Product\test_results"
+}
+
+function Test-PerformanceReportArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ReportDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [datetime]$RunStartedAtUtc,
+
+        [Parameter(Mandatory = $true)]
+        [int]$MinimumEntries,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$ExpectedEntries,
+
+        [switch]$SkipFreshnessCheck
+    )
+
+    $allowedClockSkewSeconds = 2
+    $minimumWriteTimeUtc = if ($SkipFreshnessCheck) {
+        [DateTime]::MinValue
+    } else {
+        $RunStartedAtUtc.AddSeconds(-$allowedClockSkewSeconds)
+    }
+    $expectedReports = @(
+        (Join-Path $ReportDirectory "measurement_performance_budget_report.md"),
+        (Join-Path $ReportDirectory "measurement_performance_budget_report.json")
+    )
+
+    foreach ($reportPath in $expectedReports) {
+        if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
+            throw "Expected measurement performance report artifact was not written: $reportPath"
+        }
+
+        $report = Get-Item -LiteralPath $reportPath
+        if (-not $SkipFreshnessCheck -and $report.LastWriteTimeUtc -lt $minimumWriteTimeUtc) {
+            throw "Measurement performance report artifact is stale: $reportPath (lastWriteUtc=$($report.LastWriteTimeUtc.ToString("o")), runStartedUtc=$($RunStartedAtUtc.ToString("o")))"
+        }
+    }
+
+    $jsonPath = Join-Path $ReportDirectory "measurement_performance_budget_report.json"
+    try {
+        $reportJson = Get-Content -LiteralPath $jsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Unable to parse measurement performance report JSON: $jsonPath. $($_.Exception.Message)"
+    }
+
+    if ($null -eq $reportJson.PSObject.Properties["Entries"] -or $null -eq $reportJson.Entries) {
+        throw "Measurement performance report JSON is missing Entries: $jsonPath"
+    }
+
+    $entries = @($reportJson.Entries)
+    if ($entries.Count -lt $MinimumEntries) {
+        throw "Measurement performance report has $($entries.Count) entr(ies); expected at least $MinimumEntries."
+    }
+
+    $entryNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in $entries) {
+        $name = if ($null -ne $entry.PSObject.Properties["Name"]) { [string]$entry.Name } else { "" }
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw "Measurement performance report contains an entry without Name."
+        }
+
+        if (-not $entryNames.Add($name)) {
+            throw "Measurement performance report contains duplicate entry Name: $name"
+        }
+
+        $status = if ($null -ne $entry.PSObject.Properties["Status"]) { [string]$entry.Status } else { "" }
+        if (-not $status.Equals("PASS", [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Measurement performance report entry '$name' is not PASS: $status"
+        }
+
+        foreach ($field in @("BudgetMs", "Scale", "AllowedMs", "MeanMs", "P95Ms", "P99Ms")) {
+            if ($null -eq $entry.PSObject.Properties[$field]) {
+                throw "Measurement performance report entry '$name' is missing $field."
+            }
+
+            $value = [double]$entry.$field
+            if ([double]::IsNaN($value) -or [double]::IsInfinity($value)) {
+                throw "Measurement performance report entry '$name' has non-finite $field."
+            }
+
+            if ($field -in @("BudgetMs", "Scale", "AllowedMs") -and $value -le 0) {
+                throw "Measurement performance report entry '$name' has non-positive ${field}: $value"
+            }
+
+            if ($field -in @("MeanMs", "P95Ms", "P99Ms") -and $value -lt 0) {
+                throw "Measurement performance report entry '$name' has negative ${field}: $value"
+            }
+        }
+    }
+
+    $missingEntries = @($ExpectedEntries | Where-Object { -not $entryNames.Contains($_) })
+    if ($missingEntries.Count -gt 0) {
+        throw "Measurement performance report is missing expected entr(ies): $($missingEntries -join ', ')"
+    }
+
+    Write-Host "[measurement-perf] Report artifact validation passed: $ReportDirectory (entries=$($entries.Count), minimum=$MinimumEntries)"
+}
 
 function Resolve-MeasurementPerfGateProfile {
     param(
@@ -88,7 +242,18 @@ if ([string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_MEASURE_ITERS)) {
 $env:CV_MEASUREMENT_PERF_GATE_PROFILE = $effectiveGateProfile
 
 if (-not [string]::IsNullOrWhiteSpace($ReportDirectory)) {
-    $env:CV_MEASUREMENT_PERF_REPORT_DIR = $ReportDirectory
+    $env:CV_MEASUREMENT_PERF_REPORT_DIR = Resolve-RepoRelativePath $ReportDirectory
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_REPORT_DIR)) {
+    $env:CV_MEASUREMENT_PERF_REPORT_DIR = Resolve-RepoRelativePath $env:CV_MEASUREMENT_PERF_REPORT_DIR
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:CV_PERF_REPORT_DIR)) {
+    $env:CV_PERF_REPORT_DIR = Resolve-RepoRelativePath $env:CV_PERF_REPORT_DIR
+    $env:CV_MEASUREMENT_PERF_REPORT_DIR = $env:CV_PERF_REPORT_DIR
+}
+
+if ($MinimumReportEntries -lt 1) {
+    throw "MinimumReportEntries must be greater than or equal to 1."
 }
 
 Write-Host "[measurement-perf] GateProfile=$effectiveGateProfile (reason: $($resolvedProfile.Reason))"
@@ -96,6 +261,30 @@ Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_BUDGET_SCALE=$($env:CV_MEASUR
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_WARMUP_ITERS=$($env:CV_MEASUREMENT_PERF_WARMUP_ITERS)"
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_MEASURE_ITERS=$($env:CV_MEASUREMENT_PERF_MEASURE_ITERS)"
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_REPORT_DIR=$($env:CV_MEASUREMENT_PERF_REPORT_DIR)"
+Write-Host "[measurement-perf] MinimumReportEntries=$MinimumReportEntries"
+
+if ($ValidateReportOnly) {
+    $exitCode = 0
+    try {
+        Test-PerformanceReportArtifacts `
+            -ReportDirectory (Resolve-MeasurementPerformanceReportDirectory) `
+            -RunStartedAtUtc ([DateTime]::MinValue) `
+            -MinimumEntries $MinimumReportEntries `
+            -ExpectedEntries $expectedPerformanceEntries `
+            -SkipFreshnessCheck
+    }
+    catch {
+        Write-Host "[measurement-perf] Report artifact validation failed: $($_.Exception.Message)"
+        $exitCode = 1
+    }
+
+    $global:LASTEXITCODE = $exitCode
+    if ($ReturnExitCode) {
+        return
+    }
+
+    exit $exitCode
+}
 
 $parameters = @{
     Project = $project
@@ -103,14 +292,8 @@ $parameters = @{
         "MeasurementPerformanceBudgetAcceptanceTests"
     )
     Verbosity = $Verbosity
-}
-
-if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-    $parameters.ResultsDirectory = $ResultsDirectory
-}
-
-if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
-    $parameters.LogFileName = $LogFileName
+    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
+    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
 }
 
 if ($MinimumTotalTests -gt 0) {
@@ -129,12 +312,30 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
-if ($ReturnExitCode) {
-    $parameters.ReturnExitCode = $true
+$parameters.ReturnExitCode = $true
+
+$runStartedAtUtc = [DateTime]::UtcNow
+& $runner @parameters
+$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+
+if ($exitCode -eq 0) {
+    try {
+        Test-PerformanceReportArtifacts `
+            -ReportDirectory (Resolve-MeasurementPerformanceReportDirectory) `
+            -RunStartedAtUtc $runStartedAtUtc `
+            -MinimumEntries $MinimumReportEntries `
+            -ExpectedEntries $expectedPerformanceEntries
+    }
+    catch {
+        Write-Host "[measurement-perf] Report artifact validation failed: $($_.Exception.Message)"
+        $exitCode = 1
+    }
 }
 
-& $runner @parameters
+$global:LASTEXITCODE = $exitCode
 
 if ($ReturnExitCode) {
     return
 }
+
+exit $exitCode

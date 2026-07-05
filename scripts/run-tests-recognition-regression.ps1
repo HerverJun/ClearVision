@@ -6,7 +6,15 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = 12,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,9 +23,9 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
-$resultsDirectory = Join-Path $repoRoot "test_results"
+$defaultResultsDirectory = Join-Path $repoRoot "test_results"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$logFileName = "recognition-regression-$timestamp.trx"
+$defaultLogFileName = "recognition-regression-$timestamp.trx"
 $repoDotnetHome = Join-Path $repoRoot ".dotnet-home"
 $repoNuGetPackages = Join-Path $repoRoot ".dotnet\.nuget\packages"
 
@@ -44,8 +52,12 @@ $parameters = @{
         "OcrRecognitionOperatorTests"
     )
     Verbosity = $Verbosity
-    ResultsDirectory = $resultsDirectory
-    LogFileName = $logFileName
+    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
+    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
+}
+
+if ($MinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $MinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
@@ -60,4 +72,14 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+$parameters.ReturnExitCode = $true
+
 & $runner @parameters
+$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+$global:LASTEXITCODE = $exitCode
+
+if ($ReturnExitCode) {
+    return
+}
+
+exit $exitCode

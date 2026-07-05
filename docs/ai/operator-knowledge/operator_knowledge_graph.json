@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-04T17:09:06.1794821Z",
+  "GeneratedAtUtc": "2026-07-05T03:50:25.4336351Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -13674,18 +13674,19 @@
       "Aliases": [
         "\u5F62\u6001\u5B66\uFF08\u65E7\u7248\uFF09",
         "Morphology",
-        "Erode",
-        "Dilate",
-        "Open",
-        "Close",
-        "Legacy",
-        "ImageOnly"
+        "\u5F62\u6001\u5B66",
+        "\u8150\u8680",
+        "\u81A8\u80C0",
+        "\u5F00\u8FD0\u7B97",
+        "\u95ED\u8FD0\u7B97",
+        "\u65E7\u7248",
+        "Legacy"
       ],
       "IntentTags": [
         "legacy",
         "deprecated",
         "compatibility",
-        "imageonly",
+        "image-only",
         "preprocess"
       ],
       "ScenarioTags": [
@@ -20177,6 +20178,17 @@
           "MaxValue": "30000",
           "IsRequired": true,
           "AllowedValues": []
+        },
+        {
+          "Name": "ResponseWaitMs",
+          "DisplayName": "\u54CD\u5E94\u7B49\u5F85(\u6BEB\u79D2)",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "100",
+          "MinValue": "0",
+          "MaxValue": "30000",
+          "IsRequired": true,
+          "AllowedValues": []
         }
       ],
       "RequiredResources": [],
@@ -24974,13 +24986,6 @@
     },
     {
       "RelationType": "ALIAS_OF",
-      "Source": "Close",
-      "Target": "Morphology",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
       "Source": "Closing",
       "Target": "RegionClosing",
       "Weight": 1,
@@ -25352,13 +25357,6 @@
     },
     {
       "RelationType": "ALIAS_OF",
-      "Source": "Dilate",
-      "Target": "Morphology",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
       "Source": "Dilation",
       "Target": "RegionDilation",
       "Weight": 1,
@@ -25578,13 +25576,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "equalize",
       "Target": "ImageNormalize",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "Erode",
-      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
@@ -26033,13 +26024,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "illumination",
       "Target": "ShadingCorrection",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "ImageOnly",
-      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
@@ -26747,13 +26731,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "onnx",
       "Target": "SemanticSegmentation",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "Open",
-      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29076,6 +29053,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u5F00\u8FD0\u7B97",
+      "Target": "Morphology",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u5F02\u5E38\u6355\u83B7",
       "Target": "TryCatch",
       "Weight": 1,
@@ -29085,6 +29069,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5F02\u5E38\u68C0\u6D4B",
       "Target": "AnomalyDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5F62\u6001\u5B66",
+      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29302,6 +29293,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u65E0\u76D1\u7763\u7F3A\u9677\u68C0\u6D4B",
       "Target": "AnomalyDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u65E7\u7248",
+      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29804,6 +29802,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u8150\u8680",
+      "Target": "Morphology",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u81A8\u80C0",
+      "Target": "Morphology",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u81EA\u9002\u5E94\u9608\u503C",
       "Target": "AdaptiveThreshold",
       "Weight": 1,
@@ -30156,6 +30168,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u957F\u5EA6",
       "Target": "Measurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u95ED\u8FD0\u7B97",
+      "Target": "Morphology",
       "Weight": 1,
       "Metadata": {}
     },
