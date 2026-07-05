@@ -196,6 +196,7 @@ export class ImageViewerComponent {
         `;
         
         this.canvas = document.getElementById(this.canvasId);
+        this.updateDefectSidebarState();
     }
 
     /**
@@ -447,6 +448,7 @@ export class ImageViewerComponent {
         this.imageCanvas.clearOverlays();
         this.defects = [];
         this.omittedDefectCount = 0;
+        this.updateDefectSidebarState();
     }
 
     createDisplayDefect(defect, index) {
@@ -533,6 +535,10 @@ export class ImageViewerComponent {
      */
     renderDefectList() {
         const list = this.container.querySelector('#defect-list');
+        this.updateDefectSidebarState();
+        if (!list) {
+            return;
+        }
         
         if (this.defects.length === 0) {
             list.innerHTML = '<div class="defect-empty">暂无缺陷</div>';
@@ -573,6 +579,15 @@ export class ImageViewerComponent {
                 this.selectDefect(id);
             });
         });
+    }
+
+    updateDefectSidebarState() {
+        const wrapper = this.container.querySelector('.image-viewer-wrapper');
+        if (!wrapper) {
+            return;
+        }
+
+        wrapper.classList.toggle('has-defects', this.defects.length > 0);
     }
 
     /**

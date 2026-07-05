@@ -1285,7 +1285,8 @@ function isProjectPageCapabilityEnabled() {
 }
 
 function isInspectionCapabilityEnabled() {
-    return INSPECTION_CAPABILITY_ENABLED;
+    return INSPECTION_CAPABILITY_ENABLED
+        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_INSPECTION_CAPABILITY === true;
 }
 
 function isResultsReviewCapabilityEnabled() {
