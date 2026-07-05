@@ -1245,6 +1245,18 @@ function isPropertyPanelCapabilityEnabled() {
     return PROPERTY_PANEL_CAPABILITY_ENABLED;
 }
 
+function shouldPreviewPanelCapabilityOwnSidebarPreview() {
+    return isPreviewPanelCapabilityEnabled();
+}
+
+function shouldLegacyPropertyPanelOwnSidebarPreview() {
+    return !isPropertyPanelCapabilityEnabled() && !isPreviewPanelCapabilityEnabled();
+}
+
+function shouldHideUnownedSidebarPreviewHost() {
+    return isPropertyPanelCapabilityEnabled() && !isPreviewPanelCapabilityEnabled();
+}
+
 function isGlobalVariablesCapabilityEnabled() {
     return GLOBAL_VARIABLES_CAPABILITY_ENABLED;
 }
@@ -1287,7 +1299,13 @@ function initializePreviewPanelCapability() {
 
     disposePreviewPanelCapabilityOwner();
 
-    if (!isPreviewPanelCapabilityEnabled()) {
+    if (shouldHideUnownedSidebarPreviewHost()) {
+        hostPanel?.classList.add('hidden');
+        container.innerHTML = '<p class="empty-text">预览面板未启用</p>';
+        return;
+    }
+
+    if (!shouldPreviewPanelCapabilityOwnSidebarPreview()) {
         hostPanel?.classList.remove('hidden');
         return;
     }
@@ -1329,13 +1347,14 @@ function disposePropertyPanelOwner() {
 
 async function createLegacyPropertyPanelOwner() {
     const { PropertyPanel } = await loadLegacyPropertyPanelModule();
+    const ownsPreviewSidebar = shouldLegacyPropertyPanelOwnSidebarPreview();
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
-        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled(),
-        previewContainer: isPreviewPanelCapabilityEnabled()
-            ? null
-            : document.getElementById('preview-panel')
+        previewResourcesEnabled: ownsPreviewSidebar,
+        previewContainer: ownsPreviewSidebar
+            ? document.getElementById('preview-panel')
+            : null
     });
     let disposed = false;
 

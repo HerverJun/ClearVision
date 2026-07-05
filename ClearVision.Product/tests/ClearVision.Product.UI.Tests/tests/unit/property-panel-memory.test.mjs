@@ -357,6 +357,99 @@ test('PropertyPanel reuses an external PreviewPanel host without duplicate subsc
   assert.match(previewContainer.innerHTML, /请选择一个算子/);
 });
 
+test('PropertyPanel clears external preview host when switching to a library selection', () => {
+  const canvasOperator = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  const secondCanvasOperator = {
+    id: 'node-2',
+    type: 'Morphology',
+    title: 'Morphology',
+    parameters: [{ name: 'Operation', value: 'Open' }]
+  };
+  const previewCoordinator = createPreviewCoordinatorHarness({
+    activeNodeId: 'node-1',
+    nodeType: 'Thresholding',
+    title: 'Threshold',
+    status: 'success',
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: 'data:image/png;base64,input',
+      outputImageSrc: 'data:image/png;base64,old-output'
+    },
+    outputData: { Score: 0.98 },
+    request: {
+      projectId: 'project-1',
+      nodeId: 'node-1',
+      flowRevision: 3,
+      parameterSnapshot: [],
+      requestKey: 'request-1'
+    }
+  });
+  const propertyContainer = new PreviewHostFakeContainer('property-root');
+  const previewContainer = new PreviewHostFakeContainer('preview-root');
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    container: propertyContainer,
+    previewContainer,
+    previewResourcesEnabled: true,
+    previewPanel: null,
+    roiEditorPanel: null,
+    calibrationDraftWorkbench: null,
+    currentOperator: canvasOperator,
+    previewCoordinator,
+    onOpenPreviewImage() {},
+    onChangeCallback() {},
+    inputImageBase64Load: null,
+    pendingRecommendation: null,
+    recommendedFieldNames: new Set(),
+    recommendationSupportedOperators: new Set(),
+    circleSearchV2ToolEnabled: false,
+    nPointCalibrationWorkbenchEnabled: false,
+    validateCurrentOperator() {
+      return true;
+    }
+  });
+
+  PropertyPanel.prototype.initPreviewPanel.call(panel);
+
+  assert.equal(previewCoordinator.listenerCount(), 1);
+  assert.equal(
+    previewContainer.querySelector('#preview-output-image')?.getAttribute('src'),
+    'data:image/png;base64,old-output'
+  );
+
+  panel.currentOperator = {
+    isLibrarySelection: true,
+    type: 'Thresholding',
+    displayName: 'Thresholding',
+    category: '图像处理',
+    description: 'Library entry',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  PropertyPanel.prototype.render.call(panel);
+
+  assert.equal(previewCoordinator.listenerCount(), 0);
+  assert.equal(panel.previewPanel, null);
+  assert.match(previewContainer.innerHTML, /算子库条目无运行预览/);
+  assert.doesNotMatch(previewContainer.innerHTML, /preview-output-image/);
+  assert.doesNotMatch(previewContainer.innerHTML, /old-output/);
+  assert.doesNotMatch(previewContainer.innerHTML, /operator-preview-output-item/);
+  assert.doesNotMatch(previewContainer.innerHTML, /operator-result-diagnostic/);
+
+  panel.currentOperator = secondCanvasOperator;
+  PropertyPanel.prototype.initPreviewPanel.call(panel);
+
+  assert.equal(previewCoordinator.listenerCount(), 1);
+  assert.equal((previewContainer.innerHTML.match(/data-role="preview-output-image"/g) || []).length, 1);
+
+  PropertyPanel.prototype.destroy.call(panel);
+  assert.equal(previewCoordinator.listenerCount(), 0);
+});
+
 test('flow editor layout keeps variables in the toolbar and preview outside PropertyPanel', () => {
   const indexSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/index.html');
   const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
@@ -368,8 +461,11 @@ test('flow editor layout keeps variables in the toolbar and preview outside Prop
   assert.doesNotMatch(rightSidebar, /panel-title">全局变量/);
   assert.match(rightSidebar, /preview-sidebar-panel/);
   assert.match(rightSidebar, /property-sidebar-panel/);
-  assert.match(appSource, /previewContainer:\s*isPreviewPanelCapabilityEnabled\(\)[\s\S]*document\.getElementById\('preview-panel'\)/);
+  assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\)/);
+  assert.match(appSource, /previewResourcesEnabled:\s*ownsPreviewSidebar/);
+  assert.match(appSource, /previewContainer:\s*ownsPreviewSidebar[\s\S]*document\.getElementById\('preview-panel'\)/);
   assert.match(propertySource, /shouldMountInternalPreviewContainer/);
+  assert.match(propertySource, /resetPreviewForNonCanvasSelection/);
   assert.match(propertySource, /this\.previewPanel\?\.container === container/);
 });
 

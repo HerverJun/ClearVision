@@ -1087,7 +1087,12 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(appSource, /const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce\(\);/);
   assert.match(appSource, /if \(isPreviewPanelCapabilityEnabled\(\)\) \{[\s\S]*disposeLegacyNodePreviewSurfaces\(\);[\s\S]*return;/);
   assert.match(appSource, /new PreviewPanelCapabilityOwner\(/);
-  assert.match(appSource, /previewResourcesEnabled: !isPreviewPanelCapabilityEnabled\(\)/);
+  assert.match(appSource, /function shouldPreviewPanelCapabilityOwnSidebarPreview\(\)/);
+  assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\)/);
+  assert.match(appSource, /function shouldHideUnownedSidebarPreviewHost\(\)/);
+  assert.match(appSource, /if \(shouldHideUnownedSidebarPreviewHost\(\)\) \{[\s\S]*hostPanel\?\.classList\.add\('hidden'\)/);
+  assert.match(appSource, /if \(!shouldPreviewPanelCapabilityOwnSidebarPreview\(\)\) \{[\s\S]*hostPanel\?\.classList\.remove\('hidden'\)/);
+  assert.match(appSource, /previewResourcesEnabled: ownsPreviewSidebar/);
   assert.equal((appSource.match(/new PreviewPanelCapabilityOwner\(/g) || []).length, 1);
   assert.equal((appSource.match(/new NodePreviewCoordinator\(/g) || []).length, 1);
   assert.doesNotMatch(appSource, /import\s+NodePreviewOverlay\s+from\s+'\.\/features\/flow-editor\/nodePreviewOverlay\.js'/);

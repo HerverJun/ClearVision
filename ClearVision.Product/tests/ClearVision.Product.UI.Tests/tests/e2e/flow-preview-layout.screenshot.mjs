@@ -311,20 +311,30 @@ async function installRoutes(page, runtimeStateRef, nodeTypesById) {
   });
 }
 
-async function bootApp(page, baseUrl, theme = 'dark') {
-  await page.addInitScript(({ currentUser, selectedTheme }) => {
+async function bootApp(page, baseUrl, options = {}) {
+  const {
+    theme = 'dark',
+    featureFlags = {},
+    waitForPreviewSurface = true
+  } = options;
+  await page.addInitScript(({ currentUser, selectedTheme, startupFeatureFlags }) => {
+    window.__CLEARVISION_STARTUP__ = {
+      featureFlags: startupFeatureFlags
+    };
     sessionStorage.setItem('cv_auth_token', 'layout-token');
     sessionStorage.setItem('cv_current_user', JSON.stringify(currentUser));
     localStorage.setItem('cv_welcome_shown', 'true');
     localStorage.setItem('cv_theme', selectedTheme);
-  }, { currentUser: user, selectedTheme: theme });
+  }, { currentUser: user, selectedTheme: theme, startupFeatureFlags: featureFlags });
 
   await page.goto(`${baseUrl}/index.html`, { waitUntil: 'domcontentloaded' });
   await page.locator('#app').waitFor({ state: 'visible', timeout: 10000 });
   await page.locator('#loading-screen').waitFor({ state: 'detached', timeout: 10000 }).catch(async () => {
     await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 10000 });
   });
-  await page.locator('#preview-panel [data-role="preview-output-image"]').waitFor({ state: 'attached', timeout: 10000 });
+  if (waitForPreviewSurface) {
+    await page.locator('#preview-panel [data-role="preview-output-image"]').waitFor({ state: 'attached', timeout: 10000 });
+  }
 }
 
 async function setProject(page) {
@@ -379,6 +389,29 @@ async function addAndSelectNode(page, nodeTypesById, config) {
   return nodeId;
 }
 
+async function selectLibraryOperator(page) {
+  await page.evaluate(async () => {
+    const appModule = await import('/src/app.js');
+    appModule.setSelectedOperator({
+      isLibrarySelection: true,
+      type: 'Thresholding',
+      displayName: '阈值分割',
+      category: '图像预处理',
+      description: '算子库条目用于查看说明，尚未添加到画布运行。',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int' },
+        { name: 'Mode', value: 'Binary', dataType: 'enum' }
+      ],
+      inputType: 'Image',
+      outputType: 'Image'
+    });
+  });
+  await page.waitForFunction(() => {
+    const preview = document.querySelector('#preview-panel');
+    return preview?.textContent?.includes('算子库条目无运行预览');
+  }, null, { timeout: 5000 });
+}
+
 async function waitForOutputImage(page) {
   await page.waitForFunction(() => {
     const image = document.querySelector('#preview-output-image');
@@ -421,6 +454,21 @@ async function collectLayoutMetrics(page) {
       previewPanel: rect('.preview-sidebar-panel'),
       propertyPanel: rect('.property-sidebar-panel'),
       previewMain: rect('[data-role="preview-main-image-container"]'),
+      previewHostHidden: (() => {
+        const element = document.querySelector('.preview-sidebar-panel');
+        if (!element) {
+          return true;
+        }
+        const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        return element.classList.contains('hidden') ||
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          bounds.width === 0 ||
+          bounds.height === 0;
+      })(),
+      previewText: document.querySelector('#preview-panel')?.textContent?.trim() || '',
+      previewImageSrc: document.querySelector('#preview-output-image')?.getAttribute('src') || '',
       panelTitles: Array.from(document.querySelectorAll('.sidebar.right .panel-title')).map(item => item.textContent.trim()),
       globalInRight: Boolean(document.querySelector('.sidebar.right #global-variable-panel')),
       outputImageCount: document.querySelectorAll('#preview-panel [data-role="preview-output-image"]').length,
@@ -434,20 +482,37 @@ async function collectLayoutMetrics(page) {
   });
 }
 
-function assertLayoutMetrics(metrics, scenarioName) {
+function assertLayoutMetrics(metrics, scenarioName, options = {}) {
+  const expectedOutputImageCount = options.expectedOutputImageCount ?? 1;
   if (metrics.panelTitles.join('|') !== '预览|属性') {
     throw new Error(`${scenarioName}: right sidebar titles are ${metrics.panelTitles.join(', ')}`);
   }
   if (metrics.globalInRight) {
     throw new Error(`${scenarioName}: global-variable-panel is still inside the right sidebar`);
   }
-  if (metrics.outputImageCount !== 1) {
-    throw new Error(`${scenarioName}: expected one output image surface, found ${metrics.outputImageCount}`);
+  if (metrics.outputImageCount !== expectedOutputImageCount) {
+    throw new Error(`${scenarioName}: expected ${expectedOutputImageCount} output image surface(s), found ${metrics.outputImageCount}`);
   }
   if (metrics.oldPreviewCount !== 0) {
     throw new Error(`${scenarioName}: old before/after preview DOM is present`);
   }
-  if (!metrics.previewMain || metrics.previewMain.height < 170) {
+
+  if (options.expectPreviewHidden) {
+    if (!metrics.previewHostHidden) {
+      throw new Error(`${scenarioName}: preview host should be hidden for this flag matrix`);
+    }
+  } else if (metrics.previewHostHidden) {
+    throw new Error(`${scenarioName}: preview host is unexpectedly hidden`);
+  }
+
+  if (options.expectedPreviewText && !metrics.previewText.includes(options.expectedPreviewText)) {
+    throw new Error(`${scenarioName}: preview text did not include "${options.expectedPreviewText}"`);
+  }
+  if (options.expectPreviewEmpty && metrics.previewImageSrc) {
+    throw new Error(`${scenarioName}: preview still has image src after empty-state transition`);
+  }
+
+  if (!options.expectPreviewHidden && !options.expectPreviewEmpty && (!metrics.previewMain || metrics.previewMain.height < 170)) {
     throw new Error(`${scenarioName}: preview main image is too short`);
   }
   if (metrics.horizontalOverflow || metrics.bodyHorizontalOverflow) {
@@ -464,13 +529,13 @@ function assertLayoutMetrics(metrics, scenarioName) {
   }
 }
 
-async function capture(page, name, note, screenshots) {
+async function capture(page, name, note, screenshots, options = {}) {
   await page.evaluate(() => {
     document.querySelector('#cv-toast-container')?.replaceChildren();
   });
   await page.waitForTimeout(50);
   const metrics = await collectLayoutMetrics(page);
-  assertLayoutMetrics(metrics, name);
+  assertLayoutMetrics(metrics, name, options);
   const filePath = path.join(outputDir, `${name}.png`);
   await page.screenshot({ path: filePath, fullPage: false });
   screenshots.push({ name, path: filePath, note, metrics });
@@ -503,7 +568,7 @@ async function main() {
 
   try {
     await installRoutes(page, runtimeStateRef, nodeTypesById);
-    await bootApp(page, baseUrl, 'dark');
+    await bootApp(page, baseUrl, { theme: 'dark' });
 
     await capture(
       page,
@@ -539,7 +604,7 @@ async function main() {
       '图像采集算子：右侧上方只有一个输出主图区域，没有输入/输出双 PictureBox。',
       screenshots);
 
-    await addAndSelectNode(page, nodeTypesById, {
+    const preprocessingNodeId = await addAndSelectNode(page, nodeTypesById, {
       type: 'Thresholding',
       title: '预处理阈值',
       x: 340,
@@ -558,11 +623,36 @@ async function main() {
       '有图像输出的预处理算子：优先展示输出图，摘要区仍可见。',
       screenshots);
 
+    await selectLibraryOperator(page);
+    await capture(
+      page,
+      '05-library-selection-empty-preview-dark',
+      '左侧算子库条目/非画布节点选择：右侧预览显示空态，不保留上一个输出图。',
+      screenshots,
+      {
+        expectedOutputImageCount: 0,
+        expectPreviewEmpty: true,
+        expectedPreviewText: '算子库条目无运行预览'
+      });
+
+    await page.evaluate(nodeId => {
+      const flowCanvas = window.flowCanvas;
+      const node = flowCanvas?.nodes?.get?.(nodeId);
+      if (!flowCanvas || !node) {
+        return;
+      }
+      flowCanvas.selectedNode = nodeId;
+      flowCanvas.selectedConnection = null;
+      flowCanvas.onNodeSelected?.(node);
+      flowCanvas.render?.();
+    }, preprocessingNodeId);
+    await waitForOutputImage(page);
+
     await page.setViewportSize({ width: 980, height: 720 });
     await page.waitForTimeout(150);
     await capture(
       page,
-      '05-narrow-window-layout-dark',
+      '06-narrow-window-layout-dark',
       '缩窄窗口：预览和属性区仍保留可用高度，无横向溢出。',
       screenshots);
 
@@ -575,7 +665,7 @@ async function main() {
     await page.locator('.gv-warning').waitFor({ state: 'visible', timeout: 5000 });
     await capture(
       page,
-      '06-global-variable-manager-locked-dark',
+      '07-global-variable-manager-locked-dark',
       '打开全局变量管理弹窗：搜索、筛选、关闭可见，运行中锁定提示保留。',
       screenshots);
     await page.locator('.gv-manager [data-action="close"]').click();
@@ -585,16 +675,45 @@ async function main() {
     await setTheme(page, 'dark');
     await capture(
       page,
-      '07-theme-dark-flow',
+      '08-theme-dark-flow',
       '暗色主题流程页：顶部变量入口和右侧预览视觉一致。',
       screenshots);
 
     await setTheme(page, 'light');
     await capture(
       page,
-      '08-theme-light-flow',
+      '09-theme-light-flow',
       '亮色主题流程页：顶部变量入口和右侧预览视觉一致。',
       screenshots);
+
+    const flagPage = await context.newPage();
+    flagPage.on('console', message => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    flagPage.on('pageerror', error => {
+      consoleErrors.push(error.message);
+    });
+    await installRoutes(flagPage, runtimeStateRef, new Map());
+    await bootApp(flagPage, baseUrl, {
+      theme: 'dark',
+      featureFlags: {
+        'Studio2.PropertyPanel': true,
+        'Studio2.PreviewPanel': false
+      },
+      waitForPreviewSurface: false
+    });
+    await capture(
+      flagPage,
+      '10-property-capability-preview-disabled-dark',
+      'Studio2.PropertyPanel=true 且 Studio2.PreviewPanel=false：右侧预览 host 被隐藏，没有无人接管空壳。',
+      screenshots,
+      {
+        expectedOutputImageCount: 0,
+        expectPreviewHidden: true
+      });
+    await flagPage.close();
 
     if (consoleErrors.length > 0) {
       throw new Error(`Console errors detected:\n${consoleErrors.join('\n')}`);

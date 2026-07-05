@@ -159,6 +159,18 @@ class PropertyPanel {
         return this.previewContainer || this.container.querySelector('#operator-preview-container');
     }
 
+    resetPreviewForNonCanvasSelection(message = '请选择画布算子节点查看预览') {
+        if (this.previewPanel) {
+            this.previewPanel.destroy();
+            this.previewPanel = null;
+        }
+
+        const container = this.getPreviewContainer();
+        if (container) {
+            container.innerHTML = `<p class="empty-text">${this.escapeHtml(message)}</p>`;
+        }
+    }
+
     /**
      * 绑定全局事件
      */
@@ -407,10 +419,7 @@ class PropertyPanel {
     }
 
     renderLibraryOperatorSummary() {
-        if (this.previewPanel && !this.previewContainer) {
-            this.previewPanel.destroy();
-            this.previewPanel = null;
-        }
+        this.resetPreviewForNonCanvasSelection('算子库条目无运行预览');
         if (this.roiEditorPanel) {
             this.roiEditorPanel.destroy();
             this.roiEditorPanel = null;
