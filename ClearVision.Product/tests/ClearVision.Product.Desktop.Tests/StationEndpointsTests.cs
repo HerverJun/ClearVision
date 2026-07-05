@@ -107,6 +107,29 @@ public sealed class StationEndpointsTests
         replayChunk.Should().Contain("\"diagnosticCode\":\"OK\"");
     }
 
+    [Theory]
+    [InlineData("lastEventId")]
+    [InlineData("afterSequence")]
+    public async Task EventsEndpoint_ShouldReplayStoredEventsAfterQueryCursor(string cursorName)
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+        host.Registry.UpsertRegistration("conn-1", BuildRegistration("station-a"));
+        var checkpoint = host.Registry.GetEventsAfter(0).Max(evt => evt.SequenceId);
+
+        host.Registry.UpsertResultSummary("conn-1", BuildResult("station-a", 7, RuntimeRunOutcome.Ng, "WIRE_SWAP", -1));
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/stations/events?{cursorName}={checkpoint}"),
+            HttpCompletionOption.ResponseHeadersRead);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+
+        var replayChunk = await ReadUntilContainsAsync(stream, "event: stationResultAdded", TimeSpan.FromSeconds(2));
+        replayChunk.Should().Contain($"id: {checkpoint + 1}");
+        replayChunk.Should().Contain("\"stationId\":\"station-a\"");
+        replayChunk.Should().Contain("\"diagnosticCode\":\"WIRE_SWAP\"");
+    }
+
     [Fact]
     public async Task ResultsEndpoint_ShouldPageAndFilterAllStationResults()
     {

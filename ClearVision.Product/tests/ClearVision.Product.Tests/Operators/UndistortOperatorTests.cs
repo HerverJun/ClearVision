@@ -1,3 +1,4 @@
+using System.Reflection;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.Operators;
@@ -119,6 +120,33 @@ public class UndistortOperatorTests
         _operator.ValidateParameters(op).IsValid.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Dispose_AfterCachePopulation_ShouldClearRemapCacheAndRejectFurtherExecution()
+    {
+        var op = new Operator("Undistort", OperatorType.Undistort, 0, 0);
+        using var image = TestHelpers.CreateTestImage(width: 320, height: 240);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["CalibrationData"] = CalibrationBundleV2TestData.CreateAcceptedCameraBundleJson();
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue();
+        GetMapCacheCount(_operator).Should().Be(1);
+
+        _operator.Dispose();
+
+        GetMapCacheCount(_operator).Should().Be(0);
+
+        using var imageAfterDispose = TestHelpers.CreateTestImage(width: 320, height: 240);
+        var inputsAfterDispose = TestHelpers.CreateImageInputs(imageAfterDispose);
+        inputsAfterDispose["CalibrationData"] = CalibrationBundleV2TestData.CreateAcceptedCameraBundleJson();
+
+        var afterDispose = await _operator.ExecuteAsync(op, inputsAfterDispose);
+
+        afterDispose.IsSuccess.Should().BeFalse();
+        afterDispose.ErrorMessage.Should().Contain(nameof(UndistortOperator));
+    }
+
     private static string CreateCameraBundleWithQuality(double meanError, double maxError)
     {
         var meanText = meanError.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
@@ -127,5 +155,17 @@ public class UndistortOperatorTests
         return CalibrationBundleV2TestData.CreateAcceptedCameraBundleJson()
             .Replace("\"meanError\": 0.11", $"\"meanError\": {meanText}", StringComparison.Ordinal)
             .Replace("\"maxError\": 0.23", $"\"maxError\": {maxText}", StringComparison.Ordinal);
+    }
+
+    private static int GetMapCacheCount(UndistortOperator @operator)
+    {
+        var field = typeof(UndistortOperator).GetField("_mapCache", BindingFlags.Instance | BindingFlags.NonPublic);
+        field.Should().NotBeNull();
+
+        var cache = field!.GetValue(@operator);
+        var countProperty = cache!.GetType().GetProperty("Count");
+        countProperty.Should().NotBeNull();
+
+        return (int)countProperty!.GetValue(cache)!;
     }
 }

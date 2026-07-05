@@ -12,6 +12,7 @@ using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station;
 using ClearVision.Product.Station.Sync;
 using FluentAssertions;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -224,11 +225,125 @@ public sealed class StationSyncHostedServiceTests
         }
     }
 
+    [Fact]
+    public async Task ReportCommandAsync_WhenJournalWriteFails_ShouldStillReportRemoteResult()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationSyncCommandJournalFailureTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var hubConnection = new RecordingStationHubConnection();
+
+        try
+        {
+            await using var fixture = CreateFixture(
+                root,
+                outboundQueueCapacity: 4,
+                connectionFactory: (_, _) => hubConnection);
+            SetPrivateStringField(
+                fixture.CommandExecutionJournalStore,
+                "_filePath",
+                Path.Combine(root, "missing-journal-dir", "journal.jsonl"));
+            var command = BuildCommand("cmd-journal-fail", StationCommandType.Ping, "{}");
+
+            await InvokeReportCommandAsync(
+                fixture.Service,
+                command,
+                StationCommandStatus.Succeeded,
+                100,
+                "done");
+
+            hubConnection.ReportedCommandResults.Should().ContainSingle(result =>
+                result.CommandId == command.CommandId &&
+                result.Status == StationCommandStatus.Succeeded);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ReportCommandAsync_WhenRemoteAndSpoolWritesFail_ShouldNotThrow()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationSyncCommandSpoolFailureTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var hubConnection = new RecordingStationHubConnection { FailInvocations = true };
+
+        try
+        {
+            await using var fixture = CreateFixture(
+                root,
+                outboundQueueCapacity: 4,
+                connectionFactory: (_, _) => hubConnection);
+            SetPrivateStringField(
+                fixture.CommandResultSpoolStore,
+                "_filePath",
+                Path.Combine(root, "missing-spool-dir", "command-results.jsonl"));
+            var command = BuildCommand("cmd-spool-fail", StationCommandType.Ping, "{}");
+
+            var act = () => InvokeReportCommandAsync(
+                fixture.Service,
+                command,
+                StationCommandStatus.Running,
+                50,
+                "running");
+
+            await act.Should().NotThrowAsync();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task TryPollAndExecuteCommandAsync_WhenCommandTypeIsUnsupported_ShouldReportChineseFailureMessage()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationSyncUnsupportedCommandTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var hubConnection = new RecordingStationHubConnection
+        {
+            NextCommand = BuildCommand("cmd-unsupported", (StationCommandType)9999, "{}")
+        };
+
+        try
+        {
+            await using var fixture = CreateFixture(
+                root,
+                outboundQueueCapacity: 4,
+                connectionFactory: (_, _) => hubConnection);
+
+            var didWork = await InvokeTryPollAndExecuteCommandAsync(fixture.Service);
+
+            didWork.Should().BeTrue();
+            hubConnection.ReportedCommandResults.Should().Contain(result =>
+                result.CommandId == "cmd-unsupported" &&
+                result.Status == StationCommandStatus.Failed &&
+                result.ErrorCode == "NotSupported" &&
+                result.Message != null &&
+                result.Message.Contains("当前 Station 版本不支持命令") &&
+                !result.Message.Contains("is not supported by this Station build", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static StationSyncHostedServiceFixture CreateFixture(
         string root,
         int outboundQueueCapacity,
         ICameraManager? cameraManager = null,
-        bool syncEnabled = true)
+        bool syncEnabled = true,
+        Func<string, string, IStationHubConnection>? connectionFactory = null)
     {
         if (cameraManager == null)
         {
@@ -256,7 +371,7 @@ public sealed class StationSyncHostedServiceTests
         settingsStore.UpdateStationIdentity("station-sync-test", "line-a");
         var siteProfileStore = new StationSiteProfileStore(Path.Combine(root, "profiles"));
         var identityResolver = new StationIdentityResolver(settingsStore);
-        var hubClient = new StationHubClient(options, NullLogger<StationHubClient>.Instance);
+        var hubClient = new StationHubClient(options, NullLogger<StationHubClient>.Instance, connectionFactory);
         var spoolStore = new StationSpoolStore(options, NullLogger<StationSpoolStore>.Instance);
         var commandResultSpoolStore = new StationCommandResultSpoolStore(options, NullLogger<StationCommandResultSpoolStore>.Instance);
         var commandExecutionJournalStore = new StationCommandExecutionJournalStore(options, NullLogger<StationCommandExecutionJournalStore>.Instance);
@@ -337,11 +452,43 @@ public sealed class StationSyncHostedServiceTests
         return await (Task<bool>)method!.Invoke(service, [command, CancellationToken.None])!;
     }
 
+    private static async Task<bool> InvokeTryPollAndExecuteCommandAsync(StationSyncHostedService service)
+    {
+        var method = typeof(StationSyncHostedService).GetMethod(
+            "TryPollAndExecuteCommandAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+        return await (Task<bool>)method!.Invoke(service, [CancellationToken.None])!;
+    }
+
+    private static async Task InvokeReportCommandAsync(
+        StationSyncHostedService service,
+        StationCommandDto command,
+        StationCommandStatus status,
+        int progress,
+        string message)
+    {
+        var method = typeof(StationSyncHostedService).GetMethod(
+            "ReportCommandAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+        await (Task)method!.Invoke(
+            service,
+            [command, status, progress, message, CancellationToken.None, null, null, true])!;
+    }
+
     private static long ReadPrivateLong(object instance, string fieldName)
     {
         var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         field.Should().NotBeNull();
         return (long)field!.GetValue(instance)!;
+    }
+
+    private static void SetPrivateStringField(object instance, string fieldName, string value)
+    {
+        var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        field.Should().NotBeNull();
+        field!.SetValue(instance, value);
     }
 
     private static RuntimeNormalizedResult BuildResult(string runId)
@@ -475,6 +622,73 @@ public sealed class StationSyncHostedServiceTests
         {
             await HubClient.DisposeAsync();
             await RuntimeHost.DisposeAsync();
+        }
+    }
+
+    private sealed class RecordingStationHubConnection : IStationHubConnection
+    {
+        public List<StationCommandResultDto> ReportedCommandResults { get; } = [];
+
+        public bool FailInvocations { get; init; }
+
+        public StationCommandDto? NextCommand { get; init; }
+
+        public HubConnectionState State { get; private set; } = HubConnectionState.Disconnected;
+
+        public event Func<Exception?, Task>? Closed
+        {
+            add { }
+            remove { }
+        }
+
+        public event Func<Exception?, Task>? Reconnecting
+        {
+            add { }
+            remove { }
+        }
+
+        public event Func<string?, Task>? Reconnected
+        {
+            add { }
+            remove { }
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            State = HubConnectionState.Connected;
+            return Task.CompletedTask;
+        }
+
+        public Task<T> InvokeAsync<T>(string methodName, object payload, CancellationToken cancellationToken)
+        {
+            if (methodName == StationHubMethods.PollCommand &&
+                typeof(T) == typeof(StationCommandDto))
+            {
+                return Task.FromResult((T)(object)NextCommand!);
+            }
+
+            return Task.FromResult(default(T)!);
+        }
+
+        public Task InvokeAsync(string methodName, object payload, CancellationToken cancellationToken)
+        {
+            if (FailInvocations)
+            {
+                throw new InvalidOperationException("synthetic remote failure");
+            }
+
+            if (payload is StationCommandResultDto commandResult)
+            {
+                ReportedCommandResults.Add(commandResult);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            State = HubConnectionState.Disconnected;
+            return ValueTask.CompletedTask;
         }
     }
 }

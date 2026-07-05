@@ -156,6 +156,67 @@ public class InspectionWorkerTests
     }
 
     [Fact]
+    public async Task TryStartRunAsync_ShouldRegisterRunBeforeBackgroundExecutionPublishesRunning()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => WaitForCancellationAsync(callInfo.ArgAt<CancellationToken>(3)));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Returns(CancellationToken.None);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            resultRepository,
+            projectRepository);
+
+        var store = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
+        var bus = new InMemoryInspectionEventBus(NullLogger<InMemoryInspectionEventBus>.Instance, store);
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            coordinator,
+            bus,
+            NullLogger<InspectionWorker>.Instance,
+            lifetime,
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var runningObserved = false;
+        using var runningSubscription = bus.Subscribe<InspectionStateChangedEvent>(async (evt, _) =>
+        {
+            if (evt.NewState != "Running")
+            {
+                return;
+            }
+
+            runningObserved = true;
+            (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromMilliseconds(25)))
+                .Should()
+                .BeFalse("the run must already be registered before background execution publishes Running");
+        });
+
+        (await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None)).Should().Be(StartResult.Success);
+        (await worker.TryStartRunAsync(projectId, sessionId, new OperatorFlow("Registered-Before-Running"), null)).Should().BeTrue();
+
+        await WaitUntilAsync(() => runningObserved, TimeSpan.FromSeconds(2));
+        (await coordinator.TryStopAsync(projectId, CancellationToken.None)).Should().BeTrue();
+        (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task WaitForRunExitAsync_WhenProjectHasReplacementSession_TreatsOriginalSessionAsExited()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();

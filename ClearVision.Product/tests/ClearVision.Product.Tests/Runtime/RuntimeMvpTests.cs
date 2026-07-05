@@ -171,6 +171,54 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_EventSubscribers_WhenOneThrows_ShouldContinuePublishing()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreatePackageConfiguredImageProject("isolated-runtime-events");
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var flowExecutionService = CreateFlowExecutionService(
+                new PackageConfiguredImageAcquisitionExecutor([4, 2, 1]),
+                new DeterministicJudgmentExecutor());
+
+            await using var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            var snapshotCount = 0;
+            var resultCount = 0;
+            var logCount = 0;
+            runtimeHost.SnapshotChanged += _ => throw new InvalidOperationException("snapshot subscriber failed");
+            runtimeHost.SnapshotChanged += _ => snapshotCount++;
+            runtimeHost.ResultAvailable += _ => throw new InvalidOperationException("result subscriber failed");
+            runtimeHost.ResultAvailable += _ => resultCount++;
+            runtimeHost.LogMessage += _ => throw new InvalidOperationException("log subscriber failed");
+            runtimeHost.LogMessage += _ => logCount++;
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var result = await runtimeHost.RunPackageConfiguredSingleAsync();
+
+            result.Outcome.Should().Be(RuntimeRunOutcome.Ok);
+            snapshotCount.Should().BeGreaterThan(0);
+            resultCount.Should().Be(1);
+            logCount.Should().BeGreaterThan(0);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_WithCalibrationPackageAsset_ShouldRunPixelToWorldWithoutStudio()
     {
         var root = CreateTempDirectory();

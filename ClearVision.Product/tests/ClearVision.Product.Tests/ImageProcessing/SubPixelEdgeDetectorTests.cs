@@ -332,51 +332,27 @@ public class SubPixelEdgeDetectorTests : IDisposable
     }
 
     /// <summary>
-    /// 测试10: 与 OpenCV cornerSubPix 对比（基准测试）
-    /// 验证我们的实现与 OpenCV 标准算法的误差
+    /// 测试10: 与 OpenCV moments 对比（基准测试）
+    /// 验证我们的 1D 灰度重心实现与 OpenCV 强度矩基准一致
     /// </summary>
     [Fact]
-    public void Test_Centroid_CompareWithOpenCV()
+    public void Test_Centroid_CompareWithOpenCvMoments()
     {
-        // Arrange: 创建一个简单的角点图像
-        // 使用黑色背景和白色方块形成的角点
-        using var cornerImage = new Mat(100, 100, MatType.CV_8UC1, Scalar.All(0));
+        // Arrange: 创建一条非对称灰度边缘轮廓，OpenCV moments 可直接给出强度重心。
+        byte[] edgeData = { 0, 64, 128, 192, 255 };
+        using var source = Mat.FromArray(edgeData);
+        using var lineProfile = source.Reshape(1, 1);
 
-        // 绘制白色方块（左上象限）
-        var roi = new Rect(0, 0, 50, 50);
-        cornerImage.Rectangle(roi, Scalar.All(255), -1);
+        var moments = Cv2.Moments(lineProfile, binaryImage: false);
+        moments.M00.Should().BeGreaterThan(0);
+        var openCvCentroid = (float)(moments.M10 / moments.M00);
 
-        // 理想角点位置: (50, 50)
-        Point2f initialPoint = new Point2f(50, 50);
-        Point2f[] corners = { initialPoint };
+        // Act
+        float ourResult = _detector.DetectCentroid(lineProfile, threshold: 0);
 
-        // 使用 OpenCV cornerSubPix 精确定位
-        using var gray = cornerImage.Clone();
-        TermCriteria criteria = new TermCriteria(CriteriaTypes.MaxIter | CriteriaTypes.Eps, 30, 0.01);
-
-        try
-        {
-            Cv2.CornerSubPix(gray, corners, new Size(10, 10), new Size(-1, -1), criteria);
-            float openCvResult = corners[0].X;
-
-            // 使用我们的重心法检测同一位置的水平轮廓
-            Point start = new Point(40, 50);
-            Point end = new Point(60, 50);
-            float ourResult = _detector.DetectEdgeInImage(gray, start, end);
-
-            // 调整 ourResult 为绝对坐标
-            ourResult += start.X;
-
-            // Assert: 误差应小于 5%
-            float error = Math.Abs(ourResult - openCvResult) / openCvResult * 100;
-            error.Should().BeLessThan(5.0f,
-                $"重心法与 OpenCV cornerSubPix 的误差应小于 5%，实际误差: {error:F2}%");
-        }
-        catch (Exception ex)
-        {
-            // 如果 OpenCV 方法失败，跳过此测试
-            Assert.True(true, $"OpenCV cornerSubPix 调用失败，跳过对比测试: {ex.Message}");
-        }
+        // Assert: 同一强度矩定义下应与 OpenCV 基准一致。
+        ourResult.Should().BeApproximately(openCvCentroid, 0.01f,
+            "灰度重心法应与 OpenCV moments 的强度重心一致");
     }
 
     /// <summary>

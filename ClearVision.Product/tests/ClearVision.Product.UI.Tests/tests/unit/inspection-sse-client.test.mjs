@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildSseHeaders,
+  buildSseUrl,
   parseSseFrame
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionSseClient.mjs';
 
@@ -12,6 +13,20 @@ test('buildSseHeaders includes authorization and last event id when available', 
   });
 
   assert.deepEqual(buildSseHeaders(null, null), {});
+});
+
+test('buildSseUrl appends lastEventId cursor without dropping existing query', () => {
+  assert.equal(
+    buildSseUrl('http://localhost:5000/api/inspection/realtime/project/events', '42'),
+    'http://localhost:5000/api/inspection/realtime/project/events?lastEventId=42'
+  );
+
+  assert.equal(
+    buildSseUrl('http://localhost:5000/api/stations/events?stationId=s1', '7'),
+    'http://localhost:5000/api/stations/events?stationId=s1&lastEventId=7'
+  );
+
+  assert.equal(buildSseUrl('/events', null), '/events');
 });
 
 test('parseSseFrame parses event id, event name, comments, and multiline data', () => {

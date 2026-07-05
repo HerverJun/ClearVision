@@ -52,7 +52,9 @@ public class MqttPublishOperatorTests
         });
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("placeholder-disabled");
+        result.ErrorMessage.Should().Contain("[MQTT_PUBLISH_DISABLED]");
+        result.ErrorMessage.Should().Contain("当前版本未启用 MQTT 发布能力");
+        result.ErrorMessage.Should().NotContain("placeholder-disabled");
         result.OutputData.Should().BeNull();
     }
 

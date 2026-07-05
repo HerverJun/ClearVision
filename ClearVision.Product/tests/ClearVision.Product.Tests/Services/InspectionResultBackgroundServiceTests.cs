@@ -141,6 +141,48 @@ public sealed class InspectionResultBackgroundServiceTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenRepositoryAndSpoolFail_ShouldDeadLetterAndReleaseImageBudget()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var repository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using var provider = CreateProvider(repository);
+            var service = CreateService(
+                provider,
+                root,
+                new Dictionary<string, string?>
+                {
+                    ["Performance:Persistence:MaxQueuedImageBytes"] = "128"
+                });
+            Directory.CreateDirectory(Path.Combine(root, "inspection-results.jsonl"));
+
+            await service.StartAsync(CancellationToken.None);
+            await service.WriteAsync(CreateResult(outputImageBytes: 128), CancellationToken.None);
+
+            var acceptedAfterRelease = false;
+            await WaitUntilAsync(
+                () =>
+                {
+                    if (!TryGetDeadLetterLineCount(root, out var lineCount) || lineCount != 1)
+                    {
+                        return false;
+                    }
+
+                    acceptedAfterRelease = service.TryWrite(CreateResult(outputImageBytes: 128));
+                    return acceptedAfterRelease;
+                },
+                TimeSpan.FromSeconds(5));
+            acceptedAfterRelease.Should().BeTrue("a failed repository+spool batch must release queued image budget");
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     private static InspectionResultBackgroundService CreateService(
         IServiceProvider provider,
         string spoolRoot,
@@ -210,9 +252,9 @@ public sealed class InspectionResultBackgroundServiceTests
         return result;
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition)
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(30));
         while (!condition())
         {
             cts.Token.ThrowIfCancellationRequested();
@@ -222,9 +264,18 @@ public sealed class InspectionResultBackgroundServiceTests
 
     private static bool TryGetSpoolLineCount(string root, out int lineCount)
     {
+        return TryGetLineCount(Path.Combine(root, "inspection-results.jsonl"), out lineCount);
+    }
+
+    private static bool TryGetDeadLetterLineCount(string root, out int lineCount)
+    {
+        return TryGetLineCount(Path.Combine(root, "inspection-results.deadletter.jsonl"), out lineCount);
+    }
+
+    private static bool TryGetLineCount(string path, out int lineCount)
+    {
         lineCount = 0;
-        var spoolFile = Path.Combine(root, "inspection-results.jsonl");
-        if (!File.Exists(spoolFile))
+        if (!File.Exists(path))
         {
             return false;
         }
@@ -232,7 +283,7 @@ public sealed class InspectionResultBackgroundServiceTests
         try
         {
             using var stream = new FileStream(
-                spoolFile,
+                path,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);

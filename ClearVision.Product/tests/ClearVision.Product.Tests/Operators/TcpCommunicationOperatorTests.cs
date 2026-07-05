@@ -127,6 +127,86 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenResponseTimesOut_ShouldInvalidateConnectionAndReconnectOnNextCall()
+    {
+        ResetStaticTcpState();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var serverTask = RunTimeoutThenEchoOnNewConnectionAsync(listener, cts.Token);
+
+        try
+        {
+            var first = await ExecuteClientAsync(port, "R001", 150, cts.Token);
+            first.IsSuccess.Should().BeFalse();
+            first.ErrorMessage.Should().Contain("超时");
+            TcpCommunicationOperator.GetConnectionStateSnapshot()
+                .Should()
+                .NotContainKey($"127.0.0.1:{port}");
+
+            var second = await ExecuteClientAsync(port, "R002", 2500, cts.Token);
+
+            second.IsSuccess.Should().BeTrue();
+            GetResponse(second).Should().Be("S002");
+        }
+        finally
+        {
+            cts.Cancel();
+            listener.Stop();
+            await IgnoreServerTerminationAsync(serverTask);
+            ResetStaticTcpState();
+        }
+    }
+
+    [Fact]
+    public void CleanupIdleConnections_ShouldRemoveExpiredIdleConnections()
+    {
+        ResetStaticTcpState();
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            SeedPooledTcpConnection("127.0.0.1:41000", now - TimeSpan.FromMinutes(11));
+            SeedPooledTcpConnection("127.0.0.1:41001", now - TimeSpan.FromMinutes(1));
+
+            InvokeCleanupIdleConnections(now);
+
+            StaticDictionaryContainsKey("_connectionPool", "127.0.0.1:41000").Should().BeFalse();
+            StaticDictionaryContainsKey("_connectionPool", "127.0.0.1:41001").Should().BeTrue();
+            StaticDictionaryContainsKey("_connectionLastUsed", "127.0.0.1:41000").Should().BeFalse();
+        }
+        finally
+        {
+            ResetStaticTcpState();
+        }
+    }
+
+    [Fact]
+    public void TrimConnectionPoolIfNeeded_ShouldCapPoolWithoutRemovingProtectedConnection()
+    {
+        ResetStaticTcpState();
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            for (var i = 0; i < 40; i++)
+            {
+                SeedPooledTcpConnection($"127.0.0.1:{42000 + i}", now.AddSeconds(i));
+            }
+
+            InvokeTrimConnectionPoolIfNeeded("127.0.0.1:42039");
+
+            GetStaticDictionaryCount("_connectionPool").Should().BeLessThanOrEqualTo(32);
+            StaticDictionaryContainsKey("_connectionPool", "127.0.0.1:42039").Should().BeTrue();
+            StaticDictionaryContainsKey("_connectionPool", "127.0.0.1:42000").Should().BeFalse();
+        }
+        finally
+        {
+            ResetStaticTcpState();
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithFailedUniqueEndpoints_ShouldNotRetainPerKeyLocks()
     {
         ResetStaticTcpState();
@@ -223,6 +303,26 @@ public class TcpCommunicationOperatorTests
         await secondStream.FlushAsync(cancellationToken);
     }
 
+    private static async Task RunTimeoutThenEchoOnNewConnectionAsync(
+        TcpListener listener,
+        CancellationToken cancellationToken)
+    {
+        using (var firstClient = await listener.AcceptTcpClientAsync(cancellationToken))
+        using (var firstStream = firstClient.GetStream())
+        {
+            _ = await ReadExactAsync(firstStream, 4, cancellationToken);
+
+            using var secondClient = await listener.AcceptTcpClientAsync(cancellationToken);
+            using var secondStream = secondClient.GetStream();
+            var requestBytes = await ReadExactAsync(secondStream, 4, cancellationToken);
+            var request = Encoding.UTF8.GetString(requestBytes);
+            var response = Encoding.UTF8.GetBytes(ToResponse(request));
+
+            await secondStream.WriteAsync(response, cancellationToken);
+            await secondStream.FlushAsync(cancellationToken);
+        }
+    }
+
     private static async Task<byte[]> ReadExactAsync(NetworkStream stream, int length, CancellationToken cancellationToken)
     {
         var buffer = new byte[length];
@@ -264,32 +364,53 @@ public class TcpCommunicationOperatorTests
 
     private static int GetStaticDictionaryCount(string fieldName)
     {
-        var field = typeof(TcpCommunicationOperator).GetField(fieldName, BindingFlags.Static | BindingFlags.NonPublic);
-        field.Should().NotBeNull();
+        return GetStaticDictionary(fieldName).Count;
+    }
 
-        var dictionary = field!.GetValue(null) as IDictionary;
-        dictionary.Should().NotBeNull();
-        return dictionary!.Count;
+    private static bool StaticDictionaryContainsKey(string fieldName, string key)
+    {
+        return GetStaticDictionary(fieldName).Contains(key);
+    }
+
+    private void InvokeCleanupIdleConnections(DateTimeOffset now)
+    {
+        var method = typeof(TcpCommunicationOperator).GetMethod(
+            "CleanupIdleConnections",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+
+        method!.Invoke(_operator, new object[] { now });
+    }
+
+    private void InvokeTrimConnectionPoolIfNeeded(string protectedKey)
+    {
+        var method = typeof(TcpCommunicationOperator).GetMethod(
+            "TrimConnectionPoolIfNeeded",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+
+        method!.Invoke(_operator, new object[] { protectedKey });
+    }
+
+    private static void SeedPooledTcpConnection(string key, DateTimeOffset lastUsed)
+    {
+        GetStaticDictionary("_connectionPool")[key] = new TcpClient();
+        GetStaticDictionary("_connectionLastUsed")[key] = lastUsed;
     }
 
     private static void ResetStaticTcpState()
     {
         ResetStaticDictionary("_connectionPool");
         ResetStaticDictionary("_streamPool");
+        ResetStaticDictionary("_connectionLastUsed");
+        ResetStaticDictionary("_activeOperations");
         ResetStaticDictionary("_connectionLocks");
         ResetStaticDictionary("_requestResponseLocks");
     }
 
     private static void ResetStaticDictionary(string fieldName)
     {
-        var field = typeof(TcpCommunicationOperator).GetField(fieldName, BindingFlags.Static | BindingFlags.NonPublic);
-        field.Should().NotBeNull();
-
-        if (field!.GetValue(null) is not IDictionary dictionary)
-        {
-            return;
-        }
-
+        var dictionary = GetStaticDictionary(fieldName);
         foreach (DictionaryEntry entry in dictionary)
         {
             if (entry.Value is IDisposable disposable)
@@ -299,5 +420,15 @@ public class TcpCommunicationOperatorTests
         }
 
         dictionary.Clear();
+    }
+
+    private static IDictionary GetStaticDictionary(string fieldName)
+    {
+        var field = typeof(TcpCommunicationOperator).GetField(fieldName, BindingFlags.Static | BindingFlags.NonPublic);
+        field.Should().NotBeNull();
+
+        var dictionary = field!.GetValue(null) as IDictionary;
+        dictionary.Should().NotBeNull();
+        return dictionary!;
     }
 }

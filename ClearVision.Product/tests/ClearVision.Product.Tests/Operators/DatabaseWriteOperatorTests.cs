@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -172,6 +173,39 @@ public sealed class DatabaseWriteOperatorTests
         countB.Should().Be(1);
     }
 
+    [Fact]
+    public void TableExistsCache_WhenManyDynamicKeysAreRecorded_ShouldStayBounded()
+    {
+        var maxEntries = GetPrivateStaticField<int>("MaxTableExistsCacheEntries");
+        var method = typeof(DatabaseWriteOperator).GetMethod("MarkTableKnown", BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+
+        for (var index = 0; index < maxEntries + 25; index++)
+        {
+            method!.Invoke(null, new object[] { $"SQLite|test-{Guid.NewGuid():N}|Inspection_{index}" });
+        }
+
+        GetPrivateStaticCollectionCount("TableExistsCache").Should().BeLessThanOrEqualTo(maxEntries);
+    }
+
+    [Fact]
+    public void TableEnsureLock_WhenReleased_ShouldBeRemovedFromStaticCache()
+    {
+        var cacheKey = $"SQLite|lock-{Guid.NewGuid():N}|Inspection";
+        var acquire = typeof(DatabaseWriteOperator).GetMethod("AcquireTableEnsureLock", BindingFlags.NonPublic | BindingFlags.Static);
+        var release = typeof(DatabaseWriteOperator).GetMethod("ReleaseTableEnsureLock", BindingFlags.NonPublic | BindingFlags.Static);
+        acquire.Should().NotBeNull();
+        release.Should().NotBeNull();
+
+        var entry = acquire!.Invoke(null, new object[] { cacheKey });
+
+        ContainsTableEnsureLock(cacheKey).Should().BeTrue();
+
+        release!.Invoke(null, new[] { cacheKey, entry });
+
+        ContainsTableEnsureLock(cacheKey).Should().BeFalse();
+    }
+
     private static Operator CreateOperator(
         string connectionString,
         string tableName = "InspectionResults",
@@ -213,5 +247,28 @@ public sealed class DatabaseWriteOperatorTests
             }));
 
         return op;
+    }
+
+    private static T GetPrivateStaticField<T>(string name)
+    {
+        var field = typeof(DatabaseWriteOperator).GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
+        field.Should().NotBeNull();
+        return (T)field!.GetValue(null)!;
+    }
+
+    private static int GetPrivateStaticCollectionCount(string name)
+    {
+        var collection = GetPrivateStaticField<object>(name);
+        var countProperty = collection.GetType().GetProperty("Count");
+        countProperty.Should().NotBeNull();
+        return (int)countProperty!.GetValue(collection)!;
+    }
+
+    private static bool ContainsTableEnsureLock(string cacheKey)
+    {
+        var locks = GetPrivateStaticField<object>("TableEnsureLocks");
+        var containsKey = locks.GetType().GetMethod("ContainsKey", new[] { typeof(string) });
+        containsKey.Should().NotBeNull();
+        return (bool)containsKey!.Invoke(locks, new object[] { cacheKey })!;
     }
 }

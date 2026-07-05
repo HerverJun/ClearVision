@@ -100,4 +100,58 @@ public class InspectionRuntimeCoordinatorTests
 
         result.Should().Be(StartResult.MutationInProgress);
     }
+
+    [Fact]
+    public async Task StateChanged_WhenSubscriberThrows_ShouldContinueStateTransitionAndNotifyRemainingSubscribers()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var throwingSubscriberCalls = 0;
+        var healthySubscriberCalls = 0;
+
+        coordinator.StateChanged += (_, _) =>
+        {
+            throwingSubscriberCalls++;
+            throw new InvalidOperationException("synthetic subscriber failure");
+        };
+        coordinator.StateChanged += (_, args) =>
+        {
+            args.NewStatus.Should().Be(RuntimeStatus.Starting);
+            healthySubscriberCalls++;
+        };
+
+        var result = await coordinator.TryStartAsync(projectId, Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().Be(StartResult.Success);
+        coordinator.GetState(projectId)!.Status.Should().Be(RuntimeStatus.Starting);
+        throwingSubscriberCalls.Should().Be(1);
+        healthySubscriberCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task StateChanged_WhenSubscriberStopsStartingRun_ShouldNotBeInvokedInsideStateLock()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var reentrantStopCompleted = false;
+
+        coordinator.StateChanged += (_, args) =>
+        {
+            if (args.NewStatus != RuntimeStatus.Starting)
+            {
+                return;
+            }
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+            coordinator.TryStopAsync(projectId, timeout.Token).GetAwaiter().GetResult();
+            reentrantStopCompleted = true;
+        };
+
+        var result = await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+
+        result.Should().Be(StartResult.Success);
+        reentrantStopCompleted.Should().BeTrue();
+        coordinator.GetState(projectId)!.Status.Should().Be(RuntimeStatus.Stopping);
+    }
 }

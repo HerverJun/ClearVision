@@ -74,6 +74,38 @@ public class InspectionServiceRealtimeTests
         context.Coordinator.GetState(projectId).Should().BeNull();
     }
 
+    [Fact]
+    public async Task StartRealtimeInspectionFlowAsync_WhenWorkerStartFailsAfterRequestCancellation_ShouldRollbackRuntimeState()
+    {
+        var cancellation = new CancellationTokenSource();
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = Substitute.For<IInspectionWorker>();
+        worker.TryStartRunAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<string?>())
+            .Returns(_ =>
+            {
+                cancellation.Cancel();
+                return Task.FromResult(false);
+            });
+        var service = CreateService(coordinator, worker);
+        var projectId = Guid.NewGuid();
+
+        var act = async () => await service.StartRealtimeInspectionFlowAsync(
+            projectId,
+            new OperatorFlow("Realtime-Start-Failure"),
+            cameraId: null,
+            cancellation.Token);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("实时检测启动失败，请重试");
+        await WaitUntilAsync(
+            () => coordinator.GetState(projectId) == null,
+            TimeSpan.FromSeconds(2));
+    }
+
     private static TestContext CreateContext()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -127,6 +159,29 @@ public class InspectionServiceRealtimeTests
             NullLogger<InspectionService>.Instance);
 
         return new TestContext(provider, service, worker, coordinator, flowExecution);
+    }
+
+    private static InspectionService CreateService(
+        IInspectionRuntimeCoordinator coordinator,
+        IInspectionWorker worker)
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig());
+
+        return new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            new AnalysisDataBuilder(),
+            NullLogger<InspectionService>.Instance);
     }
 
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)

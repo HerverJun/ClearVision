@@ -73,6 +73,34 @@ public sealed class StationOfflineReplayTests
     }
 
     [Fact]
+    public void Acknowledge_ShouldAdvanceStateWithoutRewritingSpoolUntilCompaction()
+    {
+        var spoolDirectory = CreateTempDirectory();
+        try
+        {
+            var spool = CreateSpool(spoolDirectory, maxBufferedResults: 100);
+            spool.Enqueue(BuildResult(0, "run-ack-1"));
+            spool.Enqueue(BuildResult(0, "run-ack-2"));
+            spool.Enqueue(BuildResult(0, "run-ack-3"));
+
+            var spoolFilePath = Path.Combine(spoolDirectory, "station-results.jsonl");
+            File.ReadLines(spoolFilePath).Should().HaveCount(3);
+
+            spool.Acknowledge(3);
+
+            File.ReadLines(spoolFilePath).Should().HaveCount(3);
+            var restarted = CreateSpool(spoolDirectory, maxBufferedResults: 100);
+            restarted.AckedSequenceId.Should().Be(3);
+            restarted.GetPendingBatch(10).Should().BeEmpty();
+            File.ReadLines(spoolFilePath).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteTempDirectory(spoolDirectory);
+        }
+    }
+
+    [Fact]
     public void OfflineSpool_ShouldReplayTwentyResultsAfterStationRestart()
     {
         var spoolDirectory = CreateTempDirectory();
@@ -115,7 +143,7 @@ public sealed class StationOfflineReplayTests
     }
 
     [Fact]
-    public void Enqueue_ShouldKeepDiskSpoolWithinCapacity_WhenOverflowTrimsPendingResults()
+    public void Enqueue_ShouldIgnoreStaleOverflowRowsOnRestart_WhenOverflowTrimsPendingResults()
     {
         var spoolDirectory = CreateTempDirectory();
         try
@@ -133,13 +161,13 @@ public sealed class StationOfflineReplayTests
                 .Select(summary => summary!)
                 .ToList();
 
-            persisted.Should().HaveCount(100);
-            persisted.Select(result => result.SequenceId).Should().Equal(Enumerable.Range(6, 100).Select(value => (long)value));
+            persisted.Should().HaveCount(105);
 
             var restartedSpool = CreateSpool(spoolDirectory, maxBufferedResults: 100);
             restartedSpool.GetPendingBatch(200).Select(result => result.SequenceId)
                 .Should()
                 .Equal(Enumerable.Range(6, 100).Select(value => (long)value));
+            File.ReadLines(spoolFilePath).Should().HaveCount(100);
             restartedSpool.GetPendingUnavailableRange().Should().Be((1L, 5L));
 
             restartedSpool.AcknowledgeUnavailableThrough(5);

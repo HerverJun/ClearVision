@@ -65,6 +65,53 @@ public class StatisticsOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenWindowTrimsOldValues_ShouldMaintainRollingStats()
+    {
+        var op = CreateOperator(
+            Guid.NewGuid(),
+            new Dictionary<string, object>
+            {
+                ["WindowSize"] = 3
+            });
+
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 1.0 });
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 10.0 });
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 2.0 });
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 3.0 });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, (int)result.OutputData!["Count"]);
+        Assert.Equal(5.0, (double)result.OutputData["Mean"]);
+        Assert.Equal(2.0, (double)result.OutputData["Min"]);
+        Assert.Equal(10.0, (double)result.OutputData["Max"]);
+        Assert.Equal(8.0, (double)result.OutputData["Range"]);
+        Assert.Equal(Math.Sqrt(19.0), (double)result.OutputData["StdDev"], 3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithReset_ShouldClearRollingHistoryBeforeAddingValue()
+    {
+        var op = CreateOperator(Guid.NewGuid());
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 10.0 });
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 20.0 });
+        op = CreateOperator(
+            op.Id,
+            new Dictionary<string, object>
+            {
+                ["Reset"] = true
+            });
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Value"] = 30.0 });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, (int)result.OutputData!["Count"]);
+        Assert.Equal(30.0, (double)result.OutputData["Mean"]);
+        Assert.Equal(30.0, (double)result.OutputData["Min"]);
+        Assert.Equal(30.0, (double)result.OutputData["Max"]);
+    }
+
+
+    [Fact]
     public void ValidateParameters_UslLessThanLsl_ReturnsInvalid()
     {
         var op = CreateOperator(
@@ -83,17 +130,36 @@ public class StatisticsOperatorTests
     private static Operator CreateOperator(Guid id, Dictionary<string, object>? parameters = null)
     {
         var op = new Operator(id, "Stats", OperatorType.Statistics, 0, 0);
-        op.AddParameter(new Parameter(Guid.NewGuid(), "WindowSize", "WindowSize", "", "int", 1000));
-        op.AddParameter(new Parameter(Guid.NewGuid(), "Reset", "Reset", "", "bool", false));
+        var effectiveParameters = new Dictionary<string, object>
+        {
+            ["WindowSize"] = 1000,
+            ["Reset"] = false
+        };
 
         if (parameters != null)
         {
             foreach (var (key, value) in parameters)
             {
-                op.AddParameter(new Parameter(Guid.NewGuid(), key, key, "", "double", value));
+                effectiveParameters[key] = value;
             }
         }
 
+        foreach (var (key, value) in effectiveParameters)
+        {
+            op.AddParameter(new Parameter(Guid.NewGuid(), key, key, "", GetParameterDataType(value), value));
+        }
+
         return op;
+    }
+
+    private static string GetParameterDataType(object value)
+    {
+        return value switch
+        {
+            bool => "bool",
+            int or long => "int",
+            double or float or decimal => "double",
+            _ => "string"
+        };
     }
 }

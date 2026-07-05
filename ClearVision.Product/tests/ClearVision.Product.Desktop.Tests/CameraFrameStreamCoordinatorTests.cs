@@ -289,6 +289,51 @@ public class CameraFrameStreamCoordinatorTests
         await camera.Received(1).StopContinuousAcquisitionAsync();
     }
 
+    [Fact]
+    public async Task AcquireFrameAsync_AfterDirectAcquire_ShouldStopProducerWhenIdleTimeoutElapses()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var camera = CreateIndustrialCamera();
+        Func<byte[], Task>? frameCallback = null;
+
+        camera.When(x => x.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()))
+            .Do(callInfo => frameCallback = callInfo.Arg<Func<byte[], Task>>());
+
+        var binding = new CameraBindingConfig
+        {
+            Id = "binding-idle-timeout",
+            SerialNumber = "SN-IDLE-TIMEOUT",
+            TriggerMode = "Continuous"
+        };
+
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(binding.Id).Returns(Task.FromResult<ICamera>(camera));
+        cameraManager.GetCamera(binding.SerialNumber).Returns(camera);
+
+        await using var sut = new CameraFrameStreamCoordinator(
+            cameraManager,
+            NullLogger<CameraFrameStreamCoordinator>.Instance,
+            NoOpTriggerInputService.Instance,
+            NoOpSerialPhotoelectricTriggerInputService.Instance,
+            TimeSpan.FromMilliseconds(20),
+            TimeSpan.FromMilliseconds(20));
+        var acquireTask = sut.AcquireFrameAsync(binding.Id);
+        await Task.Delay(50);
+
+        var frameBytes = CreatePngBytes(new Scalar(96, 32, 64));
+        await frameCallback!(frameBytes);
+        var frame = await acquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        frame.ImageData.Should().Equal(frameBytes);
+        for (var attempt = 0; attempt < 20 && sut.SnapshotStreamUsage(binding.Id).IsRunning; attempt++)
+        {
+            await Task.Delay(20);
+        }
+
+        sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
+        await camera.Received(1).StopContinuousAcquisitionAsync();
+    }
+
     private static byte[] CreatePngBytes(Scalar color)
     {
         using var mat = new Mat(2, 2, MatType.CV_8UC3, color);

@@ -36,7 +36,7 @@ public class Step123_GapAnalysisImplementationTests
         Assert.NotNull(factory.GetMetadata(OperatorType.Comment));
     }
 
-    [Fact(Skip = "Pending P1 Implementation")]
+    [Fact]
     public async Task ComparatorOperator_ShouldCompareValues()
     {
         var logger = Substitute.For<ILogger<ComparatorOperator>>();
@@ -56,7 +56,7 @@ public class Step123_GapAnalysisImplementationTests
         Assert.Equal(5d, result.OutputData!["Difference"]);
     }
 
-    [Fact(Skip = "Pending P1 Implementation")]
+    [Fact]
     public async Task MeasurementOperator_ShouldSupportPointInputsWithoutImage()
     {
         var logger = Substitute.For<ILogger<MeasureDistanceOperator>>();

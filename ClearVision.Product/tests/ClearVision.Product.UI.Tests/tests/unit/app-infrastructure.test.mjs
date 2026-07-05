@@ -307,7 +307,16 @@ test('toolbar run still requires run-ready flow validation', async () => {
 
 test('operator visual registry supports localized category groups', () => {
   const defaultIcon = getCategoryIconPath('__missing-category__');
-  const localizedCategories = ['频域', '区域处理', '纹理'];
+  const localizedCategories = [
+    'AI Detection',
+    'AI 检测',
+    'Communication',
+    'Detection',
+    'Flow Control',
+    '频域',
+    '区域处理',
+    '纹理'
+  ];
 
   for (const category of localizedCategories) {
     assert.notEqual(getCategoryIconPath(category), defaultIcon);
@@ -392,6 +401,65 @@ test('project manager save updates current project and list cache for explicit f
   assert.equal(getCurrentProject().flow, flow);
   assert.equal(getProjectList()[0].id, 'project-save-sync');
   assert.equal(getProjectList()[0].flow, flow);
+});
+
+test('project manager save flushes registered flow snapshot provider before persisting', async (t) => {
+  const originalPut = httpClient.put;
+  const previousDocument = globalThis.document;
+  const staleFlow = { operators: [{ id: 'stale-node' }], connections: [] };
+  const freshFlow = { operators: [{ id: 'fresh-node' }], connections: [] };
+  const project = {
+    id: 'project-provider-flow',
+    name: 'Provider Flow',
+    description: '',
+    flow: staleFlow
+  };
+  const puts = [];
+  let providerCalls = 0;
+
+  t.after(() => {
+    httpClient.put = originalPut;
+    projectManager.setFlowSnapshotProvider(null);
+    projectManager.currentProject = null;
+    projectManager.unsavedChanges = false;
+    projectManager.forgetProjectFromCaches(project.id);
+    setCurrentProject(null);
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  });
+
+  globalThis.document = {
+    title: '',
+    getElementById() {
+      return null;
+    }
+  };
+  projectManager.currentProject = project;
+  projectManager.unsavedChanges = true;
+  setCurrentProject(project);
+  projectManager.setFlowSnapshotProvider((currentProject) => {
+    providerCalls += 1;
+    assert.equal(currentProject.id, project.id);
+    return freshFlow;
+  });
+  httpClient.put = async (url, body) => {
+    puts.push({ url, body });
+    return { ok: true };
+  };
+
+  await projectManager.saveProject();
+
+  assert.equal(providerCalls, 1);
+  assert.deepEqual(puts.map(call => call.url), [
+    '/projects/project-provider-flow',
+    '/projects/project-provider-flow/flow'
+  ]);
+  assert.deepEqual(puts[1].body, freshFlow);
+  assert.equal(getCurrentProject().flow, freshFlow);
+  assert.equal(projectManager.unsavedChanges, false);
 });
 
 test('project manager flow save omits unchanged global variables from aggregate payload', async (t) => {

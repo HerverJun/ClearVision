@@ -77,6 +77,58 @@ public class FrameAveragingOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_MeanMode_WhenWindowTrimsOldFrame_ShouldAverageRecentFramesOnly()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "FrameCount", 2 },
+            { "Mode", "Mean" }
+        });
+
+        using var frame1 = CreateGrayImage(10);
+        using var frame2 = CreateGrayImage(50);
+        using var frame3 = CreateGrayImage(90);
+
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame1));
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
+        var third = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame3));
+
+        Assert.True(third.IsSuccess, third.ErrorMessage);
+        Assert.Equal(2, Convert.ToInt32(third.OutputData!["FrameCount"]));
+
+        using var output = Assert.IsType<ImageWrapper>(third.OutputData["Image"]);
+        using var resultMat = output.GetMat();
+        Assert.Equal(70, resultMat.At<byte>(0, 0));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MeanMode_WhenShapeChanges_ShouldResetBufferedFramesAndAccumulator()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "FrameCount", 3 },
+            { "Mode", "Mean" }
+        });
+
+        using var frame1 = CreateGrayImage(10, rows: 80, cols: 80);
+        using var frame2 = CreateGrayImage(90, rows: 40, cols: 40);
+
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame1));
+        var second = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
+
+        Assert.True(second.IsSuccess, second.ErrorMessage);
+        Assert.Equal(1, Convert.ToInt32(second.OutputData!["FrameCount"]));
+
+        using var output = Assert.IsType<ImageWrapper>(second.OutputData["Image"]);
+        using var resultMat = output.GetMat();
+        Assert.Equal(40, resultMat.Rows);
+        Assert.Equal(40, resultMat.Cols);
+        Assert.Equal(90, resultMat.At<byte>(0, 0));
+    }
+
+    [Fact]
     public void ValidateParameters_WithInvalidMode_ShouldReturnInvalid()
     {
         var sut = CreateSut();
@@ -197,9 +249,9 @@ public class FrameAveragingOperatorTests
         return new ImageWrapper(mat);
     }
 
-    private static ImageWrapper CreateGrayImage(byte value)
+    private static ImageWrapper CreateGrayImage(byte value, int rows = 80, int cols = 80)
     {
-        var mat = new Mat(80, 80, MatType.CV_8UC1, new Scalar(value));
+        var mat = new Mat(rows, cols, MatType.CV_8UC1, new Scalar(value));
         return new ImageWrapper(mat);
     }
 }

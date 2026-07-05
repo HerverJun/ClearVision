@@ -5871,6 +5871,8 @@ test('PlanRun first Build after completion uses final workspace revision and sta
   });
   await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_revision_gate', 'PlanRun final plan');
   assert.equal(panel.workspaceSnapshotRevision, 31);
+  assert.equal(panel.activePlanRunId, null);
+  assert.equal(panel.activePlanRunRequestId, null);
   panel._startAgentRunEventSource = (runId, options) => {
     startedBuildStreams.push({ runId, options });
   };
@@ -5886,6 +5888,22 @@ test('PlanRun first Build after completion uses final workspace revision and sta
   assert.equal(panel.activeAgentRunId, 'ar_build_revision_gate');
   assert.equal(panel.agentWorkspaceMode, 'build');
   assert.deepEqual(startedBuildStreams.map(item => item.runId), ['ar_build_revision_gate']);
+
+  const cancelTargets = [];
+  panel._updateProgress = payload => {
+    panel.lastProgress = payload;
+  };
+  panel._cancelActivePlanRun = () => {
+    cancelTargets.push('plan');
+  };
+  panel._cancelActiveAgentRun = () => {
+    cancelTargets.push('agent');
+  };
+
+  panel._handleCancelGenerate();
+
+  assert.deepEqual(cancelTargets, ['agent']);
+  assert.equal(panel.lastProgress?.phase, 'cancelling');
 });
 
 test('PlanRun terminal persistence warning is visible and plan result remains available', async () => {

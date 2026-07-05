@@ -81,6 +81,38 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         received.Sequence.Should().Be(3);
     }
 
+    [Fact(DisplayName = "AgentRun subscription closes lagging live subscriber instead of buffering without bound")]
+    public async Task Subscribe_ShouldCloseLaggingLiveSubscriber()
+    {
+        var run = _service.CreateRun("lagging subscriber");
+        using var subscription = _service.Subscribe(run.RunId, afterSequence: 2);
+
+        for (var i = 0; i < 300; i++)
+        {
+            _service.Append(run.RunId, Draft(AgentRunEventTypes.ToolCallCompleted, "planner"));
+        }
+
+        var receivedSequences = new List<long>();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        while (await subscription!.LiveEvents.WaitToReadAsync(timeout.Token))
+        {
+            while (subscription.LiveEvents.TryRead(out var evt))
+            {
+                receivedSequences.Add(evt.Sequence);
+            }
+        }
+
+        receivedSequences.Should().NotBeEmpty();
+        receivedSequences.Count.Should().BeLessThan(300);
+        receivedSequences.Should().BeInAscendingOrder();
+
+        var replay = _service.Replay(run.RunId)!;
+        replay.Events.Should().HaveCount(302);
+        replay.Events.Select(evt => evt.Sequence).Should().Equal(Enumerable.Range(1, 302).Select(i => (long)i));
+        replay.Summary.StaleEventCount.Should().Be(1);
+        replay.Diagnostics.StaleEventCount.Should().Be(1);
+    }
+
     [Fact(DisplayName = "AgentRun complete persists terminal summary and closes live stream")]
     public async Task Complete_ShouldPersistSummaryAndCloseLiveStream()
     {
@@ -377,6 +409,22 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         replay.Diagnostics.DroppedEventCount.Should().Be(1);
     }
 
+    [Fact(DisplayName = "AgentRun append after terminal persists dropped count across restart")]
+    public void AppendAfterTerminal_ShouldPersistDroppedCountAcrossRestart()
+    {
+        var run = _service.CreateRun("terminal restart");
+        _service.Complete(run.RunId, "done");
+
+        _service.Append(run.RunId, Draft(AgentRunEventTypes.StageStarted, "planner")).Should().BeNull();
+
+        var reloaded = new AgentRunEventStreamService(new AgentRunEventStore(_directory, _redactor), _redactor);
+        var replay = reloaded.Replay(run.RunId)!;
+
+        replay.Summary.Status.Should().Be(AgentRunEventStatuses.Completed);
+        replay.Summary.DroppedEventCount.Should().Be(1);
+        replay.Diagnostics.DroppedEventCount.Should().Be(1);
+    }
+
     [Fact(DisplayName = "AgentRun JSONL storage writes metadata-only events and summaries")]
     public void Storage_ShouldWriteMetadataOnlyJsonl()
     {
@@ -393,6 +441,54 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
             document.RootElement.GetProperty("redactionPass").GetBoolean().Should().BeTrue();
             _redactor.IsRedactionSafeText(line).Should().BeTrue();
         }
+    }
+
+    [Fact(DisplayName = "AgentRun JSONL storage compacts repeated summaries to latest per run")]
+    public void Storage_ShouldCompactRepeatedSummariesToLatestPerRun()
+    {
+        var store = CreateCompactingStore(maxEventsPerRun: 128);
+        var service = new AgentRunEventStreamService(store, _redactor);
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        service.UtcNowProvider = () => now;
+        var run = service.CreateRun("compact summaries");
+
+        for (var i = 0; i < 6; i++)
+        {
+            now = now.AddSeconds(1);
+            service.Append(run.RunId, Draft(AgentRunEventTypes.ToolCallCompleted, "planner"));
+        }
+
+        File.ReadLines(store.SummaryPath).Should().HaveCount(1);
+        var summary = store.LoadSummary(run.RunId);
+        summary.Should().NotBeNull();
+        summary!.LastSequence.Should().Be(8);
+        summary.EventCount.Should().Be(8);
+    }
+
+    [Fact(DisplayName = "AgentRun JSONL storage compaction keeps first and recent events for long runs")]
+    public void Storage_ShouldCompactLongRunEventsToFirstAndRecentEvents()
+    {
+        var options = CompactingOptions(maxEventsPerRun: 4);
+        var store = new AgentRunEventStore(_directory, _redactor, options);
+        var service = new AgentRunEventStreamService(store, _redactor);
+        var run = service.CreateRun("compact long run");
+
+        for (var i = 0; i < 6; i++)
+        {
+            service.Append(run.RunId, Draft(AgentRunEventTypes.ToolCallCompleted, "planner"));
+        }
+
+        File.ReadLines(store.EventPath).Should().HaveCount(4);
+        var reloaded = new AgentRunEventStreamService(new AgentRunEventStore(_directory, _redactor, options), _redactor);
+        var replay = reloaded.Replay(run.RunId)!;
+
+        replay.Events.Select(evt => evt.Sequence).Should().Equal(1, 6, 7, 8);
+        replay.Summary.EventCount.Should().Be(8);
+        replay.Summary.LastSequence.Should().Be(8);
+
+        var appended = reloaded.Append(run.RunId, Draft(AgentRunEventTypes.StageCompleted, "planner"));
+        appended.Should().NotBeNull();
+        appended!.Sequence.Should().Be(9);
     }
 
     [Theory(DisplayName = "AgentRun required event type is publishable")]
@@ -608,6 +704,22 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
                 status = "running",
                 metadataOnly = true
             }
+        };
+    }
+
+    private AgentRunEventStore CreateCompactingStore(int maxEventsPerRun)
+    {
+        return new AgentRunEventStore(_directory, _redactor, CompactingOptions(maxEventsPerRun));
+    }
+
+    private static AgentRunEventStoreOptions CompactingOptions(int maxEventsPerRun)
+    {
+        return new AgentRunEventStoreOptions
+        {
+            CompactionAppendThreshold = 1,
+            CompactionSizeThresholdBytes = 1,
+            MaxSummaryRuns = 10,
+            MaxEventsPerRun = maxEventsPerRun
         };
     }
 }

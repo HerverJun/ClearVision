@@ -22,21 +22,17 @@ public class IndustrialMeasurementBenchmarkTests
     }
 
     [Fact]
-    public async Task CircleMeasurement_RealIndustrialSample_ShouldStayWithinBaseline()
+    public async Task CircleMeasurement_DeterministicIndustrialScene_ShouldStayWithinBaseline()
     {
         var baseline = LoadBaseline().CircleBaseline;
-        if (!SampleExists())
-        {
-            return;
-        }
 
-        using var sample = LoadSampleCrop(baseline.Crop);
+        using var sample = CreateCircleBenchmarkImage(baseline);
         var op = new Operator("circle-industrial", OperatorType.CircleMeasurement, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Method", baseline.Method, "string"));
         op.AddParameter(TestHelpers.CreateParameter("MinRadius", baseline.MinRadius, "int"));
         op.AddParameter(TestHelpers.CreateParameter("MaxRadius", baseline.MaxRadius, "int"));
 
-        var result = await _circleOperator.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(sample.Clone())));
+        var result = await _circleOperator.ExecuteAsync(op, TestHelpers.CreateImageInputs(sample));
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
 
         var center = result.OutputData!["Center"].Should().BeOfType<Position>().Subject;
@@ -47,22 +43,18 @@ public class IndustrialMeasurementBenchmarkTests
     }
 
     [Fact]
-    public async Task LineMeasurement_RealIndustrialSample_ShouldStayWithinBaseline()
+    public async Task LineMeasurement_DeterministicIndustrialScene_ShouldStayWithinBaseline()
     {
         var baseline = LoadBaseline().LineBaseline;
-        if (!SampleExists())
-        {
-            return;
-        }
 
-        using var sample = LoadSampleCrop(baseline.Crop);
+        using var sample = CreateLineBenchmarkImage(baseline);
         var op = new Operator("line-industrial", OperatorType.LineMeasurement, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Method", baseline.Method, "string"));
         op.AddParameter(TestHelpers.CreateParameter("Threshold", baseline.Threshold, "int"));
         op.AddParameter(TestHelpers.CreateParameter("MinLength", baseline.MinLength, "double"));
         op.AddParameter(TestHelpers.CreateParameter("MaxGap", baseline.MaxGap, "double"));
 
-        var result = await _lineOperator.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(sample.Clone())));
+        var result = await _lineOperator.ExecuteAsync(op, TestHelpers.CreateImageInputs(sample));
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
 
         var angle = Convert.ToDouble(result.OutputData!["Angle"]);
@@ -85,24 +77,25 @@ public class IndustrialMeasurementBenchmarkTests
         })!;
     }
 
-    private static Mat LoadSampleCrop(BenchmarkCrop crop)
+    private static ImageWrapper CreateCircleBenchmarkImage(CircleBaseline baseline)
     {
-        var repoRoot = FindRepoRoot();
-        var baseline = LoadBaseline();
-        var samplePath = Path.Combine(repoRoot, baseline.SamplePath.Replace('/', Path.DirectorySeparatorChar));
-        File.Exists(samplePath).Should().BeTrue($"industrial benchmark sample should exist at {samplePath}");
-        using var encoded = Cv2.ImDecode(File.ReadAllBytes(samplePath), ImreadModes.Color);
-        encoded.Empty().Should().BeFalse($"industrial benchmark sample should decode successfully from {samplePath}");
-        var roi = new Rect(crop.X, crop.Y, crop.Width, crop.Height);
-        return new Mat(encoded, roi).Clone();
+        return IndustrialMeasurementSceneFactory.CreateFilledCircleImage(
+            width: baseline.ImageWidth,
+            height: baseline.ImageHeight,
+            center: new Point2d(baseline.SceneCenterX, baseline.SceneCenterY),
+            radius: baseline.SceneRadius,
+            supersample: baseline.Supersample);
     }
 
-    private static bool SampleExists()
+    private static ImageWrapper CreateLineBenchmarkImage(LineBaseline baseline)
     {
-        var repoRoot = FindRepoRoot();
-        var baseline = LoadBaseline();
-        var samplePath = Path.Combine(repoRoot, baseline.SamplePath.Replace('/', Path.DirectorySeparatorChar));
-        return File.Exists(samplePath);
+        return IndustrialMeasurementSceneFactory.CreateLineImage(
+            width: baseline.ImageWidth,
+            height: baseline.ImageHeight,
+            start: new Point2d(baseline.SceneStartX, baseline.SceneStartY),
+            end: new Point2d(baseline.SceneEndX, baseline.SceneEndY),
+            thicknessPx: baseline.SceneThicknessPx,
+            supersample: baseline.Supersample);
     }
 
     private static string FindRepoRoot()
@@ -124,17 +117,21 @@ public class IndustrialMeasurementBenchmarkTests
 
     private sealed class IndustrialMeasurementBaseline
     {
-        public string SamplePath { get; set; } = string.Empty;
         public CircleBaseline CircleBaseline { get; set; } = new();
         public LineBaseline LineBaseline { get; set; } = new();
     }
 
     private sealed class CircleBaseline
     {
-        public BenchmarkCrop Crop { get; set; } = new();
+        public int ImageWidth { get; set; }
+        public int ImageHeight { get; set; }
         public string Method { get; set; } = "HoughCircle";
         public int MinRadius { get; set; }
         public int MaxRadius { get; set; }
+        public double SceneCenterX { get; set; }
+        public double SceneCenterY { get; set; }
+        public double SceneRadius { get; set; }
+        public int Supersample { get; set; } = 16;
         public double ExpectedCenterX { get; set; }
         public double ExpectedCenterY { get; set; }
         public double ExpectedRadius { get; set; }
@@ -144,23 +141,22 @@ public class IndustrialMeasurementBenchmarkTests
 
     private sealed class LineBaseline
     {
-        public BenchmarkCrop Crop { get; set; } = new();
+        public int ImageWidth { get; set; }
+        public int ImageHeight { get; set; }
         public string Method { get; set; } = "FitLine";
         public int Threshold { get; set; }
         public double MinLength { get; set; }
         public double MaxGap { get; set; }
+        public double SceneStartX { get; set; }
+        public double SceneStartY { get; set; }
+        public double SceneEndX { get; set; }
+        public double SceneEndY { get; set; }
+        public double SceneThicknessPx { get; set; } = 6.0;
+        public int Supersample { get; set; } = 16;
         public double ExpectedAngle { get; set; }
         public double AngleTolerance { get; set; }
         public double ExpectedMinLength { get; set; }
         public double ExpectedMaxLength { get; set; }
         public double MaxResidualMean { get; set; }
-    }
-
-    private sealed class BenchmarkCrop
-    {
-        public int X { get; set; }
-        public int Y { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
     }
 }

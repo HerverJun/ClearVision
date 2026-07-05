@@ -95,6 +95,49 @@ test('station monitor normalizes server statistics for the result workbench', as
   assert.equal(stats.hourlyTrend[0].count, 3);
 });
 
+test('station monitor skips KPI DOM rebuild when summary signature is unchanged', async () => {
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+
+  const view = Object.create(StationMonitorView.prototype);
+  let writes = 0;
+  let alertCount = 0;
+  view.summaryGrid = {
+    _html: '',
+    set innerHTML(value) {
+      writes += 1;
+      this._html = value;
+    },
+    get innerHTML() {
+      return this._html;
+    }
+  };
+  view.summary = null;
+  view.offlineThresholdSeconds = 15;
+  view._summaryRenderSignature = '';
+  view.escapeHtml = (value) => String(value ?? '');
+  view.getStationRenderSnapshot = () => ({
+    totalOk: 2,
+    totalNg: 1,
+    totalError: 0,
+    averageExecutionTimeMs: 35,
+    onlineCount: 1,
+    alertCount,
+    stations: [{ stationId: 'station-a' }]
+  });
+
+  view.renderSummary();
+  view.renderSummary();
+
+  assert.equal(writes, 1);
+
+  alertCount = 1;
+  view.renderSummary();
+
+  assert.equal(writes, 2);
+});
+
 test('result panel accepts station statistics shape for trace dashboard analytics', async () => {
   const { ResultPanel } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js'

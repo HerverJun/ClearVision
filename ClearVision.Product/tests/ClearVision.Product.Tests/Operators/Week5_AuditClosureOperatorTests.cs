@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -140,6 +141,28 @@ public class VariableReadOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShouldLogRunScopeReadsAtDebugLevel()
+    {
+        var context = new VariableContext();
+        context.SetValue("temperature", 42.5);
+        var logger = new RecordingLogger<VariableReadOperator>();
+        var sut = new VariableReadOperator(logger, context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "temperature", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue();
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Debug &&
+            entry.Message.Contains("[VariableRead]", StringComparison.Ordinal));
+        logger.Entries.Should().NotContain(entry =>
+            entry.Level == LogLevel.Information &&
+            entry.Message.Contains("[VariableRead]", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenProjectScopeUsesExpressionAndFloorConversion_ShouldReadProjectedInt64Value()
     {
         var variableId = Guid.NewGuid();
@@ -196,6 +219,30 @@ public class VariableWriteOperatorTests
 
         result.IsSuccess.Should().BeTrue();
         context.GetValue<string>("batchId").Should().Be("LAB-001");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldLogRunScopeWritesAtDebugLevel()
+    {
+        var context = new VariableContext();
+        var logger = new RecordingLogger<VariableWriteOperator>();
+        var sut = new VariableWriteOperator(logger, context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "batchId", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "String", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Value"] = "LAB-001"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Debug &&
+            entry.Message.Contains("[VariableWrite]", StringComparison.Ordinal));
+        logger.Entries.Should().NotContain(entry =>
+            entry.Level == LogLevel.Information &&
+            entry.Message.Contains("[VariableWrite]", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -259,6 +306,28 @@ public class VariableIncrementOperatorTests
         result.OutputData!["PreviousValue"].Should().Be(5L);
         result.OutputData["NewValue"].Should().Be(7L);
         result.OutputData["WasReset"].Should().Be(false);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldLogRunScopeIncrementsAtDebugLevel()
+    {
+        var context = new VariableContext();
+        context.SetValue("counter", 5L);
+        var logger = new RecordingLogger<VariableIncrementOperator>();
+        var sut = new VariableIncrementOperator(logger, context);
+        var op = new Operator("inc", OperatorType.VariableIncrement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "counter", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Delta", 2, "int"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue();
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Debug &&
+            entry.Message.Contains("[VariableIncrement]", StringComparison.Ordinal));
+        logger.Entries.Should().NotContain(entry =>
+            entry.Level == LogLevel.Information &&
+            entry.Message.Contains("[VariableIncrement]", StringComparison.Ordinal));
     }
 
     [Fact]

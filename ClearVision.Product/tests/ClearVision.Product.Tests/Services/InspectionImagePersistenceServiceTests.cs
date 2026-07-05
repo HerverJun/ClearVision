@@ -324,6 +324,66 @@ public sealed class InspectionImagePersistenceServiceTests
     }
 
     [Fact]
+    public async Task QueuedPersistence_StopAsync_WhenDrainTimesOut_ShouldDropPendingSnapshotsAndReleaseQueueBudget()
+    {
+        var root = CreateTempDirectory();
+        var outputImage = CreatePngImageBytes();
+        var configService = CreateConfigService(root);
+        var inner = new BlockingImagePersistenceService();
+        var logger = new RecordingLogger<QueuedInspectionImagePersistenceService>();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Performance:Persistence:ShutdownDrainTimeoutMs"] = "10"
+            })
+            .Build();
+        var service = new QueuedInspectionImagePersistenceService(
+            configService,
+            inner,
+            logger,
+            configuration);
+        var first = new InspectionResult(Guid.NewGuid());
+        first.SetResult(InspectionStatus.NG, 7);
+        first.SetOutputImage(outputImage);
+        var second = new InspectionResult(Guid.NewGuid());
+        second.SetResult(InspectionStatus.NG, 8);
+        second.SetOutputImage(outputImage.ToArray());
+        var started = false;
+
+        try
+        {
+            await service.PersistAsync(first);
+            await service.PersistAsync(second);
+            service.QueuedImageBytes.Should().Be(outputImage.Length * 2L);
+
+            await service.StartAsync(CancellationToken.None);
+            started = true;
+            await inner.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await service.StopAsync(cts.Token);
+            started = false;
+
+            inner.StartedResultIds.Should().ContainSingle().Which.Should().Be(first.Id);
+            service.QueuedImageBytes.Should().Be(0);
+            service.DroppedImageCount.Should().Be(2);
+            logger.Entries.Should().Contain(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+                entry.Message.Contains("已放弃 1 张尚未开始保存的图像", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (started)
+            {
+                await service.StopAsync(CancellationToken.None);
+            }
+
+            service.Dispose();
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task PersistAsync_WhenConfiguredDriveIsUnavailable_ShouldFallbackToLocalAppDataImages()
     {
         var outputImage = CreatePngImageBytes();
@@ -423,6 +483,21 @@ public sealed class InspectionImagePersistenceServiceTests
             .Should()
             .ContainSingle()
             .Subject;
+    }
+
+    private sealed class BlockingImagePersistenceService : IInspectionImagePersistenceService
+    {
+        public TaskCompletionSource<InspectionResult> Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public List<Guid> StartedResultIds { get; } = new();
+
+        public async Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
+        {
+            StartedResultIds.Add(result.Id);
+            Started.TrySetResult(result);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 
     private static void DeleteTempDirectory(string path)

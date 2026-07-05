@@ -184,6 +184,44 @@ public class InspectionEventEndpointsTests
         replayChunk.Should().Contain("\"processedCount\":2");
     }
 
+    [Theory]
+    [InlineData("lastEventId")]
+    [InlineData("afterSequence")]
+    public async Task EventsEndpoint_ReplaysStoredEvents_UsingQueryCursor(string cursorName)
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+
+        var firstSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            ProcessedCount = 1
+        });
+        var secondSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            ProcessedCount = 2
+        });
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/inspection/realtime/{projectId}/events?{cursorName}={firstSequence}"),
+            HttpCompletionOption.ResponseHeadersRead);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+
+        var replayChunk = await ReadUntilContainsAllAsync(
+            stream,
+            TimeSpan.FromSeconds(2),
+            $"id: {secondSequence}",
+            "event: progressChanged",
+            "\"processedCount\":2");
+        replayChunk.Should().Contain($"id: {secondSequence}");
+        replayChunk.Should().NotContain($"id: {firstSequence}\n");
+    }
+
     [Fact]
     public async Task EventsEndpoint_DoesNotDropLiveEventsPublishedWhileReplayCompletes()
     {

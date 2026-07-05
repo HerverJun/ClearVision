@@ -2,6 +2,8 @@
 // MorphologyOperatorTests测试
 // 作者：蘅芜君
 
+using System.Reflection;
+using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.Operators;
@@ -24,6 +26,17 @@ public class MorphologyOperatorTests
     public void OperatorType_ShouldBeMorphology()
     {
         _operator.OperatorType.Should().Be(OperatorType.Morphology);
+    }
+
+    [Fact]
+    public void Metadata_ShouldExposeChineseLegacyDisplayName()
+    {
+        var metadata = typeof(MorphologyOperator).GetCustomAttribute<OperatorMetaAttribute>();
+
+        metadata.Should().NotBeNull();
+        metadata!.DisplayName.Should().Be("形态学（旧版）");
+        metadata.Description.Should().Contain("旧版图像形态学节点");
+        metadata.Description.Should().NotContain("Legacy image morphology node");
     }
 
     [Fact]
