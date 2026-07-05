@@ -117,6 +117,10 @@ class PropertyPanel {
         this.previewResourcesEnabled = options.previewResourcesEnabled !== false;
         this.previewContainer = this.resolvePreviewContainerOption(options.previewContainer);
         this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
+        this.previewPanelEnabled = options.previewPanelEnabled ?? this.previewResourcesEnabled;
+        this.auxiliaryWorkbenchesEnabled = options.auxiliaryWorkbenchesEnabled ?? this.previewResourcesEnabled;
+        this.roiEditorEnabled = options.roiEditorEnabled ?? this.auxiliaryWorkbenchesEnabled;
+        this.calibrationDraftWorkbenchEnabled = options.calibrationDraftWorkbenchEnabled ?? this.auxiliaryWorkbenchesEnabled;
         this.circleSearchV2ToolEnabled = options.circleSearchV2ToolEnabled;
         this.nPointCalibrationWorkbenchEnabled = options.nPointCalibrationWorkbenchEnabled;
         this.pendingRecommendation = null;
@@ -132,6 +136,7 @@ class PropertyPanel {
             'BlobAnalysis',
             'SharpnessEvaluation'
         ]);
+        this.currentConnection = null;
         this.disposeGlobalEvents = this.bindGlobalEvents();
     }
 
@@ -148,15 +153,39 @@ class PropertyPanel {
     }
 
     shouldMountInternalPreviewContainer() {
-        return this.previewResourcesEnabled && !this.previewContainer;
+        return this.isPreviewPanelEnabled() && !this.previewContainer;
     }
 
     getPreviewContainer() {
-        if (!this.previewResourcesEnabled) {
+        if (!this.isPreviewPanelEnabled()) {
             return null;
         }
 
         return this.previewContainer || this.container.querySelector('#operator-preview-container');
+    }
+
+    isPreviewPanelEnabled() {
+        return this.previewPanelEnabled !== undefined
+            ? this.previewPanelEnabled !== false
+            : this.previewResourcesEnabled !== false;
+    }
+
+    isAuxiliaryWorkbenchesEnabled() {
+        return this.auxiliaryWorkbenchesEnabled !== undefined
+            ? this.auxiliaryWorkbenchesEnabled !== false
+            : this.previewResourcesEnabled !== false;
+    }
+
+    isRoiEditorEnabled() {
+        return this.roiEditorEnabled !== undefined
+            ? this.roiEditorEnabled !== false
+            : this.isAuxiliaryWorkbenchesEnabled();
+    }
+
+    isCalibrationDraftWorkbenchEnabled() {
+        return this.calibrationDraftWorkbenchEnabled !== undefined
+            ? this.calibrationDraftWorkbenchEnabled !== false
+            : this.isAuxiliaryWorkbenchesEnabled();
     }
 
     resetPreviewForNonCanvasSelection(message = '请选择画布算子节点查看预览') {
@@ -240,7 +269,22 @@ class PropertyPanel {
             this.recommendedFieldNames.clear();
         }
         this.currentOperator = operator;
+        this.currentConnection = null;
         this.render();
+    }
+
+    setConnection(connection) {
+        this.pendingRecommendation = null;
+        this.recommendedFieldNames.clear();
+        this.currentOperator = null;
+        this.currentConnection = connection || null;
+
+        if (!this.currentConnection) {
+            this.clear();
+            return;
+        }
+
+        this.renderConnectionSummary();
     }
 
     getOperatorIdentity(operator) {
@@ -269,6 +313,7 @@ class PropertyPanel {
         }
         this.inputImageBase64Load = null;
         this.currentOperator = null;
+        this.currentConnection = null;
         this.container.innerHTML = `
             <p class="empty-text">未选择算子</p>
             ${this.shouldMountInternalPreviewContainer() ? '<div id="operator-preview-container"></div>' : ''}
@@ -292,6 +337,7 @@ class PropertyPanel {
             this.calibrationDraftWorkbench = null;
         }
         this.currentOperator = null;
+        this.currentConnection = null;
         this.onChangeCallback = null;
         this.inputImageBase64Load = null;
         if (this.container) {
@@ -324,8 +370,8 @@ class PropertyPanel {
             circleSearchV2ToolEnabled: this.isCircleSearchV2ToolFeatureEnabled(),
             nPointCalibrationWorkbenchEnabled: this.isNPointCalibrationWorkbenchFeatureEnabled()
         });
-        const shouldMountCalibrationDraftWorkbench = this.shouldMountNPointCalibrationWorkbench();
-        const shouldMountRoiEditor = this.previewResourcesEnabled && roiEditorConfig.supported && !shouldMountCalibrationDraftWorkbench;
+        const shouldMountCalibrationDraftWorkbench = this.isCalibrationDraftWorkbenchEnabled() && this.shouldMountNPointCalibrationWorkbench();
+        const shouldMountRoiEditor = this.isRoiEditorEnabled() && roiEditorConfig.supported && !shouldMountCalibrationDraftWorkbench;
         const parametersForRenderBase = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
             : parameters;
@@ -416,6 +462,47 @@ class PropertyPanel {
         if (this.pendingRecommendation) {
             this._restoreRecommendationHighlights();
         }
+    }
+
+    renderConnectionSummary() {
+        this.resetPreviewForNonCanvasSelection('请选择画布算子节点查看预览');
+        if (this.roiEditorPanel) {
+            this.roiEditorPanel.destroy();
+            this.roiEditorPanel = null;
+        }
+        if (this.calibrationDraftWorkbench) {
+            this.calibrationDraftWorkbench.destroy();
+            this.calibrationDraftWorkbench = null;
+        }
+
+        const connection = this.currentConnection || {};
+        this.container.innerHTML = `
+            <section class="property-connection-summary" data-selection-kind="connection">
+                <div class="property-header">
+                    <div class="header-text">
+                        <h4>当前选中连线</h4>
+                        <span class="property-type">连线</span>
+                    </div>
+                </div>
+                <div class="property-content">
+                    <p class="empty-text">连线当前没有可编辑参数。可在画布中删除或重新连接端口。</p>
+                    <dl class="inspector-connection-meta">
+                        <div>
+                            <dt>输出节点</dt>
+                            <dd>${this.escapeHtml(connection.sourceTitle || '-')} / ${this.escapeHtml(connection.sourcePortName || '-')} (${this.escapeHtml(connection.sourcePortType || '-')})</dd>
+                        </div>
+                        <div>
+                            <dt>输入节点</dt>
+                            <dd>${this.escapeHtml(connection.targetTitle || '-')} / ${this.escapeHtml(connection.targetPortName || '-')} (${this.escapeHtml(connection.targetPortType || '-')})</dd>
+                        </div>
+                        <div>
+                            <dt>连线 ID</dt>
+                            <dd>${this.escapeHtml(connection.id || '-')}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+        `;
     }
 
     renderLibraryOperatorSummary() {
@@ -704,6 +791,41 @@ class PropertyPanel {
         `;
     }
 
+    resolveParameterControlType(param) {
+        const dataType = getParameterDataType(param, param?.dataType || param?.DataType || 'string');
+        const normalizedType = dataType.toLowerCase();
+
+        if (normalizedType === 'file') {
+            return 'file';
+        }
+        if (normalizedType === 'camerabinding') {
+            return 'cameraBinding';
+        }
+        if (normalizedType === 'string' && this.isPathLikeParameter(param)) {
+            return 'file';
+        }
+
+        return dataType;
+    }
+
+    isPathLikeParameter(param) {
+        const normalizedName = normalizeParameterName(param?.name || param?.Name);
+        if (!normalizedName || normalizedName === 'ipaddress') {
+            return false;
+        }
+
+        return normalizedName === 'filepath' ||
+            normalizedName === 'outputpath' ||
+            normalizedName === 'savepath' ||
+            normalizedName.endsWith('filepath') ||
+            normalizedName.endsWith('templatepath') ||
+            normalizedName.endsWith('modelpath') ||
+            normalizedName.endsWith('catalogpath') ||
+            normalizedName.endsWith('labelspath') ||
+            normalizedName.endsWith('bankpath') ||
+            normalizedName.endsWith('path');
+    }
+
     /**
      * 渲染参数控件
      */
@@ -717,8 +839,9 @@ class PropertyPanel {
             ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
             : '';
         const currentValue = value !== undefined ? value : defaultValue;
+        const controlType = this.resolveParameterControlType(param);
         
-        switch (dataType) {
+        switch (controlType) {
             case 'int':
             case 'double':
             case 'float':
@@ -1756,7 +1879,7 @@ class PropertyPanel {
     }
 
     initPreviewPanel() {
-        if (!this.previewResourcesEnabled) {
+        if (!this.isPreviewPanelEnabled()) {
             if (this.previewPanel) {
                 this.previewPanel.destroy();
                 this.previewPanel = null;
@@ -1843,7 +1966,7 @@ class PropertyPanel {
     }
 
     initRoiEditorPanel() {
-        if (!this.previewResourcesEnabled) {
+        if (!this.isRoiEditorEnabled()) {
             if (this.roiEditorPanel) {
                 this.roiEditorPanel.destroy();
                 this.roiEditorPanel = null;
@@ -1878,6 +2001,14 @@ class PropertyPanel {
     }
 
     initCalibrationDraftWorkbench() {
+        if (!this.isCalibrationDraftWorkbenchEnabled()) {
+            if (this.calibrationDraftWorkbench) {
+                this.calibrationDraftWorkbench.destroy();
+                this.calibrationDraftWorkbench = null;
+            }
+            return;
+        }
+
         const container = this.container.querySelector('#calibration-draft-workbench-container');
         if (!container) {
             if (this.calibrationDraftWorkbench) {

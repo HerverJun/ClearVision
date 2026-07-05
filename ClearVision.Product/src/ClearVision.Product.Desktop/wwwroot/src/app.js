@@ -86,7 +86,6 @@ import {
 import PropertySidebarController, {
     createPropertyPanelCapabilityAdapter
 } from './features/flow-editor/propertySidebarController.mjs';
-import PropertyPanelCapabilityOwner from './features/flow-editor/propertyPanelCapabilityOwner.mjs';
 import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
 import PreviewPanelCapabilityOwner, {
     createPreviewPanelCapabilityAdapter
@@ -1516,18 +1515,59 @@ function disposePropertyPanelOwner() {
 async function createLegacyPropertyPanelOwner() {
     const { PropertyPanel } = await loadLegacyPropertyPanelModule();
     const ownsPreviewSidebar = shouldLegacyPropertyPanelOwnSidebarPreview() && !isNodePreviewInspectorEnabled();
+    const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+    propertyPanelCapabilityAdapter = flowCanvasAdapter && isPropertyPanelCapabilityEnabled()
+        ? createPropertyPanelCapabilityAdapter({
+            flowCanvasAdapter,
+            getOperatorMetadata: type => findOperatorDefinition(type)
+        })
+        : null;
+    const auxiliaryWorkbenchesEnabled = true;
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
-        previewResourcesEnabled: ownsPreviewSidebar,
+        previewResourcesEnabled: ownsPreviewSidebar || auxiliaryWorkbenchesEnabled,
+        previewPanelEnabled: ownsPreviewSidebar,
+        auxiliaryWorkbenchesEnabled,
         previewContainer: ownsPreviewSidebar
             ? document.getElementById('preview-panel')
             : null
     });
     let disposed = false;
 
-    const unsubscribeSelectedOperator = subscribeSelectedOperator((operator) => {
+    const syncSelectedCanvasEntity = (state = {}) => {
         if (disposed) {
+            return;
+        }
+
+        if (state.selectedNodeId && propertyPanelCapabilityAdapter) {
+            const operator = propertyPanelCapabilityAdapter.getSelectedOperatorSnapshot(state.selectedNodeId);
+            if (!operator) {
+                panel.clear();
+                return;
+            }
+            debugLogger.debug('[App] 选中算子变化:', operator.title || operator.type);
+            panel.setOperator(operator);
+            return;
+        }
+
+        if (state.selectedConnectionId && propertyPanelCapabilityAdapter) {
+            const connection = propertyPanelCapabilityAdapter.getSelectedConnectionSnapshot(state.selectedConnectionId);
+            if (connection) {
+                panel.setConnection?.(connection);
+                return;
+            }
+        }
+
+        panel.clear();
+    };
+
+    const unsubscribeCanvasSelection = propertyPanelCapabilityAdapter
+        ? propertyPanelCapabilityAdapter.flowCanvasAdapter?.subscribeSelection?.(syncSelectedCanvasEntity)
+        : null;
+
+    const unsubscribeSelectedOperator = subscribeSelectedOperator((operator) => {
+        if (disposed || (propertyPanelCapabilityAdapter && !operator?.isLibrarySelection)) {
             return;
         }
 
@@ -1545,7 +1585,7 @@ async function createLegacyPropertyPanelOwner() {
         }
 
         debugLogger.debug('[App] 算子参数变更:', values);
-        const operator = getSelectedOperator();
+        const operator = panel.currentOperator || getSelectedOperator();
         if (operator && flowCanvas) {
             const node = flowCanvas.nodes.get(operator.id);
             if (node) {
@@ -1565,6 +1605,7 @@ async function createLegacyPropertyPanelOwner() {
             }
 
             disposed = true;
+            unsubscribeCanvasSelection?.();
             unsubscribeSelectedOperator?.();
             panel.destroy?.();
         }
@@ -1580,26 +1621,13 @@ async function initializePropertyPanel() {
 
     disposePropertyPanelOwner();
 
-    if (isPropertyPanelCapabilityEnabled()) {
-        const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
-        propertyPanelCapabilityAdapter = createPropertyPanelCapabilityAdapter({
-            flowCanvasAdapter,
-            getOperatorMetadata: type => findOperatorDefinition(type)
-        });
-        propertyPanel = new PropertyPanelCapabilityOwner(container, {
-            propertyAdapter: propertyPanelCapabilityAdapter,
-            showToast
-        });
-        propertyPanelOwner = propertyPanel;
-        serviceRegistry.register('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
-        serviceRegistry.register('propertyPanelCapabilityOwner', propertyPanelOwner);
-        serviceRegistry.register('propertyPanel', propertyPanel);
-        debugLogger.debug('[App] Property Panel capability owner 初始化完成');
-        return;
-    }
-
     propertyPanelOwner = await createLegacyPropertyPanelOwner();
     propertyPanel = propertyPanelOwner.panel;
+
+    if (propertyPanelCapabilityAdapter) {
+        serviceRegistry.register('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
+    }
+
     serviceRegistry.register('propertyPanel', propertyPanel);
 
     debugLogger.debug('[App] 属性面板初始化完成');

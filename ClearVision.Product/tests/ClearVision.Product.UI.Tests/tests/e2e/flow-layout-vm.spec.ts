@@ -12,7 +12,11 @@ const operators = [
     displayName: '图像采集',
     category: '输入',
     description: '从相机或文件读取图像',
-    parameters: [{ name: 'SourceType', displayName: '来源', dataType: 'enum', value: 'File', options: ['File', 'Camera'] }],
+    parameters: [
+      { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: 'File', options: [{ value: 'File', label: '文件' }, { value: 'Camera', label: '相机' }] },
+      { name: 'FilePath', displayName: '文件路径', dataType: 'string', value: '' },
+      { name: 'CameraId', displayName: '相机', dataType: 'cameraBinding', value: '' },
+    ],
     inputPorts: [],
     outputPorts: [{ name: 'Image', dataType: 'Image' }],
   },
@@ -38,6 +42,30 @@ const operators = [
 
 async function installStudio2Flags(page: Page) {
   await page.addInitScript(() => {
+    const webviewListeners = new Map<string, ((event: any) => void)[]>();
+    (window as any).__pickFileMessages = [];
+    (window as any).__cvDispatchWebViewMessage = (message: any) => {
+      for (const listener of webviewListeners.get('message') ?? []) {
+        listener({ data: message });
+      }
+    };
+    (window as any).chrome = {
+      webview: {
+        addEventListener(type: string, listener: (event: any) => void) {
+          if (!webviewListeners.has(type)) {
+            webviewListeners.set(type, []);
+          }
+          webviewListeners.get(type)?.push(listener);
+        },
+        removeEventListener(type: string, listener: (event: any) => void) {
+          const listeners = webviewListeners.get(type) ?? [];
+          webviewListeners.set(type, listeners.filter(item => item !== listener));
+        },
+        postMessage(message: any) {
+          (window as any).__pickFileMessages.push(message);
+        },
+      },
+    };
     const startup = {
       featureFlags: {
         'Studio2.PropertyPanel': true,
@@ -118,6 +146,14 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
     });
   });
 
+  await page.route('**/api/cameras/bindings', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '[]',
+    });
+  });
+
   await page.route('**/api/projects', async route => {
     await route.fulfill({
       status: 200,
@@ -161,6 +197,11 @@ async function setCurrentProject(page: Page) {
 
 async function openPreprocessFlyout(page: Page) {
   await page.locator('#operator-rail .operator-rail-item', { hasText: '预处理' }).click();
+  await expect(page.locator('#operator-group-flyout')).toBeVisible();
+}
+
+async function openInputFlyout(page: Page) {
+  await page.locator('#operator-rail .operator-rail-item', { hasText: '输入' }).click();
   await expect(page.locator('#operator-group-flyout')).toBeVisible();
 }
 
@@ -229,6 +270,45 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(page.locator('.preview-workbench-pane')).toContainText('端口与耗时');
     await expect(page.locator('.preview-workbench-pane')).toContainText('中间结果');
     await expect(page.locator('.preview-workbench-pane')).toContainText('暂无输出图像');
+  });
+
+  test('keeps migrated acquisition file picker and writes picked file path back to the node', async ({ page }) => {
+    await openInputFlyout(page);
+    await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
+
+    const fileInput = page.locator('.inspector-pane input[name="FilePath"]');
+    const pickerButton = page.locator('.inspector-pane .btn-pick-file[data-param="FilePath"]');
+    await expect(page.locator('.inspector-pane')).toContainText('图像采集');
+    await expect(fileInput).toBeVisible();
+    await expect(fileInput).toHaveAttribute('readonly', '');
+    await expect(pickerButton).toBeVisible();
+    await expect(page.locator('.inspector-pane select[data-camera-binding-select="true"]')).toHaveCount(1);
+    await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
+
+    await pickerButton.click();
+    const pickMessage = await page.evaluate(() => (window as any).__pickFileMessages.at(-1));
+    expect(pickMessage.messageType).toBe('PickFileCommand');
+    expect(pickMessage.parameterName).toBe('FilePath');
+    expect(pickMessage.filter).toContain('Image Files');
+
+    await page.evaluate(() => {
+      (window as any).__cvDispatchWebViewMessage({
+        messageType: 'FilePickedEvent',
+        payload: {
+          parameterName: 'FilePath',
+          filePath: 'C:\\Data\\sample.png',
+        },
+      });
+    });
+
+    await expect(fileInput).toHaveValue('C:\\Data\\sample.png');
+    await expect.poll(async () => page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      const node = flowCanvas.nodes.get(flowCanvas.selectedNode);
+      const parameter = node.parameters.find((item: any) => item.name === 'FilePath');
+      return parameter?.value;
+    })).toBe('C:\\Data\\sample.png');
   });
 
   test('shows blank, no-image and preview-failure states', async ({ page }) => {

@@ -1,10 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createPropertyPanelCapabilityAdapter } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertySidebarController.mjs';
 
 function readRepoText(relativeUrl) {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
+}
+
+function collectFiles(rootUrl, extension) {
+  const files = [];
+  for (const entry of readdirSync(rootUrl, { withFileTypes: true })) {
+    const childUrl = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, rootUrl);
+    if (entry.isDirectory()) {
+      files.push(...collectFiles(childUrl, extension));
+    } else if (entry.name.endsWith(extension)) {
+      files.push(childUrl);
+    }
+  }
+  return files;
+}
+
+function collectOperatorParams() {
+  const operatorRoot = new URL('../../../../src/ClearVision.Product.Infrastructure/Operators/', import.meta.url);
+  const records = [];
+  for (const fileUrl of collectFiles(operatorRoot, '.cs')) {
+    const source = readFileSync(fileUrl, 'utf8');
+    const matches = source.matchAll(/\[OperatorParam\("([^"]+)",\s*"([^"]+)",\s*"([^"]+)"/g);
+    for (const match of matches) {
+      records.push({
+        name: match[1],
+        label: match[2],
+        type: match[3]
+      });
+    }
+  }
+  return records;
 }
 
 test('PropertyPanelCapabilityAdapter projects selected node metadata and writes through FlowCanvasAdapter once', () => {
@@ -71,40 +101,58 @@ test('PropertyPanelCapabilityAdapter projects selected node metadata and writes 
   assert.equal(writeCalls[0].options.parameterDefinitions.length, 3);
 });
 
-test('PropertyPanelCapabilityOwner source stays scoped to Property Panel governance', () => {
-  const ownerSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanelCapabilityOwner.mjs');
+test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface', () => {
+  const panelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
 
   for (const requiredText of [
-    '属性面板',
-    '请选择一个算子',
-    '参数',
-    '基础信息',
-    '当前算子',
-    '未选择算子',
-    '参数已更新',
-    '参数校验失败'
+    'FilePickedEvent',
+    'PickFileCommand',
+    'btn-pick-file',
+    'data-camera-binding-select="true"',
+    'gv-binding-select',
+    'param-slider',
+    'form-color-hidden',
+    'btn-recommend',
+    'btn-reset',
+    'roi-editor-container',
+    'calibration-draft-workbench-container',
+    'setConnection(connection)'
   ]) {
-    assert.match(ownerSource, new RegExp(requiredText));
+    assert.match(panelSource, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  assert.match(ownerSource, /subscribeSelectedNode/);
-  assert.match(ownerSource, /writeParameters/);
-  assert.doesNotMatch(ownerSource, /PreviewPanel/);
-  assert.doesNotMatch(ownerSource, /NodePreviewOverlay/);
-  assert.doesNotMatch(ownerSource, /GlobalVariablePanel|globalVariablePanel/);
-  assert.doesNotMatch(ownerSource, /ResultPanel|resultPanel/);
-  assert.doesNotMatch(ownerSource, /ImageCanvas|new\s+ImageViewerComponent/);
+  assert.match(panelSource, /previewPanelEnabled/);
+  assert.match(panelSource, /auxiliaryWorkbenchesEnabled/);
 });
 
-test('app composition root switches between legacy and V2 Property Panel owners by startup flag', () => {
+test('all backend operator parameter types are covered by migrated Inspector controls', () => {
+  const panelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
+  const params = collectOperatorParams();
+  const knownTypes = new Set(['string', 'int', 'double', 'float', 'number', 'bool', 'boolean', 'enum', 'select', 'file', 'cameraBinding']);
+  const unknownTypes = params.filter(param => !knownTypes.has(param.type));
+  const fileParams = params.filter(param => param.type === 'file');
+  const cameraBindingParams = params.filter(param => param.type === 'cameraBinding');
+
+  assert.equal(unknownTypes.length, 0, `未覆盖参数类型: ${unknownTypes.map(param => `${param.name}:${param.type}`).join(', ')}`);
+  assert.ok(fileParams.length > 0, '应至少扫描到 file 参数');
+  assert.ok(cameraBindingParams.length > 0, '应至少扫描到 cameraBinding 参数');
+  assert.match(panelSource, /case 'file':[\s\S]*btn-pick-file[\s\S]*PickFileCommand/);
+  assert.match(panelSource, /case 'cameraBinding':[\s\S]*data-camera-binding-select="true"/);
+});
+
+test('app composition root uses legacy PropertyPanel in the Studio2 Inspector shell', () => {
   const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
 
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2\.PropertyPanel'/);
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce\(\);/);
-  assert.match(appSource, /if \(isPropertyPanelCapabilityEnabled\(\)\) \{[\s\S]*new PropertyPanelCapabilityOwner/);
   assert.match(appSource, /propertyPanelOwner = await createLegacyPropertyPanelOwner\(\);/);
-  assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 1);
   assert.equal((appSource.match(/new PropertyPanel\('property-panel'/g) || []).length, 1);
+  assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 0);
+  assert.doesNotMatch(appSource, /propertyPanelCapabilityOwner\.mjs/);
+  assert.match(appSource, /createPropertyPanelCapabilityAdapter/);
+  assert.match(appSource, /previewPanelEnabled:\s*ownsPreviewSidebar/);
+  assert.match(appSource, /auxiliaryWorkbenchesEnabled/);
+  assert.match(appSource, /panel\.setConnection/);
   assert.doesNotMatch(appSource, /import\s+\{\s*PropertyPanel\s*\}\s+from\s+'\.\/features\/flow-editor\/propertyPanel\.js'/);
   assert.match(appSource, /legacyPropertyPanelModulePromise = import\('\.\/features\/flow-editor\/propertyPanel\.js'\)/);
   assert.doesNotMatch(appSource, /trackedSubscribe\(subscribeSelectedOperator/);
