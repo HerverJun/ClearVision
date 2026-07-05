@@ -54,6 +54,26 @@ const user = {
 
 const acquisitionImage = createPngBase64(640, 240, 'acquisition');
 const preprocessingImage = createPngBase64(640, 240, 'preprocessing');
+const operatorMetadata = [
+  {
+    type: 'ImageAcquisition',
+    displayName: '图像采集',
+    category: '输入',
+    description: '从相机或文件获取图像',
+    parameters: [],
+    inputPorts: [],
+    outputPorts: [{ name: 'Image', dataType: 'Image' }]
+  },
+  {
+    type: 'Thresholding',
+    displayName: '阈值分割',
+    category: '图像预处理',
+    description: '按阈值生成二值图像',
+    parameters: [{ name: 'Threshold', displayName: '阈值', dataType: 'int', defaultValue: 128 }],
+    inputPorts: [{ name: 'Image', dataType: 'Image' }],
+    outputPorts: [{ name: 'Mask', dataType: 'Image' }]
+  }
+];
 
 function crc32(buffer) {
   const table = crc32.table || (crc32.table = Array.from({ length: 256 }, (_, index) => {
@@ -246,8 +266,18 @@ async function installRoutes(page, runtimeStateRef, nodeTypesById) {
       return fulfillJson(user);
     }
 
-    if (pathname.endsWith('/operators/types') || pathname.endsWith('/operators/library')) {
-      return fulfillJson([]);
+    if (pathname.endsWith('/operators/library')) {
+      return fulfillJson(operatorMetadata);
+    }
+
+    if (pathname.endsWith('/operators/types')) {
+      return fulfillJson(operatorMetadata.map(operator => operator.type));
+    }
+
+    const metadataMatch = pathname.match(/\/operators\/([^/]+)\/metadata$/);
+    if (metadataMatch) {
+      const type = decodeURIComponent(metadataMatch[1]);
+      return fulfillJson(operatorMetadata.find(operator => operator.type === type) || {});
     }
 
     if (pathname.endsWith('/projects') && method === 'GET') {
@@ -314,7 +344,10 @@ async function installRoutes(page, runtimeStateRef, nodeTypesById) {
 async function bootApp(page, baseUrl, options = {}) {
   const {
     theme = 'dark',
-    featureFlags = {},
+    featureFlags = {
+      'Studio2.PropertyPanel': true,
+      'Studio2.PreviewPanel': true
+    },
     waitForPreviewSurface = true
   } = options;
   await page.addInitScript(({ currentUser, selectedTheme, startupFeatureFlags }) => {
@@ -333,7 +366,7 @@ async function bootApp(page, baseUrl, options = {}) {
     await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 10000 });
   });
   if (waitForPreviewSurface) {
-    await page.locator('#preview-panel [data-role="preview-output-image"]').waitFor({ state: 'attached', timeout: 10000 });
+    await page.locator('#preview-panel [data-owner="preview-panel-capability-v2"]').waitFor({ state: 'attached', timeout: 10000 });
   }
 }
 
@@ -357,6 +390,7 @@ async function clearFlowSelection(page) {
     flowCanvas.selectedNode = null;
     flowCanvas.selectedConnection = null;
     flowCanvas.onNodeSelected?.(null);
+    flowCanvas.markSelectionChanged?.('layout-screenshot-clear-selection');
     flowCanvas.render?.();
   });
   await page.waitForTimeout(150);
@@ -380,6 +414,7 @@ async function addAndSelectNode(page, nodeTypesById, config) {
     flowCanvas.selectedNode = node.id;
     flowCanvas.selectedConnection = null;
     flowCanvas.onNodeSelected?.(node);
+    flowCanvas.markSelectionChanged?.('layout-screenshot-select-node');
     flowCanvas.render?.();
     return node.id;
   }, config);
@@ -392,7 +427,8 @@ async function addAndSelectNode(page, nodeTypesById, config) {
 async function selectLibraryOperator(page) {
   await page.evaluate(async () => {
     const appModule = await import('/src/app.js');
-    appModule.setSelectedOperator({
+    const serviceRegistry = (await import('/src/core/app/serviceRegistry.js')).default;
+    const operator = {
       isLibrarySelection: true,
       type: 'Thresholding',
       displayName: '阈值分割',
@@ -404,17 +440,20 @@ async function selectLibraryOperator(page) {
       ],
       inputType: 'Image',
       outputType: 'Image'
-    });
+    };
+    serviceRegistry.get('flowCanvasAdapter')?.selectNode?.(null);
+    appModule.setSelectedOperator(operator);
+    serviceRegistry.get('propertyPanel')?.setOperator?.(operator);
   });
   await page.waitForFunction(() => {
     const preview = document.querySelector('#preview-panel');
-    return preview?.textContent?.includes('算子库条目无运行预览');
+    return preview?.textContent?.includes('请选择一个算子');
   }, null, { timeout: 5000 });
 }
 
 async function waitForOutputImage(page) {
   await page.waitForFunction(() => {
-    const image = document.querySelector('#preview-output-image');
+    const image = document.querySelector('#preview-panel .preview-capability-main-image img');
     return image?.getAttribute('src')?.startsWith('data:image/');
   }, null, { timeout: 10000 });
 }
@@ -450,10 +489,14 @@ async function collectLayoutMetrics(page) {
       theme: document.documentElement.dataset.theme,
       toolbar: rect('.toolbar'),
       toolbarRight: rect('.toolbar-right'),
-      rightSidebar: rect('.sidebar.right'),
+      operatorRail: rect('#operator-rail'),
+      inspectorPane: rect('.inspector-pane'),
+      rightSidebar: rect('.preview-workbench-pane'),
       previewPanel: rect('.preview-sidebar-panel'),
-      propertyPanel: rect('.property-sidebar-panel'),
-      previewMain: rect('[data-role="preview-main-image-container"]'),
+      propertyPanel: rect('.inspector-pane-panel'),
+      previewMain: rect('.preview-capability-main-image'),
+      flyout: rect('#operator-group-flyout'),
+      flyoutText: document.querySelector('#operator-group-flyout')?.textContent?.trim() || '',
       previewHostHidden: (() => {
         const element = document.querySelector('.preview-sidebar-panel');
         if (!element) {
@@ -468,10 +511,13 @@ async function collectLayoutMetrics(page) {
           bounds.height === 0;
       })(),
       previewText: document.querySelector('#preview-panel')?.textContent?.trim() || '',
-      previewImageSrc: document.querySelector('#preview-output-image')?.getAttribute('src') || '',
-      panelTitles: Array.from(document.querySelectorAll('.sidebar.right .panel-title')).map(item => item.textContent.trim()),
+      previewImageSrc: document.querySelector('#preview-panel .preview-capability-main-image img')?.getAttribute('src') || '',
+      panelTitles: [
+        document.querySelector('.inspector-pane .panel-title')?.textContent?.trim(),
+        document.querySelector('.preview-workbench-pane .panel-title')?.textContent?.trim()
+      ].filter(Boolean),
       globalInRight: Boolean(document.querySelector('.sidebar.right #global-variable-panel')),
-      outputImageCount: document.querySelectorAll('#preview-panel [data-role="preview-output-image"]').length,
+      outputImageCount: document.querySelectorAll('#preview-panel .preview-capability-main-image img').length,
       oldPreviewCount: document.querySelectorAll('#preview-panel [id*="preview-before"], #preview-panel [id*="preview-after"]').length,
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
       bodyHorizontalOverflow: document.body.scrollWidth > document.body.clientWidth + 2,
@@ -484,8 +530,14 @@ async function collectLayoutMetrics(page) {
 
 function assertLayoutMetrics(metrics, scenarioName, options = {}) {
   const expectedOutputImageCount = options.expectedOutputImageCount ?? 1;
-  if (metrics.panelTitles.join('|') !== '预览|属性') {
-    throw new Error(`${scenarioName}: right sidebar titles are ${metrics.panelTitles.join(', ')}`);
+  if (metrics.panelTitles.join('|') !== '属性检查器|预览工作台') {
+    throw new Error(`${scenarioName}: shell panel titles are ${metrics.panelTitles.join(', ')}`);
+  }
+  if (!metrics.operatorRail || metrics.operatorRail.width < 48) {
+    throw new Error(`${scenarioName}: operator rail is missing or too narrow`);
+  }
+  if (!metrics.inspectorPane || metrics.inspectorPane.width < 240) {
+    throw new Error(`${scenarioName}: inspector pane is missing or too narrow`);
   }
   if (metrics.globalInRight) {
     throw new Error(`${scenarioName}: global-variable-panel is still inside the right sidebar`);
@@ -507,6 +559,14 @@ function assertLayoutMetrics(metrics, scenarioName, options = {}) {
 
   if (options.expectedPreviewText && !metrics.previewText.includes(options.expectedPreviewText)) {
     throw new Error(`${scenarioName}: preview text did not include "${options.expectedPreviewText}"`);
+  }
+  if (options.expectFlyoutVisible) {
+    if (!metrics.flyout || metrics.flyout.width < 260 || metrics.flyout.height < 300) {
+      throw new Error(`${scenarioName}: operator flyout is missing or too small`);
+    }
+    if (options.expectedFlyoutText && !metrics.flyoutText.includes(options.expectedFlyoutText)) {
+      throw new Error(`${scenarioName}: flyout text did not include "${options.expectedFlyoutText}"`);
+    }
   }
   if (options.expectPreviewEmpty && metrics.previewImageSrc) {
     throw new Error(`${scenarioName}: preview still has image src after empty-state transition`);
@@ -573,8 +633,30 @@ async function main() {
     await capture(
       page,
       '01-no-project-dark',
-      '未打开工程：顶部变量入口禁用，右侧仅有预览和属性。',
-      screenshots);
+      '未打开工程：顶部变量入口禁用，左侧属性检查器与右侧预览工作台为空态。',
+      screenshots,
+      {
+        expectedOutputImageCount: 0,
+        expectPreviewEmpty: true,
+        expectedPreviewText: '请选择一个算子'
+      });
+
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '图像预处理' }).click();
+    await page.locator('#operator-group-flyout').waitFor({ state: 'visible', timeout: 5000 });
+    await capture(
+      page,
+      '01b-operator-flyout-open-dark',
+      '算子分组入口打开：左侧窄栏保持固定，flyout 覆盖展示组内算子且不挤压画布。',
+      screenshots,
+      {
+        expectedOutputImageCount: 0,
+        expectPreviewEmpty: true,
+        expectedPreviewText: '请选择一个算子',
+        expectFlyoutVisible: true,
+        expectedFlyoutText: '阈值分割'
+      });
+    await page.keyboard.press('Escape');
+    await page.locator('#operator-group-flyout').waitFor({ state: 'hidden', timeout: 5000 });
 
     await setProject(page);
     await clearFlowSelection(page);
@@ -582,7 +664,12 @@ async function main() {
       page,
       '02-project-no-selection-dark',
       '已打开工程但未选中算子：预览为空态，属性显示未选择算子。',
-      screenshots);
+      screenshots,
+      {
+        expectedOutputImageCount: 0,
+        expectPreviewEmpty: true,
+        expectedPreviewText: '请选择一个算子'
+      });
 
     await addAndSelectNode(page, nodeTypesById, {
       type: 'ImageAcquisition',
@@ -632,7 +719,7 @@ async function main() {
       {
         expectedOutputImageCount: 0,
         expectPreviewEmpty: true,
-        expectedPreviewText: '算子库条目无运行预览'
+        expectedPreviewText: '请选择一个算子'
       });
 
     await page.evaluate(nodeId => {
@@ -644,6 +731,7 @@ async function main() {
       flowCanvas.selectedNode = nodeId;
       flowCanvas.selectedConnection = null;
       flowCanvas.onNodeSelected?.(node);
+      flowCanvas.markSelectionChanged?.('layout-screenshot-reselect-node');
       flowCanvas.render?.();
     }, preprocessingNodeId);
     await waitForOutputImage(page);
@@ -653,7 +741,7 @@ async function main() {
     await capture(
       page,
       '06-narrow-window-layout-dark',
-      '缩窄窗口：预览和属性区仍保留可用高度，无横向溢出。',
+      '缩窄窗口：预览工作台和属性检查器仍保留可用高度，无横向溢出。',
       screenshots);
 
     await page.setViewportSize({ width: 1440, height: 900 });

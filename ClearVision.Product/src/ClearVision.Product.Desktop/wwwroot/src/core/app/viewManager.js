@@ -123,9 +123,16 @@ export function createViewManager(options) {
 
         const leftSidebar = documentRef.querySelector('.sidebar.left');
         const rightSidebar = documentRef.querySelector('.sidebar.right');
+        const operatorRail = documentRef.querySelector('.operator-rail');
+        const operatorFlyout = documentRef.querySelector('.operator-group-flyout');
         const isFlowView = view === 'flow';
         leftSidebar?.classList.toggle('hidden', !isFlowView);
         rightSidebar?.classList.toggle('hidden', !isFlowView);
+        operatorRail?.classList.toggle('hidden', !isFlowView);
+        if (!isFlowView) {
+            operatorFlyout?.classList.add('hidden');
+            operatorFlyout?.setAttribute('aria-hidden', 'true');
+        }
 
         getPropertySidebarController()?.sync?.(view);
 

@@ -935,7 +935,7 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
     previewAdapter: harness.adapter
   });
 
-  assert.match(harness.container.innerHTML, /预览面板/);
+  assert.match(harness.container.innerHTML, /预览工作台/);
   assert.match(harness.container.innerHTML, /当前算子/);
   assert.match(harness.container.innerHTML, /手动预览/);
   assert.match(harness.container.innerHTML, /自动预览/);
@@ -964,7 +964,7 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   });
   assert.match(harness.container.innerHTML, /预览完成/);
   assert.match(harness.container.innerHTML, /预览结果/);
-  assert.match(harness.container.innerHTML, /模块结果/);
+  assert.match(harness.container.innerHTML, /中间结果/);
 
   harness.emitPreview({
     ...successState(),
@@ -1107,7 +1107,7 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(ownerSource, /requestPreview/);
   assert.match(ownerSource, /readArtifactForCurrentState/);
   assert.match(ownerSource, /buildOperatorResultViewModel/);
-  assert.match(ownerSource, /预览面板/);
+  assert.match(ownerSource, /预览工作台/);
   assert.match(ownerSource, /请选择一个算子/);
   assert.match(ownerSource, /当前算子/);
   assert.match(ownerSource, /手动预览/);
@@ -1119,7 +1119,8 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(ownerSource, /预览已取消/);
   assert.match(ownerSource, /节点已删除/);
   assert.match(ownerSource, /预览结果/);
-  assert.match(ownerSource, /模块结果/);
+  assert.match(ownerSource, /中间结果/);
+  assert.match(ownerSource, /端口与耗时/);
   assert.doesNotMatch(ownerSource, /\bfetch\s*\(/);
   assert.doesNotMatch(ownerSource, /httpClient/);
   assert.doesNotMatch(ownerSource, /localStorage|IndexedDB|InspectionHistory|Evidence/);

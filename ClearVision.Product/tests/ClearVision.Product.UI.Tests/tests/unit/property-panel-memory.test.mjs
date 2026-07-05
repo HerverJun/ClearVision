@@ -454,13 +454,16 @@ test('flow editor layout keeps variables in the toolbar and preview outside Prop
   const indexSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/index.html');
   const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
   const propertySource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
-  const rightSidebar = indexSource.match(/<aside class="sidebar right"[\s\S]*?<\/aside>/)?.[0] || '';
+  const rightSidebar = indexSource.match(/<aside class="[^"]*\bsidebar\b[^"]*\bright\b[^"]*"[\s\S]*?<\/aside>/)?.[0] || '';
 
   assert.match(indexSource, /class="toolbar-global-variable-host"[\s\S]*id="global-variable-panel"/);
   assert.match(indexSource, /未打开工程/);
+  assert.match(indexSource, /id="operator-rail"/);
+  assert.match(indexSource, /class="sidebar left inspector-pane"[\s\S]*属性检查器/);
   assert.doesNotMatch(rightSidebar, /panel-title">全局变量/);
   assert.match(rightSidebar, /preview-sidebar-panel/);
-  assert.match(rightSidebar, /property-sidebar-panel/);
+  assert.match(rightSidebar, /预览工作台/);
+  assert.doesNotMatch(rightSidebar, /property-sidebar-panel/);
   assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\)/);
   assert.match(appSource, /previewResourcesEnabled:\s*ownsPreviewSidebar/);
   assert.match(appSource, /previewContainer:\s*ownsPreviewSidebar[\s\S]*document\.getElementById\('preview-panel'\)/);

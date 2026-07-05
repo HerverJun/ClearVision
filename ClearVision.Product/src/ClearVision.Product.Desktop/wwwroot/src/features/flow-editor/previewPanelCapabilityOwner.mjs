@@ -249,6 +249,32 @@ export class PreviewPanelCapabilityAdapter {
         };
     }
 
+    getSelectedConnectionSnapshot(connectionId = null) {
+        const canvas = this.flowCanvasAdapter?.raw || this.flowCanvasAdapter?.canvas || null;
+        const selectedConnection = canvas?.selectedConnection || null;
+        const connections = Array.isArray(canvas?.connections) ? canvas.connections : [];
+        const connection = selectedConnection && (!connectionId || selectedConnection.id === connectionId)
+            ? selectedConnection
+            : connections.find(item => item?.id === connectionId);
+
+        if (!connection) {
+            return null;
+        }
+
+        const sourceNode = this.getNode(connection.source);
+        const targetNode = this.getNode(connection.target);
+        const sourcePort = sourceNode?.outputs?.[connection.sourcePort] || null;
+        const targetPort = targetNode?.inputs?.[connection.targetPort] || null;
+
+        return {
+            id: connection.id,
+            sourceTitle: sourceNode?.title || sourceNode?.type || connection.source || '-',
+            targetTitle: targetNode?.title || targetNode?.type || connection.target || '-',
+            sourcePortName: sourcePort?.name || sourcePort?.Name || `输出 ${Number(connection.sourcePort) + 1}`,
+            targetPortName: targetPort?.name || targetPort?.Name || `输入 ${Number(connection.targetPort) + 1}`
+        };
+    }
+
     subscribeSelectedNode(listener) {
         if (typeof listener !== 'function') {
             return () => {};
@@ -348,6 +374,7 @@ export class PreviewPanelCapabilityOwner {
         this.showToast = typeof showToast === 'function' ? showToast : () => {};
         this.currentOperator = null;
         this.currentNodeId = null;
+        this.currentConnection = null;
         this.nodeDeleted = false;
         this.previewState = this.previewAdapter.getPreviewState();
         this.autoPreviewEnabled = true;
@@ -374,13 +401,16 @@ export class PreviewPanelCapabilityOwner {
         this.render();
     }
 
-    handleSelectedNodeChanged(operator) {
+    handleSelectedNodeChanged(operator, state = {}) {
         if (this.disposed) {
             return;
         }
 
         this.currentOperator = operator || null;
         this.currentNodeId = operator?.id || null;
+        this.currentConnection = this.currentNodeId
+            ? null
+            : this.previewAdapter.getSelectedConnectionSnapshot?.(state?.selectedConnectionId) || null;
         this.nodeDeleted = false;
         this.cancelArtifactRead();
         this.artifactReadState.clear();
@@ -406,12 +436,14 @@ export class PreviewPanelCapabilityOwner {
         if (!liveOperator) {
             this.nodeDeleted = true;
             this.currentOperator = null;
+            this.currentConnection = null;
             this.previewAdapter.clearActiveNode();
             this.render();
             return;
         }
 
         this.currentOperator = liveOperator;
+        this.currentConnection = null;
         this.render();
     }
 
@@ -526,16 +558,24 @@ export class PreviewPanelCapabilityOwner {
             this.previewState?.activeNodeId === selectedNodeId);
         const liveNode = selectedNodeId ? this.previewAdapter.getNode(selectedNodeId) : null;
         const statusInfo = getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted);
-        const title = this.currentOperator
+        const title = this.currentConnection
+            ? '当前选中连线'
+            : this.currentOperator
             ? normalizeOperatorTitle(this.currentOperator, liveNode)
             : '请选择一个算子';
-        const type = this.currentOperator?.type || liveNode?.type || '-';
+        const type = this.currentConnection
+            ? `${this.currentConnection.sourceTitle || '-'} → ${this.currentConnection.targetTitle || '-'}`
+            : this.currentOperator?.type || liveNode?.type || '-';
+        const currentHeading = this.currentConnection ? '当前连线' : '当前算子';
+        const currentMessage = this.currentConnection
+            ? '连线用于传递端口数据，不产生独立预览。请选择算子节点查看输出图像与中间结果。'
+            : statusInfo.message;
 
         this.container.innerHTML = `
             <section class="preview-capability-owner" data-owner="${PREVIEW_PANEL_CAPABILITY_OWNER_ID}" data-status="${escapeAttribute(statusInfo.kind)}">
                 <header class="preview-capability-header">
                     <div class="preview-capability-title-group">
-                        <div class="preview-capability-title">预览面板</div>
+                        <div class="preview-capability-title">预览工作台</div>
                         <div class="preview-capability-status" data-status="${escapeAttribute(statusInfo.kind)}">${escapeHtml(statusInfo.label)}</div>
                     </div>
                     <div class="preview-capability-actions">
@@ -549,12 +589,13 @@ export class PreviewPanelCapabilityOwner {
                 </header>
                 <div class="preview-capability-scroll" data-low-height-scroll="true">
                     <section class="preview-capability-current">
-                        <h5>当前算子</h5>
+                        <h5>${escapeHtml(currentHeading)}</h5>
                         <div class="preview-capability-current-title">${escapeHtml(title)}</div>
                         <div class="preview-capability-current-type">${escapeHtml(type)}</div>
-                        <p class="preview-capability-message">${escapeHtml(statusInfo.message)}</p>
+                        <p class="preview-capability-message">${escapeHtml(currentMessage)}</p>
                     </section>
                     ${this.renderPreviewMedia(belongsToSelectedNode)}
+                    ${this.renderPortsAndTiming(belongsToSelectedNode)}
                     ${this.renderPreviewSummary(belongsToSelectedNode, statusInfo)}
                     ${this.renderModuleResult(belongsToSelectedNode, liveNode)}
                 </div>
@@ -571,6 +612,59 @@ export class PreviewPanelCapabilityOwner {
                     ${presenter.outputImageSrc
                         ? `<img src="${escapeAttribute(presenter.outputImageSrc)}" alt="当前算子输出图像预览">`
                         : '<div class="preview-capability-placeholder">暂无输出图像 / 该算子无图像输出</div>'}
+                </div>
+            </section>
+        `;
+    }
+
+    renderPortsAndTiming(belongsToSelectedNode) {
+        if (this.currentConnection) {
+            return `
+                <section class="preview-capability-section" data-preview-section="connection">
+                    <h5>预览对象</h5>
+                    <div class="preview-capability-empty">
+                        当前选择为连线：${escapeHtml(this.currentConnection.sourcePortName || '-')} → ${escapeHtml(this.currentConnection.targetPortName || '-')}。预览工作台仅对算子节点运行。
+                    </div>
+                </section>
+            `;
+        }
+
+        const inputPorts = Array.isArray(this.currentOperator?.inputPorts) ? this.currentOperator.inputPorts : [];
+        const outputPorts = Array.isArray(this.currentOperator?.outputPorts) ? this.currentOperator.outputPorts : [];
+        const executionTime = belongsToSelectedNode
+            ? (this.previewState?.executionTimeMs ?? this.previewState?.observation?.outcome?.executionTimeMs ?? null)
+            : null;
+        const renderPort = (port, index, fallback) => {
+            const name = port?.displayName || port?.DisplayName || port?.name || port?.Name || `${fallback} ${index + 1}`;
+            const type = port?.dataType || port?.DataType || port?.type || port?.Type || 'Any';
+            return `${name} (${type})`;
+        };
+        const inputText = inputPorts.length > 0
+            ? inputPorts.map((port, index) => renderPort(port, index, '输入')).join('，')
+            : '无输入端口';
+        const outputText = outputPorts.length > 0
+            ? outputPorts.map((port, index) => renderPort(port, index, '输出')).join('，')
+            : '无输出端口';
+        const timeText = executionTime === null || executionTime === undefined || executionTime === ''
+            ? '暂无耗时'
+            : `${executionTime} ms`;
+
+        return `
+            <section class="preview-capability-section" data-preview-section="ports">
+                <h5>端口与耗时</h5>
+                <div class="preview-capability-kv-grid">
+                    <div class="preview-capability-kv">
+                        <span>输入端口</span>
+                        <strong>${escapeHtml(inputText)}</strong>
+                    </div>
+                    <div class="preview-capability-kv">
+                        <span>输出端口</span>
+                        <strong>${escapeHtml(outputText)}</strong>
+                    </div>
+                    <div class="preview-capability-kv">
+                        <span>运行耗时</span>
+                        <strong>${escapeHtml(timeText)}</strong>
+                    </div>
                 </div>
             </section>
         `;
@@ -673,7 +767,7 @@ export class PreviewPanelCapabilityOwner {
         return `
             <section class="preview-capability-section preview-capability-module-result" data-result-status="${escapeAttribute(this.nodeDeleted ? 'deleted' : model.status)}">
                 <div class="preview-capability-section-header">
-                    <h5>模块结果</h5>
+                    <h5>中间结果</h5>
                     <span>${escapeHtml(this.nodeDeleted ? '节点已删除' : model.statusText)}</span>
                 </div>
                 <div class="preview-capability-empty">${escapeHtml(stateMessage)}</div>
@@ -953,6 +1047,7 @@ export class PreviewPanelCapabilityOwner {
         this.container.innerHTML = '';
         this.currentOperator = null;
         this.currentNodeId = null;
+        this.currentConnection = null;
         this.previewState = null;
     }
 }

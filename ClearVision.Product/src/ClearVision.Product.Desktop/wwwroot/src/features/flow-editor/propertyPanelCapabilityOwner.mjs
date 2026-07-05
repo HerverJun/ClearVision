@@ -142,6 +142,7 @@ export class PropertyPanelCapabilityOwner {
         this.showToast = typeof showToast === 'function' ? showToast : () => {};
         this.currentOperator = null;
         this.currentNodeId = null;
+        this.currentConnection = null;
         this.validationErrors = [];
         this.statusMessage = '';
         this.lastChangedParameterName = null;
@@ -168,13 +169,16 @@ export class PropertyPanelCapabilityOwner {
         this.render();
     }
 
-    handleSelectedNodeChanged(operator) {
+    handleSelectedNodeChanged(operator, state = {}) {
         if (this.disposed) {
             return;
         }
 
         this.currentOperator = operator || null;
         this.currentNodeId = operator?.id || null;
+        this.currentConnection = this.currentNodeId
+            ? null
+            : this.propertyAdapter.getSelectedConnectionSnapshot?.(state?.selectedConnectionId) || null;
         this.validationErrors = [];
         this.statusMessage = '';
         this.lastChangedParameterName = null;
@@ -184,6 +188,16 @@ export class PropertyPanelCapabilityOwner {
 
     handleFlowChanged() {
         if (this.disposed || !this.currentNodeId) {
+            if (!this.currentNodeId && this.currentConnection) {
+                const refreshedConnection = this.propertyAdapter.getSelectedConnectionSnapshot?.(this.currentConnection.id);
+                if (!refreshedConnection) {
+                    this.currentConnection = null;
+                    this.render();
+                } else {
+                    this.currentConnection = refreshedConnection;
+                    this.render();
+                }
+            }
             return;
         }
 
@@ -191,6 +205,7 @@ export class PropertyPanelCapabilityOwner {
         if (!operator) {
             this.currentOperator = null;
             this.currentNodeId = null;
+            this.currentConnection = null;
             this.validationErrors = [];
             this.statusMessage = '';
             this.lastChangedParameterName = null;
@@ -200,6 +215,7 @@ export class PropertyPanelCapabilityOwner {
         }
 
         this.currentOperator = operator;
+        this.currentConnection = null;
         this.render();
     }
 
@@ -251,6 +267,7 @@ export class PropertyPanelCapabilityOwner {
     clear() {
         this.currentOperator = null;
         this.currentNodeId = null;
+        this.currentConnection = null;
         this.validationErrors = [];
         this.statusMessage = '';
         this.lastChangedParameterName = null;
@@ -437,6 +454,11 @@ export class PropertyPanelCapabilityOwner {
         }
 
         if (!this.currentOperator) {
+            if (this.currentConnection) {
+                this.renderConnectionSummary();
+                return;
+            }
+
             this.container.innerHTML = `
                 <section class="property-capability-owner property-capability-empty" data-owner="${PROPERTY_PANEL_CAPABILITY_OWNER_ID}">
                     <div class="property-capability-title">属性面板</div>
@@ -493,6 +515,31 @@ export class PropertyPanelCapabilityOwner {
         `;
         this.renderValidationErrors();
         this.updateStatus();
+    }
+
+    renderConnectionSummary() {
+        const connection = this.currentConnection || {};
+        this.container.innerHTML = `
+            <section class="property-capability-owner inspector-connection-summary" data-owner="${PROPERTY_PANEL_CAPABILITY_OWNER_ID}" data-selection-kind="connection">
+                <div class="property-capability-title">属性面板</div>
+                <h4>当前选中连线</h4>
+                <p>连线当前没有可编辑参数。可在画布中删除或重新连接端口。</p>
+                <dl class="inspector-connection-meta">
+                    <div>
+                        <dt>输出节点</dt>
+                        <dd>${escapeHtml(connection.sourceTitle || '-')} / ${escapeHtml(connection.sourcePortName || '-')} (${escapeHtml(connection.sourcePortType || '-')})</dd>
+                    </div>
+                    <div>
+                        <dt>输入节点</dt>
+                        <dd>${escapeHtml(connection.targetTitle || '-')} / ${escapeHtml(connection.targetPortName || '-')} (${escapeHtml(connection.targetPortType || '-')})</dd>
+                    </div>
+                    <div>
+                        <dt>连线 ID</dt>
+                        <dd>${escapeHtml(connection.id || '-')}</dd>
+                    </div>
+                </dl>
+            </section>
+        `;
     }
 
     renderParameterField(parameter) {
@@ -643,6 +690,7 @@ export class PropertyPanelCapabilityOwner {
         this.container.innerHTML = '';
         this.currentOperator = null;
         this.currentNodeId = null;
+        this.currentConnection = null;
     }
 }
 

@@ -336,6 +336,11 @@ class FlowCanvas {
      */
     addNode(type, x, y, config = {}) {
         const canonicalType = this.normalizeOperatorType(type);
+        const {
+            inputs: configInputs = [],
+            outputs: configOutputs = [],
+            ...nodeConfig
+        } = config || {};
         const node = {
             id: this.generateUUID(),
             type: canonicalType,
@@ -343,19 +348,21 @@ class FlowCanvas {
             y,
             width: NODE_DEFAULT_WIDTH,
             height: NODE_MIN_HEIGHT,
-            title: config.title || canonicalType,
-            inputs: (config.inputs || []).map(p => ({
+            title: nodeConfig.title || canonicalType,
+            color: nodeConfig.color || '#1890ff',
+            ...nodeConfig,
+            inputs: configInputs.map(p => ({
+                ...p,
                 id: p.id || this.generateUUID(),
                 name: p.name,
                 type: p.type
             })),
-            outputs: (config.outputs || []).map(p => ({
+            outputs: configOutputs.map(p => ({
+                ...p,
                 id: p.id || this.generateUUID(),
                 name: p.name,
                 type: p.type
-            })),
-            color: config.color || '#1890ff',
-            ...config
+            }))
         };
         node.height = Math.max(
             this.getRequiredNodeHeight(node.inputs, node.outputs),

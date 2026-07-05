@@ -153,31 +153,52 @@ test.describe('Flow Editor', () => {
     await expect(page.locator('#flow-canvas')).toBeVisible();
   });
 
-  test('should have operator library', async ({ page }) => {
-    await expect(page.locator('#operator-library')).toBeVisible();
+  test('should have operator rail, inspector and preview workbench', async ({ page }) => {
+    await expect(page.locator('#operator-rail')).toBeVisible();
+    await expect(page.locator('.inspector-pane')).toContainText('属性检查器');
+    await expect(page.locator('.preview-workbench-pane')).toContainText('预览工作台');
+    const legacyLibraryState = await page.locator('#operator-library').evaluate(element => {
+      const styles = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return {
+        opacity: styles.opacity,
+        pointerEvents: styles.pointerEvents,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    });
+    expect(legacyLibraryState).toEqual({
+      opacity: '0',
+      pointerEvents: 'none',
+      width: 0,
+      height: 0,
+    });
   });
 
-  test('starts operator library categories collapsed and expands on demand', async ({ page }) => {
+  test('renders grouped operator rail and opens the group flyout on demand', async ({ page }) => {
     await stubGroupedOperatorLibrary(page);
     await page.evaluate(storageKey => localStorage.removeItem(storageKey), OPERATOR_LIBRARY_EXPANDED_STORAGE_KEY);
     await page.reload();
     await expect(page.locator('#loading-screen')).toBeHidden();
 
-    await expect(page.locator('#operator-library .category-content-wrapper')).toHaveCount(2);
-    await expect(page.locator('#operator-library .operator-draggable')).toHaveCount(0);
-    await expect(page.locator('#operator-library .category-count')).toHaveText(['1', '2']);
+    await expect(page.locator('#operator-rail .operator-rail-item')).toContainText(['最近', '收藏', '输入', '预处理']);
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
 
-    await page.locator('#operator-library .category-content-wrapper', { hasText: '预处理' }).click();
-    await expect(page.locator('#operator-library .operator-draggable')).toHaveCount(2);
-    await expect(page.locator('#operator-library')).toContainText('二值化');
-    await expect(page.locator('#operator-library')).toContainText('高斯滤波');
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '预处理' }).click();
+    await expect(page.locator('#operator-group-flyout')).toBeVisible();
+    await expect(page.locator('#operator-group-flyout .operator-flyout-item')).toHaveCount(2);
+    await expect(page.locator('#operator-group-flyout')).toContainText('二值化');
+    await expect(page.locator('#operator-group-flyout')).toContainText('高斯滤波');
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
   });
 
   test('shows a property sidebar resizer and supports wider and narrower widths', async ({ page }) => {
     await expect(page.locator(PROPERTY_RESIZER_SELECTOR)).toBeVisible();
 
     const initialWidth = await getSidebarWidth(page);
-    expect(initialWidth).toBe(280);
+    expect(initialWidth).toBe(380);
 
     await dragPropertySidebar(page, -120);
     const widerWidth = await getSidebarWidth(page);
@@ -220,7 +241,7 @@ test.describe('Flow Editor', () => {
     await expect.poll(() => getSidebarWidth(page)).toBe(Math.min(560, Math.round(viewportWidth * 0.45)));
 
     await page.keyboard.press('Home');
-    await expect.poll(() => getSidebarWidth(page)).toBe(240);
+    await expect.poll(() => getSidebarWidth(page)).toBe(320);
   });
 
   test('accepts touch pointer drags on the property sidebar separator', async ({ page }) => {
@@ -238,7 +259,7 @@ test.describe('Flow Editor', () => {
     await expect.poll(() => getSidebarWidth(page)).toBe(expectedMaxWidth);
 
     await dragPropertySidebar(page, 2000);
-    await expect.poll(() => getSidebarWidth(page)).toBe(240);
+    await expect.poll(() => getSidebarWidth(page)).toBe(320);
   });
 
   test('disables the property sidebar resizer outside the flow view', async ({ page }) => {
@@ -246,6 +267,7 @@ test.describe('Flow Editor', () => {
 
     await expect(page.locator('#results-view')).toBeVisible();
     await expect(page.locator(PROPERTY_SIDEBAR_SELECTOR)).toBeHidden();
+    await expect(page.locator('#operator-rail')).toBeHidden();
     await expect(page.locator(PROPERTY_RESIZER_SELECTOR)).toBeHidden();
   });
 });

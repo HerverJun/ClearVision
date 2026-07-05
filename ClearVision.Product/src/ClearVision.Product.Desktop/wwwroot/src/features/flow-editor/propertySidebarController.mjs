@@ -1,6 +1,6 @@
 export const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
-export const PROPERTY_SIDEBAR_DEFAULT_WIDTH = 280;
-export const PROPERTY_SIDEBAR_MIN_WIDTH = 240;
+export const PROPERTY_SIDEBAR_DEFAULT_WIDTH = 380;
+export const PROPERTY_SIDEBAR_MIN_WIDTH = 320;
 export const PROPERTY_SIDEBAR_MAX_WIDTH = 560;
 export const PROPERTY_SIDEBAR_DESKTOP_BREAKPOINT = 768;
 
@@ -454,6 +454,36 @@ export class PropertyPanelCapabilityAdapter {
             inputPorts: node.inputs || metadata.inputPorts || metadata.InputPorts || [],
             outputPorts: node.outputs || metadata.outputPorts || metadata.OutputPorts || [],
             parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || [])
+        };
+    }
+
+    getSelectedConnectionSnapshot(connectionId = null) {
+        const canvas = this.flowCanvasAdapter?.raw || this.flowCanvasAdapter?.canvas || null;
+        const selectedConnection = canvas?.selectedConnection || null;
+        const connections = Array.isArray(canvas?.connections) ? canvas.connections : [];
+        const connection = selectedConnection && (!connectionId || selectedConnection.id === connectionId)
+            ? selectedConnection
+            : connections.find(item => item?.id === connectionId);
+
+        if (!connection) {
+            return null;
+        }
+
+        const sourceNode = this.getNode(connection.source);
+        const targetNode = this.getNode(connection.target);
+        const sourcePort = sourceNode?.outputs?.[connection.sourcePort] || null;
+        const targetPort = targetNode?.inputs?.[connection.targetPort] || null;
+
+        return {
+            id: connection.id,
+            sourceNodeId: connection.source,
+            targetNodeId: connection.target,
+            sourceTitle: sourceNode?.title || sourceNode?.type || connection.source || '-',
+            targetTitle: targetNode?.title || targetNode?.type || connection.target || '-',
+            sourcePortName: sourcePort?.name || sourcePort?.Name || `输出 ${Number(connection.sourcePort) + 1}`,
+            targetPortName: targetPort?.name || targetPort?.Name || `输入 ${Number(connection.targetPort) + 1}`,
+            sourcePortType: sourcePort?.type || sourcePort?.Type || sourcePort?.dataType || sourcePort?.DataType || '-',
+            targetPortType: targetPort?.type || targetPort?.Type || targetPort?.dataType || targetPort?.DataType || '-'
         };
     }
 

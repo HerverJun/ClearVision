@@ -42,6 +42,7 @@
                     "src/shared/styles/global-enhancements.css",
                     "src/shared/styles/settings-view-override.css",
                     "src/shared/styles/operator-library.css",
+                    "src/shared/styles/flow-editor-layout.css",
                     "src/features/settings/userManagement.css",
                     "src/shared/styles/ai-panel.css",
                     "src/shared/styles/sprint-c-enhancements.css",
@@ -202,13 +203,22 @@
             </header>
 
             <!-- 主内容区 -->
-            <main class="main-content" id="main-content">
-                <!-- 左侧面板 -->
-                <aside class="sidebar left">
-                    <div class="panel">
-                        <h3 class="panel-title">算子库</h3>
-                        <div class="operator-library" id="operator-library">
-                            <!-- 算子列表将动态加载 -->
+            <main class="main-content flow-editor-shell" id="main-content">
+                <!-- 左侧窄算子分组入口 -->
+                <nav class="operator-rail" id="operator-rail" aria-label="算子分组入口">
+                    <div class="operator-rail-loading">算子</div>
+                </nav>
+                <div class="operator-group-flyout hidden" id="operator-group-flyout" aria-hidden="true"></div>
+                <div class="operator-library-hidden-host" aria-hidden="true">
+                    <div class="operator-library" id="operator-library"></div>
+                </div>
+
+                <!-- 左侧属性检查器 -->
+                <aside class="sidebar left inspector-pane" data-pane="inspector">
+                    <div class="panel inspector-pane-panel">
+                        <h3 class="panel-title">属性检查器</h3>
+                        <div class="property-panel" id="property-panel">
+                            <p class="empty-text">未选择算子</p>
                         </div>
                     </div>
                 </aside>
@@ -732,22 +742,16 @@
                     class="sidebar-resizer hidden"
                     data-sidebar-resizer="property"
                     role="separator"
-                    aria-label="Property sidebar width"
+                    aria-label="预览工作台宽度"
                     aria-orientation="vertical"
                     aria-disabled="true"
                     tabindex="-1"
                 ></div>
-                <aside class="sidebar right" data-sidebar="property">
-                    <div class="panel preview-sidebar-panel" id="preview-panel-host-panel" data-preview-panel-host>
-                        <h3 class="panel-title">预览</h3>
+                <aside class="sidebar right preview-workbench-pane" data-sidebar="property" data-pane="preview-workbench">
+                    <div class="panel preview-sidebar-panel preview-workbench-panel" id="preview-panel-host-panel" data-preview-panel-host>
+                        <h3 class="panel-title">预览工作台</h3>
                         <div class="preview-panel-host" id="preview-panel">
                             <p class="empty-text">请选择一个算子</p>
-                        </div>
-                    </div>
-                    <div class="panel property-sidebar-panel">
-                        <h3 class="panel-title">属性</h3>
-                        <div class="property-panel" id="property-panel">
-                            <p class="empty-text">未选择算子</p>
                         </div>
                     </div>
                 </aside>

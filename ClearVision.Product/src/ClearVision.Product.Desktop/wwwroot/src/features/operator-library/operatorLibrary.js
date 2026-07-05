@@ -308,6 +308,7 @@ export class OperatorLibraryPanel {
             this.operatorLoadState = 'ready';
             this.operatorLoadError = '';
             this.renderOperatorTree();
+            this.dispatchOperatorsUpdated();
             showToast(`已加载 ${operators.length} 个算子`, 'success');
         } catch (error) {
             debugLogger.warn('[OperatorLibraryPanel] 加载算子失败:', error);
@@ -316,6 +317,7 @@ export class OperatorLibraryPanel {
             this.operatorLoadState = 'unavailable';
             this.operatorLoadError = error?.message || '算子库服务不可用';
             this.renderOperatorTree();
+            this.dispatchOperatorsUpdated();
             showToast('算子库服务不可用，已停止显示默认演示算子', 'warning');
         }
     }
@@ -874,6 +876,17 @@ export class OperatorLibraryPanel {
      */
     getCategories() {
         return [...new Set(this.operators.map(op => op.category || '其他'))];
+    }
+
+    dispatchOperatorsUpdated() {
+        this.container?.dispatchEvent?.(new CustomEvent('operator-library:updated', {
+            bubbles: true,
+            detail: {
+                operators: this.getOperators(),
+                categories: this.getCategories(),
+                state: this.operatorLoadState
+            }
+        }));
     }
 
     /**

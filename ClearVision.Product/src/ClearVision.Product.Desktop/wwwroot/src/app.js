@@ -70,6 +70,7 @@ import FlowCanvas from './core/canvas/flowCanvas.js';
 import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteraction.js';
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
+import OperatorPaletteShell from './features/flow-editor/operatorPaletteShell.js';
 import inspectionController, {
     createLightweightInspectionResult,
     getResultImageUrl,
@@ -203,6 +204,7 @@ function trackedSubscribe(subscribeFn, callback) {
 // Encoding cleanup: previous comment text was unreadable.
 let imageViewer = null;
 let operatorLibraryPanel = null;
+let operatorPaletteShell = null;
 let flowCanvas = null;
 let flowEditorInteraction = null;
 let propertyPanel = null;
@@ -1060,7 +1062,77 @@ function initializeOperatorLibraryPanel() {
         }
     };
 
+    initializeOperatorPaletteShell();
     debugLogger.debug('[App] 算子库面板初始化完成');
+}
+
+function initializeOperatorPaletteShell() {
+    const rail = document.getElementById('operator-rail');
+    const flyout = document.getElementById('operator-group-flyout');
+    if (!rail || !flyout) {
+        debugLogger.warn('[App] Operator rail/flyout host not found');
+        return;
+    }
+
+    operatorPaletteShell?.dispose?.();
+    operatorPaletteShell = new OperatorPaletteShell({
+        rail,
+        flyout,
+        libraryPanel: operatorLibraryPanel,
+        onOperatorDragStart: (operatorData) => {
+            debugLogger.debug('[App] 从算子组拖拽算子:', operatorData.type);
+            operatorLibraryPanel?.onOperatorDragStart?.(operatorData);
+        },
+        onOperatorAdd: (operatorData) => {
+            addOperatorFromPalette(operatorData);
+        }
+    });
+    serviceRegistry.register('operatorPaletteShell', operatorPaletteShell);
+}
+
+function addOperatorFromPalette(operatorData) {
+    if (!operatorData?.type) {
+        showToast('算子数据不完整，无法添加', 'error');
+        return null;
+    }
+
+    if (!flowCanvas || !flowEditorInteraction) {
+        const operatorCopy = {
+            ...operatorData,
+            isLibrarySelection: true,
+            title: operatorData.title || operatorData.displayName || operatorData.type,
+            parameters: operatorData.parameters ? operatorData.parameters.map(parameter => ({ ...parameter })) : []
+        };
+        setSelectedOperator(operatorCopy);
+        propertyPanel?.setOperator?.(operatorCopy);
+        showToast('画布尚未就绪，已显示算子属性', 'warning');
+        return null;
+    }
+
+    const rect = flowCanvas.canvas.getBoundingClientRect();
+    const scale = Number.isFinite(flowCanvas.scale) && flowCanvas.scale > 0 ? flowCanvas.scale : 1;
+    const offset = flowCanvas.offset || { x: 0, y: 0 };
+    const existingCount = flowCanvas.nodes?.size || 0;
+    const stagger = (existingCount % 6) * 28;
+    const x = (rect.width * 0.5) / scale + offset.x + stagger;
+    const y = (rect.height * 0.42) / scale + offset.y + stagger;
+    const operatorTitle = operatorData.displayName || operatorData.name || operatorData.title || operatorData.type;
+    const node = flowEditorInteraction.addOperatorNode(operatorData.type, x, y, operatorData);
+
+    flowEditorInteraction.saveState?.();
+    const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+    if (node?.id && flowCanvasAdapter?.selectNode) {
+        flowCanvasAdapter.selectNode(node.id);
+    } else if (node?.id) {
+        flowCanvas.selectedNode = node.id;
+        flowCanvas.selectedConnection = null;
+        flowCanvas.markSelectionChanged?.('operator-palette-add');
+        flowCanvas.onNodeSelected?.(node);
+        flowCanvas.render?.();
+    }
+    syncCurrentProjectFlowFromCanvas();
+    showToast(`已添加算子: ${operatorTitle}`, 'success');
+    return node;
 }
 
 function initializeImageViewer() {
@@ -1443,7 +1515,7 @@ function disposePropertyPanelOwner() {
 
 async function createLegacyPropertyPanelOwner() {
     const { PropertyPanel } = await loadLegacyPropertyPanelModule();
-    const ownsPreviewSidebar = shouldLegacyPropertyPanelOwnSidebarPreview();
+    const ownsPreviewSidebar = shouldLegacyPropertyPanelOwnSidebarPreview() && !isNodePreviewInspectorEnabled();
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
