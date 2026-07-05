@@ -174,6 +174,20 @@
     flex: 0 0 auto;
 }
 
+.global-variable-capability-manager .global-variable-capability-toolbar {
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, 180px) auto;
+}
+
+.global-variable-capability-manager .global-variable-capability-status {
+    min-height: 34px;
+    padding: 8px 20px 10px;
+    border-top: 1px solid var(--theme-border);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+    background: var(--bg-surface);
+}
+
 .gv-manager .form-input,
 .gv-choice .form-input {
     min-width: 0;

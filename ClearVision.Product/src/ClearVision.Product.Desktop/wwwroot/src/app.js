@@ -962,7 +962,22 @@ function initializeOperatorLibraryPanel() {
             title: operatorData.title || operatorData.displayName || operatorData.type,
             parameters: operatorData.parameters ? operatorData.parameters.map(p => ({ ...p })) : []
         };
+        if (isPropertyPanelCapabilityEnabled() || isPreviewPanelCapabilityEnabled()) {
+            const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+            if (flowCanvasAdapter?.selectNode) {
+                flowCanvasAdapter.selectNode(null);
+            } else if (flowCanvas) {
+                flowCanvas.selectedNode = null;
+                flowCanvas.selectedConnection = null;
+                flowCanvas.markSelectionChanged?.('operator-library-selection');
+                flowCanvas.onNodeSelected?.(null);
+                flowCanvas.render?.();
+            }
+        }
         setSelectedOperator(operatorCopy);
+        if (isPropertyPanelCapabilityEnabled()) {
+            propertyPanel?.setOperator?.(operatorCopy);
+        }
     };
 
     debugLogger.debug('[App] 算子库面板初始化完成');

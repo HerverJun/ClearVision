@@ -331,16 +331,12 @@ export class FlowEditorInteraction {
 
             if (clickedNode) {
                 if (!this.multiSelectedNodes.has(clickedNode.id)) {
-                    this.clearSelection();
+                    this.clearSelection({ notify: false });
                     this.selectNode(clickedNode.id);
                 } else {
                     this.canvas.selectedNode = clickedNode.id;
                     this.updateSelection();
-                }
-
-                if (this.canvas.onNodeSelected) {
-                    const selectedNode = this.canvas.nodes.get(clickedNode.id) || null;
-                    this.canvas.onNodeSelected(selectedNode);
+                    this.notifyNodeSelectionChanged('mouse-select-node');
                 }
 
                 this.startNodeDrag(e, clickedNode.id);
@@ -348,9 +344,6 @@ export class FlowEditorInteraction {
             }
 
             this.clearSelection();
-            if (this.canvas.onNodeSelected) {
-                this.canvas.onNodeSelected(null);
-            }
             this.startPan(e);
         };
 
@@ -1054,16 +1047,19 @@ export class FlowEditorInteraction {
     /**
      * 选择节点
      */
-    selectNode(nodeId) {
+    selectNode(nodeId, { notify = true } = {}) {
         this.multiSelectedNodes.add(nodeId);
         this.canvas.selectedNode = nodeId;
         this.updateSelection();
+        if (notify) {
+            this.notifyNodeSelectionChanged('select-node');
+        }
     }
 
     /**
      * 切换节点选择
      */
-    toggleNodeSelection(nodeId) {
+    toggleNodeSelection(nodeId, { notify = true } = {}) {
         if (this.multiSelectedNodes.has(nodeId)) {
             this.multiSelectedNodes.delete(nodeId);
             if (this.canvas.selectedNode === nodeId) {
@@ -1074,15 +1070,21 @@ export class FlowEditorInteraction {
             this.canvas.selectedNode = nodeId;
         }
         this.updateSelection();
+        if (notify) {
+            this.notifyNodeSelectionChanged('toggle-node-selection');
+        }
     }
 
     /**
      * 清除选择
      */
-    clearSelection() {
+    clearSelection({ notify = true } = {}) {
         this.multiSelectedNodes.clear();
         this.canvas.selectedNode = null;
         this.updateSelection();
+        if (notify) {
+            this.notifyNodeSelectionChanged('clear-selection');
+        }
     }
 
     /**
@@ -1179,10 +1181,10 @@ export class FlowEditorInteraction {
             return false;
         }
 
-        this.clearSelection();
+        this.clearSelection({ notify: false });
         this.multiSelectedNodes.add(duplicatedNode.id);
         this.canvas.selectedNode = duplicatedNode.id;
-        this.notifyNodeSelectionChanged();
+        this.notifyNodeSelectionChanged('duplicate-node-request');
         this.saveState();
         return true;
     }
@@ -1398,15 +1400,12 @@ export class FlowEditorInteraction {
         this.notifyNodeSelectionChanged();
     }
 
-    notifyNodeSelectionChanged() {
-        if (typeof this.canvas.onNodeSelected !== 'function') {
-            return;
-        }
-
+    notifyNodeSelectionChanged(reason = 'flow-editor-interaction') {
         const selectedNode = this.canvas.selectedNode
             ? this.canvas.nodes.get(this.canvas.selectedNode) || null
             : null;
-        this.canvas.onNodeSelected(selectedNode);
+        this.canvas.onNodeSelected?.(selectedNode);
+        this.canvas.markSelectionChanged?.(reason);
     }
 
     /**

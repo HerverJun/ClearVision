@@ -140,6 +140,8 @@ export class GlobalVariablesCapabilityOwner {
         this.statusMessage = '';
         this.pendingSave = false;
         this.disposed = false;
+        this.isOpen = false;
+        this.dialog = null;
         this.unsubscribes = [];
         this.handleClick = this.handleClick.bind(this);
         this.handleInput = this.handleInput.bind(this);
@@ -165,6 +167,12 @@ export class GlobalVariablesCapabilityOwner {
         this.fieldErrors = {};
         this.statusMessage = '';
         this.render();
+    }
+
+    query(selector) {
+        return this.dialog?.querySelector?.(selector) ||
+            this.container?.querySelector?.(selector) ||
+            null;
     }
 
     setSchemaFromExternal(schema) {
@@ -253,7 +261,11 @@ export class GlobalVariablesCapabilityOwner {
         }
 
         event.preventDefault();
-        if (action === 'new') {
+        if (action === 'open-manager') {
+            this.openManager();
+        } else if (action === 'close-manager') {
+            this.closeManager();
+        } else if (action === 'new') {
             this.createDraft();
         } else if (action === 'select') {
             this.selectVariable(event.target.closest('[data-variable-id]')?.dataset?.variableId || '');
@@ -267,6 +279,27 @@ export class GlobalVariablesCapabilityOwner {
             this.statusMessage = '已放弃未保存修改';
             this.render();
         }
+    }
+
+    openManager() {
+        if (!this.project) {
+            this.showToast('请先打开工程。', 'warning');
+            return;
+        }
+
+        this.isOpen = true;
+        if (!this.selectedVariableId && this.schema.variables.length > 0) {
+            this.selectedVariableId = this.schema.variables[0].id;
+            this.draft = createVariableDraft(this.getSelectedVariable());
+        }
+        this.fieldErrors = {};
+        this.render();
+    }
+
+    closeManager() {
+        this.isOpen = false;
+        this.removeDialog();
+        this.render();
     }
 
     createDraft() {
@@ -424,36 +457,96 @@ export class GlobalVariablesCapabilityOwner {
         }
 
         const locked = this.isRuntimeLocked();
-        const selected = this.getSelectedVariable();
+        const count = this.schema.variables.length;
         this.container.innerHTML = `
             <section class="global-variable-entry" data-owner="${GLOBAL_VARIABLES_CAPABILITY_OWNER_ID}">
                 <div class="global-variable-entry-summary">
                     <strong>全局变量</strong>
-                    <span>${this.project ? `${this.schema.variables.length} 个变量` : '未打开工程'}</span>
+                    <span>${this.project ? `${count} 个变量` : '未打开工程'}</span>
                 </div>
-                <div class="global-variable-capability-toolbar">
-                    <input class="cv-input" data-gv-search value="${escapeHtml(this.search)}" placeholder="搜索变量" ${this.project ? '' : 'disabled'}>
-                    <select class="cv-input" data-gv-type-filter ${this.project ? '' : 'disabled'}>
+                <button type="button"
+                        class="btn btn-secondary"
+                        id="gv-open-manager"
+                        data-gv-action="open-manager"
+                        ${this.project ? '' : 'disabled'}
+                        title="${this.project ? '打开全局变量管理' : '未打开工程'}"
+                        aria-label="打开全局变量管理">管理</button>
+                ${locked ? '<p class="global-variable-entry-hint">工程运行中，仅可查看变量。</p>' : ''}
+            </section>
+        `;
+        if (this.isOpen && this.project) {
+            this.renderDialog();
+        } else {
+            this.removeDialog();
+        }
+    }
+
+    renderDialog() {
+        this.removeDialog();
+        const overlay = document.createElement('div');
+        overlay.className = 'gv-manager-overlay show';
+        overlay.innerHTML = this.renderDialogHtml();
+        overlay.addEventListener('click', this.handleClick);
+        overlay.addEventListener('input', this.handleInput);
+        overlay.addEventListener('change', this.handleChange);
+        document.body.appendChild(overlay);
+        this.dialog = overlay;
+        this.renderVariableList();
+        overlay.querySelector('.gv-manager')?.focus?.();
+    }
+
+    removeDialog() {
+        if (!this.dialog) {
+            return;
+        }
+
+        this.dialog.removeEventListener('click', this.handleClick);
+        this.dialog.removeEventListener('input', this.handleInput);
+        this.dialog.removeEventListener('change', this.handleChange);
+        this.dialog.remove();
+        this.dialog = null;
+    }
+
+    renderDialogHtml() {
+        const locked = this.isRuntimeLocked();
+        const selected = this.getSelectedVariable();
+        return `
+            <div class="gv-manager global-variable-capability-manager"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="gv-manager-title"
+                 tabindex="-1">
+                <header class="gv-manager-header">
+                    <div>
+                        <h2 id="gv-manager-title">全局变量</h2>
+                        <p>管理变量结构、初始值和算子绑定。</p>
+                    </div>
+                    <button type="button" class="gv-icon-button" data-gv-action="close-manager" title="关闭" aria-label="关闭">×</button>
+                </header>
+                ${locked ? '<div class="gv-warning" role="status">工程运行中，仅可查看变量。</div>' : ''}
+                <section class="gv-toolbar global-variable-capability-toolbar">
+                    <input class="form-input" data-gv-search value="${escapeHtml(this.search)}" placeholder="搜索变量" ${this.project ? '' : 'disabled'} aria-label="搜索变量">
+                    <select class="form-input" data-gv-type-filter ${this.project ? '' : 'disabled'} aria-label="类型筛选">
                         <option value="">全部类型</option>
                         ${GLOBAL_VARIABLE_TYPES.map(type => `<option value="${type}" ${this.typeFilter === type ? 'selected' : ''}>${escapeHtml(getTypeLabel(type))}</option>`).join('')}
                     </select>
-                    <button type="button" class="btn btn-secondary" data-gv-action="new" ${this.project && !locked ? '' : 'disabled'}>新建</button>
-                </div>
-                ${locked ? '<p class="global-variable-entry-hint">工程运行中，仅可查看变量。</p>' : ''}
-                <div class="global-variable-capability-layout" data-low-height-scroll="true">
-                    <div class="global-variable-capability-list" data-gv-list></div>
-                    <form class="global-variable-capability-editor" data-gv-editor>
-                        ${this.renderEditor(selected, locked)}
-                    </form>
-                </div>
+                    <button type="button" class="btn btn-primary" data-gv-action="new" ${this.project && !locked ? '' : 'disabled'}>新建</button>
+                </section>
+                <main class="gv-manager-body global-variable-capability-layout" data-low-height-scroll="true">
+                    <aside class="gv-variable-list global-variable-capability-list" data-gv-list></aside>
+                    <section class="gv-detail">
+                        <form class="global-variable-capability-editor" data-gv-editor>
+                            ${this.renderEditor(selected, locked)}
+                        </form>
+                    </section>
+                </main>
                 <div class="global-variable-capability-status" data-gv-status aria-live="polite">${escapeHtml(this.statusMessage)}</div>
-            </section>
+            </div>
         `;
-        this.renderVariableList();
     }
 
     renderVariableList() {
-        const list = this.container?.querySelector?.('[data-gv-list]');
+        const list = this.query('[data-gv-list]');
         if (!list) {
             return;
         }
@@ -466,12 +559,12 @@ export class GlobalVariablesCapabilityOwner {
 
         list.innerHTML = variables.map(variable => `
             <button type="button"
-                    class="global-variable-capability-item ${variable.id === this.selectedVariableId ? 'active' : ''}"
+                    class="gv-variable-row global-variable-capability-item ${variable.id === this.selectedVariableId ? 'selected active' : ''}"
                     data-gv-action="select"
                     data-variable-id="${escapeHtml(variable.id)}">
-                <strong>${escapeHtml(variable.displayName || variable.name)}</strong>
-                <span>${escapeHtml(variable.name)} · ${escapeHtml(getTypeLabel(variable.valueType))}</span>
-                <small>${escapeHtml(formatGlobalVariableValue(variable.initialValue))}</small>
+                <strong class="gv-variable-name">${escapeHtml(variable.displayName || variable.name)}</strong>
+                <span class="gv-variable-meta">${escapeHtml(variable.name)} · ${escapeHtml(getTypeLabel(variable.valueType))}</span>
+                <small class="gv-variable-value">${escapeHtml(formatGlobalVariableValue(variable.initialValue))}</small>
             </button>
         `).join('');
     }
@@ -531,7 +624,7 @@ export class GlobalVariablesCapabilityOwner {
     }
 
     updateStatus() {
-        const status = this.container?.querySelector?.('[data-gv-status]');
+        const status = this.query('[data-gv-status]');
         if (status) {
             status.textContent = this.statusMessage || '';
         }
@@ -558,6 +651,7 @@ export class GlobalVariablesCapabilityOwner {
         this.container.removeEventListener('click', this.handleClick);
         this.container.removeEventListener('input', this.handleInput);
         this.container.removeEventListener('change', this.handleChange);
+        this.removeDialog();
         delete this.container.dataset.globalVariablesOwner;
         this.container.innerHTML = '';
     }
