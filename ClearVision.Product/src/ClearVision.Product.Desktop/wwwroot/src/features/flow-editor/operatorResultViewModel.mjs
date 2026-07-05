@@ -9,6 +9,7 @@ export const MAX_OPERATOR_RESULT_STRING_CHARS = 512;
 export const MAX_OPERATOR_RESULT_TREE_ROWS = 48;
 export const MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES = 64 * 1024;
 export const MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS = 4096;
+export const STALE_PREVIEW_MESSAGE = '参数或流程已变更，需重新预览';
 
 const SECRET_KEY_PATTERN = /(password|passwd|pwd|secret|token|api[-_]?key|authorization|credential|private[-_]?key|connectionstring)/i;
 const WINDOWS_ABSOLUTE_PATH_PATTERN = /\b[A-Za-z]:[\\/][^\s"'<>|]+/g;
@@ -35,6 +36,42 @@ function asString(value, fallback = '') {
     }
 
     return String(value);
+}
+
+function normalizeIdentityText(value) {
+    const text = asString(value).trim().toLowerCase();
+    return text || null;
+}
+
+function normalizeIdentityNumber(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const numberValue = Number(value);
+    return Number.isSafeInteger(numberValue) && numberValue >= 0
+        ? numberValue
+        : null;
+}
+
+function readRequestField(state, ...keys) {
+    return readOwn(state?.request, ...keys);
+}
+
+function readDefined(source, ...keys) {
+    if (!source || typeof source !== 'object') {
+        return undefined;
+    }
+
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(source, key) &&
+            source[key] !== undefined &&
+            source[key] !== null) {
+            return source[key];
+        }
+    }
+
+    return undefined;
 }
 
 function normalizeBool(value) {
@@ -426,12 +463,16 @@ function summarizeScene(scene) {
     };
 }
 
+function clipDiagnosticText(value, maxChars = 240) {
+    return clipText(redactLocalAbsolutePaths(value), maxChars);
+}
+
 function normalizeDiagnostic(item, source = 'diagnostic') {
     if (typeof item === 'string') {
         return {
             source,
             code: source,
-            message: clipText(item, 240),
+            message: clipDiagnosticText(item),
             pathHint: null
         };
     }
@@ -442,43 +483,213 @@ function normalizeDiagnostic(item, source = 'diagnostic') {
 
     return {
         source,
-        code: asString(readOwn(item, 'code', 'Code'), source),
-        message: clipText(readOwn(item, 'message', 'Message') ?? item, 240),
-        pathHint: readOwn(item, 'pathHint', 'PathHint') ?? null
+        code: asString(readDefined(item, 'code', 'Code'), source),
+        message: clipDiagnosticText(
+            readDefined(item, 'message', 'Message', 'description', 'Description', 'reason', 'Reason') ??
+            readDefined(item, 'displayValue', 'DisplayValue') ??
+            JSON.stringify(sanitizeResultValue(item, {
+                maxDepth: 2,
+                maxArrayItems: 6,
+                maxObjectFields: 12,
+                maxStringChars: 120
+            }))
+        ),
+        pathHint: readDefined(item, 'pathHint', 'PathHint') === undefined
+            ? null
+            : clipDiagnosticText(readDefined(item, 'pathHint', 'PathHint'), 120)
     };
+}
+
+function normalizeDiagnosticList(value, source = 'diagnostic') {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map(item => normalizeDiagnostic(item, source))
+        .filter(Boolean);
+}
+
+function classifyPreviewIssue(message, status = '') {
+    const text = asString(message).trim();
+    const normalized = text.toLowerCase();
+    const statusText = asString(status).toLowerCase();
+
+    if (statusText === 'canceled' || /cancel|abort|取消/.test(normalized)) {
+        return {
+            code: 'canceled',
+            message: text ? `预览已取消：${clipDiagnosticText(text)}` : '预览已取消'
+        };
+    }
+
+    if (/timeout|timed out|unavailable|不可用|超时|服务|连接/.test(normalized)) {
+        return {
+            code: 'timeout',
+            message: `预览超时或服务不可用：${clipDiagnosticText(text || '请稍后重试')}`
+        };
+    }
+
+    if (/missingresource|resource|artifact|not found|404|缺少资源|资源/.test(normalized)) {
+        return {
+            code: 'missing-resource',
+            message: `缺少资源：${clipDiagnosticText(text || '预览依赖的资源不可用')}`
+        };
+    }
+
+    if (/input|image|file path|camera|采集源|文件路径|输入图|相机/.test(normalized)) {
+        return {
+            code: 'missing-input',
+            message: `缺输入图或采集源：${clipDiagnosticText(text || '请先准备输入图像')}`
+        };
+    }
+
+    if (/validat|schema|invalid|parameter|参数|校验|无效/.test(normalized)) {
+        return {
+            code: 'validation',
+            message: `参数校验失败：${clipDiagnosticText(text || '请检查算子参数')}`
+        };
+    }
+
+    return {
+        code: 'backend',
+        message: `后端异常：${clipDiagnosticText(text || '预览执行失败')}`
+    };
+}
+
+function normalizeMissingResource(item) {
+    if (typeof item === 'string') {
+        return clipDiagnosticText(item, 160);
+    }
+
+    if (!item || typeof item !== 'object') {
+        return null;
+    }
+
+    const label = readDefined(item, 'name', 'Name', 'resourceId', 'ResourceId', 'id', 'Id', 'kind', 'Kind') ?? 'resource';
+    const hint = readDefined(item, 'pathHint', 'PathHint', 'reason', 'Reason', 'message', 'Message');
+    return clipDiagnosticText(hint ? `${label}: ${hint}` : label, 180);
+}
+
+function collectMissingResourceDiagnostics(value, source = 'missing-resource') {
+    if (!Array.isArray(value) || value.length === 0) {
+        return [];
+    }
+
+    const summary = value
+        .map(normalizeMissingResource)
+        .filter(Boolean)
+        .slice(0, 6)
+        .join('；');
+
+    return summary
+        ? [{
+            source,
+            code: 'missing-resource',
+            message: `缺少资源：${summary}`,
+            pathHint: null
+        }]
+        : [];
+}
+
+function collectFailedOperatorDiagnostics(...sources) {
+    for (const source of sources) {
+        const failedOperatorName = readDefined(source, 'failedOperatorName', 'FailedOperatorName');
+        const failedOperatorType = readDefined(source, 'failedOperatorType', 'FailedOperatorType');
+        const failedOperatorId = readDefined(source, 'failedOperatorId', 'FailedOperatorId');
+        if (!failedOperatorName && !failedOperatorType && !failedOperatorId) {
+            continue;
+        }
+
+        const detail = [
+            failedOperatorName ? `名称 ${failedOperatorName}` : null,
+            failedOperatorType ? `类型 ${failedOperatorType}` : null,
+            failedOperatorId ? `ID ${failedOperatorId}` : null
+        ].filter(Boolean).join('，');
+
+        return [{
+            source: 'failed-operator',
+            code: 'failed-operator',
+            message: `失败算子：${clipDiagnosticText(detail || '未知算子', 180)}`,
+            pathHint: null
+        }];
+    }
+
+    return [];
+}
+
+function pushUniqueDiagnostic(target, item) {
+    if (!item?.message) {
+        return;
+    }
+
+    const key = `${item.source || ''}|${item.code || ''}|${item.message || ''}|${item.pathHint || ''}`;
+    if (target.some(existing =>
+        `${existing.source || ''}|${existing.code || ''}|${existing.message || ''}|${existing.pathHint || ''}` === key)) {
+        return;
+    }
+
+    target.push(item);
 }
 
 function collectDiagnostics(state, observation, scene) {
     const result = [];
-    if (state?.errorMessage) {
-        result.push({
+    const status = asString(readDefined(state, 'status', 'Status'));
+    const outcome = getObservationOutcome(observation) || {};
+    const stateErrorMessage = readDefined(state, 'errorMessage', 'ErrorMessage');
+    const outcomeErrorMessage = readDefined(outcome, 'errorMessage', 'ErrorMessage');
+    const primaryError = stateErrorMessage || outcomeErrorMessage;
+
+    if (primaryError) {
+        const issue = classifyPreviewIssue(primaryError, status);
+        pushUniqueDiagnostic(result, {
             source: 'preview',
-            code: 'preview',
-            message: clipText(state.errorMessage, 240),
+            code: issue.code,
+            message: issue.message,
+            pathHint: null
+        });
+    } else if (status === 'canceled') {
+        pushUniqueDiagnostic(result, {
+            source: 'preview',
+            code: 'canceled',
+            message: '预览已取消',
+            pathHint: null
+        });
+    } else if (status === 'error') {
+        pushUniqueDiagnostic(result, {
+            source: 'preview',
+            code: 'backend',
+            message: '后端异常：预览执行失败',
             pathHint: null
         });
     }
 
-    const observationDiagnostics = readOwn(observation, 'diagnostics', 'Diagnostics');
-    if (Array.isArray(observationDiagnostics)) {
-        observationDiagnostics
-            .map(item => normalizeDiagnostic(item, 'observation'))
-            .filter(Boolean)
-            .forEach(item => result.push(item));
-    }
+    collectFailedOperatorDiagnostics(state, outcome)
+        .forEach(item => pushUniqueDiagnostic(result, item));
+
+    collectMissingResourceDiagnostics(readDefined(state, 'missingResources', 'MissingResources'), 'preview')
+        .forEach(item => pushUniqueDiagnostic(result, item));
+
+    collectMissingResourceDiagnostics(readDefined(outcome, 'missingResources', 'MissingResources'), 'observation')
+        .forEach(item => pushUniqueDiagnostic(result, item));
+
+    normalizeDiagnosticList(readDefined(state, 'diagnostics', 'Diagnostics'), 'preview')
+        .forEach(item => pushUniqueDiagnostic(result, item));
+
+    const observationDiagnostics = readDefined(observation, 'diagnostics', 'Diagnostics');
+    normalizeDiagnosticList(observationDiagnostics, 'observation')
+        .forEach(item => pushUniqueDiagnostic(result, item));
 
     getSceneDiagnostics(scene)
         .map(item => normalizeDiagnostic(item, 'scene'))
         .filter(Boolean)
-        .forEach(item => result.push(item));
+        .forEach(item => pushUniqueDiagnostic(result, item));
 
     const artifactDiagnostics = state?.outputData?._previewArtifactDiagnostics;
-    if (Array.isArray(artifactDiagnostics)) {
-        artifactDiagnostics
-            .map(item => normalizeDiagnostic(item, 'artifact'))
-            .filter(Boolean)
-            .forEach(item => result.push(item));
-    }
+    normalizeDiagnosticList(artifactDiagnostics, 'artifact')
+        .forEach(item => pushUniqueDiagnostic(result, item));
+
+    normalizeDiagnosticList(readDefined(state?.outputData, 'diagnostics', 'Diagnostics'), 'output')
+        .forEach(item => pushUniqueDiagnostic(result, item));
 
     return result.slice(0, 16);
 }
@@ -645,8 +856,8 @@ function getStatusInfo({
     if (stale) {
         return {
             kind: 'stale',
-            label: 'stale',
-            message: '结果已过期，请重新预览'
+            label: '需重新预览',
+            message: STALE_PREVIEW_MESSAGE
         };
     }
 
@@ -673,7 +884,13 @@ function getStatusInfo({
     };
 }
 
-function detectStale({ operator, liveNode, state, flowRevision }) {
+function pushStaleReason(reasons, reason) {
+    if (!reasons.includes(reason)) {
+        reasons.push(reason);
+    }
+}
+
+function detectStale({ operator, liveNode, state, flowRevision, projectId, inputImageHash }) {
     if (!state?.request) {
         return {
             stale: false,
@@ -682,20 +899,51 @@ function detectStale({ operator, liveNode, state, flowRevision }) {
     }
 
     const reasons = [];
-    const requestedFlowRevision = Number(state.request.flowRevision ?? 0);
-    const currentFlowRevision = Number(flowRevision ?? requestedFlowRevision);
-    if (Number.isFinite(currentFlowRevision) &&
-        Number.isFinite(requestedFlowRevision) &&
-        currentFlowRevision !== requestedFlowRevision) {
-        reasons.push('flowRevision');
+    const selectedNodeId = normalizeIdentityText(liveNode?.id || operator?.id);
+    const requestNodeId = normalizeIdentityText(readRequestField(state, 'nodeId', 'NodeId'));
+    const observation = getObservation(state);
+    const identity = getObservationIdentity(observation) || {};
+    const observedNodeId = normalizeIdentityText(readOwn(identity, 'targetNodeId', 'TargetNodeId'));
+
+    if (selectedNodeId && requestNodeId && selectedNodeId !== requestNodeId) {
+        pushStaleReason(reasons, 'targetNodeId');
+    }
+    if (selectedNodeId && observedNodeId && selectedNodeId !== observedNodeId) {
+        pushStaleReason(reasons, 'targetNodeId');
+    }
+
+    const currentProjectId = normalizeIdentityText(projectId);
+    const requestProjectId = normalizeIdentityText(readRequestField(state, 'projectId', 'ProjectId'));
+    const observedProjectId = normalizeIdentityText(readOwn(identity, 'projectId', 'ProjectId'));
+    if (currentProjectId && requestProjectId && currentProjectId !== requestProjectId) {
+        pushStaleReason(reasons, 'projectId');
+    }
+    if (currentProjectId && observedProjectId && currentProjectId !== observedProjectId) {
+        pushStaleReason(reasons, 'projectId');
+    }
+
+    const requestedFlowRevision = normalizeIdentityNumber(readRequestField(state, 'flowRevision', 'FlowRevision'));
+    const observedFlowRevision = normalizeIdentityNumber(readOwn(identity, 'flowRevision', 'FlowRevision'));
+    const currentFlowRevision = normalizeIdentityNumber(flowRevision);
+    if (currentFlowRevision !== null && requestedFlowRevision !== null && currentFlowRevision !== requestedFlowRevision) {
+        pushStaleReason(reasons, 'flowRevision');
+    }
+    if (currentFlowRevision !== null && observedFlowRevision !== null && currentFlowRevision !== observedFlowRevision) {
+        pushStaleReason(reasons, 'flowRevision');
     }
 
     const currentParameters = liveNode?.parameters || operator?.parameters || [];
     const currentSnapshot = buildPreviewParameterSnapshot(currentParameters);
-    if (state.request.parameterSnapshot &&
+    if (readRequestField(state, 'parameterSnapshot', 'ParameterSnapshot') &&
         currentSnapshot &&
-        state.request.parameterSnapshot !== currentSnapshot) {
-        reasons.push('parameters');
+        readRequestField(state, 'parameterSnapshot', 'ParameterSnapshot') !== currentSnapshot) {
+        pushStaleReason(reasons, 'parameters');
+    }
+
+    const currentInputImageHash = asString(inputImageHash).trim();
+    const requestInputImageHash = asString(readRequestField(state, 'inputImageHash', 'InputImageHash')).trim();
+    if (currentInputImageHash && requestInputImageHash && currentInputImageHash !== requestInputImageHash) {
+        pushStaleReason(reasons, 'inputImageHash');
     }
 
     return {
@@ -804,7 +1052,9 @@ export function buildOperatorResultViewModel(operator, previewState, options = {
             operator,
             liveNode,
             state: previewState,
-            flowRevision: options.flowRevision
+            flowRevision: options.flowRevision,
+            projectId: options.projectId,
+            inputImageHash: options.inputImageHash
         })
         : {
             stale: false,

@@ -1,10 +1,15 @@
 import { test, expect, Page } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
-type PreviewMode = { value: 'success-no-image' | 'success-image' | 'error' };
+type PreviewMode = {
+  value: 'success-no-image' | 'success-image' | 'error' | 'error-diagnostics';
+  delayMs?: number;
+  requests: any[];
+};
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+const STALE_PREVIEW_TEXT = '参数或流程已变更，需重新预览';
 
 const operators = [
   {
@@ -164,7 +169,12 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
 
   await page.route('**/api/flows/preview-node', async route => {
     const request = route.request().postDataJSON();
-    const isError = previewMode.value === 'error';
+    previewMode.requests.push(request);
+    if (previewMode.delayMs) {
+      await new Promise(resolve => setTimeout(resolve, previewMode.delayMs));
+    }
+    const isError = previewMode.value === 'error' || previewMode.value === 'error-diagnostics';
+    const diagnosticsError = previewMode.value === 'error-diagnostics';
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -175,7 +185,15 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
         observation: buildObservation(request, !isError),
         artifacts: [],
         executionTimeMs: isError ? 0 : 24,
-        errorMessage: isError ? '模拟预览失败' : null,
+        errorMessage: diagnosticsError ? 'Parameter validation failed: Threshold invalid' : (isError ? '模拟预览失败' : null),
+        diagnostics: diagnosticsError
+          ? [{ code: 'VAL001', message: '参数超出范围，请检查阈值' }]
+          : [],
+        missingResources: diagnosticsError
+          ? [{ name: 'Template', pathHint: 'C:\\Users\\A\\templates\\part.ncc' }]
+          : [],
+        failedOperatorName: diagnosticsError ? '定位算子' : null,
+        failedOperatorType: diagnosticsError ? 'BlobAnalysis' : null,
       }),
     });
   });
@@ -235,7 +253,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
   let previewMode: PreviewMode;
 
   test.beforeEach(async ({ page }) => {
-    previewMode = { value: 'success-no-image' };
+    previewMode = { value: 'success-no-image', requests: [] };
     await installStudio2Flags(page);
     await installRoutes(page, previewMode);
     await bootAuthenticatedApp(page);
@@ -269,7 +287,78 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(page.locator('.preview-workbench-pane')).toContainText('预览工作台');
     await expect(page.locator('.preview-workbench-pane')).toContainText('端口与耗时');
     await expect(page.locator('.preview-workbench-pane')).toContainText('中间结果');
-    await expect(page.locator('.preview-workbench-pane')).toContainText('暂无输出图像');
+    await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
+  });
+
+  test('shows output image summary and debug image operations in the right workbench', async ({ page }) => {
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+
+    const workbench = page.locator('.preview-workbench-pane');
+    await expect(workbench).toContainText('预览完成');
+    await expect(workbench.locator('.preview-capability-main-image img')).toBeVisible();
+    await expect(workbench).toContainText('端口与耗时');
+    await expect(workbench).toContainText('运行耗时');
+    await expect(workbench).toContainText('Score');
+    await expect(workbench).toContainText('Width');
+    await expect(workbench.locator('[data-preview-action="image-fit"]')).toContainText('适应窗口');
+    await expect(workbench.locator('[data-preview-action="image-original"]')).toContainText('原始大小');
+    await expect(workbench.locator('[data-preview-action="open-image"]')).toContainText('打开大图');
+
+    await workbench.locator('[data-preview-action="image-original"]').click();
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'original');
+    await workbench.locator('[data-preview-action="image-fit"]').click();
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'fit');
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test('marks old preview stale after parameter edit and clears stale after manual preview', async ({ page }) => {
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+    const workbench = page.locator('.preview-workbench-pane');
+    await expect(workbench).toContainText('预览完成');
+
+    await page.evaluate(() => {
+      (window as any).nodePreviewCoordinator.debounceMs = 5000;
+    });
+    previewMode.requests.length = 0;
+
+    await page.locator('.inspector-pane #param-Threshold').fill('180');
+    await page.locator('.inspector-pane #param-Threshold').blur();
+
+    await expect(workbench).toContainText(STALE_PREVIEW_TEXT, { timeout: 1000 });
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-stale', 'true');
+    expect(previewMode.requests).toHaveLength(0);
+
+    previewMode.delayMs = 0;
+    await workbench.locator('[data-preview-action="manual-preview"]').click();
+    await expect(workbench).not.toContainText(STALE_PREVIEW_TEXT);
+    await expect(workbench).toContainText('预览完成');
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-stale', 'false');
+  });
+
+  test('prevents duplicate manual preview while loading and exposes cancel state', async ({ page }) => {
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+    const workbench = page.locator('.preview-workbench-pane');
+    await expect(workbench).toContainText('预览完成');
+
+    previewMode.requests.length = 0;
+    previewMode.delayMs = 600;
+    const manualButton = workbench.locator('[data-preview-action="manual-preview"]');
+    const cancelButton = workbench.locator('[data-preview-action="cancel-preview"]');
+
+    await manualButton.click();
+    await expect(manualButton).toBeDisabled();
+    await expect(manualButton).toContainText('预览中...');
+    await expect(cancelButton).toBeEnabled();
+    await expect.poll(() => previewMode.requests.length).toBe(1);
+
+    await cancelButton.click();
+    await expect(cancelButton).toBeDisabled();
+    await expect(workbench).toContainText('预览已取消');
+    expect(previewMode.requests).toHaveLength(1);
+    previewMode.delayMs = 0;
   });
 
   test('keeps migrated acquisition file picker and writes picked file path back to the node', async ({ page }) => {
@@ -316,12 +405,78 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(page.locator('.preview-workbench-pane')).toContainText('请选择一个算子');
 
     await addNodeFromFlyout(page);
-    await expect(page.locator('.preview-workbench-pane')).toContainText('暂无输出图像');
+    await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
 
     previewMode.value = 'error';
     await page.locator('.preview-workbench-pane [data-preview-action="manual-preview"]').click();
     await expect(page.locator('.preview-workbench-pane')).toContainText('预览失败');
     await expect(page.locator('.preview-workbench-pane')).toContainText('模拟预览失败');
+  });
+
+  test('clears current preview state for connection, blank selection and deleted selected node', async ({ page }) => {
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+    const workbench = page.locator('.preview-workbench-pane');
+    await expect(workbench).toContainText('预览完成');
+    await expect(workbench).toContainText('Score');
+
+    await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      const selected = flowCanvas.nodes.get(flowCanvas.selectedNode);
+      const next = flowCanvas.addNode('GaussianBlur', selected.x + 260, selected.y, {
+        title: '高斯滤波',
+        parameters: [{ name: 'Sigma', value: 1.2 }],
+        inputs: [{ name: 'Image', type: 'Image' }],
+        outputs: [{ name: 'Image', type: 'Image' }],
+      });
+      const connection = flowCanvas.addConnection(selected.id, 0, next.id, 0);
+      flowCanvas.selectedNode = null;
+      flowCanvas.selectedConnection = connection;
+      flowCanvas.markSelectionChanged('test-select-connection');
+      flowCanvas.render();
+    });
+
+    await expect(workbench).toContainText('当前连线');
+    await expect(workbench).toContainText('连线用于传递端口数据');
+    await expect(workbench).not.toContainText('Score');
+
+    await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      flowCanvas.selectedNode = null;
+      flowCanvas.selectedConnection = null;
+      flowCanvas.markSelectionChanged('test-clear-selection');
+      flowCanvas.render();
+    });
+
+    await expect(workbench).toContainText('请选择一个算子');
+    await expect(workbench).not.toContainText('Score');
+
+    await addNodeFromFlyout(page, '阈值分割');
+    await expect(workbench).toContainText('预览完成');
+    await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      flowCanvas.removeNode(flowCanvas.selectedNode);
+    });
+
+    await expect(workbench).toContainText(/节点已删除|请选择一个算子/);
+    await expect(workbench).not.toContainText('Score');
+  });
+
+  test('shows layered Chinese diagnostics for missing resources and failed operator metadata', async ({ page }) => {
+    previewMode.value = 'error-diagnostics';
+    await addNodeFromFlyout(page);
+    const workbench = page.locator('.preview-workbench-pane');
+
+    await expect(workbench).toContainText('预览失败');
+    await expect(workbench).toContainText('参数校验失败');
+    await expect(workbench).toContainText('缺少资源');
+    await expect(workbench).toContainText('失败算子');
+    await expect(workbench).toContainText('定位算子');
+    await expect(workbench).toContainText('VAL001');
+
+    const text = await workbench.textContent();
+    expect(text ?? '').not.toContain('C:\\Users\\A');
+    expect(text ?? '').toContain('[redacted-path]');
   });
 
   test('keeps 1366 and 1920 layouts within viewport and drag-drop coordinates stable', async ({ page }) => {

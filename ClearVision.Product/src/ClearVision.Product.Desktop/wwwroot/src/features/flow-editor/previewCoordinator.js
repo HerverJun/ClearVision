@@ -422,6 +422,10 @@ function hashString(input) {
     return hash.toString(16);
 }
 
+export function buildPreviewInputImageHash(inputImageBase64) {
+    return inputImageBase64 ? hashString(inputImageBase64) : 'none';
+}
+
 function createPresenterState(state) {
     let statusText = '等待预览';
     if (state.status === 'idle' && state.errorMessage) {
@@ -545,6 +549,11 @@ function createEmptyState() {
         outputImageBase64: null,
         outputData: null,
         observation: null,
+        diagnostics: [],
+        missingResources: [],
+        failedOperatorId: null,
+        failedOperatorName: null,
+        failedOperatorType: null,
         artifacts: [],
         previewArtifactIds: [],
         previewArtifactObjectUrls: [],
@@ -565,6 +574,11 @@ function createEmptyState() {
 function withClearedPreviewResources(patch = {}) {
     return {
         observation: null,
+        diagnostics: [],
+        missingResources: [],
+        failedOperatorId: null,
+        failedOperatorName: null,
+        failedOperatorType: null,
         artifacts: [],
         previewArtifactIds: [],
         previewArtifactObjectUrls: [],
@@ -587,7 +601,7 @@ function createPreviewArtifactAbortError(message) {
 }
 
 function buildPreviewRequestKey({ projectId, nodeId, flowRevision, parameterSnapshot, inputImageBase64 }) {
-    const inputImageHash = inputImageBase64 ? hashString(inputImageBase64) : 'none';
+    const inputImageHash = buildPreviewInputImageHash(inputImageBase64);
     return {
         requestKey: `${projectId || 'no-project'}:${nodeId || 'no-node'}:${flowRevision}:${hashString(parameterSnapshot)}:${inputImageHash}`,
         projectId: projectId || null,
@@ -618,6 +632,8 @@ function parsePreviewResponse(response) {
         artifacts: normalizeArtifactReferences(readFirstDefined(response, ['artifacts', 'Artifacts'])),
         executionTimeMs: readFirstDefined(response, ['executionTimeMs', 'ExecutionTimeMs']) ?? null,
         errorMessage: readFirstDefined(response, ['errorMessage', 'ErrorMessage']) || null,
+        diagnostics: readFirstDefined(response, ['diagnostics', 'Diagnostics']) || [],
+        missingResources: readFirstDefined(response, ['missingResources', 'MissingResources']) || [],
         failedOperatorId: readFirstDefined(response, ['failedOperatorId', 'FailedOperatorId']) || null,
         failedOperatorName: readFirstDefined(response, ['failedOperatorName', 'FailedOperatorName']) || null,
         failedOperatorType: readFirstDefined(response, ['failedOperatorType', 'FailedOperatorType']) || null
@@ -889,6 +905,24 @@ export class NodePreviewCoordinator {
         }
     }
 
+    buildReleasedArtifactStatePatch() {
+        const outputImageBase64 = String(this.state?.outputImageBase64 || '').startsWith('blob:')
+            ? null
+            : this.state?.outputImageBase64 ?? null;
+        const inputImageBase64 = String(this.state?.inputImageBase64 || '').startsWith('blob:')
+            ? null
+            : this.state?.inputImageBase64 ?? null;
+
+        return {
+            inputImageBase64,
+            outputImageBase64,
+            artifacts: [],
+            previewArtifactIds: [],
+            previewArtifactObjectUrls: [],
+            previewArtifactReleased: true
+        };
+    }
+
     releaseResponseArtifacts(response) {
         const parsed = parsePreviewResponse(response);
         this.releasePreviewResources({
@@ -1121,12 +1155,13 @@ export class NodePreviewCoordinator {
             projectId: this.getProjectId(),
             node
         });
+        const nodeChanged = previousNodeId !== node.id;
         const scopeChanged = this.activeScopeKey !== nextScopeKey;
-        if (previousNodeId !== node.id || scopeChanged) {
+        if (nodeChanged || scopeChanged) {
             this.releaseArtifactResourcesForNodeSwitch();
         }
 
-        if (previousNodeId !== node.id) {
+        if (nodeChanged) {
             this.debugSessionId = null;
             this.debugSessionScopeKey = null;
         }
@@ -1134,7 +1169,7 @@ export class NodePreviewCoordinator {
 
         const metadata = this.getOperatorMetadata(node.type);
         const previewCost = getOperatorPreviewCostPolicy(node, metadata);
-        if (previousNodeId !== node.id || scopeChanged) {
+        if (nodeChanged) {
             this.updateState({
                 ...createEmptyState(),
                 activeNodeId: node.id,
@@ -1149,7 +1184,9 @@ export class NodePreviewCoordinator {
                 nodeType: node.type,
                 title: node.title || metadata?.displayName || node.type,
                 canvasEligibility: getCanvasPreviewEligibility(node, metadata),
-                previewCost
+                previewCost,
+                ...(scopeChanged ? this.buildReleasedArtifactStatePatch() : {}),
+                staleScopeKey: scopeChanged ? nextScopeKey : undefined
             });
         }
 
@@ -1189,23 +1226,12 @@ export class NodePreviewCoordinator {
             node: scheduledNode
         });
         if (this.activeScopeKey !== scheduledScopeKey) {
-            this.activeScopeKey = scheduledScopeKey;
             this.releaseArtifactResourcesForNodeSwitch();
-            this.updateState(withClearedPreviewResources({
-                status: 'idle',
-                executionTimeMs: null,
-                errorMessage: null,
-                inputImageBase64: null,
-                outputImageBase64: null,
-                outputData: null,
-                request: buildPreviewRequestKey({
-                    projectId: scheduledProjectId,
-                    nodeId: scheduledNode.id,
-                    flowRevision: normalizeFlowRevision(this.getFlowRevision()),
-                    parameterSnapshot: buildParameterSnapshot(scheduledNode.parameters),
-                    inputImageBase64: null
-                })
-            }));
+            this.activeScopeKey = scheduledScopeKey;
+            this.updateState({
+                ...this.buildReleasedArtifactStatePatch(),
+                staleScopeKey: scheduledScopeKey
+            });
         }
 
         const scheduledVersion = ++this.requestVersion;
@@ -1433,6 +1459,11 @@ export class NodePreviewCoordinator {
                     outputImageBase64: resolvedArtifacts.outputImageSrc || parsed.outputImageBase64,
                     outputData: outputDataWithDiagnostics,
                     observation: parsed.observation,
+                    diagnostics: Array.isArray(parsed.diagnostics) ? parsed.diagnostics : [],
+                    missingResources: Array.isArray(parsed.missingResources) ? parsed.missingResources : [],
+                    failedOperatorId: parsed.failedOperatorId,
+                    failedOperatorName: parsed.failedOperatorName,
+                    failedOperatorType: parsed.failedOperatorType,
                     previewCost,
                     artifacts: parsed.artifacts,
                     previewArtifactIds: resolvedArtifacts.previewArtifactIds,

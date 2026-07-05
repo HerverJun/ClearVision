@@ -1481,7 +1481,10 @@ function initializePreviewPanelCapability() {
     previewPanelCapabilityAdapter = createPreviewPanelCapabilityAdapter({
         flowCanvasAdapter,
         previewCoordinator: nodePreviewCoordinator,
-        getOperatorMetadata: type => findOperatorDefinition(type)
+        getOperatorMetadata: type => findOperatorDefinition(type),
+        getProjectId: () => getCurrentProject()?.id || null,
+        getInputImageBase64: () => getLatestInspectionInputImageBase64(),
+        onOpenPreviewImage: openImageViewerFromPreview
     });
     previewPanelCapabilityOwner = new PreviewPanelCapabilityOwner(container, {
         previewAdapter: previewPanelCapabilityAdapter,

@@ -321,6 +321,14 @@ test.describe('Node Preview Overlay', () => {
 
     await page.waitForTimeout(700);
     expect(previewCallCount).toBe(1);
+    const firstRequestSnapshot = await page.evaluate(() => {
+      const request = (window as any).nodePreviewCoordinator.getState().request;
+      return {
+        requestKey: request.requestKey,
+        flowRevision: request.flowRevision,
+        parameterSnapshot: request.parameterSnapshot,
+      };
+    });
 
     const overlayBefore = await page.locator('.node-preview-card').boundingBox();
 
@@ -329,6 +337,17 @@ test.describe('Node Preview Overlay', () => {
 
     await page.waitForTimeout(700);
     expect(previewCallCount).toBe(2);
+    const secondRequestSnapshot = await page.evaluate(() => {
+      const request = (window as any).nodePreviewCoordinator.getState().request;
+      return {
+        requestKey: request.requestKey,
+        flowRevision: request.flowRevision,
+        parameterSnapshot: request.parameterSnapshot,
+      };
+    });
+    expect(secondRequestSnapshot.requestKey).not.toBe(firstRequestSnapshot.requestKey);
+    expect(secondRequestSnapshot.parameterSnapshot).not.toBe(firstRequestSnapshot.parameterSnapshot);
+    expect(secondRequestSnapshot.flowRevision).toBeGreaterThan(firstRequestSnapshot.flowRevision);
 
     const canvas = page.locator('#flow-canvas');
     const box = await canvas.boundingBox();

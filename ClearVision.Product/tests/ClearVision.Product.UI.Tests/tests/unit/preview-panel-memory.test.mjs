@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  buildPreviewInputImageHash,
   buildPreviewParameterSnapshot
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs';
 import {
   MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
+  STALE_PREVIEW_MESSAGE,
   buildOperatorResultViewModel,
   buildSafeJsonPreview
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorResultViewModel.mjs';
@@ -347,7 +349,8 @@ function createPreviewCapabilityHarness(options = {}) {
     setActiveNode: [],
     requestPreview: [],
     cancelPreview: 0,
-    artifactReads: []
+    artifactReads: [],
+    openImages: []
   };
   let previewState = options.previewState ?? {
     ...successState({ activeNodeId: null }),
@@ -439,7 +442,10 @@ function createPreviewCapabilityHarness(options = {}) {
     getOperatorMetadata: () => ({
       displayName: '阈值',
       parameters: [{ name: 'Threshold', value: 10, dataType: 'int' }]
-    })
+    }),
+    getProjectId: () => options.projectId ?? 'project-1',
+    getInputImageBase64: () => options.inputImageBase64 ?? null,
+    onOpenPreviewImage: imageSource => calls.openImages.push(imageSource)
   });
   const container = {
     innerHTML: '',
@@ -472,6 +478,23 @@ function createPreviewCapabilityHarness(options = {}) {
         reason: 'test'
       }));
     }
+  };
+}
+
+function previewActionEvent(action, dataset = {}) {
+  const target = {
+    dataset: {
+      previewAction: action,
+      ...dataset
+    },
+    closest() {
+      return target;
+    }
+  };
+
+  return {
+    target,
+    preventDefault() {}
   };
 }
 
@@ -624,7 +647,7 @@ test('OperatorResultViewModel renders no-selection, no-preview, loading, error, 
     flowRevision: 3
   });
   assert.equal(stale.status, 'stale');
-  assert.equal(stale.stateMessage, '结果已过期，请重新预览');
+  assert.equal(stale.stateMessage, STALE_PREVIEW_MESSAGE);
   assert.deepEqual(stale.staleReasons.sort(), ['flowRevision', 'parameters']);
 
   const disabled = buildOperatorResultViewModel(operator, successState(), {
@@ -633,6 +656,87 @@ test('OperatorResultViewModel renders no-selection, no-preview, loading, error, 
   });
   assert.equal(disabled.status, 'disabled');
   assert.match(disabled.stateMessage, /禁用/);
+});
+
+test('OperatorResultViewModel marks stale project, target node, and input image hash mismatches', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  const state = successState({
+    request: {
+      projectId: 'old-project',
+      nodeId: 'node-2',
+      flowRevision: 3,
+      parameterSnapshot: buildPreviewParameterSnapshot(operator.parameters),
+      inputImageHash: buildPreviewInputImageHash('old-input-image'),
+      requestKey: 'old-project:node-2:3:params:old'
+    },
+    observation: observation({
+      identity: identity({
+        projectId: 'old-project',
+        targetNodeId: 'node-2',
+        flowRevision: 3
+      })
+    })
+  });
+
+  const model = buildOperatorResultViewModel(operator, state, {
+    flowRevision: 3,
+    projectId: 'project-1',
+    inputImageHash: buildPreviewInputImageHash('new-input-image')
+  });
+
+  assert.equal(model.status, 'stale');
+  assert.equal(model.stateMessage, STALE_PREVIEW_MESSAGE);
+  assert.deepEqual(model.staleReasons.sort(), ['inputImageHash', 'projectId', 'targetNodeId']);
+});
+
+test('OperatorResultViewModel normalizes PascalCase diagnostics and redacts local paths', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  const diagnosticObservation = observation();
+  delete diagnosticObservation.diagnostics;
+  diagnosticObservation.Diagnostics = [
+    { Code: 'OBS001', Message: 'Camera input missing' }
+  ];
+  diagnosticObservation.outcome = {
+    success: false,
+    executionTimeMs: 0,
+    ErrorMessage: 'Parameter validation failed',
+    FailedOperatorName: '定位算子',
+    FailedOperatorType: 'BlobAnalysis'
+  };
+  const state = successState({
+    status: 'error',
+    ErrorMessage: 'Preview backend unavailable at C:\\Users\\A\\secret\\runtime.log',
+    Diagnostics: [
+      { Code: 'D001', Message: '模板 C:\\Users\\A\\templates\\part.ncc 缺失' }
+    ],
+    MissingResources: [
+      { Name: 'Template', PathHint: 'C:\\Users\\A\\templates\\part.ncc' }
+    ],
+    FailedOperatorName: '定位算子',
+    FailedOperatorType: 'BlobAnalysis',
+    observation: diagnosticObservation
+  });
+
+  const model = buildOperatorResultViewModel(operator, state, { flowRevision: 3 });
+  const diagnosticText = model.diagnostics.map(item => `${item.code}:${item.message}`).join('\n');
+
+  assert.match(diagnosticText, /预览超时或服务不可用|后端异常/);
+  assert.match(diagnosticText, /缺少资源/);
+  assert.match(diagnosticText, /失败算子/);
+  assert.match(diagnosticText, /D001/);
+  assert.match(diagnosticText, /OBS001/);
+  assert.doesNotMatch(diagnosticText, /C:\\Users\\A/);
+  assert.match(diagnosticText, /\[redacted-path\]/);
 });
 
 test('OperatorResultViewModel summarizes observation outputs, artifacts, scene, diagnostics, and node list', () => {
@@ -954,6 +1058,9 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   });
   assert.match(harness.container.innerHTML, /预览中/);
 
+  owner.requestManualPreview();
+  assert.equal(harness.calls.requestPreview.length, 1);
+
   harness.emitPreview({
     ...successState(),
     presenter: {
@@ -986,6 +1093,75 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   assert.equal(harness.listeners.selection.size, 0);
   assert.equal(harness.listeners.structure.size, 0);
   assert.equal(harness.container.innerHTML, '');
+});
+
+test('PreviewPanelCapabilityOwner shows image operations and routes open image through adapter', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const imageSource = 'data:image/png;base64,TEST_IMAGE';
+
+  harness.emitPreview({
+    ...successState({
+      outputData: { Score: 0.98, Width: 320 },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: imageSource
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /输出图像/);
+  assert.match(harness.container.innerHTML, /适应窗口/);
+  assert.match(harness.container.innerHTML, /原始大小/);
+  assert.match(harness.container.innerHTML, /打开大图/);
+  assert.match(harness.container.innerHTML, /data-image-mode="fit"/);
+
+  owner.handleClick(previewActionEvent('image-original'));
+  assert.match(harness.container.innerHTML, /data-image-mode="original"/);
+
+  owner.handleClick(previewActionEvent('image-fit'));
+  assert.match(harness.container.innerHTML, /data-image-mode="fit"/);
+
+  owner.handleClick(previewActionEvent('open-image', { imageSource }));
+  assert.deepEqual(harness.calls.openImages, [imageSource]);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner marks old preview results stale when input image hash changes', () => {
+  const harness = createPreviewCapabilityHarness({
+    inputImageBase64: 'new-input-image'
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState({
+      request: {
+        projectId: 'project-1',
+        nodeId: 'node-1',
+        flowRevision: 3,
+        parameterSnapshot: buildPreviewParameterSnapshot([{ name: 'Threshold', value: 128 }]),
+        inputImageHash: buildPreviewInputImageHash('old-input-image'),
+        requestKey: 'project-1:node-1:3:params:old-input'
+      },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: 'data:image/png;base64,OLD'
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, new RegExp(STALE_PREVIEW_MESSAGE));
+  assert.match(harness.container.innerHTML, /data-status="stale"/);
+  assert.match(harness.container.innerHTML, /旧输出摘要/);
+
+  owner.dispose();
 });
 
 test('PreviewPanelCapabilityOwner honors auto toggle and clears UI after node deletion', () => {
@@ -1121,9 +1297,17 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(ownerSource, /预览结果/);
   assert.match(ownerSource, /中间结果/);
   assert.match(ownerSource, /端口与耗时/);
+  assert.match(ownerSource, /STALE_PREVIEW_MESSAGE/);
+  assert.match(ownerSource, /适应窗口/);
+  assert.match(ownerSource, /原始大小/);
+  assert.match(ownerSource, /打开大图/);
   assert.doesNotMatch(ownerSource, /\bfetch\s*\(/);
   assert.doesNotMatch(ownerSource, /httpClient/);
   assert.doesNotMatch(ownerSource, /localStorage|IndexedDB|InspectionHistory|Evidence/);
   assert.doesNotMatch(ownerSource, /new ImageCanvas|createElement\('canvas'|document\.createElement\('canvas'/);
+  assert.doesNotMatch(ownerSource, /PropertyPanelCapabilityOwner/);
+  assert.doesNotMatch(ownerSource, /operator-preview-container/);
+  assert.doesNotMatch(appSource, /new PropertyPanelCapabilityOwner\(/);
+  assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\) \{[\s\S]*return !isPropertyPanelCapabilityEnabled\(\) && !isPreviewPanelCapabilityEnabled\(\);[\s\S]*\}/);
   assert.match(propertyPanelSource, /previewResourcesEnabled/);
 });

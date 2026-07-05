@@ -182,8 +182,12 @@
     min-height: clamp(220px, 30vh, 360px);
 }
 
-.preview-workbench-panel .preview-capability-image img {
+.preview-workbench-panel .preview-capability-image-stage {
     height: clamp(220px, 30vh, 360px);
+}
+
+.preview-workbench-panel .preview-capability-image[data-image-mode="fit"] img {
+    height: 100%;
 }
 
 .preview-workbench-panel .preview-capability-placeholder {

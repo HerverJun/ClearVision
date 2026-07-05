@@ -3,6 +3,9 @@ import {
     formatPreviewOutputValue
 } from './previewOutputFormatter.mjs';
 import {
+    buildPreviewInputImageHash
+} from './previewCoordinator.js';
+import {
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES,
     buildOperatorResultViewModel,
@@ -11,7 +14,8 @@ import {
     formatResultArtifactMetadata,
     isTextArtifactForResultPanel,
     normalizeArtifactReference,
-    redactLocalAbsolutePaths
+    redactLocalAbsolutePaths,
+    STALE_PREVIEW_MESSAGE
 } from './operatorResultViewModel.mjs';
 
 export const PREVIEW_PANEL_CAPABILITY_OWNER_ID = 'preview-panel-capability-v2';
@@ -129,7 +133,7 @@ function getStateIdentitySignature(state) {
     ].join('|');
 }
 
-function getStatusLabel(state, belongsToSelectedNode, nodeDeleted) {
+function getStatusLabel(state, belongsToSelectedNode, nodeDeleted, stale = false) {
     if (nodeDeleted) {
         return {
             kind: 'deleted',
@@ -143,6 +147,14 @@ function getStatusLabel(state, belongsToSelectedNode, nodeDeleted) {
             kind: 'idle',
             label: '等待预览',
             message: '请选择一个算子'
+        };
+    }
+
+    if (stale) {
+        return {
+            kind: 'stale',
+            label: '需重新预览',
+            message: STALE_PREVIEW_MESSAGE
         };
     }
 
@@ -196,11 +208,94 @@ function normalizeOperatorTitle(operator, liveNode = null) {
         '未命名算子');
 }
 
+function normalizePortType(value) {
+    if (value === 0 || value === '0') {
+        return 'image';
+    }
+
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function hasImageOutputPort(operator, liveNode = null) {
+    const outputPorts = Array.isArray(operator?.outputPorts) && operator.outputPorts.length > 0
+        ? operator.outputPorts
+        : (Array.isArray(liveNode?.outputs) ? liveNode.outputs : []);
+
+    return outputPorts.some(port => {
+        const type = port?.dataType ?? port?.DataType ?? port?.type ?? port?.Type;
+        return normalizePortType(type) === 'image';
+    });
+}
+
+function nodeUsesExternalInputImage(node) {
+    return node?.type !== 'ImageAcquisition';
+}
+
+function hasDiagnosticCode(model, pattern) {
+    const diagnostics = Array.isArray(model?.diagnostics) ? model.diagnostics : [];
+    return diagnostics.some(item => pattern.test(String(item?.code || item?.source || item?.message || '')));
+}
+
+function getPreviewImageEmptyMessage({
+    nodeDeleted,
+    currentConnection,
+    currentNodeId,
+    belongsToSelectedNode,
+    statusInfo,
+    model,
+    hasImageOutput
+}) {
+    if (nodeDeleted) {
+        return '节点已删除';
+    }
+
+    if (currentConnection) {
+        return '连线不产生图像输出，请选择算子节点';
+    }
+
+    if (!currentNodeId) {
+        return '请选择一个算子';
+    }
+
+    if (!belongsToSelectedNode || !model) {
+        return '尚未运行预览';
+    }
+
+    if (statusInfo.kind === 'stale') {
+        return `结果过期：${STALE_PREVIEW_MESSAGE}`;
+    }
+
+    if (statusInfo.kind === 'loading') {
+        return '预览中...';
+    }
+
+    if (statusInfo.kind === 'error') {
+        if (hasDiagnosticCode(model, /missing-input|missing-resource|input|resource/i)) {
+            return '缺输入图或缺资源，无法生成输出图像';
+        }
+
+        return '预览失败，暂无输出图像';
+    }
+
+    if (statusInfo.kind === 'canceled') {
+        return '预览已取消';
+    }
+
+    if (!hasImageOutput) {
+        return '该算子没有图像输出';
+    }
+
+    return '预览完成，但没有返回图像输出';
+}
+
 export class PreviewPanelCapabilityAdapter {
     constructor({
         flowCanvasAdapter,
         previewCoordinator,
-        getOperatorMetadata = () => null
+        getOperatorMetadata = () => null,
+        getProjectId = () => null,
+        getInputImageBase64 = () => null,
+        onOpenPreviewImage = () => {}
     } = {}) {
         if (!flowCanvasAdapter) {
             throw new Error('PreviewPanelCapabilityAdapter requires a FlowCanvasAdapter.');
@@ -214,6 +309,15 @@ export class PreviewPanelCapabilityAdapter {
         this.getOperatorMetadata = typeof getOperatorMetadata === 'function'
             ? getOperatorMetadata
             : () => null;
+        this.getProjectIdValue = typeof getProjectId === 'function'
+            ? getProjectId
+            : () => null;
+        this.getInputImageBase64 = typeof getInputImageBase64 === 'function'
+            ? getInputImageBase64
+            : () => null;
+        this.onOpenPreviewImage = typeof onOpenPreviewImage === 'function'
+            ? onOpenPreviewImage
+            : () => {};
     }
 
     getSelectedNodeId() {
@@ -341,6 +445,27 @@ export class PreviewPanelCapabilityAdapter {
         return this.flowCanvasAdapter?.getFlowRevision?.() ?? this.flowCanvasAdapter?.getRevision?.() ?? 0;
     }
 
+    getProjectId() {
+        return this.getProjectIdValue?.() ?? null;
+    }
+
+    getInputImageHash(node = this.getNode(this.getSelectedNodeId())) {
+        if (!node || !nodeUsesExternalInputImage(node)) {
+            return buildPreviewInputImageHash(null);
+        }
+
+        const value = this.getInputImageBase64?.();
+        if (value && typeof value.then === 'function') {
+            return null;
+        }
+
+        return buildPreviewInputImageHash(value || null);
+    }
+
+    openPreviewImage(imageSource) {
+        this.onOpenPreviewImage?.(imageSource);
+    }
+
     getNodes() {
         const nodes = this.flowCanvasAdapter?.nodes;
         if (nodes instanceof Map) {
@@ -378,6 +503,9 @@ export class PreviewPanelCapabilityOwner {
         this.nodeDeleted = false;
         this.previewState = this.previewAdapter.getPreviewState();
         this.autoPreviewEnabled = true;
+        this.manualPreviewPending = false;
+        this.previewImageMode = 'fit';
+        this.previewImageSource = this.previewState?.presenter?.outputImageSrc || null;
         this.disposed = false;
         this.unsubscribes = [];
         this.artifactReadAbort = null;
@@ -412,6 +540,7 @@ export class PreviewPanelCapabilityOwner {
             ? null
             : this.previewAdapter.getSelectedConnectionSnapshot?.(state?.selectedConnectionId) || null;
         this.nodeDeleted = false;
+        this.manualPreviewPending = false;
         this.cancelArtifactRead();
         this.artifactReadState.clear();
 
@@ -437,6 +566,7 @@ export class PreviewPanelCapabilityOwner {
             this.nodeDeleted = true;
             this.currentOperator = null;
             this.currentConnection = null;
+            this.manualPreviewPending = false;
             this.previewAdapter.clearActiveNode();
             this.render();
             return;
@@ -453,6 +583,12 @@ export class PreviewPanelCapabilityOwner {
         }
 
         this.previewState = state || null;
+        this.manualPreviewPending = false;
+        const nextImageSource = this.previewState?.presenter?.outputImageSrc || null;
+        if (nextImageSource !== this.previewImageSource) {
+            this.previewImageSource = nextImageSource;
+            this.previewImageMode = 'fit';
+        }
         this.resetArtifactReadsIfIdentityChanged();
         this.render();
     }
@@ -473,6 +609,26 @@ export class PreviewPanelCapabilityOwner {
 
         if (action === 'cancel-preview') {
             this.previewAdapter.cancelPreview();
+            return;
+        }
+
+        if (action === 'image-fit') {
+            this.previewImageMode = 'fit';
+            this.render();
+            return;
+        }
+
+        if (action === 'image-original') {
+            this.previewImageMode = 'original';
+            this.render();
+            return;
+        }
+
+        if (action === 'open-image') {
+            const imageSource = target.dataset.imageSource || this.previewState?.presenter?.outputImageSrc || null;
+            if (imageSource) {
+                this.previewAdapter.openPreviewImage(imageSource);
+            }
             return;
         }
 
@@ -519,7 +675,13 @@ export class PreviewPanelCapabilityOwner {
             return;
         }
 
-        if (!this.previewAdapter.getNode(this.currentNodeId)) {
+        const liveNode = this.previewAdapter.getNode(this.currentNodeId);
+        const resultModel = this.buildResultViewModel(liveNode);
+        if (this.manualPreviewPending || this.isPreviewLoadingForCurrentNode(resultModel)) {
+            return;
+        }
+
+        if (!liveNode) {
             this.nodeDeleted = true;
             this.previewAdapter.clearActiveNode();
             this.render();
@@ -529,6 +691,8 @@ export class PreviewPanelCapabilityOwner {
         this.previewAdapter.setActiveNode(this.currentNodeId, {
             autoPreview: false
         });
+        this.manualPreviewPending = true;
+        this.render();
         this.previewAdapter.requestPreview({
             immediate: true,
             force: true,
@@ -547,6 +711,24 @@ export class PreviewPanelCapabilityOwner {
         this.cancelArtifactRead();
     }
 
+    buildResultViewModel(liveNode = null) {
+        return buildOperatorResultViewModel(this.currentOperator, this.previewState, {
+            liveNode,
+            flowRevision: this.previewAdapter.getFlowRevision(),
+            projectId: this.previewAdapter.getProjectId?.(),
+            inputImageHash: this.previewAdapter.getInputImageHash?.(liveNode),
+            getNodes: () => this.previewAdapter.getNodes()
+        });
+    }
+
+    isPreviewLoadingForCurrentNode(resultModel = null) {
+        return Boolean(
+            this.currentNodeId &&
+            this.previewState?.activeNodeId === this.currentNodeId &&
+            this.previewState?.status === 'loading' &&
+            resultModel?.stale !== true);
+    }
+
     render() {
         if (this.disposed || !this.container) {
             return;
@@ -557,7 +739,12 @@ export class PreviewPanelCapabilityOwner {
             selectedNodeId &&
             this.previewState?.activeNodeId === selectedNodeId);
         const liveNode = selectedNodeId ? this.previewAdapter.getNode(selectedNodeId) : null;
-        const statusInfo = getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted);
+        const resultModel = this.buildResultViewModel(liveNode);
+        const isStale = belongsToSelectedNode && resultModel?.stale === true;
+        const statusInfo = getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted, isStale);
+        const isLoadingForCurrentNode = this.isPreviewLoadingForCurrentNode(resultModel);
+        const manualPreviewDisabled = !selectedNodeId || isLoadingForCurrentNode || this.manualPreviewPending;
+        const manualPreviewLabel = isLoadingForCurrentNode || this.manualPreviewPending ? '预览中...' : '手动预览';
         const title = this.currentConnection
             ? '当前选中连线'
             : this.currentOperator
@@ -583,8 +770,8 @@ export class PreviewPanelCapabilityOwner {
                             <input type="checkbox" data-preview-auto="true" ${this.autoPreviewEnabled ? 'checked' : ''}>
                             <span>自动预览</span>
                         </label>
-                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="manual-preview" ${selectedNodeId ? '' : 'disabled'}>手动预览</button>
-                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="cancel-preview" ${belongsToSelectedNode && this.previewState?.status === 'loading' ? '' : 'disabled'}>取消预览</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="manual-preview" ${manualPreviewDisabled ? 'disabled' : ''}>${escapeHtml(manualPreviewLabel)}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="cancel-preview" ${isLoadingForCurrentNode ? '' : 'disabled'}>取消预览</button>
                     </div>
                 </header>
                 <div class="preview-capability-scroll" data-low-height-scroll="true">
@@ -594,24 +781,50 @@ export class PreviewPanelCapabilityOwner {
                         <div class="preview-capability-current-type">${escapeHtml(type)}</div>
                         <p class="preview-capability-message">${escapeHtml(currentMessage)}</p>
                     </section>
-                    ${this.renderPreviewMedia(belongsToSelectedNode)}
+                    ${this.renderPreviewMedia(belongsToSelectedNode, statusInfo, resultModel, liveNode)}
                     ${this.renderPortsAndTiming(belongsToSelectedNode)}
                     ${this.renderPreviewSummary(belongsToSelectedNode, statusInfo)}
-                    ${this.renderModuleResult(belongsToSelectedNode, liveNode)}
+                    ${this.renderModuleResult(belongsToSelectedNode, resultModel)}
                 </div>
             </section>
         `;
     }
 
-    renderPreviewMedia(belongsToSelectedNode) {
+    renderPreviewMedia(belongsToSelectedNode, statusInfo, model, liveNode) {
         const presenter = belongsToSelectedNode ? (this.previewState?.presenter || {}) : {};
+        const outputImageSrc = presenter.outputImageSrc || null;
+        const hasImage = Boolean(outputImageSrc);
+        const hasImageOutput = hasImageOutputPort(this.currentOperator, liveNode);
+        const emptyMessage = getPreviewImageEmptyMessage({
+            nodeDeleted: this.nodeDeleted,
+            currentConnection: this.currentConnection,
+            currentNodeId: this.currentNodeId,
+            belongsToSelectedNode,
+            statusInfo,
+            model,
+            hasImageOutput
+        });
+        const staleBadge = statusInfo.kind === 'stale'
+            ? `<span class="preview-capability-image-badge">${escapeHtml(STALE_PREVIEW_MESSAGE)}</span>`
+            : '';
+
         return `
             <section class="preview-capability-media preview-capability-media-single">
-                <div class="preview-capability-image preview-capability-main-image">
-                    <div class="preview-capability-image-title">输出图像</div>
-                    ${presenter.outputImageSrc
-                        ? `<img src="${escapeAttribute(presenter.outputImageSrc)}" alt="当前算子输出图像预览">`
-                        : '<div class="preview-capability-placeholder">暂无输出图像 / 该算子无图像输出</div>'}
+                <div class="preview-capability-image preview-capability-main-image" data-image-mode="${escapeAttribute(this.previewImageMode)}" data-stale="${statusInfo.kind === 'stale' ? 'true' : 'false'}">
+                    <div class="preview-capability-image-toolbar">
+                        <span class="preview-capability-image-title">输出图像</span>
+                        <div class="preview-capability-image-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-fit" ${hasImage ? '' : 'disabled'}>适应窗口</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-original" ${hasImage ? '' : 'disabled'}>原始大小</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="open-image" data-image-source="${escapeAttribute(outputImageSrc || '')}" ${hasImage ? '' : 'disabled'}>打开大图</button>
+                        </div>
+                    </div>
+                    <div class="preview-capability-image-stage">
+                        ${hasImage
+                            ? `<img src="${escapeAttribute(outputImageSrc)}" alt="当前算子输出图像预览">`
+                            : `<div class="preview-capability-placeholder">${escapeHtml(emptyMessage)}</div>`}
+                        ${hasImage ? staleBadge : ''}
+                    </div>
                 </div>
             </section>
         `;
@@ -707,6 +920,31 @@ export class PreviewPanelCapabilityOwner {
             `;
         }
 
+        if (statusInfo.kind === 'stale') {
+            const summaryItems = buildPreviewSummaryItems(this.previewState.outputData, {
+                maxItems: 8,
+                stringMaxLength: 64,
+                skipImageLikeValues: true
+            });
+            return `
+                <section class="preview-capability-section" data-preview-section="summary" data-stale="true">
+                    <h5>预览结果</h5>
+                    <div class="preview-capability-empty stale">${escapeHtml(STALE_PREVIEW_MESSAGE)}</div>
+                    ${summaryItems.length > 0
+                        ? `<div class="preview-capability-output-heading">旧输出摘要</div>
+                           <div class="preview-capability-summary">
+                               ${summaryItems.map(item => `
+                                   <div class="preview-capability-summary-row" data-output-kind="${escapeAttribute(item.kind || 'value')}">
+                                       <span>${escapeHtml(item.key)}</span>
+                                       <strong title="${escapeAttribute(item.title || item.value || '')}">${escapeHtml(item.value)}</strong>
+                                   </div>
+                               `).join('')}
+                           </div>`
+                        : ''}
+                </section>
+            `;
+        }
+
         if (statusInfo.kind === 'error') {
             return `
                 <section class="preview-capability-section">
@@ -755,12 +993,7 @@ export class PreviewPanelCapabilityOwner {
         `;
     }
 
-    renderModuleResult(belongsToSelectedNode, liveNode) {
-        const model = buildOperatorResultViewModel(this.currentOperator, this.previewState, {
-            liveNode,
-            flowRevision: this.previewAdapter.getFlowRevision(),
-            getNodes: () => this.previewAdapter.getNodes()
-        });
+    renderModuleResult(belongsToSelectedNode, model) {
         const stateMessage = this.nodeDeleted ? '节点已删除' : model.stateMessage;
         const outputSections = belongsToSelectedNode ? this.renderOutputSections(model) : '';
 
@@ -1049,6 +1282,8 @@ export class PreviewPanelCapabilityOwner {
         this.currentNodeId = null;
         this.currentConnection = null;
         this.previewState = null;
+        this.previewImageSource = null;
+        this.manualPreviewPending = false;
     }
 }
 

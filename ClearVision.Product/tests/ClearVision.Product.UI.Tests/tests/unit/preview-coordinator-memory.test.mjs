@@ -612,8 +612,9 @@ test('NodePreviewCoordinator releases same-node method artifacts before debounce
     assert.deepEqual(revokedUrls.sort(), ['blob:method-scope-1', 'blob:method-scope-2']);
     assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-caliper', 'output-artifact-caliper']);
     assert.equal(coordinator.cache.size, 0);
-    assert.equal(coordinator.getState().status, 'idle');
-    assert.equal(coordinator.getState().outputData, null);
+    assert.equal(coordinator.getState().status, 'success');
+    assert.deepEqual(coordinator.getState().outputData, { score: 1 });
+    assert.equal(coordinator.getState().outputImageBase64, null);
     assert.deepEqual(coordinator.getState().previewArtifactIds, []);
   } finally {
     globalThis.URL.createObjectURL = originalCreateObjectUrl;
