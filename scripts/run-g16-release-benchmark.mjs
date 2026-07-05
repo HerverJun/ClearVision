@@ -8,6 +8,7 @@ import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+const SCREENS_SCHEMA_NOTE = 'array; environment.Screens is canonical and display.Screens mirrors it so historical multi-screen consumers keep a stable contract even when the current probe has one primary display.';
 
 function parseArgs(argv) {
   const options = {
@@ -19,11 +20,16 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--out-dir') {
-      options.outDir = argv[++index] || null;
+      options.outDir = readRequiredValue(argv, arg, index);
+      index += 1;
     } else if (arg === '--iterations') {
-      options.iterations = Number(argv[++index]);
+      options.iterations = parseIntegerArgument(arg, readRequiredValue(argv, arg, index));
+      index += 1;
     } else if (arg === '--warmup') {
-      options.warmup = Number(argv[++index]);
+      options.warmup = parseIntegerArgument(arg, readRequiredValue(argv, arg, index));
+      index += 1;
+    } else {
+      throw new Error(`Unknown argument: ${arg}`);
     }
   }
 
@@ -42,6 +48,28 @@ function parseArgs(argv) {
   return options;
 }
 
+function readRequiredValue(argv, option, index) {
+  if (index + 1 >= argv.length || argv[index + 1].startsWith('--')) {
+    throw new Error(`Missing value for ${option}.`);
+  }
+
+  const value = argv[index + 1];
+  if (!value || !value.trim()) {
+    throw new Error(`Missing value for ${option}.`);
+  }
+
+  return value;
+}
+
+function parseIntegerArgument(option, value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${option} must be an integer.`);
+  }
+
+  return parsed;
+}
+
 function percentile(values, p) {
   if (!values.length) {
     return 0;
@@ -54,6 +82,34 @@ function percentile(values, p) {
 
 function round(value, digits = 3) {
   return Number(value.toFixed(digits));
+}
+
+function normalizeScreen(screen = {}) {
+  return {
+    DeviceName: String(screen.DeviceName ?? screen.deviceName ?? ''),
+    Width: Number(screen.Width ?? screen.width ?? 0),
+    Height: Number(screen.Height ?? screen.height ?? 0),
+    Primary: Boolean(screen.Primary ?? screen.primary ?? false)
+  };
+}
+
+function normalizeScreens(screens) {
+  if (!screens) {
+    return [];
+  }
+
+  return (Array.isArray(screens) ? screens : [screens]).map(normalizeScreen);
+}
+
+function normalizeDisplayMetrics(display) {
+  if (!display || typeof display !== 'object') {
+    return display;
+  }
+
+  return {
+    ...display,
+    Screens: normalizeScreens(display.Screens)
+  };
 }
 
 function createPrimitives(count) {
@@ -192,14 +248,14 @@ async function collectDisplayMetrics() {
   const script = `
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$screens = [System.Windows.Forms.Screen]::AllScreens | ForEach-Object {
+$screens = @([System.Windows.Forms.Screen]::AllScreens | ForEach-Object {
   [pscustomobject]@{
     DeviceName = $_.DeviceName
     Width = $_.Bounds.Width
     Height = $_.Bounds.Height
     Primary = $_.Primary
   }
-}
+})
 $graphics = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero)
 try {
   [pscustomobject]@{
@@ -219,7 +275,7 @@ try {
       windowsHide: true,
       maxBuffer: 1024 * 1024
     });
-    return JSON.parse(stdout);
+    return normalizeDisplayMetrics(JSON.parse(stdout));
   } catch (error) {
     return {
       status: 'NOT_PERFORMED',
@@ -229,6 +285,7 @@ try {
 }
 
 function buildMarkdown(report) {
+  const screens = normalizeScreens(report.environment?.Screens ?? report.display?.Screens);
   const lines = [
     '# G16 Release Benchmark',
     '',
@@ -246,7 +303,8 @@ function buildMarkdown(report) {
     lines.push(
       `- DPI: ${report.display.DpiX}x${report.display.DpiY}`,
       `- Scale percent: ${report.display.ScalePercent}`,
-      `- Screens: ${JSON.stringify(report.display.Screens)}`,
+      `- Screens schema: ${SCREENS_SCHEMA_NOTE}`,
+      `- Screens: ${JSON.stringify(screens)}`,
       ''
     );
   } else {
@@ -280,6 +338,94 @@ function buildMarkdown(report) {
   return `${lines.join('\n')}\n`;
 }
 
+function validateScreensSchema(report) {
+  const displayStatus = report.display?.status || report.display?.Status;
+  const environmentScreens = report.environment?.Screens;
+  if (!Array.isArray(environmentScreens)) {
+    throw new Error('G16 benchmark environment.Screens must be an array.');
+  }
+
+  const displayScreens = report.display?.Screens;
+  if (displayScreens !== undefined && !Array.isArray(displayScreens)) {
+    throw new Error('G16 benchmark display.Screens must be an array when present.');
+  }
+
+  if (displayScreens !== undefined && JSON.stringify(displayScreens) !== JSON.stringify(environmentScreens)) {
+    throw new Error('G16 benchmark display.Screens must mirror environment.Screens.');
+  }
+
+  if (displayStatus === 'PERFORMED' && environmentScreens.length === 0) {
+    throw new Error('G16 benchmark performed display probe must include at least one screen.');
+  }
+
+  for (const [index, screen] of environmentScreens.entries()) {
+    if (!screen || typeof screen !== 'object') {
+      throw new Error(`G16 benchmark environment.Screens[${index}] must be an object.`);
+    }
+
+    if (typeof screen.DeviceName !== 'string' || screen.DeviceName.trim().length === 0) {
+      throw new Error(`G16 benchmark environment.Screens[${index}].DeviceName is required.`);
+    }
+
+    if (!Number.isFinite(screen.Width) || screen.Width <= 0) {
+      throw new Error(`G16 benchmark environment.Screens[${index}].Width must be a positive number.`);
+    }
+
+    if (!Number.isFinite(screen.Height) || screen.Height <= 0) {
+      throw new Error(`G16 benchmark environment.Screens[${index}].Height must be a positive number.`);
+    }
+
+    if (typeof screen.Primary !== 'boolean') {
+      throw new Error(`G16 benchmark environment.Screens[${index}].Primary must be boolean.`);
+    }
+  }
+}
+
+function validateReport(report, options) {
+  const expectedPrimitiveCounts = [300, 1000];
+  if (!Array.isArray(report.scenarios) || report.scenarios.length !== expectedPrimitiveCounts.length) {
+    throw new Error(`Expected ${expectedPrimitiveCounts.length} G16 benchmark scenarios.`);
+  }
+
+  for (const expectedPrimitiveCount of expectedPrimitiveCounts) {
+    const scenario = report.scenarios.find(item => item.primitiveCount === expectedPrimitiveCount);
+    if (!scenario) {
+      throw new Error(`Missing G16 benchmark scenario for primitiveCount=${expectedPrimitiveCount}.`);
+    }
+
+    if (scenario.iterations !== options.iterations) {
+      throw new Error(
+        `G16 benchmark scenario ${expectedPrimitiveCount} iterations mismatch: ` +
+          `${scenario.iterations} !== ${options.iterations}.`
+      );
+    }
+
+    for (const field of [
+      'p95FrameTimeMs',
+      'p95UpdateTimeMs',
+      'averageFrameTimeMs',
+      'maxFrameTimeMs',
+      'previewNotificationsPerSecond',
+      'subscriptionNotificationsPerSecond',
+      'heapDeltaMB'
+    ]) {
+      if (!Number.isFinite(scenario[field])) {
+        throw new Error(`G16 benchmark scenario ${expectedPrimitiveCount} has invalid ${field}.`);
+      }
+    }
+  }
+
+  if (!report.environment?.node || !report.environment?.platform || !report.startedAtUtc) {
+    throw new Error('G16 benchmark report is missing environment or timestamp metadata.');
+  }
+
+  validateScreensSchema(report);
+
+  if (report.dpiResolutionMatrix?.status !== 'NOT_PERFORMED') {
+    throw new Error('G16 benchmark DPI/resolution matrix must remain NOT_PERFORMED unless the matrix is actually executed.');
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const outDir = path.resolve(options.outDir);
@@ -297,6 +443,11 @@ async function main() {
   };
 
   const display = await collectDisplayMetrics();
+  const screens = normalizeScreens(display?.Screens);
+  environment.Screens = screens;
+  if (display && typeof display === 'object') {
+    display.Screens = screens;
+  }
   const scenarios = [];
   for (const primitiveCount of [300, 1000]) {
     const heapBefore = process.memoryUsage().heapUsed;
@@ -320,6 +471,7 @@ async function main() {
       note: 'The script records the current display when available, but does not mutate OS DPI or resolution settings.'
     }
   };
+  validateReport(report, options);
 
   const jsonPath = path.join(outDir, 'G16-benchmark-2026-07-04.json');
   const mdPath = path.join(outDir, 'G16-benchmark-2026-07-04.md');
