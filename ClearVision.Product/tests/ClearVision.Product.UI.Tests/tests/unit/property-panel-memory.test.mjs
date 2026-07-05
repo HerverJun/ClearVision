@@ -465,7 +465,7 @@ test('flow editor layout keeps variables in the toolbar and preview outside Prop
   assert.match(rightSidebar, /预览工作台/);
   assert.doesNotMatch(rightSidebar, /property-sidebar-panel/);
   assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\)/);
-  assert.match(appSource, /previewResourcesEnabled:\s*ownsPreviewSidebar/);
+  assert.match(appSource, /previewResourcesEnabled:\s*!isPreviewPanelCapabilityEnabled\(\)/);
   assert.match(appSource, /previewContainer:\s*ownsPreviewSidebar[\s\S]*document\.getElementById\('preview-panel'\)/);
   assert.match(propertySource, /shouldMountInternalPreviewContainer/);
   assert.match(propertySource, /resetPreviewForNonCanvasSelection/);

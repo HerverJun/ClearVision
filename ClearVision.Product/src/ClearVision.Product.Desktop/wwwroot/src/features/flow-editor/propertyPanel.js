@@ -165,6 +165,10 @@ class PropertyPanel {
     }
 
     isPreviewPanelEnabled() {
+        if (!this.previewResourcesEnabled) {
+            return false;
+        }
+
         return this.previewPanelEnabled !== undefined
             ? this.previewPanelEnabled !== false
             : this.previewResourcesEnabled !== false;
@@ -314,9 +318,10 @@ class PropertyPanel {
         this.inputImageBase64Load = null;
         this.currentOperator = null;
         this.currentConnection = null;
+        const previewContainerHtml = this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : '';
         this.container.innerHTML = `
             <p class="empty-text">未选择算子</p>
-            ${this.shouldMountInternalPreviewContainer() ? '<div id="operator-preview-container"></div>' : ''}
+            ${this.shouldMountInternalPreviewContainer() ? previewContainerHtml : ''}
         `;
         this.initPreviewPanel();
     }
@@ -444,10 +449,12 @@ class PropertyPanel {
             `;
         }
 
+        const previewContainerHtml = this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : '';
+
         html += `
                 ${shouldMountCalibrationDraftWorkbench ? '<div id="calibration-draft-workbench-container"></div>' : ''}
                 ${shouldMountRoiEditor ? '<div id="roi-editor-container"></div>' : ''}
-                ${this.shouldMountInternalPreviewContainer() ? '<div id="operator-preview-container"></div>' : ''}
+                ${this.shouldMountInternalPreviewContainer() ? previewContainerHtml : ''}
             </div>
         `;
         this.container.innerHTML = html;

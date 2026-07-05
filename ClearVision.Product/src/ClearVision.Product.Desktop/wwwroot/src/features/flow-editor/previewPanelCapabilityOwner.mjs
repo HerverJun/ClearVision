@@ -816,7 +816,7 @@ export class PreviewPanelCapabilityOwner {
             : statusInfo.message;
 
         this.container.innerHTML = `
-            <section class="preview-capability-owner" data-owner="${PREVIEW_PANEL_CAPABILITY_OWNER_ID}" data-status="${escapeAttribute(statusInfo.kind)}">
+            <section class="preview-capability-owner" data-owner="${PREVIEW_PANEL_CAPABILITY_OWNER_ID}" data-status="${escapeAttribute(statusInfo.kind)}" aria-label="预览面板">
                 <header class="preview-capability-header">
                     <div class="preview-capability-title-group">
                         <div class="preview-capability-title">预览工作台</div>
@@ -1066,7 +1066,7 @@ export class PreviewPanelCapabilityOwner {
         return `
             <section class="preview-capability-section preview-capability-module-result" data-result-status="${escapeAttribute(this.nodeDeleted ? 'deleted' : model.status)}">
                 <div class="preview-capability-section-header">
-                    <h5>中间结果</h5>
+                    <h5>模块结果</h5>
                     <span>${escapeHtml(this.nodeDeleted ? '节点已删除' : model.statusText)}</span>
                 </div>
                 <div class="preview-capability-empty">${escapeHtml(stateMessage)}</div>

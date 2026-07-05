@@ -140,17 +140,21 @@ test('all backend operator parameter types are covered by migrated Inspector con
   assert.match(panelSource, /case 'cameraBinding':[\s\S]*data-camera-binding-select="true"/);
 });
 
-test('app composition root uses legacy PropertyPanel in the Studio2 Inspector shell', () => {
+test('app composition root uses PropertyPanelCapabilityOwner with legacy PropertyPanel fallback', () => {
   const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
 
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2\.PropertyPanel'/);
   assert.match(appSource, /const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce\(\);/);
-  assert.match(appSource, /propertyPanelOwner = await createLegacyPropertyPanelOwner\(\);/);
+  assert.match(appSource, /function createPropertyPanelCapabilityOwner\(\)/);
+  assert.match(appSource, /isPropertyPanelCapabilityEnabled\(\)[\s\S]*\? createPropertyPanelCapabilityOwner\(\)/);
+  assert.match(appSource, /if \(!propertyPanelOwner\) \{[\s\S]*propertyPanelOwner = await createLegacyPropertyPanelOwner\(\);[\s\S]*\}/);
   assert.equal((appSource.match(/new PropertyPanel\('property-panel'/g) || []).length, 1);
-  assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 0);
-  assert.doesNotMatch(appSource, /propertyPanelCapabilityOwner\.mjs/);
+  assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 1);
+  assert.match(appSource, /propertyPanelCapabilityOwner\.mjs/);
+  assert.match(appSource, /serviceRegistry\.register\('propertyPanelCapabilityOwner'/);
   assert.match(appSource, /createPropertyPanelCapabilityAdapter/);
   assert.match(appSource, /previewPanelEnabled:\s*ownsPreviewSidebar/);
+  assert.match(appSource, /previewResourcesEnabled:\s*!isPreviewPanelCapabilityEnabled\(\)/);
   assert.match(appSource, /auxiliaryWorkbenchesEnabled/);
   assert.match(appSource, /panel\.setConnection/);
   assert.doesNotMatch(appSource, /import\s+\{\s*PropertyPanel\s*\}\s+from\s+'\.\/features\/flow-editor\/propertyPanel\.js'/);

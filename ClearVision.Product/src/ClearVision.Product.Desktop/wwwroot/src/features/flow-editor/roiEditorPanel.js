@@ -5,6 +5,28 @@ import {
     getOperatorRoiConfig
 } from './roiEditorSupport.mjs';
 
+function comparableGeometryValue(value) {
+    if (Array.isArray(value)) {
+        return value.map(item => comparableGeometryValue(item));
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.keys(value)
+            .sort()
+            .reduce((result, key) => {
+                result[key] = comparableGeometryValue(value[key]);
+                return result;
+            }, {});
+    }
+
+    return Number.isFinite(value) ? Number(value) : value;
+}
+
+function sameGeometryValue(left, right) {
+    return JSON.stringify(comparableGeometryValue(left || null)) ===
+        JSON.stringify(comparableGeometryValue(right || null));
+}
+
 export class RoiEditorPanel {
     constructor(container, options = {}) {
         this.container = container;
@@ -104,7 +126,7 @@ export class RoiEditorPanel {
         this.onRectChanged(geometryToParams(rect, this.currentConfig), phase);
     }
 
-    syncOverlayFromOperator() {
+    syncOverlayFromOperator(options = {}) {
         if (!this.imageCanvas || !this.hasEditableImage()) {
             return;
         }
@@ -123,6 +145,12 @@ export class RoiEditorPanel {
         if (!geometry) {
             this.imageCanvas.clearEditableRectangle();
             this.currentGeometry = null;
+            return;
+        }
+
+        const overlay = this.imageCanvas.getPrimaryEditableOverlay?.() || null;
+        if (overlay && options.resetDraft !== true && sameGeometryValue(this.currentGeometry, geometry)) {
+            this.currentGeometry = geometry;
             return;
         }
 
@@ -224,7 +252,9 @@ export class RoiEditorPanel {
             return;
         }
 
-        this.syncOverlayFromOperator();
+        this.syncOverlayFromOperator({
+            resetDraft: imageChanged || forceSyncOverlay
+        });
     }
 
     publishImageBounds(bounds = undefined) {

@@ -1071,7 +1071,7 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   });
   assert.match(harness.container.innerHTML, /预览完成/);
   assert.match(harness.container.innerHTML, /预览结果/);
-  assert.match(harness.container.innerHTML, /中间结果/);
+  assert.match(harness.container.innerHTML, /模块结果/);
 
   harness.emitPreview({
     ...successState(),
@@ -1316,7 +1316,7 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(appSource, /function shouldHideUnownedSidebarPreviewHost\(\)/);
   assert.match(appSource, /if \(shouldHideUnownedSidebarPreviewHost\(\)\) \{[\s\S]*hostPanel\?\.classList\.add\('hidden'\)/);
   assert.match(appSource, /if \(!shouldPreviewPanelCapabilityOwnSidebarPreview\(\)\) \{[\s\S]*hostPanel\?\.classList\.remove\('hidden'\)/);
-  assert.match(appSource, /previewResourcesEnabled: ownsPreviewSidebar/);
+  assert.match(appSource, /previewResourcesEnabled:\s*!isPreviewPanelCapabilityEnabled\(\)/);
   assert.equal((appSource.match(/new PreviewPanelCapabilityOwner\(/g) || []).length, 1);
   assert.equal((appSource.match(/new NodePreviewCoordinator\(/g) || []).length, 1);
   assert.doesNotMatch(appSource, /import\s+NodePreviewOverlay\s+from\s+'\.\/features\/flow-editor\/nodePreviewOverlay\.js'/);
@@ -1343,7 +1343,7 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(ownerSource, /预览已取消/);
   assert.match(ownerSource, /节点已删除/);
   assert.match(ownerSource, /预览结果/);
-  assert.match(ownerSource, /中间结果/);
+  assert.match(ownerSource, /模块结果/);
   assert.match(ownerSource, /端口与耗时/);
   assert.match(ownerSource, /STALE_PREVIEW_MESSAGE/);
   assert.match(ownerSource, /适应窗口/);
@@ -1355,7 +1355,7 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.doesNotMatch(ownerSource, /new ImageCanvas|createElement\('canvas'|document\.createElement\('canvas'/);
   assert.doesNotMatch(ownerSource, /PropertyPanelCapabilityOwner/);
   assert.doesNotMatch(ownerSource, /operator-preview-container/);
-  assert.doesNotMatch(appSource, /new PropertyPanelCapabilityOwner\(/);
+  assert.equal((appSource.match(/new PropertyPanelCapabilityOwner\(/g) || []).length, 1);
   assert.match(appSource, /function shouldLegacyPropertyPanelOwnSidebarPreview\(\) \{[\s\S]*return !isPropertyPanelCapabilityEnabled\(\) && !isPreviewPanelCapabilityEnabled\(\);[\s\S]*\}/);
   assert.match(propertyPanelSource, /previewResourcesEnabled/);
 });

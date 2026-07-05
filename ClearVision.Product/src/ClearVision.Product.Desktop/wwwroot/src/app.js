@@ -86,6 +86,7 @@ import {
 import PropertySidebarController, {
     createPropertyPanelCapabilityAdapter
 } from './features/flow-editor/propertySidebarController.mjs';
+import PropertyPanelCapabilityOwner from './features/flow-editor/propertyPanelCapabilityOwner.mjs';
 import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
 import PreviewPanelCapabilityOwner, {
     createPreviewPanelCapabilityAdapter
@@ -1499,6 +1500,7 @@ function initializePreviewPanelCapability() {
 
 function disposePropertyPanelOwner() {
     const owner = propertyPanelOwner || propertyPanel;
+    const capabilityOwner = propertyPanelOwner?.panel || null;
     if (owner) {
         if (typeof owner.dispose === 'function') {
             owner.dispose();
@@ -1507,7 +1509,7 @@ function disposePropertyPanelOwner() {
         }
     }
 
-    serviceRegistry.unregister('propertyPanelCapabilityOwner', propertyPanelOwner);
+    serviceRegistry.unregister('propertyPanelCapabilityOwner', capabilityOwner);
     serviceRegistry.unregister('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
     serviceRegistry.unregister('propertyPanel', propertyPanel);
     propertyPanelOwner = null;
@@ -1525,11 +1527,11 @@ async function createLegacyPropertyPanelOwner() {
             getOperatorMetadata: type => findOperatorDefinition(type)
         })
         : null;
-    const auxiliaryWorkbenchesEnabled = true;
+    const auxiliaryWorkbenchesEnabled = !isPreviewPanelCapabilityEnabled();
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
-        previewResourcesEnabled: ownsPreviewSidebar || auxiliaryWorkbenchesEnabled,
+        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled(),
         previewPanelEnabled: ownsPreviewSidebar,
         auxiliaryWorkbenchesEnabled,
         previewContainer: ownsPreviewSidebar
@@ -1615,6 +1617,34 @@ async function createLegacyPropertyPanelOwner() {
     };
 }
 
+function createPropertyPanelCapabilityOwner() {
+    const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+    propertyPanelCapabilityAdapter = flowCanvasAdapter
+        ? createPropertyPanelCapabilityAdapter({
+            flowCanvasAdapter,
+            getOperatorMetadata: type => findOperatorDefinition(type)
+        })
+        : null;
+
+    if (!propertyPanelCapabilityAdapter) {
+        debugLogger.warn('[App] Property Panel capability adapter not available; falling back to legacy owner');
+        return null;
+    }
+
+    const owner = new PropertyPanelCapabilityOwner('property-panel', {
+        propertyAdapter: propertyPanelCapabilityAdapter,
+        showToast
+    });
+
+    return {
+        kind: 'property-panel-capability',
+        panel: owner,
+        dispose() {
+            owner.dispose?.();
+        }
+    };
+}
+
 async function initializePropertyPanel() {
     const container = document.getElementById('property-panel');
     if (!container) {
@@ -1624,11 +1654,20 @@ async function initializePropertyPanel() {
 
     disposePropertyPanelOwner();
 
-    propertyPanelOwner = await createLegacyPropertyPanelOwner();
+    propertyPanelOwner = isPropertyPanelCapabilityEnabled()
+        ? createPropertyPanelCapabilityOwner()
+        : null;
+    if (!propertyPanelOwner) {
+        propertyPanelOwner = await createLegacyPropertyPanelOwner();
+    }
     propertyPanel = propertyPanelOwner.panel;
 
     if (propertyPanelCapabilityAdapter) {
         serviceRegistry.register('propertyPanelCapabilityAdapter', propertyPanelCapabilityAdapter);
+    }
+
+    if (isPropertyPanelCapabilityEnabled()) {
+        serviceRegistry.register('propertyPanelCapabilityOwner', propertyPanelOwner.panel);
     }
 
     serviceRegistry.register('propertyPanel', propertyPanel);
