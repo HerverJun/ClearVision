@@ -89,8 +89,7 @@ export class PreviewPanel {
         this.unsubscribeStructure = null;
         this.analysisResult = null;
         this.artifactReadState.clear();
-        this._setImage('before', null);
-        this._setImage('after', null);
+        this._setOutputImage(null);
     }
 
     render() {
@@ -129,17 +128,15 @@ export class PreviewPanel {
                 </header>
 
                 <div class="operator-preview-body" id="operator-preview-body">
-                    <div class="operator-preview-images">
-                        <div class="operator-preview-image-card">
-                            <div class="title">输入</div>
-                            <img id="preview-before-image" alt="输入图像预览" data-role="preview-before-image" />
-                            <div class="placeholder" id="preview-before-placeholder">暂无输入图像</div>
+                    <div class="operator-preview-main-image" data-role="preview-main-image-container">
+                        <div class="operator-preview-image-toolbar">
+                            <span class="title">输出图像</span>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-preview-open-output" disabled>
+                                打开大图
+                            </button>
                         </div>
-                        <div class="operator-preview-image-card">
-                            <div class="title">输出</div>
-                            <img id="preview-after-image" alt="输出图像预览" data-role="preview-after-image" />
-                            <div class="placeholder" id="preview-after-placeholder">尚未执行预览</div>
-                        </div>
+                        <img id="preview-output-image" alt="当前算子输出图像预览" data-role="preview-output-image" />
+                        <div class="placeholder" id="preview-output-placeholder">暂无输出图像 / 该算子无图像输出</div>
                     </div>
 
                     <div class="operator-preview-meta">
@@ -180,13 +177,20 @@ export class PreviewPanel {
             this._handleAutoTune();
         });
 
-        this.container.querySelectorAll('[data-role="preview-before-image"], [data-role="preview-after-image"]').forEach(image => {
-            image.addEventListener('click', event => {
-                const source = event.currentTarget.getAttribute('src');
-                if (source) {
-                    this.onOpenImage(source);
-                }
-            });
+        const outputImage = this.container.querySelector('[data-role="preview-output-image"]');
+        outputImage?.addEventListener('click', event => {
+            const source = event.currentTarget.getAttribute('src');
+            if (source) {
+                this.onOpenImage(source);
+            }
+        });
+
+        const openOutputBtn = this.container.querySelector('#btn-preview-open-output');
+        openOutputBtn?.addEventListener('click', () => {
+            const source = this.container?.querySelector('[data-role="preview-output-image"]')?.getAttribute('src');
+            if (source) {
+                this.onOpenImage(source);
+            }
         });
 
         this._bindResultPanelEvents();
@@ -238,8 +242,7 @@ export class PreviewPanel {
         const operator = this.getOperator();
         if (!operator || !this.state || this.state.activeNodeId !== operator.id) {
             this._setStatus(operator ? '该算子暂无预览结果' : '请选择一个算子节点查看模块结果');
-            this._setImage('before', null);
-            this._setImage('after', null);
+            this._setOutputImage(null, operator ? '暂无输出图像 / 该算子无图像输出' : '请选择一个算子');
             this._renderOutputs(null);
             this._renderOperatorResultPanel();
             return;
@@ -247,8 +250,7 @@ export class PreviewPanel {
 
         if (this._isCurrentOperatorDisabled()) {
             this._setStatus('节点已禁用');
-            this._setImage('before', this.state.presenter?.inputImageSrc || null);
-            this._setImage('after', this.state.presenter?.outputImageSrc || null);
+            this._setOutputImage(this.state.presenter?.outputImageSrc || null);
             this._renderOutputs(this.state.outputData);
             this._renderOperatorResultPanel();
             return;
@@ -263,8 +265,7 @@ export class PreviewPanel {
                 ? (this.isAutoTuning ? '线序自动调参已完成' : '线序分析已完成')
                 : (analysisResult.errorMessage || '线序分析未完成');
             this._setStatus(statusText);
-            this._setImage('before', analysisResult.inputImageSrc || this.state.presenter.inputImageSrc);
-            this._setImage('after', analysisResult.previewImageSrc || this.state.presenter.outputImageSrc);
+            this._setOutputImage(analysisResult.previewImageSrc || this.state.presenter.outputImageSrc || null);
             this._renderOutputs(analysisResult.outputs || this.state.outputData);
             this._renderOperatorResultPanel();
             return;
@@ -273,8 +274,7 @@ export class PreviewPanel {
         const presenter = this.state.presenter;
         const resultViewModel = this._buildResultViewModel();
         this._setStatus(resultViewModel?.stale ? '结果已过期，请重新预览' : presenter.statusText);
-        this._setImage('before', presenter.inputImageSrc);
-        this._setImage('after', presenter.outputImageSrc);
+        this._setOutputImage(presenter.outputImageSrc || null);
         this._renderOutputs(this.state.status === 'loading' ? null : this.state.outputData);
         this._renderOperatorResultPanel(resultViewModel);
     }
@@ -287,11 +287,15 @@ export class PreviewPanel {
     }
 
     _setImage(type, imageSource) {
-        const isBefore = type === 'before';
-        const image = this.container?.querySelector(isBefore ? '#preview-before-image' : '#preview-after-image');
-        const placeholder = this.container?.querySelector(
-            isBefore ? '#preview-before-placeholder' : '#preview-after-placeholder'
-        );
+        if (type === 'after' || type === 'output') {
+            this._setOutputImage(imageSource);
+        }
+    }
+
+    _setOutputImage(imageSource, placeholderText = '暂无输出图像 / 该算子无图像输出') {
+        const image = this.container?.querySelector('#preview-output-image');
+        const placeholder = this.container?.querySelector('#preview-output-placeholder');
+        const openButton = this.container?.querySelector('#btn-preview-open-output');
 
         if (!image || !placeholder) {
             return;
@@ -301,6 +305,10 @@ export class PreviewPanel {
             image.removeAttribute('src');
             image.style.display = 'none';
             placeholder.style.display = 'flex';
+            placeholder.textContent = placeholderText;
+            if (openButton) {
+                openButton.disabled = true;
+            }
             return;
         }
 
@@ -309,6 +317,9 @@ export class PreviewPanel {
         }
         image.style.display = 'block';
         placeholder.style.display = 'none';
+        if (openButton) {
+            openButton.disabled = false;
+        }
     }
 
     _renderOutputs(outputs) {

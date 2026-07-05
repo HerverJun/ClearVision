@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 globalThis.window = globalThis.window || {};
 
@@ -15,6 +16,127 @@ function createDeferred() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function readRepoText(relativeUrl) {
+  return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
+}
+
+class PreviewHostFakeElement {
+  constructor(id = '') {
+    this.id = id;
+    this._innerHTML = '';
+    this.textContent = '';
+    this.style = {};
+    this.disabled = false;
+    this.attributes = new Map();
+    this.listeners = new Map();
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = String(value ?? '');
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set src(value) {
+    this.setAttribute('src', value);
+  }
+
+  get src() {
+    return this.getAttribute('src') || '';
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(String(name), String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(String(name)) ?? null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(String(name));
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
+    this.listeners.get(type).push(listener);
+  }
+
+  querySelectorAll() {
+    return [];
+  }
+}
+
+class PreviewHostFakeContainer extends PreviewHostFakeElement {
+  constructor(id = 'container') {
+    super(id);
+    this.elementsById = new Map();
+    this.elementsByRole = new Map();
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = String(value ?? '');
+    this.elementsById = new Map();
+    this.elementsByRole = new Map();
+
+    const ids = Array.from(this._innerHTML.matchAll(/id="([^"]+)"/g)).map(match => match[1]);
+    ids.forEach(id => {
+      const element = new PreviewHostFakeElement(id);
+      if (id === 'btn-preview-open-output') {
+        element.disabled = true;
+      }
+      this.elementsById.set(id, element);
+    });
+
+    const outputImage = this.elementsById.get('preview-output-image');
+    if (outputImage) {
+      this.elementsByRole.set('preview-output-image', outputImage);
+    }
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  querySelector(selector) {
+    const idMatch = String(selector).match(/^#(.+)$/);
+    if (idMatch) {
+      return this.elementsById.get(idMatch[1]) || null;
+    }
+
+    const roleMatch = String(selector).match(/^\[data-role="([^"]+)"\]$/);
+    if (roleMatch) {
+      return this.elementsByRole.get(roleMatch[1]) || null;
+    }
+
+    return null;
+  }
+}
+
+function createPreviewCoordinatorHarness(initialState) {
+  const listeners = new Set();
+  let state = initialState;
+  let previewRequests = 0;
+
+  return {
+    getState: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      listener(state);
+      return () => listeners.delete(listener);
+    },
+    requestActivePreview() {
+      previewRequests += 1;
+    },
+    listenerCount: () => listeners.size,
+    previewRequestCount: () => previewRequests
+  };
 }
 
 function createPanelWithImageLoader(loader) {
@@ -166,6 +288,89 @@ test('PropertyPanel preview resource opt-out destroys legacy PreviewPanel and RO
   assert.deepEqual(destroyed, ['preview', 'roi']);
   assert.equal(panel.previewPanel, null);
   assert.equal(panel.roiEditorPanel, null);
+});
+
+test('PropertyPanel reuses an external PreviewPanel host without duplicate subscriptions', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  const previewCoordinator = createPreviewCoordinatorHarness({
+    activeNodeId: 'node-1',
+    nodeType: 'Thresholding',
+    title: 'Threshold',
+    status: 'idle',
+    presenter: {
+      statusText: '等待预览',
+      inputImageSrc: null,
+      outputImageSrc: null
+    },
+    outputData: {},
+    request: {
+      projectId: 'project-1',
+      nodeId: 'node-1',
+      flowRevision: 3,
+      parameterSnapshot: [],
+      requestKey: 'request-1'
+    }
+  });
+  const propertyContainer = new PreviewHostFakeContainer('property-root');
+  const previewContainer = new PreviewHostFakeContainer('preview-root');
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    container: propertyContainer,
+    previewContainer,
+    previewResourcesEnabled: true,
+    previewPanel: null,
+    roiEditorPanel: null,
+    calibrationDraftWorkbench: null,
+    currentOperator: operator,
+    previewCoordinator,
+    onOpenPreviewImage() {},
+    validateCurrentOperator() {
+      return true;
+    }
+  });
+
+  PropertyPanel.prototype.initPreviewPanel.call(panel);
+  const firstPreviewPanel = panel.previewPanel;
+
+  assert.ok(firstPreviewPanel);
+  assert.equal(previewCoordinator.listenerCount(), 1);
+  assert.equal((previewContainer.innerHTML.match(/data-role="preview-output-image"/g) || []).length, 1);
+
+  PropertyPanel.prototype.initPreviewPanel.call(panel);
+
+  assert.equal(panel.previewPanel, firstPreviewPanel);
+  assert.equal(previewCoordinator.listenerCount(), 1);
+
+  PropertyPanel.prototype.clear.call(panel);
+
+  assert.equal(panel.previewPanel, firstPreviewPanel);
+  assert.equal(previewCoordinator.listenerCount(), 1);
+  assert.equal((previewContainer.innerHTML.match(/data-role="preview-output-image"/g) || []).length, 1);
+
+  PropertyPanel.prototype.destroy.call(panel);
+  assert.equal(previewCoordinator.listenerCount(), 0);
+  assert.match(previewContainer.innerHTML, /请选择一个算子/);
+});
+
+test('flow editor layout keeps variables in the toolbar and preview outside PropertyPanel', () => {
+  const indexSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/index.html');
+  const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
+  const propertySource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
+  const rightSidebar = indexSource.match(/<aside class="sidebar right"[\s\S]*?<\/aside>/)?.[0] || '';
+
+  assert.match(indexSource, /class="toolbar-global-variable-host"[\s\S]*id="global-variable-panel"/);
+  assert.match(indexSource, /未打开工程/);
+  assert.doesNotMatch(rightSidebar, /panel-title">全局变量/);
+  assert.match(rightSidebar, /preview-sidebar-panel/);
+  assert.match(rightSidebar, /property-sidebar-panel/);
+  assert.match(appSource, /previewContainer:\s*isPreviewPanelCapabilityEnabled\(\)[\s\S]*document\.getElementById\('preview-panel'\)/);
+  assert.match(propertySource, /shouldMountInternalPreviewContainer/);
+  assert.match(propertySource, /this\.previewPanel\?\.container === container/);
 });
 
 test('PropertyPanel gates CircleMeasurement parameters by Method without deleting hidden values', () => {

@@ -57,6 +57,7 @@ body {
     align-items: center;
     gap: 32px;
     height: 100%;
+    min-width: 0;
 }
 
 /* Logo - Understated elegance */
@@ -79,6 +80,7 @@ body {
     gap: 28px;
     height: 100%;
     align-items: center;
+    min-width: 0;
 }
 
 .nav-btn {
@@ -95,6 +97,7 @@ body {
     font-size: var(--font-size-sm);
     letter-spacing: 0.02em;
     transition: color var(--duration-fast);
+    white-space: nowrap;
 }
 
 .nav-btn:hover {
@@ -122,6 +125,8 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 /* ==========================================================================
@@ -158,6 +163,71 @@ body {
     width: var(--right-sidebar-width);
     flex-basis: var(--right-sidebar-width);
     animation-delay: 0.12s;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sidebar.right .panel {
+    min-height: 0;
+}
+
+.sidebar.right .preview-sidebar-panel {
+    flex: 0 1 clamp(430px, 58%, 560px);
+    min-height: 400px;
+    max-height: min(62vh, 600px);
+}
+
+.sidebar.right .property-sidebar-panel {
+    flex: 1 1 0;
+    min-height: 180px;
+}
+
+.preview-sidebar-panel .preview-panel-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+}
+
+.property-sidebar-panel .property-panel {
+    min-height: 0;
+}
+
+@media (max-height: 760px) {
+    .sidebar.right .preview-sidebar-panel {
+        flex-basis: 260px;
+        min-height: 220px;
+    }
+
+    .sidebar.right .property-sidebar-panel {
+        min-height: 160px;
+    }
+}
+
+@media (max-height: 640px) {
+    .sidebar.right .preview-sidebar-panel {
+        flex-basis: 220px;
+        min-height: 190px;
+    }
+
+    .sidebar.right .property-sidebar-panel {
+        min-height: 140px;
+    }
+}
+
+@media (max-width: 1120px) {
+    .toolbar {
+        padding: 0 12px;
+    }
+
+    .toolbar-left {
+        gap: 18px;
+    }
+
+    .main-nav {
+        gap: 16px;
+    }
 }
 
 .sidebar-resizer {

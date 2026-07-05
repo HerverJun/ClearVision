@@ -565,18 +565,12 @@ export class PreviewPanelCapabilityOwner {
     renderPreviewMedia(belongsToSelectedNode) {
         const presenter = belongsToSelectedNode ? (this.previewState?.presenter || {}) : {};
         return `
-            <section class="preview-capability-media">
-                <div class="preview-capability-image">
-                    <div class="preview-capability-image-title">输入</div>
-                    ${presenter.inputImageSrc
-                        ? `<img src="${escapeAttribute(presenter.inputImageSrc)}" alt="输入图像预览">`
-                        : '<div class="preview-capability-placeholder">暂无输入图像</div>'}
-                </div>
-                <div class="preview-capability-image">
-                    <div class="preview-capability-image-title">输出</div>
+            <section class="preview-capability-media preview-capability-media-single">
+                <div class="preview-capability-image preview-capability-main-image">
+                    <div class="preview-capability-image-title">输出图像</div>
                     ${presenter.outputImageSrc
-                        ? `<img src="${escapeAttribute(presenter.outputImageSrc)}" alt="输出图像预览">`
-                        : '<div class="preview-capability-placeholder">暂无输出图像</div>'}
+                        ? `<img src="${escapeAttribute(presenter.outputImageSrc)}" alt="当前算子输出图像预览">`
+                        : '<div class="preview-capability-placeholder">暂无输出图像 / 该算子无图像输出</div>'}
                 </div>
             </section>
         `;

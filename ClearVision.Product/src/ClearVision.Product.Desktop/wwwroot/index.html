@@ -132,6 +132,21 @@
                         </svg>
                         <span>运行</span>
                     </button>
+                    <div
+                        class="toolbar-global-variable-host"
+                        id="global-variable-panel"
+                        aria-live="polite"
+                    >
+                        <section class="global-variable-entry">
+                            <div class="global-variable-entry-summary">
+                                <strong>变量</strong>
+                                <span>未打开工程</span>
+                            </div>
+                            <button type="button" class="btn btn-secondary" disabled>
+                                管理
+                            </button>
+                        </section>
+                    </div>
                     <div class="toolbar-divider"></div>
                     <button
                         id="btn-theme-toggle"
@@ -723,22 +738,16 @@
                     tabindex="-1"
                 ></div>
                 <aside class="sidebar right" data-sidebar="property">
-                    <div class="panel">
-                        <h3 class="panel-title">全局变量</h3>
-                        <div class="global-variable-panel-host" id="global-variable-panel">
-                            <p class="empty-text">未打开工程</p>
-                        </div>
-                    </div>
-                    <div class="panel hidden" id="preview-panel-host-panel" data-preview-panel-host>
-                        <h3 class="panel-title">预览面板</h3>
+                    <div class="panel preview-sidebar-panel" id="preview-panel-host-panel" data-preview-panel-host>
+                        <h3 class="panel-title">预览</h3>
                         <div class="preview-panel-host" id="preview-panel">
                             <p class="empty-text">请选择一个算子</p>
                         </div>
                     </div>
-                    <div class="panel">
+                    <div class="panel property-sidebar-panel">
                         <h3 class="panel-title">属性</h3>
                         <div class="property-panel" id="property-panel">
-                            <p class="empty-text">选择一个算子查看属性</p>
+                            <p class="empty-text">未选择算子</p>
                         </div>
                     </div>
                 </aside>

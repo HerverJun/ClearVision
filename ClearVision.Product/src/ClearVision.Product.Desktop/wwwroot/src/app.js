@@ -1288,8 +1288,7 @@ function initializePreviewPanelCapability() {
     disposePreviewPanelCapabilityOwner();
 
     if (!isPreviewPanelCapabilityEnabled()) {
-        hostPanel?.classList.add('hidden');
-        container.innerHTML = '';
+        hostPanel?.classList.remove('hidden');
         return;
     }
 
@@ -1333,7 +1332,10 @@ async function createLegacyPropertyPanelOwner() {
     const panel = new PropertyPanel('property-panel', {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview,
-        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled()
+        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled(),
+        previewContainer: isPreviewPanelCapabilityEnabled()
+            ? null
+            : document.getElementById('preview-panel')
     });
     let disposed = false;
 

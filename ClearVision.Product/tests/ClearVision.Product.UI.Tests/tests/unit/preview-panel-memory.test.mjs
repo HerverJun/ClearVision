@@ -196,6 +196,109 @@ function createCoordinatorHarness(initialState, options = {}) {
   return coordinator;
 }
 
+class PreviewPanelFakeElement {
+  constructor(id = '') {
+    this.id = id;
+    this._innerHTML = '';
+    this.textContent = '';
+    this.style = {};
+    this.disabled = false;
+    this.attributes = new Map();
+    this.listeners = new Map();
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = String(value ?? '');
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set src(value) {
+    this.setAttribute('src', value);
+  }
+
+  get src() {
+    return this.getAttribute('src') || '';
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(String(name), String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(String(name)) ?? null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(String(name));
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
+    this.listeners.get(type).push(listener);
+  }
+
+  querySelectorAll() {
+    return [];
+  }
+}
+
+class PreviewPanelFakeContainer extends PreviewPanelFakeElement {
+  constructor() {
+    super('preview-root');
+    this.elementsById = new Map();
+    this.elementsByRole = new Map();
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = String(value ?? '');
+    this.elementsById = new Map();
+    this.elementsByRole = new Map();
+
+    const ids = Array.from(this._innerHTML.matchAll(/id="([^"]+)"/g)).map(match => match[1]);
+    ids.forEach(id => {
+      const element = new PreviewPanelFakeElement(id);
+      if (id === 'btn-preview-open-output') {
+        element.disabled = true;
+      }
+      this.elementsById.set(id, element);
+    });
+
+    const outputImage = this.elementsById.get('preview-output-image');
+    if (outputImage) {
+      this.elementsByRole.set('preview-output-image', outputImage);
+    }
+    const imageContainer = new PreviewPanelFakeElement('preview-main-image-container');
+    this.elementsByRole.set('preview-main-image-container', imageContainer);
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  querySelector(selector) {
+    const idMatch = String(selector).match(/^#(.+)$/);
+    if (idMatch) {
+      return this.elementsById.get(idMatch[1]) || null;
+    }
+
+    const roleMatch = String(selector).match(/^\[data-role="([^"]+)"\]$/);
+    if (roleMatch) {
+      return this.elementsByRole.get(roleMatch[1]) || null;
+    }
+
+    return null;
+  }
+
+  querySelectorAll() {
+    return [];
+  }
+}
+
 function createPreviewCapabilityHarness(options = {}) {
   const listeners = {
     selection: new Set(),
@@ -400,6 +503,75 @@ test('PreviewPanel analysis results avoid retaining input images and oversized p
   panel.analysisResult = normalized;
   panel.destroy();
   assert.equal(panel.analysisResult, null);
+});
+
+test('PreviewPanel renders one output image surface and keeps output summary visible', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }]
+  };
+  const coordinator = createCoordinatorHarness(successState({
+    outputData: {
+      Score: 0.98,
+      Image: 'data:image/png;base64,SHOULD_BE_SKIPPED'
+    },
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: 'input-image-src',
+      outputImageSrc: 'output-image-src'
+    }
+  }));
+  const container = new PreviewPanelFakeContainer();
+
+  const panel = new PreviewPanel(container, {
+    getOperator: () => operator,
+    previewCoordinator: coordinator,
+    getFlowRevision: () => 3
+  });
+
+  assert.equal((container.innerHTML.match(/data-role="preview-output-image"/g) || []).length, 1);
+  assert.doesNotMatch(container.innerHTML, /preview-before|preview-after|输入图像预览/);
+  assert.equal(container.querySelector('#preview-output-image').getAttribute('src'), 'output-image-src');
+  assert.equal(container.querySelector('#preview-output-placeholder').style.display, 'none');
+  assert.equal(container.querySelector('#btn-preview-open-output').disabled, false);
+  assert.match(container.querySelector('#preview-output-list').innerHTML, /Score/);
+  assert.doesNotMatch(container.querySelector('#preview-output-list').innerHTML, /SHOULD_BE_SKIPPED/);
+  assert.equal(coordinator.listenerCount(), 1);
+
+  panel.destroy();
+  assert.equal(coordinator.listenerCount(), 0);
+});
+
+test('PreviewPanel does not fall back to a persistent input image when output is missing', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'ImageAcquisition',
+    title: '图像采集',
+    parameters: []
+  };
+  const coordinator = createCoordinatorHarness(successState({
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: 'input-image-src',
+      outputImageSrc: null
+    }
+  }));
+  const container = new PreviewPanelFakeContainer();
+
+  const panel = new PreviewPanel(container, {
+    getOperator: () => operator,
+    previewCoordinator: coordinator,
+    getFlowRevision: () => 3
+  });
+
+  assert.equal(container.querySelector('#preview-output-image').getAttribute('src'), null);
+  assert.equal(container.querySelector('#preview-output-placeholder').style.display, 'flex');
+  assert.match(container.querySelector('#preview-output-placeholder').textContent, /暂无输出图像/);
+  assert.equal(container.querySelector('#btn-preview-open-output').disabled, true);
+
+  panel.destroy();
 });
 
 test('OperatorResultViewModel renders no-selection, no-preview, loading, error, stale, and disabled states', () => {

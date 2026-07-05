@@ -4,6 +4,74 @@
     gap: 10px;
 }
 
+.toolbar-global-variable-host {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.toolbar-global-variable-host .global-variable-entry {
+    min-height: 30px;
+    max-width: 230px;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 5px 3px 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--glass-card) 82%, transparent);
+    box-shadow: var(--shadow-sm), var(--glass-inner-glow);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.toolbar-global-variable-host .global-variable-entry-summary {
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.toolbar-global-variable-host .global-variable-entry-summary strong {
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.toolbar-global-variable-host .global-variable-entry-summary span {
+    min-width: 0;
+    max-width: 92px;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toolbar-global-variable-host #gv-open-manager,
+.toolbar-global-variable-host .global-variable-entry > .btn {
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    min-height: 24px;
+    font-size: var(--font-size-xs);
+}
+
+.toolbar-global-variable-host .global-variable-entry-hint {
+    display: none;
+}
+
+@media (max-width: 1120px) {
+    .toolbar-global-variable-host .global-variable-entry {
+        max-width: 196px;
+        padding-left: 8px;
+    }
+
+    .toolbar-global-variable-host .global-variable-entry-summary span {
+        max-width: 72px;
+    }
+}
+
 .global-variable-entry-summary {
     display: flex;
     align-items: center;

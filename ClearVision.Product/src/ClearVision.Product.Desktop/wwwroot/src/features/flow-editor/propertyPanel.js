@@ -115,6 +115,7 @@ class PropertyPanel {
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
         this.previewResourcesEnabled = options.previewResourcesEnabled !== false;
+        this.previewContainer = this.resolvePreviewContainerOption(options.previewContainer);
         this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
         this.circleSearchV2ToolEnabled = options.circleSearchV2ToolEnabled;
         this.nPointCalibrationWorkbenchEnabled = options.nPointCalibrationWorkbenchEnabled;
@@ -132,6 +133,30 @@ class PropertyPanel {
             'SharpnessEvaluation'
         ]);
         this.disposeGlobalEvents = this.bindGlobalEvents();
+    }
+
+    resolvePreviewContainerOption(container) {
+        if (!container) {
+            return null;
+        }
+
+        if (typeof container === 'string') {
+            return document.getElementById(container);
+        }
+
+        return container;
+    }
+
+    shouldMountInternalPreviewContainer() {
+        return this.previewResourcesEnabled && !this.previewContainer;
+    }
+
+    getPreviewContainer() {
+        if (!this.previewResourcesEnabled) {
+            return null;
+        }
+
+        return this.previewContainer || this.container.querySelector('#operator-preview-container');
     }
 
     /**
@@ -218,7 +243,7 @@ class PropertyPanel {
      * 清空面板
      */
     clear() {
-        if (this.previewPanel) {
+        if (this.previewPanel && !this.previewContainer) {
             this.previewPanel.destroy();
             this.previewPanel = null;
         }
@@ -233,8 +258,8 @@ class PropertyPanel {
         this.inputImageBase64Load = null;
         this.currentOperator = null;
         this.container.innerHTML = `
-            <p class="empty-text">选择一个算子查看属性</p>
-            ${this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : ''}
+            <p class="empty-text">未选择算子</p>
+            ${this.shouldMountInternalPreviewContainer() ? '<div id="operator-preview-container"></div>' : ''}
         `;
         this.initPreviewPanel();
     }
@@ -259,6 +284,9 @@ class PropertyPanel {
         this.inputImageBase64Load = null;
         if (this.container) {
             this.container.innerHTML = '';
+        }
+        if (this.previewContainer) {
+            this.previewContainer.innerHTML = '<p class="empty-text">请选择一个算子</p>';
         }
     }
 
@@ -361,7 +389,7 @@ class PropertyPanel {
         html += `
                 ${shouldMountCalibrationDraftWorkbench ? '<div id="calibration-draft-workbench-container"></div>' : ''}
                 ${shouldMountRoiEditor ? '<div id="roi-editor-container"></div>' : ''}
-                ${this.previewResourcesEnabled ? '<div id="operator-preview-container"></div>' : ''}
+                ${this.shouldMountInternalPreviewContainer() ? '<div id="operator-preview-container"></div>' : ''}
             </div>
         `;
         this.container.innerHTML = html;
@@ -379,7 +407,7 @@ class PropertyPanel {
     }
 
     renderLibraryOperatorSummary() {
-        if (this.previewPanel) {
+        if (this.previewPanel && !this.previewContainer) {
             this.previewPanel.destroy();
             this.previewPanel = null;
         }
@@ -1727,12 +1755,19 @@ class PropertyPanel {
             return;
         }
 
-        const container = this.container.querySelector('#operator-preview-container');
+        const container = this.getPreviewContainer();
         if (!container) {
             if (this.previewPanel) {
                 this.previewPanel.destroy();
                 this.previewPanel = null;
             }
+            return;
+        }
+
+        if (this.previewPanel?.container === container) {
+            this.previewPanel.render();
+            this.previewPanel.applyPreviewState();
+            this.previewPanel.scheduleAutoPreview();
             return;
         }
 

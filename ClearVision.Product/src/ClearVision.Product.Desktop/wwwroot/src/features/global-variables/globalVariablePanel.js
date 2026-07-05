@@ -119,13 +119,14 @@ export default class GlobalVariablePanel {
 
         const count = this.schema.variables.length;
         const locked = this.isRuntimeLocked();
+        const managerTitle = this.project ? '打开全局变量管理' : '未打开工程';
         this.container.innerHTML = `
             <section class="global-variable-entry">
                 <div class="global-variable-entry-summary">
                     <strong>全局变量</strong>
                     <span>${this.project ? `${count} 个变量` : '未打开工程'}</span>
                 </div>
-                <button type="button" class="btn btn-secondary" id="gv-open-manager" ${this.project ? '' : 'disabled'} title="打开全局变量管理" aria-label="打开全局变量管理">管理</button>
+                <button type="button" class="btn btn-secondary" id="gv-open-manager" ${this.project ? '' : 'disabled'} title="${managerTitle}" aria-label="打开全局变量管理">管理</button>
                 ${locked ? '<p class="global-variable-entry-hint">工程运行中，仅可查看和刷新。</p>' : ''}
             </section>
         `;
