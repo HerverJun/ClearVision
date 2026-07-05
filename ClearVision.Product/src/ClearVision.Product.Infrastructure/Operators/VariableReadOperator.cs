@@ -65,7 +65,7 @@ public class VariableReadOperator : OperatorBase
         var exists = _variableContext.Contains(variableName);
         var value = ReadRunVariable(variableName, defaultValue, dataType);
 
-        Logger.LogInformation("[VariableRead] Read {VariableName} = {Value} (exists: {Exists})",
+        Logger.LogDebug("[VariableRead] Read {VariableName} = {Value} (exists: {Exists})",
             variableName, value, exists);
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>

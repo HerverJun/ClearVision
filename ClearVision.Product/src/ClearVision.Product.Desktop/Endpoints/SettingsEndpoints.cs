@@ -172,7 +172,14 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            return Results.Ok(await databaseMaintenance.RepairAsync(cancellationToken));
+            try
+            {
+                return Results.Ok(await databaseMaintenance.RepairAsync(cancellationToken));
+            }
+            catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
+            {
+                return BuildDatabaseMaintenanceError(ex);
+            }
         });
 
         app.MapPost("/api/settings/database/backup", async (
@@ -185,7 +192,14 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            return Results.Ok(await databaseMaintenance.CreateBackupAsync("manual", cancellationToken));
+            try
+            {
+                return Results.Ok(await databaseMaintenance.CreateBackupAsync("manual", cancellationToken));
+            }
+            catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
+            {
+                return BuildDatabaseMaintenanceError(ex);
+            }
         });
 
         app.MapPost("/api/settings/database/restore", async (
@@ -204,7 +218,14 @@ public static class SettingsEndpoints
                 return Results.BadRequest(new { Error = "BackupPath is required." });
             }
 
-            return Results.Ok(await databaseMaintenance.RestoreBackupAsync(request.BackupPath, cancellationToken));
+            try
+            {
+                return Results.Ok(await databaseMaintenance.RestoreBackupAsync(request.BackupPath, cancellationToken));
+            }
+            catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
+            {
+                return BuildDatabaseMaintenanceError(ex);
+            }
         });
 
         app.MapPost("/api/settings/database/cleanup", async (
@@ -222,7 +243,14 @@ public static class SettingsEndpoints
             var retentionDays = request.RetentionDays
                 ?? configService.GetCurrent().Storage?.RetentionDays
                 ?? 30;
-            return Results.Ok(await databaseMaintenance.CleanupHistoryAsync(retentionDays, cancellationToken));
+            try
+            {
+                return Results.Ok(await databaseMaintenance.CleanupHistoryAsync(retentionDays, cancellationToken));
+            }
+            catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
+            {
+                return BuildDatabaseMaintenanceError(ex);
+            }
         });
 
         // ==================== AI 多模型管理 API ====================
@@ -1787,6 +1815,29 @@ public static class SettingsEndpoints
         return context.Items.TryGetValue("CurrentUser", out var userObj) &&
                userObj is UserSession user &&
                string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+    }
+
+    private static bool IsDatabaseMaintenanceClientError(Exception ex)
+    {
+        return ex is ArgumentException
+            or InvalidOperationException
+            or FileNotFoundException
+            or DirectoryNotFoundException
+            or InvalidDataException;
+    }
+
+    private static IResult BuildDatabaseMaintenanceError(Exception ex)
+    {
+        if (ex is FileNotFoundException fileNotFound)
+        {
+            return Results.NotFound(new
+            {
+                Error = fileNotFound.Message,
+                FileName = fileNotFound.FileName
+            });
+        }
+
+        return Results.BadRequest(new { Error = ex.Message });
     }
 
     private static bool IsDeveloperUiRequested(HttpContext context)

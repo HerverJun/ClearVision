@@ -9,11 +9,15 @@ namespace ClearVision.Product.Station.Sync;
 
 public sealed class StationSpoolStore
 {
+    private const int MinStaleRecordsBeforeCompaction = 128;
+    private const int MaxStaleRecordsBeforeCompaction = 1000;
+
     private readonly object _syncRoot = new();
     private readonly string _directoryPath;
     private readonly string _spoolFilePath;
     private readonly string _stateFilePath;
     private readonly int _maxBufferedResults;
+    private readonly int _staleRecordCompactionThreshold;
     private readonly long _maxSpoolBytes;
     private readonly TimeSpan _maxSpoolAge;
     private readonly ILogger<StationSpoolStore> _logger;
@@ -30,6 +34,7 @@ public sealed class StationSpoolStore
 
     private readonly List<StationResultSummaryDto> _pendingResults = [];
     private StationSpoolState _state = new();
+    private int _staleSpoolRecords;
     private long _cachedSpoolBytes = -1;
     private DateTime _lastSpoolBytesTime = DateTime.MinValue;
 
@@ -39,6 +44,10 @@ public sealed class StationSpoolStore
     {
         _logger = logger;
         _maxBufferedResults = Math.Max(1, options.Value.MaxBufferedResults);
+        _staleRecordCompactionThreshold = Math.Clamp(
+            _maxBufferedResults / 10,
+            MinStaleRecordsBeforeCompaction,
+            MaxStaleRecordsBeforeCompaction);
         _maxSpoolBytes = Math.Max(1, options.Value.MaxSpoolMb) * 1024L * 1024L;
         _maxSpoolAge = TimeSpan.FromDays(Math.Max(1, options.Value.MaxSpoolDays));
         _directoryPath = string.IsNullOrWhiteSpace(options.Value.ResolvedSpoolDirectory)
@@ -134,17 +143,16 @@ public sealed class StationSpoolStore
             _state.NextSequenceId = nextSequenceId;
             _pendingResults.Add(Clone(summary));
 
-            var trimmedOverflow = TrimOverflowLocked();
-            if (trimmedOverflow)
-            {
-                RewriteSpoolLocked();
-            }
-            else
+            var dropped = TrimOverflowLocked();
+            var shouldPersistSummary = _pendingResults.Any(result => result.SequenceId == nextSequenceId);
+            if (shouldPersistSummary)
             {
                 AppendResultLocked(summary);
             }
 
+            _staleSpoolRecords += dropped.Count(result => result.SequenceId != nextSequenceId);
             SaveStateLocked();
+            CompactSpoolIfNeededLocked();
 
             return Clone(summary);
         }
@@ -182,9 +190,10 @@ public sealed class StationSpoolStore
                 _state.UnavailableFromSequenceId = 0;
             }
 
-            _pendingResults.RemoveAll(result => result.SequenceId <= ackedSequenceId);
-            RewriteSpoolLocked();
+            var removed = _pendingResults.RemoveAll(result => result.SequenceId <= ackedSequenceId);
+            _staleSpoolRecords += removed;
             SaveStateLocked();
+            CompactSpoolIfNeededLocked();
         }
     }
 
@@ -291,11 +300,12 @@ public sealed class StationSpoolStore
     {
         var line = JsonSerializer.Serialize(summary, _jsonOptions);
         File.AppendAllText(_spoolFilePath, line + Environment.NewLine, Encoding.UTF8);
+        InvalidateCachedSpoolBytesLocked();
     }
 
     private void RewriteSpoolLocked()
     {
-        var tempPath = _spoolFilePath + ".tmp";
+        var tempPath = $"{_spoolFilePath}.{Guid.NewGuid():N}.tmp";
         using (var stream = File.Create(tempPath))
         using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
         {
@@ -306,17 +316,49 @@ public sealed class StationSpoolStore
         }
 
         File.Move(tempPath, _spoolFilePath, overwrite: true);
+        _staleSpoolRecords = 0;
+        InvalidateCachedSpoolBytesLocked();
     }
 
     private void SaveStateLocked()
     {
-        var tempPath = _stateFilePath + ".tmp";
+        var tempPath = $"{_stateFilePath}.{Guid.NewGuid():N}.tmp";
         var json = JsonSerializer.Serialize(_state, _jsonOptions);
         File.WriteAllText(tempPath, json, new UTF8Encoding(false));
         File.Move(tempPath, _stateFilePath, overwrite: true);
+        InvalidateCachedSpoolBytesLocked();
     }
 
-    private bool TrimOverflowLocked()
+    private void CompactSpoolIfNeededLocked()
+    {
+        if (_staleSpoolRecords <= 0)
+        {
+            return;
+        }
+
+        if (_staleSpoolRecords < _staleRecordCompactionThreshold &&
+            GetFileLength(_spoolFilePath) <= _maxSpoolBytes)
+        {
+            return;
+        }
+
+        RewriteSpoolLocked();
+    }
+
+    private void InvalidateCachedSpoolBytesLocked()
+    {
+        _cachedSpoolBytes = -1;
+        _lastSpoolBytesTime = DateTime.MinValue;
+    }
+
+    private static long GetFileLength(string path)
+    {
+        return File.Exists(path)
+            ? new FileInfo(path).Length
+            : 0;
+    }
+
+    private List<StationResultSummaryDto> TrimOverflowLocked()
     {
         _pendingResults.Sort((left, right) => left.SequenceId.CompareTo(right.SequenceId));
         var dropped = new List<StationResultSummaryDto>();
@@ -348,7 +390,7 @@ public sealed class StationSpoolStore
 
         if (dropped.Count == 0)
         {
-            return false;
+            return dropped;
         }
 
         var droppedFromId = dropped.Min(result => result.SequenceId);
@@ -374,7 +416,7 @@ public sealed class StationSpoolStore
             droppedFromId,
             cutoffSequenceId);
 
-        return true;
+        return dropped;
     }
 
     private long EstimateSpoolBytes(IEnumerable<StationResultSummaryDto> results)

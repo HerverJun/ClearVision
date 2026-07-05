@@ -228,14 +228,56 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             }
         }
 
-        await AppendSpoolAsync(results, _spoolFilePath, cancellationToken);
-        Interlocked.Add(ref _spooledResultCount, results.Count);
-        _logger.LogError(
-            "Inspection result batch moved to durable spool after retries. Count={Count}, SpoolFile={SpoolFile}, TotalSpooled={Spooled}",
-            results.Count,
-            _spoolFilePath,
-            Volatile.Read(ref _spooledResultCount));
+        try
+        {
+            await AppendSpoolAsync(results, _spoolFilePath, cancellationToken);
+            Interlocked.Add(ref _spooledResultCount, results.Count);
+            _logger.LogError(
+                "Inspection result batch moved to durable spool after retries. Count={Count}, SpoolFile={SpoolFile}, TotalSpooled={Spooled}",
+                results.Count,
+                _spoolFilePath,
+                Volatile.Read(ref _spooledResultCount));
+        }
+        catch (Exception ex)
+        {
+            await TryAppendDeadLetterBatchAsync(results, ex, cancellationToken);
+        }
+
         return true;
+    }
+
+    private async Task TryAppendDeadLetterBatchAsync(
+        List<InspectionResult> results,
+        Exception spoolException,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await AppendSpoolAsync(results, _deadLetterFilePath, cancellationToken);
+            Interlocked.Add(ref _deadLetterResultCount, results.Count);
+            _logger.LogCritical(
+                spoolException,
+                "Inspection result batch could not be saved or spooled; moved to dead letter and released queue budget. Count={Count}, DeadLetterFile={DeadLetterFile}, DeadLetter={DeadLetter}",
+                results.Count,
+                _deadLetterFilePath,
+                Volatile.Read(ref _deadLetterResultCount));
+        }
+        catch (Exception deadLetterException)
+        {
+            Interlocked.Add(ref _deadLetterResultCount, results.Count);
+            _logger.LogCritical(
+                deadLetterException,
+                "Inspection result batch could not be saved, spooled, or dead-lettered; dropping batch to release queue budget. Count={Count}, SpoolFile={SpoolFile}, DeadLetterFile={DeadLetterFile}, DeadLetter={DeadLetter}",
+                results.Count,
+                _spoolFilePath,
+                _deadLetterFilePath,
+                Volatile.Read(ref _deadLetterResultCount));
+            _logger.LogCritical(
+                spoolException,
+                "Original inspection result spool failure before drop. Count={Count}, SpoolFile={SpoolFile}",
+                results.Count,
+                _spoolFilePath);
+        }
     }
 
     private async Task<bool> TrySaveBatchAsync(List<InspectionResult> results, CancellationToken cancellationToken)

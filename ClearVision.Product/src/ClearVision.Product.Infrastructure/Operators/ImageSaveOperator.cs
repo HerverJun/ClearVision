@@ -44,7 +44,7 @@ public class ImageSaveOperator : OperatorBase
 
     public ImageSaveOperator(ILogger<ImageSaveOperator> logger) : base(logger) { }
 
-    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public class ImageSaveOperator : OperatorBase
         // 获取输入图像
         if (!TryGetInputImage(inputs, out var imageWrapper) || imageWrapper == null)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("未提供输入图像"));
+            return OperatorExecutionOutput.Failure("未提供输入图像");
         }
 
         // 获取参数
@@ -65,7 +65,7 @@ public class ImageSaveOperator : OperatorBase
 
         if (string.IsNullOrWhiteSpace(folderPath))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Directory/FolderPath 参数不能为空"));
+            return OperatorExecutionOutput.Failure("Directory/FolderPath 参数不能为空");
         }
 
         try
@@ -94,7 +94,7 @@ public class ImageSaveOperator : OperatorBase
 
             if (!TryValidateFileName(actualFileName, out var fileNameError))
             {
-                return Task.FromResult(OperatorExecutionOutput.Failure(fileNameError));
+                return OperatorExecutionOutput.Failure(fileNameError);
             }
 
             var fullPath = Path.Combine(folderPath, actualFileName);
@@ -125,20 +125,14 @@ public class ImageSaveOperator : OperatorBase
                 _ => null
             };
 
-            // 保存图像
-            if (formatParams != null)
-            {
-                Cv2.ImWrite(fullPath, mat, formatParams);
-            }
-            else
-            {
-                Cv2.ImWrite(fullPath, mat);
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            var imageBytes = EncodeImage(extension, mat, formatParams);
+            await File.WriteAllBytesAsync(fullPath, imageBytes, cancellationToken);
 
             Logger.LogInformation("[ImageSave] 图像已保存: {Path}, 格式={Format}, 大小={Width}x{Height}",
                 fullPath, format, mat.Width, mat.Height);
 
-            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            return OperatorExecutionOutput.Success(new Dictionary<string, object>
             {
                 { "IsSuccess", true },
                 { "Success", true },
@@ -147,14 +141,38 @@ public class ImageSaveOperator : OperatorBase
                 { "Format", format },
                 { "Width", mat.Width },
                 { "Height", mat.Height },
-                { "FileSize", new FileInfo(fullPath).Length }
-            }));
+                { "FileSize", (long)imageBytes.Length }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[ImageSave] 保存失败");
-            return Task.FromResult(OperatorExecutionOutput.Failure($"图像保存失败: {ex.Message}"));
+            return OperatorExecutionOutput.Failure($"图像保存失败: {ex.Message}");
         }
+    }
+
+    private static byte[] EncodeImage(string extension, Mat mat, ImageEncodingParam[]? formatParams)
+    {
+        byte[] imageBytes;
+        if (formatParams != null)
+        {
+            Cv2.ImEncode(extension, mat, out imageBytes, formatParams);
+        }
+        else
+        {
+            Cv2.ImEncode(extension, mat, out imageBytes);
+        }
+
+        if (imageBytes.Length == 0)
+        {
+            throw new InvalidOperationException("Image encoding produced no output.");
+        }
+
+        return imageBytes;
     }
 
     /// <summary>

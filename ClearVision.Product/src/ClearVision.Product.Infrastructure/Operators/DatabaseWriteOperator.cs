@@ -31,13 +31,16 @@ public sealed class DatabaseWriteOperator : OperatorBase
     private const int CommandTimeoutSeconds = 5;
     private const int RetryAttempts = 3;
     private const int MaxRecordIdLength = 128;
+    private const int MaxTableExistsCacheEntries = 512;
 
     private static readonly Regex ValidTableNameRegex = new(
         @"^[a-zA-Z_][a-zA-Z0-9_]*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private static readonly ConcurrentDictionary<string, bool> TableExistsCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> TableEnsureLocks = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, byte> TableExistsCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Queue<string> TableExistsCacheOrder = new();
+    private static readonly object TableExistsCacheLock = new();
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> TableEnsureLocks = new(StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = false };
     private static readonly IReadOnlyDictionary<string, IDatabaseWriteProvider> ProviderByDbType =
         new Dictionary<string, IDatabaseWriteProvider>(StringComparer.OrdinalIgnoreCase)
@@ -300,17 +303,20 @@ public sealed class DatabaseWriteOperator : OperatorBase
         CancellationToken cancellationToken)
     {
         var cacheKey = BuildTableCacheKey(provider.DbType, connectionString, tableName);
-        if (TableExistsCache.ContainsKey(cacheKey))
+        if (IsTableKnown(cacheKey))
         {
             return;
         }
 
-        var guard = TableEnsureLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-        await guard.WaitAsync(cancellationToken);
+        var guard = AcquireTableEnsureLock(cacheKey);
+        var hasGuard = false;
 
         try
         {
-            if (TableExistsCache.ContainsKey(cacheKey))
+            await guard.Semaphore.WaitAsync(cancellationToken);
+            hasGuard = true;
+
+            if (IsTableKnown(cacheKey))
             {
                 return;
             }
@@ -318,15 +324,81 @@ public sealed class DatabaseWriteOperator : OperatorBase
             await using var ensureTableCommand = provider.CreateEnsureTableCommand(connection, tableName);
             ensureTableCommand.CommandTimeout = CommandTimeoutSeconds;
             await ensureTableCommand.ExecuteNonQueryAsync(cancellationToken);
-            TableExistsCache.TryAdd(cacheKey, true);
+            MarkTableKnown(cacheKey);
         }
         finally
         {
-            guard.Release();
+            if (hasGuard)
+            {
+                guard.Semaphore.Release();
+            }
+
+            ReleaseTableEnsureLock(cacheKey, guard);
+        }
+    }
+
+    private static bool IsTableKnown(string cacheKey)
+    {
+        lock (TableExistsCacheLock)
+        {
+            return TableExistsCache.ContainsKey(cacheKey);
+        }
+    }
+
+    private static void MarkTableKnown(string cacheKey)
+    {
+        lock (TableExistsCacheLock)
+        {
             if (TableExistsCache.ContainsKey(cacheKey))
             {
-                TableEnsureLocks.TryRemove(cacheKey, out _);
+                return;
             }
+
+            TableExistsCache[cacheKey] = 1;
+            TableExistsCacheOrder.Enqueue(cacheKey);
+
+            while (TableExistsCache.Count > MaxTableExistsCacheEntries &&
+                   TableExistsCacheOrder.TryDequeue(out var oldestKey))
+            {
+                TableExistsCache.Remove(oldestKey);
+            }
+        }
+    }
+
+    private static RefCountedSemaphore AcquireTableEnsureLock(string cacheKey)
+    {
+        while (true)
+        {
+            var entry = TableEnsureLocks.GetOrAdd(cacheKey, static _ => new RefCountedSemaphore());
+            lock (entry)
+            {
+                if (!entry.IsRetired)
+                {
+                    entry.RefCount++;
+                    return entry;
+                }
+            }
+
+            TableEnsureLocks.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(cacheKey, entry));
+        }
+    }
+
+    private static void ReleaseTableEnsureLock(string cacheKey, RefCountedSemaphore entry)
+    {
+        var shouldDispose = false;
+        lock (entry)
+        {
+            entry.RefCount--;
+            if (entry.RefCount == 0)
+            {
+                entry.IsRetired = true;
+                shouldDispose = TableEnsureLocks.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(cacheKey, entry));
+            }
+        }
+
+        if (shouldDispose)
+        {
+            entry.Dispose();
         }
     }
 
@@ -340,5 +412,19 @@ public sealed class DatabaseWriteOperator : OperatorBase
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(connectionString));
         return Convert.ToHexString(bytes);
+    }
+
+    private sealed class RefCountedSemaphore : IDisposable
+    {
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public int RefCount { get; set; }
+
+        public bool IsRetired { get; set; }
+
+        public void Dispose()
+        {
+            Semaphore.Dispose();
+        }
     }
 }

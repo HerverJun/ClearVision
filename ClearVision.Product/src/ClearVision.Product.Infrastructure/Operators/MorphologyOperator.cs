@@ -12,16 +12,16 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// Legacy morphology operator kept for compatibility with existing flows.
-/// New flows should prefer <see cref="MorphologicalOperationOperator"/>.
+/// 旧版图像形态学算子，仅用于兼容既有流程。
+/// 新流程应优先使用 <see cref="MorphologicalOperationOperator"/>。
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Morphology (Legacy)",
-    Description = "Legacy image morphology node. Use Morphological Operation for image workflows and Region* morphology operators for region workflows.",
-    Category = "Preprocessing",
+    DisplayName = "形态学（旧版）",
+    Description = "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
+    Category = "预处理",
     IconName = "morphology",
-    Keywords = new[] { "Morphology", "Erode", "Dilate", "Open", "Close", "Legacy", "ImageOnly" },
-    Tags = new[] { "Legacy", "Deprecated", "Compatibility", "ImageOnly" }
+    Keywords = new[] { "形态学", "腐蚀", "膨胀", "开运算", "闭运算", "旧版", "Morphology", "Legacy" },
+    Tags = new[] { "legacy", "deprecated", "compatibility", "image-only" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]

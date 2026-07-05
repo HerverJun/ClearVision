@@ -31,7 +31,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Encoding", "Encoding", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF8", "GBK|GBK" })]
 public class TextSaveOperator : OperatorBase
 {
-    private static readonly ConcurrentDictionary<string, object> FileLocks = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileLocks = new(StringComparer.OrdinalIgnoreCase);
 
     public override OperatorType OperatorType => OperatorType.TextSave;
 
@@ -39,7 +39,7 @@ public class TextSaveOperator : OperatorBase
     {
     }
 
-    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public class TextSaveOperator : OperatorBase
 
         if (string.IsNullOrWhiteSpace(filePathTemplate))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("FilePath is required."));
+            return OperatorExecutionOutput.Failure("FilePath is required.");
         }
 
         try
@@ -71,18 +71,22 @@ public class TextSaveOperator : OperatorBase
             }
 
             var encoding = ResolveEncoding(encodingName);
-            WriteContentThreadSafe(filePath, content + Environment.NewLine, appendMode, encoding);
+            await WriteContentThreadSafeAsync(filePath, content + Environment.NewLine, appendMode, encoding, cancellationToken);
 
-            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            return OperatorExecutionOutput.Success(new Dictionary<string, object>
             {
                 { "FilePath", filePath },
                 { "Success", true }
-            }));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to save text.");
-            return Task.FromResult(OperatorExecutionOutput.Failure($"Failed to save text: {ex.Message}"));
+            return OperatorExecutionOutput.Failure($"Failed to save text: {ex.Message}");
         }
     }
 
@@ -184,19 +188,31 @@ public class TextSaveOperator : OperatorBase
         return Encoding.UTF8;
     }
 
-    private static void WriteContentThreadSafe(string filePath, string content, bool appendMode, Encoding encoding)
+    private static async Task WriteContentThreadSafeAsync(
+        string filePath,
+        string content,
+        bool appendMode,
+        Encoding encoding,
+        CancellationToken cancellationToken)
     {
-        var fileLock = FileLocks.GetOrAdd(filePath, _ => new object());
-        lock (fileLock)
+        var fileLock = FileLocks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
+        await fileLock.WaitAsync(cancellationToken);
+        try
         {
-            if (appendMode)
-            {
-                File.AppendAllText(filePath, content, encoding);
-            }
-            else
-            {
-                File.WriteAllText(filePath, content, encoding);
-            }
+            var fileMode = appendMode ? FileMode.Append : FileMode.Create;
+            await using var stream = new FileStream(
+                filePath,
+                fileMode,
+                FileAccess.Write,
+                FileShare.Read,
+                bufferSize: 4096,
+                options: FileOptions.Asynchronous);
+            await using var writer = new StreamWriter(stream, encoding);
+            await writer.WriteAsync(content.AsMemory(), cancellationToken);
+        }
+        finally
+        {
+            fileLock.Release();
         }
     }
 }

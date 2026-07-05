@@ -55,61 +55,46 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         Guid sessionId,
         CancellationToken ct)
     {
+        StateChangedEventArgs? stateChanged = null;
+        StartResult result;
         await _stateLock.WaitAsync(ct);
         try
         {
             if (_isShuttingDown)
             {
-                return StartResult.ShutdownInProgress;
+                result = StartResult.ShutdownInProgress;
             }
-
-            // 双重检查：避免锁等待期间状态变化
-            if (_sessions.TryGetValue(projectId, out var existing))
+            else
             {
-                if (existing.Status == RuntimeStatus.Running || existing.Status == RuntimeStatus.Starting)
+                // 双重检查：避免锁等待期间状态变化
+                if (_sessions.TryGetValue(projectId, out var existing))
                 {
-                    _logger.LogWarning("[Coordinator] 项目 {ProjectId} 已在运行中: {SessionId}",
-                        projectId, existing.SessionId);
-                    return StartResult.AlreadyRunning;
+                    if (existing.Status == RuntimeStatus.Running || existing.Status == RuntimeStatus.Starting)
+                    {
+                        _logger.LogWarning("[Coordinator] 项目 {ProjectId} 已在运行中: {SessionId}",
+                            projectId, existing.SessionId);
+                        result = StartResult.AlreadyRunning;
+                    }
+                    else
+                    {
+                        // 清理旧会话状态
+                        CleanupSessionCore(projectId, existing.SessionId);
+                        result = TryCreateSessionLocked(projectId, sessionId, out stateChanged);
+                    }
                 }
-
-                // 清理旧会话状态
-                CleanupSessionCore(projectId, existing.SessionId);
+                else
+                {
+                    result = TryCreateSessionLocked(projectId, sessionId, out stateChanged);
+                }
             }
-
-            if (_mutationLeases.Contains(projectId))
-            {
-                _logger.LogWarning("[Coordinator] 项目 {ProjectId} 正在配置变更中，拒绝启动运行。", projectId);
-                return StartResult.MutationInProgress;
-            }
-
-            // 创建新的取消令牌源（与 HTTP 请求 token 无关）
-            var cts = new CancellationTokenSource();
-            _ctsMap[projectId] = cts;
-
-            // 创建新会话
-            var session = new RuntimeSession
-            {
-                ProjectId = projectId,
-                SessionId = sessionId,
-                Status = RuntimeStatus.Starting,
-                StartedAt = DateTime.UtcNow,
-                CancellationTokenSource = cts
-            };
-
-            _sessions[projectId] = session;
-
-            _logger.LogInformation("[Coordinator] 会话已启动: {ProjectId}, Session: {SessionId}",
-                projectId, sessionId);
-
-            RaiseStateChanged(projectId, sessionId, RuntimeStatus.Starting, RuntimeStatus.Stopped);
-
-            return StartResult.Success;
         }
         finally
         {
             _stateLock.Release();
         }
+
+        RaiseStateChanged(stateChanged);
+        return result;
     }
 
     public async Task<ProjectMutationLease?> TryAcquireMutationLeaseAsync(Guid projectId, string reason, CancellationToken ct)
@@ -156,6 +141,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         }
 
         CancellationTokenSource? workerCts = null;
+        StateChangedEventArgs? stateChanged = null;
         await _stateLock.WaitAsync(ct);
         try
         {
@@ -173,13 +159,15 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             // 更新状态
             var oldStatus = session.Status;
             session.Status = RuntimeStatus.Stopping;
-            RaiseStateChanged(projectId, session.SessionId, RuntimeStatus.Stopping, oldStatus);
+            stateChanged = CreateStateChangedEventArgs(projectId, session.SessionId, RuntimeStatus.Stopping, oldStatus);
             workerCts = session.CancellationTokenSource;
         }
         finally
         {
             _stateLock.Release();
         }
+
+        RaiseStateChanged(stateChanged);
 
         // 触发取消
         if (workerCts != null)
@@ -251,7 +239,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         _logger.LogError("[Coordinator] 会话故障: {ProjectId}, Error: {Error}",
             projectId, errorMessage);
 
-        RaiseStateChanged(projectId, session!.SessionId, RuntimeStatus.Faulted, oldStatus, errorMessage);
+        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, RuntimeStatus.Faulted, oldStatus, errorMessage));
         ScheduleCleanup(projectId, sessionId);
     }
 
@@ -283,7 +271,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
         _logger.LogInformation("[Coordinator] 会话已停止: {ProjectId}", projectId);
 
-        RaiseStateChanged(projectId, session!.SessionId, RuntimeStatus.Stopped, oldStatus);
+        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, RuntimeStatus.Stopped, oldStatus));
         ScheduleCleanup(projectId, sessionId);
     }
 
@@ -314,7 +302,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         _logger.LogInformation("[Coordinator] 会话状态更新: {ProjectId}, {OldStatus} -> {NewStatus}",
             projectId, oldStatus, status);
 
-        RaiseStateChanged(projectId, session!.SessionId, status, oldStatus);
+        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, status, oldStatus));
     }
 
     public IEnumerable<RuntimeState> GetActiveSessions()
@@ -340,16 +328,87 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         return _sessions.Values.Where(s => s.Status == RuntimeStatus.Running || s.Status == RuntimeStatus.Starting);
     }
 
-    private void RaiseStateChanged(Guid projectId, Guid sessionId, RuntimeStatus newStatus, RuntimeStatus oldStatus, string? errorMessage = null)
+    private StartResult TryCreateSessionLocked(
+        Guid projectId,
+        Guid sessionId,
+        out StateChangedEventArgs? stateChanged)
     {
-        StateChanged?.Invoke(this, new StateChangedEventArgs
+        stateChanged = null;
+        if (_mutationLeases.Contains(projectId))
+        {
+            _logger.LogWarning("[Coordinator] 项目 {ProjectId} 正在配置变更中，拒绝启动运行。", projectId);
+            return StartResult.MutationInProgress;
+        }
+
+        // 创建新的取消令牌源（与 HTTP 请求 token 无关）
+        var cts = new CancellationTokenSource();
+        _ctsMap[projectId] = cts;
+
+        // 创建新会话
+        var session = new RuntimeSession
+        {
+            ProjectId = projectId,
+            SessionId = sessionId,
+            Status = RuntimeStatus.Starting,
+            StartedAt = DateTime.UtcNow,
+            CancellationTokenSource = cts
+        };
+
+        _sessions[projectId] = session;
+
+        _logger.LogInformation("[Coordinator] 会话已启动: {ProjectId}, Session: {SessionId}",
+            projectId, sessionId);
+
+        stateChanged = CreateStateChangedEventArgs(projectId, sessionId, RuntimeStatus.Starting, RuntimeStatus.Stopped);
+        return StartResult.Success;
+    }
+
+    private static StateChangedEventArgs CreateStateChangedEventArgs(
+        Guid projectId,
+        Guid sessionId,
+        RuntimeStatus newStatus,
+        RuntimeStatus oldStatus,
+        string? errorMessage = null)
+    {
+        return new StateChangedEventArgs
         {
             ProjectId = projectId,
             SessionId = sessionId,
             NewStatus = newStatus,
             OldStatus = oldStatus,
             ErrorMessage = errorMessage
-        });
+        };
+    }
+
+    private void RaiseStateChanged(StateChangedEventArgs? args)
+    {
+        if (args == null)
+        {
+            return;
+        }
+
+        var handlers = StateChanged;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((EventHandler<StateChangedEventArgs>)handler).Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[Coordinator] StateChanged 订阅者异常，已继续通知其它订阅者: {ProjectId}, {OldStatus} -> {NewStatus}",
+                    args.ProjectId,
+                    args.OldStatus,
+                    args.NewStatus);
+            }
+        }
     }
 
     private void ScheduleCleanup(Guid projectId, Guid sessionId)

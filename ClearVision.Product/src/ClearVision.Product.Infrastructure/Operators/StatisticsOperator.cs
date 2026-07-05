@@ -62,35 +62,27 @@ public class StatisticsOperator : OperatorBase
 
         var state = HistoryByOperator.GetOrAdd(@operator.Id, _ => new RollingHistoryState());
 
-        double[] snapshot;
+        RollingStatisticsSnapshot snapshot;
         lock (state.SyncRoot)
         {
             if (reset)
             {
-                state.Values.Clear();
+                state.Clear();
             }
 
-            state.Values.Enqueue(value);
-            while (state.Values.Count > windowSize)
-            {
-                state.Values.Dequeue();
-            }
-
+            state.Add(value, windowSize);
             state.LastTouchedUtc = nowUtc;
             state.Ttl = TimeSpan.FromMinutes(stateTtlMinutes);
-            snapshot = state.Values.ToArray();
+            snapshot = state.Snapshot();
         }
 
         TryCleanupStaleStates(nowUtc);
 
-        var count = snapshot.Length;
-        var mean = snapshot.Average();
-        var min = snapshot.Min();
-        var max = snapshot.Max();
-        var variance = count > 1
-            ? snapshot.Select(v => (v - mean) * (v - mean)).Sum() / (count - 1)
-            : 0.0;
-        var stdDev = Math.Sqrt(Math.Max(0, variance));
+        var count = snapshot.Count;
+        var mean = snapshot.Mean;
+        var min = snapshot.Min;
+        var max = snapshot.Max;
+        var stdDev = snapshot.StdDev;
 
         var output = new Dictionary<string, object>
         {
@@ -199,14 +191,97 @@ public class StatisticsOperator : OperatorBase
         return double.TryParse(param.Value.ToString(), out var value) ? value : null;
     }
 
+    private readonly record struct RollingStatisticsSnapshot(
+        int Count,
+        double Mean,
+        double StdDev,
+        double Min,
+        double Max);
+
     private sealed class RollingHistoryState
     {
         public object SyncRoot { get; } = new();
 
-        public Queue<double> Values { get; } = new();
+        private readonly Queue<double> _values = new();
+        private readonly LinkedList<double> _minCandidates = new();
+        private readonly LinkedList<double> _maxCandidates = new();
+        private double _sum;
+        private double _sumSquares;
 
         public DateTime LastTouchedUtc { get; set; } = DateTime.UtcNow;
 
         public TimeSpan Ttl { get; set; } = TimeSpan.FromMinutes(120);
+
+        public void Add(double value, int windowSize)
+        {
+            _values.Enqueue(value);
+            _sum += value;
+            _sumSquares += value * value;
+
+            while (_minCandidates.Last != null && _minCandidates.Last.Value > value)
+            {
+                _minCandidates.RemoveLast();
+            }
+
+            _minCandidates.AddLast(value);
+
+            while (_maxCandidates.Last != null && _maxCandidates.Last.Value < value)
+            {
+                _maxCandidates.RemoveLast();
+            }
+
+            _maxCandidates.AddLast(value);
+
+            while (_values.Count > windowSize)
+            {
+                RemoveOldest();
+            }
+        }
+
+        public void Clear()
+        {
+            _values.Clear();
+            _minCandidates.Clear();
+            _maxCandidates.Clear();
+            _sum = 0.0;
+            _sumSquares = 0.0;
+        }
+
+        public RollingStatisticsSnapshot Snapshot()
+        {
+            var count = _values.Count;
+            if (count == 0)
+            {
+                return new RollingStatisticsSnapshot(0, 0.0, 0.0, 0.0, 0.0);
+            }
+
+            var mean = _sum / count;
+            var variance = count > 1
+                ? (_sumSquares - (_sum * _sum / count)) / (count - 1)
+                : 0.0;
+            return new RollingStatisticsSnapshot(
+                count,
+                mean,
+                Math.Sqrt(Math.Max(0.0, variance)),
+                _minCandidates.First!.Value,
+                _maxCandidates.First!.Value);
+        }
+
+        private void RemoveOldest()
+        {
+            var removed = _values.Dequeue();
+            _sum -= removed;
+            _sumSquares -= removed * removed;
+
+            if (_minCandidates.First != null && _minCandidates.First.Value.Equals(removed))
+            {
+                _minCandidates.RemoveFirst();
+            }
+
+            if (_maxCandidates.First != null && _maxCandidates.First.Value.Equals(removed))
+            {
+                _maxCandidates.RemoveFirst();
+            }
+        }
     }
 }

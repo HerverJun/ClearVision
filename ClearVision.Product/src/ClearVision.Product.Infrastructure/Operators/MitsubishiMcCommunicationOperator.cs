@@ -97,26 +97,35 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             {
                 if (pollingMode.Equals("WaitForValue", StringComparison.OrdinalIgnoreCase))
                 {
-                    var pollingReadOutput = await ExecuteReadWithPollingAsync(
-                        client,
-                        address,
-                        dataType,
-                        (ushort)length,
-                        pollingCondition,
-                        pollingValue,
-                        pollingTimeout,
-                        pollingInterval,
+                    var pollingReadOutput = await ExecuteWithConnectionOperationLockAsync(
+                        connectionKey,
+                        () => ExecuteReadWithPollingAsync(
+                            client,
+                            address,
+                            dataType,
+                            (ushort)length,
+                            pollingCondition,
+                            pollingValue,
+                            pollingTimeout,
+                            pollingInterval,
+                            cancellationToken),
                         cancellationToken);
                     AttachConnectionAuditInfo(pollingReadOutput, connectionSource);
                     return pollingReadOutput;
                 }
 
-                var readOutput = await ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken);
+                var readOutput = await ExecuteWithConnectionOperationLockAsync(
+                    connectionKey,
+                    () => ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken),
+                    cancellationToken);
                 AttachConnectionAuditInfo(readOutput, connectionSource);
                 return readOutput;
             }
 
-            var writeOutput = await ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken);
+            var writeOutput = await ExecuteWithConnectionOperationLockAsync(
+                connectionKey,
+                () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
+                cancellationToken);
             AttachConnectionAuditInfo(writeOutput, connectionSource);
             return writeOutput;
         }

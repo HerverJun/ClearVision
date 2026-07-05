@@ -60,10 +60,14 @@ public sealed class MainForm : Form
     private readonly TextBox _logTextBox = new();
     private readonly List<RuntimeNormalizedResult> _recentResults = [];
     private readonly List<long> _durations = [];
+    private readonly Queue<string> _logLines = new();
     private string? _selectedImagePath;
     private string? _selectedFolderPath;
     private RuntimePackage? _loadedPackage;
     private RuntimeSiteProfile? _activeSiteProfile;
+    private const int DefaultLogRetainedLineCount = 200;
+    private const int LargeLogRetainedLineCount = 1000;
+    private const int MaxLogTrimBatchSize = 1000;
     private const int LeftSidebarWidth = 300;
     private const int RightSidebarWidth = 320;
 
@@ -1453,16 +1457,46 @@ public sealed class MainForm : Form
     private void AppendLog(string message)
     {
         var timestamped = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        var lines = _logTextBox.Lines.ToList();
-        lines.Add(timestamped);
-        while (lines.Count > (_loadedPackage?.RuntimeProfile.LogRetainedLineCount ?? 200))
+        var retainedLineCount = Math.Max(0, _loadedPackage?.RuntimeProfile.LogRetainedLineCount ?? DefaultLogRetainedLineCount);
+        if (retainedLineCount == 0)
         {
-            lines.RemoveAt(0);
+            _logLines.Clear();
+            _logTextBox.Clear();
+            return;
         }
 
-        _logTextBox.Lines = lines.ToArray();
-        _logTextBox.SelectionStart = _logTextBox.Text.Length;
+        _logLines.Enqueue(timestamped);
+        if (_logLines.Count > retainedLineCount + GetLogTrimBatchSize(retainedLineCount))
+        {
+            while (_logLines.Count > retainedLineCount)
+            {
+                _logLines.Dequeue();
+            }
+
+            _logTextBox.Lines = _logLines.ToArray();
+        }
+        else
+        {
+            if (_logTextBox.TextLength > 0)
+            {
+                _logTextBox.AppendText(Environment.NewLine);
+            }
+
+            _logTextBox.AppendText(timestamped);
+        }
+
+        _logTextBox.SelectionStart = _logTextBox.TextLength;
         _logTextBox.ScrollToCaret();
+    }
+
+    private static int GetLogTrimBatchSize(int retainedLineCount)
+    {
+        if (retainedLineCount < LargeLogRetainedLineCount)
+        {
+            return 0;
+        }
+
+        return Math.Min(MaxLogTrimBatchSize, Math.Max(32, retainedLineCount / 20));
     }
 
     private void RefreshHeaderCards()

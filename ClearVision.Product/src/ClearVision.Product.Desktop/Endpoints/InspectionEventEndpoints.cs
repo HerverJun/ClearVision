@@ -187,7 +187,14 @@ public static class InspectionEventEndpoints
             return parsedId;
         }
 
-        return 0;
+        if (long.TryParse(request.Query["lastEventId"].FirstOrDefault(), out var lastEventId))
+        {
+            return lastEventId;
+        }
+
+        return long.TryParse(request.Query["afterSequence"].FirstOrDefault(), out var afterSequence)
+            ? afterSequence
+            : 0;
     }
 
     private static int ResolveSseChannelCapacity()

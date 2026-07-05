@@ -1,6 +1,5 @@
 // OperatorBase.cs
 // 算子执行器抽象基类 - 提供统一的参数获取、输入检查、日志记录和执行计时功能
-// Encoding cleanup: previous comment text was unreadable.
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -42,7 +41,7 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 执行算子并应用统一的生命周期处理
     /// </summary>
     /// <param name="operator">算子实体</param>
     /// <param name="inputs">输入数据</param>
@@ -53,12 +52,12 @@ public abstract class OperatorBase : IOperatorExecutor
         Dictionary<string, object>? inputs = null,
         CancellationToken cancellationToken = default)
     {
-        // Encoding cleanup: previous comment text was unreadable.
+        // 统一入口委托给生命周期包装方法，保证异常、计时和输入释放一致。
         return await ExecuteWithLifecycleAsync(@operator, inputs, cancellationToken);
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 执行核心逻辑并统一管理计时、日志、取消和 ImageWrapper 输入引用释放。
     /// 
     /// Manages ImageWrapper reference counts automatically:
     /// 1. Before execution, upstream inputs have already called AddRef.
@@ -134,7 +133,7 @@ public abstract class OperatorBase : IOperatorExecutor
             // Sprint 1 Task 1.1: 释放输入中的 ImageWrapper 引用
             if (inputs != null)
             {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 同一个 ImageWrapper 可能被多个输入键引用，只释放一次。
                 var releasedImages = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
                 foreach (var value in inputs.Values)
                 {
@@ -169,11 +168,11 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 参数获取方法
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 获取指定参数，缺失或转换失败时返回默认值
     /// </summary>
     /// <typeparam name="T">目标类型</typeparam>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
     /// <returns>参数值</returns>
     protected T GetParam<T>(Operator @operator, string paramName, T defaultValue)
@@ -206,12 +205,12 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 获取可空值类型参数，缺失或转换失败时返回 null
     /// </summary>
-    /// <typeparam name="T">Parameter value type</typeparam>
-    /// <param name="operator">Operator instance</param>
-    /// <param name="paramName">Parameter name</param>
-    /// <returns>Parameter value, or null when the parameter is absent.</returns>
+    /// <typeparam name="T">参数值类型</typeparam>
+    /// <param name="operator">算子实体</param>
+    /// <param name="paramName">参数名</param>
+    /// <returns>参数值；参数不存在或转换失败时返回 null。</returns>
     protected T? GetParamOrNull<T>(Operator @operator, string paramName) where T : struct
     {
         var param = FindParameter(@operator, paramName);
@@ -240,7 +239,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 获取字符串参数
     /// </summary>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
     /// <returns>参数值</returns>
     protected string GetStringParam(Operator @operator, string paramName, string defaultValue = "")
@@ -252,10 +251,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 获取整型参数
     /// </summary>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="min">最小值约束</param>
+    /// <param name="max">最大值约束</param>
     /// <returns>参数值</returns>
     protected int GetIntParam(Operator @operator, string paramName, int defaultValue, int? min = null, int? max = null)
     {
@@ -273,10 +272,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 获取双精度浮点参数
     /// </summary>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="min">最小值约束</param>
+    /// <param name="max">最大值约束</param>
     /// <returns>参数值</returns>
     protected double GetDoubleParam(Operator @operator, string paramName, double defaultValue, double? min = null, double? max = null)
     {
@@ -294,10 +293,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 获取单精度浮点参数
     /// </summary>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="min">最小值约束</param>
+    /// <param name="max">最大值约束</param>
     /// <returns>参数值</returns>
     protected float GetFloatParam(Operator @operator, string paramName, float defaultValue, float? min = null, float? max = null)
     {
@@ -315,7 +314,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 获取布尔参数
     /// </summary>
     /// <param name="operator">算子实体</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="paramName">参数名</param>
     /// <param name="defaultValue">默认值</param>
     /// <returns>参数值</returns>
     protected bool GetBoolParam(Operator @operator, string paramName, bool defaultValue)
@@ -328,8 +327,7 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 输入处理方法
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 按键名获取图像输入，必要时把兼容输入包装为 ImageWrapper
     /// </summary>
     /// <param name="inputs">输入字典</param>
     /// <param name="key">图像键名，默认为 "Image"</param>
@@ -369,7 +367,7 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 从默认 Image 键获取图像输入
     /// </summary>
     /// <param name="inputs">输入字典</param>
     /// <param name="image">输出图像包装器</param>
@@ -418,7 +416,7 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 输出处理方法 (P0: ImageWrapper 零拷贝输出)
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 创建以 ImageWrapper 承载图像的输出字典
     /// </summary>
     /// <param name="mat">输出图像Mat</param>
     /// <param name="additionalData">附加数据</param>
@@ -478,10 +476,10 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 创建图像输出，可在 ImageWrapper 零拷贝和 PNG byte[] 兼容格式之间选择
     /// </summary>
     /// <param name="mat">输出图像Mat</param>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// <param name="useZeroCopy">是否使用 ImageWrapper 零拷贝输出</param>
     /// <param name="additionalData">附加数据</param>
     /// <returns>输出字典</returns>
     protected Dictionary<string, object> CreateImageOutput(Mat mat, bool useZeroCopy, Dictionary<string, object>? additionalData = null)
@@ -632,7 +630,7 @@ public abstract class OperatorBase : IOperatorExecutor
             if (targetType == typeof(long) || targetType == typeof(long?))
                 return (T?)(object)element.GetInt64();
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 其他简单类型回退到字符串转换。
             return (T?)Convert.ChangeType(element.ToString(), targetType);
         }
         catch

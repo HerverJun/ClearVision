@@ -31,6 +31,7 @@ namespace ClearVision.Product.Application.Services;
 public class InspectionService : IInspectionService
 {
     private const string TraceabilityFieldName = "Traceability";
+    private static readonly TimeSpan RealtimeStartRollbackTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IInspectionResultRepository _resultRepository;
     private readonly IProjectRepository _projectRepository;
@@ -357,7 +358,7 @@ public class InspectionService : IInspectionService
         {
             // Worker 启动失败，回滚 Coordinator 状态
             _logger.LogError("[InspectionService] Worker 启动失败，回滚状态: {ProjectId}", projectId);
-            await _coordinator.TryStopAsync(projectId, cancellationToken);
+            await RollbackRealtimeStartAsync(projectId, sessionId);
             throw new InvalidOperationException("实时检测启动失败，请重试");
         }
 
@@ -367,6 +368,35 @@ public class InspectionService : IInspectionService
 
         // 注意：不再使用 Task.Run + onResultReady 回调
         // 结果通过事件总线推送（Phase 2 实现）
+    }
+
+    private async Task RollbackRealtimeStartAsync(Guid projectId, Guid sessionId)
+    {
+        try
+        {
+            using var rollbackCts = new CancellationTokenSource(RealtimeStartRollbackTimeout);
+            var stopRequested = await _coordinator.TryStopAsync(projectId, rollbackCts.Token);
+            if (stopRequested)
+            {
+                _coordinator.MarkAsStopped(projectId, sessionId);
+            }
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogError(
+                ex,
+                "[InspectionService] Worker 启动失败后的状态回滚超时: {ProjectId}, SessionId={SessionId}",
+                projectId,
+                sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "[InspectionService] Worker 启动失败后的状态回滚异常: {ProjectId}, SessionId={SessionId}",
+                projectId,
+                sessionId);
+        }
     }
 
     /// <summary>

@@ -760,7 +760,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             await _resultWriter.EnqueueAsync(result, cancellationToken);
         }
 
-        ResultAvailable?.Invoke(result);
+        InvokeRuntimeEventHandlers(ResultAvailable, result, nameof(ResultAvailable));
         EmitLog($"{result.ImageId}: {FormatOutcome(result.Outcome)}（{result.ExecutionTimeMs} ms）");
         EmitSnapshot();
         await Task.CompletedTask;
@@ -1073,13 +1073,36 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     private void EmitSnapshot()
     {
-        SnapshotChanged?.Invoke(GetSnapshot());
+        InvokeRuntimeEventHandlers(SnapshotChanged, GetSnapshot(), nameof(SnapshotChanged));
     }
 
     private void EmitLog(string message)
     {
-        LogMessage?.Invoke(message);
+        InvokeRuntimeEventHandlers(LogMessage, message, nameof(LogMessage));
         _logger.LogInformation("{Message}", message);
+    }
+
+    private void InvokeRuntimeEventHandlers<T>(Action<T>? handlers, T value, string eventName)
+    {
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((Action<T>)handler).Invoke(value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "RuntimeHost {EventName} subscriber failed; continuing with remaining subscribers.",
+                    eventName);
+            }
+        }
     }
 
     private RuntimeSiteProfile GetActiveSiteProfileSnapshot(RuntimePackage package)

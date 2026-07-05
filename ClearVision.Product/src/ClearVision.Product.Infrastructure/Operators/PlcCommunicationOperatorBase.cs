@@ -23,13 +23,16 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     private static readonly Dictionary<string, IPlcClient> _connectionPool = new();
     private static readonly SemaphoreSlim _poolLock = new(1, 1);
     private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionKeyLocks = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _operationLocks = new(StringComparer.Ordinal);
 
     // ─── 心跳巡检 ─────────────────────────────────────────────
+    private static readonly object _heartbeatGate = new();
     private static Task? _heartbeatTask;
     private static CancellationTokenSource? _heartbeatCts;
     private static readonly ConcurrentDictionary<string, bool> _lastKnownState = new(StringComparer.Ordinal);
     private static ILogger? _heartbeatLogger;
     private static bool _heartbeatStarted;
+    private static bool _processExitRegistered;
 
     /// <summary>
     /// 心跳检测间隔（毫秒）
@@ -40,6 +43,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// 单次 Ping 超时（毫秒）。超时视为设备忙碌（≈在线）
     /// </summary>
     private const int PingTimeoutMs = 2000;
+    private const int MaxHeartbeatConcurrency = 4;
     private static readonly object _configLock = new();
     private static readonly TimeSpan ConfigRefreshInterval = TimeSpan.FromSeconds(2);
     private static readonly JsonSerializerOptions _configJsonOptions = new()
@@ -53,11 +57,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     protected PlcCommunicationOperatorBase(ILogger logger) : base(logger)
     {
         // 首次创建算子时自动启动心跳巡检
-        if (!_heartbeatStarted)
-        {
-            _heartbeatLogger = logger;
-            StartHeartbeat();
-        }
+        StartHeartbeat(logger);
     }
 
     // ─── 心跳管理 ─────────────────────────────────────────────
@@ -67,15 +67,33 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// </summary>
     public static void StartHeartbeat()
     {
-        if (_heartbeatStarted)
-            return;
-        _heartbeatStarted = true;
+        StartHeartbeat(null);
+    }
 
-        _heartbeatCts = new CancellationTokenSource();
-        _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCts.Token));
+    private static void StartHeartbeat(ILogger? logger)
+    {
+        lock (_heartbeatGate)
+        {
+            if (_heartbeatStarted)
+            {
+                return;
+            }
 
-        // 注册进程退出时优雅关闭
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => StopHeartbeat();
+            if (logger != null)
+            {
+                _heartbeatLogger = logger;
+            }
+
+            _heartbeatCts = new CancellationTokenSource();
+            _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCts.Token));
+            _heartbeatStarted = true;
+
+            if (!_processExitRegistered)
+            {
+                AppDomain.CurrentDomain.ProcessExit += (_, _) => StopHeartbeat();
+                _processExitRegistered = true;
+            }
+        }
     }
 
     /// <summary>
@@ -83,15 +101,28 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// </summary>
     public static void StopHeartbeat()
     {
-        if (!_heartbeatStarted)
-            return;
+        Task? heartbeatTask;
+        CancellationTokenSource? heartbeatCts;
 
-        _heartbeatCts?.Cancel();
-        _heartbeatStarted = false;
+        lock (_heartbeatGate)
+        {
+            if (!_heartbeatStarted)
+            {
+                return;
+            }
+
+            heartbeatTask = _heartbeatTask;
+            heartbeatCts = _heartbeatCts;
+            _heartbeatTask = null;
+            _heartbeatCts = null;
+            _heartbeatStarted = false;
+        }
+
+        heartbeatCts?.Cancel();
 
         try
         {
-            _heartbeatTask?.Wait(TimeSpan.FromSeconds(3));
+            heartbeatTask?.Wait(TimeSpan.FromSeconds(3));
         }
         catch (AggregateException)
         {
@@ -99,15 +130,13 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         }
         finally
         {
-            _heartbeatCts?.Dispose();
-            _heartbeatCts = null;
-            _heartbeatTask = null;
+            heartbeatCts?.Dispose();
         }
     }
 
     public static IReadOnlyDictionary<string, bool> GetConnectionStateSnapshot()
     {
-        if (_poolLock.Wait(50))
+        if (_poolLock.Wait(0))
         {
             try
             {
@@ -215,13 +244,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
                 if (snapshot.Length == 0)
                     continue;
 
-                // 逐个检测
-                foreach (var (key, client) in snapshot)
-                {
-                    if (ct.IsCancellationRequested)
-                        break;
-                    await PingClientAsync(key, client, ct);
-                }
+                await PingSnapshotAsync(snapshot, ct);
             }
             catch (OperationCanceledException)
             {
@@ -234,6 +257,25 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         }
 
         _heartbeatLogger?.LogInformation("[Heartbeat] 心跳巡检已停止");
+    }
+
+    private static async Task PingSnapshotAsync(KeyValuePair<string, IPlcClient>[] snapshot, CancellationToken ct)
+    {
+        if (snapshot.Length == 1)
+        {
+            var (key, client) = snapshot[0];
+            await PingClientAsync(key, client, ct);
+            return;
+        }
+
+        await Parallel.ForEachAsync(
+            snapshot,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = MaxHeartbeatConcurrency,
+                CancellationToken = ct
+            },
+            async (entry, token) => await PingClientAsync(entry.Key, entry.Value, token));
     }
 
     /// <summary>
@@ -249,7 +291,10 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             pingCts.CancelAfter(PingTimeoutMs);
 
-            isAlive = await client.PingAsync(pingCts.Token);
+            isAlive = await ExecuteWithConnectionOperationLockCoreAsync(
+                key,
+                () => client.PingAsync(pingCts.Token),
+                pingCts.Token);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -433,6 +478,39 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             }
 
             ReleaseRefCountedSemaphore(_connectionKeyLocks, connectionKey, keyLockEntry);
+        }
+    }
+
+    protected Task<T> ExecuteWithConnectionOperationLockAsync<T>(
+        string connectionKey,
+        Func<Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        return ExecuteWithConnectionOperationLockCoreAsync(connectionKey, operation, cancellationToken);
+    }
+
+    private static async Task<T> ExecuteWithConnectionOperationLockCoreAsync<T>(
+        string connectionKey,
+        Func<Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        var operationLockEntry = AcquireRefCountedSemaphore(_operationLocks, connectionKey);
+        var lockAcquired = false;
+
+        try
+        {
+            await operationLockEntry.Semaphore.WaitAsync(cancellationToken);
+            lockAcquired = true;
+            return await operation();
+        }
+        finally
+        {
+            if (lockAcquired)
+            {
+                operationLockEntry.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(_operationLocks, connectionKey, operationLockEntry);
         }
     }
 

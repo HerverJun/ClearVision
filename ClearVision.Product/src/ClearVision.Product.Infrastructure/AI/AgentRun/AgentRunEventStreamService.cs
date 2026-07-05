@@ -52,6 +52,7 @@ public sealed record AgentRunTerminalReservationResult(
 public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 {
     private const int MaxRecentEvents = 4096;
+    private const int MaxSubscriberBufferedEvents = 256;
 
     private readonly ConcurrentDictionary<string, AgentRunState> _runs = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, AgentRunStreamToken> _streamTokens = new(StringComparer.Ordinal);
@@ -121,34 +122,43 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             return null;
         }
 
-        AgentRunEvent evt;
-        List<ChannelWriter<AgentRunEvent>> subscribers;
+        AgentRunEvent? evt = null;
+        AgentRunSummary? summary = null;
+        List<ChannelWriter<AgentRunEvent>> subscribers = [];
         lock (state.Gate)
         {
             if (state.IsTerminal)
             {
                 state.DroppedEventCount++;
-                _store.AppendSummary(state.ToSummary());
-                return null;
+                summary = state.ToSummary();
             }
-
-            evt = BuildSafeEvent(state.RunId, state.NextSequence(), draft);
-            state.Events.Add(evt);
-            if (state.Events.Count > MaxRecentEvents)
+            else
             {
-                state.Events.RemoveRange(0, state.Events.Count - MaxRecentEvents);
+                evt = BuildSafeEvent(state.RunId, state.NextSequence(), draft);
+                state.Events.Add(evt);
+                if (state.Events.Count > MaxRecentEvents)
+                {
+                    state.Events.RemoveRange(0, state.Events.Count - MaxRecentEvents);
+                }
+
+                UpdateSummaryFromEvent(state, evt);
+                summary = state.ToSummary();
+                subscribers = state.Subscribers.ToList();
+            }
+        }
+
+        if (evt == null)
+        {
+            if (summary != null)
+            {
+                _store.AppendSummary(summary);
             }
 
-            UpdateSummaryFromEvent(state, evt);
-            _store.AppendEvent(evt);
-            _store.AppendSummary(state.ToSummary());
-            subscribers = state.Subscribers.ToList();
+            return null;
         }
 
-        foreach (var subscriber in subscribers)
-        {
-            subscriber.TryWrite(evt);
-        }
+        _store.AppendEventWithSummary(evt, summary!);
+        PublishToSubscribers(state, subscribers, evt);
 
         return evt;
     }
@@ -251,6 +261,8 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             return null;
         }
 
+        AgentRunTerminalIntentRecord record;
+        AgentRunSummary summary;
         lock (state.Gate)
         {
             if (state.IsTerminal)
@@ -290,7 +302,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                     : null;
             }
 
-            var record = new AgentRunTerminalIntentRecord
+            record = new AgentRunTerminalIntentRecord
             {
                 RunId = state.RunId,
                 SessionId = intent.SessionId?.Trim() ?? string.Empty,
@@ -308,9 +320,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
             state.TerminalIntent = record;
             state.UpdatedAt = UtcNowProvider();
-            _store.AppendSummary(state.ToSummary());
-            return record;
+            summary = state.ToSummary();
         }
+
+        _store.AppendSummary(summary);
+        return record;
     }
 
     public AgentRunEvent? Complete(
@@ -400,10 +414,12 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             return null;
         }
 
-        var channel = Channel.CreateUnbounded<AgentRunEvent>(new UnboundedChannelOptions
+        var channel = Channel.CreateBounded<AgentRunEvent>(new BoundedChannelOptions(MaxSubscriberBufferedEvents)
         {
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
         });
 
         IReadOnlyList<AgentRunEvent> replay;
@@ -633,6 +649,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         }
 
         AgentRunEvent evt;
+        AgentRunSummary summary;
         List<ChannelWriter<AgentRunEvent>> subscribers;
         lock (state.Gate)
         {
@@ -659,19 +676,70 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                     Phase = "TerminalCommitted"
                 };
             }
-            _store.AppendEvent(evt);
-            _store.AppendSummary(state.ToSummary());
+            summary = state.ToSummary();
             subscribers = state.Subscribers.ToList();
             state.Subscribers.Clear();
         }
 
+        _store.AppendEventWithSummary(evt, summary);
+
         foreach (var subscriber in subscribers)
         {
-            subscriber.TryWrite(evt);
+            if (!subscriber.TryWrite(evt))
+            {
+                MarkLaggedSubscriber(state, subscriber, removeFromActiveSubscribers: false);
+            }
+
             subscriber.TryComplete();
         }
 
         return evt;
+    }
+
+    private void PublishToSubscribers(
+        AgentRunState state,
+        IReadOnlyList<ChannelWriter<AgentRunEvent>> subscribers,
+        AgentRunEvent evt)
+    {
+        foreach (var subscriber in subscribers)
+        {
+            if (subscriber.TryWrite(evt))
+            {
+                continue;
+            }
+
+            MarkLaggedSubscriber(state, subscriber, removeFromActiveSubscribers: true);
+        }
+    }
+
+    private void MarkLaggedSubscriber(
+        AgentRunState state,
+        ChannelWriter<AgentRunEvent> subscriber,
+        bool removeFromActiveSubscribers)
+    {
+        var shouldRecordStaleSubscriber = false;
+        AgentRunSummary? summary = null;
+        lock (state.Gate)
+        {
+            shouldRecordStaleSubscriber = removeFromActiveSubscribers
+                ? state.Subscribers.Remove(subscriber)
+                : true;
+            if (shouldRecordStaleSubscriber)
+            {
+                state.StaleEventCount++;
+                summary = state.ToSummary();
+            }
+        }
+
+        if (shouldRecordStaleSubscriber)
+        {
+            if (summary != null)
+            {
+                _store.AppendSummary(summary);
+            }
+
+            subscriber.TryComplete();
+        }
     }
 
     private static bool CanCommitTerminalLocked(

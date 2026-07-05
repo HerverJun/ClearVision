@@ -92,7 +92,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly IVariableContext _variableContext;
     private readonly IProjectVariableExecutionContextAccessor _projectVariableContextAccessor;
 
-    // Encoding cleanup: previous comment text was unreadable.
+    // 调试输出缓存按调试会话和算子分桶；大小索引在 _debugCacheEvictionGate 下同步维护。
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), string> _debugCacheFingerprints = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), long> _debugCacheEntrySizes = new();
@@ -564,7 +564,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             projectVariableContext?.RunId ?? Guid.NewGuid(),
             enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 每次流程执行视为一次变量循环，先递增再写入算子可读取的上下文。
         _variableContext.IncrementCycleCount();
         _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
 
@@ -579,7 +579,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         try
         {
-            // Encoding cleanup: previous comment text was unreadable.
+            // 执行计划缓存包含拓扑、扇出和端口索引，并按流程 stamp 自动失效。
             var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
@@ -1123,7 +1123,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             using var layerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             OperatorExecutionResult? primaryLayerFailure = null;
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 同一层级内的算子可并行执行；首个失败会通过 layerCts 请求取消同层剩余任务。
             var layerTasks = layer.Select(op => ExecuteParallelLayerOperatorAsync(
                 plan,
                 op,
@@ -1441,11 +1441,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return layers;
     }
 
-    // Encoding cleanup: previous comment text was unreadable.
+    // 单算子默认超时，防止外设、脚本或模型推理调用永久挂起。
     private const int DefaultOperatorTimeoutMs = 30000;
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 执行单个算子，并将异常、取消和超时归一化为 OperatorExecutionResult
     /// </summary>
     private async Task<OperatorExecutionResult> ExecuteOperatorInternalAsync(
         Operator op,
@@ -1462,7 +1462,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 具体执行器负责核心逻辑；OperatorBase 会统一释放输入中的 ImageWrapper 引用。
             var opResult = await executor.ExecuteAsync(op, inputs, timeoutCts.Token);
             opStopwatch.Stop();
 
@@ -1650,7 +1650,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
             catch (ObjectDisposedException)
             {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 取消可能与正常清理并发；CTS 已释放时无需再处理。
             }
         }
 
@@ -1664,8 +1664,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 将调试输出中的 ImageWrapper/Mat 归一化为 byte[]，并过滤运行时上下文输入
     /// </summary>
     private Dictionary<string, object> ConvertImageWrappersToBytes(Dictionary<string, object>? outputData)
     {
@@ -1939,7 +1938,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region Sprint 1 Task 1.1: 扇出预分析与引用计数管理
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 分析每个输出端口连接到多少个下游算子。
     /// 用于决定 ImageWrapper 的引用计数初始值。
     /// </summary>
     private static Dictionary<(Guid OperatorId, Guid PortId), int> AnalyzeFanOutDegrees(
@@ -1964,8 +1963,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 根据扇出度为输出 ImageWrapper 增加引用计数。
+    /// 每个下游消费者都会在算子生命周期结束时释放自己的引用。
     /// </summary>
     private void ApplyFanOutRefCounts(
         Operator op,
@@ -1989,7 +1988,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 ? fanOutDegrees.GetValueOrDefault((op.Id, port.Id), 1)
                 : 1;
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 输出初始引用已为 1，只为额外消费者补 AddRef。
             for (int i = 1; i < fanOut; i++)
             {
                 img.AddRef();
@@ -2066,8 +2065,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         inputPreparationIndex ??= BuildFlowInputPreparationIndex(flow);
 
-        // Encoding cleanup: previous comment text was unreadable.
-        // Encoding cleanup: previous comment text was unreadable.
+        // 先注入算子参数作为基础输入，连接输入随后按端口映射补充或覆盖对应字段。
         foreach (var param in op.Parameters)
         {
             if (param.Value != null)
@@ -2076,7 +2074,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 再按拓扑连接收集上游输出。
         var incomingConnections = inputPreparationIndex.GetIncomingConnections(op.Id);
 
         // 如果没有输入连接，尝试从初始输入数据获取 (Guid.Empty)
@@ -2100,13 +2098,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 if (operatorOutputs.TryGetValue(connection.SourceOperatorId, out var sourceOutputs))
                 {
-                    // Encoding cleanup: previous comment text was unreadable.
+                    // 按源算子类型选择条件分支特殊处理或普通端口映射。
                     var sourceOperator = inputPreparationIndex.GetSourceOperator(connection.SourceOperatorId);
 
                     if (sourceOperator?.Type == OperatorType.ConditionalBranch)
                     {
-                        // Encoding cleanup: previous comment text was unreadable.
-                        // Encoding cleanup: previous comment text was unreadable.
+                        // 条件分支只向被激活的输出端口传播数据。
                         var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
                         if (sourcePort != null)
                         {
@@ -2124,7 +2121,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     inputs[portName] = portData;
                                 }
-                                // Encoding cleanup: previous comment text was unreadable.
+                                // 保留条件判断详情，兼容读取这些字段的下游算子。
                                 if (sourceOutputs.TryGetValue("Result", out var result))
                                     inputs["ConditionResult"] = result;
                                 if (sourceOutputs.TryGetValue("Condition", out var condition))
@@ -2132,15 +2129,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 if (sourceOutputs.TryGetValue("ActualValue", out var actualValue))
                                     inputs["ActualValue"] = actualValue;
                             }
-                            // Encoding cleanup: previous comment text was unreadable.
+                            // 未命中的分支不注入数据，避免下游误以为有有效输入。
                         }
                     }
                     else
                     {
-                        // Encoding cleanup: previous comment text was unreadable.
-
-                        // Encoding cleanup: previous comment text was unreadable.
-                        // Encoding cleanup: previous comment text was unreadable.
+                        // 普通算子优先使用端口元数据做精确映射；找不到端口时再走兼容合并。
                         Port? sourcePort = null;
                         Port? targetPort = null;
                         if (sourceOperator != null)
@@ -2151,10 +2145,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                             // 【Bug 4 修复】基于端口名称的精确映射
                             if (sourcePort != null && targetPort != null)
                             {
-                                // Encoding cleanup: previous comment text was unreadable.
+                                // 按源端口解析实际输出数据，兼容 Image/Output/端口名等历史键。
                                 if (TryResolveConnectedSourceOutputData(sourceOutputs, sourceOperator, sourcePort, out var data) && data != null)
                                 {
-                                    // Encoding cleanup: previous comment text was unreadable.
+                                    // 按目标端口名写入，避免源/目标端口名不一致时丢输入。
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
                                     PropagateSpatialContextForConnection(sourceOutputs, connection, sourceOperator, sourcePort, targetPort, inputs);
@@ -2162,9 +2156,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                             }
                         }
 
-                        // Encoding cleanup: previous comment text was unreadable.
-                        // Encoding cleanup: previous comment text was unreadable.
-                        // Encoding cleanup: previous comment text was unreadable.
+                        // 保留历史兼容的全量输出合并，用于旧算子读取非端口命名字段。
                         // 我们依然执行全量合并，但跳过已存在的键（避免覆盖精确映射的结果）
                         foreach (var kvp in sourceOutputs)
                         {
@@ -2648,7 +2640,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region 调试功能实现
 
     /// <summary>
-    // Encoding cleanup: previous comment text was unreadable.
+    /// 在项目变量上下文中执行调试流程，成功完整运行后提交正式变量写入
     /// </summary>
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
         OperatorFlow flow,
@@ -2751,7 +2743,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 调试模式按拓扑顺序逐个执行，支持断点和单步暂停。
             int completedCount = 0;
             Guid? pausedOperatorId = null;
 
@@ -2773,7 +2765,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                     if (options.StepMode)
                     {
-                        // Encoding cleanup: previous comment text was unreadable.
+                        // 单步模式命中断点后暂停，等待下一次调试请求继续。
                         break;
                     }
                 }
@@ -2963,7 +2955,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     break;
                 }
 
-                // Encoding cleanup: previous comment text was unreadable.
+                // 仅缓存成功归一化后的可序列化输出，避免保存运行时对象引用。
                 if (cacheEnabledForOperator && normalizedOutputData.Count > 0)
                 {
                     SetDebugCacheEntry(cacheKey, normalizedOutputData, cacheFingerprint!);
@@ -3075,7 +3067,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     public Task ClearDebugCacheAsync(Guid debugSessionId)
     {
-        // Encoding cleanup: previous comment text was unreadable.
+        // 在同一锁内移除缓存和大小计数，保证总字节数一致。
         lock (_debugCacheEvictionGate)
         {
             var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();

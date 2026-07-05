@@ -86,13 +86,19 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
 
             if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
             {
-                var readOutput = await ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken);
+                var readOutput = await ExecuteWithConnectionOperationLockAsync(
+                    connectionKey,
+                    () => ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken),
+                    cancellationToken);
                 AttachConnectionAuditInfo(readOutput, connectionSource);
                 return readOutput;
             }
             else
             {
-                var writeOutput = await ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken);
+                var writeOutput = await ExecuteWithConnectionOperationLockAsync(
+                    connectionKey,
+                    () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
+                    cancellationToken);
                 AttachConnectionAuditInfo(writeOutput, connectionSource);
                 return writeOutput;
             }

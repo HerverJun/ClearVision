@@ -1046,6 +1046,11 @@ public class ShapeMatchingOperator : OperatorBase
 
     private static List<MatchResult> NonMaximumSuppression(List<MatchResult> matches, float iouThreshold)
     {
+        if (matches.Count == 0)
+        {
+            return new List<MatchResult>();
+        }
+
         var sorted = matches
             .OrderByDescending(m => m.Score)
             .ThenBy(m => m.Y)
@@ -1053,14 +1058,31 @@ public class ShapeMatchingOperator : OperatorBase
             .ThenBy(m => m.Angle)
             .ThenBy(m => m.Scale)
             .ToList();
-        var result = new List<MatchResult>();
+        var result = new List<MatchResult>(sorted.Count);
+        var suppressed = new bool[sorted.Count];
 
-        while (sorted.Count > 0)
+        for (var i = 0; i < sorted.Count; i++)
         {
-            var best = sorted[0];
+            if (suppressed[i])
+            {
+                continue;
+            }
+
+            var best = sorted[i];
             result.Add(best);
-            sorted.RemoveAt(0);
-            sorted = sorted.Where(m => CalculateIoU(best, m) < iouThreshold).ToList();
+
+            for (var j = i + 1; j < sorted.Count; j++)
+            {
+                if (suppressed[j])
+                {
+                    continue;
+                }
+
+                if (CalculateIoU(best, sorted[j]) >= iouThreshold)
+                {
+                    suppressed[j] = true;
+                }
+            }
         }
 
         return result;

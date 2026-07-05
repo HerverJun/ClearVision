@@ -11,7 +11,8 @@ public sealed class StationHubClient : IAsyncDisposable
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationHubClient> _logger;
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
-    private HubConnection? _connection;
+    private readonly Func<string, string, IStationHubConnection> _connectionFactory;
+    private IStationHubConnection? _connection;
     private ConnectionSignature? _connectionSignature;
     private long _connectionEpoch;
     private bool _disposed;
@@ -19,9 +20,18 @@ public sealed class StationHubClient : IAsyncDisposable
     public StationHubClient(
         IOptions<StationSyncOptions> options,
         ILogger<StationHubClient> logger)
+        : this(options, logger, null)
+    {
+    }
+
+    internal StationHubClient(
+        IOptions<StationSyncOptions> options,
+        ILogger<StationHubClient> logger,
+        Func<string, string, IStationHubConnection>? connectionFactory)
     {
         _options = options.Value;
         _logger = logger;
+        _connectionFactory = connectionFactory ?? BuildSignalRConnection;
     }
 
     public bool IsConnected => _connection?.State == HubConnectionState.Connected;
@@ -54,42 +64,7 @@ public sealed class StationHubClient : IAsyncDisposable
 
         try
         {
-            if (_disposed)
-            {
-                return false;
-            }
-
-            var desiredSignature = BuildConnectionSignature();
-            if (desiredSignature == null)
-            {
-                await DisposeConnectionCoreAsync();
-                return false;
-            }
-
-            if (_connection != null && !desiredSignature.Equals(_connectionSignature))
-            {
-                _logger.LogInformation(
-                    "Station sync connection settings changed. Reconnecting Studio Station hub from {OldHubUrl} to {NewHubUrl}.",
-                    _connectionSignature?.HubUrl ?? "none",
-                    desiredSignature.HubUrl);
-                await DisposeConnectionCoreAsync();
-            }
-
-            _connection ??= BuildConnection(desiredSignature);
-            _connectionSignature ??= desiredSignature;
-            if (_connection.State == HubConnectionState.Connected ||
-                _connection.State == HubConnectionState.Connecting ||
-                _connection.State == HubConnectionState.Reconnecting)
-            {
-                return _connection.State == HubConnectionState.Connected;
-            }
-
-            await _connection.StartAsync(cancellationToken);
-            BumpConnectionEpoch();
-            LastConnectedAtUtc = DateTimeOffset.UtcNow;
-            LastErrorMessage = string.Empty;
-            _logger.LogInformation("Connected to Studio Station hub at {HubUrl}", desiredSignature.HubUrl);
-            return true;
+            return await EnsureConnectedCoreAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -165,21 +140,7 @@ public sealed class StationHubClient : IAsyncDisposable
 
     public async Task<bool> ReportCommandResultAsync(StationCommandResultDto payload, CancellationToken cancellationToken)
     {
-        if (!await EnsureConnectedAsync(cancellationToken))
-        {
-            return false;
-        }
-
-        try
-        {
-            await _connection!.InvokeAsync(StationHubMethods.ReportCommandResult, payload, cancellationToken);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            await HandleInvocationFailureAsync(StationHubMethods.ReportCommandResult, ex);
-            return false;
-        }
+        return await InvokeVoidAsync(StationHubMethods.ReportCommandResult, payload, cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -266,21 +227,71 @@ public sealed class StationHubClient : IAsyncDisposable
         _connectionSignature = null;
     }
 
-    private HubConnection BuildConnection(ConnectionSignature signature)
+    private async Task<bool> EnsureConnectedCoreAsync(CancellationToken cancellationToken)
+    {
+        if (_disposed)
+        {
+            return false;
+        }
+
+        var desiredSignature = BuildConnectionSignature();
+        if (desiredSignature == null)
+        {
+            await DisposeConnectionCoreAsync();
+            return false;
+        }
+
+        if (_connection != null && !desiredSignature.Equals(_connectionSignature))
+        {
+            _logger.LogInformation(
+                "Station sync connection settings changed. Reconnecting Studio Station hub from {OldHubUrl} to {NewHubUrl}.",
+                _connectionSignature?.HubUrl ?? "none",
+                desiredSignature.HubUrl);
+            await DisposeConnectionCoreAsync();
+        }
+
+        if (_connection == null)
+        {
+            _connection = _connectionFactory(desiredSignature.HubUrl, desiredSignature.SharedToken);
+            ConfigureConnectionEvents(_connection);
+            _connectionSignature = desiredSignature;
+        }
+
+        if (_connection.State == HubConnectionState.Connected ||
+            _connection.State == HubConnectionState.Connecting ||
+            _connection.State == HubConnectionState.Reconnecting)
+        {
+            return _connection.State == HubConnectionState.Connected;
+        }
+
+        await _connection.StartAsync(cancellationToken);
+        BumpConnectionEpoch();
+        LastConnectedAtUtc = DateTimeOffset.UtcNow;
+        LastErrorMessage = string.Empty;
+        _logger.LogInformation("Connected to Studio Station hub at {HubUrl}", desiredSignature.HubUrl);
+        return true;
+    }
+
+    private IStationHubConnection BuildSignalRConnection(string hubUrl, string sharedToken)
     {
         var connection = new HubConnectionBuilder()
             .WithUrl(
-                signature.HubUrl,
+                hubUrl,
                 options =>
                 {
                     options.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
-                    options.AccessTokenProvider = () => Task.FromResult<string?>(signature.SharedToken);
-                    options.Headers[StationSyncContractDefaults.StationTokenHeaderName] = signature.SharedToken;
-                    options.Headers["X-Station-Token"] = signature.SharedToken;
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(sharedToken);
+                    options.Headers[StationSyncContractDefaults.StationTokenHeaderName] = sharedToken;
+                    options.Headers["X-Station-Token"] = sharedToken;
                 })
             .WithAutomaticReconnect()
             .Build();
 
+        return new SignalRStationHubConnection(connection);
+    }
+
+    private void ConfigureConnectionEvents(IStationHubConnection connection)
+    {
         connection.Closed += error =>
         {
             if (error != null)
@@ -312,25 +323,92 @@ public sealed class StationHubClient : IAsyncDisposable
             _logger.LogInformation("Reconnected to Studio Station hub. ConnectionId={ConnectionId}", connectionId);
             return Task.CompletedTask;
         };
-
-        return connection;
     }
 
     private async Task<T?> InvokeAsync<T>(string methodName, object payload, CancellationToken cancellationToken)
     {
-        if (!await EnsureConnectedAsync(cancellationToken))
+        Exception? invocationFailure = null;
+        try
+        {
+            await _connectionGate.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
         {
             return default;
         }
 
         try
         {
+            if (!await EnsureConnectedCoreAsync(cancellationToken))
+            {
+                return default;
+            }
+
             return await _connection!.InvokeAsync<T>(methodName, payload, cancellationToken);
         }
         catch (Exception ex)
         {
-            await HandleInvocationFailureAsync(methodName, ex);
+            invocationFailure = ex;
             return default;
+        }
+        finally
+        {
+            try
+            {
+                _connectionGate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            if (invocationFailure != null)
+            {
+                await HandleInvocationFailureAsync(methodName, invocationFailure);
+            }
+        }
+    }
+
+    private async Task<bool> InvokeVoidAsync(string methodName, object payload, CancellationToken cancellationToken)
+    {
+        Exception? invocationFailure = null;
+        try
+        {
+            await _connectionGate.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (!await EnsureConnectedCoreAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            await _connection!.InvokeAsync(methodName, payload, cancellationToken);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            invocationFailure = ex;
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                _connectionGate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            if (invocationFailure != null)
+            {
+                await HandleInvocationFailureAsync(methodName, invocationFailure);
+            }
         }
     }
 
@@ -389,4 +467,71 @@ public sealed class StationHubClient : IAsyncDisposable
     }
 
     private sealed record ConnectionSignature(string HubUrl, string SharedToken);
+}
+
+internal interface IStationHubConnection : IAsyncDisposable
+{
+    HubConnectionState State { get; }
+
+    event Func<Exception?, Task>? Closed;
+
+    event Func<Exception?, Task>? Reconnecting;
+
+    event Func<string?, Task>? Reconnected;
+
+    Task StartAsync(CancellationToken cancellationToken);
+
+    Task<T> InvokeAsync<T>(string methodName, object payload, CancellationToken cancellationToken);
+
+    Task InvokeAsync(string methodName, object payload, CancellationToken cancellationToken);
+}
+
+internal sealed class SignalRStationHubConnection : IStationHubConnection
+{
+    private readonly HubConnection _inner;
+
+    public SignalRStationHubConnection(HubConnection inner)
+    {
+        _inner = inner;
+    }
+
+    public HubConnectionState State => _inner.State;
+
+    public event Func<Exception?, Task>? Closed
+    {
+        add => _inner.Closed += value;
+        remove => _inner.Closed -= value;
+    }
+
+    public event Func<Exception?, Task>? Reconnecting
+    {
+        add => _inner.Reconnecting += value;
+        remove => _inner.Reconnecting -= value;
+    }
+
+    public event Func<string?, Task>? Reconnected
+    {
+        add => _inner.Reconnected += value;
+        remove => _inner.Reconnected -= value;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        return _inner.StartAsync(cancellationToken);
+    }
+
+    public Task<T> InvokeAsync<T>(string methodName, object payload, CancellationToken cancellationToken)
+    {
+        return _inner.InvokeAsync<T>(methodName, payload, cancellationToken);
+    }
+
+    public Task InvokeAsync(string methodName, object payload, CancellationToken cancellationToken)
+    {
+        return _inner.InvokeAsync(methodName, payload, cancellationToken);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return _inner.DisposeAsync();
+    }
 }

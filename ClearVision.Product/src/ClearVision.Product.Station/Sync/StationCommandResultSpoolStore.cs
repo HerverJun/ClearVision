@@ -9,6 +9,10 @@ namespace ClearVision.Product.Station.Sync;
 
 public sealed class StationCommandResultSpoolStore
 {
+    private const int OperationCompactionThreshold = 512;
+    private const string OperationUpsert = "upsert";
+    private const string OperationAcknowledge = "ack";
+
     private readonly object _syncRoot = new();
     private readonly string _filePath;
     private readonly ILogger<StationCommandResultSpoolStore> _logger;
@@ -24,6 +28,7 @@ public sealed class StationCommandResultSpoolStore
     };
 
     private readonly List<StationCommandResultDto> _pending = [];
+    private int _operationCountSinceCompaction;
 
     public StationCommandResultSpoolStore(
         IOptions<StationSyncOptions> options,
@@ -69,19 +74,9 @@ public sealed class StationCommandResultSpoolStore
                 clone.CreatedAtUtc = clone.ReportedAtUtc;
             }
 
-            var existingIndex = _pending.FindIndex(item =>
-                string.Equals(item.CommandId, clone.CommandId, StringComparison.OrdinalIgnoreCase) &&
-                item.Status == clone.Status);
-            if (existingIndex >= 0)
-            {
-                _pending[existingIndex] = clone;
-            }
-            else
-            {
-                _pending.Add(clone);
-            }
-
-            RewriteLocked();
+            UpsertLocked(clone);
+            AppendRecordLocked(StationCommandResultSpoolRecord.Upsert(clone));
+            CompactIfNeededLocked();
         }
     }
 
@@ -110,7 +105,8 @@ public sealed class StationCommandResultSpoolStore
                 item.Status == status);
             if (removed > 0)
             {
-                RewriteLocked();
+                AppendRecordLocked(StationCommandResultSpoolRecord.Acknowledge(commandId.Trim(), status));
+                CompactIfNeededLocked();
             }
         }
     }
@@ -125,6 +121,7 @@ public sealed class StationCommandResultSpoolStore
                 return;
             }
 
+            var loadedLineCount = 0;
             foreach (var line in File.ReadLines(_filePath, Encoding.UTF8))
             {
                 if (string.IsNullOrWhiteSpace(line))
@@ -134,25 +131,102 @@ public sealed class StationCommandResultSpoolStore
 
                 try
                 {
-                    var result = JsonSerializer.Deserialize<StationCommandResultDto>(line, _jsonOptions);
-                    if (result == null || string.IsNullOrWhiteSpace(result.CommandId))
-                    {
-                        continue;
-                    }
-
-                    _pending.Add(result);
+                    ApplyLoadedLineLocked(line);
+                    loadedLineCount++;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to load Station command result spool line.");
                 }
             }
+
+            if (loadedLineCount >= OperationCompactionThreshold)
+            {
+                RewriteLocked();
+            }
         }
+    }
+
+    private void ApplyLoadedLineLocked(string line)
+    {
+        using var document = JsonDocument.Parse(line);
+        if (document.RootElement.ValueKind == JsonValueKind.Object &&
+            document.RootElement.TryGetProperty("operation", out var operationProperty))
+        {
+            var operation = operationProperty.GetString();
+            if (string.Equals(operation, OperationUpsert, StringComparison.OrdinalIgnoreCase) &&
+                document.RootElement.TryGetProperty("result", out var resultProperty))
+            {
+                var result = resultProperty.Deserialize<StationCommandResultDto>(_jsonOptions);
+                if (result != null && !string.IsNullOrWhiteSpace(result.CommandId))
+                {
+                    UpsertLocked(result);
+                }
+
+                return;
+            }
+
+            if (string.Equals(operation, OperationAcknowledge, StringComparison.OrdinalIgnoreCase))
+            {
+                var commandId = document.RootElement.TryGetProperty("commandId", out var commandIdProperty)
+                    ? commandIdProperty.GetString()
+                    : string.Empty;
+                var status = document.RootElement.TryGetProperty("status", out var statusProperty)
+                    ? statusProperty.Deserialize<StationCommandStatus>(_jsonOptions)
+                    : default;
+                if (!string.IsNullOrWhiteSpace(commandId))
+                {
+                    _pending.RemoveAll(item =>
+                        string.Equals(item.CommandId, commandId, StringComparison.OrdinalIgnoreCase) &&
+                        item.Status == status);
+                }
+            }
+
+            return;
+        }
+
+        var legacyResult = JsonSerializer.Deserialize<StationCommandResultDto>(line, _jsonOptions);
+        if (legacyResult != null && !string.IsNullOrWhiteSpace(legacyResult.CommandId))
+        {
+            UpsertLocked(legacyResult);
+        }
+    }
+
+    private void UpsertLocked(StationCommandResultDto result)
+    {
+        var existingIndex = _pending.FindIndex(item =>
+            string.Equals(item.CommandId, result.CommandId, StringComparison.OrdinalIgnoreCase) &&
+            item.Status == result.Status);
+        if (existingIndex >= 0)
+        {
+            _pending[existingIndex] = Clone(result);
+        }
+        else
+        {
+            _pending.Add(Clone(result));
+        }
+    }
+
+    private void AppendRecordLocked(StationCommandResultSpoolRecord record)
+    {
+        var line = JsonSerializer.Serialize(record, _jsonOptions);
+        File.AppendAllText(_filePath, line + Environment.NewLine, Encoding.UTF8);
+        _operationCountSinceCompaction++;
+    }
+
+    private void CompactIfNeededLocked()
+    {
+        if (_operationCountSinceCompaction < OperationCompactionThreshold)
+        {
+            return;
+        }
+
+        RewriteLocked();
     }
 
     private void RewriteLocked()
     {
-        var tempPath = _filePath + ".tmp";
+        var tempPath = $"{_filePath}.{Guid.NewGuid():N}.tmp";
         using (var stream = File.Create(tempPath))
         using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
         {
@@ -163,6 +237,7 @@ public sealed class StationCommandResultSpoolStore
         }
 
         File.Move(tempPath, _filePath, overwrite: true);
+        _operationCountSinceCompaction = 0;
     }
 
     private static StationCommandResultDto Clone(StationCommandResultDto result)
@@ -182,5 +257,35 @@ public sealed class StationCommandResultSpoolStore
             ReportedAtUtc = result.ReportedAtUtc,
             CreatedAtUtc = result.CreatedAtUtc
         };
+    }
+
+    private sealed class StationCommandResultSpoolRecord
+    {
+        public string Operation { get; init; } = string.Empty;
+
+        public StationCommandResultDto? Result { get; init; }
+
+        public string CommandId { get; init; } = string.Empty;
+
+        public StationCommandStatus Status { get; init; }
+
+        public static StationCommandResultSpoolRecord Upsert(StationCommandResultDto result)
+        {
+            return new StationCommandResultSpoolRecord
+            {
+                Operation = OperationUpsert,
+                Result = Clone(result)
+            };
+        }
+
+        public static StationCommandResultSpoolRecord Acknowledge(string commandId, StationCommandStatus status)
+        {
+            return new StationCommandResultSpoolRecord
+            {
+                Operation = OperationAcknowledge,
+                CommandId = commandId,
+                Status = status
+            };
+        }
     }
 }

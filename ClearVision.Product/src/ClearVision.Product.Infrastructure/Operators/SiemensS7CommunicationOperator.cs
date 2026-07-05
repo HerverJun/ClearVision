@@ -113,26 +113,35 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                 // 【第二优先级】支持轮询等待模式
                 if (pollingMode.Equals("WaitForValue", StringComparison.OrdinalIgnoreCase))
                 {
-                    var pollingReadOutput = await ExecuteReadWithPollingAsync(
-                        client,
-                        address,
-                        dataType,
-                        pollingCondition,
-                        pollingValue,
-                        pollingTimeout,
-                        pollingInterval,
+                    var pollingReadOutput = await ExecuteWithConnectionOperationLockAsync(
+                        connectionKey,
+                        () => ExecuteReadWithPollingAsync(
+                            client,
+                            address,
+                            dataType,
+                            pollingCondition,
+                            pollingValue,
+                            pollingTimeout,
+                            pollingInterval,
+                            cancellationToken),
                         cancellationToken);
                     AttachConnectionAuditInfo(pollingReadOutput, connectionSource);
                     return pollingReadOutput;
                 }
 
-                var readOutput = await ExecuteReadAsync(client, address, dataType, cancellationToken);
+                var readOutput = await ExecuteWithConnectionOperationLockAsync(
+                    connectionKey,
+                    () => ExecuteReadAsync(client, address, dataType, cancellationToken),
+                    cancellationToken);
                 AttachConnectionAuditInfo(readOutput, connectionSource);
                 return readOutput;
             }
             else
             {
-                var writeOutput = await ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken);
+                var writeOutput = await ExecuteWithConnectionOperationLockAsync(
+                    connectionKey,
+                    () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
+                    cancellationToken);
                 AttachConnectionAuditInfo(writeOutput, connectionSource);
                 return writeOutput;
             }

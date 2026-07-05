@@ -97,7 +97,7 @@ internal static class OperatorMetadataLocalization
             [OperatorType.MinEnclosingGeometry] = new("最小外接几何体", "测量"),
             [OperatorType.ModbusCommunication] = new("Modbus通信", "通信"),
             [OperatorType.MorphologicalOperation] = new("形态学操作", "预处理"),
-            [OperatorType.Morphology] = new("Morphology (Legacy)", "预处理"),
+            [OperatorType.Morphology] = new("形态学（旧版）", "预处理"),
             [OperatorType.MqttPublish] = new("MQTT 发布", "通信"),
             [OperatorType.NPointCalibration] = new("N点标定", "标定"),
             [OperatorType.OcrRecognition] = new("OCR 识别", "识别"),

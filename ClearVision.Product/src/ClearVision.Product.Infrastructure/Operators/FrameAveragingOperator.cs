@@ -63,27 +63,11 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
         int bufferedFrameCount;
         lock (state.SyncRoot)
         {
-            if (state.Frames.Count > 0)
-            {
-                var reference = state.Frames.Peek();
-                if (reference.Rows != src.Rows || reference.Cols != src.Cols || reference.Type() != src.Type())
-                {
-                    state.Clear();
-                }
-            }
-
-            state.Frames.Enqueue(src.Clone());
-            while (state.Frames.Count > frameCount)
-            {
-                var old = state.Frames.Dequeue();
-                old.Dispose();
-            }
-
-            var frames = state.Frames.ToArray();
-            bufferedFrameCount = frames.Length;
+            state.AddFrame(src, frameCount);
+            bufferedFrameCount = state.Count;
             result = mode.Equals("Median", StringComparison.OrdinalIgnoreCase)
-                ? ComputeMedian(frames)
-                : ComputeMean(frames);
+                ? ComputeMedian(state.GetFrameSnapshot())
+                : state.ComputeMean();
             state.LastTouchedUtc = nowUtc;
         }
 
@@ -131,16 +115,108 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
     private sealed class FrameWindowState
     {
         public object SyncRoot { get; } = new();
-        public Queue<Mat> Frames { get; } = new();
+        private readonly Queue<Mat> _frames = new();
+        private Mat? _meanAccumulator;
+        private MatType _meanAccumulatorType;
         public DateTime LastTouchedUtc { get; set; } = DateTime.UtcNow;
+        public int Count => _frames.Count;
 
         public void Clear()
         {
-            while (Frames.Count > 0)
+            while (_frames.Count > 0)
             {
-                var stale = Frames.Dequeue();
+                var stale = _frames.Dequeue();
                 stale.Dispose();
             }
+
+            _meanAccumulator?.Dispose();
+            _meanAccumulator = null;
+        }
+
+        public void AddFrame(Mat src, int frameCount)
+        {
+            if (_frames.Count > 0)
+            {
+                var reference = _frames.Peek();
+                if (reference.Rows != src.Rows || reference.Cols != src.Cols || reference.Type() != src.Type())
+                {
+                    Clear();
+                }
+            }
+
+            var clone = src.Clone();
+            _frames.Enqueue(clone);
+            AddToAccumulatorIfInitialized(clone);
+
+            while (_frames.Count > frameCount)
+            {
+                var old = _frames.Dequeue();
+                SubtractFromAccumulatorIfInitialized(old);
+                old.Dispose();
+            }
+        }
+
+        public IReadOnlyList<Mat> GetFrameSnapshot()
+        {
+            return _frames.ToArray();
+        }
+
+        public Mat ComputeMean()
+        {
+            if (_frames.Count == 0)
+            {
+                throw new InvalidOperationException("No frames available for averaging");
+            }
+
+            EnsureMeanAccumulator();
+            var result = new Mat();
+            _meanAccumulator!.ConvertTo(result, _frames.Peek().Type(), 1.0 / _frames.Count);
+            return result;
+        }
+
+        private void EnsureMeanAccumulator()
+        {
+            if (_meanAccumulator != null)
+            {
+                return;
+            }
+
+            var reference = _frames.Peek();
+            _meanAccumulatorType = GetMeanAccumulatorType(reference);
+            _meanAccumulator = new Mat(reference.Rows, reference.Cols, _meanAccumulatorType, Scalar.All(0));
+            foreach (var frame in _frames)
+            {
+                AddToAccumulator(frame);
+            }
+        }
+
+        private void AddToAccumulatorIfInitialized(Mat frame)
+        {
+            if (_meanAccumulator != null)
+            {
+                AddToAccumulator(frame);
+            }
+        }
+
+        private void SubtractFromAccumulatorIfInitialized(Mat frame)
+        {
+            var accumulator = _meanAccumulator;
+            if (accumulator == null)
+            {
+                return;
+            }
+
+            using var temp = new Mat();
+            frame.ConvertTo(temp, _meanAccumulatorType);
+            Cv2.Subtract(accumulator, temp, accumulator);
+        }
+
+        private void AddToAccumulator(Mat frame)
+        {
+            var accumulator = _meanAccumulator ?? throw new InvalidOperationException("Mean accumulator is not initialized");
+            using var temp = new Mat();
+            frame.ConvertTo(temp, _meanAccumulatorType);
+            Cv2.Add(accumulator, temp, accumulator);
         }
     }
 
@@ -181,40 +257,6 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
 
             _lastCleanupUtc = nowUtc;
         }
-    }
-
-    private static Mat ComputeMean(IReadOnlyList<Mat> frames)
-    {
-        if (frames.Count == 0)
-        {
-            throw new InvalidOperationException("No frames available for averaging");
-        }
-
-        EnsureSameShapeAndType(frames);
-
-        var channelCount = frames[0].Channels();
-        var accumType = channelCount switch
-        {
-            1 => MatType.CV_32FC1,
-            2 => MatType.CV_32FC2,
-            3 => MatType.CV_32FC3,
-            4 => MatType.CV_32FC4,
-            _ => throw new InvalidOperationException($"Unsupported channel count for frame averaging: {channelCount}")
-        };
-
-        using var accum = new Mat(frames[0].Rows, frames[0].Cols, accumType, Scalar.All(0));
-        using var noMask = new Mat();
-
-        foreach (var frame in frames)
-        {
-            using var temp = new Mat();
-            frame.ConvertTo(temp, accumType);
-            Cv2.Accumulate(temp, accum, noMask);
-        }
-
-        var result = new Mat();
-        accum.ConvertTo(result, frames[0].Type(), 1.0 / frames.Count);
-        return result;
     }
 
     private static Mat ComputeMedian(IReadOnlyList<Mat> frames)
@@ -366,6 +408,18 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
                 throw new InvalidOperationException("All frames must have the same size and type");
             }
         }
+    }
+
+    private static MatType GetMeanAccumulatorType(Mat frame)
+    {
+        return frame.Channels() switch
+        {
+            1 => MatType.CV_32FC1,
+            2 => MatType.CV_32FC2,
+            3 => MatType.CV_32FC3,
+            4 => MatType.CV_32FC4,
+            _ => throw new InvalidOperationException($"Unsupported channel count for frame averaging: {frame.Channels()}")
+        };
     }
 }
 

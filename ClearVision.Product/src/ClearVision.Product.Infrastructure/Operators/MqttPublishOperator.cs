@@ -34,6 +34,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("TimeoutMs", "Timeout (ms)", "int", DefaultValue = 5000)]
 public class MqttPublishOperator : OperatorBase
 {
+    private const string DisabledErrorCode = "MQTT_PUBLISH_DISABLED";
+
     public override OperatorType OperatorType => OperatorType.MqttPublish;
 
     public MqttPublishOperator(ILogger<MqttPublishOperator> logger) : base(logger)
@@ -78,7 +80,8 @@ public class MqttPublishOperator : OperatorBase
         }
 
         Logger.LogWarning(
-            "[MqttPublish] MQTT publish requested for {Broker}:{Port}/{Topic}. Qos={Qos}, Retain={Retain}, TimeoutMs={TimeoutMs}, PayloadLength={PayloadLength}. The runtime integration is placeholder-disabled in this build.",
+            "[MqttPublish] 请求发布 MQTT 消息，但当前版本未启用 MQTT 发布能力。ErrorCode={ErrorCode}, Broker={Broker}, Port={Port}, Topic={Topic}, Qos={Qos}, Retain={Retain}, TimeoutMs={TimeoutMs}, PayloadLength={PayloadLength}",
+            DisabledErrorCode,
             broker,
             port,
             topic,
@@ -88,7 +91,7 @@ public class MqttPublishOperator : OperatorBase
             message.Length);
 
         return Task.FromResult(OperatorExecutionOutput.Failure(
-            "MQTT publish is placeholder-disabled in this build. Enable the MQTT client integration before using this operator."));
+            $"[{DisabledErrorCode}] 当前版本未启用 MQTT 发布能力。请启用 MQTT 客户端集成后再使用该算子。"));
     }
 
     private static bool TryGetInputValue(

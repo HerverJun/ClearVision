@@ -6,6 +6,7 @@ namespace ClearVision.Product.Infrastructure.Calibration;
 public sealed class CalibrationPlanarTransformRuntime
 {
     private const double Epsilon = 1e-12;
+    private const string UnsupportedPlanarTransformModelErrorCode = "CALIBRATION_PLANAR_TRANSFORM_MODEL_UNSUPPORTED";
 
     private CalibrationPlanarTransformRuntime(
         TransformModelV2 model,
@@ -45,7 +46,7 @@ public sealed class CalibrationPlanarTransformRuntime
             transform.Model != TransformModelV2.Affine &&
             transform.Model != TransformModelV2.Homography)
         {
-            error = $"Transform2D model {transform.Model} is not supported by planar runtime.";
+            error = $"[{UnsupportedPlanarTransformModelErrorCode}] 当前平面标定运行时不支持二维变换模型：{transform.Model}。";
             return false;
         }
 

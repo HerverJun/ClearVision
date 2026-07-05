@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-04T03:58:57.0633505+08:00",
+  "generatedAt": "2026-07-05T18:24:06.3177828+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -19,7 +19,7 @@
         "DualModalVoting"
       ]
     },
-    "AI 检测": {
+    "AI Inspection": {
       "count": 1,
       "operators": [
         "DetectionSequenceJudge"
@@ -441,13 +441,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageAcquisition.md"
     },
@@ -548,13 +548,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Filtering.md"
     },
@@ -789,13 +789,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/EdgeDetection.md"
     },
@@ -904,13 +904,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Thresholding.md"
     },
@@ -1016,13 +1016,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Morphology.md"
     },
@@ -1278,13 +1278,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/BlobAnalysis.md"
     },
@@ -1675,13 +1675,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TemplateMatching.md"
     },
@@ -1803,13 +1803,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Measurement.md"
     },
@@ -1910,13 +1910,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CodeRecognition.md"
     },
@@ -2227,13 +2227,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/DeepLearning.md"
     },
@@ -2349,27 +2349,16 @@
           "max": null,
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "MaxFormattedCollectionItems",
-          "displayName": "Max formatted collection items",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "256",
-          "min": "1",
-          "max": "10000",
-          "isRequired": true,
-          "options": null
         }
       ],
       "quality": {
-        "totalScore": 98,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ResultOutput.md"
     },
@@ -2590,13 +2579,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ContourDetection.md"
     },
@@ -2643,13 +2632,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MedianBlur.md"
     },
@@ -2718,13 +2707,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/BilateralFilter.md"
     },
@@ -2832,13 +2821,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageResize.md"
     },
@@ -2918,13 +2907,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageCrop.md"
     },
@@ -3015,13 +3004,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageRotate.md"
     },
@@ -3289,13 +3278,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PerspectiveTransform.md"
     },
@@ -3305,7 +3294,7 @@
       "displayName": "圆测量",
       "description": "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
       "category": "检测",
-      "version": "1.1.2",
+      "version": "1.0.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
@@ -3362,42 +3351,6 @@
           "displayName": "圆数据列表",
           "dataType": "Any",
           "isRequired": null
-        },
-        {
-          "name": "CaliperFitV2Result",
-          "displayName": "卡尺圆拟合 V2 结果",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "EdgePoints",
-          "displayName": "V2 边缘点",
-          "dataType": "PointList",
-          "isRequired": null
-        },
-        {
-          "name": "InlierPoints",
-          "displayName": "V2 内点",
-          "dataType": "PointList",
-          "isRequired": null
-        },
-        {
-          "name": "OutlierPoints",
-          "displayName": "V2 离群点",
-          "dataType": "PointList",
-          "isRequired": null
-        },
-        {
-          "name": "CaliperDiagnostics",
-          "displayName": "V2 诊断",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "CaliperProfileEvidence",
-          "displayName": "V2 profile evidence",
-          "dataType": "Any",
-          "isRequired": null
         }
       ],
       "parameters": [
@@ -3418,10 +3371,6 @@
             {
               "value": "FitEllipse",
               "label": "拟合椭圆"
-            },
-            {
-              "value": "CaliperFitV2",
-              "label": "卡尺圆拟合 V2"
             }
           ]
         },
@@ -3490,249 +3439,16 @@
           "max": "255",
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "SearchCenterMode",
-          "displayName": "V2 搜索中心模式",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "ImageCenter",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "ImageCenter",
-              "label": "图像中心"
-            },
-            {
-              "value": "Explicit",
-              "label": "显式中心"
-            }
-          ]
-        },
-        {
-          "name": "SearchCenterX",
-          "displayName": "V2 搜索中心 X",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "SearchCenterY",
-          "displayName": "V2 搜索中心 Y",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "NominalRadius",
-          "displayName": "V2 标称半径",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "100",
-          "min": "1",
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "CaliperCount",
-          "displayName": "V2 卡尺数量",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "96",
-          "min": "3",
-          "max": "720",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "AveragingThickness",
-          "displayName": "V2 平均厚度",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "5",
-          "min": "1",
-          "max": "128",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "ProfileSampleCount",
-          "displayName": "V2 轮廓采样数",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "129",
-          "min": "16",
-          "max": "4096",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "GaussianSigma",
-          "displayName": "V2 高斯 Sigma",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "1.2",
-          "min": "0",
-          "max": "12",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "EdgePolarity",
-          "displayName": "V2 边缘极性",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Auto",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Auto",
-              "label": "自动"
-            },
-            {
-              "value": "DarkToLight",
-              "label": "暗到亮"
-            },
-            {
-              "value": "LightToDark",
-              "label": "亮到暗"
-            }
-          ]
-        },
-        {
-          "name": "EdgeThreshold",
-          "displayName": "V2 边缘阈值",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "0",
-          "min": "0",
-          "max": "255",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MinEdgeStrength",
-          "displayName": "V2 最小边缘强度",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "4",
-          "min": "0",
-          "max": "255",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MinValidCalipers",
-          "displayName": "V2 最小有效卡尺",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "24",
-          "min": "3",
-          "max": "720",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MinCoverageRatio",
-          "displayName": "V2 最小覆盖率",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "0.35",
-          "min": "0",
-          "max": "1",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MinAngularCoverageDegrees",
-          "displayName": "V2 最小角覆盖",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "180",
-          "min": "0",
-          "max": "360",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "OutlierMode",
-          "displayName": "V2 离群模式",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Mad",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "None",
-              "label": "关闭"
-            },
-            {
-              "value": "Mad",
-              "label": "MAD"
-            },
-            {
-              "value": "Huber",
-              "label": "Huber"
-            }
-          ]
-        },
-        {
-          "name": "OutlierThreshold",
-          "displayName": "V2 离群阈值",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "3.5",
-          "min": "0.1",
-          "max": "20",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MaxOutlierIterations",
-          "displayName": "V2 最大离群迭代",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "3",
-          "min": "0",
-          "max": "20",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "MaxResidualRmse",
-          "displayName": "V2 最大残差 RMSE",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "2",
-          "min": "0.01",
-          "max": "128",
-          "isRequired": true,
-          "options": null
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CircleMeasurement.md"
     },
@@ -3849,13 +3565,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LineMeasurement.md"
     },
@@ -3962,13 +3678,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ContourMeasurement.md"
     },
@@ -4132,13 +3848,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/AngleMeasurement.md"
     },
@@ -4319,13 +4035,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GeometricTolerance.md"
     },
@@ -4462,13 +4178,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CameraCalibration.md"
     },
@@ -4509,13 +4225,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 91,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Undistort.md"
     },
@@ -4603,13 +4319,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CoordinateTransform.md"
     },
@@ -4776,13 +4492,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
@@ -4912,13 +4628,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
@@ -5012,13 +4728,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/DatabaseWrite.md"
     },
@@ -5114,13 +4830,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ConditionalBranch.md"
     },
@@ -5203,13 +4919,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ColorConversion.md"
     },
@@ -5318,13 +5034,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/AdaptiveThreshold.md"
     },
@@ -5413,13 +5129,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/HistogramEqualization.md"
     },
@@ -5580,13 +5296,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GeometricFitting.md"
     },
@@ -5622,12 +5338,6 @@
           "name": "Mask",
           "displayName": "掩膜",
           "dataType": "Image",
-          "isRequired": null
-        },
-        {
-          "name": "SpatialContext",
-          "displayName": "空间上下文",
-          "dataType": "Any",
           "isRequired": null
         }
       ],
@@ -5766,13 +5476,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RoiManager.md"
     },
@@ -5976,13 +5686,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ShapeMatching.md"
     },
@@ -6095,13 +5805,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SubpixelEdgeDetection.md"
     },
@@ -6437,13 +6147,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ColorDetection.md"
     },
@@ -6627,13 +6337,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SerialCommunication.md"
     },
@@ -6945,13 +6655,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SiemensS7Communication.md"
     },
@@ -7208,13 +6918,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MitsubishiMcCommunication.md"
     },
@@ -7471,13 +7181,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/OmronFinsCommunication.md"
     },
@@ -7660,22 +7370,22 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ResultJudgment.md"
     },
     {
       "id": "DetectionSequenceJudge",
       "type": 61,
-      "displayName": "检测顺序判定",
-      "description": "对检测结果排序，并与期望标签序列进行比对。",
-      "category": "AI 检测",
+      "displayName": "Detection Sequence Judge",
+      "description": "Sorts detections and compares the resulting label order against an expected sequence.",
+      "category": "AI Inspection",
       "version": "1.0.0",
       "tags": [
         "experimental",
@@ -7689,25 +7399,25 @@
       "inputPorts": [
         {
           "name": "Detections",
-          "displayName": "检测结果",
+          "displayName": "Detections",
           "dataType": "DetectionList",
           "isRequired": true
         },
         {
           "name": "SlotPoints",
-          "displayName": "槽位点",
+          "displayName": "Slot Points",
           "dataType": "PointList",
           "isRequired": false
         },
         {
           "name": "PerspectiveSrcPoints",
-          "displayName": "透视源点",
+          "displayName": "Perspective Source Points",
           "dataType": "PointList",
           "isRequired": false
         },
         {
           "name": "PerspectiveDstPoints",
-          "displayName": "透视目标点",
+          "displayName": "Perspective Destination Points",
           "dataType": "PointList",
           "isRequired": false
         }
@@ -7715,79 +7425,79 @@
       "outputPorts": [
         {
           "name": "IsMatch",
-          "displayName": "是否匹配",
+          "displayName": "Is Match",
           "dataType": "Boolean",
           "isRequired": null
         },
         {
           "name": "ActualOrder",
-          "displayName": "实际顺序",
+          "displayName": "Actual Order",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "Count",
-          "displayName": "数量",
+          "displayName": "Count",
           "dataType": "Integer",
           "isRequired": null
         },
         {
           "name": "MissingLabels",
-          "displayName": "缺失标签",
+          "displayName": "Missing Labels",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "DuplicateLabels",
-          "displayName": "重复标签",
+          "displayName": "Duplicate Labels",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "SortedDetections",
-          "displayName": "排序后检测",
+          "displayName": "Sorted Detections",
           "dataType": "DetectionList",
           "isRequired": null
         },
         {
           "name": "Assignment",
-          "displayName": "分配结果",
+          "displayName": "Assignment",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "UnassignedDetections",
-          "displayName": "未分配检测",
+          "displayName": "Unassigned Detections",
           "dataType": "DetectionList",
           "isRequired": null
         },
         {
           "name": "SlotDistances",
-          "displayName": "槽位距离",
+          "displayName": "Slot Distances",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "RowCount",
-          "displayName": "行数",
+          "displayName": "Row Count",
           "dataType": "Integer",
           "isRequired": null
         },
         {
           "name": "PerspectiveApplied",
-          "displayName": "已应用透视",
+          "displayName": "Perspective Applied",
           "dataType": "Boolean",
           "isRequired": null
         },
         {
           "name": "Diagnostics",
-          "displayName": "诊断信息",
+          "displayName": "Diagnostics",
           "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "Message",
-          "displayName": "消息",
+          "displayName": "Message",
           "dataType": "String",
           "isRequired": null
         }
@@ -7795,9 +7505,9 @@
       "parameters": [
         {
           "name": "ExpectedLabels",
-          "displayName": "期望标签序列",
+          "displayName": "Expected Labels",
           "dataType": "string",
-          "description": "按顺序填写的期望标签，使用逗号分隔。",
+          "description": "Comma-separated expected labels in order.",
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -7806,9 +7516,9 @@
         },
         {
           "name": "SortBy",
-          "displayName": "排序字段",
+          "displayName": "Sort By",
           "dataType": "enum",
-          "description": "判定前用于排序检测结果的字段。",
+          "description": "Field used to sort detections before judging the sequence.",
           "defaultValue": "CenterX",
           "min": null,
           "max": null,
@@ -7816,31 +7526,31 @@
           "options": [
             {
               "value": "CenterX",
-              "label": "中心 X"
+              "label": "Center X"
             },
             {
               "value": "CenterY",
-              "label": "中心 Y"
+              "label": "Center Y"
             },
             {
               "value": "TopY",
-              "label": "顶部 Y"
+              "label": "Top Y"
             },
             {
               "value": "Confidence",
-              "label": "置信度"
+              "label": "Confidence"
             },
             {
               "value": "Area",
-              "label": "面积"
+              "label": "Area"
             }
           ]
         },
         {
           "name": "Direction",
-          "displayName": "排序方向",
+          "displayName": "Direction",
           "dataType": "enum",
-          "description": "排序后的方向。",
+          "description": "Ordering direction after sorting.",
           "defaultValue": "Ascending",
           "min": null,
           "max": null,
@@ -7848,35 +7558,35 @@
           "options": [
             {
               "value": "Ascending",
-              "label": "升序"
+              "label": "Ascending"
             },
             {
               "value": "Descending",
-              "label": "降序"
+              "label": "Descending"
             },
             {
               "value": "LeftToRight",
-              "label": "从左到右"
+              "label": "Left To Right"
             },
             {
               "value": "RightToLeft",
-              "label": "从右到左"
+              "label": "Right To Left"
             },
             {
               "value": "TopToBottom",
-              "label": "从上到下"
+              "label": "Top To Bottom"
             },
             {
               "value": "BottomToTop",
-              "label": "从下到上"
+              "label": "Bottom To Top"
             }
           ]
         },
         {
           "name": "ExpectedCount",
-          "displayName": "期望数量",
+          "displayName": "Expected Count",
           "dataType": "int",
-          "description": "期望检测数量；为 0 时从期望标签序列推导。",
+          "description": "Expected detection count. Use 0 to derive from ExpectedLabels.",
           "defaultValue": "0",
           "min": "0",
           "max": "256",
@@ -7885,9 +7595,9 @@
         },
         {
           "name": "MinConfidence",
-          "displayName": "最低置信度",
+          "displayName": "Min Confidence",
           "dataType": "double",
-          "description": "顺序判定前忽略低于该置信度的检测结果。",
+          "description": "Ignore detections below this confidence before sequence judgment.",
           "defaultValue": "0",
           "min": "0",
           "max": "1",
@@ -7896,9 +7606,9 @@
         },
         {
           "name": "AllowMissing",
-          "displayName": "允许缺失",
+          "displayName": "Allow Missing",
           "dataType": "bool",
-          "description": "期望标签缺失时是否仍判为匹配。",
+          "description": "Whether missing expected labels should still be treated as a match.",
           "defaultValue": "false",
           "min": null,
           "max": null,
@@ -7907,9 +7617,9 @@
         },
         {
           "name": "AllowDuplicate",
-          "displayName": "允许重复",
+          "displayName": "Allow Duplicate",
           "dataType": "bool",
-          "description": "标签重复时是否仍判为匹配。",
+          "description": "Whether duplicate labels should still be treated as a match.",
           "defaultValue": "false",
           "min": null,
           "max": null,
@@ -7918,9 +7628,9 @@
         },
         {
           "name": "GroupingMode",
-          "displayName": "分组模式",
+          "displayName": "Grouping Mode",
           "dataType": "enum",
-          "description": "SingleRow 使用单行排序，RowCluster 按行分组，SlotAssignment 按槽位分配，Auto 优先使用槽位。",
+          "description": "SingleRow keeps legacy sorting, RowCluster groups detections into rows, SlotAssignment assigns detections to expected slot points, Auto prefers slots when provided.",
           "defaultValue": "SingleRow",
           "min": null,
           "max": null,
@@ -7928,15 +7638,15 @@
           "options": [
             {
               "value": "SingleRow",
-              "label": "单行"
+              "label": "Single Row"
             },
             {
               "value": "RowCluster",
-              "label": "行聚类"
+              "label": "Row Cluster"
             },
             {
               "value": "SlotAssignment",
-              "label": "槽位分配"
+              "label": "Slot Assignment"
             },
             {
               "value": "Auto",
@@ -7946,9 +7656,9 @@
         },
         {
           "name": "ExpectedSlots",
-          "displayName": "期望槽位",
+          "displayName": "Expected Slots",
           "dataType": "string",
-          "description": "期望槽位中心点，支持 JSON 数组或 x:y;x:y 简写。",
+          "description": "JSON array or shorthand x:y;x:y list of expected slot centers.",
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -7957,9 +7667,9 @@
         },
         {
           "name": "RowTolerance",
-          "displayName": "行容差",
+          "displayName": "Row Tolerance",
           "dataType": "double",
-          "description": "行聚类允许的最大 Y 偏差；0 表示自动。",
+          "description": "Maximum Y delta for row clustering. Use 0 for auto.",
           "defaultValue": "0",
           "min": "0",
           "max": "5000",
@@ -7968,9 +7678,9 @@
         },
         {
           "name": "SlotTolerance",
-          "displayName": "槽位容差",
+          "displayName": "Slot Tolerance",
           "dataType": "double",
-          "description": "分配到期望槽位的最大距离；0 表示自动。",
+          "description": "Maximum assignment distance to an expected slot. Use 0 for auto.",
           "defaultValue": "0",
           "min": "0",
           "max": "5000",
@@ -7979,9 +7689,9 @@
         },
         {
           "name": "PerspectiveSrcPointsJson",
-          "displayName": "透视源点 JSON",
+          "displayName": "Perspective Source Points JSON",
           "dataType": "string",
-          "description": "可选的 4 点透视源点 JSON 数组。",
+          "description": "Optional 4-point JSON array for perspective source points.",
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -7990,9 +7700,9 @@
         },
         {
           "name": "PerspectiveDstPointsJson",
-          "displayName": "透视目标点 JSON",
+          "displayName": "Perspective Destination Points JSON",
           "dataType": "string",
-          "description": "可选的 4 点透视目标点 JSON 数组。",
+          "description": "Optional 4-point JSON array for perspective destination points.",
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -8001,13 +7711,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/DetectionSequenceJudge.md"
     },
@@ -8136,13 +7846,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ClaheEnhancement.md"
     },
@@ -8297,13 +8007,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MorphologicalOperation.md"
     },
@@ -8372,13 +8082,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LaplacianSharpen.md"
     },
@@ -8503,13 +8213,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageAdd.md"
     },
@@ -8580,13 +8290,13 @@
         }
       ],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageSubtract.md"
     },
@@ -8661,13 +8371,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageBlend.md"
     },
@@ -8675,7 +8385,7 @@
       "id": "VariableRead",
       "type": 80,
       "displayName": "变量读取",
-      "description": "从单次运行变量或项目全局变量读取值",
+      "description": "从全局变量表读取值",
       "category": "变量",
       "version": "1.0.0",
       "tags": [
@@ -8706,37 +8416,6 @@
         }
       ],
       "parameters": [
-        {
-          "name": "Scope",
-          "displayName": "作用域",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Run",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Run",
-              "label": "单次运行"
-            },
-            {
-              "value": "Project",
-              "label": "项目全局"
-            }
-          ]
-        },
-        {
-          "name": "VariableId",
-          "displayName": "变量ID",
-          "dataType": "string",
-          "description": "Project 作用域变量的稳定 ID",
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
         {
           "name": "VariableName",
           "displayName": "变量名",
@@ -8786,59 +8465,16 @@
               "label": "布尔值"
             }
           ]
-        },
-        {
-          "name": "ConversionMode",
-          "displayName": "Conversion Mode",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Exact",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Exact",
-              "label": "Exact"
-            },
-            {
-              "value": "Round",
-              "label": "Round"
-            },
-            {
-              "value": "Floor",
-              "label": "Floor"
-            },
-            {
-              "value": "Ceiling",
-              "label": "Ceiling"
-            },
-            {
-              "value": "Truncate",
-              "label": "Truncate"
-            }
-          ]
-        },
-        {
-          "name": "Expression",
-          "displayName": "Expression",
-          "dataType": "string",
-          "description": "Optional controlled expression evaluated after Project variable read. Use value for the current variable value.",
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/VariableRead.md"
     },
@@ -8846,7 +8482,7 @@
       "id": "VariableWrite",
       "type": 81,
       "displayName": "变量写入",
-      "description": "写入单次运行变量或项目全局变量",
+      "description": "写入值到全局变量表",
       "category": "变量",
       "version": "1.0.0",
       "tags": [
@@ -8884,37 +8520,6 @@
         }
       ],
       "parameters": [
-        {
-          "name": "Scope",
-          "displayName": "作用域",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Run",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Run",
-              "label": "单次运行"
-            },
-            {
-              "value": "Project",
-              "label": "项目全局"
-            }
-          ]
-        },
-        {
-          "name": "VariableId",
-          "displayName": "变量ID",
-          "dataType": "string",
-          "description": "Project 作用域变量的稳定 ID",
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
         {
           "name": "VariableName",
           "displayName": "变量名",
@@ -8958,7 +8563,7 @@
           "name": "UseInputValue",
           "displayName": "使用输入值",
           "dataType": "bool",
-          "description": "优先使用上游输入值，否则使用静态值",
+          "description": "优先使用上游输入的值，否则使用下方静态值",
           "defaultValue": "true",
           "min": null,
           "max": null,
@@ -8969,51 +8574,8 @@
           "name": "StaticValue",
           "displayName": "静态值",
           "dataType": "string",
-          "description": "没有上游输入时使用的值",
+          "description": "当没有上游输入时使用的值",
           "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "ConversionMode",
-          "displayName": "Conversion Mode",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Exact",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Exact",
-              "label": "Exact"
-            },
-            {
-              "value": "Round",
-              "label": "Round"
-            },
-            {
-              "value": "Floor",
-              "label": "Floor"
-            },
-            {
-              "value": "Ceiling",
-              "label": "Ceiling"
-            },
-            {
-              "value": "Truncate",
-              "label": "Truncate"
-            }
-          ]
-        },
-        {
-          "name": "Expression",
-          "displayName": "Expression",
-          "dataType": "string",
-          "description": "Optional controlled expression evaluated before Project variable write. Use value for the raw input.",
-          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -9021,13 +8583,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/VariableWrite.md"
     },
@@ -9035,7 +8597,7 @@
       "id": "VariableIncrement",
       "type": 82,
       "displayName": "变量递增",
-      "description": "递增单次运行变量或项目全局 Int64 变量",
+      "description": "计数器自增/自减，支持重置条件",
       "category": "变量",
       "version": "1.0.0",
       "tags": [
@@ -9079,37 +8641,6 @@
       ],
       "parameters": [
         {
-          "name": "Scope",
-          "displayName": "作用域",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Run",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Run",
-              "label": "单次运行"
-            },
-            {
-              "value": "Project",
-              "label": "项目全局"
-            }
-          ]
-        },
-        {
-          "name": "VariableId",
-          "displayName": "变量ID",
-          "dataType": "string",
-          "description": "Project 作用域变量的稳定 ID",
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
           "name": "VariableName",
           "displayName": "变量名",
           "dataType": "string",
@@ -9124,7 +8655,7 @@
           "name": "Delta",
           "displayName": "增量",
           "dataType": "int",
-          "description": "每次递增的值，可为负数",
+          "description": "每次递增的值（可为负数实现递减）",
           "defaultValue": "1",
           "min": null,
           "max": null,
@@ -9183,13 +8714,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/VariableIncrement.md"
     },
@@ -9276,13 +8807,13 @@
         }
       ],
       "quality": {
-        "totalScore": 93,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TryCatch.md"
     },
@@ -9370,13 +8901,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CycleCounter.md"
     },
@@ -9666,13 +9197,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/AkazeFeatureMatch.md"
     },
@@ -9995,13 +9526,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/OrbFeatureMatch.md"
     },
@@ -10205,13 +9736,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GradientShapeMatch.md"
     },
@@ -10464,13 +9995,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PyramidShapeMatch.md"
     },
@@ -10611,13 +10142,13 @@
         }
       ],
       "quality": {
-        "totalScore": 84,
-        "level": "B",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/DualModalVoting.md"
     },
@@ -10706,13 +10237,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ForEach.md"
     },
@@ -10818,13 +10349,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ArrayIndexer.md"
     },
@@ -10910,13 +10441,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/JsonExtractor.md"
     },
@@ -11020,13 +10551,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MathOperation.md"
     },
@@ -11104,13 +10635,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LogicGate.md"
     },
@@ -11215,13 +10746,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TypeConvert.md"
     },
@@ -11358,13 +10889,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/HttpRequest.md"
     },
@@ -11475,13 +11006,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MqttPublish.md"
     },
@@ -11534,13 +11065,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/StringFormat.md"
     },
@@ -11615,13 +11146,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageSave.md"
     },
@@ -11662,13 +11193,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/OcrRecognition.md"
     },
@@ -11715,13 +11246,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageDiff.md"
     },
@@ -11848,13 +11379,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Statistics.md"
     },
@@ -11960,13 +11491,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Aggregator.md"
     },
@@ -12019,13 +11550,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Comment.md"
     },
@@ -12157,13 +11688,13 @@
         }
       ],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Comparator.md"
     },
@@ -12216,13 +11747,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/Delay.md"
     },
@@ -12456,13 +11987,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CaliperTool.md"
     },
@@ -12658,13 +12189,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/WidthMeasurement.md"
     },
@@ -12748,13 +12279,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PointLineDistance.md"
     },
@@ -12867,13 +12398,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LineLineDistance.md"
     },
@@ -13001,13 +12532,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/BoxNms.md"
     },
@@ -13177,13 +12708,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/BoxFilter.md"
     },
@@ -13358,13 +12889,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SharpnessEvaluation.md"
     },
@@ -13514,13 +13045,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PositionCorrection.md"
     },
@@ -13723,13 +13254,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/NPointCalibration.md"
     },
@@ -13781,13 +13312,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CalibrationLoader.md"
     },
@@ -13913,13 +13444,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/UnitConvert.md"
     },
@@ -14026,13 +13557,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TimerStatistics.md"
     },
@@ -14134,13 +13665,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ScriptOperator.md"
     },
@@ -14234,13 +13765,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TriggerModule.md"
     },
@@ -14325,13 +13856,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PointAlignment.md"
     },
@@ -14471,13 +14002,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PointCorrection.md"
     },
@@ -14668,13 +14199,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GapMeasurement.md"
     },
@@ -14804,13 +14335,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PolarUnwrap.md"
     },
@@ -14907,13 +14438,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ShadingCorrection.md"
     },
@@ -14986,13 +14517,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FrameAveraging.md"
     },
@@ -15142,13 +14673,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/AffineTransform.md"
     },
@@ -15349,13 +14880,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ColorMeasurement.md"
     },
@@ -15810,13 +15341,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SurfaceDefectDetection.md"
     },
@@ -15935,13 +15466,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/EdgePairDefect.md"
     },
@@ -16075,13 +15606,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RectangleDetection.md"
     },
@@ -16171,13 +15702,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TranslationRotationCalibration.md"
     },
@@ -16289,13 +15820,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CornerDetection.md"
     },
@@ -16375,13 +15906,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/EdgeIntersection.md"
     },
@@ -16491,13 +16022,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ParallelLineFind.md"
     },
@@ -16607,13 +16138,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/QuadrilateralFind.md"
     },
@@ -16755,13 +16286,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GeoMeasurement.md"
     },
@@ -16860,13 +16391,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageStitching.md"
     },
@@ -16967,13 +16498,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageTiling.md"
     },
@@ -17075,13 +16606,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageNormalize.md"
     },
@@ -17185,13 +16716,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ImageCompose.md"
     },
@@ -17310,13 +16841,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/CopyMakeBorder.md"
     },
@@ -17441,13 +16972,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/TextSave.md"
     },
@@ -17607,13 +17138,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PointSetTool.md"
     },
@@ -17717,13 +17248,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/BlobLabeling.md"
     },
@@ -17902,13 +17433,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/HistogramAnalysis.md"
     },
@@ -18056,13 +17587,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PixelStatistics.md"
     },
@@ -18141,13 +17672,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MeanFilter.md"
     },
@@ -18200,13 +17731,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RoiTransform.md"
     },
@@ -18259,13 +17790,13 @@
         }
       ],
       "quality": {
-        "totalScore": 95,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/VoxelDownsample.md"
     },
@@ -18335,13 +17866,13 @@
         }
       ],
       "quality": {
-        "totalScore": 95,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/StatisticalOutlierRemoval.md"
     },
@@ -18463,13 +17994,13 @@
         }
       ],
       "quality": {
-        "totalScore": 95,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RansacPlaneSegmentation.md"
     },
@@ -18550,13 +18081,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/EuclideanClusterExtraction.md"
     },
@@ -18637,13 +18168,13 @@
         }
       ],
       "quality": {
-        "totalScore": 95,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PPFEstimation.md"
     },
@@ -18885,13 +18416,13 @@
         }
       ],
       "quality": {
-        "totalScore": 95,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PPFMatch.md"
     },
@@ -19007,13 +18538,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LawsTextureFilter.md"
     },
@@ -19178,13 +18709,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/GlcmTexture.md"
     },
@@ -19231,18 +18762,6 @@
         {
           "name": "ClassCount",
           "displayName": "Class Count",
-          "dataType": "Integer",
-          "isRequired": null
-        },
-        {
-          "name": "ClassMaskCount",
-          "displayName": "Class Mask Count",
-          "dataType": "Integer",
-          "isRequired": null
-        },
-        {
-          "name": "OmittedClassMaskCount",
-          "displayName": "Omitted Class Mask Count",
           "dataType": "Integer",
           "isRequired": null
         },
@@ -19351,17 +18870,6 @@
           "options": null
         },
         {
-          "name": "MaxClassMasks",
-          "displayName": "Max Class Masks",
-          "dataType": "int",
-          "description": "Limits generated per-class mask images; 0 disables per-class masks.",
-          "defaultValue": "32",
-          "min": "0",
-          "max": "4096",
-          "isRequired": true,
-          "options": null
-        },
-        {
           "name": "ExecutionProvider",
           "displayName": "Execution Provider",
           "dataType": "enum",
@@ -19436,13 +18944,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/SemanticSegmentation.md"
     },
@@ -19732,13 +19240,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/AnomalyDetection.md"
     },
@@ -19890,13 +19398,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/HandEyeCalibration.md"
     },
@@ -20006,13 +19514,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/HandEyeCalibrationValidator.md"
     },
@@ -20171,13 +19679,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FisheyeCalibration.md"
     },
@@ -20269,13 +19777,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FisheyeUndistort.md"
     },
@@ -20486,13 +19994,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/StereoCalibration.md"
     },
@@ -20502,7 +20010,7 @@
       "displayName": "Pixel To World Transform",
       "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
       "category": "标定",
-      "version": "1.0.1",
+      "version": "1.0.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -20567,70 +20075,6 @@
             {
               "value": "WorldToPixel",
               "label": "World to Pixel"
-            }
-          ]
-        },
-        {
-          "name": "InputFrame",
-          "displayName": "Input Frame",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Auto",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Auto",
-              "label": "Auto"
-            },
-            {
-              "value": "ImageFull",
-              "label": "Image Full"
-            },
-            {
-              "value": "RoiLocal",
-              "label": "ROI Local"
-            },
-            {
-              "value": "Undistorted",
-              "label": "Undistorted"
-            },
-            {
-              "value": "World2D",
-              "label": "World 2D"
-            }
-          ]
-        },
-        {
-          "name": "OutputFrame",
-          "displayName": "Output Frame",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "Auto",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Auto",
-              "label": "Auto"
-            },
-            {
-              "value": "ImageFull",
-              "label": "Image Full"
-            },
-            {
-              "value": "RoiLocal",
-              "label": "ROI Local"
-            },
-            {
-              "value": "Undistorted",
-              "label": "Undistorted"
-            },
-            {
-              "value": "World2D",
-              "label": "World 2D"
             }
           ]
         },
@@ -20702,13 +20146,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PixelToWorldTransform.md"
     },
@@ -21091,13 +20535,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PlanarMatching.md"
     },
@@ -21334,13 +20778,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/LocalDeformableMatching.md"
     },
@@ -21492,13 +20936,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/DistanceTransform.md"
     },
@@ -21692,13 +21136,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/MinEnclosingGeometry.md"
     },
@@ -21809,13 +21253,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionErosion.md"
     },
@@ -21926,13 +21370,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionDilation.md"
     },
@@ -22032,13 +21476,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionOpening.md"
     },
@@ -22138,13 +21582,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionClosing.md"
     },
@@ -22232,13 +21676,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionSkeleton.md"
     },
@@ -22291,13 +21735,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionUnion.md"
     },
@@ -22350,13 +21794,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionIntersection.md"
     },
@@ -22409,13 +21853,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionDifference.md"
     },
@@ -22480,13 +21924,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 85,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/RegionComplement.md"
     },
@@ -22563,13 +22007,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 81,
-        "level": "B",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ArcCaliper.md"
     },
@@ -22646,13 +22090,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/ContourExtrema.md"
     },
@@ -22711,13 +22155,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FFT1D.md"
     },
@@ -22788,13 +22232,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 81,
-        "level": "B",
+        "totalScore": 40,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },
@@ -22853,13 +22297,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/InverseFFT1D.md"
     },
@@ -22930,13 +22374,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/PhaseClosure.md"
     },
@@ -23285,13 +22729,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 50,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=100, Validation=0, ErrorHandling=0"
       },
       "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     }

@@ -18,8 +18,10 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     private readonly ITriggerInputService _triggerInputService;
     private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
     private readonly TimeSpan _frameHealthProbeInterval;
+    private readonly TimeSpan _directAcquireIdleTimeout;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentQueue<ProducerEntry> _retiredProducers = new();
 
     private sealed class ProducerEntry
     {
@@ -102,6 +104,17 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         ITriggerInputService triggerInputService,
         ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
         TimeSpan frameHealthProbeInterval)
+        : this(cameraManager, logger, triggerInputService, serialPhotoelectricTriggerInputService, frameHealthProbeInterval, DirectAcquireIdleTimeout)
+    {
+    }
+
+    internal CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
+        TimeSpan frameHealthProbeInterval,
+        TimeSpan directAcquireIdleTimeout)
     {
         _cameraManager = cameraManager;
         _logger = logger;
@@ -110,6 +123,9 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         _frameHealthProbeInterval = frameHealthProbeInterval > TimeSpan.Zero
             ? frameHealthProbeInterval
             : DefaultFrameHealthProbeInterval;
+        _directAcquireIdleTimeout = directAcquireIdleTimeout > TimeSpan.Zero
+            ? directAcquireIdleTimeout
+            : DirectAcquireIdleTimeout;
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -122,11 +138,11 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         var entry = await EnsureProducerAsync(binding, cancellationToken);
         long? afterSequence;
+        CancellationTokenSource? idleStopCts = null;
         await entry.Gate.WaitAsync(cancellationToken);
         try
         {
-            entry.IdleStopCts?.Cancel();
-            entry.IdleStopCts?.Dispose();
+            idleStopCts = entry.IdleStopCts;
             entry.IdleStopCts = null;
             afterSequence = entry.LatestFrame?.Sequence;
         }
@@ -135,8 +151,9 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             entry.Gate.Release();
         }
 
+        CancelAndDisposeIdleStop(idleStopCts);
         var frame = await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
-        ArmDirectAcquireIdleStop(entry);
+        await ArmDirectAcquireIdleStopAsync(entry);
         return frame;
     }
 
@@ -155,9 +172,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
 
         var entry = await EnsureProducerAsync(binding, cancellationToken);
+        CancellationTokenSource? idleStopCts = null;
         await entry.Gate.WaitAsync(cancellationToken);
         try
         {
+            idleStopCts = entry.IdleStopCts;
+            entry.IdleStopCts = null;
             entry.LeaseCount++;
             return new CameraStreamLease(
                 Guid.NewGuid().ToString("N"),
@@ -168,6 +188,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         finally
         {
             entry.Gate.Release();
+            CancelAndDisposeIdleStop(idleStopCts);
         }
     }
 
@@ -200,7 +221,6 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             return;
         }
 
-        var disposeGate = false;
         await entry.Gate.WaitAsync();
         try
         {
@@ -212,21 +232,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
             {
                 await StopProducerCoreAsync(entry);
-                _producers.TryRemove(entry.CameraBindingId, out _);
-                disposeGate = true;
+                RetireProducer(entry);
             }
         }
         finally
         {
-            if (!disposeGate)
-            {
-                entry.Gate.Release();
-            }
-        }
-
-        if (disposeGate)
-        {
-            entry.Gate.Dispose();
+            entry.Gate.Release();
         }
     }
 
@@ -238,7 +249,6 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             return;
         }
 
-        var disposeGate = false;
         await entry.Gate.WaitAsync();
         try
         {
@@ -247,21 +257,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 Volatile.Read(ref entry.PendingFrameWaiters) == 0)
             {
                 await StopProducerCoreAsync(entry);
-                _producers.TryRemove(entry.CameraBindingId, out _);
-                disposeGate = true;
+                RetireProducer(entry);
             }
         }
         finally
         {
-            if (!disposeGate)
-            {
-                entry.Gate.Release();
-            }
-        }
-
-        if (disposeGate)
-        {
-            entry.Gate.Dispose();
+            entry.Gate.Release();
         }
     }
 
@@ -275,10 +276,13 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         var entry = await EnsureProducerAsync(binding, cancellationToken);
         var sessionId = Guid.NewGuid().ToString("N");
+        CancellationTokenSource? idleStopCts = null;
 
         await entry.Gate.WaitAsync(cancellationToken);
         try
         {
+            idleStopCts = entry.IdleStopCts;
+            entry.IdleStopCts = null;
             entry.PreviewSessionCount++;
             _previewSessions[sessionId] = new PreviewSessionState
             {
@@ -292,6 +296,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         finally
         {
             entry.Gate.Release();
+            CancelAndDisposeIdleStop(idleStopCts);
         }
 
         return new CameraPreviewSession(sessionId, binding.CameraBindingId, binding.TriggerMode, binding.TargetFrameRateFps);
@@ -328,7 +333,6 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
 
         await entry.Gate.WaitAsync();
-        var disposeGate = false;
         try
         {
             if (entry.PreviewSessionCount > 0)
@@ -339,21 +343,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
             {
                 await StopProducerCoreAsync(entry);
-                _producers.TryRemove(entry.CameraBindingId, out _);
-                disposeGate = true;
+                RetireProducer(entry);
             }
         }
         finally
         {
-            if (!disposeGate)
-            {
-                entry.Gate.Release();
-            }
-        }
-
-        if (disposeGate)
-        {
-            entry.Gate.Dispose();
+            entry.Gate.Release();
         }
     }
 
@@ -426,15 +421,16 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             try
             {
                 await StopProducerCoreAsync(entry);
+                RetireProducer(entry);
             }
             finally
             {
                 entry.Gate.Release();
-                entry.Gate.Dispose();
             }
         }
 
         _producers.Clear();
+        DisposeRetiredProducerGates();
     }
 
     private ResolvedBinding ResolveBinding(string cameraId)
@@ -642,8 +638,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         entry.EventCamera = null;
         entry.FrameReceivedHandler = null;
-        entry.IdleStopCts?.Cancel();
-        entry.IdleStopCts?.Dispose();
+        CancelAndDisposeIdleStop(entry.IdleStopCts);
         entry.IdleStopCts = null;
         entry.IsRunning = false;
         entry.SerialNumber = string.Empty;
@@ -687,8 +682,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
         finally
         {
-            entry.IdleStopCts?.Cancel();
-            entry.IdleStopCts?.Dispose();
+            CancelAndDisposeIdleStop(entry.IdleStopCts);
             entry.IdleStopCts = null;
             entry.IsRunning = false;
             entry.SerialNumber = string.Empty;
@@ -702,70 +696,115 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
-    private void ArmDirectAcquireIdleStop(ProducerEntry entry)
+    private async Task ArmDirectAcquireIdleStopAsync(ProducerEntry entry)
     {
         var idleCts = new CancellationTokenSource();
-        CancellationTokenSource? previousCts;
+        CancellationTokenSource? previousCts = null;
+        var shouldArm = false;
 
-        lock (entry)
+        try
         {
-            previousCts = entry.IdleStopCts;
-            entry.IdleStopCts = idleCts;
+            await entry.Gate.WaitAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            idleCts.Dispose();
+            return;
         }
 
-        previousCts?.Cancel();
-        previousCts?.Dispose();
+        try
+        {
+            previousCts = entry.IdleStopCts;
+            entry.IdleStopCts = null;
+            if (entry.IsRunning && entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
+            {
+                entry.IdleStopCts = idleCts;
+                shouldArm = true;
+            }
+        }
+        finally
+        {
+            entry.Gate.Release();
+        }
+
+        CancelAndDisposeIdleStop(previousCts);
+        if (!shouldArm)
+        {
+            idleCts.Dispose();
+            return;
+        }
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(DirectAcquireIdleTimeout, idleCts.Token);
+                await Task.Delay(_directAcquireIdleTimeout, idleCts.Token);
                 await entry.Gate.WaitAsync(idleCts.Token);
-                var disposeGate = false;
                 try
                 {
-                    if (idleCts.IsCancellationRequested)
+                    if (idleCts.IsCancellationRequested || !ReferenceEquals(entry.IdleStopCts, idleCts))
                     {
                         return;
                     }
 
+                    entry.IdleStopCts = null;
                     if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
                     {
                         await StopProducerCoreAsync(entry);
-                        _producers.TryRemove(entry.CameraBindingId, out _);
-                        disposeGate = true;
+                        RetireProducer(entry);
                     }
                 }
                 finally
                 {
-                    if (!disposeGate)
-                    {
-                        entry.Gate.Release();
-                    }
-                }
-
-                if (disposeGate)
-                {
-                    entry.Gate.Dispose();
+                    entry.Gate.Release();
                 }
             }
             catch (OperationCanceledException)
             {
             }
+            catch (ObjectDisposedException)
+            {
+            }
             finally
             {
-                lock (entry)
-                {
-                    if (ReferenceEquals(entry.IdleStopCts, idleCts))
-                    {
-                        entry.IdleStopCts = null;
-                    }
-                }
-
                 idleCts.Dispose();
             }
         });
+    }
+
+    private static void CancelAndDisposeIdleStop(CancellationTokenSource? cts)
+    {
+        if (cts == null)
+        {
+            return;
+        }
+
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        cts.Dispose();
+    }
+
+    private void RetireProducer(ProducerEntry entry)
+    {
+        var producers = (ICollection<KeyValuePair<string, ProducerEntry>>)_producers;
+        if (producers.Remove(new KeyValuePair<string, ProducerEntry>(entry.CameraBindingId, entry)))
+        {
+            _retiredProducers.Enqueue(entry);
+        }
+    }
+
+    private void DisposeRetiredProducerGates()
+    {
+        while (_retiredProducers.TryDequeue(out var entry))
+        {
+            entry.Gate.Dispose();
+        }
     }
 
     private async Task<CameraStreamFrame> AcquireSoftwareFrameAsync(ResolvedBinding binding, CancellationToken cancellationToken)

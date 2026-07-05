@@ -203,10 +203,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         var coordinatorToken = _coordinator.GetCancellationToken(projectId);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(coordinatorToken);
         var exitCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // 创建任务（使用 Task.Run 但不会立即等待）
+        // Create the task before registration, but keep execution gated until bookkeeping is complete.
         var task = Task.Run(async () =>
         {
+            await startGate.Task.ConfigureAwait(false);
             await RunWithTripleExceptionProtectionAsync(projectId, sessionId, flow, cameraId, cts.Token);
         }, CancellationToken.None);
 
@@ -225,6 +227,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             // 竞争失败，取消任务
             await cts.CancelAsync();
+            startGate.TrySetCanceled(CancellationToken.None);
             cts.Dispose();
             return false;
         }
@@ -241,6 +244,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         _logger.LogInformation("[InspectionWorker] 任务已启动: {ProjectId}, Session: {SessionId}",
             projectId, sessionId);
 
+        startGate.TrySetResult();
         return true;
     }
 

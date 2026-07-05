@@ -31,13 +31,30 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("SendData", "发送内容", "string", DefaultValue = "")]
 [OperatorParam("Encoding", "编码", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF-8", "ASCII|ASCII", "HEX|HEX" })]
 [OperatorParam("TimeoutMs", "超时(毫秒)", "int", DefaultValue = 3000, Min = 100, Max = 30000)]
+[OperatorParam("ResponseWaitMs", "响应等待(毫秒)", "int", DefaultValue = 100, Min = 0, Max = 30000)]
 public class SerialCommunicationOperator : OperatorBase
 {
+    private const int DefaultResponseWaitMs = 100;
+    private const int ResponsePollIntervalMs = 10;
+
+    private readonly Func<SerialPortConnectionSettings, ISerialPortConnection> _connectionFactory;
+
     public override OperatorType OperatorType => OperatorType.SerialCommunication;
 
-    public SerialCommunicationOperator(ILogger<SerialCommunicationOperator> logger) : base(logger) { }
+    public SerialCommunicationOperator(ILogger<SerialCommunicationOperator> logger)
+        : this(logger, settings => new SerialPortConnection(settings))
+    {
+    }
 
-    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+    internal SerialCommunicationOperator(
+        ILogger<SerialCommunicationOperator> logger,
+        Func<SerialPortConnectionSettings, ISerialPortConnection> connectionFactory)
+        : base(logger)
+    {
+        _connectionFactory = connectionFactory;
+    }
+
+    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
@@ -49,6 +66,7 @@ public class SerialCommunicationOperator : OperatorBase
         var stopBitsStr = GetStringParam(@operator, "StopBits", "One");
         var parityStr = GetStringParam(@operator, "Parity", "None");
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", 3000);
+        var responseWaitMs = Math.Clamp(GetIntParam(@operator, "ResponseWaitMs", DefaultResponseWaitMs), 0, timeoutMs);
         var sendData = GetStringParam(@operator, "SendData", "");
         var encoding = GetStringParam(@operator, "Encoding", "UTF8");
 
@@ -73,18 +91,20 @@ public class SerialCommunicationOperator : OperatorBase
         // 验证数据位范围
         if (dataBits < 5 || dataBits > 8)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("数据位必须在 5-8 之间"));
+            return OperatorExecutionOutput.Failure("数据位必须在 5-8 之间");
         }
 
-        using var port = new SerialPort(portName, baudRate, parity, dataBits, stopBits)
-        {
-            ReadTimeout = timeoutMs,
-            WriteTimeout = timeoutMs
-        };
+        using var port = _connectionFactory(new SerialPortConnectionSettings(
+            portName,
+            baudRate,
+            parity,
+            dataBits,
+            stopBits,
+            timeoutMs));
 
         try
         {
-            port.Open();
+            await port.OpenAsync(cancellationToken);
 
             // 发送数据
             if (!string.IsNullOrEmpty(sendData))
@@ -96,7 +116,7 @@ public class SerialCommunicationOperator : OperatorBase
                     var hexString = sendData.Replace(" ", "").Replace("-", "");
                     if (hexString.Length % 2 != 0)
                     {
-                        return Task.FromResult(OperatorExecutionOutput.Failure("HEX 数据长度必须是偶数"));
+                        return OperatorExecutionOutput.Failure("HEX 数据长度必须是偶数");
                     }
 
                     bytes = new byte[hexString.Length / 2];
@@ -117,22 +137,22 @@ public class SerialCommunicationOperator : OperatorBase
                     bytes = textEncoding.GetBytes(sendData);
                 }
 
-                port.Write(bytes, 0, bytes.Length);
+                await port.WriteAsync(bytes, cancellationToken);
                 Logger.LogInformation("[SerialCommunication] 已发送 {Bytes} 字节到 {Port}", bytes.Length, portName);
             }
 
             // 接收响应
-            Thread.Sleep(100); // 等待设备响应
-
             string response = "";
-            if (port.BytesToRead > 0)
+            var bytesAvailable = await WaitForAvailableBytesAsync(port, responseWaitMs, cancellationToken);
+            var bytesReceived = 0;
+            if (bytesAvailable > 0)
             {
-                byte[] buffer = new byte[port.BytesToRead];
-                int bytesRead = port.Read(buffer, 0, buffer.Length);
+                byte[] buffer = new byte[bytesAvailable];
+                bytesReceived = await port.ReadAsync(buffer, cancellationToken);
 
                 if (encoding.Equals("HEX", StringComparison.OrdinalIgnoreCase))
                 {
-                    response = BitConverter.ToString(buffer, 0, bytesRead).Replace("-", " ");
+                    response = BitConverter.ToString(buffer, 0, bytesReceived).Replace("-", " ");
                 }
                 else
                 {
@@ -142,43 +162,78 @@ public class SerialCommunicationOperator : OperatorBase
                         "UTF8" => Encoding.UTF8,
                         _ => Encoding.UTF8
                     };
-                    response = textEncoding.GetString(buffer, 0, bytesRead);
+                    response = textEncoding.GetString(buffer, 0, bytesReceived);
                 }
 
-                Logger.LogInformation("[SerialCommunication] 从 {Port} 接收 {Bytes} 字节", portName, bytesRead);
+                Logger.LogInformation("[SerialCommunication] 从 {Port} 接收 {Bytes} 字节", portName, bytesReceived);
             }
 
             var output = new Dictionary<string, object>
             {
                 { "Response", response },
-                { "BytesReceived", response.Length },
+                { "BytesReceived", bytesReceived },
                 { "Port", portName },
                 { "BaudRate", baudRate },
                 { "Success", true }
             };
 
-            return Task.FromResult(OperatorExecutionOutput.Success(output));
+            return OperatorExecutionOutput.Success(output);
         }
         catch (UnauthorizedAccessException ex)
         {
             Logger.LogError(ex, "[SerialCommunication] 串口 {Port} 访问被拒绝", portName);
-            return Task.FromResult(OperatorExecutionOutput.Failure($"串口 {portName} 访问被拒绝，请检查串口是否被其他程序占用"));
+            return OperatorExecutionOutput.Failure($"串口 {portName} 访问被拒绝，请检查串口是否被其他程序占用");
         }
         catch (IOException ex)
         {
             Logger.LogError(ex, "[SerialCommunication] 串口 {Port} IO 错误", portName);
-            return Task.FromResult(OperatorExecutionOutput.Failure($"串口 {portName} IO 错误: {ex.Message}"));
+            return OperatorExecutionOutput.Failure($"串口 {portName} IO 错误: {ex.Message}");
         }
         catch (TimeoutException ex)
         {
             Logger.LogError(ex, "[SerialCommunication] 串口 {Port} 操作超时", portName);
-            return Task.FromResult(OperatorExecutionOutput.Failure($"串口 {portName} 操作超时"));
+            return OperatorExecutionOutput.Failure($"串口 {portName} 操作超时");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[SerialCommunication] 串口通信失败: {Port}", portName);
-            return Task.FromResult(OperatorExecutionOutput.Failure($"串口通信失败: {ex.Message}"));
+            return OperatorExecutionOutput.Failure($"串口通信失败: {ex.Message}");
         }
+    }
+
+    private static async Task<int> WaitForAvailableBytesAsync(
+        ISerialPortConnection port,
+        int responseWaitMs,
+        CancellationToken cancellationToken)
+    {
+        var available = port.BytesToRead;
+        if (available > 0 || responseWaitMs <= 0)
+        {
+            return available;
+        }
+
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(responseWaitMs);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var remainingMs = (int)Math.Max(0, (deadline - DateTimeOffset.UtcNow).TotalMilliseconds);
+            if (remainingMs == 0)
+            {
+                break;
+            }
+
+            await Task.Delay(Math.Min(ResponsePollIntervalMs, remainingMs), cancellationToken);
+            available = port.BytesToRead;
+            if (available > 0)
+            {
+                return available;
+            }
+        }
+
+        return port.BytesToRead;
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -208,5 +263,65 @@ public class SerialCommunicationOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    internal readonly record struct SerialPortConnectionSettings(
+        string PortName,
+        int BaudRate,
+        Parity Parity,
+        int DataBits,
+        StopBits StopBits,
+        int TimeoutMs);
+
+    internal interface ISerialPortConnection : IDisposable
+    {
+        int BytesToRead { get; }
+
+        Task OpenAsync(CancellationToken cancellationToken);
+
+        Task WriteAsync(byte[] bytes, CancellationToken cancellationToken);
+
+        Task<int> ReadAsync(byte[] buffer, CancellationToken cancellationToken);
+    }
+
+    private sealed class SerialPortConnection : ISerialPortConnection
+    {
+        private readonly SerialPort _port;
+
+        public SerialPortConnection(SerialPortConnectionSettings settings)
+        {
+            _port = new SerialPort(
+                settings.PortName,
+                settings.BaudRate,
+                settings.Parity,
+                settings.DataBits,
+                settings.StopBits)
+            {
+                ReadTimeout = settings.TimeoutMs,
+                WriteTimeout = settings.TimeoutMs
+            };
+        }
+
+        public int BytesToRead => _port.BytesToRead;
+
+        public Task OpenAsync(CancellationToken cancellationToken)
+        {
+            return Task.Run(_port.Open, cancellationToken);
+        }
+
+        public Task WriteAsync(byte[] bytes, CancellationToken cancellationToken)
+        {
+            return _port.BaseStream.WriteAsync(bytes.AsMemory(0, bytes.Length), cancellationToken).AsTask();
+        }
+
+        public async Task<int> ReadAsync(byte[] buffer, CancellationToken cancellationToken)
+        {
+            return await _port.BaseStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            _port.Dispose();
+        }
     }
 }

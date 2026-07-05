@@ -18,12 +18,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [InputPort("CalibrationData", "Calibration Data", PortDataType.String, IsRequired = false)]
 [OutputPort("Image", "Undistorted Image", PortDataType.Image)]
-public class UndistortOperator : OperatorBase
+public class UndistortOperator : OperatorBase, IDisposable
 {
     private const int MaxCacheEntries = 16;
     private readonly Dictionary<string, (Mat map1, Mat map2)> _mapCache = new(StringComparer.Ordinal);
     private readonly Queue<string> _cacheOrder = new();
+    private readonly List<(Mat map1, Mat map2)> _retiredMaps = new();
     private readonly object _cacheLock = new();
+    private int _activeMapLeases;
+    private bool _disposed;
 
     public override OperatorType OperatorType => OperatorType.Undistort;
 
@@ -74,9 +77,9 @@ public class UndistortOperator : OperatorBase
                 profile: "undistort-brown",
                 outputSize: src.Size());
 
-            var (map1, map2) = GetOrCreateRemap(cacheKey, runtime.CameraMatrix, runtime.DistCoeffs, src.Size());
+            using var remap = GetOrCreateRemap(cacheKey, runtime.CameraMatrix, runtime.DistCoeffs, src.Size());
             var dst = new Mat();
-            Cv2.Remap(src, dst, map1, map2, InterpolationFlags.Linear, BorderTypes.Constant);
+            Cv2.Remap(src, dst, remap.Map1, remap.Map2, InterpolationFlags.Linear, BorderTypes.Constant);
 
             var diagnostics = runtime.Bundle.Quality.Diagnostics?.Count > 0
                 ? string.Join("; ", runtime.Bundle.Quality.Diagnostics)
@@ -111,6 +114,33 @@ public class UndistortOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
+    public void Dispose()
+    {
+        List<(Mat map1, Mat map2)>? mapsToDispose = null;
+
+        lock (_cacheLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            RetireMapsLocked(_mapCache.Values);
+            _mapCache.Clear();
+            _cacheOrder.Clear();
+
+            while (_activeMapLeases > 0)
+            {
+                Monitor.Wait(_cacheLock);
+            }
+
+            mapsToDispose = DrainRetiredMapsLocked();
+        }
+
+        DisposeMaps(mapsToDispose);
+    }
+
     private bool TryResolveCalibrationData(
         Operator @operator,
         Dictionary<string, object>? inputs,
@@ -141,36 +171,55 @@ public class UndistortOperator : OperatorBase
         return true;
     }
 
-    private (Mat map1, Mat map2) GetOrCreateRemap(string key, Mat cameraMatrix, Mat distCoeffs, Size imageSize)
+    private RemapLease GetOrCreateRemap(string key, Mat cameraMatrix, Mat distCoeffs, Size imageSize)
     {
+        List<(Mat map1, Mat map2)>? mapsToDispose = null;
+        Mat map1;
+        Mat map2;
+
         lock (_cacheLock)
         {
-            if (_mapCache.TryGetValue(key, out var cached))
+            if (_disposed)
             {
-                return cached;
+                throw new ObjectDisposedException(nameof(UndistortOperator));
             }
 
-            var map1 = new Mat();
-            var map2 = new Mat();
-            Cv2.InitUndistortRectifyMap(
-                cameraMatrix,
-                distCoeffs,
-                new Mat(),
-                cameraMatrix,
-                imageSize,
-                MatType.CV_32FC1,
-                map1,
-                map2);
+            if (_mapCache.TryGetValue(key, out var cached))
+            {
+                map1 = cached.map1;
+                map2 = cached.map2;
+            }
+            else
+            {
+                map1 = new Mat();
+                map2 = new Mat();
+                using var rectification = new Mat();
+                Cv2.InitUndistortRectifyMap(
+                    cameraMatrix,
+                    distCoeffs,
+                    rectification,
+                    cameraMatrix,
+                    imageSize,
+                    MatType.CV_32FC1,
+                    map1,
+                    map2);
 
-            _mapCache[key] = (map1, map2);
-            _cacheOrder.Enqueue(key);
-            TrimCacheIfNeeded();
-            return (map1, map2);
+                _mapCache[key] = (map1, map2);
+                _cacheOrder.Enqueue(key);
+                mapsToDispose = TrimCacheIfNeededLocked();
+            }
+
+            _activeMapLeases++;
         }
+
+        DisposeMaps(mapsToDispose);
+        return new RemapLease(this, map1, map2);
     }
 
-    private void TrimCacheIfNeeded()
+    private List<(Mat map1, Mat map2)>? TrimCacheIfNeededLocked()
     {
+        List<(Mat map1, Mat map2)>? mapsToDispose = null;
+
         while (_cacheOrder.Count > MaxCacheEntries)
         {
             var oldestKey = _cacheOrder.Dequeue();
@@ -179,8 +228,93 @@ public class UndistortOperator : OperatorBase
                 continue;
             }
 
-            maps.map1.Dispose();
-            maps.map2.Dispose();
+            if (_activeMapLeases > 0)
+            {
+                _retiredMaps.Add(maps);
+            }
+            else
+            {
+                mapsToDispose ??= new List<(Mat map1, Mat map2)>();
+                mapsToDispose.Add(maps);
+            }
+        }
+
+        return mapsToDispose;
+    }
+
+    private void ReleaseRemapLease()
+    {
+        List<(Mat map1, Mat map2)>? mapsToDispose = null;
+
+        lock (_cacheLock)
+        {
+            _activeMapLeases--;
+            if (_activeMapLeases == 0)
+            {
+                if (_disposed)
+                {
+                    Monitor.PulseAll(_cacheLock);
+                }
+                else
+                {
+                    mapsToDispose = DrainRetiredMapsLocked();
+                }
+            }
+        }
+
+        DisposeMaps(mapsToDispose);
+    }
+
+    private void RetireMapsLocked(IEnumerable<(Mat map1, Mat map2)> maps)
+    {
+        _retiredMaps.AddRange(maps);
+    }
+
+    private List<(Mat map1, Mat map2)>? DrainRetiredMapsLocked()
+    {
+        if (_retiredMaps.Count == 0)
+        {
+            return null;
+        }
+
+        var mapsToDispose = new List<(Mat map1, Mat map2)>(_retiredMaps);
+        _retiredMaps.Clear();
+        return mapsToDispose;
+    }
+
+    private static void DisposeMaps(List<(Mat map1, Mat map2)>? maps)
+    {
+        if (maps == null)
+        {
+            return;
+        }
+
+        foreach (var (map1, map2) in maps)
+        {
+            map1.Dispose();
+            map2.Dispose();
+        }
+    }
+
+    private sealed class RemapLease : IDisposable
+    {
+        private UndistortOperator? _owner;
+
+        public RemapLease(UndistortOperator owner, Mat map1, Mat map2)
+        {
+            _owner = owner;
+            Map1 = map1;
+            Map2 = map2;
+        }
+
+        public Mat Map1 { get; }
+
+        public Mat Map2 { get; }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.ReleaseRemapLease();
         }
     }
 }

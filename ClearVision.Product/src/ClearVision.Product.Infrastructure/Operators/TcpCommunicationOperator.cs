@@ -33,6 +33,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Encoding", "编码", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF-8", "ASCII|ASCII", "GBK|GBK" })]
 public class TcpCommunicationOperator : OperatorBase
 {
+    private const int MaxPooledConnections = 32;
+    private static readonly TimeSpan MaxIdleConnectionAge = TimeSpan.FromMinutes(10);
+
     public override OperatorType OperatorType => OperatorType.TcpCommunication;
 
     public TcpCommunicationOperator(ILogger<TcpCommunicationOperator> logger) : base(logger) { }
@@ -42,6 +45,8 @@ public class TcpCommunicationOperator : OperatorBase
     private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionLocks = new();
     private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _requestResponseLocks = new();
     private static readonly ConcurrentDictionary<string, NetworkStream> _streamPool = new();
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> _connectionLastUsed = new();
+    private static readonly ConcurrentDictionary<string, int> _activeOperations = new();
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -114,33 +119,57 @@ public class TcpCommunicationOperator : OperatorBase
         lockAcquired = true;
         try
         {
+            CleanupIdleConnections(DateTimeOffset.UtcNow);
+
             // 检查现有连接是否有效
-            if (_connectionPool.TryGetValue(key, out var existingClient) &&
-                _streamPool.TryGetValue(key, out var existingStream))
+            var hasExistingClient = _connectionPool.TryGetValue(key, out var existingClient);
+            var hasExistingStream = _streamPool.TryGetValue(key, out var existingStream);
+            if (hasExistingClient && hasExistingStream)
             {
-                if (IsConnectionAlive(existingClient))
+                if (IsConnectionAlive(existingClient!))
                 {
+                    ApplyClientTimeouts(existingClient!, timeoutMs);
+                    TouchConnection(key);
                     Logger.LogDebug("TCP 连接复用: {Key}", key);
-                    return (existingClient, existingStream);
+                    return (existingClient!, existingStream!);
                 }
 
                 // 清理旧连接
                 InvalidateConnection(key);
             }
+            else if (hasExistingClient || hasExistingStream)
+            {
+                InvalidateConnection(key);
+            }
 
             // 建立新连接
-            var client = new TcpClient();
+            var client = new TcpClient
+            {
+                NoDelay = true,
+                ReceiveTimeout = timeoutMs,
+                SendTimeout = timeoutMs
+            };
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeoutMs);
 
-            await client.ConnectAsync(ipAddress, port, cts.Token);
-            var stream = client.GetStream();
+            try
+            {
+                await client.ConnectAsync(ipAddress, port, cts.Token);
+                var stream = client.GetStream();
 
-            _connectionPool[key] = client;
-            _streamPool[key] = stream;
+                _connectionPool[key] = client;
+                _streamPool[key] = stream;
+                TouchConnection(key);
+                TrimConnectionPoolIfNeeded(key);
 
-            Logger.LogInformation("TCP 连接已建立: {Key}", key);
-            return (client, stream);
+                Logger.LogInformation("TCP 连接已建立: {Key}", key);
+                return (client, stream);
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
         }
         finally
         {
@@ -175,15 +204,18 @@ public class TcpCommunicationOperator : OperatorBase
             try
             {
                 client.Close();
+                client.Dispose();
             }
             catch
             {
                 // Ignore cleanup exceptions.
             }
         }
+
+        _connectionLastUsed.TryRemove(key, out _);
     }
 
-    private bool IsConnectionAlive(TcpClient client)
+    private static bool IsConnectionAlive(TcpClient client)
     {
         try
         {
@@ -197,20 +229,143 @@ public class TcpCommunicationOperator : OperatorBase
         }
     }
 
-    private sealed class RefCountedSemaphore
+    public static IReadOnlyDictionary<string, bool> GetConnectionStateSnapshot()
     {
+        var snapshot = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, client) in _connectionPool)
+        {
+            snapshot[key] = IsConnectionAlive(client);
+        }
+
+        return snapshot;
+    }
+
+    public static void ClearConnectionPool()
+    {
+        foreach (var key in _connectionPool.Keys.Concat(_streamPool.Keys).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            InvalidateConnection(key);
+        }
+
+        _connectionPool.Clear();
+        _streamPool.Clear();
+        _connectionLastUsed.Clear();
+        _activeOperations.Clear();
+    }
+
+    private static void ApplyClientTimeouts(TcpClient client, int timeoutMs)
+    {
+        client.ReceiveTimeout = timeoutMs;
+        client.SendTimeout = timeoutMs;
+    }
+
+    private static void TouchConnection(string key)
+    {
+        _connectionLastUsed[key] = DateTimeOffset.UtcNow;
+    }
+
+    private void CleanupIdleConnections(DateTimeOffset now)
+    {
+        foreach (var entry in _connectionLastUsed)
+        {
+            if (now - entry.Value > MaxIdleConnectionAge)
+            {
+                PurgeConnection(entry.Key, force: false);
+            }
+        }
+    }
+
+    private void TrimConnectionPoolIfNeeded(string protectedKey)
+    {
+        if (_connectionPool.Count <= MaxPooledConnections)
+        {
+            return;
+        }
+
+        foreach (var candidate in _connectionLastUsed.OrderBy(entry => entry.Value))
+        {
+            if (_connectionPool.Count <= MaxPooledConnections)
+            {
+                break;
+            }
+
+            if (candidate.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            PurgeConnection(candidate.Key, force: false);
+        }
+    }
+
+    private void PurgeConnection(string key, bool force)
+    {
+        if (!force && _activeOperations.TryGetValue(key, out var activeCount) && activeCount > 0)
+        {
+            return;
+        }
+
+        InvalidateConnection(key);
+    }
+
+    private static void IncrementActiveOperations(string key)
+    {
+        _activeOperations.AddOrUpdate(key, 1, static (_, count) => count + 1);
+    }
+
+    private static void DecrementActiveOperations(string key)
+    {
+        _activeOperations.AddOrUpdate(
+            key,
+            0,
+            static (_, count) => Math.Max(0, count - 1));
+
+        if (_activeOperations.TryGetValue(key, out var count) && count == 0)
+        {
+            _activeOperations.TryRemove(new KeyValuePair<string, int>(key, 0));
+        }
+    }
+
+    private sealed class RefCountedSemaphore : IDisposable
+    {
+        private readonly object _sync = new();
         private int _refCount;
+        private bool _removed;
 
         public SemaphoreSlim Semaphore { get; } = new(1, 1);
 
-        public void AddRef()
+        public bool TryAddRef()
         {
-            Interlocked.Increment(ref _refCount);
+            lock (_sync)
+            {
+                if (_removed)
+                {
+                    return false;
+                }
+
+                _refCount++;
+                return true;
+            }
         }
 
-        public int ReleaseRef()
+        public bool ReleaseRefAndMarkRemovedIfUnused()
         {
-            return Interlocked.Decrement(ref _refCount);
+            lock (_sync)
+            {
+                _refCount--;
+                if (_refCount != 0)
+                {
+                    return false;
+                }
+
+                _removed = true;
+                return true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Semaphore.Dispose();
         }
     }
 
@@ -221,14 +376,21 @@ public class TcpCommunicationOperator : OperatorBase
         while (true)
         {
             var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
-            entry.AddRef();
+            if (!entry.TryAddRef())
+            {
+                dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+                continue;
+            }
 
             if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
             {
                 return entry;
             }
 
-            _ = entry.ReleaseRef();
+            if (entry.ReleaseRefAndMarkRemovedIfUnused())
+            {
+                entry.Dispose();
+            }
         }
     }
 
@@ -237,12 +399,15 @@ public class TcpCommunicationOperator : OperatorBase
         string key,
         RefCountedSemaphore entry)
     {
-        if (entry.ReleaseRef() != 0)
+        if (!entry.ReleaseRefAndMarkRemovedIfUnused())
         {
             return;
         }
 
-        _ = dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+        if (dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry)))
+        {
+            entry.Dispose();
+        }
     }
 
     /// <summary>
@@ -259,16 +424,19 @@ public class TcpCommunicationOperator : OperatorBase
         var key = $"{ipAddress}:{port}";
         var requestLockEntry = AcquireRefCountedSemaphore(_requestResponseLocks, key);
         var requestLockAcquired = false;
-        await requestLockEntry.Semaphore.WaitAsync(cancellationToken);
-        requestLockAcquired = true;
+        var operationTracked = false;
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromMilliseconds(timeout));
 
         try
         {
-            // 从连接池获取连接
-            var (_, stream) = await GetOrCreateConnectionAsync(ipAddress, port, timeout, cancellationToken);
+            await requestLockEntry.Semaphore.WaitAsync(cts.Token);
+            requestLockAcquired = true;
+            IncrementActiveOperations(key);
+            operationTracked = true;
 
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromMilliseconds(timeout));
+            // 从连接池获取连接
+            var (_, stream) = await GetOrCreateConnectionAsync(ipAddress, port, timeout, cts.Token);
 
             // 发送数据
             if (!string.IsNullOrEmpty(sendData))
@@ -293,10 +461,20 @@ public class TcpCommunicationOperator : OperatorBase
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            if (operationTracked)
+            {
+                InvalidateConnection(key);
+            }
+
             return ("通信被取消", false);
         }
         catch (OperationCanceledException)
         {
+            if (operationTracked)
+            {
+                InvalidateConnection(key);
+            }
+
             return ("连接超时", false);
         }
         catch (Exception ex)
@@ -307,6 +485,20 @@ public class TcpCommunicationOperator : OperatorBase
         }
         finally
         {
+            if (operationTracked)
+            {
+                if (_connectionPool.ContainsKey(key))
+                {
+                    TouchConnection(key);
+                }
+                else
+                {
+                    _connectionLastUsed.TryRemove(key, out _);
+                }
+
+                DecrementActiveOperations(key);
+            }
+
             if (requestLockAcquired)
             {
                 requestLockEntry.Semaphore.Release();

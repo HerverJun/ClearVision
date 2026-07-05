@@ -11,13 +11,14 @@ namespace ClearVision.Product.Infrastructure.Services;
 public sealed class QueuedInspectionImagePersistenceService : BackgroundService, IInspectionImagePersistenceService
 {
     private const int QueueCapacity = 256;
-    private static readonly TimeSpan ShutdownDrainTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultShutdownDrainTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IConfigurationService _configurationService;
-    private readonly InspectionImagePersistenceService _inner;
+    private readonly IInspectionImagePersistenceService _inner;
     private readonly ILogger<QueuedInspectionImagePersistenceService> _logger;
     private readonly Channel<InspectionResult> _queue;
     private readonly long _maxQueuedImageBytes;
+    private readonly TimeSpan _shutdownDrainTimeout;
     private readonly object _queuedImageBytesLock = new();
     private long _queuedImageBytes;
     private long _droppedImageCount;
@@ -25,6 +26,15 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
     public QueuedInspectionImagePersistenceService(
         IConfigurationService configurationService,
         InspectionImagePersistenceService inner,
+        ILogger<QueuedInspectionImagePersistenceService> logger,
+        IConfiguration? configuration = null)
+        : this(configurationService, (IInspectionImagePersistenceService)inner, logger, configuration)
+    {
+    }
+
+    internal QueuedInspectionImagePersistenceService(
+        IConfigurationService configurationService,
+        IInspectionImagePersistenceService inner,
         ILogger<QueuedInspectionImagePersistenceService> logger,
         IConfiguration? configuration = null)
     {
@@ -39,13 +49,34 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
             fallback: 64 * 1024 * 1024,
             min: 1,
             max: int.MaxValue);
+        _shutdownDrainTimeout = TimeSpan.FromMilliseconds(ResolveConfiguredInt(
+            configuration,
+            "Performance:Persistence:ShutdownDrainTimeoutMs",
+            "Performance__Persistence__ShutdownDrainTimeoutMs",
+            "CV_PERSISTENCE_SHUTDOWN_DRAIN_TIMEOUT_MS",
+            fallback: (int)DefaultShutdownDrainTimeout.TotalMilliseconds,
+            min: 1,
+            max: 300_000));
         _queue = Channel.CreateBounded<InspectionResult>(new BoundedChannelOptions(QueueCapacity)
         {
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.Wait
         });
     }
+
+    public long QueuedImageBytes
+    {
+        get
+        {
+            lock (_queuedImageBytesLock)
+            {
+                return _queuedImageBytes;
+            }
+        }
+    }
+
+    public long DroppedImageCount => Volatile.Read(ref _droppedImageCount);
 
     public Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
@@ -100,6 +131,11 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
+                    var droppedCount = Interlocked.Increment(ref _droppedImageCount);
+                    _logger.LogWarning(
+                        "[InspectionImagePersistenceQueue] 图像保存已被停机取消。 ResultId={ResultId}, DroppedCount={DroppedCount}",
+                        result.Id,
+                        droppedCount);
                     break;
                 }
                 catch (Exception ex)
@@ -127,7 +163,7 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
             return;
         }
 
-        var drainTask = Task.Delay(ShutdownDrainTimeout, cancellationToken);
+        var drainTask = Task.Delay(_shutdownDrainTimeout, cancellationToken);
         var completedTask = await Task.WhenAny(executeTask, drainTask);
         if (completedTask == executeTask)
         {
@@ -135,10 +171,34 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
             return;
         }
 
+        var droppedSnapshots = DropQueuedSnapshots();
+        if (droppedSnapshots > 0)
+        {
+            var droppedCount = Interlocked.Add(ref _droppedImageCount, droppedSnapshots);
+            _logger.LogWarning(
+                "[InspectionImagePersistenceQueue] 停机前未能在 {TimeoutMilliseconds:F0} ms 内排空图像保存队列，已放弃 {DroppedSnapshots} 张尚未开始保存的图像以释放内存预算。 QueuedImageBytes={QueuedImageBytes}, DroppedCount={DroppedCount}",
+                _shutdownDrainTimeout.TotalMilliseconds,
+                droppedSnapshots,
+                QueuedImageBytes,
+                droppedCount);
+        }
+
         _logger.LogWarning(
-            "[InspectionImagePersistenceQueue] 停机前未能在 {TimeoutSeconds:F0} 秒内排空图像保存队列，将按主机关闭流程取消剩余保存。",
-            ShutdownDrainTimeout.TotalSeconds);
+            "[InspectionImagePersistenceQueue] 停机前未能在 {TimeoutMilliseconds:F0} ms 内排空图像保存队列，将按主机关闭流程取消剩余保存。",
+            _shutdownDrainTimeout.TotalMilliseconds);
         await base.StopAsync(cancellationToken);
+    }
+
+    private int DropQueuedSnapshots()
+    {
+        var droppedSnapshots = 0;
+        while (_queue.Reader.TryRead(out var result))
+        {
+            ReleaseQueuedImageBytes(result);
+            droppedSnapshots++;
+        }
+
+        return droppedSnapshots;
     }
 
     private static InspectionResult SnapshotResult(InspectionResult source)

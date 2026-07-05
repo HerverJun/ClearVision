@@ -5,6 +5,9 @@ namespace ClearVision.Product.Infrastructure.Calibration;
 
 public static class CalibrationBundleV2Json
 {
+    public const string UnsupportedDistortionModelErrorCode = "CALIBRATION_DISTORTION_MODEL_UNSUPPORTED";
+    public const string UnsupportedTransform2DModelErrorCode = "CALIBRATION_TRANSFORM2D_MODEL_UNSUPPORTED";
+
     public static readonly JsonSerializerOptions DefaultOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -128,7 +131,7 @@ public static class CalibrationBundleV2Json
 
         if (allowedDistortionModels.Length > 0 && !allowedDistortionModels.Contains(bundle.Distortion.Model))
         {
-            error = $"Distortion model {bundle.Distortion.Model} is not supported by this operator.";
+            error = $"[{UnsupportedDistortionModelErrorCode}] 不支持的畸变模型：{bundle.Distortion.Model}。";
             return false;
         }
 
@@ -154,7 +157,7 @@ public static class CalibrationBundleV2Json
 
         if (allowedModels.Length > 0 && !allowedModels.Contains(bundle.Transform2D.Model))
         {
-            error = $"Transform2D model {bundle.Transform2D.Model} is not supported by this operator.";
+            error = $"[{UnsupportedTransform2DModelErrorCode}] 不支持的二维变换模型：{bundle.Transform2D.Model}。";
             return false;
         }
 

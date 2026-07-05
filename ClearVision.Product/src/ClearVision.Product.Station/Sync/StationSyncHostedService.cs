@@ -711,7 +711,7 @@ public sealed class StationSyncHostedService : BackgroundService
                     await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, collectMessage, stoppingToken);
                     break;
                 default:
-                    await ReportCommandAsync(command, StationCommandStatus.Failed, 100, $"{command.CommandType} is not supported by this Station build.", stoppingToken, "NotSupported");
+                    await ReportCommandAsync(command, StationCommandStatus.Failed, 100, $"当前 Station 版本不支持命令：{command.CommandType}。", stoppingToken, "NotSupported");
                     break;
             }
         }
@@ -947,14 +947,36 @@ public sealed class StationSyncHostedService : BackgroundService
 
         if (recordTerminal && IsTerminalCommandStatus(status))
         {
-            _commandExecutionJournalStore.RecordTerminalResult(command, payload);
+            try
+            {
+                _commandExecutionJournalStore.RecordTerminalResult(command, payload);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to record Station command terminal journal; remote command result reporting will continue. CommandId={CommandId}, Status={Status}",
+                    command.CommandId,
+                    status);
+            }
         }
 
         if (!await _hubClient.ReportCommandResultAsync(payload, cancellationToken))
         {
             MarkUnregistered();
-            _commandResultSpoolStore.Enqueue(payload);
-            SignalSync();
+            try
+            {
+                _commandResultSpoolStore.Enqueue(payload);
+                SignalSync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to spool Station command result after remote reporting failed. CommandId={CommandId}, Status={Status}",
+                    command.CommandId,
+                    status);
+            }
         }
     }
 

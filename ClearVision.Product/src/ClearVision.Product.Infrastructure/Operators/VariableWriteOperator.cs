@@ -67,7 +67,7 @@ public class VariableWriteOperator : OperatorBase
         var converted = ConvertRunValue(value, dataType);
         _variableContext.SetValue(variableName, converted);
 
-        Logger.LogInformation("[VariableWrite] Write {VariableName} = {Value}", variableName, converted);
+        Logger.LogDebug("[VariableWrite] Write {VariableName} = {Value}", variableName, converted);
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
         {

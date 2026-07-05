@@ -203,7 +203,7 @@ public class VariableIncrementOperator : OperatorBase
 
     private OperatorExecutionOutput BuildSuccess(string variableName, long previousValue, long newValue, long delta, bool wasReset)
     {
-        Logger.LogInformation("[VariableIncrement] {VariableName}: {PreviousValue} + {Delta} = {NewValue}",
+        Logger.LogDebug("[VariableIncrement] {VariableName}: {PreviousValue} + {Delta} = {NewValue}",
             variableName, previousValue, delta, newValue);
 
         return OperatorExecutionOutput.Success(new Dictionary<string, object>

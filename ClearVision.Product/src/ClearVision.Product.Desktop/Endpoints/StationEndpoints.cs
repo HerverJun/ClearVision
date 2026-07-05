@@ -335,7 +335,14 @@ public static class StationEndpoints
             return parsedId;
         }
 
-        return 0;
+        if (long.TryParse(request.Query["lastEventId"].FirstOrDefault(), out var lastEventId))
+        {
+            return lastEventId;
+        }
+
+        return long.TryParse(request.Query["afterSequence"].FirstOrDefault(), out var afterSequence)
+            ? afterSequence
+            : 0;
     }
 
     private static async Task SendHeartbeatsAsync(ChannelWriter<StoredStationRegistryEvent> writer, CancellationToken cancellationToken)
