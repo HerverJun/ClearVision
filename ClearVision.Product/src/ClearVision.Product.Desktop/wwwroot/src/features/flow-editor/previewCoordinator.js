@@ -484,7 +484,8 @@ function isLiveCameraAcquisitionNode(node) {
     }
 
     const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
-    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera';
+    const cameraId = String(getParameterValue(node.parameters, 'CameraId', 'cameraId') || '').trim();
+    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera' && Boolean(cameraId);
 }
 
 function validatePreviewPrerequisites(node, inputImageBase64) {

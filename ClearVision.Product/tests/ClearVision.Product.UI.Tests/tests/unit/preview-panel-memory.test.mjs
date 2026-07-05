@@ -1095,6 +1095,54 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   assert.equal(harness.container.innerHTML, '');
 });
 
+test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layered empty states', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const emitIdleError = errorMessage => harness.emitPreview({
+    ...successState({
+      activeNodeId: 'node-1',
+      status: 'idle',
+      executionTimeMs: null,
+      errorMessage,
+      outputImageBase64: null,
+      outputData: null,
+      observation: null,
+      artifacts: [],
+      presenter: {
+        statusText: errorMessage,
+        inputImageSrc: null,
+        outputImageSrc: null
+      }
+    })
+  });
+
+  emitIdleError('请先配置文件路径');
+  assert.match(harness.container.innerHTML, /data-status="idle-error">缺输入图或采集源/);
+  assert.match(harness.container.innerHTML, /请先配置文件路径/);
+  assert.match(harness.container.innerHTML, /缺输入图或采集源，无法生成输出图像/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
+
+  emitIdleError('输入图像过大，已跳过预览。请先缩小图像或执行完整检测。');
+  assert.match(harness.container.innerHTML, /data-status="idle-error">输入图像过大/);
+  assert.match(harness.container.innerHTML, /输入图像过大，无法生成输出图像/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
+
+  emitIdleError('该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“刷新预览”手动执行。');
+  assert.match(harness.container.innerHTML, /data-status="idle-error">需手动预览/);
+  assert.match(harness.container.innerHTML, /需手动预览后生成输出图像/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
+
+  emitIdleError('C:\\Users\\A\\secret\\preview.log unavailable');
+  assert.match(harness.container.innerHTML, /data-status="idle-error">预览未运行/);
+  assert.match(harness.container.innerHTML, /预览未运行，暂无输出图像/);
+  assert.doesNotMatch(harness.container.innerHTML, /C:\\Users\\A/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
+
+  owner.dispose();
+});
+
 test('PreviewPanelCapabilityOwner shows image operations and routes open image through adapter', () => {
   const harness = createPreviewCapabilityHarness();
   const owner = new PreviewPanelCapabilityOwner(harness.container, {

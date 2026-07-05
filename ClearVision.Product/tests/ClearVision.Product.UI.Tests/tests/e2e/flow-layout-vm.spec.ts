@@ -368,12 +368,17 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     const fileInput = page.locator('.inspector-pane input[name="FilePath"]');
     const pickerButton = page.locator('.inspector-pane .btn-pick-file[data-param="FilePath"]');
+    const workbench = page.locator('.preview-workbench-pane');
     await expect(page.locator('.inspector-pane')).toContainText('图像采集');
+    await expect(page.locator('.inspector-pane .property-form')).toBeVisible();
     await expect(fileInput).toBeVisible();
     await expect(fileInput).toHaveAttribute('readonly', '');
     await expect(pickerButton).toBeVisible();
     await expect(page.locator('.inspector-pane select[data-camera-binding-select="true"]')).toHaveCount(1);
     await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
+    await expect(workbench).toContainText('缺输入图或采集源');
+    await expect(workbench).toContainText('请先配置文件路径');
+    await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
 
     await pickerButton.click();
     const pickMessage = await page.evaluate(() => (window as any).__pickFileMessages.at(-1));
@@ -398,6 +403,21 @@ test.describe('Flow layout VisionMaster-style shell', () => {
       const parameter = node.parameters.find((item: any) => item.name === 'FilePath');
       return parameter?.value;
     })).toBe('C:\\Data\\sample.png');
+  });
+
+  test('shows missing camera prerequisite for camera acquisition without CameraId', async ({ page }) => {
+    await openInputFlyout(page);
+    await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
+
+    await expect(page.locator('.inspector-pane .property-form')).toBeVisible();
+    await page.locator('.inspector-pane #param-SourceType').selectOption('Camera');
+
+    const workbench = page.locator('.preview-workbench-pane');
+    await expect(workbench).toContainText('请先选择相机');
+    await expect(workbench).toContainText('缺输入图或采集源');
+    await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
+    await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
   });
 
   test('shows blank, no-image and preview-failure states', async ({ page }) => {

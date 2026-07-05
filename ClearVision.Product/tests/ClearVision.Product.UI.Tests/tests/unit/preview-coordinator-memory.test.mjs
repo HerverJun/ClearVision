@@ -241,6 +241,60 @@ test('NodePreviewCoordinator compacts preview outputData before retaining state 
   }
 });
 
+test('NodePreviewCoordinator keeps high-cost auto previews idle until manual request', async () => {
+  const highCostNode = {
+    id: 'template-node',
+    type: 'TemplateMatching',
+    parameters: [],
+    outputs: [{ type: 'image' }]
+  };
+  const { coordinator, getExecuteCount } = createCoordinator({
+    node: highCostNode
+  });
+
+  try {
+    coordinator.setActiveNode(highCostNode);
+    await waitFor(() => assert.match(coordinator.getState().errorMessage || '', /高成本计算|手动执行/));
+
+    assert.equal(coordinator.getState().status, 'idle');
+    assert.equal(getExecuteCount(), 0);
+
+    coordinator.requestActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    assert.equal(getExecuteCount(), 1);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator reports missing camera before live camera manual policy', async () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: '' }
+    ],
+    outputs: [{ type: 'image' }]
+  };
+  const { coordinator, getExecuteCount } = createCoordinator({
+    node: cameraNode,
+    inputImageBase64: null
+  });
+
+  try {
+    coordinator.setActiveNode(cameraNode);
+    await waitFor(() => assert.equal(coordinator.getState().errorMessage, '请先选择相机'));
+
+    assert.equal(coordinator.getState().status, 'idle');
+    assert.equal(coordinator.getState().presenter.statusText, '请先选择相机');
+    assert.equal(getExecuteCount(), 0);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
 test('NodePreviewCoordinator sends client request sequence and flow revision', async () => {
   let capturedOptions = null;
   const { coordinator, node } = createCoordinator({

@@ -133,6 +133,49 @@ function getStateIdentitySignature(state) {
     ].join('|');
 }
 
+function classifyIdlePreviewError(errorMessage) {
+    const detail = redactLocalAbsolutePaths(String(errorMessage || '').trim());
+    if (!detail) {
+        return null;
+    }
+
+    const normalized = detail.toLowerCase();
+
+    if (/过大|too large|oversize|exceed|payload/.test(normalized)) {
+        return {
+            reason: 'input-too-large',
+            label: '输入图像过大',
+            message: '输入图像过大',
+            emptyMessage: '输入图像过大，无法生成输出图像'
+        };
+    }
+
+    if (/高成本|手动|manual|auto.*skip|自动.*跳过|刷新预览|真实取帧|\bai\b|\bocr\b|模板|特征匹配|matching/.test(normalized)) {
+        return {
+            reason: 'manual-required',
+            label: '需手动预览',
+            message: '需手动预览',
+            emptyMessage: '需手动预览后生成输出图像'
+        };
+    }
+
+    if (/文件路径|采集源|输入图|相机|file path|camera|input image|missing input|missing source/.test(normalized)) {
+        return {
+            reason: 'missing-input',
+            label: '缺输入图或采集源',
+            message: detail,
+            emptyMessage: '缺输入图或采集源，无法生成输出图像'
+        };
+    }
+
+    return {
+        reason: 'not-run',
+        label: '预览未运行',
+        message: '预览未运行',
+        emptyMessage: '预览未运行，暂无输出图像'
+    };
+}
+
 function getStatusLabel(state, belongsToSelectedNode, nodeDeleted, stale = false) {
     if (nodeDeleted) {
         return {
@@ -188,6 +231,16 @@ function getStatusLabel(state, belongsToSelectedNode, nodeDeleted, stale = false
             label: '预览已取消',
             message: '预览已取消'
         };
+    }
+
+    if (state?.status === 'idle' && state?.errorMessage) {
+        const idleError = classifyIdlePreviewError(state.errorMessage);
+        if (idleError) {
+            return {
+                kind: 'idle-error',
+                ...idleError
+            };
+        }
     }
 
     return {
@@ -279,6 +332,10 @@ function getPreviewImageEmptyMessage({
 
     if (statusInfo.kind === 'canceled') {
         return '预览已取消';
+    }
+
+    if (statusInfo.kind === 'idle-error') {
+        return statusInfo.emptyMessage || '预览未运行，暂无输出图像';
     }
 
     if (!hasImageOutput) {
@@ -941,6 +998,15 @@ export class PreviewPanelCapabilityOwner {
                                `).join('')}
                            </div>`
                         : ''}
+                </section>
+            `;
+        }
+
+        if (statusInfo.kind === 'idle-error') {
+            return `
+                <section class="preview-capability-section">
+                    <h5>预览结果</h5>
+                    <div class="preview-capability-empty">${escapeHtml(statusInfo.message || statusInfo.label)}</div>
                 </section>
             `;
         }
