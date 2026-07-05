@@ -1,10 +1,10 @@
 {
   "schemaVersion": "2026-04-29.quasi-industrial-audit.v1",
-  "generatedAtUtc": "2026-04-30T04:24:54+00:00",
+  "generatedAtUtc": "2026-07-05T06:15:50+00:00",
   "passed": true,
   "summary": {
-    "checkCount": 57,
-    "passedCount": 57,
+    "checkCount": 64,
+    "passedCount": 64,
     "failedCount": 0,
     "realIndustrialValidationComplete": 0
   },
@@ -87,7 +87,12 @@
     {
       "id": "public_benchmark_proof_exists",
       "passed": true,
-      "details": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json"
+      "details": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.summary.json"
+    },
+    {
+      "id": "public_benchmark_proof_retained_summary",
+      "passed": true,
+      "details": "raw-json-removed-from-git"
     },
     {
       "id": "public_benchmark_proof_accepted",
@@ -100,9 +105,19 @@
       "details": "10"
     },
     {
+      "id": "public_benchmark_proof_summary_counts_consistent",
+      "passed": true,
+      "details": "operators=10/10 accepted=10 failed=0"
+    },
+    {
       "id": "public_benchmark_proof_schema_complete",
       "passed": true,
       "details": ""
+    },
+    {
+      "id": "public_benchmark_proof_replay_count_consistent",
+      "passed": true,
+      "details": "184/184"
     },
     {
       "id": "public_benchmark_proof_no_real_field_overclaim",
@@ -135,6 +150,21 @@
       "details": "quality/evals/reports/QualityFlywheel_public_benchmark_replay_manifest.json"
     },
     {
+      "id": "public_benchmark_replay_schema_version",
+      "passed": true,
+      "details": "2026-04-29.public-benchmark-replay.v1"
+    },
+    {
+      "id": "public_benchmark_replay_source_baseline",
+      "passed": true,
+      "details": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json"
+    },
+    {
+      "id": "public_benchmark_replay_source_sha_matches_proof",
+      "passed": true,
+      "details": "0481d7db11f693b5f4b764e969c0b6174a732b7f857f65c31402333d3b1007b3/0481d7db11f693b5f4b764e969c0b6174a732b7f857f65c31402333d3b1007b3"
+    },
+    {
       "id": "public_benchmark_replay_manifest_accepted",
       "passed": true,
       "details": "True"
@@ -142,10 +172,30 @@
     {
       "id": "public_benchmark_replay_has_cases",
       "passed": true,
-      "details": "183"
+      "details": "184"
+    },
+    {
+      "id": "public_benchmark_replay_summary_counts_consistent",
+      "passed": true,
+      "details": "cases=184/184/184 operators=10/10/10"
+    },
+    {
+      "id": "public_benchmark_replay_class_counts_consistent",
+      "passed": true,
+      "details": "{'boundary': 139, 'failure': 45}"
     },
     {
       "id": "public_benchmark_replay_triage_complete",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "id": "public_benchmark_replay_classes_allowed",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "id": "public_benchmark_replay_commands_allowed",
       "passed": true,
       "details": ""
     },
@@ -180,17 +230,22 @@
       "details": "183/183"
     },
     {
-      "id": "algorithm_ab_replay_report_candidate_executed_ge_183",
+      "id": "algorithm_ab_replay_report_candidate_executed_ge_160",
       "passed": true,
-      "details": "183"
+      "details": "160"
     },
     {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_executed",
+      "id": "algorithm_ab_replay_report_regressed_zero",
       "passed": true,
-      "details": "candidate-executed"
+      "details": "0"
     },
     {
-      "id": "algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20",
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_or_control",
+      "passed": true,
+      "details": "unchanged-baseline-control"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_cases_ge_20",
       "passed": true,
       "details": "20"
     },
@@ -200,32 +255,12 @@
       "details": "0"
     },
     {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_summary_accessible",
+      "id": "algorithm_ab_replay_report_deeplearning_control_case_count",
       "passed": true,
-      "details": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json"
+      "details": "20/20"
     },
     {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_summary_exists",
-      "passed": true,
-      "details": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json"
-    },
-    {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_profile",
-      "passed": true,
-      "details": "real_model_hard_nms_045"
-    },
-    {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_annotation_seeded_false",
-      "passed": true,
-      "details": "False"
-    },
-    {
-      "id": "algorithm_ab_replay_report_deeplearning_candidate_artifact_present",
-      "passed": true,
-      "details": "generated-smoke-fixture"
-    },
-    {
-      "id": "algorithm_ab_replay_report_candidate_camera_cases_executed_ge_3",
+      "id": "algorithm_ab_replay_report_camera_cases_ge_3",
       "passed": true,
       "details": "3"
     },
@@ -277,7 +312,7 @@
     {
       "id": "algorithm_improvement_suite_has_active_entry",
       "passed": true,
-      "details": "2"
+      "details": "12"
     },
     {
       "id": "algorithm_improvement_suite_no_raw_path",

@@ -1,11 +1,11 @@
 {
   "Summary": {
-    "GeneratedAtUtc": "2026-04-29T03:30:05.253897+00:00",
+    "GeneratedAtUtc": "2026-07-05T05:26:53.1150434+00:00",
     "CaseCount": 26,
     "Passed": 26,
     "Failed": 0,
-    "RuntimeMs": 114.769,
-    "MemoryAllocationBytes": 672504
+    "RuntimeMs": 69.855,
+    "MemoryAllocationBytes": 681520
   },
   "Operators": [
     {
@@ -13,8 +13,8 @@
       "CaseCount": 26,
       "Passed": 26,
       "Failed": 0,
-      "RuntimeMsAvg": 4.414,
-      "MemoryAllocationBytesAvg": 25866
+      "RuntimeMsAvg": 2.687,
+      "MemoryAllocationBytesAvg": 26212
     }
   ],
   "Scenarios": [
@@ -23,63 +23,63 @@
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.435
+      "RuntimeMsAvg": 0.534
     },
     {
       "Scenario": "NMS contract",
       "CaseCount": 5,
       "Passed": 5,
       "Failed": 0,
-      "RuntimeMsAvg": 0.366
+      "RuntimeMsAvg": 0.638
     },
     {
       "Scenario": "Output contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.129
+      "RuntimeMsAvg": 0.146
     },
     {
       "Scenario": "Output tensor selection",
       "CaseCount": 3,
       "Passed": 3,
       "Failed": 0,
-      "RuntimeMsAvg": 1.129
+      "RuntimeMsAvg": 1.584
     },
     {
       "Scenario": "Preprocess contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 6.21
+      "RuntimeMsAvg": 9.306
     },
     {
       "Scenario": "Target class contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 4.365
+      "RuntimeMsAvg": 5.962
     },
     {
       "Scenario": "Visualization contract",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 0.282
+      "RuntimeMsAvg": 0.335
     },
     {
       "Scenario": "YOLO output parsing",
       "CaseCount": 5,
       "Passed": 5,
       "Failed": 0,
-      "RuntimeMsAvg": 16.674
+      "RuntimeMsAvg": 5.057
     },
     {
       "Scenario": "YOLO version detection",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 1.376
+      "RuntimeMsAvg": 1.666
     }
   ],
   "Cases": [
@@ -87,8 +87,8 @@
       "CaseId": "yolov8_standard_box_mapping",
       "Scenario": "YOLO output parsing",
       "Passed": true,
-      "RuntimeMs": 80.386,
-      "MemoryAllocationBytes": 40056,
+      "RuntimeMs": 21.684,
+      "MemoryAllocationBytes": 70936,
       "Failure": null,
       "Metrics": {
         "DetectionCount": 1,
@@ -103,7 +103,7 @@
       "CaseId": "yolov8_transposed_box_mapping",
       "Scenario": "YOLO output parsing",
       "Passed": true,
-      "RuntimeMs": 1.566,
+      "RuntimeMs": 1.927,
       "MemoryAllocationBytes": 25776,
       "Failure": null,
       "Metrics": {
@@ -117,7 +117,7 @@
       "CaseId": "yolov8_coordinate_clamp",
       "Scenario": "YOLO output parsing",
       "Passed": true,
-      "RuntimeMs": 0.185,
+      "RuntimeMs": 0.245,
       "MemoryAllocationBytes": 8288,
       "Failure": null,
       "Metrics": {
@@ -131,7 +131,7 @@
       "CaseId": "yolov5_standard_objectness_product",
       "Scenario": "YOLO output parsing",
       "Passed": true,
-      "RuntimeMs": 0.774,
+      "RuntimeMs": 0.864,
       "MemoryAllocationBytes": 6440,
       "Failure": null,
       "Metrics": {
@@ -144,7 +144,7 @@
       "CaseId": "yolov5_transposed_objectness_product",
       "Scenario": "YOLO output parsing",
       "Passed": true,
-      "RuntimeMs": 0.46,
+      "RuntimeMs": 0.564,
       "MemoryAllocationBytes": 8632,
       "Failure": null,
       "Metrics": {
@@ -157,7 +157,7 @@
       "CaseId": "auto_detect_yolov8_custom_labels",
       "Scenario": "YOLO version detection",
       "Passed": true,
-      "RuntimeMs": 2.529,
+      "RuntimeMs": 2.983,
       "MemoryAllocationBytes": 4048,
       "Failure": null,
       "Metrics": {
@@ -168,7 +168,7 @@
       "CaseId": "auto_detect_yolov5_custom_labels",
       "Scenario": "YOLO version detection",
       "Passed": true,
-      "RuntimeMs": 0.223,
+      "RuntimeMs": 0.348,
       "MemoryAllocationBytes": 4792,
       "Failure": null,
       "Metrics": {
@@ -179,7 +179,7 @@
       "CaseId": "select_detection_output_known_label_count",
       "Scenario": "Output tensor selection",
       "Passed": true,
-      "RuntimeMs": 0.99,
+      "RuntimeMs": 1.18,
       "MemoryAllocationBytes": 2656,
       "Failure": null,
       "Metrics": {
@@ -191,7 +191,7 @@
       "CaseId": "select_detection_output_rank3_heuristic",
       "Scenario": "Output tensor selection",
       "Passed": true,
-      "RuntimeMs": 0.293,
+      "RuntimeMs": 0.36,
       "MemoryAllocationBytes": 3416,
       "Failure": null,
       "Metrics": {
@@ -203,8 +203,8 @@
       "CaseId": "select_detection_output_fail_closed",
       "Scenario": "Output tensor selection",
       "Passed": true,
-      "RuntimeMs": 2.104,
-      "MemoryAllocationBytes": 13304,
+      "RuntimeMs": 3.212,
+      "MemoryAllocationBytes": 21400,
       "Failure": null,
       "Metrics": {
         "FailClosed": true
@@ -214,8 +214,8 @@
       "CaseId": "nms_same_class_suppresses_overlap",
       "Scenario": "NMS contract",
       "Passed": true,
-      "RuntimeMs": 1.228,
-      "MemoryAllocationBytes": 33920,
+      "RuntimeMs": 1.831,
+      "MemoryAllocationBytes": 27728,
       "Failure": null,
       "Metrics": {
         "Kept": 2,
@@ -226,7 +226,7 @@
       "CaseId": "nms_different_class_keeps_overlap",
       "Scenario": "NMS contract",
       "Passed": true,
-      "RuntimeMs": 0.253,
+      "RuntimeMs": 0.52,
       "MemoryAllocationBytes": 5696,
       "Failure": null,
       "Metrics": {
@@ -238,7 +238,7 @@
       "CaseId": "nms_iou_threshold_low_suppresses",
       "Scenario": "NMS contract",
       "Passed": true,
-      "RuntimeMs": 0.126,
+      "RuntimeMs": 0.301,
       "MemoryAllocationBytes": 2760,
       "Failure": null,
       "Metrics": {
@@ -250,7 +250,7 @@
       "CaseId": "nms_iou_threshold_high_keeps",
       "Scenario": "NMS contract",
       "Passed": true,
-      "RuntimeMs": 0.111,
+      "RuntimeMs": 0.259,
       "MemoryAllocationBytes": 2760,
       "Failure": null,
       "Metrics": {
@@ -262,7 +262,7 @@
       "CaseId": "nms_invalid_box_discarded",
       "Scenario": "NMS contract",
       "Passed": true,
-      "RuntimeMs": 0.113,
+      "RuntimeMs": 0.279,
       "MemoryAllocationBytes": 2776,
       "Failure": null,
       "Metrics": {
@@ -273,7 +273,7 @@
       "CaseId": "target_classes_numeric_filter",
       "Scenario": "Target class contract",
       "Passed": true,
-      "RuntimeMs": 1.079,
+      "RuntimeMs": 2.055,
       "MemoryAllocationBytes": 12208,
       "Failure": null,
       "Metrics": {
@@ -285,7 +285,7 @@
       "CaseId": "target_classes_named_parse",
       "Scenario": "Target class contract",
       "Passed": true,
-      "RuntimeMs": 7.65,
+      "RuntimeMs": 9.87,
       "MemoryAllocationBytes": 3832,
       "Failure": null,
       "Metrics": {
@@ -296,31 +296,32 @@
       "CaseId": "label_contract_match_valid",
       "Scenario": "Label contract",
       "Passed": true,
-      "RuntimeMs": 0.842,
-      "MemoryAllocationBytes": 8376,
+      "RuntimeMs": 0.88,
+      "MemoryAllocationBytes": 9512,
       "Failure": null,
       "Metrics": {
-        "ValidationStatus": "MetadataValidatedWithExternalLabels",
+        "ValidationStatus": "MetadataOnly",
         "ResolvedLabelSource": "ModelMetadata"
       }
     },
     {
-      "CaseId": "label_contract_mismatch_fails",
+      "CaseId": "label_contract_metadata_overrides_external",
       "Scenario": "Label contract",
       "Passed": true,
-      "RuntimeMs": 0.491,
-      "MemoryAllocationBytes": 20000,
+      "RuntimeMs": 0.576,
+      "MemoryAllocationBytes": 22248,
       "Failure": null,
       "Metrics": {
-        "ValidationStatus": "Mismatch"
+        "ValidationStatus": "MetadataOnly",
+        "ResolvedLabelSource": "ModelMetadata"
       }
     },
     {
       "CaseId": "label_contract_missing_fails",
       "Scenario": "Label contract",
       "Passed": true,
-      "RuntimeMs": 0.245,
-      "MemoryAllocationBytes": 1096,
+      "RuntimeMs": 0.332,
+      "MemoryAllocationBytes": 1072,
       "Failure": null,
       "Metrics": {
         "ValidationStatus": "MissingLabelContract"
@@ -330,7 +331,7 @@
       "CaseId": "visualization_nms_when_internal_disabled",
       "Scenario": "Visualization contract",
       "Passed": true,
-      "RuntimeMs": 0.282,
+      "RuntimeMs": 0.335,
       "MemoryAllocationBytes": 4592,
       "Failure": null,
       "Metrics": {
@@ -341,7 +342,7 @@
       "CaseId": "statistics_label_object_mode",
       "Scenario": "Output contract",
       "Passed": true,
-      "RuntimeMs": 0.137,
+      "RuntimeMs": 0.153,
       "MemoryAllocationBytes": 880,
       "Failure": null,
       "Metrics": {
@@ -352,7 +353,7 @@
       "CaseId": "statistics_label_defect_mode",
       "Scenario": "Output contract",
       "Passed": true,
-      "RuntimeMs": 0.121,
+      "RuntimeMs": 0.138,
       "MemoryAllocationBytes": 2416,
       "Failure": null,
       "Metrics": {
@@ -363,8 +364,8 @@
       "CaseId": "preprocess_grayscale_to_chw_rgb",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 11.371,
-      "MemoryAllocationBytes": 219408,
+      "RuntimeMs": 17.259,
+      "MemoryAllocationBytes": 224920,
       "Failure": null,
       "Metrics": {
         "Shape": "1,3,64,64"
@@ -374,8 +375,8 @@
       "CaseId": "preprocess_float_unit_range",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 1.048,
-      "MemoryAllocationBytes": 232936,
+      "RuntimeMs": 1.353,
+      "MemoryAllocationBytes": 200296,
       "Failure": null,
       "Metrics": {
         "FirstValue": 0.5019608
@@ -385,7 +386,7 @@
       "CaseId": "class_name_fallback_is_class_id",
       "Scenario": "Label contract",
       "Passed": true,
-      "RuntimeMs": 0.162,
+      "RuntimeMs": 0.347,
       "MemoryAllocationBytes": 1440,
       "Failure": null,
       "Metrics": {

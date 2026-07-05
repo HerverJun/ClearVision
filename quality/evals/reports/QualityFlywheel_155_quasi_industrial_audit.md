@@ -1,12 +1,12 @@
 # Quality Flywheel 155 Quasi-Industrial Audit
 
-GeneratedAtUtc: `2026-04-30T04:24:54+00:00`
+GeneratedAtUtc: `2026-07-05T06:15:50+00:00`
 Passed: `Yes`
 
 ## Summary
 
-- Checks: 57
-- Passed: 57
+- Checks: 64
+- Passed: 64
 - Failed: 0
 - Real industrial validation complete: 0
 
@@ -29,35 +29,42 @@ Passed: `Yes`
 | public_dataset_license_source_present | Pass |  |
 | public_dataset_planned_items_explicit | Pass |  |
 | public_dataset_cards_no_raw_path | Pass | dataset card raw path scan |
-| public_benchmark_proof_exists | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json |
+| public_benchmark_proof_exists | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.summary.json |
+| public_benchmark_proof_retained_summary | Pass | raw-json-removed-from-git |
 | public_benchmark_proof_accepted | Pass | True |
 | public_benchmark_proof_operator_count | Pass | 10 |
+| public_benchmark_proof_summary_counts_consistent | Pass | operators=10/10 accepted=10 failed=0 |
 | public_benchmark_proof_schema_complete | Pass |  |
+| public_benchmark_proof_replay_count_consistent | Pass | 184/184 |
 | public_benchmark_proof_no_real_field_overclaim | Pass |  |
 | public_benchmark_proof_privacy_clean | Pass |  |
 | public_benchmark_proof_no_raw_path | Pass | public benchmark proof raw path scan |
 | public_benchmark_proof_deeplearning_baseline | Pass | quality/evals/reports/DeepLearning_coco_real_model_baseline.json |
 | public_benchmark_proof_deeplearning_no_annotation_seeded_claim | Pass | COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used) |
 | public_benchmark_replay_manifest_exists | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_replay_manifest.json |
+| public_benchmark_replay_schema_version | Pass | 2026-04-29.public-benchmark-replay.v1 |
+| public_benchmark_replay_source_baseline | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json |
+| public_benchmark_replay_source_sha_matches_proof | Pass | 0481d7db11f693b5f4b764e969c0b6174a732b7f857f65c31402333d3b1007b3/0481d7db11f693b5f4b764e969c0b6174a732b7f857f65c31402333d3b1007b3 |
 | public_benchmark_replay_manifest_accepted | Pass | True |
-| public_benchmark_replay_has_cases | Pass | 183 |
+| public_benchmark_replay_has_cases | Pass | 184 |
+| public_benchmark_replay_summary_counts_consistent | Pass | cases=184/184/184 operators=10/10/10 |
+| public_benchmark_replay_class_counts_consistent | Pass | {'boundary': 139, 'failure': 45} |
 | public_benchmark_replay_triage_complete | Pass |  |
+| public_benchmark_replay_classes_allowed | Pass |  |
+| public_benchmark_replay_commands_allowed | Pass |  |
 | public_benchmark_replay_no_raw_path | Pass | public benchmark replay raw path scan |
 | algorithm_ab_replay_report_exists | Pass | quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json |
 | algorithm_ab_replay_report_accepted | Pass | True |
 | algorithm_ab_replay_report_has_replay_cases | Pass | 183 |
 | algorithm_ab_replay_report_no_pending_candidates | Pass | 0 |
 | algorithm_ab_replay_report_all_cases_compared | Pass | 183/183 |
-| algorithm_ab_replay_report_candidate_executed_ge_183 | Pass | 183 |
-| algorithm_ab_replay_report_deeplearning_candidate_executed | Pass | candidate-executed |
-| algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20 | Pass | 20 |
+| algorithm_ab_replay_report_candidate_executed_ge_160 | Pass | 160 |
+| algorithm_ab_replay_report_regressed_zero | Pass | 0 |
+| algorithm_ab_replay_report_deeplearning_candidate_or_control | Pass | unchanged-baseline-control |
+| algorithm_ab_replay_report_deeplearning_cases_ge_20 | Pass | 20 |
 | algorithm_ab_replay_report_deeplearning_processing_errors_zero | Pass | 0 |
-| algorithm_ab_replay_report_deeplearning_candidate_summary_accessible | Pass | quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json |
-| algorithm_ab_replay_report_deeplearning_candidate_summary_exists | Pass | quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json |
-| algorithm_ab_replay_report_deeplearning_candidate_profile | Pass | real_model_hard_nms_045 |
-| algorithm_ab_replay_report_deeplearning_candidate_annotation_seeded_false | Pass | False |
-| algorithm_ab_replay_report_deeplearning_candidate_artifact_present | Pass | generated-smoke-fixture |
-| algorithm_ab_replay_report_candidate_camera_cases_executed_ge_3 | Pass | 3 |
+| algorithm_ab_replay_report_deeplearning_control_case_count | Pass | 20/20 |
+| algorithm_ab_replay_report_camera_cases_ge_3 | Pass | 3 |
 | algorithm_ab_replay_report_camera_regressed_zero | Pass | 0 |
 | algorithm_ab_replay_report_camera_worse_metric_zero | Pass | 0 |
 | algorithm_ab_replay_report_all_ops_wired | Pass |  |
@@ -67,7 +74,7 @@ Passed: `Yes`
 | public_benchmark_suite_no_raw_path | Pass | suite raw path scan |
 | full155_quality_suite_has_active_entry | Pass | 7 |
 | full155_quality_suite_no_raw_path | Pass | suite raw path scan |
-| algorithm_improvement_suite_has_active_entry | Pass | 2 |
+| algorithm_improvement_suite_has_active_entry | Pass | 12 |
 | algorithm_improvement_suite_no_raw_path | Pass | suite raw path scan |
 | audit_suite_has_active_entry | Pass | 1 |
 | audit_suite_no_raw_path | Pass | suite raw path scan |

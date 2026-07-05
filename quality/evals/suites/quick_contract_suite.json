@@ -120,7 +120,7 @@
           "id": "g1_p3_contract_batch2",
           "status": "active",
           "evidenceKind": "contract",
-          "operators": ["BoxNms", "ConditionalBranch", "PointSetTool", "VoxelDownsample", "CodeRecognition", "DatabaseWrite", "EuclideanClusterExtraction", "GlcmTexture", "HttpRequest", "ImageAdd", "ImageSave", "LawsTextureFilter", "MinEnclosingGeometry", "ModbusCommunication", "MqttPublish", "OcrRecognition", "PolarUnwrap", "RoiManager", "ScriptOperator", "SerialCommunication", "TcpCommunication", "TextSave"],
+          "operators": ["Aggregator", "BoxNms", "CodeRecognition", "ConditionalBranch", "DatabaseWrite", "EuclideanClusterExtraction", "GlcmTexture", "HttpRequest", "ImageAdd", "ImageSave", "LawsTextureFilter", "MinEnclosingGeometry", "ModbusCommunication", "MqttPublish", "OcrRecognition", "PPFEstimation", "PPFMatch", "PointAlignment", "PointCorrection", "PointLineDistance", "PointSetTool", "PolarUnwrap", "RansacPlaneSegmentation", "ResultOutput", "RoiManager", "RoiTransform", "ScriptOperator", "SerialCommunication", "ShadingCorrection", "SharpnessEvaluation", "StatisticalOutlierRemoval", "Statistics", "TcpCommunication", "TextSave", "TriggerModule", "TryCatch", "UnitConvert", "VoxelDownsample"],
           "command": ["dotnet", "run", "--project", "quality/tools/G1P3ContractBatch2Runner/G1P3ContractBatch2Runner.csproj", "--", "--output", "quality/evals/reports/G1P3ContractBatch2_baseline.json", "--report", "quality/evals/reports/G1P3ContractBatch2_baseline.md"],
           "baselineJson": "quality/evals/reports/G1P3ContractBatch2_baseline.json",
           "reportMarkdown": "quality/evals/reports/G1P3ContractBatch2_baseline.md",

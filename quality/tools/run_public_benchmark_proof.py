@@ -14,11 +14,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 DATASET_DIR = REPO_ROOT / "quality" / "datasets"
 OUTPUT_JSON = REPORT_DIR / "QualityFlywheel_public_benchmark_proof_baseline.json"
+OUTPUT_SUMMARY_JSON = REPORT_DIR / "QualityFlywheel_public_benchmark_proof_baseline.summary.json"
 OUTPUT_MD = REPORT_DIR / "QualityFlywheel_public_benchmark_proof_baseline.md"
 REPLAY_JSON = REPORT_DIR / "QualityFlywheel_public_benchmark_replay_manifest.json"
 REPLAY_MD = REPORT_DIR / "QualityFlywheel_public_benchmark_replay_manifest.md"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 GENERATED_AT = "2026-04-29T00:00:00Z"
+PROOF_SCHEMA_VERSION = "2026-04-29.public-benchmark-proof.v1"
+REPLAY_SCHEMA_VERSION = "2026-04-29.public-benchmark-replay.v1"
+ALLOWED_REPLAY_COMMANDS = {
+    ("python", "quality/tools/run_algorithm_ab_replay.py", "--execute-camera-calibration"),
+    ("python", "quality/tools/run_algorithm_ab_replay.py", "--execute-matching"),
+}
 REQUIRED_RESULT_FIELDS = {
     "datasetId",
     "manifestSha256",
@@ -201,6 +208,23 @@ def numeric(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def strict_int(value: Any) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def normalize_sha256(value: Any) -> str:
+    text = str(value or "").strip()
+    if text.startswith("sha256:"):
+        text = text[len("sha256:") :]
+    return text
+
+
+def is_sha256_hex(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{64}", value))
 
 
 def summary(document: dict[str, Any]) -> dict[str, Any]:
@@ -456,7 +480,7 @@ def build_document() -> dict[str, Any]:
     results = [build_operator_result(config) for config in PROOF_SOURCES]
     accepted = all(result["accepted"] for result in results)
     return {
-        "schemaVersion": "2026-04-29.public-benchmark-proof.v1",
+        "schemaVersion": PROOF_SCHEMA_VERSION,
         "generatedAtUtc": GENERATED_AT,
         "requiredRunnerFields": sorted(REQUIRED_RESULT_FIELDS),
         "accepted": accepted,
@@ -486,7 +510,7 @@ def build_replay_manifest(document: dict[str, Any]) -> dict[str, Any]:
     ]
     class_counts = Counter(str(item.get("replayClass")) for item in replay_cases)
     return {
-        "schemaVersion": "2026-04-29.public-benchmark-replay.v1",
+        "schemaVersion": REPLAY_SCHEMA_VERSION,
         "generatedAtUtc": document["generatedAtUtc"],
         "sourceProofBaseline": repo(OUTPUT_JSON),
         "sourceProofSha256": sha256_file(OUTPUT_JSON) if OUTPUT_JSON.exists() else "",
@@ -502,6 +526,10 @@ def build_replay_manifest(document: dict[str, Any]) -> dict[str, Any]:
 
 def validate_document(document: dict[str, Any]) -> list[str]:
     errors: list[str] = []
+    if document.get("schemaVersion") != PROOF_SCHEMA_VERSION:
+        errors.append(f"public benchmark proof schemaVersion must be {PROOF_SCHEMA_VERSION}")
+    if document.get("accepted") is not True:
+        errors.append("public benchmark proof accepted must be true")
     operators = document.get("operators")
     if not isinstance(operators, list) or not operators:
         return ["public benchmark proof must contain operator results"]
@@ -538,30 +566,214 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             errors.append(f"{operator} missing replayCases")
         elif any(not item.get("triageLabel") or not item.get("replayCommand") for item in replay_cases):
             errors.append(f"{operator} replayCases missing triageLabel or replayCommand")
-    if document.get("summary", {}).get("realIndustrialValidationComplete") != 0:
+    summary_row = document.get("summary")
+    if not isinstance(summary_row, dict):
+        errors.append("public benchmark proof missing summary")
+        summary_row = {}
+    operator_count = strict_int(summary_row.get("operatorCount"))
+    accepted_count = strict_int(summary_row.get("acceptedCount"))
+    failed_count = strict_int(summary_row.get("failedCount"))
+    replay_case_count = strict_int(summary_row.get("replayCaseCount"))
+    if operator_count != len(operators):
+        errors.append("summary.operatorCount must equal operator row count")
+    if accepted_count != sum(1 for row in operators if row.get("accepted") is True):
+        errors.append("summary.acceptedCount must equal accepted operator rows")
+    if failed_count != sum(1 for row in operators if row.get("accepted") is not True):
+        errors.append("summary.failedCount must equal failed operator rows")
+    if replay_case_count != sum(len(row.get("replayCases", [])) for row in operators if isinstance(row, dict)):
+        errors.append("summary.replayCaseCount must equal operator replayCases")
+    if summary_row.get("realIndustrialValidationComplete") != 0:
         errors.append("summary must keep realIndustrialValidationComplete at 0")
     if RAW_PATH_RE.search(json.dumps(document, ensure_ascii=False)):
         errors.append("proof document contains raw path pattern")
     return errors
 
 
-def validate_replay_manifest(manifest: dict[str, Any]) -> list[str]:
+def validate_retained_summary(document: dict[str, Any]) -> list[str]:
     errors: list[str] = []
+    if document.get("schemaVersion") != "quality-report-summary/v1":
+        errors.append("retained summary schemaVersion must be quality-report-summary/v1")
+    if document.get("evidenceKind") != "public-benchmark-proof":
+        errors.append("retained summary evidenceKind must be public-benchmark-proof")
+
+    source_report = document.get("sourceReport")
+    if not isinstance(source_report, dict):
+        errors.append("retained summary missing sourceReport")
+        source_report = {}
+    if source_report.get("originalPath") != repo(OUTPUT_JSON):
+        errors.append("retained summary originalPath must match public benchmark proof baseline")
+    if "removed-from-git" not in str(source_report.get("retentionDecision") or ""):
+        errors.append("retained summary must document raw-json removal from git")
+    original_sha = normalize_sha256(source_report.get("originalSha256"))
+    if not is_sha256_hex(original_sha):
+        errors.append("retained summary originalSha256 must be a sha256 digest")
+    original_size = strict_int(source_report.get("originalSizeBytes"))
+    if original_size is None or original_size <= 0:
+        errors.append("retained summary originalSizeBytes must be a positive integer")
+
+    if document.get("accepted") is not True:
+        errors.append("retained summary accepted must be true")
+
+    summary = document.get("summary")
+    if not isinstance(summary, dict):
+        errors.append("retained summary missing summary")
+        summary = {}
+    operator_count = strict_int(summary.get("operatorCount"))
+    accepted_count = strict_int(summary.get("acceptedCount"))
+    failed_count = strict_int(summary.get("failedCount"))
+    replay_case_count = strict_int(summary.get("replayCaseCount"))
+    if operator_count is None or operator_count < 8:
+        errors.append("retained summary operatorCount must be at least 8")
+    if accepted_count != operator_count:
+        errors.append("retained summary acceptedCount must equal operatorCount")
+    if failed_count != 0:
+        errors.append("retained summary failedCount must be 0")
+    if replay_case_count is None or replay_case_count <= 0:
+        errors.append("retained summary replayCaseCount must be positive")
+    if summary.get("realIndustrialValidationComplete") != 0:
+        errors.append("retained summary must keep realIndustrialValidationComplete at 0")
+
+    required_fields = set(document.get("requiredRunnerFields") or [])
+    if not REQUIRED_RESULT_FIELDS.issubset(required_fields):
+        errors.append("retained summary requiredRunnerFields missing canonical runner fields")
+
+    operators = document.get("operators")
+    if not isinstance(operators, list) or not operators:
+        errors.append("retained summary must contain operator rows")
+        operators = []
+    elif operator_count is not None and len(operators) != operator_count:
+        errors.append("retained summary operator row count must equal summary.operatorCount")
+
+    operator_replay_case_count = 0
+
+    for row in operators:
+        if not isinstance(row, dict):
+            errors.append("retained summary contains non-object operator row")
+            continue
+        operator = row.get("operator", "<unknown>")
+        for field in (
+            "operator",
+            "datasetId",
+            "proofLevel",
+            "sourceBaselineSha256",
+            "manifestSha256",
+            "metrics",
+            "thresholdResultCount",
+            "perCaseResultCount",
+            "replayCaseCount",
+            "accepted",
+        ):
+            if field not in row:
+                errors.append(f"{operator} retained summary missing {field}")
+        if row.get("proofLevel") == "real-field":
+            errors.append(f"{operator} overclaims real-field proof")
+        if str(row.get("industrialStatus", "")).strip().lower() == "real industrial validation complete":
+            errors.append(f"{operator} overclaims real industrial validation")
+        if row.get("privacyLeakCount") != 0:
+            errors.append(f"{operator} privacyLeakCount must be 0")
+        if row.get("missingCaseResults") is True:
+            errors.append(f"{operator} source CaseCount does not match perCaseResults")
+        if row.get("accepted") is not True:
+            errors.append(f"{operator} accepted must be true")
+        per_case_count = strict_int(row.get("perCaseResultCount"))
+        threshold_count = strict_int(row.get("thresholdResultCount"))
+        operator_replay_count = strict_int(row.get("replayCaseCount"))
+        if per_case_count is None or per_case_count <= 0:
+            errors.append(f"{operator} retained summary perCaseResultCount must be positive")
+        if threshold_count is None or threshold_count <= 0:
+            errors.append(f"{operator} retained summary thresholdResultCount must be positive")
+        if operator_replay_count is None or operator_replay_count <= 0:
+            errors.append(f"{operator} retained summary replayCaseCount must be positive")
+        else:
+            operator_replay_case_count += operator_replay_count
+        if operator == "DeepLearning" and row.get("sourceBaseline") != "quality/evals/reports/DeepLearning_coco_real_model_baseline.json":
+            errors.append("DeepLearning row sourceBaseline must be DeepLearning_coco_real_model_baseline.json")
+
+    if replay_case_count is not None and operator_replay_case_count != replay_case_count:
+        errors.append("retained summary replayCaseCount must equal operator replayCaseCount sum")
+
+    if RAW_PATH_RE.search(json.dumps(document, ensure_ascii=False)):
+        errors.append("retained summary contains raw path pattern")
+    return errors
+
+
+def validate_replay_manifest(
+    manifest: dict[str, Any],
+    expected_source_sha: str | None = None,
+    expected_replay_case_count: int | None = None,
+    expected_operator_count: int | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    if manifest.get("schemaVersion") != REPLAY_SCHEMA_VERSION:
+        errors.append(f"replay manifest schemaVersion must be {REPLAY_SCHEMA_VERSION}")
+    if manifest.get("sourceProofBaseline") != repo(OUTPUT_JSON):
+        errors.append("replay manifest sourceProofBaseline must match public benchmark proof baseline")
+    source_sha = normalize_sha256(manifest.get("sourceProofSha256"))
+    if not is_sha256_hex(source_sha):
+        errors.append("replay manifest sourceProofSha256 must be a sha256 digest")
+    expected_sha = normalize_sha256(expected_source_sha)
+    if expected_sha and source_sha != expected_sha:
+        errors.append("replay manifest sourceProofSha256 must match the validated proof baseline")
+
     cases = manifest.get("cases")
     if not isinstance(cases, list) or not cases:
         return ["replay manifest must contain cases"]
+    summary_row = manifest.get("summary")
+    if not isinstance(summary_row, dict):
+        errors.append("replay manifest missing summary")
+        summary_row = {}
+
     for index, case in enumerate(cases):
         for key in ("caseId", "operator", "datasetId", "replayClass", "triageLabel", "replayCommand"):
             if not case.get(key):
                 errors.append(f"replay case {index} missing {key}")
+        replay_class = case.get("replayClass")
+        if replay_class not in {"boundary", "failure"}:
+            errors.append(f"replay case {index} replayClass must be boundary or failure")
+        replay_command = case.get("replayCommand")
+        if not isinstance(replay_command, list) or any(not isinstance(item, str) for item in replay_command):
+            errors.append(f"replay case {index} replayCommand must be a list of strings")
+        elif tuple(replay_command) not in ALLOWED_REPLAY_COMMANDS:
+            errors.append(f"replay case {index} replayCommand is not allowed")
+        elif case.get("operator") == "CameraCalibration" and replay_command[-1] != "--execute-camera-calibration":
+            errors.append("CameraCalibration replay cases must use --execute-camera-calibration")
+        elif case.get("operator") != "CameraCalibration" and replay_command[-1] != "--execute-matching":
+            errors.append(f"replay case {index} non-camera operator must use --execute-matching")
+
     replay_keys = [(case.get("operator"), case.get("datasetId"), case.get("caseId")) for case in cases]
     if len(replay_keys) != len(set(replay_keys)):
         errors.append("replay manifest contains duplicate operator/dataset/caseId entries")
     if manifest.get("accepted") is not True:
         errors.append("replay manifest accepted must be true")
+    class_counts = Counter(str(case.get("replayClass")) for case in cases)
+    operator_count = len({case.get("operator") for case in cases})
+    replay_case_count = strict_int(summary_row.get("replayCaseCount"))
+    summary_operator_count = strict_int(summary_row.get("operatorCount"))
+    summary_class_counts = summary_row.get("classCounts")
+    if replay_case_count != len(cases):
+        errors.append("replay manifest summary.replayCaseCount must equal case count")
+    if expected_replay_case_count is not None and replay_case_count != expected_replay_case_count:
+        errors.append("replay manifest summary.replayCaseCount must match proof summary")
+    if summary_operator_count != operator_count:
+        errors.append("replay manifest summary.operatorCount must equal case operator count")
+    if expected_operator_count is not None and summary_operator_count != expected_operator_count:
+        errors.append("replay manifest summary.operatorCount must match proof summary")
+    if summary_class_counts != dict(sorted(class_counts.items())):
+        errors.append("replay manifest summary.classCounts must equal case replayClass counts")
     if RAW_PATH_RE.search(json.dumps(manifest, ensure_ascii=False)):
         errors.append("replay manifest contains raw path pattern")
     return errors
+
+
+def expected_replay_source_sha(document: dict[str, Any], retained_summary: bool) -> str | None:
+    if retained_summary:
+        source_report = document.get("sourceReport")
+        if isinstance(source_report, dict):
+            return normalize_sha256(source_report.get("originalSha256"))
+        return None
+    if OUTPUT_JSON.exists():
+        return sha256_file(OUTPUT_JSON)
+    return None
 
 
 def render_markdown(document: dict[str, Any]) -> str:
@@ -646,7 +858,12 @@ def generate() -> dict[str, Any]:
     write_json(OUTPUT_JSON, document)
     write_text(OUTPUT_MD, render_markdown(document))
     replay_manifest = build_replay_manifest(document)
-    replay_errors = validate_replay_manifest(replay_manifest)
+    replay_errors = validate_replay_manifest(
+        replay_manifest,
+        expected_source_sha=sha256_file(OUTPUT_JSON),
+        expected_replay_case_count=document["summary"]["replayCaseCount"],
+        expected_operator_count=document["summary"]["operatorCount"],
+    )
     if replay_errors:
         raise SystemExit("\n".join(f"error: {error}" for error in replay_errors))
     write_json(REPLAY_JSON, replay_manifest)
@@ -659,13 +876,26 @@ def main() -> int:
     parser.add_argument("--validate-only", action="store_true", help="Validate existing generated public benchmark proof baseline.")
     args = parser.parse_args()
 
-    document = read_json(OUTPUT_JSON) if args.validate_only else generate()
-    errors = validate_document(document)
+    retained_summary = args.validate_only and not OUTPUT_JSON.exists() and OUTPUT_SUMMARY_JSON.exists()
+    if retained_summary:
+        document = read_json(OUTPUT_SUMMARY_JSON)
+        errors = validate_retained_summary(document)
+    else:
+        document = read_json(OUTPUT_JSON) if args.validate_only else generate()
+        errors = validate_document(document)
     if args.validate_only:
         if not REPLAY_JSON.exists():
             errors.append(f"missing replay manifest: {repo(REPLAY_JSON)}")
         else:
-            errors.extend(validate_replay_manifest(read_json(REPLAY_JSON)))
+            proof_summary = document.get("summary") if isinstance(document.get("summary"), dict) else {}
+            errors.extend(
+                validate_replay_manifest(
+                    read_json(REPLAY_JSON),
+                    expected_source_sha=expected_replay_source_sha(document, retained_summary),
+                    expected_replay_case_count=strict_int(proof_summary.get("replayCaseCount")),
+                    expected_operator_count=strict_int(proof_summary.get("operatorCount")),
+                )
+            )
     if errors:
         for error in errors:
             print(f"error: {error}")
@@ -674,6 +904,7 @@ def main() -> int:
         "public benchmark proof valid: "
         f"operators={document['summary']['operatorCount']} "
         f"accepted={document['summary']['acceptedCount']} "
+        f"source={'summary' if retained_summary else 'raw'} "
         f"generatedAt={utc_now()}"
     )
     return 0

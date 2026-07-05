@@ -2,7 +2,7 @@
   "schemaVersion": "2026-04-29.public-benchmark-replay.v1",
   "generatedAtUtc": "2026-04-29T00:00:00Z",
   "sourceProofBaseline": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
-  "sourceProofSha256": "d481bfb1267eea14843941e66b1fe3d56104746f9d51997c10880de50f7f41cf",
+  "sourceProofSha256": "0481d7db11f693b5f4b764e969c0b6174a732b7f857f65c31402333d3b1007b3",
   "accepted": true,
   "summary": {
     "replayCaseCount": 184,

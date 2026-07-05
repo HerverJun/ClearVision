@@ -66,7 +66,7 @@ internal static class ContractRunner
             new("target_classes_numeric_filter", "Target class contract", TargetClassesNumericFilter),
             new("target_classes_named_parse", "Target class contract", TargetClassesNamedParse),
             new("label_contract_match_valid", "Label contract", LabelContractMatchValid),
-            new("label_contract_mismatch_fails", "Label contract", LabelContractMismatchFails),
+            new("label_contract_metadata_overrides_external", "Label contract", LabelContractMetadataOverridesExternal),
             new("label_contract_missing_fails", "Label contract", LabelContractMissingFails),
             new("visualization_nms_when_internal_disabled", "Visualization contract", VisualizationNmsWhenInternalDisabled),
             new("statistics_label_object_mode", "Output contract", StatisticsLabelObjectMode),
@@ -364,13 +364,18 @@ internal static class ContractRunner
         return Metrics(("ValidationStatus", ReadProperty<string>(contract, "ValidationStatus")), ("ResolvedLabelSource", ReadProperty<string>(contract, "ResolvedLabelSource")));
     }
 
-    private static Dictionary<string, object?> LabelContractMismatchFails()
+    private static Dictionary<string, object?> LabelContractMetadataOverridesExternal()
     {
         var sourceInfo = CreateLabelSourceInfo(["Wire_Black", "Wire_Blue"], "ExplicitFile", "labels.txt", isFileBacked: true);
         var contract = InvokeBuildLabelContract("model.onnx", ["Wire_Blue", "Wire_Black"], sourceInfo);
-        Require(!ReadProperty<bool>(contract, "IsValid"), "Expected invalid label contract.");
-        Require(ReadProperty<string>(contract, "ValidationStatus") == "Mismatch", "Expected mismatch status.");
-        return Metrics(("ValidationStatus", ReadProperty<string>(contract, "ValidationStatus")));
+        Require(ReadProperty<bool>(contract, "IsValid"), "Expected metadata label contract to remain valid.");
+        Require(ReadProperty<string>(contract, "ValidationStatus") == "MetadataOnly", "Expected metadata-only status.");
+        Require(ReadProperty<string>(contract, "ResolvedLabelSource") == "ModelMetadata", "Expected metadata source.");
+        Require(ReadProperty<string[]>(contract, "ResolvedLabels").SequenceEqual(["Wire_Blue", "Wire_Black"]), "Expected metadata labels.");
+        Require(ReadProperty<string[]>(contract, "ExternalLabels").Length == 0, "Expected ignored external labels.");
+        return Metrics(
+            ("ValidationStatus", ReadProperty<string>(contract, "ValidationStatus")),
+            ("ResolvedLabelSource", ReadProperty<string>(contract, "ResolvedLabelSource")));
     }
 
     private static Dictionary<string, object?> LabelContractMissingFails()

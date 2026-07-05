@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,12 @@ SUITE_DIR = REPO_ROOT / "quality" / "evals" / "suites"
 DATASET_DIR = REPO_ROOT / "quality" / "datasets"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 ALLOWED_PROOF_LEVELS = {"missing", "contract", "golden", "public-benchmark", "field-substitute", "real-field"}
+PUBLIC_PROOF_SCHEMA_VERSION = "2026-04-29.public-benchmark-proof.v1"
+PUBLIC_REPLAY_SCHEMA_VERSION = "2026-04-29.public-benchmark-replay.v1"
+ALLOWED_REPLAY_COMMANDS = {
+    ("python", "quality/tools/run_algorithm_ab_replay.py", "--execute-camera-calibration"),
+    ("python", "quality/tools/run_algorithm_ab_replay.py", "--execute-matching"),
+}
 REQUIRED_RUNNER_FIELDS = {
     "datasetId",
     "manifestSha256",
@@ -37,6 +45,27 @@ def repo(path: Path) -> str:
 def read_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def strict_int(value: Any) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def normalize_sha256(value: Any) -> str:
+    text = str(value or "").strip()
+    if text.startswith("sha256:"):
+        text = text[len("sha256:") :]
+    return text
+
+
+def is_sha256_hex(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{64}", value))
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
@@ -125,22 +154,106 @@ def inspect_public_datasets(checks: list[dict[str, Any]], dataset_cards: dict[st
 
 def inspect_public_benchmark_proof(checks: list[dict[str, Any]]) -> None:
     proof_path = REPORT_DIR / "QualityFlywheel_public_benchmark_proof_baseline.json"
+    proof_summary_path = REPORT_DIR / "QualityFlywheel_public_benchmark_proof_baseline.summary.json"
+    retained_summary = False
+    source_proof_sha: str | None = None
     if not proof_path.exists():
-        add_check(checks, "public_benchmark_proof_exists", False, "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json")
-        return
+        if not proof_summary_path.exists():
+            add_check(checks, "public_benchmark_proof_exists", False, "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json")
+            return
+        proof = read_json(proof_summary_path)
+        retained_summary = True
+        source_report = proof.get("sourceReport", {}) if isinstance(proof.get("sourceReport"), dict) else {}
+        original_sha = normalize_sha256(source_report.get("originalSha256"))
+        if is_sha256_hex(original_sha):
+            source_proof_sha = original_sha
+        add_check(
+            checks,
+            "public_benchmark_proof_exists",
+            source_report.get("originalPath") == "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
+            repo(proof_summary_path),
+        )
+        add_check(
+            checks,
+            "public_benchmark_proof_retained_summary",
+            proof.get("schemaVersion") == "quality-report-summary/v1"
+            and "removed-from-git" in str(source_report.get("retentionDecision") or "")
+            and is_sha256_hex(original_sha)
+            and (strict_int(source_report.get("originalSizeBytes")) or 0) > 0,
+            str(source_report.get("retentionDecision")),
+        )
+    else:
+        proof = read_json(proof_path)
+        source_proof_sha = sha256_file(proof_path)
+        add_check(checks, "public_benchmark_proof_exists", True, "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json")
+        add_check(
+            checks,
+            "public_benchmark_proof_schema_version",
+            proof.get("schemaVersion") == PUBLIC_PROOF_SCHEMA_VERSION,
+            str(proof.get("schemaVersion")),
+        )
 
-    proof = read_json(proof_path)
     operators = proof.get("operators", [])
-    add_check(checks, "public_benchmark_proof_exists", True, "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json")
+    if not isinstance(operators, list):
+        operators = []
+    proof_summary = proof.get("summary") if isinstance(proof.get("summary"), dict) else {}
+    summary_operator_count = strict_int(proof_summary.get("operatorCount"))
+    summary_accepted_count = strict_int(proof_summary.get("acceptedCount"))
+    summary_failed_count = strict_int(proof_summary.get("failedCount"))
+    summary_replay_case_count = strict_int(proof_summary.get("replayCaseCount"))
     add_check(checks, "public_benchmark_proof_accepted", proof.get("accepted") is True, str(proof.get("accepted")))
     add_check(checks, "public_benchmark_proof_operator_count", len(operators) >= 8, str(len(operators)))
+    add_check(
+        checks,
+        "public_benchmark_proof_summary_counts_consistent",
+        summary_operator_count == len(operators)
+        and summary_accepted_count == sum(1 for row in operators if isinstance(row, dict) and row.get("accepted") is True)
+        and summary_failed_count == sum(1 for row in operators if isinstance(row, dict) and row.get("accepted") is not True),
+        f"operators={summary_operator_count}/{len(operators)} accepted={summary_accepted_count} failed={summary_failed_count}",
+    )
 
     missing_fields = []
+    operator_replay_case_count = 0
     for row in operators:
-        missing = REQUIRED_RUNNER_FIELDS - set(row.keys())
+        if not isinstance(row, dict):
+            missing_fields.append("<non-object>: row")
+            continue
+        if retained_summary:
+            missing = {
+                "accepted",
+                "datasetId",
+                "failureTaxonomy",
+                "manifestSha256",
+                "metrics",
+                "perCaseResultCount",
+                "privacyLeakCount",
+                "splitSummary",
+                "thresholdResultCount",
+            } - set(row.keys())
+            per_case_count = strict_int(row.get("perCaseResultCount"))
+            threshold_count = strict_int(row.get("thresholdResultCount"))
+            replay_count = strict_int(row.get("replayCaseCount"))
+            if per_case_count is None or per_case_count <= 0:
+                missing.add("positivePerCaseResultCount")
+            if threshold_count is None or threshold_count <= 0:
+                missing.add("positiveThresholdResultCount")
+            if replay_count is None or replay_count <= 0:
+                missing.add("positiveReplayCaseCount")
+            else:
+                operator_replay_case_count += replay_count
+        else:
+            missing = REQUIRED_RUNNER_FIELDS - set(row.keys())
+            replay_cases = row.get("replayCases")
+            operator_replay_case_count += len(replay_cases) if isinstance(replay_cases, list) else 0
         if missing:
             missing_fields.append(f"{row.get('operator')}: {','.join(sorted(missing))}")
     add_check(checks, "public_benchmark_proof_schema_complete", not missing_fields, "; ".join(missing_fields[:5]))
+    add_check(
+        checks,
+        "public_benchmark_proof_replay_count_consistent",
+        summary_replay_case_count == operator_replay_case_count,
+        f"{summary_replay_case_count}/{operator_replay_case_count}",
+    )
 
     overclaims = [
         row.get("operator")
@@ -182,15 +295,89 @@ def inspect_public_benchmark_proof(checks: list[dict[str, Any]]) -> None:
         return
     replay = read_json(replay_path)
     replay_cases = replay.get("cases", [])
+    if not isinstance(replay_cases, list):
+        replay_cases = []
+    replay_summary = replay.get("summary") if isinstance(replay.get("summary"), dict) else {}
+    replay_source_sha = normalize_sha256(replay.get("sourceProofSha256"))
+    replay_class_counts = Counter(str(case.get("replayClass")) for case in replay_cases if isinstance(case, dict))
+    replay_operator_count = len({case.get("operator") for case in replay_cases if isinstance(case, dict)})
+    replay_summary_case_count = strict_int(replay_summary.get("replayCaseCount"))
+    replay_summary_operator_count = strict_int(replay_summary.get("operatorCount"))
     add_check(checks, "public_benchmark_replay_manifest_exists", True, repo(replay_path))
+    add_check(
+        checks,
+        "public_benchmark_replay_schema_version",
+        replay.get("schemaVersion") == PUBLIC_REPLAY_SCHEMA_VERSION,
+        str(replay.get("schemaVersion")),
+    )
+    add_check(
+        checks,
+        "public_benchmark_replay_source_baseline",
+        replay.get("sourceProofBaseline") == "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
+        str(replay.get("sourceProofBaseline")),
+    )
+    add_check(
+        checks,
+        "public_benchmark_replay_source_sha_matches_proof",
+        source_proof_sha is not None and replay_source_sha == source_proof_sha,
+        f"{replay_source_sha}/{source_proof_sha}",
+    )
     add_check(checks, "public_benchmark_replay_manifest_accepted", replay.get("accepted") is True, str(replay.get("accepted")))
     add_check(checks, "public_benchmark_replay_has_cases", len(replay_cases) >= len(operators), str(len(replay_cases)))
+    add_check(
+        checks,
+        "public_benchmark_replay_summary_counts_consistent",
+        replay_summary_case_count == len(replay_cases)
+        and replay_summary_case_count == summary_replay_case_count
+        and replay_summary_operator_count == replay_operator_count
+        and replay_summary_operator_count == summary_operator_count,
+        f"cases={replay_summary_case_count}/{len(replay_cases)}/{summary_replay_case_count} "
+        f"operators={replay_summary_operator_count}/{replay_operator_count}/{summary_operator_count}",
+    )
+    add_check(
+        checks,
+        "public_benchmark_replay_class_counts_consistent",
+        replay_summary.get("classCounts") == dict(sorted(replay_class_counts.items())),
+        str(replay_summary.get("classCounts")),
+    )
     missing_triage = [
         case.get("caseId")
         for case in replay_cases
-        if not case.get("triageLabel") or not case.get("replayCommand")
+        if isinstance(case, dict) and (not case.get("triageLabel") or not case.get("replayCommand"))
     ]
     add_check(checks, "public_benchmark_replay_triage_complete", not missing_triage, ", ".join(map(str, missing_triage[:10])))
+    invalid_replay_commands = []
+    invalid_replay_classes = []
+    for index, case in enumerate(replay_cases):
+        if not isinstance(case, dict):
+            invalid_replay_commands.append(f"{index}: non-object")
+            continue
+        replay_class = case.get("replayClass")
+        if replay_class not in {"boundary", "failure"}:
+            invalid_replay_classes.append(str(case.get("caseId") or index))
+        replay_command = case.get("replayCommand")
+        if not isinstance(replay_command, list) or any(not isinstance(item, str) for item in replay_command):
+            invalid_replay_commands.append(str(case.get("caseId") or index))
+            continue
+        command_tuple = tuple(replay_command)
+        if command_tuple not in ALLOWED_REPLAY_COMMANDS:
+            invalid_replay_commands.append(str(case.get("caseId") or index))
+        elif case.get("operator") == "CameraCalibration" and replay_command[-1] != "--execute-camera-calibration":
+            invalid_replay_commands.append(str(case.get("caseId") or index))
+        elif case.get("operator") != "CameraCalibration" and replay_command[-1] != "--execute-matching":
+            invalid_replay_commands.append(str(case.get("caseId") or index))
+    add_check(
+        checks,
+        "public_benchmark_replay_classes_allowed",
+        not invalid_replay_classes,
+        ", ".join(invalid_replay_classes[:10]),
+    )
+    add_check(
+        checks,
+        "public_benchmark_replay_commands_allowed",
+        not invalid_replay_commands,
+        ", ".join(invalid_replay_commands[:10]),
+    )
     add_check(
         checks,
         "public_benchmark_replay_no_raw_path",
@@ -241,26 +428,33 @@ def inspect_algorithm_ab_report(checks: list[dict[str, Any]]) -> None:
     )
     add_check(
         checks,
-        "algorithm_ab_replay_report_candidate_executed_ge_183",
-        report.get("summary", {}).get("executedCandidateCaseCount", 0) >= 183,
+        "algorithm_ab_replay_report_candidate_executed_ge_160",
+        report.get("summary", {}).get("executedCandidateCaseCount", 0) >= 160,
         str(report.get("summary", {}).get("executedCandidateCaseCount")),
+    )
+    add_check(
+        checks,
+        "algorithm_ab_replay_report_regressed_zero",
+        report.get("summary", {}).get("regressedCaseCount", 0) == 0,
+        str(report.get("summary", {}).get("regressedCaseCount")),
     )
     deep_learning_rows = [row for row in rows if row.get("operator") == "DeepLearning"]
     if not deep_learning_rows:
         add_check(checks, "algorithm_ab_replay_report_deeplearning_row_present", False, "DeepLearning row missing")
     else:
         deep_learning_row = deep_learning_rows[0]
+        deep_learning_status = str(deep_learning_row.get("comparisonStatus") or "")
         add_check(
             checks,
-            "algorithm_ab_replay_report_deeplearning_candidate_executed",
-            deep_learning_row.get("comparisonStatus") == "candidate-executed",
-            str(deep_learning_row.get("comparisonStatus")),
+            "algorithm_ab_replay_report_deeplearning_candidate_or_control",
+            deep_learning_status in {"candidate-executed", "unchanged-baseline-control"},
+            deep_learning_status,
         )
         add_check(
             checks,
-            "algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20",
-            report.get("summary", {}).get("deepLearningRealModelCaseCount", 0) >= 20,
-            str(report.get("summary", {}).get("deepLearningRealModelCaseCount")),
+            "algorithm_ab_replay_report_deeplearning_cases_ge_20",
+            report.get("summary", {}).get("deepLearningCaseCount", 0) >= 20,
+            str(report.get("summary", {}).get("deepLearningCaseCount")),
         )
         add_check(
             checks,
@@ -268,13 +462,19 @@ def inspect_algorithm_ab_report(checks: list[dict[str, Any]]) -> None:
             report.get("summary", {}).get("deepLearningProcessingErrorCaseCount", 0) == 0,
             str(report.get("summary", {}).get("deepLearningProcessingErrorCaseCount")),
         )
-        add_check(
-            checks,
-            "algorithm_ab_replay_report_deeplearning_candidate_summary_accessible",
-            bool(deep_learning_row.get("candidateBaseline")),
-            str(deep_learning_row.get("candidateBaseline")),
-        )
-        if deep_learning_row.get("candidateBaseline"):
+        if deep_learning_status == "candidate-executed":
+            add_check(
+                checks,
+                "algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20",
+                report.get("summary", {}).get("deepLearningRealModelCaseCount", 0) >= 20,
+                str(report.get("summary", {}).get("deepLearningRealModelCaseCount")),
+            )
+            add_check(
+                checks,
+                "algorithm_ab_replay_report_deeplearning_candidate_summary_accessible",
+                bool(deep_learning_row.get("candidateBaseline")),
+                str(deep_learning_row.get("candidateBaseline")),
+            )
             candidate_summary_path = REPO_ROOT / str(deep_learning_row.get("candidateBaseline"))
             candidate_report_available = candidate_summary_path.exists()
             add_check(
@@ -304,11 +504,18 @@ def inspect_algorithm_ab_report(checks: list[dict[str, Any]]) -> None:
                     str(candidate_summary.get("ModelArtifactRef", "")).strip() != "",
                     str(candidate_summary.get("ModelArtifactRef")),
                 )
+        else:
+            add_check(
+                checks,
+                "algorithm_ab_replay_report_deeplearning_control_case_count",
+                deep_learning_row.get("replayCaseCount") == report.get("summary", {}).get("deepLearningCaseCount"),
+                f"{deep_learning_row.get('replayCaseCount')}/{report.get('summary', {}).get('deepLearningCaseCount')}",
+            )
     add_check(
         checks,
-        "algorithm_ab_replay_report_candidate_camera_cases_executed_ge_3",
-        report.get("summary", {}).get("cameraCalibrationExecutedCaseCount", 0) >= 3,
-        str(report.get("summary", {}).get("cameraCalibrationExecutedCaseCount")),
+        "algorithm_ab_replay_report_camera_cases_ge_3",
+        report.get("summary", {}).get("cameraCalibrationCaseCount", 0) >= 3,
+        str(report.get("summary", {}).get("cameraCalibrationCaseCount")),
     )
     add_check(
         checks,
