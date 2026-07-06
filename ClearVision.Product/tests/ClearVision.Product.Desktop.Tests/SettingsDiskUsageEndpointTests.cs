@@ -189,6 +189,16 @@ public class SettingsDiskUsageEndpointTests
     }
 
     [Fact]
+    public async Task GetDiskUsage_ShouldRejectOperator()
+    {
+        await using var host = await SettingsDiskUsageTestHost.CreateAsync(new AppConfig(), role: "Operator");
+
+        using var response = await host.Client.GetAsync("/api/settings/disk-usage");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task GetDiskUsage_WithFileInParentPath_ShouldReturnUnwritableDirectoryFlags()
     {
         var directory = CreateTempDirectory();
@@ -268,7 +278,7 @@ public class SettingsDiskUsageEndpointTests
 
         public HttpClient Client { get; }
 
-        public static async Task<SettingsDiskUsageTestHost> CreateAsync(AppConfig config)
+        public static async Task<SettingsDiskUsageTestHost> CreateAsync(AppConfig config, string role = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -300,6 +310,16 @@ public class SettingsDiskUsageEndpointTests
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
+                };
+                await next();
+            });
             app.MapSettingsEndpoints();
             await app.StartAsync();
             return new SettingsDiskUsageTestHost(app, aiConfigRoot);

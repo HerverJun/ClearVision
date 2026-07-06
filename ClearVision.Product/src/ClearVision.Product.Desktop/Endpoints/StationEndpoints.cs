@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ClearVision.Product.Desktop.Endpoints;
 
@@ -65,12 +66,14 @@ public static class StationEndpoints
         app.MapGet("/api/stations/{stationId}/logs", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetRecentLogs(stationId, Math.Clamp(take ?? 100, 1, 500)));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapGet("/api/stations/{stationId}/commands", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetRecentCommands(stationId, Math.Clamp(take ?? 100, 1, 500)));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapPatch("/api/stations/{stationId}/identity", (
             string stationId,
@@ -95,12 +98,14 @@ public static class StationEndpoints
                 issuedBy,
                 context.Connection.RemoteIpAddress?.ToString());
             return Results.Ok(updated);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapGet("/api/stations/audit", (string? stationId, int? take, [FromServices] StationCentralStore store) =>
         {
             return Results.Ok(store.GetAudits(stationId, Math.Clamp(take ?? 100, 1, 500)));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapPost("/api/stations/{stationId}/commands", (
             string stationId,
@@ -136,7 +141,8 @@ public static class StationEndpoints
                 issuedBy,
                 TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
             return Results.Ok(command);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapPost("/api/stations/{stationId}/deploy-package", (
             string stationId,
@@ -196,12 +202,14 @@ public static class StationEndpoints
                 issuedBy,
                 TimeSpan.FromMinutes(30));
             return Results.Ok(command);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapGet("/api/station-packages", ([FromServices] StationPackageStore packageStore) =>
         {
             return Results.Ok(packageStore.GetPackages());
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, HttpContext context, CancellationToken cancellationToken) =>
         {
@@ -217,10 +225,19 @@ public static class StationEndpoints
             }
 
             return Results.Ok(await packageStore.CreateTestPackageAsync(cancellationToken));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
-        app.MapGet("/api/station-packages/{packageId}/download", (string packageId, [FromServices] StationPackageStore packageStore) =>
+        app.MapGet("/api/station-packages/{packageId}/download", (
+            string packageId,
+            [FromServices] StationPackageStore packageStore,
+            HttpContext context) =>
         {
+            if (!CanDownloadStationPackage(context))
+            {
+                return Results.Json(new { error = "StationPackageDownloadPermissionRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             if (!packageStore.TryGetPackageFileForDownload(packageId, out var path))
             {
                 return Results.NotFound(new { error = "PackageNotFound" });
@@ -248,7 +265,8 @@ public static class StationEndpoints
         {
             var station = registry.GetStation(stationId);
             return station == null ? Results.NotFound() : Results.Ok(station);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
         return app;
     }
@@ -413,23 +431,31 @@ public static class StationEndpoints
 
     private static bool IsStationAdmin(HttpContext context)
     {
-        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        return ClearVisionPermissionPolicies.Authorize(
+            context,
+            ClearVisionPermissionPolicies.RequireStationAdmin,
+            out _);
+    }
+
+    private static bool CanDownloadStationPackage(HttpContext context)
+    {
+        if (IsStationAdmin(context))
         {
-            return false;
+            return true;
         }
 
-        var role = userObj switch
-        {
-            ClearVision.Product.Application.Services.UserSession user => user.Role,
-            UserSession user => user.Role,
-            _ => null
-        };
-
-        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+        var stationAuthService = context.RequestServices.GetService<StationIngressAuthService>();
+        return stationAuthService?.TryAuthorize(context, out _) == true;
     }
 
     private static string GetAuthenticatedUserName(HttpContext context)
     {
+        var resolvedUserName = EndpointPermissionGuards.GetAuthenticatedUserName(context);
+        if (!string.IsNullOrWhiteSpace(resolvedUserName))
+        {
+            return resolvedUserName;
+        }
+
         if (context.Items.TryGetValue("CurrentUser", out var userObj))
         {
             var userName = userObj switch

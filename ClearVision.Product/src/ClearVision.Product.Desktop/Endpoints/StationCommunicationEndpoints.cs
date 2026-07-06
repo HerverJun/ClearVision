@@ -24,7 +24,8 @@ public static class StationCommunicationEndpoints
             }
 
             return Results.Ok(store.GetSettings(runningIngressOptions.Value));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPut("/api/station-communication/settings", (
             StationCommunicationSettingsUpdateRequest request,
@@ -44,7 +45,8 @@ public static class StationCommunicationEndpoints
             }
 
             return Results.Ok(result.Settings);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/station-communication/token", (
             StationCommunicationTokenRequest request,
@@ -79,25 +81,11 @@ public static class StationCommunicationEndpoints
                 success = false,
                 message = "Token operation must be reveal or regenerate."
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         return app;
     }
 
-    private static bool IsAdmin(HttpContext context)
-    {
-        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
-        {
-            return false;
-        }
-
-        var role = userObj switch
-        {
-            ClearVision.Product.Application.Services.UserSession user => user.Role,
-            UserSession user => user.Role,
-            _ => null
-        };
-
-        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
-    }
+    private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
 }

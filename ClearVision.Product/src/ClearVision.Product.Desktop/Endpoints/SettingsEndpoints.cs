@@ -37,10 +37,15 @@ public static class SettingsEndpoints
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         // 获取当前配置
-        app.MapGet("/api/settings", async (IConfigurationService configService) =>
+        app.MapGet("/api/settings", async (IConfigurationService configService, HttpContext context) =>
         {
             var config = await configService.LoadAsync();
-            return Results.Ok(config);
+            if (IsAdmin(context))
+            {
+                return Results.Ok(config);
+            }
+
+            return Results.Ok(ToSafeSettingsResponse(config));
         });
 
         // 更新配置
@@ -64,7 +69,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 更新主题配置（避免回写整份配置造成并发覆盖）
         app.MapPut("/api/settings/theme", async (ThemeUpdateRequest request, IConfigurationService configService) =>
@@ -87,7 +93,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 重置配置为默认值
         app.MapPost("/api/settings/reset", async (IConfigurationService configService, AiConfigStore aiConfigStore, HttpContext context) =>
@@ -107,7 +114,8 @@ public static class SettingsEndpoints
                 aiModels = defaultModels.Select(ToAiModelResponse),
                 resetScope = new[] { "appConfig", "aiModels" }
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 获取磁盘容量信息（用于设置页存储卡片）
         app.MapGet("/api/settings/disk-usage", (string? path, IConfigurationService configService) =>
@@ -153,14 +161,16 @@ public static class SettingsEndpoints
             }
 
             return Results.Ok(usage);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapGet("/api/settings/database/status", async (
             [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
             CancellationToken cancellationToken) =>
         {
             return Results.Ok(await databaseMaintenance.GetStatusAsync(cancellationToken));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/settings/database/repair", async (
             [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
@@ -180,7 +190,8 @@ public static class SettingsEndpoints
             {
                 return BuildDatabaseMaintenanceError(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/settings/database/backup", async (
             [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
@@ -200,7 +211,8 @@ public static class SettingsEndpoints
             {
                 return BuildDatabaseMaintenanceError(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/settings/database/restore", async (
             [FromBody] VisionDatabaseRestoreRequest request,
@@ -226,7 +238,8 @@ public static class SettingsEndpoints
             {
                 return BuildDatabaseMaintenanceError(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/settings/database/cleanup", async (
             [FromBody] VisionDatabaseCleanupRequest request,
@@ -251,15 +264,18 @@ public static class SettingsEndpoints
             {
                 return BuildDatabaseMaintenanceError(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // ==================== AI 多模型管理 API ====================
 
         // 获取所有模型（不含 ApiKey）
-        app.MapGet("/api/ai/models", (AiConfigStore configStore) =>
+        app.MapGet("/api/ai/models", (AiConfigStore configStore, HttpContext context) =>
         {
             var models = configStore.GetAll();
-            var result = models.Select(ToAiModelResponse);
+            var result = IsAdmin(context)
+                ? models.Select(ToAiModelResponse)
+                : models.Select(ToSafeAiModelResponse);
             return Results.Ok(result);
         });
 
@@ -316,7 +332,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 更新指定模型
         app.MapPut("/api/ai/models/{id}", (string id, AiModelUpdateRequest request, AiConfigStore configStore, HttpContext context) =>
@@ -362,7 +379,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 删除指定模型
         app.MapDelete("/api/ai/models/{id}", (string id, AiConfigStore configStore, HttpContext context) =>
@@ -383,7 +401,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 设为激活模型
         app.MapPost("/api/ai/models/{id}/activate", (string id, AiConfigStore configStore, HttpContext context) =>
@@ -397,7 +416,8 @@ public static class SettingsEndpoints
             return ok
                 ? Results.Ok(new { Message = "已切换激活模型" })
                 : Results.NotFound(new { Error = $"模型 {id} 不存在" });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 测试指定模型的连接（使用该模型的真实 Key，不影响全局 active 状态）
         app.MapPost("/api/ai/models/{id}/default-planner", (string id, AiConfigStore configStore, HttpContext context) =>
@@ -411,7 +431,8 @@ public static class SettingsEndpoints
             return ok
                 ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
                 : Results.NotFound(new { Error = $"Model {id} not found." });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/ai/models/{id}/default-shadow-eval", (string id, AiConfigStore configStore, HttpContext context) =>
         {
@@ -424,7 +445,8 @@ public static class SettingsEndpoints
             return ok
                 ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
                 : Results.NotFound(new { Error = $"Model {id} not found." });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/ai/models/{id}/test", async (string id, AiConfigStore configStore, AiApiClient apiClient, HttpContext context) =>
         {
@@ -455,7 +477,8 @@ public static class SettingsEndpoints
                 DateTimeOffset.UtcNow,
                 testResult.LatencyMs);
             return Results.Ok(testResult);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // AI model connection tests only call the configured LLM endpoint and do not touch RuntimePreview, Station, camera, PLC, or deployment.
         // ==================== 相机管理 API ====================
@@ -507,7 +530,8 @@ public static class SettingsEndpoints
                 metadataOnly = true,
                 realResourcesTouched = false
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapGet("/api/settings/runtime-preview-pilot/catalog", async (
             [FromServices] IConfigurationService configService,
@@ -1400,7 +1424,8 @@ public static class SettingsEndpoints
         {
             var devices = await cameraManager.EnumerateCamerasAsync();
             return Results.Ok(devices);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 仅通过华睿 SDK 搜索在线相机
         app.MapGet("/api/cameras/discover/huaray", (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
@@ -1409,14 +1434,16 @@ public static class SettingsEndpoints
             var mapped = MapDiscoveredDevices(devices, cameraManager).ToList();
             var diagnostics = BuildHuarayDiagnostics(mapped.Count);
             return Results.Ok(new { devices = mapped, diagnostics });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 仅通过海康 SDK 搜索在线相机
         app.MapGet("/api/cameras/discover/hikvision", (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
         {
             var devices = CameraProviderFactory.DiscoverHikvisionOnly();
             return Results.Ok(MapDiscoveredDevices(devices, cameraManager));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 获取已配置的相机绑定列表
         app.MapGet("/api/cameras/bindings", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
@@ -1472,7 +1499,8 @@ public static class SettingsEndpoints
             });
 
             return Results.Ok(payload);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 更新相机绑定配置
         app.MapPut("/api/cameras/bindings", async (
@@ -1483,9 +1511,9 @@ public static class SettingsEndpoints
             IConfigurationService configService,
             HttpContext context) =>
         {
-            if (!IsAdmin(context))
+            if (!ClearVisionPermissionPolicies.IsEngineerOrAdmin(context))
             {
-                return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+                return Results.Json(new { error = "HardwareOperationPermissionRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
             try
@@ -1567,7 +1595,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 使用绑定参数执行手动软触发抓图（仅用于预览）
         app.MapPost("/api/cameras/soft-trigger-capture", async (
@@ -1659,17 +1688,20 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapGet("/api/trigger-input/diagnostics", ([FromServices] ITriggerInputService triggerInputService) =>
         {
             return Results.Ok(triggerInputService.GetDiagnostics());
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapGet("/api/trigger-input/serial-photoelectric-ports", () =>
         {
             return Results.Ok(BuildSerialPhotoelectricPortList());
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/trigger-input/test-serial-photoelectric", async (
             SerialPhotoelectricTestRequest request,
@@ -1710,7 +1742,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/trigger-input/learn-enter-device", async (
             TriggerDeviceLearnRequest request,
@@ -1730,7 +1763,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/cameras/continuous-preview/start", async (
             CameraContinuousPreviewStartRequest request,
@@ -1757,7 +1791,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapGet("/api/cameras/continuous-preview/frame/{sessionId}", async (
             string sessionId,
@@ -1791,7 +1826,8 @@ public static class SettingsEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/cameras/continuous-preview/stop", async (
             CameraContinuousPreviewStopRequest request,
@@ -1805,16 +1841,27 @@ public static class SettingsEndpoints
 
             await streamCoordinator.StopPreviewSessionAsync(request.SessionId);
             return Results.Ok(new { Message = "Continuous preview session stopped." });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         return app;
     }
 
-    private static bool IsAdmin(HttpContext context)
+    private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
+
+    private static object ToSafeSettingsResponse(AppConfig config)
     {
-        return context.Items.TryGetValue("CurrentUser", out var userObj) &&
-               userObj is UserSession user &&
-               string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+        config.Normalize();
+        return new
+        {
+            safeSubset = true,
+            config.Revision,
+            general = new
+            {
+                config.General.SoftwareTitle,
+                config.General.Theme
+            }
+        };
     }
 
     private static bool IsDatabaseMaintenanceClientError(Exception ex)
@@ -2066,6 +2113,18 @@ public static class SettingsEndpoints
         };
     }
 
+    private static object ToSafeAiModelResponse(AiModelConfig m) => new
+    {
+        m.Id,
+        displayName = string.IsNullOrWhiteSpace(m.DisplayName) ? m.Name : m.DisplayName,
+        m.Provider,
+        m.Model,
+        m.ModelRole,
+        m.IsEnabled,
+        m.IsActive,
+        m.Capabilities
+    };
+
     private static object ToAiModelResponse(AiModelConfig m) => new
     {
         m.Id,
@@ -2075,7 +2134,7 @@ public static class SettingsEndpoints
         hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey),
         apiKeyMasked = AiSecretSanitizer.MaskApiKey(!string.IsNullOrWhiteSpace(m.ApiKey)),
         m.Model,
-        baseUrl = m.BaseUrl ?? "",
+        baseUrl = AiSecretSanitizer.Redact(m.BaseUrl ?? ""),
         m.TimeoutMs,
         m.IsActive,
         m.IsEnabled,
@@ -2083,9 +2142,9 @@ public static class SettingsEndpoints
         m.WireApi,
         m.AuthMode,
         m.AuthHeaderName,
-        m.ExtraHeaders,
-        m.ExtraQuery,
-        m.ExtraBody,
+        ExtraHeaders = MaskSensitiveStringMap(m.ExtraHeaders),
+        ExtraQuery = MaskSensitiveStringMap(m.ExtraQuery),
+        ExtraBody = MaskSensitiveJsonMap(m.ExtraBody),
         m.RoleBindings,
         m.ModelRole,
         m.Priority,
@@ -2099,6 +2158,85 @@ public static class SettingsEndpoints
         m.Reasoning,
         ReasoningSupport = m.GetReasoningSupport()
     };
+
+    private static Dictionary<string, string>? MaskSensitiveStringMap(Dictionary<string, string>? values)
+    {
+        if (values == null)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in values)
+        {
+            result[item.Key] = IsSensitiveAiConfigKey(item.Key)
+                ? "<redacted>"
+                : AiSecretSanitizer.Redact(item.Value);
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, JsonElement>? MaskSensitiveJsonMap(Dictionary<string, JsonElement>? values)
+    {
+        if (values == null)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in values)
+        {
+            result[item.Key] = IsSensitiveAiConfigKey(item.Key)
+                ? JsonSerializer.SerializeToElement("<redacted>")
+                : RedactJsonElement(item.Value);
+        }
+
+        return result;
+    }
+
+    private static JsonElement RedactJsonElement(JsonElement value)
+    {
+        var redactedRaw = AiSecretSanitizer.Redact(value.GetRawText());
+        try
+        {
+            return JsonSerializer.Deserialize<JsonElement>(redactedRaw).Clone();
+        }
+        catch (JsonException)
+        {
+            return JsonSerializer.SerializeToElement(AiSecretSanitizer.Redact(value.ToString()));
+        }
+    }
+
+    private static bool IsSensitiveAiConfigKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        var normalized = key.Trim()
+            .Replace("_", "-", StringComparison.Ordinal)
+            .ToLowerInvariant();
+        return normalized is "authorization"
+            or "x-api-key"
+            or "api-key"
+            or "apikey"
+            or "api-key-id"
+            or "token"
+            or "access-token"
+            or "refresh-token"
+            or "secret"
+            or "client-secret"
+            or "password"
+            or "signature"
+            or "sig" ||
+            normalized.Contains("token", StringComparison.Ordinal) ||
+            normalized.Contains("secret", StringComparison.Ordinal) ||
+            normalized.Contains("password", StringComparison.Ordinal) ||
+            normalized.Contains("api-key", StringComparison.Ordinal) ||
+            normalized.Contains("apikey", StringComparison.Ordinal);
+    }
 
     private static IEnumerable<CameraInfo> MapDiscoveredDevices(
         IEnumerable<CameraDeviceInfo> devices,

@@ -294,6 +294,66 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectWriteEndpoints_ShouldRejectOperatorButAllowProjectReads()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            role: UserRole.Operator);
+
+        using var projectRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}");
+        using var schemaRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variables");
+        using var valuesRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variable-values");
+        using var create = await host.Client.PostAsJsonAsync("/api/projects", new CreateProjectRequest { Name = "blocked" });
+        using var update = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}", new UpdateProjectRequest { Name = "blocked" });
+        using var delete = await host.Client.DeleteAsync($"/api/projects/{host.Project.Id}");
+        using var flow = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/flow", new UpdateFlowRequest());
+        using var schemaWrite = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            CreateSchema(variableId, 2, manualWriteAllowed: true));
+        using var valueWrite = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 3L });
+        using var resetOne = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}/reset",
+            null);
+        using var resetAll = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/reset",
+            null);
+        using var export = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/runtime-package/export",
+            new ApiEndpoints.ExportRuntimePackageRequest { RegisterForStationDeployment = false });
+
+        projectRead.StatusCode.Should().Be(HttpStatusCode.OK);
+        schemaRead.StatusCode.Should().Be(HttpStatusCode.OK);
+        valuesRead.StatusCode.Should().Be(HttpStatusCode.OK);
+        create.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        update.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        delete.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        flow.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        schemaWrite.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        valueWrite.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        resetOne.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        resetAll.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        export.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task RuntimePackageExport_ShouldRejectEngineer()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            role: UserRole.Engineer);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/runtime-package/export",
+            new ApiEndpoints.ExportRuntimePackageRequest { RegisterForStationDeployment = false });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task ProjectGlobalVariableEndpoints_ShouldRejectMutationsWhileProjectIsRunning()
     {
         var variableId = Guid.NewGuid();
@@ -803,7 +863,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
             RuntimeStatus? status = null,
             IProjectVariableStateStore? stateStore = null,
             IProjectFlowStorage? flowStorage = null,
-            IProjectAssetStorage? assetStorage = null)
+            IProjectAssetStorage? assetStorage = null,
+            UserRole role = UserRole.Admin)
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
@@ -876,9 +937,9 @@ public sealed class ProjectGlobalVariableEndpointsTests
             {
                 context.Items["CurrentUser"] = new UserSession
                 {
-                    UserId = "test-admin",
-                    Username = "test-admin",
-                    Role = UserRole.Admin.ToString(),
+                    UserId = $"test-{role.ToString().ToLowerInvariant()}",
+                    Username = $"test-{role.ToString().ToLowerInvariant()}",
+                    Role = role.ToString(),
                     ExpiresAt = DateTime.UtcNow.AddHours(1)
                 };
                 await next();

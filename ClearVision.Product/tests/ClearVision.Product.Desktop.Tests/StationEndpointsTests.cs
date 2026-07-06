@@ -21,6 +21,8 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public sealed class StationEndpointsTests
 {
+    private const string StationSharedToken = "station-secret";
+
     [Fact]
     public async Task EventsEndpoint_ShouldStreamInitialSnapshotAndLiveStationUpdates()
     {
@@ -279,6 +281,77 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task SensitiveReadEndpoints_ShouldRejectOperator()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+
+        var responses = new[]
+        {
+            await host.Client.GetAsync("/api/station-packages"),
+            await host.Client.GetAsync("/api/station-packages/package-a/download"),
+            await host.Client.GetAsync("/api/stations/station-a"),
+            await host.Client.GetAsync("/api/stations/station-a/logs"),
+            await host.Client.GetAsync("/api/stations/station-a/commands"),
+            await host.Client.GetAsync("/api/stations/audit")
+        };
+
+        try
+        {
+            responses.Should().OnlyContain(response => response.StatusCode == HttpStatusCode.Forbidden);
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task StationPackageList_ShouldAllowAdmin()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+
+        using var response = await host.Client.GetAsync("/api/station-packages");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain("production-package");
+    }
+
+    [Fact]
+    public async Task DownloadPackage_ShouldAllowStationSharedToken()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: null);
+        var packageStore = host.Services.GetRequiredService<StationPackageStore>();
+        var package = await packageStore.CreateTestPackageAsync(CancellationToken.None);
+        var packagePath = packageStore.GetPackagePath(package.PackageId);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/station-packages/{package.PackageId}/download");
+            request.Headers.Add(StationSyncContractDefaults.StationTokenHeaderName, StationSharedToken);
+
+            using var response = await host.Client.SendAsync(request);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await response.Content.ReadAsByteArrayAsync()).Should().NotBeEmpty();
+        }
+        finally
+        {
+            var packageDirectory = string.IsNullOrWhiteSpace(packagePath)
+                ? null
+                : Path.GetDirectoryName(packagePath);
+            if (!string.IsNullOrWhiteSpace(packageDirectory) && Directory.Exists(packageDirectory))
+            {
+                Directory.Delete(packageDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task DeployPackage_ShouldRejectBlankPackageId()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
@@ -509,6 +582,7 @@ public sealed class StationEndpointsTests
             builder.Services.AddSingleton(Options.Create(new StationIngressOptions
             {
                 Enabled = true,
+                SharedToken = StationSharedToken,
                 OfflineThresholdSeconds = 15,
                 ResultBufferPerStation = 20,
                 EventBufferSize = 50
@@ -541,6 +615,7 @@ public sealed class StationEndpointsTests
             builder.Services.AddSingleton(Options.Create(new StationIngressOptions
             {
                 Enabled = true,
+                SharedToken = StationSharedToken,
                 OfflineThresholdSeconds = 15,
                 ResultBufferPerStation = 20,
                 EventBufferSize = 50
@@ -557,6 +632,10 @@ public sealed class StationEndpointsTests
                 new StationPackageStore(
                     sp.GetRequiredService<IServiceScopeFactory>(),
                     NullLogger<StationPackageStore>.Instance));
+            builder.Services.AddSingleton<StationIngressAuthService>(sp =>
+                new StationIngressAuthService(
+                    sp.GetRequiredService<IOptions<StationIngressOptions>>(),
+                    NullLogger<StationIngressAuthService>.Instance));
 
             var app = builder.Build();
             await using (var scope = app.Services.CreateAsyncScope())

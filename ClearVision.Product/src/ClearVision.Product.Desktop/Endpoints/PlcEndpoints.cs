@@ -24,7 +24,8 @@ public static class PlcEndpoints
                 success = true,
                 settings = config.Communication
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPut("/api/plc/settings", async (
             CommunicationConfig? settings,
@@ -64,7 +65,8 @@ public static class PlcEndpoints
                 settings = config.Communication,
                 errors = Array.Empty<PlcValidationIssue>()
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         app.MapPost("/api/plc/test-connection", async (
             PlcTestConnectionRequest request,
@@ -145,14 +147,16 @@ public static class PlcEndpoints
                     protocol
                 });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapGet("/api/plc/mappings", async (IConfigurationService configService) =>
         {
             var config = await configService.LoadAsync();
             config.Normalize();
             return Results.Ok(config.Communication.GetMappings(config.Communication.ActiveProtocol));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPut("/api/plc/mappings", async (
             List<PlcAddressMapping>? mappings,
@@ -192,7 +196,8 @@ public static class PlcEndpoints
                 mappings = config.Communication.GetMappings(config.Communication.ActiveProtocol),
                 errors = Array.Empty<PlcValidationIssue>()
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         return app;
     }
@@ -209,22 +214,7 @@ public static class PlcEndpoints
         }
     }
 
-    private static bool IsAdmin(HttpContext context)
-    {
-        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
-        {
-            return false;
-        }
-
-        var role = userObj switch
-        {
-            ClearVision.Product.Application.Services.UserSession user => user.Role,
-            UserSession user => user.Role,
-            _ => null
-        };
-
-        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
-    }
+    private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
 
     private static bool TryBuildPlcCommConnectionString(
         string protocol,

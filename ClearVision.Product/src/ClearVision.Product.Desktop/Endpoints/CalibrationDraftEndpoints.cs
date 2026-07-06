@@ -103,7 +103,8 @@ public static class CalibrationDraftEndpoints
             {
                 return ToProjectAssetFailure(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         return app;
     }

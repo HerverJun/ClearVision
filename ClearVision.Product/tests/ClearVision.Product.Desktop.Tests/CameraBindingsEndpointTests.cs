@@ -139,7 +139,7 @@ public class CameraBindingsEndpointTests
     }
 
     [Fact]
-    public async Task UpdateCameraBindings_ShouldRejectNonAdminUser()
+    public async Task UpdateCameraBindings_ShouldRejectOperator()
     {
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
@@ -150,7 +150,7 @@ public class CameraBindingsEndpointTests
         await using var host = await CameraBindingsTestHost.CreateAsync(
             cameraManager,
             configService: configService,
-            role: "Engineer");
+            role: "Operator");
 
         var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
         {
@@ -161,6 +161,20 @@ public class CameraBindingsEndpointTests
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
         await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
+    [Fact]
+    public async Task GetCameraBindings_ShouldRejectOperator()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+
+        await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager, role: "Operator");
+
+        using var response = await host.Client.GetAsync("/api/cameras/bindings");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        cameraManager.DidNotReceive().GetBindings();
     }
 
     [Fact]

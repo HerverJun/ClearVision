@@ -88,6 +88,21 @@ public class SettingsThemeEndpointTests
         document.RootElement.GetProperty("theme").GetString().Should().Be(GeneralConfig.ThemeLight);
     }
 
+    [Fact]
+    public async Task UpdateTheme_ShouldRejectOperator()
+    {
+        var initialConfig = new AppConfig();
+        await using var host = await SettingsThemeTestHost.CreateAsync(initialConfig, role: "Operator");
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings/theme", new ThemeUpdateRequest
+        {
+            Theme = GeneralConfig.ThemeDark
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
     private sealed class SettingsThemeTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -103,7 +118,7 @@ public class SettingsThemeEndpointTests
 
         public IConfigurationService ConfigurationService { get; }
 
-        public static async Task<SettingsThemeTestHost> CreateAsync(AppConfig initialConfig)
+        public static async Task<SettingsThemeTestHost> CreateAsync(AppConfig initialConfig, string role = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -134,6 +149,16 @@ public class SettingsThemeEndpointTests
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new ClearVision.Product.Application.Services.UserSession
+                {
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
+                };
+                await next();
+            });
             app.MapSettingsEndpoints();
             await app.StartAsync();
             return new SettingsThemeTestHost(app, configService);

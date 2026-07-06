@@ -64,6 +64,78 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task GetAiModels_ForOperator_ShouldReturnSafeModelDtoWithoutAuthMaterial()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Operator");
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "secret-model",
+            Name = "Secret Model",
+            DisplayName = "Secret Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o",
+            BaseUrl = "https://internal-gateway.example/v1",
+            AuthHeaderName = "Authorization",
+            ExtraHeaders = new Dictionary<string, string> { ["authorization"] = "Bearer secret-token" },
+            ExtraQuery = new Dictionary<string, string> { ["token"] = "query-secret" },
+            ExtraBody = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+                """{"token":"body-secret","safe":"value"}""")
+        });
+
+        using var response = await host.Client.GetAsync("/api/ai/models");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        responseJson.Should().NotContain("secret-token");
+        responseJson.Should().NotContain("query-secret");
+        responseJson.Should().NotContain("body-secret");
+        using var document = JsonDocument.Parse(responseJson);
+        var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "secret-model");
+        model.GetProperty("displayName").GetString().Should().Be("Secret Model");
+        model.TryGetProperty("baseUrl", out _).Should().BeFalse();
+        model.TryGetProperty("authHeaderName", out _).Should().BeFalse();
+        model.TryGetProperty("extraHeaders", out _).Should().BeFalse();
+        model.TryGetProperty("extraQuery", out _).Should().BeFalse();
+        model.TryGetProperty("extraBody", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAiModels_ForAdmin_ShouldMaskSensitiveExtraFields()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "admin-secret-model",
+            Name = "Admin Secret Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o",
+            BaseUrl = "https://internal-gateway.example/v1?token=url-secret",
+            AuthHeaderName = "Authorization",
+            ExtraHeaders = new Dictionary<string, string> { ["authorization"] = "Bearer header-secret", ["x-api-key"] = "api-secret" },
+            ExtraQuery = new Dictionary<string, string> { ["token"] = "query-secret" },
+            ExtraBody = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+                """{"token":"body-secret","safe":"value"}""")
+        });
+
+        using var response = await host.Client.GetAsync("/api/ai/models");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        responseJson.Should().NotContain("url-secret");
+        responseJson.Should().NotContain("header-secret");
+        responseJson.Should().NotContain("api-secret");
+        responseJson.Should().NotContain("query-secret");
+        responseJson.Should().NotContain("body-secret");
+        using var document = JsonDocument.Parse(responseJson);
+        var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "admin-secret-model");
+        model.GetProperty("baseUrl").GetString().Should().Contain("<redacted>");
+        model.GetProperty("extraHeaders").GetProperty("authorization").GetString().Should().Be("<redacted>");
+        model.GetProperty("extraHeaders").GetProperty("x-api-key").GetString().Should().Be("<redacted>");
+        model.GetProperty("extraQuery").GetProperty("token").GetString().Should().Be("<redacted>");
+        model.GetProperty("extraBody").GetProperty("token").GetString().Should().Be("<redacted>");
+    }
+
+    [Fact]
     public async Task UpdateAiModel_ShouldRejectTurningOffLockedReasonerModel()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();

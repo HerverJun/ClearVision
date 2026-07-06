@@ -159,7 +159,8 @@ public static class ApiEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // 更新工程
         app.MapPut("/api/projects/{id:guid}", async (
@@ -186,7 +187,8 @@ public static class ApiEndpoints
             {
                 return ToProjectUpdateFailure(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // 删除工程
         app.MapDelete("/api/projects/{id:guid}", async (
@@ -209,7 +211,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // 更新流程
         app.MapPut("/api/projects/{id:guid}/flow", async (
@@ -237,7 +240,8 @@ public static class ApiEndpoints
                 // 日志已由全局异常中间件记录
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapGet("/api/projects/{id:guid}/global-variables", async (
             Guid id,
@@ -277,7 +281,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapGet("/api/projects/{id:guid}/global-variable-values", async (
             Guid id,
@@ -357,7 +362,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapPost("/api/projects/{id:guid}/global-variable-values/reset", async (
             Guid id,
@@ -412,7 +418,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapPost("/api/projects/{id:guid}/global-variable-values/{variableId:guid}/reset", async (
             Guid id,
@@ -469,7 +476,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
             Guid id,
@@ -479,16 +487,10 @@ public static class ApiEndpoints
             StationPackageStore packageStore,
             IInspectionRuntimeCoordinator runtimeCoordinator,
             IServiceProvider serviceProvider,
-            HttpContext context,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                if (!IsAdmin(context))
-                {
-                    return Results.Json(new { Error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
-                }
-
                 await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "runtime-package-export", cancellationToken);
                 if (mutationLease == null)
                 {
@@ -553,7 +555,8 @@ public static class ApiEndpoints
             {
                 return ToBadRequest(ex);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
     }
 
     private static void MapInspectionEndpoints(IEndpointRouteBuilder app)
@@ -1043,7 +1046,8 @@ public static class ApiEndpoints
 
             var created = await templateService.CreateTemplateAsync(template, cancellationToken);
             return Results.Created($"/api/templates/{created.Id}", created);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // 更新流程模板
         app.MapPut("/api/templates/{id:guid}", async (
@@ -1074,7 +1078,8 @@ public static class ApiEndpoints
 
             var updated = await templateService.UpdateTemplateAsync(id, template, cancellationToken);
             return updated != null ? Results.Ok(updated) : Results.NotFound();
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // 推荐算子参数
         app.MapPost("/api/operators/{type}/recommend-parameters", (

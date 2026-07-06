@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
@@ -64,6 +65,26 @@ public class ContinuousPreviewEndpointTests
         await streamCoordinator.Received(1).StopPreviewSessionAsync("session-1");
     }
 
+    [Fact]
+    public async Task ContinuousPreviewEndpoints_ShouldRejectOperator()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+
+        await using var host = await PreviewTestHost.CreateAsync(cameraManager, streamCoordinator, role: "Operator");
+
+        var startResponse = await host.Client.PostAsJsonAsync("/api/cameras/continuous-preview/start", new { cameraBindingId = "binding-1" });
+        var frameResponse = await host.Client.GetAsync("/api/cameras/continuous-preview/frame/session-1");
+        var stopResponse = await host.Client.PostAsJsonAsync("/api/cameras/continuous-preview/stop", new { sessionId = "session-1" });
+
+        startResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        frameResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        stopResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await streamCoordinator.DidNotReceive().StartPreviewSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await streamCoordinator.DidNotReceive().WaitForPreviewFrameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await streamCoordinator.DidNotReceive().StopPreviewSessionAsync(Arg.Any<string>());
+    }
+
     private sealed class PreviewTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -76,7 +97,10 @@ public class ContinuousPreviewEndpointTests
 
         public HttpClient Client { get; }
 
-        public static async Task<PreviewTestHost> CreateAsync(ICameraManager cameraManager, ICameraFrameStreamCoordinator streamCoordinator)
+        public static async Task<PreviewTestHost> CreateAsync(
+            ICameraManager cameraManager,
+            ICameraFrameStreamCoordinator streamCoordinator,
+            string role = "Engineer")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -105,6 +129,16 @@ public class ContinuousPreviewEndpointTests
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
+                };
+                await next();
+            });
             app.MapSettingsEndpoints();
             await app.StartAsync();
             return new PreviewTestHost(app);

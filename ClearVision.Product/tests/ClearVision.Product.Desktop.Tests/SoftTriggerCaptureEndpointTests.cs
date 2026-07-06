@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
@@ -57,6 +58,35 @@ public class SoftTriggerCaptureEndpointTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await response.Content.ReadAsStringAsync()).Should().Contain("Camera binding not found");
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task HardwareOperationEndpoints_ShouldRejectOperator()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput,
+            role: "Operator");
+
+        var captureResponse = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = "cam-a" });
+        var serialTestResponse = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
+        {
+            portName = "COM3",
+            baudRate = 9600
+        });
+        var serialPortsResponse = await host.Client.GetAsync("/api/trigger-input/serial-photoelectric-ports");
+
+        captureResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        serialTestResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        serialPortsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await serialTriggerInput.DidNotReceive().WaitForSerialPhotoelectricAsync(
+            Arg.Any<SerialPhotoelectricTriggerOptions>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -421,7 +451,8 @@ public class SoftTriggerCaptureEndpointTests
         public static async Task<SoftTriggerTestHost> CreateAsync(
             ICameraManager cameraManager,
             ITriggerInputService? triggerInputService = null,
-            ISerialPhotoelectricTriggerInputService? serialPhotoelectricTriggerInputService = null)
+            ISerialPhotoelectricTriggerInputService? serialPhotoelectricTriggerInputService = null,
+            string role = "Engineer")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -452,6 +483,16 @@ public class SoftTriggerCaptureEndpointTests
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
+                };
+                await next();
+            });
             app.MapSettingsEndpoints();
             await app.StartAsync();
             return new SoftTriggerTestHost(app);

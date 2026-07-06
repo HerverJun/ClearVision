@@ -21,6 +21,46 @@ namespace ClearVision.Product.Desktop.Tests;
 public class SettingsResetEndpointTests
 {
     [Fact]
+    public async Task GetSettings_ForOperator_ShouldReturnOnlySafeUiSubset()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync(role: "Operator", initialConfig: CreateSensitiveConfig());
+
+        using var response = await host.Client.GetAsync("/api/settings");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        responseJson.Should().Contain("safeSubset");
+        responseJson.Should().Contain("general");
+        responseJson.Should().Contain("theme");
+        responseJson.Should().NotContain("communication");
+        responseJson.Should().NotContain("plc");
+        responseJson.Should().NotContain("cameras");
+        responseJson.Should().NotContain("storage");
+        responseJson.Should().NotContain("security");
+        responseJson.Should().NotContain("runtime");
+        responseJson.Should().NotContain("192.168.10.8");
+        responseJson.Should().NotContain("CAM-SECRET-001");
+        responseJson.Should().NotContain("D:\\SensitiveImages");
+    }
+
+    [Fact]
+    public async Task GetSettings_ForAdmin_ShouldReturnFullConfig()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync(initialConfig: CreateSensitiveConfig());
+
+        using var response = await host.Client.GetAsync("/api/settings");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        responseJson.Should().Contain("communication");
+        responseJson.Should().Contain("cameras");
+        responseJson.Should().Contain("storage");
+        responseJson.Should().Contain("security");
+        responseJson.Should().Contain("192.168.10.8");
+        responseJson.Should().Contain("CAM-SECRET-001");
+    }
+
+    [Fact]
     public async Task ResetSettings_ShouldResetAppConfigAndAiModels()
     {
         await using var host = await SettingsResetTestHost.CreateAsync();
@@ -84,7 +124,7 @@ public class SettingsResetEndpointTests
 
         public IConfigurationService ConfigurationService { get; }
 
-        public static async Task<SettingsResetTestHost> CreateAsync()
+        public static async Task<SettingsResetTestHost> CreateAsync(string role = "Admin", AppConfig? initialConfig = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -94,8 +134,9 @@ public class SettingsResetEndpointTests
             builder.WebHost.UseTestServer();
 
             var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-            configService.GetCurrent().Returns(new AppConfig());
+            var config = initialConfig ?? new AppConfig();
+            configService.LoadAsync().Returns(Task.FromResult(config));
+            configService.GetCurrent().Returns(config);
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
@@ -120,8 +161,8 @@ public class SettingsResetEndpointTests
                 context.Items["CurrentUser"] = new UserSession
                 {
                     UserId = "admin",
-                    Username = "admin",
-                    Role = "Admin"
+                    Username = role.ToLowerInvariant(),
+                    Role = role
                 };
                 await next();
             });
@@ -136,5 +177,35 @@ public class SettingsResetEndpointTests
             await _app.StopAsync();
             await _app.DisposeAsync();
         }
+    }
+
+    private static AppConfig CreateSensitiveConfig()
+    {
+        return new AppConfig
+        {
+            General = new GeneralConfig { Theme = GeneralConfig.ThemeLight, SoftwareTitle = "ClearVision" },
+            Communication = new CommunicationConfig
+            {
+                ActiveProtocol = CommunicationConfig.ProtocolS7,
+                S7 = new S7CommunicationProfile
+                {
+                    IpAddress = "192.168.10.8",
+                    Port = 102,
+                    Mappings = [new PlcAddressMapping { Name = "Start", Address = "DB1.DBX0.0" }]
+                }
+            },
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-a",
+                    SerialNumber = "CAM-SECRET-001",
+                    IpAddress = "10.10.0.9"
+                }
+            ],
+            Storage = new StorageConfig { ImageSavePath = @"D:\SensitiveImages" },
+            Runtime = new RuntimeConfig { AutoRun = true },
+            Security = new SecurityConfig { PasswordMinLength = 12 }
+        };
     }
 }

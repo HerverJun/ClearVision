@@ -172,6 +172,22 @@ public class PlcSettingsEndpointTests
         await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
     }
 
+    [Fact]
+    public async Task PlcHardwareReadAndProbeEndpoints_ShouldRejectOperator()
+    {
+        await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig(), role: "Operator");
+
+        using var settingsResponse = await host.Client.GetAsync("/api/plc/settings");
+        using var mappingsResponse = await host.Client.GetAsync("/api/plc/mappings");
+        using var testResponse = await host.Client.PostAsync(
+            "/api/plc/test-connection",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        settingsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        mappingsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        testResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     [Theory]
     [InlineData("S7", "S7-1200", 0, 1)]
     [InlineData("MC", null, null, null)]

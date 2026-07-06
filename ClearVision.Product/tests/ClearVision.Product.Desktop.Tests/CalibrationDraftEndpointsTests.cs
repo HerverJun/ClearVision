@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
@@ -154,6 +155,26 @@ public sealed class CalibrationDraftEndpointsTests
         host.AssetStorage.Metadata.Should().BeNull();
     }
 
+    [Fact]
+    public async Task FormalSaveEndpoint_ShouldRejectOperator()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync(role: UserRole.Operator.ToString());
+
+        var response = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id:D}/calibration-assets/from-draft",
+            new
+            {
+                expectedPersistenceRevision = 0,
+                sessionId = "draft-1",
+                targetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                imageIdentity = "image-hash",
+                candidateBundleJson = CreateAcceptedBundleJson()
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        host.AssetStorage.Metadata.Should().BeNull();
+    }
+
     private static NPointCalibrationDraftSampleDto CreateSample(
         string sampleId,
         int order,
@@ -226,7 +247,7 @@ public sealed class CalibrationDraftEndpointsTests
 
         public RecordingProjectAssetStorage AssetStorage { get; }
 
-        public static async Task<CalibrationEndpointHost> CreateAsync()
+        public static async Task<CalibrationEndpointHost> CreateAsync(string role = "Engineer")
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
@@ -257,6 +278,16 @@ public sealed class CalibrationDraftEndpointsTests
             builder.Services.AddScoped<ProjectSaveCoordinator>();
             builder.Services.AddScoped<ProjectService>();
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
+                };
+                await next();
+            });
             app.MapCalibrationDraftEndpoints();
             await app.StartAsync();
             return new CalibrationEndpointHost(app, project, assetStorage);
