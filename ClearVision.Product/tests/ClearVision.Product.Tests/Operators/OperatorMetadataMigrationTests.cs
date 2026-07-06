@@ -1,5 +1,7 @@
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
+using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Operators;
 
@@ -77,6 +79,59 @@ public class OperatorMetadataMigrationTests
     }
 
     [Fact]
+    public void MetadataCatalog_ShouldLocalizeUiFacingDescriptions()
+    {
+        var factory = new OperatorFactory();
+
+        var englishDescriptions = factory
+            .GetAllMetadata()
+            .SelectMany(GetUiFacingDescriptions)
+            .Where(item => IsUnlocalizedEnglishDescription(item.Text))
+            .OrderBy(item => item.Owner)
+            .ToList();
+
+        Assert.True(
+            englishDescriptions.Count == 0,
+            "UI-facing operator descriptions should be localized: " +
+            string.Join("; ", englishDescriptions.Select(item => $"{item.Owner}='{item.Text}'")));
+    }
+
+    [Fact]
+    public void MetadataCatalog_ShouldLocalizeUiFacingPropertyLabels()
+    {
+        var factory = new OperatorFactory();
+        var metadataByType = factory.GetAllMetadata().ToDictionary(m => m.Type, m => m);
+
+        metadataByType[OperatorType.RectangleRegion].Parameters
+            .Single(parameter => parameter.Name == "Width")
+            .DisplayName.Should().Be("宽度");
+        metadataByType[OperatorType.RectangleRegion].Parameters
+            .Single(parameter => parameter.Name == "Height")
+            .DisplayName.Should().Be("高度");
+
+        metadataByType[OperatorType.SemanticSegmentation].Parameters
+            .Single(parameter => parameter.Name == "MaxClassMasks")
+            .DisplayName.Should().Be("最大类别掩码数");
+        metadataByType[OperatorType.SemanticSegmentation].OutputPorts
+            .Single(port => port.Name == "ClassMasks")
+            .DisplayName.Should().Be("类别掩码");
+
+        metadataByType[OperatorType.VariableRead].Parameters
+            .Single(parameter => parameter.Name == "Expression")
+            .DisplayName.Should().Be("表达式");
+        metadataByType[OperatorType.VariableRead].Parameters
+            .Single(parameter => parameter.Name == "ConversionMode")
+            .DisplayName.Should().Be("转换模式");
+        metadataByType[OperatorType.VariableWrite].Parameters
+            .Single(parameter => parameter.Name == "Expression")
+            .DisplayName.Should().Be("表达式");
+
+        metadataByType[OperatorType.BoxNms].Parameters
+            .Single(parameter => parameter.Name == "ShowSuppressed")
+            .DisplayName.Should().Be("显示被抑制框");
+    }
+
+    [Fact]
     public void MetadataCatalog_ShouldUseSupportedOperatorLibraryCategories()
     {
         var supportedCategories = new HashSet<string>
@@ -131,5 +186,42 @@ public class OperatorMetadataMigrationTests
         Assert.Equal("手眼标定", metadataByType[OperatorType.HandEyeCalibration].DisplayName);
         Assert.Equal("标定", metadataByType[OperatorType.HandEyeCalibrationValidator].Category);
         Assert.Equal("手眼标定验证", metadataByType[OperatorType.HandEyeCalibrationValidator].DisplayName);
+    }
+
+    private static IEnumerable<(string Owner, string Text)> GetUiFacingDescriptions(OperatorMetadata metadata)
+    {
+        yield return ($"{metadata.Type}.Description", metadata.Description);
+
+        foreach (var parameter in metadata.Parameters)
+        {
+            yield return ($"{metadata.Type}.{parameter.Name}.Description", parameter.Description ?? string.Empty);
+        }
+
+        foreach (var port in metadata.InputPorts)
+        {
+            yield return ($"{metadata.Type}.{port.Name}.InputDescription", port.Description ?? string.Empty);
+        }
+
+        foreach (var port in metadata.OutputPorts)
+        {
+            yield return ($"{metadata.Type}.{port.Name}.OutputDescription", port.Description ?? string.Empty);
+        }
+    }
+
+    private static bool IsUnlocalizedEnglishDescription(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return !text.Any(IsCjk)
+            && text.Any(char.IsLetter)
+            && text.Count(char.IsWhiteSpace) > 0;
+    }
+
+    private static bool IsCjk(char value)
+    {
+        return value is >= '\u3400' and <= '\u9fff';
     }
 }

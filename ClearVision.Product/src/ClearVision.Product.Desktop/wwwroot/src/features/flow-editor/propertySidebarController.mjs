@@ -57,12 +57,12 @@ function createRectangleRegionMetadataFallback() {
         parameters: [
             { name: 'X', displayName: 'X', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },
             { name: 'Y', displayName: 'Y', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },
-            { name: 'Width', displayName: 'Width', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 },
-            { name: 'Height', displayName: 'Height', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 }
+            { name: 'Width', displayName: '宽度', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 },
+            { name: 'Height', displayName: '高度', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 }
         ],
         inputPorts: [],
         outputPorts: [
-            { name: 'Rectangle', displayName: 'Rectangle', dataType: 'Rectangle', type: 'Rectangle' }
+            { name: 'Rectangle', displayName: '矩形', dataType: 'Rectangle', type: 'Rectangle' }
         ]
     };
 }
