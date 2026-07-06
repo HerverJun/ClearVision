@@ -59,6 +59,7 @@ function syncDraftBeforeSave(propertyPanel) {
  * @property {{ setProject?: Function, executeSingle?: Function }} inspectionController
  * @property {(message: string, type?: string) => void} showToast
  * @property {(options?: any) => void} handleNewProject
+ * @property {() => boolean} [canEditProject]
  * @property {(view: string) => void} setCurrentView
  * @property {(view: string) => void} syncActiveNavButton
  * @property {(view: string) => Promise<void>} switchView
@@ -85,6 +86,7 @@ export function bindToolbarCommands(options) {
         inspectionController,
         showToast,
         handleNewProject,
+        canEditProject = () => true,
         setCurrentView,
         syncActiveNavButton,
         switchView,
@@ -97,6 +99,11 @@ export function bindToolbarCommands(options) {
 
     bindButton(documentRef, 'btn-save', async () => {
         try {
+            if (!canEditProject()) {
+                showToast('保存工程需要工程师或管理员权限。', 'warning');
+                return;
+            }
+
             const propertyPanel = getPropertyPanel?.() || serviceRegistry?.get?.('propertyPanel');
             const flowCanvas = getFlowCanvas();
             if (!syncDraftBeforeSave(propertyPanel)) {

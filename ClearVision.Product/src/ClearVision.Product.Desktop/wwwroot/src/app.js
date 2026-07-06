@@ -62,7 +62,7 @@ debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}.
 // ============================================
 // Auth session bootstrap
 // ============================================
-import { bootstrapAuthSession, logout } from './features/auth/auth.js';
+import { PermissionGuard, bootstrapAuthSession, logout } from './features/auth/auth.js';
 
 import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
@@ -448,6 +448,22 @@ function updateAuthenticatedUserDisplay() {
     if (userNameEl && window.currentUser) {
         userNameEl.textContent = window.currentUser.displayName || window.currentUser.username || '--';
     }
+}
+
+function canEditProject() {
+    return PermissionGuard.canEdit();
+}
+
+function canExportRuntimePackage() {
+    return PermissionGuard.canManageUsers();
+}
+
+function showProjectEditPermissionHint(action = '执行该操作') {
+    showToast(`${action}需要工程师或管理员权限。`, 'warning');
+}
+
+function showRuntimePackageExportPermissionHint() {
+    showToast('导出运行包需要管理员权限。', 'warning');
 }
 
 function syncActiveNavButton(view) {
@@ -2012,6 +2028,11 @@ async function initializeFlowEditor() {
 }
 
 function handleNewProject(options = {}) {
+    if (!canEditProject()) {
+        showProjectEditPermissionHint(options.preserveCanvas ? '保存为新工程' : '新建工程');
+        return;
+    }
+
     const { preserveCanvas = false } = options;
     const nameInput = createLabeledInput({ label: '工程名称', required: true, placeholder: `Project_${Date.now()}` });
     const descInput = createLabeledInput({ label: '描述', placeholder: '工程描述...' });
@@ -2077,6 +2098,11 @@ async function loadProject(projectId) {
 }
 
 async function createProject(name, description = '', preserveCanvas = false) {
+    if (!canEditProject()) {
+        showProjectEditPermissionHint(preserveCanvas ? '保存为新工程' : '创建工程');
+        throw new Error('ProjectEditPermissionRequired');
+    }
+
     try {
         const preservedFlow = preserveCanvas && flowCanvas && typeof flowCanvas.serialize === 'function'
             ? flowCanvas.serialize()
@@ -2118,6 +2144,10 @@ function initializeTheme() {
 }
 
 async function persistThemePreference(theme) {
+    if (!PermissionGuard.canManageUsers()) {
+        return theme;
+    }
+
     const result = await httpClient.put('/settings/theme', { theme });
     return result?.theme || theme;
 }
@@ -2499,6 +2529,7 @@ function initializeToolbar() {
         inspectionController,
         showToast,
         handleNewProject,
+        canEditProject,
         setCurrentView,
         syncActiveNavButton,
         switchView,
@@ -2666,6 +2697,11 @@ projectManager.setFlowSnapshotProvider?.(() => getCurrentFlowSnapshotForPersiste
 
 async function ensureProjectForAppliedFlow(flow, options = {}) {
     if (getCurrentProject()?.id || getFlowNodeCount(flow) === 0) {
+        return null;
+    }
+
+    if (!canEditProject()) {
+        showProjectEditPermissionHint('保存 AI 生成工程');
         return null;
     }
 
@@ -2875,6 +2911,11 @@ async function exportProjectToJson(projectId = null) {
 }
 
 async function exportRuntimePackage(projectId = null) {
+    if (!canExportRuntimePackage()) {
+        showRuntimePackageExportPermissionHint();
+        return;
+    }
+
     const currentProject = getCurrentProject();
     const targetProjectId = projectId || currentProject?.id || null;
     if (!targetProjectId) {
@@ -2968,6 +3009,11 @@ function showProjectExportDialog() {
         text: '导出运行包',
         disabled: true,
         onClick: async () => {
+            if (!canExportRuntimePackage()) {
+                showRuntimePackageExportPermissionHint();
+                return;
+            }
+
             const selectedProjectId = projectSelect.value;
             if (!selectedProjectId) {
                 showToast('请选择要导出的工程', 'warning');
@@ -2981,7 +3027,10 @@ function showProjectExportDialog() {
 
     const setExportActionsEnabled = (enabled) => {
         btnJson.disabled = !enabled;
-        btnRuntime.disabled = !enabled;
+        btnRuntime.disabled = !enabled || !canExportRuntimePackage();
+        btnRuntime.title = canExportRuntimePackage()
+            ? ''
+            : '只有管理员可以导出运行包';
     };
 
     const populateProjectOptions = (projects) => {
@@ -3097,6 +3146,11 @@ function mergeParameters(defParams, nodeParams) {
  */
 async function importProjectFromJson(file) {
     if (!file) return;
+
+    if (!canEditProject()) {
+        showProjectEditPermissionHint('导入工程');
+        return;
+    }
     
     try {
         const content = await file.text();

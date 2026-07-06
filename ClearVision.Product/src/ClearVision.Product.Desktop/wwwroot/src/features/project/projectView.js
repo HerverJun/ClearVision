@@ -4,6 +4,7 @@
  */
 
 import projectManager from './projectManager.js';
+import { PermissionGuard } from '../auth/auth.js';
 import { showToast, createModal, closeModal, createButton } from '../../shared/components/uiComponents.js';
 import {
     getFeatureBadge,
@@ -50,13 +51,26 @@ export class ProjectView {
         // 新建工程按钮（工程分页内）
         const newProjectBtn = document.getElementById('btn-new-project-inline');
         if (newProjectBtn) {
+            if (!this.canEditProject()) {
+                newProjectBtn.disabled = true;
+                newProjectBtn.title = '只有工程师或管理员可以新建工程';
+            }
             newProjectBtn.addEventListener('click', () => this.showNewProjectDialog());
         }
         
         // 导入工程按钮（从全局工具栏迁移至此）
         const importBtn = document.getElementById('btn-import');
         if (importBtn) {
+            if (!this.canEditProject()) {
+                importBtn.disabled = true;
+                importBtn.title = '只有工程师或管理员可以导入并保存工程';
+            }
             importBtn.addEventListener('click', () => {
+                if (!this.canEditProject()) {
+                    this.showEditPermissionHint('导入工程');
+                    return;
+                }
+
                 console.log('[ProjectView] 导入工程');
                 if (typeof window.showImportDialog === 'function') {
                     window.showImportDialog();
@@ -105,6 +119,14 @@ export class ProjectView {
             });
         }
     }
+
+    canEditProject() {
+        return PermissionGuard.canEdit();
+    }
+
+    showEditPermissionHint(action = '修改工程') {
+        showToast(`${action}需要工程师或管理员权限。`, 'warning');
+    }
     
     async loadProjects() {
         const listContainer = document.getElementById('project-list');
@@ -149,6 +171,12 @@ export class ProjectView {
      * 渲染空状态
      */
     renderEmptyState() {
+        const createDisabled = this.canEditProject()
+            ? ''
+            : 'disabled title="只有工程师或管理员可以新建工程"';
+        const createClick = this.canEditProject()
+            ? 'onclick="document.getElementById(\'btn-new-project-inline\').click()"'
+            : '';
         return `
             <div class="empty-state">
                 <div class="empty-state-icon">
@@ -158,7 +186,7 @@ export class ProjectView {
                 </div>
                 <h3 class="empty-state-title">还没有工程</h3>
                 <p class="empty-state-desc">创建或导入工程后即可配置产品、连接设备并开始检测</p>
-                <button class="btn btn-primary empty-state-action" onclick="document.getElementById('btn-new-project-inline').click()">
+                <button class="btn btn-primary empty-state-action" ${createClick} ${createDisabled}>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                     </svg>
@@ -249,6 +277,9 @@ export class ProjectView {
         const modifiedDate = this.formatProjectDate(project.modifiedAt, project.createdAt);
         const status = project.status || 'ready';
         const statusConfig = this.getStatusConfig(status);
+        const deleteDisabled = this.canEditProject()
+            ? 'title="删除"'
+            : 'title="只有工程师或管理员可以删除项目" disabled';
         
         return `
             <div class="project-list-item" data-id="${project.id}">
@@ -269,7 +300,7 @@ export class ProjectView {
                     <button class="action-btn btn-open" title="打开">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
                     </button>
-                    <button class="action-btn btn-delete" title="删除">
+                    <button class="action-btn btn-delete" ${deleteDisabled}>
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2v-7H6v7zM19 4h-3.5l-1-1h-5.7l-1 1H5v2h14V4z"/></svg>
                     </button>
                 </div>
@@ -311,6 +342,11 @@ export class ProjectView {
             // 删除按钮
             card.querySelector('.btn-delete')?.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (!this.canEditProject()) {
+                    this.showEditPermissionHint('删除项目');
+                    return;
+                }
+
                 const name = card.querySelector('.project-list-title')?.textContent 
                           || '未知工程';
                 this.confirmDelete(projectId, name);
@@ -333,6 +369,11 @@ export class ProjectView {
     }
     
     confirmDelete(projectId, projectName) {
+        if (!this.canEditProject()) {
+            this.showEditPermissionHint('删除项目');
+            return;
+        }
+
         const content = document.createElement('p');
         content.textContent = `确定要删除工程 "${projectName}" 吗？此操作无法撤销。`;
         
@@ -404,6 +445,11 @@ export class ProjectView {
      * 显示新建工程对话框
      */
     showNewProjectDialog() {
+        if (!this.canEditProject()) {
+            this.showEditPermissionHint('新建工程');
+            return;
+        }
+
         const demoFeature = getFeatureMeta('project.demoCreation');
         const demoCreationEnabled = isFeatureEnabled('project.demoCreation');
         const demoBadge = getFeatureBadge('project.demoCreation');
