@@ -302,13 +302,13 @@ export function getOperatorRoiConfig(operator, options = {}) {
             geometryAdapter,
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
             subtitle: shape === 'Circle'
-                ? 'Drag the circle ROI; commit writes CenterX / CenterY / Radius.'
+                ? '拖拽圆形 ROI，提交后写入 CenterX / CenterY / Radius。'
                 : shape === 'Polygon'
-                    ? 'Edit polygon ROI vertices; commit writes the legacy PolygonPoints JSON.'
-                    : 'Drag the rectangle ROI; commit writes X / Y / Width / Height.',
+                    ? '编辑多边形 ROI 顶点，提交后写入 PolygonPoints JSON。'
+                    : '拖拽矩形 ROI，提交后写入 X / Y / Width / Height。',
             readonlyMessage: shape === 'Polygon'
-                ? 'PolygonPoints must be valid legacy JSON with at least three finite, in-bounds, non-self-intersecting vertices.'
-                : 'Image editing supports Rectangle, Circle, and valid Polygon ROI shapes.'
+                ? 'PolygonPoints 必须是有效 JSON，至少包含 3 个有限、图内且不自交的顶点。'
+                : '图上编辑支持矩形、圆形和有效多边形 ROI。'
         };
     }
 
@@ -334,9 +334,9 @@ export function getOperatorRoiConfig(operator, options = {}) {
                 RoiHeight: 0
             },
             subtitle: useRoi
-                ? 'Drag the template search ROI; commit writes UseRoi / RoiX / RoiY / RoiWidth / RoiHeight.'
-                : 'Draw a template search ROI; commit enables UseRoi and writes RoiX / RoiY / RoiWidth / RoiHeight.',
-            readonlyMessage: 'TemplateMatching search ROI is editable on the search input image.',
+                ? '拖拽模板搜索 ROI，提交后写入 UseRoi / RoiX / RoiY / RoiWidth / RoiHeight。'
+                : '框选模板搜索 ROI，提交后启用 UseRoi 并写入 RoiX / RoiY / RoiWidth / RoiHeight。',
+            readonlyMessage: 'TemplateMatching 搜索 ROI 可在搜索输入图像上编辑。',
             description: '模板搜索 ROI 使用搜索图坐标。模板原点必须基于模板图坐标，不能在这里用搜索图点选写入 OriginX / OriginY。'
         };
     }
@@ -350,8 +350,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
             shape: 'Rectangle',
             geometryAdapter: { kind: 'rectangle', paramKeys: REGION_RECT_PARAM_KEYS },
             rectParamKeys: REGION_RECT_PARAM_KEYS,
-            subtitle: 'Drag the region rectangle; commit writes RegionX / RegionY / RegionW / RegionH.',
-            readonlyMessage: 'Image editing supports BoxFilter only when FilterMode is Region.'
+            subtitle: '拖拽区域矩形，提交后写入 RegionX / RegionY / RegionW / RegionH。',
+            readonlyMessage: 'BoxFilter 仅在 FilterMode 为 Region 时支持图上编辑。'
         };
     }
 
@@ -383,8 +383,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
             shape,
             geometryAdapter: { kind: 'annulusArc', paramKeys: POLAR_ANNULUS_ARC_PARAM_KEYS },
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-            subtitle: 'Edit the annulus or arc; commit writes CenterX / CenterY / radii / angles.',
-            readonlyMessage: 'Annulus parameters are invalid: OuterRadius must be greater than InnerRadius and all values must be finite.'
+            subtitle: '编辑环形或弧形区域，提交后写入 CenterX / CenterY / 半径 / 角度。',
+            readonlyMessage: '环形参数无效：OuterRadius 必须大于 InnerRadius，且所有值必须为有限数。'
         };
     }
 
@@ -396,8 +396,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
                 shape: 'PointSequence',
                 geometryAdapter: { kind: 'pointSequence', paramKeys: POINT_PAIRS_PARAM_KEYS },
                 rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-                subtitle: 'N Point draft workbench is disabled.',
-                readonlyMessage: 'N Point draft workbench is disabled; use the generic PointPairs parameter.'
+                subtitle: 'N 点标定草稿工作台已禁用。',
+                readonlyMessage: 'N 点标定草稿工作台已禁用，请使用通用 PointPairs 参数。'
             };
         }
 
@@ -411,8 +411,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
             shape: 'PointSequence',
             geometryAdapter: { kind: 'pointSequence', paramKeys: POINT_PAIRS_PARAM_KEYS },
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-            subtitle: 'Edit calibration image sample points; commit preserves WorldX / WorldY in PointPairs JSON.',
-            readonlyMessage: 'PointPairs must be a parseable legacy JSON array.'
+            subtitle: '编辑标定图像采样点，提交时保留 PointPairs JSON 中的 WorldX / WorldY。',
+            readonlyMessage: 'PointPairs 必须是可解析的 JSON 数组。'
         };
     }
 
@@ -436,8 +436,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
                 shape: 'CircleSearchV2',
                 geometryAdapter: { kind: 'circleSearchV2', paramKeys: CIRCLE_SEARCH_V2_PARAM_KEYS },
                 rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-                subtitle: 'Edit the search ring and nominal circle; commit writes SearchCenterX / SearchCenterY / MinRadius / NominalRadius / MaxRadius.',
-                readonlyMessage: 'Circle Search V2 geometry requires 1 <= MinRadius <= NominalRadius <= MaxRadius.'
+                subtitle: '编辑搜索环和名义圆，提交后写入 SearchCenterX / SearchCenterY / MinRadius / NominalRadius / MaxRadius。',
+                readonlyMessage: 'Circle Search V2 几何要求 1 <= MinRadius <= NominalRadius <= MaxRadius。'
             };
         }
     }
@@ -449,8 +449,8 @@ export function getOperatorRoiConfig(operator, options = {}) {
             shape: 'Rectangle',
             geometryAdapter: { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS },
             rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-            subtitle: 'Draw the caliper search rectangle; commit creates or updates a RectangleRegion node connected to SearchRegion.',
-            readonlyMessage: 'CaliperTool.SearchRegion is an input port and must be modeled by a RectangleRegion connection.',
+            subtitle: '框选卡尺搜索矩形，提交后创建或更新连接到 SearchRegion 的 RectangleRegion 节点。',
+            readonlyMessage: 'CaliperTool.SearchRegion 是输入端口，必须通过 RectangleRegion 连线建模。',
             description: '卡尺搜索区域通过 RectangleRegion -> CaliperTool.SearchRegion 连接表达，不会给 CaliperTool 增加伪参数。'
         };
     }
@@ -461,7 +461,7 @@ export function getOperatorRoiConfig(operator, options = {}) {
         shape: 'Rectangle',
         geometryAdapter: { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS },
         rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
-        subtitle: 'Drag an ROI to update parameters.',
-        readonlyMessage: 'The selected node does not support image editing.'
+        subtitle: '拖拽 ROI 以更新参数。',
+        readonlyMessage: '当前节点不支持图上编辑。'
     };
 }

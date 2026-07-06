@@ -207,23 +207,26 @@ html[data-theme="dark"] .property-geometry-description {
 
 .roi-editor-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     padding: 10px 12px;
     border-bottom: 1px solid #e2e8f0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .roi-editor-title-group {
     min-width: 0;
-    flex: 1;
+    width: 100%;
 }
 
 .roi-editor-title {
     font-size: 13px;
     font-weight: 700;
     color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .roi-editor-subtitle {
@@ -231,12 +234,23 @@ html[data-theme="dark"] .property-geometry-description {
     font-size: 11px;
     color: #64748b;
     line-height: 1.4;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 .roi-editor-actions {
-    display: inline-flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+}
+
+.roi-editor-actions .btn {
+    min-width: 0;
+    padding-inline: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .roi-editor-stage {
@@ -316,18 +330,26 @@ html[data-theme="dark"] .roi-editor-readonly {
 
 .calibration-draft-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     padding: 10px 12px;
     border-bottom: 1px solid #e2e8f0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+}
+
+.calibration-draft-header > div:first-child {
+    min-width: 0;
+    width: 100%;
 }
 
 .calibration-draft-title {
     font-size: 13px;
     font-weight: 700;
     color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .calibration-draft-subtitle {
@@ -335,13 +357,24 @@ html[data-theme="dark"] .roi-editor-readonly {
     font-size: 11px;
     color: #64748b;
     line-height: 1.35;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 .calibration-draft-actions {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
-    flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch;
+    width: 100%;
+}
+
+.calibration-draft-actions .btn {
+    min-width: 0;
+    padding-inline: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .calibration-draft-options {

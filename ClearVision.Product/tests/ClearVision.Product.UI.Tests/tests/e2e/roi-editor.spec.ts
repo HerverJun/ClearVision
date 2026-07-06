@@ -987,6 +987,54 @@ test.describe('ROI Editor', () => {
     await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
   });
 
+  test('image editing headers remain readable in the narrow inspector', async ({ page }) => {
+    await page.addStyleTag({
+      content: `
+        .flow-editor-shell { --inspector-pane-width: 240px !important; }
+      `,
+    });
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page);
+    await waitForRoiEditorReady(page);
+    await expect(page.locator('.roi-editor-title')).toHaveText('ROI 编辑器');
+    await expect(page.locator('#roi-editor-subtitle')).toContainText('拖拽矩形 ROI');
+    await expect(page.locator('#roi-editor-subtitle')).not.toContainText('Drag the rectangle');
+    const roiHeaderMetrics = await page.locator('.roi-editor-title').evaluate(element => {
+      const style = getComputedStyle(element);
+      const fontSize = Number.parseFloat(style.fontSize) || 13;
+      return {
+        height: element.getBoundingClientRect().height,
+        lineHeight: Number.parseFloat(style.lineHeight) || fontSize * 1.2,
+      };
+    });
+    expect(roiHeaderMetrics.height).toBeLessThanOrEqual(roiHeaderMetrics.lineHeight * 1.35);
+
+    await addAndSelectNPointNode(page);
+    await waitForCalibrationDraftWorkbenchReady(page);
+    const npointHeaderMetrics = await page.locator('.calibration-draft-title').evaluate(element => {
+      const style = getComputedStyle(element);
+      const fontSize = Number.parseFloat(style.fontSize) || 13;
+      return {
+        height: element.getBoundingClientRect().height,
+        lineHeight: Number.parseFloat(style.lineHeight) || fontSize * 1.2,
+      };
+    });
+    expect(npointHeaderMetrics.height).toBeLessThanOrEqual(npointHeaderMetrics.lineHeight * 1.35);
+  });
+
   test('drawing a new rectangle updates XYWH and triggers one extra preview', async ({ page }) => {
     let previewCallCount = 0;
     await page.route('**/api/flows/preview-node', async route => {
