@@ -82,6 +82,7 @@ public static class PreviewNodeEndpoints
             HttpContext context,
             IFlowExecutionService flowService,
             IProjectRepository projectRepository,
+            IExecutionAdmissionService executionAdmissionService,
             IProjectFlowStorage flowStorage,
             ProjectVariableSessionRegistry projectVariableSessions,
             IServiceProvider serviceProvider,
@@ -104,6 +105,14 @@ public static class PreviewNodeEndpoints
 
                 var useArtifactReferences = UsesPreviewArtifactReferences(request);
                 var artifactOwner = CreateArtifactOwner(request);
+                var projectAdmission = await executionAdmissionService.ValidateProjectAsync(
+                    request.ProjectId,
+                    ExecutionAdmissionSurface.NodePreview,
+                    context.RequestAborted);
+                if (!projectAdmission.IsAllowed)
+                {
+                    return ToAdmissionFailure(projectAdmission);
+                }
 
                 if (request.ProjectId != Guid.Empty)
                 {
@@ -155,6 +164,16 @@ public static class PreviewNodeEndpoints
                 }
 
                 // 构建调试选项
+                var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+                    request.ProjectId,
+                    flow,
+                    ExecutionAdmissionSurface.NodePreview,
+                    context.RequestAborted);
+                if (!flowAdmission.IsAllowed)
+                {
+                    return ToAdmissionFailure(flowAdmission);
+                }
+
                 var debugOptions = new DebugOptions
                 {
                     DebugSessionId = request.DebugSessionId,
@@ -390,6 +409,16 @@ public static class PreviewNodeEndpoints
         return HasExecutableFlow(project.Flow) ? project.Flow : null;
     }
 
+    private static IResult ToAdmissionFailure(ExecutionAdmissionResult admission)
+    {
+        return Results.BadRequest(new
+        {
+            Code = admission.Code,
+            Error = admission.Message,
+            Violations = admission.Violations
+        });
+    }
+
     private static async Task<ProjectVariableExecutionContext?> CreatePreviewProjectVariableContextAsync(
         Guid projectId,
         ClearVision.Product.Core.Entities.OperatorFlow flow,
@@ -401,7 +430,7 @@ public static class PreviewNodeEndpoints
             return null;
         }
 
-        var project = await projectRepository.GetByIdAsync(projectId);
+        var project = await projectRepository.GetByIdFreshAsync(projectId);
         var schema = project?.GlobalVariables;
         if (schema == null ||
             (schema.Variables.Count == 0 && schema.SourceBindings.Count == 0 && schema.TargetBindings.Count == 0))

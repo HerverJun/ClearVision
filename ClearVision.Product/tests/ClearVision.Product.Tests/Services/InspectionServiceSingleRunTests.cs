@@ -29,6 +29,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
         OperatorFlow? executedFlow = null;
         Dictionary<string, object>? executedInputs = null;
         InspectionResult? persistedResult = null;
@@ -82,8 +83,180 @@ public class InspectionServiceSingleRunTests
         persistedResult.CalibrationBundleId.Should().Be("bundle-single-run");
         persistedResult.SessionId.Should().NotBeNull();
         persistedResult.OutputDataJson.Should().Contain("Traceability");
+        await projectRepository.Received(1).GetByIdFreshAsync(projectId);
         _ = projectRepository.DidNotReceive().GetWithFlowAsync(Arg.Any<Guid>());
         _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithInlineFlowAndMissingProject_ShouldRejectWithoutPersistingResult()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var explicitFlow = CreateFlow("client-flow");
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_PROJECT_NOT_ACTIVE:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithInlineFlowAndSoftDeletedProject_ShouldRejectWithoutPersistingResult()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns((Project?)null);
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, CreateFlow("client-flow"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_PROJECT_NOT_ACTIVE:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithInlineSideEffectOperator_ShouldRejectWithoutExecuting()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, CreateSideEffectFlow(OperatorType.TextSave));
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_INLINE_SIDE_EFFECT_BLOCKED:*TextSave*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithStoredSideEffectFlow_ShouldKeepProductionExecutionAllowed()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var project = new Project("stored-side-effect-project");
+        project.UpdateFlow(CreateSideEffectFlow(OperatorType.TextSave));
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        OperatorFlow? executedFlow = null;
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedFlow = callInfo.Arg<OperatorFlow>();
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 8,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, flow: null);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        executedFlow.Should().NotBeNull();
+        executedFlow!.Operators.Should().ContainSingle(op => op.Type == OperatorType.TextSave);
+        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
     }
 
     [Fact]
@@ -211,6 +384,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -260,6 +434,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -305,6 +480,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -361,6 +537,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -421,6 +598,7 @@ public class InspectionServiceSingleRunTests
         var imageCache = Substitute.For<IImageCacheRepository>();
         var cachedImageId = Guid.NewGuid();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
         InspectionResult? persistedResult = null;
         InspectionResult? capturedEvidenceResult = null;
 
@@ -514,6 +692,7 @@ public class InspectionServiceSingleRunTests
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
         var evidenceManifest = Substitute.For<IInspectionEvidenceManifestService>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
         InspectionResult? persistedResult = null;
 
         flowExecution
@@ -579,6 +758,7 @@ public class InspectionServiceSingleRunTests
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var imageCache = Substitute.For<IImageCacheRepository>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
         InspectionResult? result = null;
 
         configurationService.GetCurrent().Returns(new AppConfig
@@ -657,6 +837,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
@@ -700,6 +881,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("camera-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         imageAcquisition
             .AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
@@ -732,7 +914,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceFlow_ShouldSkipCameraPreAcquire()
+    public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceInlineFlow_ShouldRejectBeforeExecution()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -744,13 +926,12 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateImageAcquisitionFlow("File", @"C:\images\latest.png", "stale-camera");
-        Dictionary<string, object>? executedInputs = null;
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
             .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -775,12 +956,17 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
+        var act = async () => await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedInputs.Should().NotBeNull();
-        executedInputs!.Should().NotContainKey("Image");
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_INLINE_SIDE_EFFECT_BLOCKED:*ImageAcquisition*FilePath*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
         _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     private static string FindSavedImagePath(string root, InspectionResult result, string extension)
@@ -798,6 +984,13 @@ public class InspectionServiceSingleRunTests
     {
         var flow = new OperatorFlow("test-flow");
         flow.AddOperator(new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultOutput, 0, 0));
+        return flow;
+    }
+
+    private static OperatorFlow CreateSideEffectFlow(OperatorType operatorType)
+    {
+        var flow = new OperatorFlow("side-effect-flow");
+        flow.AddOperator(new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0));
         return flow;
     }
 

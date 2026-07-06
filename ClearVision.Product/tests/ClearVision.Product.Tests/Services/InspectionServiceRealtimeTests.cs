@@ -1,6 +1,7 @@
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
@@ -106,6 +107,30 @@ public class InspectionServiceRealtimeTests
             TimeSpan.FromSeconds(2));
     }
 
+    [Fact]
+    public async Task StartRealtimeInspectionFlowAsync_WithInlineSideEffectFlow_ShouldRejectWithoutRuntimeSession()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = Substitute.For<IInspectionWorker>();
+        var service = CreateService(coordinator, worker);
+        var projectId = Guid.NewGuid();
+
+        var act = async () => await service.StartRealtimeInspectionFlowAsync(
+            projectId,
+            CreateSideEffectFlow(OperatorType.TextSave),
+            cameraId: null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_REALTIME_INLINE_SIDE_EFFECT_BLOCKED:*TextSave*");
+        coordinator.GetState(projectId).Should().BeNull();
+        await worker.DidNotReceiveWithAnyArgs().TryStartRunAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Guid>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<string?>());
+    }
+
     private static TestContext CreateContext()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -120,6 +145,7 @@ public class InspectionServiceRealtimeTests
         var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("active-realtime-project"));
         var configurationService = Substitute.For<IConfigurationService>();
         var lifetime = Substitute.For<IHostApplicationLifetime>();
         lifetime.ApplicationStopping.Returns(CancellationToken.None);
@@ -169,6 +195,7 @@ public class InspectionServiceRealtimeTests
         var imageAcquisition = Substitute.For<IImageAcquisitionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("active-realtime-project"));
         var configurationService = Substitute.For<IConfigurationService>();
         configurationService.GetCurrent().Returns(new AppConfig());
 
@@ -202,6 +229,13 @@ public class InspectionServiceRealtimeTests
 
             await Task.Delay(25);
         }
+    }
+
+    private static OperatorFlow CreateSideEffectFlow(OperatorType operatorType)
+    {
+        var flow = new OperatorFlow("side-effect-realtime-flow");
+        flow.AddOperator(new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0));
+        return flow;
     }
 
     private sealed record TestContext(

@@ -112,6 +112,19 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             _logger.LogInformation("[WebMessageHandler] 处理消息: {MessageType}", message.Type);
 
             var messageJson = ExtractCommandJson(message);
+            if (IsLegacyExecutionMessage(message.Type))
+            {
+                var admission = GetLegacyWebMessageAdmission(message.Type);
+                _logger.LogWarning(
+                    "[WebMessageHandler] Blocked legacy execution WebMessage: {MessageType}",
+                    message.Type);
+                return new WebMessageResponse
+                {
+                    RequestId = message.Id,
+                    Success = false,
+                    Error = admission.Message
+                };
+            }
 
             switch (message.Type)
             {
@@ -250,6 +263,21 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
             _logger.LogInformation("[WebMessageHandler] 收到消息: {MessageType}", messageType);
 
+            if (IsLegacyExecutionMessage(messageType))
+            {
+                var admission = GetLegacyWebMessageAdmission(messageType);
+                _logger.LogWarning(
+                    "[WebMessageHandler] Blocked legacy execution WebMessage: {MessageType}",
+                    messageType);
+                SendProgressMessage("LegacyWebMessageBlocked", new
+                {
+                    messageType,
+                    code = admission.Code,
+                    error = admission.Message
+                });
+                return;
+            }
+
             switch (messageType)
             {
                 case nameof(ExecuteOperatorCommand):
@@ -322,6 +350,35 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
+    }
+
+    private static bool IsLegacyExecutionMessage(string? messageType)
+    {
+        return string.Equals(messageType, nameof(ExecuteOperatorCommand), StringComparison.Ordinal) ||
+            string.Equals(messageType, nameof(UpdateFlowCommand), StringComparison.Ordinal) ||
+            string.Equals(messageType, nameof(StartInspectionCommand), StringComparison.Ordinal) ||
+            string.Equals(messageType, nameof(StopInspectionCommand), StringComparison.Ordinal);
+    }
+
+    private ExecutionAdmissionResult GetLegacyWebMessageAdmission(string messageType)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var admissionService = scope.ServiceProvider.GetService<IExecutionAdmissionService>();
+            if (admissionService != null)
+            {
+                return admissionService.ValidateLegacyWebMessage(messageType);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[WebMessageHandler] Failed to resolve execution admission service.");
+        }
+
+        return ExecutionAdmissionResult.Reject(
+            "ADMISSION_LEGACY_WEBMESSAGE_DISABLED",
+            $"Legacy WebMessage '{messageType}' is disabled. Use the authenticated HTTP API instead.");
     }
 
     /// <summary>
@@ -641,7 +698,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var isSaved = await calibService.SaveCalibrationAsync(result, fileName);
 
             // 发送结果回前端
-            SendProgressMessage("planar2d:save:result", new { success = isSaved });
+            SendProgressMessage("planar2d:save:result", new
+            {
+                success = isSaved,
+                message = isSaved ? "Calibration saved." : "Calibration result did not pass acceptance criteria."
+            });
         }
         catch (Exception ex)
         {

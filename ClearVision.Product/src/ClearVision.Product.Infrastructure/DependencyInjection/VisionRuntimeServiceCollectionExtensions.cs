@@ -36,6 +36,7 @@ public static class VisionRuntimeServiceCollectionExtensions
     public static IServiceCollection AddVisionRuntimeCoreServices(this IServiceCollection services)
     {
         services.AddScoped<IFlowExecutionService, FlowExecutionService>();
+        services.AddScoped<IExecutionAdmissionService, ExecutionAdmissionService>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
         services.AddSingleton<ParameterRecommender>();
         services.AddScoped<OperatorPreviewService>();

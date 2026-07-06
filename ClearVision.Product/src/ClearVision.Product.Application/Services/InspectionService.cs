@@ -47,6 +47,7 @@ public class InspectionService : IInspectionService
     private readonly IInspectionEvidenceManifestService? _evidenceManifestService;
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
+    private readonly IExecutionAdmissionService _executionAdmissionService;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -69,7 +70,8 @@ public class InspectionService : IInspectionService
         IInspectionImagePersistenceService? imagePersistenceService = null,
         ProjectVariableSessionRegistry? projectVariableSessions = null,
         ProjectSaveCoordinator? projectSaveCoordinator = null,
-        IInspectionEvidenceManifestService? evidenceManifestService = null)
+        IInspectionEvidenceManifestService? evidenceManifestService = null,
+        IExecutionAdmissionService? executionAdmissionService = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -87,6 +89,7 @@ public class InspectionService : IInspectionService
         _evidenceManifestService = evidenceManifestService;
         _projectVariableSessions = projectVariableSessions;
         _projectSaveCoordinator = projectSaveCoordinator;
+        _executionAdmissionService = executionAdmissionService ?? new ExecutionAdmissionService(projectRepository);
         _logger = logger;
     }
 
@@ -166,16 +169,24 @@ public class InspectionService : IInspectionService
 
     #region 单次检测
 
-    public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData)
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        CancellationToken cancellationToken = default)
     {
-        return await ExecuteSingleAsync(projectId, imageData, null);
+        return await ExecuteSingleAsync(projectId, imageData, null, cancellationToken);
     }
 
-    public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow)
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        OperatorFlow? flow,
+        CancellationToken cancellationToken = default)
     {
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            sessionId => ExecuteSingleCoreAsync(projectId, imageData, flow, sessionId));
+            sessionId => ExecuteSingleCoreAsync(projectId, imageData, flow, sessionId, cancellationToken),
+            cancellationToken);
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
         if (flow != null)
@@ -245,10 +256,10 @@ public class InspectionService : IInspectionService
             var analysisData = _analysisDataBuilder.Build(actualFlow, flowResult, status);
             AnalysisPayloadSerialization.TrySetOutputDataJson(result, flowResult.OutputData, _logger);
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
-            await PersistResultImageAsync(result, CancellationToken.None);
+            await PersistResultImageAsync(result, cancellationToken);
             await CacheResultImageAsync(result);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
-            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
+            await CaptureEvidenceManifestAsync(result, cancellationToken);
 
             return result;
         }
@@ -262,9 +273,12 @@ public class InspectionService : IInspectionService
 #endif
     }
 
-    public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId)
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraId,
+        CancellationToken cancellationToken = default)
     {
-        return await ExecuteSingleAsync(projectId, cameraId, null);
+        return await ExecuteSingleAsync(projectId, cameraId, null, cancellationToken);
 #if false
         try
         {
@@ -288,11 +302,16 @@ public class InspectionService : IInspectionService
 #endif
     }
 
-    public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId, OperatorFlow? flow)
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraId,
+        OperatorFlow? flow,
+        CancellationToken cancellationToken = default)
     {
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            sessionId => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow, sessionId));
+            sessionId => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow, sessionId, cancellationToken),
+            cancellationToken);
     }
 
     #endregion
@@ -308,8 +327,12 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
-        var (actualFlow, _) = await ResolveExecutionFlowAsync(projectId, flow: null);
-        await StartRealtimeInspectionFlowAsync(projectId, actualFlow, cameraId, cancellationToken, onResultReady);
+        var (actualFlow, _) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow: null,
+            ExecutionAdmissionSurface.StoredProjectExecution,
+            cancellationToken);
+        await StartRealtimeInspectionFlowCoreAsync(projectId, actualFlow, cameraId, cancellationToken, onResultReady);
     }
 
     /// <summary>
@@ -318,6 +341,23 @@ public class InspectionService : IInspectionService
     /// 2. 调用 Worker 启动后台任务
     /// </summary>
     public async Task StartRealtimeInspectionFlowAsync(
+        Guid projectId,
+        OperatorFlow flow,
+        string? cameraId,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null)
+    {
+        var inlineAdmission = await _executionAdmissionService.ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.RealtimeInlineExecution,
+            cancellationToken);
+        ThrowIfAdmissionRejected(inlineAdmission);
+
+        await StartRealtimeInspectionFlowCoreAsync(projectId, flow, cameraId, cancellationToken, onResultReady);
+    }
+
+    private async Task StartRealtimeInspectionFlowCoreAsync(
         Guid projectId,
         OperatorFlow flow,
         string? cameraId,
@@ -594,10 +634,11 @@ public class InspectionService : IInspectionService
 
     private async Task<InspectionResult> ExecuteSingleWithCoordinatorAsync(
         Guid projectId,
-        Func<Guid, Task<InspectionResult>> executeAsync)
+        Func<Guid, Task<InspectionResult>> executeAsync,
+        CancellationToken cancellationToken)
     {
         var sessionId = Guid.NewGuid();
-        var startResult = await _coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        var startResult = await _coordinator.TryStartAsync(projectId, sessionId, cancellationToken);
         if (startResult != StartResult.Success)
         {
             throw new InvalidOperationException(startResult is StartResult.AlreadyRunning or StartResult.MutationInProgress
@@ -610,6 +651,10 @@ public class InspectionService : IInspectionService
             _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
             return await executeAsync(sessionId);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _coordinator.MarkAsFaulted(projectId, sessionId, ex.Message);
@@ -621,13 +666,25 @@ public class InspectionService : IInspectionService
         }
     }
 
-    private async Task<InspectionResult> ExecuteSingleCoreAsync(Guid projectId, byte[]? imageData, OperatorFlow? flow, Guid sessionId)
+    private async Task<InspectionResult> ExecuteSingleCoreAsync(
+        Guid projectId,
+        byte[]? imageData,
+        OperatorFlow? flow,
+        Guid sessionId,
+        CancellationToken cancellationToken)
     {
-        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(projectId, flow);
+        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow,
+            HasExecutableFlow(flow)
+                ? ExecutionAdmissionSurface.InlineOfficialExecution
+                : ExecutionAdmissionSurface.StoredProjectExecution,
+            cancellationToken);
         var result = new InspectionResult(projectId);
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var executionInputs = new Dictionary<string, object>();
             if (imageData != null && imageData.Length > 0)
             {
@@ -636,8 +693,17 @@ public class InspectionService : IInspectionService
 
             var projectVariables = CreateProjectVariableContext(projectId, actualFlow, globalVariables);
             var flowResult = projectVariables == null
-                ? await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs)
-                : await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs, projectVariables);
+                ? await _flowExecutionService.ExecuteFlowAsync(
+                    actualFlow,
+                    executionInputs,
+                    enableParallel: false,
+                    cancellationToken)
+                : await _flowExecutionService.ExecuteFlowAsync(
+                    actualFlow,
+                    executionInputs,
+                    projectVariables,
+                    enableParallel: false,
+                    cancellationToken);
 
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
@@ -705,12 +771,16 @@ public class InspectionService : IInspectionService
             var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
             AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputPayload, _logger);
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
-            await PersistResultImageAsync(result, CancellationToken.None);
+            await PersistResultImageAsync(result, cancellationToken);
             await CacheResultImageAsync(result);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
-            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
+            await CaptureEvidenceManifestAsync(result, cancellationToken);
 
             return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -718,27 +788,44 @@ public class InspectionService : IInspectionService
             result.MarkAsError(ex.Message);
             result.SetTraceability(ComputeFlowVersionHash(actualFlow), null, sessionId);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
-            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
+            await CaptureEvidenceManifestAsync(result, cancellationToken);
             return result;
         }
     }
 
-    private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(Guid projectId, string cameraId, OperatorFlow? flow, Guid sessionId)
+    private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(
+        Guid projectId,
+        string cameraId,
+        OperatorFlow? flow,
+        Guid sessionId,
+        CancellationToken cancellationToken)
     {
         ImageDto? imageDto = null;
         try
         {
-            var (actualFlow, _) = await ResolveExecutionFlowAsync(projectId, flow);
+            var (actualFlow, _) = await ResolveExecutionFlowAsync(
+                projectId,
+                flow,
+                HasExecutableFlow(flow)
+                    ? ExecutionAdmissionSurface.InlineOfficialExecution
+                    : ExecutionAdmissionSurface.StoredProjectExecution,
+                cancellationToken);
             if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))
             {
                 _logger.LogInformation(
                     "[InspectionService] 图像采集算子使用本地文件输入，跳过相机预采集: ProjectId={ProjectId}, CameraId={CameraId}",
                     projectId,
                     cameraId);
-                return await ExecuteSingleCoreAsync(projectId, imageData: null, flow: actualFlow, sessionId: sessionId);
+                return await ExecuteSingleCoreAsync(
+                    projectId,
+                    imageData: null,
+                    flow: actualFlow,
+                    sessionId: sessionId,
+                    cancellationToken: cancellationToken);
             }
 
-            imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId);
+            cancellationToken.ThrowIfCancellationRequested();
+            imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId, cancellationToken);
 
             if (string.IsNullOrEmpty(imageDto.DataBase64))
             {
@@ -746,7 +833,15 @@ public class InspectionService : IInspectionService
             }
 
             var imageData = Convert.FromBase64String(imageDto.DataBase64);
-            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow, sessionId);
+            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow, sessionId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("ADMISSION", StringComparison.Ordinal))
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -754,7 +849,7 @@ public class InspectionService : IInspectionService
             result.MarkAsError($"相机采集或检测失败: {ex.Message}");
             result.SetTraceability(null, null, sessionId);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
-            await CaptureEvidenceManifestAsync(result, CancellationToken.None);
+            await CaptureEvidenceManifestAsync(result, cancellationToken);
             return result;
         }
         finally
@@ -775,15 +870,24 @@ public class InspectionService : IInspectionService
 
     private async Task<(OperatorFlow Flow, ProjectGlobalVariableSchema? GlobalVariables)> ResolveExecutionFlowAsync(
         Guid projectId,
-        OperatorFlow? flow)
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface,
+        CancellationToken cancellationToken = default)
     {
         var access = _projectSaveCoordinator == null
             ? null
-            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
         await using (access)
         {
             if (HasExecutableFlow(flow))
             {
+                var admission = await _executionAdmissionService.ValidateFlowAsync(
+                    projectId,
+                    flow,
+                    surface,
+                    cancellationToken);
+                ThrowIfAdmissionRejected(admission);
+
                 _logger.LogInformation(
                     "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
                     flow!.Operators.Count);
@@ -877,6 +981,14 @@ public class InspectionService : IInspectionService
     private static bool HasExecutableFlow(OperatorFlow? flow)
     {
         return flow?.Operators?.Count > 0;
+    }
+
+    private static void ThrowIfAdmissionRejected(ExecutionAdmissionResult admission)
+    {
+        if (!admission.IsAllowed)
+        {
+            throw new InvalidOperationException($"{admission.Code}: {admission.Message}");
+        }
     }
 
     private static InspectionJudgmentEvaluation DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)

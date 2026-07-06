@@ -559,7 +559,10 @@ public static class ApiEndpoints
     private static void MapInspectionEndpoints(IEndpointRouteBuilder app)
     {
         // 执行检测
-        app.MapPost("/api/inspection/execute", async (ExecuteInspectionRequest request, Core.Services.IInspectionService service) =>
+        app.MapPost("/api/inspection/execute", async (
+            ExecuteInspectionRequest request,
+            Core.Services.IInspectionService service,
+            CancellationToken cancellationToken) =>
         {
             try
             {
@@ -570,12 +573,20 @@ public static class ApiEndpoints
                         return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
                     }
 
-                    var result = await service.ExecuteSingleAsync(request.ProjectId, imageData, request.FlowData?.ToEntity());
+                    var result = await service.ExecuteSingleAsync(
+                        request.ProjectId,
+                        imageData,
+                        request.FlowData?.ToEntity(),
+                        cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
                 else if (!string.IsNullOrEmpty(request.CameraId))
                 {
-                    var result = await service.ExecuteSingleAsync(request.ProjectId, request.CameraId, request.FlowData?.ToEntity());
+                    var result = await service.ExecuteSingleAsync(
+                        request.ProjectId,
+                        request.CameraId,
+                        request.FlowData?.ToEntity(),
+                        cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
                 else
@@ -585,7 +596,11 @@ public static class ApiEndpoints
                     OperatorFlow? flow = request.FlowData?.ToEntity();
                     // 前端流程数据已通过日志中间件记录
 
-                    var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
+                    var result = await service.ExecuteSingleAsync(
+                        request.ProjectId,
+                        (byte[])null!,
+                        flow,
+                        cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
             }
@@ -936,7 +951,8 @@ public static class ApiEndpoints
         var separatorIndex = message.IndexOf(':', StringComparison.Ordinal);
         var candidateCode = separatorIndex > 0 ? message[..separatorIndex] : message;
         if (!candidateCode.StartsWith("GV", StringComparison.OrdinalIgnoreCase) &&
-            !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase))
+            !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase) &&
+            !candidateCode.StartsWith("ADMISSION", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

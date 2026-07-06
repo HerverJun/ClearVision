@@ -104,7 +104,7 @@ public class RuntimeMvpTests
             await File.WriteAllBytesAsync(imagePath, imageBytes);
 
             var flowExecutionService = CreateFlowExecutionService(new DeterministicJudgmentExecutor());
-            var inspectionService = CreateInspectionService(flowExecutionService);
+            var inspectionService = CreateInspectionService(flowExecutionService, project.Id);
 
             await using var runtimeHost = new RuntimeHost(
                 flowExecutionService,
@@ -1063,7 +1063,7 @@ public class RuntimeMvpTests
         throw new InvalidOperationException($"Runtime result record not found for run {result.RunId}.");
     }
 
-    private static InspectionService CreateInspectionService(IFlowExecutionService flowExecutionService)
+    private static InspectionService CreateInspectionService(IFlowExecutionService flowExecutionService, Guid projectId)
     {
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         resultRepository.AddAsync(Arg.Any<InspectionResult>())
@@ -1079,9 +1079,12 @@ public class RuntimeMvpTests
             }
         });
 
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-runtime-project"));
+
         return new InspectionService(
             resultRepository,
-            Substitute.For<IProjectRepository>(),
+            projectRepository,
             flowExecutionService,
             Substitute.For<IImageAcquisitionService>(),
             configurationService,

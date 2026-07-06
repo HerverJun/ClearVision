@@ -52,7 +52,8 @@ public class CalibrationV2IntegrationTests
     {
         var service = new PlanarScaleOffsetCalibrationService();
         var loader = new CalibrationLoaderOperator(NullLogger<CalibrationLoaderOperator>.Instance);
-        var tempFile = Path.Combine(Path.GetTempPath(), $"planar_scale_offset_v2_{Guid.NewGuid():N}.json");
+        var fileName = $"planar_scale_offset_v2_{Guid.NewGuid():N}.json";
+        var tempFile = PlanarScaleOffsetCalibrationService.ResolveCalibrationSavePath(fileName);
 
         try
         {
@@ -69,7 +70,7 @@ public class CalibrationV2IntegrationTests
                     Rmse = 0.02,
                     PointCount = 4
                 },
-                tempFile);
+                fileName);
 
             Assert.True(saved);
 

@@ -1550,7 +1550,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
-    public async Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null)
+    public async Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default)
     {
         if (!TryResolveExecutor(@operator.Type, out var executor))
         {
@@ -1567,7 +1570,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             @operator,
             executor,
             inputs ?? new Dictionary<string, object>(),
-            CancellationToken.None);
+            cancellationToken);
     }
 
     public FlowValidationResult ValidateFlow(OperatorFlow flow)

@@ -20,15 +20,18 @@ public sealed class OperatorPreviewService
 {
     private readonly IOperatorFactory _operatorFactory;
     private readonly IFlowExecutionService _flowExecutionService;
+    private readonly IExecutionAdmissionService _executionAdmissionService;
     private readonly ILogger<OperatorPreviewService> _logger;
 
     public OperatorPreviewService(
         IOperatorFactory operatorFactory,
         IFlowExecutionService flowExecutionService,
+        IExecutionAdmissionService executionAdmissionService,
         ILogger<OperatorPreviewService> logger)
     {
         _operatorFactory = operatorFactory;
         _flowExecutionService = flowExecutionService;
+        _executionAdmissionService = executionAdmissionService;
         _logger = logger;
     }
 
@@ -45,6 +48,15 @@ public sealed class OperatorPreviewService
 
         var previewOperator = _operatorFactory.CreateOperator(type, $"{type}_Preview", 0, 0);
         ApplyParameters(previewOperator, parameters);
+        var admission = _executionAdmissionService.ValidateOperator(
+            previewOperator,
+            ExecutionAdmissionSurface.OperatorPreview);
+        if (!admission.IsAllowed)
+        {
+            return OperatorPreviewResult.Failure(
+                admission.Message,
+                "OperatorPreviewSideEffectBlocked");
+        }
 
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
@@ -55,7 +67,7 @@ public sealed class OperatorPreviewService
 
         try
         {
-            execution = await _flowExecutionService.ExecuteOperatorAsync(previewOperator, inputs);
+            execution = await _flowExecutionService.ExecuteOperatorAsync(previewOperator, inputs, cancellationToken);
 
             var result = new OperatorPreviewResult
             {
@@ -389,12 +401,15 @@ public sealed class OperatorPreviewResult
 
     public string? ErrorMessage { get; set; }
 
-    public static OperatorPreviewResult Failure(string message)
+    public string? ErrorCode { get; set; }
+
+    public static OperatorPreviewResult Failure(string message, string? errorCode = null)
     {
         return new OperatorPreviewResult
         {
             IsSuccess = false,
-            ErrorMessage = message
+            ErrorMessage = message,
+            ErrorCode = errorCode
         };
     }
 }

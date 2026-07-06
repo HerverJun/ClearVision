@@ -9,7 +9,8 @@ public class PlanarScaleOffsetCalibrationServiceTests
     public async Task SaveCalibrationAsync_WithSuccessfulResult_ShouldPersistCalibrationBundleV2()
     {
         var service = new PlanarScaleOffsetCalibrationService();
-        var tempFile = Path.Combine(Path.GetTempPath(), $"planar_scale_offset_v2_{Guid.NewGuid():N}.json");
+        var fileName = $"planar_scale_offset_v2_{Guid.NewGuid():N}.json";
+        var tempFile = PlanarScaleOffsetCalibrationService.ResolveCalibrationSavePath(fileName);
 
         try
         {
@@ -26,7 +27,7 @@ public class PlanarScaleOffsetCalibrationServiceTests
                 PointCount = 4
             };
 
-            var saved = await service.SaveCalibrationAsync(result, tempFile);
+            var saved = await service.SaveCalibrationAsync(result, fileName);
             Assert.True(saved);
 
             var json = await File.ReadAllTextAsync(tempFile);
@@ -46,5 +47,45 @@ public class PlanarScaleOffsetCalibrationServiceTests
                 File.Delete(tempFile);
             }
         }
+    }
+
+    [Fact]
+    public async Task SaveCalibrationAsync_WithAbsolutePath_ShouldReject()
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+        var result = CreateAcceptedResult();
+        var absolutePath = Path.Combine(Path.GetTempPath(), $"planar_scale_offset_v2_{Guid.NewGuid():N}.json");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => service.SaveCalibrationAsync(result, absolutePath));
+        Assert.Contains("relative", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(absolutePath));
+    }
+
+    [Theory]
+    [InlineData("..\\escape.json")]
+    [InlineData("nested\\..\\..\\escape.json")]
+    public async Task SaveCalibrationAsync_WithTraversalPath_ShouldReject(string fileName)
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+        var result = CreateAcceptedResult();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => service.SaveCalibrationAsync(result, fileName));
+        Assert.Contains("ClearVision calibration directory", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static PlanarScaleOffsetCalibrationResult CreateAcceptedResult()
+    {
+        return new PlanarScaleOffsetCalibrationResult
+        {
+            Success = true,
+            OriginX = 10.0,
+            OriginY = 20.0,
+            ScaleX = 0.02,
+            ScaleY = 0.03,
+            MeanErrorX = 0.01,
+            MeanErrorY = 0.02,
+            Rmse = 0.03,
+            PointCount = 4
+        };
     }
 }

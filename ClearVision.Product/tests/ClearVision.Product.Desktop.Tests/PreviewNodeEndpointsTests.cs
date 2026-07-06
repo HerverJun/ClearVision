@@ -891,7 +891,7 @@ public class PreviewNodeEndpointsTests
                         }
                     }));
             },
-            projectRepository => projectRepository.GetByIdAsync(project.Id).Returns(project));
+            projectRepository => projectRepository.GetByIdFreshAsync(project.Id).Returns(project));
 
         using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
         {
@@ -901,6 +901,78 @@ public class PreviewNodeEndpointsTests
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithDeletedProjectAndInlineFlow_ShouldRejectBeforeExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        IFlowExecutionService? flowExecution = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            configuredFlowExecution =>
+            {
+                flowExecution = configuredFlowExecution;
+                configuredFlowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
+            },
+            projectRepository => projectRepository.GetByIdFreshAsync(projectId).Returns((Project?)null));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(CreateOperatorDto(targetNodeId, "Target", OperatorType.ResultJudgment))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().Contain("ADMISSION_PROJECT_NOT_ACTIVE");
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<DebugOptions>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithInlineSideEffectOperator_ShouldRejectBeforeDebugExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        IFlowExecutionService? flowExecution = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(configuredFlowExecution =>
+        {
+            flowExecution = configuredFlowExecution;
+            configuredFlowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(CreateOperatorDto(targetNodeId, "HttpRequest", OperatorType.HttpRequest))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<DebugOptions>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1352,7 +1424,7 @@ public class PreviewNodeEndpointsTests
                     "Acquire",
                     OperatorType.ImageAcquisition,
                     outputPorts: [acquisitionOutput],
-                    parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = "demo.png" }),
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "ProvidedFrame" }),
                 CreateOperatorDto(
                     targetNodeId,
                     "Resize",
@@ -1506,7 +1578,7 @@ public class PreviewNodeEndpointsTests
                     "Acquire",
                     OperatorType.ImageAcquisition,
                     outputPorts: [acquisitionOutput],
-                    parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = "demo.png" }),
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "ProvidedFrame" }),
                 CreateOperatorDto(
                     integerNodeId,
                     "Counter",
@@ -1581,7 +1653,7 @@ public class PreviewNodeEndpointsTests
                     "Acquire",
                     OperatorType.ImageAcquisition,
                     outputPorts: [acquisitionImageOutput],
-                    parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = "demo.png" }),
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "ProvidedFrame" }),
                 CreateOperatorDto(
                     deepLearningId,
                     "DeepLearning",
@@ -1678,7 +1750,7 @@ public class PreviewNodeEndpointsTests
                     "Acquire",
                     OperatorType.ImageAcquisition,
                     outputPorts: [acquisitionOutput],
-                    parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = "demo.png" }),
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "ProvidedFrame" }),
                 CreateOperatorDto(
                     resizeId,
                     "Resize",
@@ -2119,12 +2191,14 @@ public class PreviewNodeEndpointsTests
             var projectRepository = Substitute.For<IProjectRepository>();
             var flowStorage = Substitute.For<IProjectFlowStorage>();
             var registry = new ProjectVariableSessionRegistry();
+            projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("active-preview-project"));
             configureFlowExecution(flowExecution);
             configureProjectRepository?.Invoke(projectRepository);
             configureFlowStorage?.Invoke(flowStorage);
 
             builder.Services.AddSingleton(flowExecution);
             builder.Services.AddSingleton(projectRepository);
+            builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services.AddSingleton(flowStorage);
             builder.Services.AddSingleton(registry);
             builder.Services.AddPreviewArtifactServices();
@@ -2157,10 +2231,12 @@ public class PreviewNodeEndpointsTests
                 accessor);
             var projectRepository = Substitute.For<IProjectRepository>();
             projectRepository.GetByIdAsync(project.Id).Returns(project);
+            projectRepository.GetByIdFreshAsync(project.Id).Returns(project);
             var flowStorage = Substitute.For<IProjectFlowStorage>();
 
             builder.Services.AddSingleton<IFlowExecutionService>(flowExecution);
             builder.Services.AddSingleton(projectRepository);
+            builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services.AddSingleton(flowStorage);
             builder.Services.AddSingleton(registry);
             builder.Services.AddPreviewArtifactServices();

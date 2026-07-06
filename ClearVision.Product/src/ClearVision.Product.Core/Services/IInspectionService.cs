@@ -19,7 +19,10 @@ public interface IInspectionService
     /// <param name="projectId">工程ID</param>
     /// <param name="imageData">图像数据</param>
     /// <returns>检测结果</returns>
-    Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData);
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 执行单次检测（使用前端提供的流程数据）
@@ -28,7 +31,11 @@ public interface IInspectionService
     /// <param name="imageData">图像数据</param>
     /// <param name="flow">流程数据（含前端编辑过的参数）</param>
     /// <returns>检测结果</returns>
-    Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow);
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        OperatorFlow? flow,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 执行单次检测（使用相机采集）
@@ -36,8 +43,16 @@ public interface IInspectionService
     /// <param name="projectId">工程ID</param>
     /// <param name="cameraId">相机ID</param>
     /// <returns>检测结果</returns>
-    Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId);
-    Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId, OperatorFlow? flow);
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraId,
+        CancellationToken cancellationToken = default);
+
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraId,
+        OperatorFlow? flow,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 开始实时检测（相机驱动模式 - 兼容旧模式）

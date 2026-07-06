@@ -24,7 +24,7 @@ namespace ClearVision.Product.Desktop.Tests;
 public class WebMessageHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_UpdateFlowCommand_ShouldPersistThroughProjectService()
+    public async Task HandleAsync_UpdateFlowCommand_ShouldBlockLegacyExecutionBridge()
     {
         var operatorFactory = new OperatorFactory();
         var projectRepository = Substitute.For<IProjectRepository>();
@@ -74,10 +74,12 @@ public class WebMessageHandlerTests
                 Payload = payload
             });
 
-            response.Success.Should().BeTrue(response.Error);
+            response.Success.Should().BeFalse();
+            response.Error.Should().Contain("Legacy WebMessage");
             var savedFlow = await flowStorage.LoadFlowJsonAsync(project.Id);
-            savedFlow.Should().Contain("ResultOutput").And.Contain("MainFlow");
-            (await flowStorage.LoadMetadataAsync(project.Id))!.PersistenceRevision.Should().Be(1);
+            savedFlow.Should().BeNull();
+            (await flowStorage.LoadMetadataAsync(project.Id)).Should().BeNull();
+            await projectRepository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
         }
         finally
         {
@@ -89,7 +91,7 @@ public class WebMessageHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ExecuteOperatorCommand_ShouldResolveOperatorFromStoredFlow()
+    public async Task HandleAsync_ExecuteOperatorCommand_ShouldBlockLegacyExecutionBridge()
     {
         var operatorFactory = new OperatorFactory();
         var projectRepository = Substitute.For<IProjectRepository>();
@@ -109,7 +111,10 @@ public class WebMessageHandlerTests
         projectRepository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>(new[] { project }));
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         flowStorage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(flowDto)));
-        flowExecutionService.ExecuteOperatorAsync(Arg.Any<Operator>(), Arg.Any<Dictionary<string, object>?>())
+        flowExecutionService.ExecuteOperatorAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new OperatorExecutionResult
             {
                 OperatorId = operatorId,
@@ -142,10 +147,12 @@ public class WebMessageHandlerTests
             Payload = payload
         });
 
-        response.Success.Should().BeTrue();
-        await flowExecutionService.Received(1).ExecuteOperatorAsync(
-            Arg.Is<Operator>(op => op.Id == operatorId && op.Type == OperatorType.ResultOutput),
-            Arg.Any<Dictionary<string, object>?>());
+        response.Success.Should().BeFalse();
+        response.Error.Should().Contain("Legacy WebMessage");
+        await flowExecutionService.DidNotReceiveWithAnyArgs().ExecuteOperatorAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -164,7 +171,38 @@ public class WebMessageHandlerTests
         });
 
         response.Success.Should().BeFalse();
-        response.Error.Should().Contain("/api/inspection/realtime/stop");
+        response.Error.Should().Contain("Legacy WebMessage");
+    }
+
+    [Fact]
+    public async Task HandleAsync_StartInspectionCommand_ShouldBlockLegacyExecutionBridge()
+    {
+        var operatorFactory = new OperatorFactory();
+        var inspectionService = Substitute.For<IInspectionService>();
+
+        await using var serviceProvider = BuildServiceProvider(services =>
+        {
+            services.AddSingleton(inspectionService);
+        });
+        var handler = CreateHandler(serviceProvider, operatorFactory);
+
+        var response = await handler.HandleAsync(new WebMessage
+        {
+            Type = nameof(StartInspectionCommand),
+            Id = "req-start-inspection",
+            Payload = JsonSerializer.Serialize(new StartInspectionCommand
+            {
+                ProjectId = Guid.NewGuid(),
+                CameraId = "camera-1"
+            })
+        });
+
+        response.Success.Should().BeFalse();
+        response.Error.Should().Contain("Legacy WebMessage");
+        await inspectionService.DidNotReceiveWithAnyArgs().ExecuteSingleAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

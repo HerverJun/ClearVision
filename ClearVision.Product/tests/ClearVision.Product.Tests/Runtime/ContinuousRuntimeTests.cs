@@ -611,7 +611,10 @@ public class ContinuousRuntimeTests
             return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
         }
 
-        public Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null) => throw new NotSupportedException();
+        public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public FlowValidationResult ValidateFlow(OperatorFlow flow) => new() { IsValid = true };
         public FlowExecutionStatus? GetExecutionStatus(Guid flowId) => null;
         public Task CancelExecutionAsync(Guid flowId) => Task.CompletedTask;

@@ -55,7 +55,10 @@ public interface IFlowExecutionService
     /// <param name="operator">算子</param>
     /// <param name="inputs">输入数据</param>
     /// <returns>算子执行结果</returns>
-    Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null);
+    Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 验证流程有效性

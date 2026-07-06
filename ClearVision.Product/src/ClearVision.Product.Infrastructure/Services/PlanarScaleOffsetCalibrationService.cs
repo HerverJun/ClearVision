@@ -69,6 +69,8 @@ public interface IPlanarScaleOffsetCalibrationService
 /// </summary>
 public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibrationService
 {
+    private const string CalibrationDirectoryName = "calibration";
+
     public Task<PlanarScaleOffsetCalibrationResult> SolveAsync(List<PlanarScaleOffsetCalibrationPoint> points)
     {
         if (points == null || points.Count < 2)
@@ -163,25 +165,13 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
             return false;
         }
 
-        try
+        var fullPath = ResolveCalibrationSavePath(fileName);
+        var directoryPath = Path.GetDirectoryName(fullPath)
+            ?? throw new InvalidOperationException("Unable to resolve calibration output directory.");
+        Directory.CreateDirectory(directoryPath);
+
+        var bundle = new CalibrationBundleV2
         {
-            var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision");
-            Directory.CreateDirectory(appData);
-
-            if (!fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-            {
-                fileName += ".json";
-            }
-
-            var fullPath = Path.IsPathRooted(fileName) ? fileName : Path.Combine(appData, fileName);
-            var directoryPath = Path.GetDirectoryName(fullPath);
-            if (!string.IsNullOrWhiteSpace(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-
-            var bundle = new CalibrationBundleV2
-            {
                 CalibrationKind = CalibrationKindV2.PlanarTransform2D,
                 TransformModel = TransformModelV2.ScaleOffset,
                 SourceFrame = "image",
@@ -212,15 +202,42 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
                     }
                 },
                 ProducerOperator = nameof(PlanarScaleOffsetCalibrationService)
-            };
+        };
 
-            var json = CalibrationBundleV2Json.Serialize(bundle);
-            await File.WriteAllTextAsync(fullPath, json);
-            return true;
-        }
-        catch
+        var json = CalibrationBundleV2Json.Serialize(bundle);
+        await File.WriteAllTextAsync(fullPath, json);
+        return true;
+    }
+
+    public static string ResolveCalibrationSavePath(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
         {
-            return false;
+            throw new ArgumentException("Calibration file name is required.", nameof(fileName));
         }
+
+        var trimmedFileName = fileName.Trim();
+        if (Path.IsPathRooted(trimmedFileName))
+        {
+            throw new ArgumentException("Calibration file name must be relative.", nameof(fileName));
+        }
+
+        if (!trimmedFileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmedFileName += ".json";
+        }
+
+        var calibrationRoot = Path.GetFullPath(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ClearVision",
+            CalibrationDirectoryName));
+        var fullPath = Path.GetFullPath(Path.Combine(calibrationRoot, trimmedFileName));
+        var rootWithSeparator = Path.TrimEndingDirectorySeparator(calibrationRoot) + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Calibration file path must stay within the ClearVision calibration directory.", nameof(fileName));
+        }
+
+        return fullPath;
     }
 }
