@@ -1,3 +1,5 @@
+import { buildOperatorNodeConfig } from '../../shared/operatorVisuals.js';
+
 export const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
 export const PROPERTY_SIDEBAR_DEFAULT_WIDTH = 380;
 export const PROPERTY_SIDEBAR_MIN_WIDTH = 320;
@@ -28,6 +30,41 @@ function getParameterName(parameter) {
 
 function getParameterValue(parameter) {
     return parameter?.value ?? parameter?.Value ?? parameter?.defaultValue ?? parameter?.DefaultValue ?? null;
+}
+
+function normalizeName(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function getPortName(port) {
+    return String(port?.name ?? port?.Name ?? '').trim();
+}
+
+function getPortDataType(port) {
+    return port?.type ?? port?.Type ?? port?.dataType ?? port?.DataType ?? null;
+}
+
+function isRectanglePort(port) {
+    const dataType = getPortDataType(port);
+    return dataType === 6 || normalizeName(dataType) === 'rectangle';
+}
+
+function createRectangleRegionMetadataFallback() {
+    return {
+        type: 'RectangleRegion',
+        displayName: '矩形区域',
+        category: '几何',
+        parameters: [
+            { name: 'X', displayName: 'X', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },
+            { name: 'Y', displayName: 'Y', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },
+            { name: 'Width', displayName: 'Width', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 },
+            { name: 'Height', displayName: 'Height', dataType: 'int', value: 1, defaultValue: 1, minValue: 1 }
+        ],
+        inputPorts: [],
+        outputPorts: [
+            { name: 'Rectangle', displayName: 'Rectangle', dataType: 'Rectangle', type: 'Rectangle' }
+        ]
+    };
 }
 
 function mergeParameters(definitionParameters = [], nodeParameters = []) {
@@ -511,6 +548,163 @@ export class PropertyPanelCapabilityAdapter {
             allowCreateParameters: true,
             parameterDefinitions: snapshot?.parameters || []
         });
+    }
+
+    getCanvas() {
+        return this.flowCanvasAdapter?.raw || this.flowCanvasAdapter?.canvas || null;
+    }
+
+    findPortIndex(ports = [], portName) {
+        const normalizedPortName = normalizeName(portName);
+        return (Array.isArray(ports) ? ports : [])
+            .findIndex(port => normalizeName(getPortName(port)) === normalizedPortName);
+    }
+
+    findInputConnection(nodeId, inputPortName) {
+        const canvas = this.getCanvas();
+        const node = this.getNode(nodeId);
+        if (!canvas || !node) {
+            return null;
+        }
+
+        const targetPortIndex = this.findPortIndex(node.inputs, inputPortName);
+        if (targetPortIndex < 0) {
+            return null;
+        }
+
+        return (Array.isArray(canvas.connections) ? canvas.connections : [])
+            .find(connection => connection?.target === nodeId && Number(connection.targetPort) === targetPortIndex) || null;
+    }
+
+    getCaliperSearchRegionOperatorSnapshot(caliperNodeId) {
+        const binding = this.getCaliperSearchRegionBinding(caliperNodeId);
+        if (!binding?.sourceNode || normalizeName(binding.sourceNode.type) !== 'rectangleregion') {
+            return null;
+        }
+
+        return this.getSelectedOperatorSnapshot(binding.sourceNode.id);
+    }
+
+    getCaliperSearchRegionBinding(caliperNodeId) {
+        const canvas = this.getCanvas();
+        const caliperNode = this.getNode(caliperNodeId);
+        if (!canvas || !caliperNode || normalizeName(caliperNode.type) !== 'calipertool') {
+            return null;
+        }
+
+        const targetPortIndex = this.findPortIndex(caliperNode.inputs, 'SearchRegion');
+        if (targetPortIndex < 0) {
+            return null;
+        }
+
+        const connection = (Array.isArray(canvas.connections) ? canvas.connections : [])
+            .find(item => item?.target === caliperNodeId && Number(item.targetPort) === targetPortIndex) || null;
+        if (!connection) {
+            return {
+                caliperNode,
+                targetPortIndex,
+                connection: null,
+                sourceNode: null,
+                sourcePortIndex: -1,
+                sourcePort: null
+            };
+        }
+
+        const sourceNode = this.getNode(connection.source);
+        const sourcePortIndex = Number(connection.sourcePort);
+        const sourcePort = sourceNode?.outputs?.[sourcePortIndex] || null;
+
+        return {
+            caliperNode,
+            targetPortIndex,
+            connection,
+            sourceNode,
+            sourcePortIndex,
+            sourcePort
+        };
+    }
+
+    getRectangleRegionNodeConfig(values = {}) {
+        const metadata = this.getOperatorMetadata('RectangleRegion') || createRectangleRegionMetadataFallback();
+        const config = buildOperatorNodeConfig('RectangleRegion', metadata);
+        const valueByName = new Map(Object.entries(values).map(([name, value]) => [normalizeName(name), value]));
+        config.parameters = (config.parameters || createRectangleRegionMetadataFallback().parameters).map(parameter => {
+            const name = getParameterName(parameter);
+            if (!valueByName.has(normalizeName(name))) {
+                return parameter;
+            }
+
+            const value = valueByName.get(normalizeName(name));
+            const nextParameter = {
+                ...parameter,
+                value
+            };
+            if (Object.prototype.hasOwnProperty.call(parameter, 'Value')) {
+                nextParameter.Value = value;
+            }
+
+            return nextParameter;
+        });
+
+        return config;
+    }
+
+    upsertCaliperSearchRegion(caliperNodeId, values = {}) {
+        const binding = this.getCaliperSearchRegionBinding(caliperNodeId);
+        if (!binding?.caliperNode || binding.targetPortIndex < 0) {
+            return { updated: false, reason: 'search_region_port_not_found' };
+        }
+
+        if (binding.connection) {
+            if (normalizeName(binding.sourceNode?.type) !== 'rectangleregion' || !isRectanglePort(binding.sourcePort)) {
+                return {
+                    updated: false,
+                    reason: 'search_region_connected_to_non_rectangle_region'
+                };
+            }
+
+            const result = this.writeParameters(binding.sourceNode.id, values);
+            return {
+                ...result,
+                operator: this.getSelectedOperatorSnapshot(binding.sourceNode.id),
+                connection: binding.connection
+            };
+        }
+
+        const canvas = this.getCanvas();
+        const addNode = typeof this.flowCanvasAdapter?.addNode === 'function'
+            ? this.flowCanvasAdapter.addNode.bind(this.flowCanvasAdapter)
+            : canvas?.addNode?.bind(canvas);
+        if (!canvas || !addNode || typeof canvas.addConnection !== 'function') {
+            return { updated: false, reason: 'flow_canvas_mutation_unavailable' };
+        }
+
+        const regionNode = addNode(
+            'RectangleRegion',
+            Number(binding.caliperNode.x ?? 0) - 260,
+            Number(binding.caliperNode.y ?? 0),
+            this.getRectangleRegionNodeConfig(values));
+        if (!regionNode) {
+            return { updated: false, reason: 'rectangle_region_create_failed' };
+        }
+
+        const sourcePortIndex = (regionNode.outputs || []).findIndex(isRectanglePort);
+        if (sourcePortIndex < 0) {
+            return { updated: false, reason: 'rectangle_region_output_not_found' };
+        }
+
+        const connection = canvas.addConnection(regionNode.id, sourcePortIndex, caliperNodeId, binding.targetPortIndex);
+        if (!connection) {
+            return { updated: false, reason: 'search_region_connection_failed', operator: regionNode };
+        }
+
+        this.flowCanvasAdapter?.markFlowStructureChanged?.('caliper-search-region-upsert');
+        return {
+            updated: true,
+            reason: 'created',
+            operator: this.getSelectedOperatorSnapshot(regionNode.id),
+            connection
+        };
     }
 
     selectNode(nodeId) {

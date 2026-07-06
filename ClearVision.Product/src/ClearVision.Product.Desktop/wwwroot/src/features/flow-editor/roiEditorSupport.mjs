@@ -31,6 +31,12 @@ export const CIRCLE_SEARCH_V2_TOOL_FEATURE_ID = 'operator.circleSearchV2Tool';
 export const CIRCLE_SEARCH_V2_TOOL_STARTUP_FLAG = 'Studio:CircleSearchV2ToolEnabled';
 export const NPOINT_CALIBRATION_WORKBENCH_FEATURE_ID = 'operator.nPointCalibrationWorkbench';
 export const NPOINT_CALIBRATION_WORKBENCH_STARTUP_FLAG = 'Studio:NPointCalibrationWorkbenchEnabled';
+export const TEMPLATE_MATCHING_ROI_PARAM_KEYS = {
+    x: 'RoiX',
+    y: 'RoiY',
+    width: 'RoiWidth',
+    height: 'RoiHeight'
+};
 
 export function isCircleSearchV2ToolEnabled(options = {}) {
     const startupFlags = globalThis?.window?.__CLEARVISION_STARTUP__?.featureFlags;
@@ -97,6 +103,19 @@ function readStringValue(values, key, fallback = '') {
         : String(value);
 }
 
+function readBooleanValue(values, key, fallback = false) {
+    if (!key || !Object.prototype.hasOwnProperty.call(values || {}, key)) {
+        return fallback;
+    }
+
+    const value = values?.[key];
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    return String(value).trim().toLowerCase() === 'true';
+}
+
 function roundGeometryNumber(value, digits = 3) {
     const numberValue = Number(value);
     if (!Number.isFinite(numberValue)) {
@@ -113,6 +132,10 @@ export function geometryFromParams(values, config, bounds = null) {
     }
 
     if (adapter.kind === 'rectangle') {
+        if (adapter.enabledParamName && !readBooleanValue(values, adapter.enabledParamName, false)) {
+            return null;
+        }
+
         return {
             kind: 'rectangle',
             ...rectFromParams(values, adapter.paramKeys)
@@ -289,6 +312,35 @@ export function getOperatorRoiConfig(operator, options = {}) {
         };
     }
 
+    if (type === 'TemplateMatching') {
+        const values = readOperatorValues(operator);
+        const useRoi = readBooleanValue(values, 'UseRoi', false);
+        return {
+            supported: true,
+            editable: true,
+            shape: 'Rectangle',
+            geometryAdapter: {
+                kind: 'rectangle',
+                paramKeys: TEMPLATE_MATCHING_ROI_PARAM_KEYS,
+                enabledParamName: 'UseRoi'
+            },
+            rectParamKeys: TEMPLATE_MATCHING_ROI_PARAM_KEYS,
+            commitValues: { UseRoi: true },
+            clearValues: {
+                UseRoi: false,
+                RoiX: 0,
+                RoiY: 0,
+                RoiWidth: 0,
+                RoiHeight: 0
+            },
+            subtitle: useRoi
+                ? 'Drag the template search ROI; commit writes UseRoi / RoiX / RoiY / RoiWidth / RoiHeight.'
+                : 'Draw a template search ROI; commit enables UseRoi and writes RoiX / RoiY / RoiWidth / RoiHeight.',
+            readonlyMessage: 'TemplateMatching search ROI is editable on the search input image.',
+            description: '模板搜索 ROI 使用搜索图坐标。模板原点必须基于模板图坐标，不能在这里用搜索图点选写入 OriginX / OriginY。'
+        };
+    }
+
     if (type === 'BoxFilter') {
         const filterMode = String(readOperatorValue(operator, 'FilterMode', 'Area'));
         const editable = filterMode.toLowerCase() === 'region';
@@ -388,6 +440,19 @@ export function getOperatorRoiConfig(operator, options = {}) {
                 readonlyMessage: 'Circle Search V2 geometry requires 1 <= MinRadius <= NominalRadius <= MaxRadius.'
             };
         }
+    }
+
+    if (type === 'CaliperTool') {
+        return {
+            supported: true,
+            editable: true,
+            shape: 'Rectangle',
+            geometryAdapter: { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS },
+            rectParamKeys: DEFAULT_RECT_PARAM_KEYS,
+            subtitle: 'Draw the caliper search rectangle; commit creates or updates a RectangleRegion node connected to SearchRegion.',
+            readonlyMessage: 'CaliperTool.SearchRegion is an input port and must be modeled by a RectangleRegion connection.',
+            description: '卡尺搜索区域通过 RectangleRegion -> CaliperTool.SearchRegion 连接表达，不会给 CaliperTool 增加伪参数。'
+        };
     }
 
     return {

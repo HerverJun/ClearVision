@@ -82,6 +82,7 @@ public class OperatorMetadataMigrationTests
         var supportedCategories = new HashSet<string>
         {
             "3D",
+            "几何",
             "AI检测",
             "变量",
             "标定",

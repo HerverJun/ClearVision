@@ -165,6 +165,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, StatisticalOutlierRemovalOperator>();
         services.AddSingleton<IOperatorExecutor, RansacPlaneSegmentationOperator>();
         services.AddSingleton<IOperatorExecutor, EuclideanClusterExtractionOperator>();
+        services.AddSingleton<IOperatorExecutor, RectangleRegionOperator>();
         services.AddSingleton<IOperatorExecutor, PPFEstimationOperator>();
         services.AddSingleton<IOperatorExecutor, PPFMatchOperator>();
         services.AddSingleton<IOperatorExecutor, LawsTextureFilterOperator>();

@@ -118,6 +118,7 @@ internal static class OperatorMetadataLocalization
             [OperatorType.PyramidShapeMatch] = new("金字塔形状匹配", "匹配定位"),
             [OperatorType.QuadrilateralFind] = new("四边形查找", "定位"),
             [OperatorType.RectangleDetection] = new("矩形检测", "定位"),
+            [OperatorType.RectangleRegion] = new("矩形区域", "几何"),
             [OperatorType.RegionClosing] = new("区域闭运算", "区域处理"),
             [OperatorType.RegionComplement] = new("区域补集", "区域处理"),
             [OperatorType.RegionDifference] = new("区域差集", "区域处理"),

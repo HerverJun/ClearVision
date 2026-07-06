@@ -6,6 +6,12 @@ import {
     getParameterEffectiveState,
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
+import RoiEditorPanel from './roiEditorPanel.js';
+import {
+    getOperatorRoiConfig,
+    isCircleSearchV2ToolEnabled,
+    isNPointCalibrationWorkbenchEnabled
+} from './roiEditorSupport.mjs';
 
 export const PROPERTY_PANEL_CAPABILITY_OWNER_ID = 'property-panel-capability-v2';
 
@@ -170,7 +176,12 @@ function getFormValue(input) {
 export class PropertyPanelCapabilityOwner {
     constructor(container, {
         propertyAdapter,
-        showToast = () => {}
+        showToast = () => {},
+        previewCoordinator = null,
+        previewResourcesEnabled = true,
+        onOpenPreviewImage = () => {},
+        circleSearchV2ToolEnabled = undefined,
+        nPointCalibrationWorkbenchEnabled = undefined
     } = {}) {
         this.container = resolveElement(container);
         if (!this.container) {
@@ -182,6 +193,13 @@ export class PropertyPanelCapabilityOwner {
 
         this.propertyAdapter = propertyAdapter;
         this.showToast = typeof showToast === 'function' ? showToast : () => {};
+        this.previewCoordinator = previewCoordinator;
+        this.previewResourcesEnabled = previewResourcesEnabled !== false;
+        this.onOpenPreviewImage = typeof onOpenPreviewImage === 'function'
+            ? onOpenPreviewImage
+            : () => {};
+        this.circleSearchV2ToolEnabled = circleSearchV2ToolEnabled;
+        this.nPointCalibrationWorkbenchEnabled = nPointCalibrationWorkbenchEnabled;
         this.currentOperator = null;
         this.currentNodeId = null;
         this.currentConnection = null;
@@ -193,6 +211,8 @@ export class PropertyPanelCapabilityOwner {
         this.unsubscribes = [];
         this.cameraBindingsCache = [];
         this.cameraBindingsLoadingPromise = null;
+        this.roiEditorPanel = null;
+        this.geometryImageBounds = null;
 
         this.handleContainerChange = this.handleContainerChange.bind(this);
         this.handleContainerClick = this.handleContainerClick.bind(this);
@@ -275,8 +295,21 @@ export class PropertyPanelCapabilityOwner {
     }
 
     handleContainerClick(event) {
+        if (this.disposed) {
+            return;
+        }
+
+        const clearRoiButton = event.target?.closest?.('[data-property-geometry-clear-roi]');
+        if (clearRoiButton) {
+            event.preventDefault();
+            if (!clearRoiButton.disabled) {
+                this.handleGeometryClearRoi();
+            }
+            return;
+        }
+
         const button = event.target?.closest?.('.btn-pick-file');
-        if (!button || this.disposed) {
+        if (!button) {
             return;
         }
 
@@ -668,6 +701,7 @@ export class PropertyPanelCapabilityOwner {
     }
 
     clear() {
+        this.teardownGeometryEditor();
         this.currentOperator = null;
         this.currentNodeId = null;
         this.currentConnection = null;
@@ -694,6 +728,242 @@ export class PropertyPanelCapabilityOwner {
         });
 
         return values;
+    }
+
+    isCircleSearchV2ToolFeatureEnabled() {
+        return isCircleSearchV2ToolEnabled({
+            circleSearchV2ToolEnabled: this.circleSearchV2ToolEnabled
+        });
+    }
+
+    isNPointCalibrationWorkbenchFeatureEnabled() {
+        return isNPointCalibrationWorkbenchEnabled({
+            nPointCalibrationWorkbenchEnabled: this.nPointCalibrationWorkbenchEnabled
+        });
+    }
+
+    getGeometryEditorOptions() {
+        return {
+            circleSearchV2ToolEnabled: this.isCircleSearchV2ToolFeatureEnabled(),
+            nPointCalibrationWorkbenchEnabled: this.isNPointCalibrationWorkbenchFeatureEnabled()
+        };
+    }
+
+    getGeometryConfig(operator = this.currentOperator) {
+        return getOperatorRoiConfig(operator, this.getGeometryEditorOptions());
+    }
+
+    getCurrentOperatorType() {
+        return String(this.currentOperator?.type || this.currentOperator?.operatorType || '').trim();
+    }
+
+    isCaliperToolOperator() {
+        return this.getCurrentOperatorType() === 'CaliperTool';
+    }
+
+    getGeometryEditorOperator() {
+        if (!this.isCaliperToolOperator() || !this.currentNodeId) {
+            return this.currentOperator;
+        }
+
+        return this.propertyAdapter.getCaliperSearchRegionOperatorSnapshot?.(this.currentNodeId) ||
+            this.currentOperator;
+    }
+
+    buildGeometryWriteValues(values = {}) {
+        const config = this.getGeometryConfig();
+        return {
+            ...(config?.commitValues || {}),
+            ...values
+        };
+    }
+
+    writeInputValue(input, rawValue) {
+        const type = String(input.dataset.type || '').toLowerCase();
+        if (type === 'boolean' || type === 'bool') {
+            input.checked = toBoolean(rawValue);
+            return;
+        }
+
+        input.value = rawValue ?? '';
+
+        const slider = input.parentElement?.querySelector('.param-slider');
+        if (slider) {
+            slider.value = input.value;
+        }
+
+        if (input.type === 'color') {
+            const wrapper = input.closest('.color-picker-wrapper');
+            const preview = wrapper?.querySelector('.color-preview-box');
+            const valueText = wrapper?.querySelector('.color-value');
+            if (preview) {
+                preview.style.backgroundColor = input.value;
+            }
+            if (valueText) {
+                valueText.textContent = input.value;
+            }
+        }
+    }
+
+    applyValuesToForm(values = {}) {
+        Object.entries(values).forEach(([name, value]) => {
+            const input = this.findParamInput(name);
+            if (input) {
+                this.writeInputValue(input, value);
+            }
+        });
+    }
+
+    handleGeometryChanged(values = {}, phase = 'dragging') {
+        if (!this.currentNodeId || !this.currentOperator || this.disposed) {
+            return;
+        }
+
+        const writeValues = this.buildGeometryWriteValues(values);
+        this.applyValuesToForm(writeValues);
+
+        if (phase !== 'commit') {
+            this.statusMessage = '图上几何拖动中，松开后写回参数';
+            this.updateStatus();
+            return;
+        }
+
+        if (this.isCaliperToolOperator()) {
+            const result = this.propertyAdapter.upsertCaliperSearchRegion?.(this.currentNodeId, writeValues);
+            this.statusMessage = result?.updated === false
+                ? '卡尺搜索区域未变更'
+                : '卡尺搜索区域已通过 RectangleRegion 连接更新';
+            this.dirty = result?.updated !== false;
+            this.updateStatus();
+            if (result?.operator) {
+                this.roiEditorPanel?.refreshFromOperator?.({ forceSyncOverlay: true });
+            }
+            return;
+        }
+
+        const result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        if (result?.reason === 'node_not_found') {
+            this.currentOperator = null;
+            this.currentNodeId = null;
+            this.render();
+            return;
+        }
+
+        Object.entries(writeValues).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
+        this.validationErrors = [];
+        this.statusMessage = '图上几何已写回参数';
+        this.lastChangedParameterName = null;
+        this.dirty = result?.updated === true;
+        this.renderValidationErrors();
+        this.updateStatus();
+    }
+
+    handleGeometryImageBoundsChanged(bounds) {
+        this.geometryImageBounds = bounds &&
+            Number.isFinite(Number(bounds.width)) &&
+            Number.isFinite(Number(bounds.height)) &&
+            Number(bounds.width) > 0 &&
+            Number(bounds.height) > 0
+            ? { width: Number(bounds.width), height: Number(bounds.height) }
+            : null;
+    }
+
+    syncGeometryEditorFromParams() {
+        this.roiEditorPanel?.refreshFromOperator?.({ forceSyncOverlay: true });
+    }
+
+    handleGeometryClearRoi() {
+        if (!this.currentNodeId || !this.currentOperator) {
+            return;
+        }
+
+        const config = this.getGeometryConfig();
+        const values = config?.clearValues || null;
+        if (!values) {
+            return;
+        }
+
+        const result = this.propertyAdapter.writeParameters(this.currentNodeId, values);
+        if (result?.reason === 'node_not_found') {
+            this.currentOperator = null;
+            this.currentNodeId = null;
+            this.render();
+            return;
+        }
+
+        this.applyValuesToForm(values);
+        Object.entries(values).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
+        this.statusMessage = '搜索 ROI 已清除';
+        this.dirty = result?.updated === true;
+        this.updateStatus();
+        this.syncGeometryEditorFromParams();
+    }
+
+    teardownGeometryEditor() {
+        if (!this.roiEditorPanel) {
+            return;
+        }
+
+        this.roiEditorPanel.destroy?.();
+        this.roiEditorPanel = null;
+    }
+
+    initGeometryEditor() {
+        this.teardownGeometryEditor();
+
+        if (!this.currentOperator || this.currentConnection) {
+            return;
+        }
+
+        const config = this.getGeometryConfig();
+        if (!config?.supported) {
+            return;
+        }
+
+        const container = this.container.querySelector('[data-property-geometry-editor-container]');
+        if (!container) {
+            return;
+        }
+
+        this.roiEditorPanel = new RoiEditorPanel(container, {
+            getOperator: () => this.getGeometryEditorOperator(),
+            getRoiConfig: operator => {
+                if (this.isCaliperToolOperator()) {
+                    return this.getGeometryConfig(this.currentOperator);
+                }
+
+                return getOperatorRoiConfig(operator, this.getGeometryEditorOptions());
+            },
+            previewCoordinator: this.previewCoordinator,
+            previewResourcesEnabled: this.previewResourcesEnabled,
+            onOpenPreviewImage: this.onOpenPreviewImage,
+            onRectChanged: (values, phase) => this.handleGeometryChanged(values, phase),
+            onImageBoundsChanged: bounds => this.handleGeometryImageBoundsChanged(bounds),
+            onRequestSyncFromParams: () => this.syncGeometryEditorFromParams()
+        });
+    }
+
+    renderGeometrySection(config) {
+        if (!config?.supported) {
+            return '';
+        }
+
+        return `
+            <section class="property-summary-section property-geometry-section" data-property-geometry-section="true">
+                <div class="property-geometry-header">
+                    <h5>图上几何</h5>
+                    ${config.clearValues ? `
+                        <button type="button"
+                                class="btn btn-secondary btn-sm"
+                                data-property-geometry-clear-roi="true">
+                            清除 ROI
+                        </button>
+                    ` : ''}
+                </div>
+                ${config.description ? `<p class="property-geometry-description">${escapeHtml(config.description)}</p>` : ''}
+                <div data-property-geometry-editor-container></div>
+            </section>
+        `;
     }
 
     validateValues(values) {
@@ -859,6 +1129,8 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
+        this.teardownGeometryEditor();
+
         if (!this.currentOperator) {
             if (this.currentConnection) {
                 this.renderConnectionSummary();
@@ -880,6 +1152,7 @@ export class PropertyPanelCapabilityOwner {
         const type = operator.type || '';
         const typeDisplay = getOperatorTypeDisplayName(type, { includeType: true }) || type;
         const parameters = Array.isArray(operator.parameters) ? operator.parameters : [];
+        const geometryConfig = this.getGeometryConfig(operator);
 
         this.container.innerHTML = `
             <section class="property-capability-owner" data-owner="${PROPERTY_PANEL_CAPABILITY_OWNER_ID}">
@@ -904,6 +1177,7 @@ export class PropertyPanelCapabilityOwner {
                             </div>
                         </dl>
                     </section>
+                    ${this.renderGeometrySection(geometryConfig)}
                     <section class="property-summary-section">
                         <h5>参数</h5>
                         ${parameters.length === 0
@@ -923,6 +1197,7 @@ export class PropertyPanelCapabilityOwner {
         this.syncImageAcquisitionSourceControls();
         void this.loadCameraBindingsForSelects();
         this.updateStatus();
+        this.initGeometryEditor();
     }
 
     renderConnectionSummary() {
@@ -1167,6 +1442,7 @@ export class PropertyPanelCapabilityOwner {
         this.container.removeEventListener('click', this.handleContainerClick);
         this.container.removeEventListener('input', this.handleContainerInput);
         this.container.removeEventListener('submit', this.handleContainerSubmit);
+        this.teardownGeometryEditor();
         delete this.container.dataset.propertyPanelOwner;
         this.container.innerHTML = '';
         this.currentOperator = null;

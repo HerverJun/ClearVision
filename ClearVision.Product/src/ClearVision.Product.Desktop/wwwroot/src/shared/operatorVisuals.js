@@ -144,6 +144,7 @@ position|PositionCorrection
 ppf|PPFEstimation
 quadrilateral|QuadrilateralFind
 rectangle|RectangleDetection
+rectangle-region|RectangleRegion
 region-closing|RegionClosing
 region-complement|RegionComplement
 region-difference|RegionDifference
@@ -315,6 +316,7 @@ PyramidShapeMatch|M12 2L1 21h22L12 2zm0 3.83l7.65 13.17H4.35L12 5.83z M6.8 12h10
 QuadrilateralFind|M4.5 4.5l11-2 4 13-14 3-1-14z M3 3c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm12.5-2c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm4.5 13c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zM4 19c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z M10 10l4 4m0-4l-4 4
 RansacPlaneSegmentation|M3 15l9-4 9 4-9 4-9-4zm9-10l6 3-6 3-6-3 6-3zm-5 11v2l5 2 5-2v-2l-5 2-5-2z
 RectangleDetection|M3 5v14h18V5H3zm16 12H5V7h14v10z M8 10h8v4H8v-4z M12 8v2 M12 14v2 M8 12h2 M14 12h2 M7 9h2v2H7z M15 13h2v2h-2z
+RectangleRegion|M4 5h16v14H4V5zm2 2v10h12V7H6zm2 2h8v6H8V9zm-5 1h2v2H3v-2zm16 0h2v2h-2v-2z
 RegionClosing|M6 12a6 6 0 0 1 6-6c2.21 0 4.14 1.2 5.18 3H21l-4 4-4-4h2.18A4 4 0 1 0 16 15.46l1.41 1.41A5.96 5.96 0 0 1 12 18a6 6 0 0 1-6-6z
 RegionComplement|M4 4h16v16H4V4zm4 4v8h8V8H8zm-3 3h2v2H5v-2zm12 0h2v2h-2v-2z
 RegionDifference|M4 6h8v12H4V6zm8 0h8v12h-8V6zm-2 2v8h4V8h-4z
@@ -424,6 +426,7 @@ Measurement|#2f54eb
 ModbusCommunication|#13c2c2
 Morphology|#fa8c16
 ResultOutput|#595959
+RectangleRegion|#14b8a6
 RoiManager|#1890ff
 SerialCommunication|#13c2c2
 ShapeMatching|#52c41a
@@ -456,6 +459,7 @@ Texture|#8b5cf6
 颜色处理|#fa541c
 变量|#597ef7
 图像处理|#1890ff
+几何|#14b8a6
 定位|#40a9ff
 辅助|#8c8c8c
 控制|#faad14

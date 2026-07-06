@@ -1635,6 +1635,11 @@ function createPropertyPanelCapabilityOwner() {
 
     const owner = new PropertyPanelCapabilityOwner('property-panel', {
         propertyAdapter: propertyPanelCapabilityAdapter,
+        previewCoordinator: nodePreviewCoordinator,
+        previewResourcesEnabled: !isPreviewPanelCapabilityEnabled(),
+        onOpenPreviewImage: openImageViewerFromPreview,
+        circleSearchV2ToolEnabled: readStartupFeatureFlagOnce('Studio:CircleSearchV2ToolEnabled'),
+        nPointCalibrationWorkbenchEnabled: readStartupFeatureFlagOnce('Studio:NPointCalibrationWorkbenchEnabled'),
         showToast
     });
 

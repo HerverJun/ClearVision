@@ -169,6 +169,33 @@
     margin-bottom: 0;
 }
 
+.property-geometry-section {
+    display: block;
+}
+
+.property-geometry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.property-geometry-header h5 {
+    margin: 0;
+}
+
+.property-geometry-description {
+    margin: 0 0 10px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+html[data-theme="dark"] .property-geometry-description {
+    color: var(--text-secondary);
+}
+
 /* ROI Editor -------------------------------------------------------------- */
 .roi-editor-panel {
     margin-bottom: 14px;

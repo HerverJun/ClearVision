@@ -73,6 +73,7 @@ import {
   validateRectangleGeometry
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/roiGeometry.mjs';
 import {
+  TEMPLATE_MATCHING_ROI_PARAM_KEYS,
   geometryFromParams,
   geometryToParams,
   getOperatorRoiConfig
@@ -647,6 +648,65 @@ test('point sequence adapter preserves order enabled state and legacy PointPairs
     kind: 'pointSequence',
     points: [{ x: 8, y: 9 }]
   }).valid, false);
+});
+
+test('TemplateMatching search ROI adapter writes only search ROI parameters', () => {
+  const config = getOperatorRoiConfig({
+    type: 'TemplateMatching',
+    parameters: [
+      { name: 'UseRoi', value: false },
+      { name: 'RoiX', value: 10 },
+      { name: 'RoiY', value: 20 },
+      { name: 'RoiWidth', value: 30 },
+      { name: 'RoiHeight', value: 40 },
+      { name: 'OriginX', value: 6 },
+      { name: 'OriginY', value: 7 }
+    ]
+  });
+
+  assert.equal(config.supported, true);
+  assert.equal(config.editable, true);
+  assert.deepEqual(config.geometryAdapter.paramKeys, TEMPLATE_MATCHING_ROI_PARAM_KEYS);
+  assert.equal(
+    geometryFromParams({
+      UseRoi: false,
+      RoiX: 10,
+      RoiY: 20,
+      RoiWidth: 30,
+      RoiHeight: 40
+    }, config, { width: 128, height: 128 }),
+    null
+  );
+  assert.deepEqual(geometryToParams({ kind: 'rectangle', x: 4, y: 5, width: 20, height: 16 }, config), {
+    RoiX: 4,
+    RoiY: 5,
+    RoiWidth: 20,
+    RoiHeight: 16
+  });
+  assert.deepEqual(config.commitValues, { UseRoi: true });
+  assert.deepEqual(config.clearValues, {
+    UseRoi: false,
+    RoiX: 0,
+    RoiY: 0,
+    RoiWidth: 0,
+    RoiHeight: 0
+  });
+  assert.match(config.description, /OriginX \/ OriginY/);
+});
+
+test('CaliperTool ROI config is backed by a RectangleRegion SearchRegion connection', () => {
+  const config = getOperatorRoiConfig({
+    type: 'CaliperTool',
+    parameters: []
+  });
+
+  assert.equal(config.supported, true);
+  assert.equal(config.editable, true);
+  assert.equal(config.shape, 'Rectangle');
+  assert.deepEqual(config.geometryAdapter.paramKeys, DEFAULT_RECT_PARAM_KEYS);
+  assert.match(config.subtitle, /RectangleRegion/);
+  assert.match(config.subtitle, /SearchRegion/);
+  assert.match(config.readonlyMessage, /CaliperTool\.SearchRegion/);
 });
 
 test('rectFromParams supports BoxFilter region parameter names', () => {

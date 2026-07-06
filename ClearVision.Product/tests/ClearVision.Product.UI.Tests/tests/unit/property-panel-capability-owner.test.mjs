@@ -101,6 +101,150 @@ test('PropertyPanelCapabilityAdapter projects selected node metadata and writes 
   assert.equal(writeCalls[0].options.parameterDefinitions.length, 3);
 });
 
+test('PropertyPanelCapabilityAdapter creates and reuses RectangleRegion for Caliper SearchRegion', () => {
+  const connections = [];
+  const addNodeCalls = [];
+  const patchCalls = [];
+  const structureReasons = [];
+  const nodes = new Map([
+    ['caliper-1', {
+      id: 'caliper-1',
+      type: 'CaliperTool',
+      title: 'Caliper A',
+      x: 400,
+      y: 120,
+      inputs: [
+        { name: 'Image', dataType: 'Image' },
+        { name: 'SearchRegion', dataType: 'Rectangle' }
+      ],
+      outputs: [],
+      parameters: []
+    }]
+  ]);
+  const canvas = {
+    connections,
+    addConnection(source, sourcePort, target, targetPort) {
+      const connection = {
+        id: `conn-${connections.length + 1}`,
+        source,
+        sourcePort,
+        target,
+        targetPort
+      };
+      connections.push(connection);
+      return connection;
+    }
+  };
+  const fakeFlowCanvasAdapter = {
+    selectedNode: 'caliper-1',
+    nodes,
+    raw: canvas,
+    addNode(type, x, y, config) {
+      const node = {
+        id: `region-${addNodeCalls.length + 1}`,
+        type,
+        title: config.title,
+        x,
+        y,
+        inputs: config.inputs,
+        outputs: config.outputs,
+        parameters: config.parameters
+      };
+      nodes.set(node.id, node);
+      addNodeCalls.push({ type, x, y, config, node });
+      return node;
+    },
+    patchNodeParameters(nodeId, values, options) {
+      const node = nodes.get(nodeId);
+      patchCalls.push({ nodeId, values, options });
+      for (const [name, value] of Object.entries(values)) {
+        const parameter = node.parameters.find(item => item.name === name);
+        if (parameter) {
+          parameter.value = value;
+        } else {
+          node.parameters.push({ name, value, dataType: 'int' });
+        }
+      }
+      return { updated: true, reason: 'updated', missingParameters: [] };
+    },
+    markFlowStructureChanged(reason) {
+      structureReasons.push(reason);
+    }
+  };
+  const propertyAdapter = createPropertyPanelCapabilityAdapter({
+    flowCanvasAdapter: fakeFlowCanvasAdapter,
+    getOperatorMetadata(type) {
+      if (type === 'RectangleRegion') {
+        return {
+          displayName: 'Rectangle Region',
+          parameters: [
+            { name: 'X', dataType: 'int', value: 0 },
+            { name: 'Y', dataType: 'int', value: 0 },
+            { name: 'Width', dataType: 'int', value: 1 },
+            { name: 'Height', dataType: 'int', value: 1 }
+          ],
+          inputPorts: [],
+          outputPorts: [
+            { name: 'Rectangle', dataType: 'Rectangle' }
+          ]
+        };
+      }
+
+      return null;
+    }
+  });
+
+  const created = propertyAdapter.upsertCaliperSearchRegion('caliper-1', {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  });
+
+  assert.equal(created.updated, true);
+  assert.equal(created.reason, 'created');
+  assert.equal(addNodeCalls.length, 1);
+  assert.equal(addNodeCalls[0].type, 'RectangleRegion');
+  assert.equal(addNodeCalls[0].x, 140);
+  assert.equal(addNodeCalls[0].y, 120);
+  assert.deepEqual(connections[0], {
+    id: 'conn-1',
+    source: 'region-1',
+    sourcePort: 0,
+    target: 'caliper-1',
+    targetPort: 1
+  });
+  assert.deepEqual(
+    created.operator.parameters.map(parameter => [parameter.name, parameter.value]),
+    [
+      ['X', 10],
+      ['Y', 12],
+      ['Width', 30],
+      ['Height', 16]
+    ]
+  );
+  assert.deepEqual(structureReasons, ['caliper-search-region-upsert']);
+
+  const reused = propertyAdapter.upsertCaliperSearchRegion('caliper-1', {
+    X: 11,
+    Y: 13,
+    Width: 31,
+    Height: 17
+  });
+
+  assert.equal(reused.updated, true);
+  assert.equal(addNodeCalls.length, 1);
+  assert.equal(patchCalls.length, 1);
+  assert.equal(patchCalls[0].nodeId, 'region-1');
+  assert.deepEqual(patchCalls[0].values, {
+    X: 11,
+    Y: 13,
+    Width: 31,
+    Height: 17
+  });
+  assert.equal(propertyAdapter.getCaliperSearchRegionBinding('caliper-1').sourceNode.id, 'region-1');
+});
+
 test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface', () => {
   const panelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
 
@@ -139,7 +283,15 @@ test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () 
     'syncImageAcquisitionSourceControls',
     "httpClient.get('/cameras/bindings')",
     'param-slider',
-    'form-color-hidden'
+    'form-color-hidden',
+    'RoiEditorPanel',
+    'getOperatorRoiConfig',
+    'previewCoordinator',
+    'previewResourcesEnabled',
+    'onOpenPreviewImage',
+    'data-property-geometry-editor-container',
+    'property-geometry-section',
+    'upsertCaliperSearchRegion'
   ]) {
     assert.match(ownerSource, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
@@ -149,6 +301,8 @@ test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () 
   assert.match(ownerSource, /webMessageBridge\.sendMessage\('PickFileCommand'/);
   assert.match(ownerSource, /webMessageBridge\.on\('FilePickedEvent'/);
   assert.match(ownerSource, /normalizeParameterName\(parameterName\) === 'filepath'/);
+  assert.match(ownerSource, /this\.propertyAdapter\.writeParameters\(this\.currentNodeId, writeValues\)/);
+  assert.match(ownerSource, /this\.propertyAdapter\.upsertCaliperSearchRegion\?\.\(this\.currentNodeId, writeValues\)/);
 });
 
 test('all backend operator parameter types are covered by migrated Inspector controls', () => {
@@ -180,7 +334,11 @@ test('app composition root uses PropertyPanelCapabilityOwner with legacy Propert
   assert.match(appSource, /serviceRegistry\.register\('propertyPanelCapabilityOwner'/);
   assert.match(appSource, /createPropertyPanelCapabilityAdapter/);
   assert.match(appSource, /previewPanelEnabled:\s*ownsPreviewSidebar/);
+  assert.match(appSource, /previewCoordinator:\s*nodePreviewCoordinator/);
   assert.match(appSource, /previewResourcesEnabled:\s*!isPreviewPanelCapabilityEnabled\(\)/);
+  assert.match(appSource, /onOpenPreviewImage:\s*openImageViewerFromPreview/);
+  assert.match(appSource, /circleSearchV2ToolEnabled:\s*readStartupFeatureFlagOnce\('Studio:CircleSearchV2ToolEnabled'\)/);
+  assert.match(appSource, /nPointCalibrationWorkbenchEnabled:\s*readStartupFeatureFlagOnce\('Studio:NPointCalibrationWorkbenchEnabled'\)/);
   assert.match(appSource, /auxiliaryWorkbenchesEnabled/);
   assert.match(appSource, /panel\.setConnection/);
   assert.doesNotMatch(appSource, /import\s+\{\s*PropertyPanel\s*\}\s+from\s+'\.\/features\/flow-editor\/propertyPanel\.js'/);

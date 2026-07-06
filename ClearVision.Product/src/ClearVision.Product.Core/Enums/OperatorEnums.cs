@@ -305,6 +305,8 @@ public enum OperatorType
 
     MinEnclosingGeometry = 236,
 
+    RectangleRegion = 237,
+
     // Phase 4.2: Region Processing and Measurement
     RegionErosion = 240,
 
