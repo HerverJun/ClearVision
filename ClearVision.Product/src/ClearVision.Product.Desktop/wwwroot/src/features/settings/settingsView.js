@@ -20,18 +20,7 @@ export class SettingsView {
         this.cameraBindings = [];
         this.selectedCameraBindingId = null;
         
-        // 尝试从本地存储或全局对象中获取当前用户信息
-        const storedUser = localStorage.getItem('cv_current_user');
-        let parsedStoredUser = {};
-        if (storedUser) {
-            try {
-                parsedStoredUser = JSON.parse(storedUser) || {};
-            } catch {
-                localStorage.removeItem('cv_current_user');
-            }
-        }
-
-        const currentUser = window.currentUser || parsedStoredUser;
+        const currentUser = window.currentUser || {};
         this.currentUser = currentUser || {};
         this.isAdmin = currentUser?.role === 'Admin';
         

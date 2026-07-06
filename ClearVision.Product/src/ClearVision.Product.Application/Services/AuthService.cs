@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -23,7 +24,7 @@ public class AuthService : IAuthService
     private readonly IConfigurationService _configurationService;
     private readonly ILogger<AuthService> _logger;
 
-    private static readonly Dictionary<string, UserSession> _sessions = new();
+    private static readonly Dictionary<string, SessionRecord> _sessions = new();
     private static readonly Dictionary<string, LoginFailureState> _loginFailures = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _lock = new();
     private static readonly SemaphoreSlim _initialAdminSetupGate = new(1, 1);
@@ -106,9 +107,12 @@ public class AuthService : IAuthService
             ExpiresAt = utcNow.Add(ResolveSessionTimeout())
         };
 
+        var passwordFingerprint = ComputePasswordFingerprint(user.PasswordHash);
+
         lock (_lock)
         {
-            _sessions[token] = session;
+            CleanExpiredSessionsLocked(utcNow);
+            _sessions[token] = new SessionRecord(session, passwordFingerprint);
         }
 
         _logger.LogInformation("[AuthService] Login success: {Username}", normalizedUsername);
@@ -133,56 +137,72 @@ public class AuthService : IAuthService
         return Task.CompletedTask;
     }
 
-    public Task<bool> ValidateTokenAsync(string token)
+    public async Task<bool> ValidateTokenAsync(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
-            return Task.FromResult(false);
+            return false;
         }
 
-        var utcNow = UtcNowProvider();
-
-        lock (_lock)
-        {
-            if (_sessions.TryGetValue(token, out var session))
-            {
-                if (session.IsExpiredAt(utcNow))
-                {
-                    _sessions.Remove(token);
-                    return Task.FromResult(false);
-                }
-
-                return Task.FromResult(true);
-            }
-        }
-
-        return Task.FromResult(false);
+        return await GetSessionAsync(token) != null;
     }
 
-    public Task<UserSession?> GetSessionAsync(string token)
+    public async Task<UserSession?> GetSessionAsync(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
-            return Task.FromResult<UserSession?>(null);
+            return null;
         }
 
         var utcNow = UtcNowProvider();
+        SessionRecord record;
 
         lock (_lock)
         {
-            if (_sessions.TryGetValue(token, out var session))
+            CleanExpiredSessionsLocked(utcNow);
+            if (!_sessions.TryGetValue(token, out record!))
             {
-                if (session.IsExpiredAt(utcNow))
-                {
-                    _sessions.Remove(token);
-                    return Task.FromResult<UserSession?>(null);
-                }
-
-                return Task.FromResult<UserSession?>(session);
+                return null;
             }
         }
 
-        return Task.FromResult<UserSession?>(null);
+        if (!Guid.TryParse(record.Session.UserId, out var userId))
+        {
+            RemoveSession(token);
+            return null;
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null || !user.IsActive)
+        {
+            RemoveSession(token);
+            return null;
+        }
+
+        var currentFingerprint = ComputePasswordFingerprint(user.PasswordHash);
+        if (!string.Equals(record.PasswordFingerprint, currentFingerprint, StringComparison.Ordinal))
+        {
+            RemoveSession(token);
+            return null;
+        }
+
+        var refreshed = new UserSession
+        {
+            UserId = user.Id.ToString(),
+            Username = user.Username,
+            Role = user.Role.ToString(),
+            ExpiresAt = record.Session.ExpiresAt
+        };
+
+        lock (_lock)
+        {
+            if (_sessions.TryGetValue(token, out var current) && ReferenceEquals(current, record))
+            {
+                _sessions[token] = record with { Session = refreshed };
+            }
+        }
+
+        return refreshed;
     }
 
     public async Task<AuthResult> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
@@ -218,6 +238,7 @@ public class AuthService : IAuthService
         var newHash = _passwordHasher.HashPassword(newPassword);
         user.ChangePassword(newHash);
         await _userRepository.UpdateAsync(user);
+        RevokeSessionsForUser(user.Id.ToString());
         _logger.LogInformation("[AuthService] Password changed: {UserId}", userId);
 
         return AuthResult.Ok(string.Empty, MapToDto(user));
@@ -306,6 +327,14 @@ public class AuthService : IAuthService
         }
     }
 
+    public static int GetInMemorySessionCountForTests()
+    {
+        lock (_lock)
+        {
+            return _sessions.Count;
+        }
+    }
+
     private static string GenerateToken()
     {
         var tokenBytes = RandomNumberGenerator.GetBytes(SessionTokenByteLength);
@@ -313,6 +342,45 @@ public class AuthService : IAuthService
             .TrimEnd('=')
             .Replace('+', '-')
             .Replace('/', '_');
+    }
+
+    private static string ComputePasswordFingerprint(string passwordHash)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(passwordHash ?? string.Empty));
+        return Convert.ToHexString(bytes);
+    }
+
+    private static void CleanExpiredSessionsLocked(DateTime utcNow)
+    {
+        foreach (var expiredToken in _sessions
+                     .Where(item => item.Value.Session.IsExpiredAt(utcNow))
+                     .Select(item => item.Key)
+                     .ToList())
+        {
+            _sessions.Remove(expiredToken);
+        }
+    }
+
+    private static void RemoveSession(string token)
+    {
+        lock (_lock)
+        {
+            _sessions.Remove(token);
+        }
+    }
+
+    private static void RevokeSessionsForUser(string userId)
+    {
+        lock (_lock)
+        {
+            foreach (var token in _sessions
+                         .Where(item => string.Equals(item.Value.Session.UserId, userId, StringComparison.Ordinal))
+                         .Select(item => item.Key)
+                         .ToList())
+            {
+                _sessions.Remove(token);
+            }
+        }
     }
 
     private TimeSpan ResolveSessionTimeout()
@@ -462,4 +530,6 @@ public class AuthService : IAuthService
 
         public bool IsLockedAt(DateTime utcNow) => LockedUntilUtc > utcNow;
     }
+
+    private sealed record SessionRecord(UserSession Session, string PasswordFingerprint);
 }

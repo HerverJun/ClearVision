@@ -11,7 +11,7 @@ import {
     saveApiPort
 } from '../../core/messaging/apiConfig.js';
 import httpClient from '../../core/messaging/httpClient.js';
-import { clearAuthSession, getStoredToken, getStoredUser } from './authStorage.js';
+import { clearAuthSession, getStoredToken, storeAuthSession } from './authStorage.js';
 
 function buildAppUrl(relativePath) {
     return new URL(relativePath, window.location.href).toString();
@@ -23,6 +23,42 @@ function isLoginPage() {
 
 function applyCurrentUser(user) {
     window.currentUser = user || null;
+}
+
+function normalizeServerUser(payload) {
+    const source = payload?.user || payload?.User || payload || {};
+    const userId = source.userId || source.UserId || source.id || source.Id || '';
+    const username = source.username || source.Username || '';
+    const displayName = source.displayName || source.DisplayName || username;
+    const role = source.role || source.Role || '';
+
+    if (!userId || !username || !role) {
+        return null;
+    }
+
+    return {
+        id: userId,
+        userId,
+        username,
+        displayName,
+        role
+    };
+}
+
+async function applyAuthenticatedUserResponse(response, token) {
+    if (!response.ok) {
+        return null;
+    }
+
+    const payload = await response.json();
+    const user = normalizeServerUser(payload);
+    if (!user) {
+        return null;
+    }
+
+    storeAuthSession(token, user);
+    applyCurrentUser(user);
+    return user;
 }
 
 function clearCurrentUser() {
@@ -60,7 +96,7 @@ export function getToken() {
 }
 
 export function getCurrentUser() {
-    return getStoredUser();
+    return window.currentUser || null;
 }
 
 export function isAuthenticated() {
@@ -134,23 +170,20 @@ export const PermissionGuard = {
 
 export function initAuth() {
     const token = getToken();
-    const user = getCurrentUser();
 
-    if (!token || !user) {
+    if (!token) {
         resetAuthState();
         redirectToLogin();
-        return false;
+        return null;
     }
 
-    applyCurrentUser(user);
     return true;
 }
 
 export async function bootstrapAuthSession({ redirectOnFailure = true } = {}) {
     const token = getToken();
-    const user = getCurrentUser();
 
-    if (!token || !user) {
+    if (!token) {
         resetAuthState();
         if (redirectOnFailure) {
             redirectToLogin();
@@ -163,10 +196,8 @@ export async function bootstrapAuthSession({ redirectOnFailure = true } = {}) {
         };
     }
 
-    applyCurrentUser(user);
-
-    const isValid = await validateTokenAsync();
-    if (!isValid) {
+    const refreshedUser = await refreshAuthenticatedUserAsync();
+    if (!refreshedUser) {
         resetAuthState();
         if (redirectOnFailure) {
             redirectToLogin();
@@ -182,13 +213,17 @@ export async function bootstrapAuthSession({ redirectOnFailure = true } = {}) {
     return {
         ok: true,
         reason: 'authenticated',
-        user
+        user: refreshedUser
     };
 }
 
 export async function validateTokenAsync() {
+    return !!(await refreshAuthenticatedUserAsync());
+}
+
+async function refreshAuthenticatedUserAsync() {
     const token = getToken();
-    if (!token) return false;
+    if (!token) return null;
 
     try {
         if (window.__API_BASE_URL__) {
@@ -196,7 +231,7 @@ export async function validateTokenAsync() {
                 method: 'GET',
                 headers: { Authorization: `Bearer ${token}` }
             });
-            return response.ok;
+            return await applyAuthenticatedUserResponse(response, token);
         }
 
         if (isHostInjectedEnvironment()) {
@@ -220,14 +255,14 @@ export async function validateTokenAsync() {
 
                     if (response.ok) {
                         saveApiPort(port);
-                        return true;
+                        return await applyAuthenticatedUserResponse(response, token);
                     }
                 } catch {
                     // Try the next candidate port.
                 }
             }
 
-            return false;
+            return null;
         }
 
         const { protocol, hostname, port } = window.location;
@@ -235,11 +270,11 @@ export async function validateTokenAsync() {
             method: 'GET',
             headers: { Authorization: `Bearer ${token}` }
         });
-        return response.ok;
+        return await applyAuthenticatedUserResponse(response, token);
     } catch (e) {
         console.warn('[Auth] Token 验证请求失败:', e.message);
-        return false;
+        return null;
     }
 }
 
-applyCurrentUser(getCurrentUser());
+applyCurrentUser(null);

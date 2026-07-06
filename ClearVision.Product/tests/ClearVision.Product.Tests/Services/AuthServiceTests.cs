@@ -25,6 +25,7 @@ public class AuthServiceTests
         var user = CreateUser("tester", "hash");
 
         repository.GetByUsernameAsync("tester", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
         passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
 
         var service = new AuthService(repository, passwordHasher, configurationService)
@@ -142,6 +143,7 @@ public class AuthServiceTests
         var user = CreateUser("logout-user", "hash");
 
         repository.GetByUsernameAsync("logout-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
         passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
 
         var service = new AuthService(repository, passwordHasher, configurationService);
@@ -153,6 +155,155 @@ public class AuthServiceTests
 
         (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
         (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExistingSession_ShouldRefreshRoleFromCurrentUser()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2);
+        var user = CreateUser("downgrade-user", "hash", UserRole.Admin);
+
+        repository.GetByUsernameAsync("downgrade-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("downgrade-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        user.ChangeRole(UserRole.Operator);
+
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
+        var session = await service.GetSessionAsync(login.Token!);
+        session.Should().NotBeNull();
+        session!.Role.Should().Be(UserRole.Operator.ToString());
+    }
+
+    [Fact]
+    public async Task ExistingSession_ShouldBeInvalid_WhenUserIsDisabled()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2);
+        var user = CreateUser("disabled-user", "hash");
+
+        repository.GetByUsernameAsync("disabled-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("disabled-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        user.Deactivate();
+
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExistingSession_ShouldBeInvalid_WhenUserIsDeleted()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2);
+        var user = CreateUser("deleted-user", "hash");
+        var deleted = false;
+
+        repository.GetByUsernameAsync("deleted-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(deleted ? null : user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("deleted-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        deleted = true;
+
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExistingSession_ShouldBeInvalid_WhenPasswordHashChanges()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2);
+        var user = CreateUser("reset-user", "old-hash");
+
+        repository.GetByUsernameAsync("reset-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("reset-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        user.ChangePassword("new-hash");
+
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_ShouldRevokeExistingSessionsForUser()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 8);
+        var user = CreateUser("change-revoke-user", "old-hash");
+
+        repository.GetByUsernameAsync("change-revoke-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("CurrentPwd1", user.PasswordHash).Returns(true);
+        passwordHasher.HashPassword("NewPwd123").Returns("new-hash");
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        passwordHasher.VerifyPassword("CurrentPwd1", user.PasswordHash).Returns(true);
+        var login = await service.LoginAsync("change-revoke-user", "CurrentPwd1");
+        login.Success.Should().BeTrue();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(1);
+
+        var result = await service.ChangePasswordAsync(user.Id.ToString(), "CurrentPwd1", "NewPwd123");
+
+        result.Success.Should().BeTrue();
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldRemoveExpiredSessions()
+    {
+        var now = new DateTime(2026, 3, 20, 10, 0, 0, DateTimeKind.Utc);
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 1, loginFailureLockoutCount: 2);
+        var user = CreateUser("cleanup-user", "hash");
+
+        repository.GetByUsernameAsync("cleanup-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService)
+        {
+            UtcNowProvider = () => now
+        };
+
+        var firstLogin = await service.LoginAsync("cleanup-user", "correct-password");
+        firstLogin.Success.Should().BeTrue();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(1);
+
+        service.UtcNowProvider = () => now.AddMinutes(2);
+        var secondLogin = await service.LoginAsync("cleanup-user", "correct-password");
+
+        secondLogin.Success.Should().BeTrue();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(1);
+        (await service.ValidateTokenAsync(firstLogin.Token!)).Should().BeFalse();
     }
 
     [Fact]
@@ -353,8 +504,8 @@ public class AuthServiceTests
         return configurationService;
     }
 
-    private static User CreateUser(string username, string passwordHash)
+    private static User CreateUser(string username, string passwordHash, UserRole role = UserRole.Engineer)
     {
-        return User.Create(username, passwordHash, username, UserRole.Engineer);
+        return User.Create(username, passwordHash, username, role);
     }
 }
