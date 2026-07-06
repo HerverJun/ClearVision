@@ -5,6 +5,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Tests.TestSupport;
@@ -219,6 +220,7 @@ public class InspectionServiceSingleRunTests
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var project = new Project("stored-side-effect-project");
         project.UpdateFlow(CreateSideEffectFlow(OperatorType.TextSave));
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         OperatorFlow? executedFlow = null;
 
@@ -275,6 +277,7 @@ public class InspectionServiceSingleRunTests
         var fileFlowJson = SerializeFlowDto("file-flow");
         OperatorFlow? executedFlow = null;
 
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         flowStorage.LoadFlowJsonAsync(projectId).Returns(fileFlowJson);
         flowExecution
@@ -331,6 +334,7 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         project.UpdateFlow(databaseFlow);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         flowStorage.LoadFlowJsonAsync(projectId).Returns(fileFlowJson);
         flowExecution
@@ -914,6 +918,243 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WithCameraIdAndStoredResultOutputSaveToFileFlow_ShouldKeepProductionExecutionAllowed()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var storedFlow = CreateResultOutputSaveToFileFlow();
+        var project = new Project("stored-camera-result-output-project");
+        project.UpdateFlow(storedFlow);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateCameraImageDto()));
+        OperatorFlow? executedFlow = null;
+        Dictionary<string, object>? executedInputs = null;
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 13,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        executedFlow.Should().BeSameAs(storedFlow);
+        executedInputs.Should().NotBeNull();
+        executedInputs!.Should().ContainKey("Image");
+        await flowExecution.Received(1).ExecuteFlowAsync(
+            storedFlow,
+            Arg.Any<Dictionary<string, object>?>(),
+            false,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithCameraIdAndStoredImageAcquisitionCameraFlow_ShouldNotRunInlineAdmission()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var storedFlow = CreateImageAcquisitionFlow("Camera", string.Empty, "stored-camera-binding");
+        var project = new Project("stored-camera-acquisition-project");
+        project.UpdateFlow(storedFlow);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateCameraImageDto()));
+        OperatorFlow? executedFlow = null;
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedFlow = callInfo.Arg<OperatorFlow>();
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 14,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        executedFlow.Should().BeSameAs(storedFlow);
+        await imageAcquisition.Received(1).AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithCameraIdAndInlineTextSaveFlow_ShouldRejectBeforeExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.ExecuteSingleAsync(
+            projectId,
+            "camera-1",
+            CreateSideEffectFlow(OperatorType.TextSave));
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_INLINE_SIDE_EFFECT_BLOCKED:*TextSave*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithCameraIdAndStoredGlobalVariables_ShouldPassProjectVariableContext()
+    {
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var storedFlow = CreateFlow("stored-global-variable-flow");
+        var schema = CreateGlobalVariableSchema(variableId);
+        var project = new Project("stored-camera-global-variable-project");
+        project.UpdateFlow(storedFlow);
+        project.UpdateGlobalVariables(schema);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateCameraImageDto()));
+        ProjectVariableExecutionContext? capturedContext = null;
+
+        flowExecution
+            .ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ProjectVariableExecutionContext>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedContext = callInfo.Arg<ProjectVariableExecutionContext>();
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 15,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance,
+            projectVariableSessions: new ProjectVariableSessionRegistry());
+
+        var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        capturedContext.Should().NotBeNull();
+        capturedContext!.Session.Schema.Variables.Should().ContainSingle(variable => variable.Id == variableId);
+        await flowExecution.Received(1).ExecuteFlowAsync(
+            storedFlow,
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<ProjectVariableExecutionContext>(),
+            false,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceInlineFlow_ShouldRejectBeforeExecution()
     {
         var projectId = Guid.NewGuid();
@@ -987,11 +1228,47 @@ public class InspectionServiceSingleRunTests
         return flow;
     }
 
+    private static OperatorFlow CreateResultOutputSaveToFileFlow()
+    {
+        var flow = new OperatorFlow("result-output-save-to-file-flow");
+        var output = new Operator(Guid.NewGuid(), "ResultOutput", OperatorType.ResultOutput, 0, 0);
+        output.AddParameter(new Parameter(Guid.NewGuid(), "SaveToFile", "SaveToFile", string.Empty, "bool", true));
+        flow.AddOperator(output);
+        return flow;
+    }
+
     private static OperatorFlow CreateSideEffectFlow(OperatorType operatorType)
     {
         var flow = new OperatorFlow("side-effect-flow");
         flow.AddOperator(new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0));
         return flow;
+    }
+
+    private static ImageDto CreateCameraImageDto()
+    {
+        return new ImageDto
+        {
+            Id = Guid.NewGuid(),
+            DataBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 })
+        };
+    }
+
+    private static ProjectGlobalVariableSchema CreateGlobalVariableSchema(Guid variableId)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "BatchCount",
+                    DisplayName = "Batch Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(0L)
+                }
+            ]
+        };
     }
 
     private static OperatorFlow CreateImageAcquisitionFlow(string sourceType, string filePath, string cameraId)

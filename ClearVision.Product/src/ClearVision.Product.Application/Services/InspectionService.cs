@@ -680,6 +680,24 @@ public class InspectionService : IInspectionService
                 ? ExecutionAdmissionSurface.InlineOfficialExecution
                 : ExecutionAdmissionSurface.StoredProjectExecution,
             cancellationToken);
+
+        return await ExecuteSingleResolvedCoreAsync(
+            projectId,
+            imageData,
+            actualFlow,
+            globalVariables,
+            sessionId,
+            cancellationToken);
+    }
+
+    private async Task<InspectionResult> ExecuteSingleResolvedCoreAsync(
+        Guid projectId,
+        byte[]? imageData,
+        OperatorFlow actualFlow,
+        ProjectGlobalVariableSchema? globalVariables,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
         var result = new InspectionResult(projectId);
 
         try
@@ -803,7 +821,7 @@ public class InspectionService : IInspectionService
         ImageDto? imageDto = null;
         try
         {
-            var (actualFlow, _) = await ResolveExecutionFlowAsync(
+            var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
                 projectId,
                 flow,
                 HasExecutableFlow(flow)
@@ -816,12 +834,13 @@ public class InspectionService : IInspectionService
                     "[InspectionService] 图像采集算子使用本地文件输入，跳过相机预采集: ProjectId={ProjectId}, CameraId={CameraId}",
                     projectId,
                     cameraId);
-                return await ExecuteSingleCoreAsync(
+                return await ExecuteSingleResolvedCoreAsync(
                     projectId,
-                    imageData: null,
-                    flow: actualFlow,
-                    sessionId: sessionId,
-                    cancellationToken: cancellationToken);
+                    null,
+                    actualFlow,
+                    globalVariables,
+                    sessionId,
+                    cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -833,7 +852,13 @@ public class InspectionService : IInspectionService
             }
 
             var imageData = Convert.FromBase64String(imageDto.DataBase64);
-            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow, sessionId, cancellationToken);
+            return await ExecuteSingleResolvedCoreAsync(
+                projectId,
+                imageData,
+                actualFlow,
+                globalVariables,
+                sessionId,
+                cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -893,6 +918,12 @@ public class InspectionService : IInspectionService
                     flow!.Operators.Count);
                 return (flow, null);
             }
+
+            var storedAdmission = await _executionAdmissionService.ValidateProjectAsync(
+                projectId,
+                surface,
+                cancellationToken);
+            ThrowIfAdmissionRejected(storedAdmission);
 
             var project = await _projectRepository.GetWithFlowAsync(projectId);
             if (project == null)
