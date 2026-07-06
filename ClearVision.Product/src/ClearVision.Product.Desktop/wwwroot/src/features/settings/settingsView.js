@@ -9,6 +9,7 @@ import { installPlcTab } from './tabs/plcTab.js';
 import { installRuntimePreviewPilotConsole } from './tabs/runtimePreviewPilotConsole.js';
 import { installStationTab } from './tabs/stationTab.js';
 import { installSystemTabs } from './tabs/systemTabs.js';
+import { installTcpTab } from './tabs/tcpTab.js';
 
 export class SettingsView {
     constructor(containerId) {
@@ -37,6 +38,12 @@ export class SettingsView {
         this.plcConnectionStatus = 'unknown';
         this.plcValidationErrors = [];
         this.plcSettingsLoaded = false;
+        this.tcpProfiles = [];
+        this.selectedTcpProfileId = null;
+        this.tcpSettingsLoaded = false;
+        this.tcpDraftDirty = false;
+        this.tcpStatusById = {};
+        this.tcpFramesById = {};
         this.savedCommunicationConfig = null;
         this.stationCommunicationSettings = null;
         this.stationCommunicationLoaded = false;
@@ -162,6 +169,10 @@ export class SettingsView {
             this.syncPlcMappingsFromActiveProfile();
             this.plcSettingsLoaded = false;
             this.plcValidationErrors = [];
+            this.tcpSettingsLoaded = false;
+            this.tcpDraftDirty = false;
+            this.tcpStatusById = {};
+            this.tcpFramesById = {};
             this.stationCommunicationLoaded = false;
             this.stationTokenVisible = false;
             this.stationTokenValue = '';
@@ -179,6 +190,10 @@ export class SettingsView {
             this.syncPlcMappingsFromActiveProfile();
             this.plcSettingsLoaded = false;
             this.plcValidationErrors = [];
+            this.tcpSettingsLoaded = false;
+            this.tcpDraftDirty = false;
+            this.tcpStatusById = {};
+            this.tcpFramesById = {};
             this.stationCommunicationLoaded = false;
             this.stationTokenVisible = false;
             this.stationTokenValue = '';
@@ -211,6 +226,11 @@ export class SettingsView {
                 button: '保存 PLC 设置',
                 title: '保存 PLC 设置',
                 body: '保存 PLC 协议连接和映射配置。'
+            },
+            tcp: {
+                button: '保存 TCP Profile',
+                title: '保存 TCP 通讯',
+                body: '保存机器人/通用 TCP Client 与 Server 调试 Profile。'
             },
             station: {
                 button: '保存 Station 设置',
@@ -306,6 +326,10 @@ export class SettingsView {
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                             PLC 通讯
                         </div>
+                        <div class="settings-menu-item" data-tab="tcp">
+                            <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M4 7h5v2H6v6h3v2H4V7zm7 3h2v4h-2v-4zm4-3h5v10h-5v-2h3V9h-3V7zM8 11h8v2H8v-2z"/></svg>
+                            TCP 通讯
+                        </div>
                         <div class="settings-menu-item" data-tab="station">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M4 5h16v6H4V5zm2 2v2h12V7H6zm-2 6h7v6H4v-6zm2 2v2h3v-2H6zm7-2h7v6h-7v-6zm2 2v2h3v-2h-3z"/></svg>
                             工站通讯
@@ -345,6 +369,7 @@ export class SettingsView {
                     <div class="settings-tab-panels">
                         <div class="settings-panel active" data-section="general">${this.renderGeneralTab()}</div>
                         <div class="settings-panel" data-section="communication">${this.renderCommunicationTab()}</div>
+                        <div class="settings-panel" data-section="tcp">${this.renderTcpTab()}</div>
                         <div class="settings-panel" data-section="station">${this.renderStationCommunicationTab()}</div>
                         <div class="settings-panel" data-section="storage">${this.renderStorageTab()}</div>
                         <div class="settings-panel" data-section="database">${this.renderDatabaseTab()}</div>
@@ -408,6 +433,8 @@ export class SettingsView {
                 .catch(error => console.warn('[SettingsView] Camera tab load failed:', error));
         } else if (tabName === 'communication') {
             this.loadPlcSettings();
+        } else if (tabName === 'tcp') {
+            this.loadTcpSettings();
         } else if (tabName === 'station') {
             this.loadStationCommunicationSettings();
         } else if (tabName === 'database') {
@@ -451,6 +478,7 @@ export class SettingsView {
         this.bindAiSettingsEvents();
         this.bindRuntimePreviewPilotConsoleEvents?.();
         this.bindPlcSettingsEvents();
+        this.bindTcpSettingsEvents();
         this.bindStationCommunicationEvents();
 
         // 存储路径变化后刷新磁盘容量卡片
@@ -494,6 +522,11 @@ export class SettingsView {
             return;
         }
 
+        if (activeTabName === 'tcp') {
+            await this.saveTcpSettings();
+            return;
+        }
+
         if (activeTabName === 'cameras') {
             await this.saveCameraSettingsFromTop();
             return;
@@ -521,6 +554,7 @@ export class SettingsView {
 
 installSettingsNormalizers(SettingsView);
 installPlcTab(SettingsView);
+installTcpTab(SettingsView);
 installStationTab(SettingsView);
 installAiTab(SettingsView);
 installRuntimePreviewPilotConsole(SettingsView);

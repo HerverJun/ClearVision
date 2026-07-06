@@ -1,19 +1,20 @@
 // TcpCommunicationOperator.cs
-// 客户端模式执行（带连接池）
+// TCP client operator backed by the global TCP device manager.
 // 作者：蘅芜君
 
-using System.Collections.Concurrent;
-using System.Net.Sockets;
-using System.Text;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// TCP/IP通信算子 - 支持客户端/服务器模式（带连接池）
+/// TCP/IP通信算子 - 复用全局 TCP / 机器人通讯 Profile，兼容旧客户端参数。
 /// </summary>
 [OperatorMeta(
     DisplayName = "TCP通信",
@@ -25,518 +26,218 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "响应", PortDataType.String)]
 [OutputPort("Status", "状态", PortDataType.Boolean)]
+[OperatorParam("ProfileId", "全局Profile", "string", DefaultValue = "")]
+[OperatorParam("UseGlobalProfile", "使用全局Profile", "bool", DefaultValue = false)]
 [OperatorParam("Mode", "模式", "enum", DefaultValue = "Client", Options = new[] { "Client|客户端", "Server|服务器" })]
 [OperatorParam("IpAddress", "IP地址", "string", DefaultValue = "127.0.0.1")]
 [OperatorParam("Port", "端口", "int", DefaultValue = 8080, Min = 1, Max = 65535)]
 [OperatorParam("SendData", "发送数据", "string", DefaultValue = "")]
-[OperatorParam("Timeout", "超时(ms)", "int", DefaultValue = 5000, Min = 100, Max = 30000)]
-[OperatorParam("Encoding", "编码", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF-8", "ASCII|ASCII", "GBK|GBK" })]
+[OperatorParam("UseFixedSendData", "固定发送数据", "bool", DefaultValue = false)]
+[OperatorParam("PayloadTemplate", "报文模板", "string", DefaultValue = "")]
+[OperatorParam("WaitResponse", "等待响应", "bool", DefaultValue = true)]
+[OperatorParam("ResponseTimeoutMs", "响应超时(ms)", "int", DefaultValue = 5000, Min = 100, Max = 600000)]
+[OperatorParam("Timeout", "超时(ms)", "int", DefaultValue = 5000, Min = 100, Max = 600000)]
+[OperatorParam("Encoding", "编码", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF-8", "ASCII|ASCII", "GBK|GBK", "HEX|HEX" })]
 public class TcpCommunicationOperator : OperatorBase
 {
-    private const int MaxPooledConnections = 32;
-    private static readonly TimeSpan MaxIdleConnectionAge = TimeSpan.FromMinutes(10);
+    private readonly ITcpDeviceManager _tcpDeviceManager;
 
     public override OperatorType OperatorType => OperatorType.TcpCommunication;
 
-    public TcpCommunicationOperator(ILogger<TcpCommunicationOperator> logger) : base(logger) { }
+    public TcpCommunicationOperator(ILogger<TcpCommunicationOperator> logger)
+        : this(logger, new TcpDeviceManager(null, NullLogger<TcpDeviceManager>.Instance))
+    {
+    }
 
-    // 连接池 - 静态缓存
-    private static readonly ConcurrentDictionary<string, TcpClient> _connectionPool = new();
-    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionLocks = new();
-    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _requestResponseLocks = new();
-    private static readonly ConcurrentDictionary<string, NetworkStream> _streamPool = new();
-    private static readonly ConcurrentDictionary<string, DateTimeOffset> _connectionLastUsed = new();
-    private static readonly ConcurrentDictionary<string, int> _activeOperations = new();
+    public TcpCommunicationOperator(
+        ILogger<TcpCommunicationOperator> logger,
+        ITcpDeviceManager tcpDeviceManager)
+        : base(logger)
+    {
+        _tcpDeviceManager = tcpDeviceManager;
+    }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取输入数据（可选）
-        object? inputData = null;
-        if (inputs != null && inputs.TryGetValue("Data", out var data))
-        {
-            inputData = data;
-        }
+        inputs ??= new Dictionary<string, object>();
+        inputs.TryGetValue("Data", out var inputData);
 
-        // 获取参数
         var mode = GetStringParam(@operator, "Mode", "Client");
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty).Trim();
+        var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
         var ipAddress = GetStringParam(@operator, "IpAddress", "127.0.0.1");
         var port = GetIntParam(@operator, "Port", 8080, 1, 65535);
-        var sendData = GetStringParam(@operator, "SendData", "");
-        var timeout = GetIntParam(@operator, "Timeout", 5000, 100, 30000);
-        var encoding = GetStringParam(@operator, "Encoding", "UTF8");
+        var sendData = GetStringParam(@operator, "SendData", string.Empty);
+        var payloadTemplate = GetStringParam(@operator, "PayloadTemplate", string.Empty);
+        var useFixedSendData = GetBoolParam(@operator, "UseFixedSendData", false);
+        var waitResponse = GetBoolParam(@operator, "WaitResponse", true);
+        var responseTimeoutMs = GetIntParam(@operator, "ResponseTimeoutMs", 5000, 100, 600000);
+        var timeout = GetIntParam(@operator, "Timeout", 5000, 100, 600000);
+        var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
+        var payload = ResolvePayload(inputData, sendData, payloadTemplate, useFixedSendData);
 
-        var enc = encoding.ToUpper() switch
+        TcpDeviceSendResult result;
+        if (!string.IsNullOrWhiteSpace(profileId))
         {
-            "ASCII" => Encoding.ASCII,
-            "GBK" => Encoding.GetEncoding("GBK"),
-            _ => Encoding.UTF8
-        };
-
-        string response = "";
-        bool status = false;
-
-        if (mode == "Client")
-        {
-            (response, status) = await ExecuteClientModeAsync(
-                ipAddress, port, sendData, timeout, enc, cancellationToken);
+            result = await _tcpDeviceManager.SendAsync(
+                profileId,
+                new TcpDeviceSendRequest(
+                    payload,
+                    IsHexEncoding(encoding),
+                    waitResponse,
+                    responseTimeoutMs),
+                cancellationToken);
         }
         else
         {
-            // 服务器模式简化实现
-            response = "服务器模式需要单独启动监听，当前版本仅支持客户端模式";
-            status = false;
+            if (useGlobalProfile)
+            {
+                return OperatorExecutionOutput.Failure("启用全局 Profile 时必须配置 ProfileId。");
+            }
+
+            if (string.Equals(mode, TcpCommunicationProfile.ModeServer, StringComparison.OrdinalIgnoreCase))
+            {
+                return OperatorExecutionOutput.Failure("Server 监听请在全局 TCP 通讯页启动，算子只负责通过已配置 Profile 发送/等待响应。");
+            }
+
+            var legacyProfile = new TcpCommunicationProfile
+            {
+                Id = BuildLegacyProfileId(ipAddress, port),
+                Name = $"Legacy {ipAddress}:{port}",
+                Enabled = true,
+                Mode = TcpCommunicationProfile.ModeClient,
+                RemoteHost = ipAddress,
+                RemotePort = port,
+                Encoding = encoding,
+                FrameMode = IsHexEncoding(encoding)
+                    ? TcpCommunicationProfile.FrameModeHex
+                    : TcpCommunicationProfile.FrameModeRaw,
+                TimeoutMs = timeout,
+                Reconnect = true
+            };
+
+            result = await _tcpDeviceManager.SendTransientAsync(
+                legacyProfile,
+                new TcpDeviceSendRequest(
+                    payload,
+                    IsHexEncoding(encoding),
+                    waitResponse,
+                    responseTimeoutMs),
+                cancellationToken);
         }
 
-        if (!status)
+        if (!result.Success)
         {
-            return OperatorExecutionOutput.Failure(response);
+            return OperatorExecutionOutput.Failure(result.Message);
         }
 
         return OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
-            { "Response", response },
-            { "Status", status },
-            { "Mode", mode },
+            { "Response", result.Response },
+            { "Status", result.Success },
+            { "Mode", string.IsNullOrWhiteSpace(profileId) ? mode : "Profile" },
+            { "ProfileId", profileId },
             { "IpAddress", ipAddress },
             { "Port", port }
         });
     }
 
-    /// <summary>
-    /// 从连接池获取或创建连接
-    /// </summary>
-    private async Task<(TcpClient client, NetworkStream stream)> GetOrCreateConnectionAsync(
-        string ipAddress, int port, int timeoutMs, CancellationToken ct)
-    {
-        var key = $"{ipAddress}:{port}";
-        var lockEntry = AcquireRefCountedSemaphore(_connectionLocks, key);
-        var lockAcquired = false;
-
-        await lockEntry.Semaphore.WaitAsync(ct);
-        lockAcquired = true;
-        try
-        {
-            CleanupIdleConnections(DateTimeOffset.UtcNow);
-
-            // 检查现有连接是否有效
-            var hasExistingClient = _connectionPool.TryGetValue(key, out var existingClient);
-            var hasExistingStream = _streamPool.TryGetValue(key, out var existingStream);
-            if (hasExistingClient && hasExistingStream)
-            {
-                if (IsConnectionAlive(existingClient!))
-                {
-                    ApplyClientTimeouts(existingClient!, timeoutMs);
-                    TouchConnection(key);
-                    Logger.LogDebug("TCP 连接复用: {Key}", key);
-                    return (existingClient!, existingStream!);
-                }
-
-                // 清理旧连接
-                InvalidateConnection(key);
-            }
-            else if (hasExistingClient || hasExistingStream)
-            {
-                InvalidateConnection(key);
-            }
-
-            // 建立新连接
-            var client = new TcpClient
-            {
-                NoDelay = true,
-                ReceiveTimeout = timeoutMs,
-                SendTimeout = timeoutMs
-            };
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeoutMs);
-
-            try
-            {
-                await client.ConnectAsync(ipAddress, port, cts.Token);
-                var stream = client.GetStream();
-
-                _connectionPool[key] = client;
-                _streamPool[key] = stream;
-                TouchConnection(key);
-                TrimConnectionPoolIfNeeded(key);
-
-                Logger.LogInformation("TCP 连接已建立: {Key}", key);
-                return (client, stream);
-            }
-            catch
-            {
-                client.Dispose();
-                throw;
-            }
-        }
-        finally
-        {
-            if (lockAcquired)
-            {
-                lockEntry.Semaphore.Release();
-            }
-
-            ReleaseRefCountedSemaphore(_connectionLocks, key, lockEntry);
-        }
-    }
-
-    /// <summary>
-    /// 检测连接是否存活
-    /// </summary>
-    private static void InvalidateConnection(string key)
-    {
-        if (_streamPool.TryRemove(key, out var stream))
-        {
-            try
-            {
-                stream.Dispose();
-            }
-            catch
-            {
-                // Ignore cleanup exceptions.
-            }
-        }
-
-        if (_connectionPool.TryRemove(key, out var client))
-        {
-            try
-            {
-                client.Close();
-                client.Dispose();
-            }
-            catch
-            {
-                // Ignore cleanup exceptions.
-            }
-        }
-
-        _connectionLastUsed.TryRemove(key, out _);
-    }
-
-    private static bool IsConnectionAlive(TcpClient client)
-    {
-        try
-        {
-            if (!client.Connected)
-                return false;
-            return !(client.Client.Poll(1, SelectMode.SelectRead) && client.Client.Available == 0);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static IReadOnlyDictionary<string, bool> GetConnectionStateSnapshot()
-    {
-        var snapshot = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, client) in _connectionPool)
-        {
-            snapshot[key] = IsConnectionAlive(client);
-        }
-
-        return snapshot;
-    }
-
-    public static void ClearConnectionPool()
-    {
-        foreach (var key in _connectionPool.Keys.Concat(_streamPool.Keys).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            InvalidateConnection(key);
-        }
-
-        _connectionPool.Clear();
-        _streamPool.Clear();
-        _connectionLastUsed.Clear();
-        _activeOperations.Clear();
-    }
-
-    private static void ApplyClientTimeouts(TcpClient client, int timeoutMs)
-    {
-        client.ReceiveTimeout = timeoutMs;
-        client.SendTimeout = timeoutMs;
-    }
-
-    private static void TouchConnection(string key)
-    {
-        _connectionLastUsed[key] = DateTimeOffset.UtcNow;
-    }
-
-    private void CleanupIdleConnections(DateTimeOffset now)
-    {
-        foreach (var entry in _connectionLastUsed)
-        {
-            if (now - entry.Value > MaxIdleConnectionAge)
-            {
-                PurgeConnection(entry.Key, force: false);
-            }
-        }
-    }
-
-    private void TrimConnectionPoolIfNeeded(string protectedKey)
-    {
-        if (_connectionPool.Count <= MaxPooledConnections)
-        {
-            return;
-        }
-
-        foreach (var candidate in _connectionLastUsed.OrderBy(entry => entry.Value))
-        {
-            if (_connectionPool.Count <= MaxPooledConnections)
-            {
-                break;
-            }
-
-            if (candidate.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            PurgeConnection(candidate.Key, force: false);
-        }
-    }
-
-    private void PurgeConnection(string key, bool force)
-    {
-        if (!force && _activeOperations.TryGetValue(key, out var activeCount) && activeCount > 0)
-        {
-            return;
-        }
-
-        InvalidateConnection(key);
-    }
-
-    private static void IncrementActiveOperations(string key)
-    {
-        _activeOperations.AddOrUpdate(key, 1, static (_, count) => count + 1);
-    }
-
-    private static void DecrementActiveOperations(string key)
-    {
-        _activeOperations.AddOrUpdate(
-            key,
-            0,
-            static (_, count) => Math.Max(0, count - 1));
-
-        if (_activeOperations.TryGetValue(key, out var count) && count == 0)
-        {
-            _activeOperations.TryRemove(new KeyValuePair<string, int>(key, 0));
-        }
-    }
-
-    private sealed class RefCountedSemaphore : IDisposable
-    {
-        private readonly object _sync = new();
-        private int _refCount;
-        private bool _removed;
-
-        public SemaphoreSlim Semaphore { get; } = new(1, 1);
-
-        public bool TryAddRef()
-        {
-            lock (_sync)
-            {
-                if (_removed)
-                {
-                    return false;
-                }
-
-                _refCount++;
-                return true;
-            }
-        }
-
-        public bool ReleaseRefAndMarkRemovedIfUnused()
-        {
-            lock (_sync)
-            {
-                _refCount--;
-                if (_refCount != 0)
-                {
-                    return false;
-                }
-
-                _removed = true;
-                return true;
-            }
-        }
-
-        public void Dispose()
-        {
-            Semaphore.Dispose();
-        }
-    }
-
-    private static RefCountedSemaphore AcquireRefCountedSemaphore(
-        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
-        string key)
-    {
-        while (true)
-        {
-            var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
-            if (!entry.TryAddRef())
-            {
-                dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
-                continue;
-            }
-
-            if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
-            {
-                return entry;
-            }
-
-            if (entry.ReleaseRefAndMarkRemovedIfUnused())
-            {
-                entry.Dispose();
-            }
-        }
-    }
-
-    private static void ReleaseRefCountedSemaphore(
-        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
-        string key,
-        RefCountedSemaphore entry)
-    {
-        if (!entry.ReleaseRefAndMarkRemovedIfUnused())
-        {
-            return;
-        }
-
-        if (dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry)))
-        {
-            entry.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// 客户端模式执行（带连接池）
-    /// </summary>
-    private async Task<(string response, bool status)> ExecuteClientModeAsync(
-        string ipAddress,
-        int port,
-        string sendData,
-        int timeout,
-        Encoding encoding,
-        CancellationToken cancellationToken)
-    {
-        var key = $"{ipAddress}:{port}";
-        var requestLockEntry = AcquireRefCountedSemaphore(_requestResponseLocks, key);
-        var requestLockAcquired = false;
-        var operationTracked = false;
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromMilliseconds(timeout));
-
-        try
-        {
-            await requestLockEntry.Semaphore.WaitAsync(cts.Token);
-            requestLockAcquired = true;
-            IncrementActiveOperations(key);
-            operationTracked = true;
-
-            // 从连接池获取连接
-            var (_, stream) = await GetOrCreateConnectionAsync(ipAddress, port, timeout, cts.Token);
-
-            // 发送数据
-            if (!string.IsNullOrEmpty(sendData))
-            {
-                var sendBytes = encoding.GetBytes(sendData);
-                await stream.WriteAsync(sendBytes.AsMemory(0, sendBytes.Length), cts.Token);
-                await stream.FlushAsync(cts.Token);
-            }
-
-            // 接收响应
-            var buffer = new byte[4096];
-            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
-            if (bytesRead == 0)
-            {
-                InvalidateConnection(key);
-                return ("连接已关闭", false);
-            }
-
-            var response = encoding.GetString(buffer, 0, bytesRead);
-
-            return (response, true);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            if (operationTracked)
-            {
-                InvalidateConnection(key);
-            }
-
-            return ("通信被取消", false);
-        }
-        catch (OperationCanceledException)
-        {
-            if (operationTracked)
-            {
-                InvalidateConnection(key);
-            }
-
-            return ("连接超时", false);
-        }
-        catch (Exception ex)
-        {
-            InvalidateConnection(key);
-            Logger.LogError(ex, "TCP 通信错误: {IpAddress}:{Port}", ipAddress, port);
-            return ($"通信错误: {ex.Message}", false);
-        }
-        finally
-        {
-            if (operationTracked)
-            {
-                if (_connectionPool.ContainsKey(key))
-                {
-                    TouchConnection(key);
-                }
-                else
-                {
-                    _connectionLastUsed.TryRemove(key, out _);
-                }
-
-                DecrementActiveOperations(key);
-            }
-
-            if (requestLockAcquired)
-            {
-                requestLockEntry.Semaphore.Release();
-            }
-
-            ReleaseRefCountedSemaphore(_requestResponseLocks, key, requestLockEntry);
-        }
-    }
-
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty).Trim();
+        var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
         var host = GetStringParam(@operator, "IpAddress", "127.0.0.1");
         var port = GetIntParam(@operator, "Port", 8080);
         var timeout = GetIntParam(@operator, "Timeout", 5000);
+        var responseTimeoutMs = GetIntParam(@operator, "ResponseTimeoutMs", 5000);
         var mode = GetStringParam(@operator, "Mode", "Client");
-        var encoding = GetStringParam(@operator, "Encoding", "UTF8");
+        var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
 
-        if (@operator.Parameters.Any(p => p.Name == "IpAddress") && string.IsNullOrEmpty(host))
+        if (useGlobalProfile && string.IsNullOrWhiteSpace(profileId))
         {
-            return ValidationResult.Invalid("主机地址不能为空");
+            return ValidationResult.Invalid("启用全局 Profile 时必须配置 ProfileId。");
         }
-        if (port < 1 || port > 65535)
-        {
-            return ValidationResult.Invalid("端口号必须在 1-65535 之间");
-        }
-        if (timeout < 100 || timeout > 30000)
-        {
-            return ValidationResult.Invalid("超时时间必须在 100-30000 ms 之间");
-        }
-        if (mode != "Client" && mode != "Server")
+
+        if (mode != TcpCommunicationProfile.ModeClient && mode != TcpCommunicationProfile.ModeServer)
         {
             return ValidationResult.Invalid("模式必须是 Client 或 Server");
         }
-        if (encoding.ToUpper() != "UTF8" && encoding.ToUpper() != "ASCII" && encoding.ToUpper() != "GBK")
+
+        if (string.IsNullOrWhiteSpace(profileId) && mode == TcpCommunicationProfile.ModeServer)
         {
-            return ValidationResult.Invalid("编码必须是 UTF8、ASCII 或 GBK");
+            return ValidationResult.Invalid("Server 监听请在全局 TCP 通讯页启动。");
+        }
+
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            if (@operator.Parameters.Any(p => p.Name == "IpAddress") && string.IsNullOrWhiteSpace(host))
+            {
+                return ValidationResult.Invalid("主机地址不能为空");
+            }
+
+            if (port < 1 || port > 65535)
+            {
+                return ValidationResult.Invalid("端口号必须在 1-65535 之间");
+            }
+        }
+
+        if (timeout is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
+        {
+            return ValidationResult.Invalid($"超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
+        }
+
+        if (responseTimeoutMs is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
+        {
+            return ValidationResult.Invalid($"响应超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
+        }
+
+        if (encoding is not (
+            TcpCommunicationProfile.EncodingUtf8 or
+            TcpCommunicationProfile.EncodingAscii or
+            TcpCommunicationProfile.EncodingGbk or
+            TcpCommunicationProfile.EncodingHex))
+        {
+            return ValidationResult.Invalid("编码必须是 UTF8、ASCII、GBK 或 HEX");
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static string ResolvePayload(
+        object? inputData,
+        string sendData,
+        string payloadTemplate,
+        bool useFixedSendData)
+    {
+        var inputText = inputData?.ToString() ?? string.Empty;
+        if (!string.IsNullOrEmpty(payloadTemplate))
+        {
+            return payloadTemplate
+                .Replace("{Data}", inputText, StringComparison.OrdinalIgnoreCase)
+                .Replace("{SendData}", sendData ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!useFixedSendData && inputData != null)
+        {
+            return inputText;
+        }
+
+        return sendData ?? string.Empty;
+    }
+
+    private static bool IsHexEncoding(string encoding)
+    {
+        return string.Equals(
+            TcpCommunicationProfile.NormalizeEncoding(encoding),
+            TcpCommunicationProfile.EncodingHex,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildLegacyProfileId(string ipAddress, int port)
+    {
+        return $"legacy-{ipAddress.Trim()}-{port}".Replace(":", "-", StringComparison.Ordinal);
     }
 }

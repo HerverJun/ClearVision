@@ -58,6 +58,17 @@ const settingsApi = {
     savePlcSettings: payload => httpClient.put('/plc/settings', payload),
     testPlcConnection: payload => httpClient.post('/plc/test-connection', payload),
 
+    listTcpProfiles: () => httpClient.get('/tcp/profiles'),
+    saveTcpProfiles: profiles => httpClient.put('/tcp/profiles', profiles),
+    connectTcpProfile: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/connect`, {}),
+    disconnectTcpProfile: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/disconnect`, {}),
+    sendTcpProfile: (id, payload) => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/send`, payload),
+    startTcpServer: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/server/start`, {}),
+    stopTcpServer: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/server/stop`, {}),
+    getTcpProfileStatus: id => httpClient.get(`/tcp/profiles/${encodeURIComponent(id)}/status`),
+    getTcpProfileFrames: id => httpClient.get(`/tcp/profiles/${encodeURIComponent(id)}/frames`),
+    clearTcpProfileFrames: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/frames/clear`, {}),
+
     loadStationCommunicationSettings: () => httpClient.get('/station-communication/settings'),
     saveStationCommunicationSettings: payload => httpClient.put('/station-communication/settings', payload),
     revealStationToken: () => httpClient.post('/station-communication/token', { operation: 'reveal' }),

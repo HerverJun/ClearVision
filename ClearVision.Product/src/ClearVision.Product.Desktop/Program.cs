@@ -356,6 +356,7 @@ static class Program
         app.MapSettingsEndpoints();
         app.MapAgentRunEndpoints();
         app.MapPlcEndpoints();
+        app.MapTcpEndpoints();
         app.MapStationCommunicationEndpoints();
         app.MapStationEndpoints();
         app.MapDemoEndpoints();

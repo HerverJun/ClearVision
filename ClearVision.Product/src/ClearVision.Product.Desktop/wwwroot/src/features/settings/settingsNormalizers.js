@@ -109,6 +109,77 @@ export function installSettingsNormalizers(SettingsView) {
             return JSON.parse(JSON.stringify(config || this.getDefaultConfig().communication));
         }
         ,
+        cloneTcpCommunicationConfig(config) {
+            return JSON.parse(JSON.stringify(config || this.getDefaultConfig().tcpCommunication));
+        }
+        ,
+        normalizeTcpMode(mode) {
+            return String(mode || '').trim().toLowerCase() === 'server' ? 'Server' : 'Client';
+        }
+        ,
+        normalizeTcpEncoding(encoding) {
+            const normalized = String(encoding || '').trim().replace(/[-_\s]/g, '').toUpperCase();
+            if (normalized === 'ASCII') return 'ASCII';
+            if (normalized === 'GBK') return 'GBK';
+            if (normalized === 'HEX') return 'HEX';
+            return 'UTF8';
+        }
+        ,
+        normalizeTcpFrameMode(frameMode) {
+            const normalized = String(frameMode || '').trim().replace(/[-_\s]/g, '').toLowerCase();
+            if (normalized === 'line') return 'Line';
+            if (normalized === 'fixedlength') return 'FixedLength';
+            if (normalized === 'hex') return 'Hex';
+            return 'Raw';
+        }
+        ,
+        normalizeTcpLineEnding(lineEnding) {
+            const normalized = String(lineEnding || '').trim().toUpperCase();
+            if (['CR', 'LF', 'CRLF'].includes(normalized)) return normalized;
+            return 'None';
+        }
+        ,
+        normalizeTcpPort(value) {
+            const parsed = Number.parseInt(`${value ?? ''}`, 10);
+            return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : 0;
+        }
+        ,
+        normalizeTcpTimeout(value) {
+            const parsed = Number.parseInt(`${value ?? ''}`, 10);
+            if (!Number.isInteger(parsed) || parsed <= 0) return 5000;
+            return Math.min(600000, Math.max(100, parsed));
+        }
+        ,
+        normalizeTcpProfile(profile = {}) {
+            const id = String(profile?.id || '').trim() || `tcp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+            return {
+                id,
+                name: String(profile?.name || 'TCP Profile').trim() || 'TCP Profile',
+                enabled: profile?.enabled === true,
+                mode: this.normalizeTcpMode(profile?.mode),
+                remoteHost: String(profile?.remoteHost || '127.0.0.1').trim() || '127.0.0.1',
+                remotePort: this.normalizeTcpPort(profile?.remotePort),
+                localHost: String(profile?.localHost || '127.0.0.1').trim() || '127.0.0.1',
+                localPort: this.normalizeTcpPort(profile?.localPort),
+                encoding: this.normalizeTcpEncoding(profile?.encoding),
+                frameMode: this.normalizeTcpFrameMode(profile?.frameMode),
+                fixedLength: this.normalizeTcpPort(profile?.fixedLength),
+                lineEnding: this.normalizeTcpLineEnding(profile?.lineEnding),
+                timeoutMs: this.normalizeTcpTimeout(profile?.timeoutMs),
+                keepAlive: profile?.keepAlive === true,
+                reconnect: profile?.reconnect !== false,
+                connectOnStartup: profile?.connectOnStartup === true,
+                description: String(profile?.description || '').trim()
+            };
+        }
+        ,
+        normalizeTcpCommunicationConfig(tcpCommunication) {
+            const sourceProfiles = Array.isArray(tcpCommunication?.profiles) ? tcpCommunication.profiles : [];
+            return {
+                profiles: sourceProfiles.map(profile => this.normalizeTcpProfile(profile))
+            };
+        }
+        ,
         normalizePlcProtocol(protocol) {
             const candidate = `${protocol || ''}`.trim().toUpperCase();
             if (candidate === 'MC' || candidate === 'MITSUBISHIMC') return 'MC';
@@ -199,6 +270,7 @@ export function installSettingsNormalizers(SettingsView) {
                     theme: normalizeTheme(config?.general?.theme, defaults.general.theme)
                 },
                 communication: this.normalizeCommunicationConfig(config?.communication),
+                tcpCommunication: this.normalizeTcpCommunicationConfig(config?.tcpCommunication),
                 storage: { ...defaults.storage, ...(config?.storage || {}) },
                 runtime: { ...defaults.runtime, ...(config?.runtime || {}) },
                 security: { ...defaults.security, ...(config?.security || {}) },
@@ -351,6 +423,9 @@ export function installSettingsNormalizers(SettingsView) {
                         port: 9600,
                         mappings: []
                     }
+                },
+                tcpCommunication: {
+                    profiles: []
                 },
                 storage: { imageSavePath: 'D:\\VisionData\\Images', savePolicy: 'NgOnly', retentionDays: 30, minFreeSpaceGb: 5 },
                 runtime: {

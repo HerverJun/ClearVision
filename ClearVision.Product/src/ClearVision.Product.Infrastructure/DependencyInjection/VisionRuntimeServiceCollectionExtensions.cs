@@ -39,6 +39,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IExecutionAdmissionService, ExecutionAdmissionService>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
         services.AddSingleton<ParameterRecommender>();
+        services.AddSingleton<ITcpDeviceManager, TcpDeviceManager>();
         services.AddScoped<OperatorPreviewService>();
 
         services.AddSingleton<IOperatorExecutor, ImageAcquisitionOperator>();

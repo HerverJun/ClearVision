@@ -84,6 +84,75 @@ export function validateStationCommunicationDraft(payload) {
     return { ok: true, value: { mode, port: parsedPort, lanHost } };
 }
 
+export function validateTcpProfileDraft(profile) {
+    const mode = String(profile?.mode || 'Client').trim();
+    if (!['Client', 'Server'].includes(mode)) {
+        return { ok: false, message: 'TCP 模式必须是 Client 或 Server。' };
+    }
+
+    const validateIp = (value, label) => {
+        const text = String(value || '').trim();
+        if (!text || text.toLowerCase() === 'localhost') {
+            return text ? { ok: true, value: text } : { ok: false, message: `${label}不能为空。` };
+        }
+
+        if (!/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(text)) {
+            return { ok: false, message: `${label}必须是有效 IP 地址。` };
+        }
+
+        return { ok: true, value: text };
+    };
+
+    const name = String(profile?.name || '').trim();
+    if (!name) {
+        return { ok: false, message: 'TCP Profile 名称不能为空。' };
+    }
+
+    const host = mode === 'Server'
+        ? validateIp(profile?.localHost, '本地监听 IP')
+        : validateIp(profile?.remoteHost, '远端 IP');
+    if (!host.ok) {
+        return host;
+    }
+
+    const port = validateIntegerValue(
+        mode === 'Server' ? profile?.localPort : profile?.remotePort,
+        mode === 'Server' ? '本地监听端口' : '远端端口',
+        { min: 1, max: 65535 });
+    if (!port.ok) {
+        return port;
+    }
+
+    const timeout = validateIntegerValue(profile?.timeoutMs, '超时时间', { min: 100, max: 600000 });
+    if (!timeout.ok) {
+        return timeout;
+    }
+
+    const encoding = String(profile?.encoding || 'UTF8').trim().toUpperCase();
+    if (!['UTF8', 'ASCII', 'GBK', 'HEX'].includes(encoding)) {
+        return { ok: false, message: '编码必须是 UTF8、ASCII、GBK 或 HEX。' };
+    }
+
+    const frameMode = String(profile?.frameMode || 'Raw').trim();
+    if (!['Raw', 'Line', 'FixedLength', 'Hex'].includes(frameMode)) {
+        return { ok: false, message: '报文模式必须是 Raw、Line、FixedLength 或 Hex。' };
+    }
+
+    if (frameMode === 'FixedLength') {
+        const fixedLength = validateIntegerValue(profile?.fixedLength, '固定长度', { min: 1, max: 1048576 });
+        if (!fixedLength.ok) {
+            return fixedLength;
+        }
+    }
+
+    const lineEnding = String(profile?.lineEnding || 'None').trim();
+    if (!['None', 'CR', 'LF', 'CRLF'].includes(lineEnding)) {
+        return { ok: false, message: '行结束符必须是 None、CR、LF 或 CRLF。' };
+    }
+
+    return { ok: true, value: profile };
+}
+
 export function validateCameraParameterDraft(payload) {
     if (!Number.isFinite(payload?.exposureTimeUs) || payload.exposureTimeUs < 10 || payload.exposureTimeUs > 1000000) {
         return { ok: false, message: '曝光时间需在 10 - 1000000 µs 范围内' };

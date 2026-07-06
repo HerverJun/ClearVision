@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Net;
 using ClearVision.Product.Core.Continuous;
 
 namespace ClearVision.Product.Core.Entities;
@@ -11,6 +12,8 @@ public class AppConfig
     public GeneralConfig General { get; set; } = new();
 
     public CommunicationConfig Communication { get; set; } = new();
+
+    public TcpCommunicationConfig TcpCommunication { get; set; } = new();
 
     public StorageConfig Storage { get; set; } = new();
 
@@ -30,6 +33,8 @@ public class AppConfig
         General.Normalize();
         Communication ??= new CommunicationConfig();
         Communication.Normalize();
+        TcpCommunication ??= new TcpCommunicationConfig();
+        TcpCommunication.Normalize();
         Storage ??= new StorageConfig();
         Runtime ??= new RuntimeConfig();
         Runtime.Normalize();
@@ -378,6 +383,358 @@ public sealed class S7CommunicationProfile : PlcCommunicationProfile
         };
     }
 }
+
+public class TcpCommunicationConfig
+{
+    public List<TcpCommunicationProfile> Profiles { get; set; } = new();
+
+    public void Normalize()
+    {
+        Profiles ??= new List<TcpCommunicationProfile>();
+
+        var normalizedProfiles = new List<TcpCommunicationProfile>();
+        foreach (var profile in Profiles)
+        {
+            if (profile == null)
+            {
+                continue;
+            }
+
+            profile.Normalize();
+            normalizedProfiles.Add(profile);
+        }
+
+        Profiles = normalizedProfiles;
+    }
+
+    public TcpCommunicationProfile? FindProfile(string? id)
+    {
+        Normalize();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        return Profiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, id.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+}
+
+public class TcpCommunicationProfile
+{
+    public const string ModeClient = "Client";
+    public const string ModeServer = "Server";
+    public const string EncodingUtf8 = "UTF8";
+    public const string EncodingAscii = "ASCII";
+    public const string EncodingGbk = "GBK";
+    public const string EncodingHex = "HEX";
+    public const string FrameModeRaw = "Raw";
+    public const string FrameModeLine = "Line";
+    public const string FrameModeFixedLength = "FixedLength";
+    public const string FrameModeHex = "Hex";
+    public const string LineEndingNone = "None";
+    public const string LineEndingCr = "CR";
+    public const string LineEndingLf = "LF";
+    public const string LineEndingCrlf = "CRLF";
+    public const int DefaultTimeoutMs = 5000;
+    public const int MinTimeoutMs = 100;
+    public const int MaxTimeoutMs = 600000;
+
+    public string Id { get; set; } = string.Empty;
+
+    public string Name { get; set; } = "TCP Profile";
+
+    public bool Enabled { get; set; }
+
+    public string Mode { get; set; } = ModeClient;
+
+    public string RemoteHost { get; set; } = "127.0.0.1";
+
+    public int RemotePort { get; set; }
+
+    public string LocalHost { get; set; } = IPAddress.Loopback.ToString();
+
+    public int LocalPort { get; set; }
+
+    public string Encoding { get; set; } = EncodingUtf8;
+
+    public string FrameMode { get; set; } = FrameModeRaw;
+
+    public int FixedLength { get; set; }
+
+    public string LineEnding { get; set; } = LineEndingNone;
+
+    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+
+    public bool KeepAlive { get; set; }
+
+    public bool Reconnect { get; set; } = true;
+
+    public bool ConnectOnStartup { get; set; }
+
+    public string Description { get; set; } = string.Empty;
+
+    public void Normalize()
+    {
+        Id = NormalizeId(Id);
+        Name = string.IsNullOrWhiteSpace(Name) ? "TCP Profile" : Name.Trim();
+        Mode = NormalizeMode(Mode);
+        RemoteHost = string.IsNullOrWhiteSpace(RemoteHost) ? IPAddress.Loopback.ToString() : RemoteHost.Trim();
+        LocalHost = string.IsNullOrWhiteSpace(LocalHost) ? IPAddress.Loopback.ToString() : LocalHost.Trim();
+        RemotePort = NormalizePort(RemotePort);
+        LocalPort = NormalizePort(LocalPort);
+        Encoding = NormalizeEncoding(Encoding);
+        FrameMode = NormalizeFrameMode(FrameMode);
+        FixedLength = FixedLength < 0 ? 0 : FixedLength;
+        LineEnding = NormalizeLineEnding(LineEnding);
+        TimeoutMs = NormalizeTimeout(TimeoutMs);
+        Description = Description?.Trim() ?? string.Empty;
+    }
+
+    public TcpCommunicationProfile CloneNormalized()
+    {
+        var clone = new TcpCommunicationProfile
+        {
+            Id = Id,
+            Name = Name,
+            Enabled = Enabled,
+            Mode = Mode,
+            RemoteHost = RemoteHost,
+            RemotePort = RemotePort,
+            LocalHost = LocalHost,
+            LocalPort = LocalPort,
+            Encoding = Encoding,
+            FrameMode = FrameMode,
+            FixedLength = FixedLength,
+            LineEnding = LineEnding,
+            TimeoutMs = TimeoutMs,
+            KeepAlive = KeepAlive,
+            Reconnect = Reconnect,
+            ConnectOnStartup = ConnectOnStartup,
+            Description = Description
+        };
+        clone.Normalize();
+        return clone;
+    }
+
+    public static string NormalizeId(string? value)
+    {
+        var candidate = (value ?? string.Empty).Trim();
+        return string.IsNullOrWhiteSpace(candidate)
+            ? $"tcp_{Guid.NewGuid():N}"[..12]
+            : candidate;
+    }
+
+    public static string NormalizeMode(string? mode)
+    {
+        return string.Equals(mode?.Trim(), ModeServer, StringComparison.OrdinalIgnoreCase)
+            ? ModeServer
+            : ModeClient;
+    }
+
+    public static string NormalizeEncoding(string? encoding)
+    {
+        var candidate = (encoding ?? string.Empty).Trim().Replace("-", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return candidate.ToUpperInvariant() switch
+        {
+            EncodingAscii => EncodingAscii,
+            EncodingGbk => EncodingGbk,
+            EncodingHex => EncodingHex,
+            _ => EncodingUtf8
+        };
+    }
+
+    public static string NormalizeFrameMode(string? frameMode)
+    {
+        var candidate = (frameMode ?? string.Empty).Trim().Replace("-", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return candidate.ToUpperInvariant() switch
+        {
+            "LINE" => FrameModeLine,
+            "FIXEDLENGTH" => FrameModeFixedLength,
+            "HEX" => FrameModeHex,
+            _ => FrameModeRaw
+        };
+    }
+
+    public static string NormalizeLineEnding(string? lineEnding)
+    {
+        return (lineEnding ?? string.Empty).Trim().ToUpperInvariant() switch
+        {
+            LineEndingCr => LineEndingCr,
+            LineEndingLf => LineEndingLf,
+            LineEndingCrlf => LineEndingCrlf,
+            _ => LineEndingNone
+        };
+    }
+
+    public static int NormalizeTimeout(int timeoutMs)
+    {
+        if (timeoutMs <= 0)
+        {
+            return DefaultTimeoutMs;
+        }
+
+        return Math.Clamp(timeoutMs, MinTimeoutMs, MaxTimeoutMs);
+    }
+
+    public static int NormalizePort(int port)
+    {
+        return port is >= 0 and <= 65535 ? port : 0;
+    }
+}
+
+public static class TcpCommunicationConfigValidator
+{
+    public static TcpCommunicationValidationResult Validate(TcpCommunicationConfig? config)
+    {
+        config ??= new TcpCommunicationConfig();
+        config.Normalize();
+
+        var issues = new List<TcpCommunicationValidationIssue>();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < config.Profiles.Count; index++)
+        {
+            var profile = config.Profiles[index];
+            ValidateProfile(profile, index, issues);
+            if (!seenIds.Add(profile.Id))
+            {
+                issues.Add(new TcpCommunicationValidationIssue(
+                    profile.Id,
+                    "profile",
+                    "id",
+                    index,
+                    "Profile Id 不能重复。"));
+            }
+        }
+
+        return new TcpCommunicationValidationResult(issues.Count == 0, issues);
+    }
+
+    public static TcpCommunicationValidationResult ValidateProfileForOperation(TcpCommunicationProfile? profile)
+    {
+        if (profile == null)
+        {
+            return new TcpCommunicationValidationResult(
+                false,
+                [new TcpCommunicationValidationIssue(string.Empty, "profile", "id", null, "TCP Profile 不存在。")]);
+        }
+
+        profile.Normalize();
+        var issues = new List<TcpCommunicationValidationIssue>();
+        ValidateProfile(profile, null, issues);
+        if (!profile.Enabled)
+        {
+            issues.Add(new TcpCommunicationValidationIssue(
+                profile.Id,
+                "profile",
+                "enabled",
+                null,
+                "TCP Profile 已禁用。"));
+        }
+
+        return new TcpCommunicationValidationResult(issues.Count == 0, issues);
+    }
+
+    private static void ValidateProfile(
+        TcpCommunicationProfile profile,
+        int? index,
+        ICollection<TcpCommunicationValidationIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(profile.Id))
+        {
+            issues.Add(new TcpCommunicationValidationIssue(profile.Id, "profile", "id", index, "Profile Id 不能为空。"));
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Name))
+        {
+            issues.Add(new TcpCommunicationValidationIssue(profile.Id, "profile", "name", index, "Profile 名称不能为空。"));
+        }
+
+        if (profile.Mode == TcpCommunicationProfile.ModeClient)
+        {
+            ValidateIp(profile.Id, "connection", "remoteHost", index, profile.RemoteHost, "远端 IP", issues);
+            ValidatePort(profile.Id, "connection", "remotePort", index, profile.RemotePort, "远端端口", issues);
+        }
+        else
+        {
+            ValidateIp(profile.Id, "connection", "localHost", index, profile.LocalHost, "本地监听 IP", issues);
+            ValidatePort(profile.Id, "connection", "localPort", index, profile.LocalPort, "本地监听端口", issues);
+        }
+
+        if (profile.FrameMode == TcpCommunicationProfile.FrameModeFixedLength && profile.FixedLength <= 0)
+        {
+            issues.Add(new TcpCommunicationValidationIssue(
+                profile.Id,
+                "frame",
+                "fixedLength",
+                index,
+                "FixedLength 报文模式需要配置正整数长度。"));
+        }
+
+        if (profile.TimeoutMs is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
+        {
+            issues.Add(new TcpCommunicationValidationIssue(
+                profile.Id,
+                "connection",
+                "timeoutMs",
+                index,
+                $"超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间。"));
+        }
+    }
+
+    private static void ValidateIp(
+        string profileId,
+        string section,
+        string field,
+        int? index,
+        string? value,
+        string label,
+        ICollection<TcpCommunicationValidationIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            (!IPAddress.TryParse(value.Trim(), out _) &&
+             !string.Equals(value.Trim(), "localhost", StringComparison.OrdinalIgnoreCase)))
+        {
+            issues.Add(new TcpCommunicationValidationIssue(
+                profileId,
+                section,
+                field,
+                index,
+                $"{label} 必须是有效 IP 地址。"));
+        }
+    }
+
+    private static void ValidatePort(
+        string profileId,
+        string section,
+        string field,
+        int? index,
+        int value,
+        string label,
+        ICollection<TcpCommunicationValidationIssue> issues)
+    {
+        if (value is < 1 or > 65535)
+        {
+            issues.Add(new TcpCommunicationValidationIssue(
+                profileId,
+                section,
+                field,
+                index,
+                $"{label} 必须在 1-65535 之间。"));
+        }
+    }
+}
+
+public sealed record TcpCommunicationValidationResult(
+    bool IsValid,
+    IReadOnlyList<TcpCommunicationValidationIssue> Errors);
+
+public sealed record TcpCommunicationValidationIssue(
+    string ProfileId,
+    string Section,
+    string Field,
+    int? Index,
+    string Message);
 
 public class StorageConfig
 {
