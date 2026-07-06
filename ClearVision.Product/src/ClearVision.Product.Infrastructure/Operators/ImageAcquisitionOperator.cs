@@ -253,6 +253,26 @@ public class ImageAcquisitionOperator : OperatorBase
             normalized = normalized[..separatorIndex].Trim();
         }
 
+        var token = normalized.ToLowerInvariant();
+        if (token == "camera" ||
+            token.Contains("cam", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("相机", StringComparison.Ordinal) ||
+            normalized.Contains("摄像", StringComparison.Ordinal))
+        {
+            return "Camera";
+        }
+
+        if (token == "file" ||
+            token.Contains("image", StringComparison.OrdinalIgnoreCase) ||
+            token.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("文件", StringComparison.Ordinal) ||
+            normalized.Contains("图像", StringComparison.Ordinal) ||
+            normalized.Contains("图片", StringComparison.Ordinal) ||
+            normalized.Contains("路径", StringComparison.Ordinal))
+        {
+            return "File";
+        }
+
         return normalized;
     }
 

@@ -1100,6 +1100,28 @@ test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layere
   const owner = new PreviewPanelCapabilityOwner(harness.container, {
     previewAdapter: harness.adapter
   });
+  harness.emitPreview({
+    ...successState({
+      activeNodeId: 'node-1',
+      status: 'idle',
+      executionTimeMs: null,
+      errorMessage: null,
+      outputImageBase64: null,
+      outputData: null,
+      observation: null,
+      artifacts: [],
+      presenter: {
+        statusText: '等待预览',
+        inputImageSrc: null,
+        outputImageSrc: null
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /data-status="idle">等待预览/);
+  assert.match(harness.container.innerHTML, /等待预览，暂无输出图像/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
+
   const emitIdleError = errorMessage => harness.emitPreview({
     ...successState({
       activeNodeId: 'node-1',

@@ -52,6 +52,75 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithUnicodeFilePath_ShouldLoadImage()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"ClearVision-图像采集-{Guid.NewGuid():N}");
+        var filePath = Path.Combine(directory, "菠萝苑LOGO样张.png");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            using var source = new Mat(9, 15, MatType.CV_8UC3, new Scalar(10, 120, 240));
+            File.WriteAllBytes(filePath, source.ToBytes(".png"));
+
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            result.OutputData.Should().NotBeNull();
+            result.OutputData!["Image"].Should().BeOfType<ImageWrapper>();
+            result.OutputData["Width"].Should().Be(15);
+            result.OutputData["Height"].Should().Be(9);
+            result.OutputData["Source"].Should().Be("file");
+            result.OutputData["FilePath"].Should().Be(filePath);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLocalizedFileSourceType_ShouldLoadImage()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"ClearVision-采集源-{Guid.NewGuid():N}");
+        var filePath = Path.Combine(directory, "本地图像.png");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            using var source = new Mat(6, 10, MatType.CV_8UC3, new Scalar(40, 90, 180));
+            File.WriteAllBytes(filePath, source.ToBytes(".png"));
+
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "文件"));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            result.OutputData.Should().NotBeNull();
+            result.OutputData!["Width"].Should().Be(10);
+            result.OutputData["Height"].Should().Be(6);
+            result.OutputData["Source"].Should().Be("file");
+            result.OutputData["FilePath"].Should().Be(filePath);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithRuntimeImageAndNoFilePath_ShouldUseProvidedImage()
     {
         using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
@@ -262,6 +331,18 @@ public class ImageAcquisitionOperatorTests
 
         result.IsValid.Should().BeTrue();
         result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateParameters_WithLocalizedCameraSourceAndMissingCamera_ShouldRequireCameraId()
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "相机"));
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain("CameraId is required when SourceType is Camera.");
     }
 
     private static Operator CreateTestOperator()

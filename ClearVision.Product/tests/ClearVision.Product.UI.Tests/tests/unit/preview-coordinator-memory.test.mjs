@@ -4,6 +4,9 @@ import {
   NodePreviewCoordinator,
   previewObservationMatchesRequest
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
+import {
+  normalizeAcquisitionSourceType
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/parameterDependencyRules.js';
 
 function waitFor(assertion, timeoutMs = 1000) {
   const startedAt = Date.now();
@@ -123,6 +126,41 @@ function buildArtifactPreviewResponse(nodeId, options, suffix = '1') {
     ]
   };
 }
+
+test('normalizeAcquisitionSourceType recognizes localized file and camera labels', () => {
+  assert.equal(normalizeAcquisitionSourceType('文件'), 'file');
+  assert.equal(normalizeAcquisitionSourceType('图像文件'), 'file');
+  assert.equal(normalizeAcquisitionSourceType('File|文件'), 'file');
+  assert.equal(normalizeAcquisitionSourceType('相机'), 'camera');
+  assert.equal(normalizeAcquisitionSourceType('摄像头'), 'camera');
+  assert.equal(normalizeAcquisitionSourceType('Camera|相机'), 'camera');
+});
+
+test('NodePreviewCoordinator accepts localized file acquisition source when file path is present', async () => {
+  const fileNode = {
+    id: 'file-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: '文件' },
+      { name: 'FilePath', value: 'C:\\Images\\part.png' }
+    ],
+    outputs: [{ type: 'image' }]
+  };
+  const { coordinator, getExecuteCount } = createCoordinator({
+    node: fileNode,
+    inputImageBase64: null
+  });
+
+  try {
+    coordinator.setActiveNode(fileNode);
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    assert.equal(getExecuteCount(), 1);
+    assert.equal(coordinator.getState().errorMessage, null);
+  } finally {
+    coordinator.destroy();
+  }
+});
 
 test('NodePreviewCoordinator cache entries do not retain input image base64', async () => {
   const inputImageBase64 = 'A'.repeat(1024 * 1024);

@@ -327,11 +327,17 @@ export function normalizeAcquisitionSourceType(value) {
     const separatorIndex = raw.indexOf('|');
     const token = (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
 
-    if (token === 'camera' || token.includes('cam')) {
+    if (token === 'camera' || token.includes('cam') || token.includes('相机') || token.includes('摄像')) {
         return 'camera';
     }
 
-    if (token === 'file' || token.includes('image') || token.includes('path')) {
+    if (token === 'file' ||
+        token.includes('image') ||
+        token.includes('path') ||
+        token.includes('文件') ||
+        token.includes('图像') ||
+        token.includes('图片') ||
+        token.includes('路径')) {
         return 'file';
     }
 

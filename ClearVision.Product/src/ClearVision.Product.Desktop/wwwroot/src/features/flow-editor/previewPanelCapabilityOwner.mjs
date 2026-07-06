@@ -342,6 +342,10 @@ function getPreviewImageEmptyMessage({
         return '该算子没有图像输出';
     }
 
+    if (statusInfo.kind === 'idle') {
+        return '等待预览，暂无输出图像';
+    }
+
     return '预览完成，但没有返回图像输出';
 }
 
