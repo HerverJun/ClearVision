@@ -10,6 +10,7 @@ import {
   REGION_RECT_PARAM_KEYS,
   appendPointSequencePoint,
   cancelRectangleDraft,
+  circleFromPoints,
   clampRectToBounds,
   commitRectangleDraft,
   computeClockwiseAngleSpanDegrees,
@@ -46,6 +47,8 @@ import {
   parsePointPairs,
   parsePolygonPoints,
   pointPairsToParamsJson,
+  polygonFromPoints,
+  polygonFromRect,
   polygonToParamsJson,
   rectFromParams,
   rectToParams,
@@ -231,6 +234,14 @@ test('circle geometry normalizes validates translates resizes and hit-tests with
   assert.deepEqual(
     resizeCircleByHandle(circle, 'radius', { x: 74, y: 40 }, bounds),
     { kind: 'circle', centerX: 50, centerY: 40, radius: 24 }
+  );
+  assert.deepEqual(
+    circleFromPoints({ x: 20, y: 18 }, { x: 42, y: 40 }, bounds),
+    { kind: 'circle', centerX: 31, centerY: 29, radius: 11 }
+  );
+  assert.deepEqual(
+    circleFromPoints({ x: 42, y: 40 }, { x: 20, y: 18 }, bounds),
+    { kind: 'circle', centerX: 31, centerY: 29, radius: 11 }
   );
 
   const invalid = validateCircleGeometry({ centerX: 10, centerY: 10, radius: Number.NaN });
@@ -509,6 +520,25 @@ test('polygon geometry validates fail-closed policy and supports vertex edits', 
   const translated = translatePolygon(polygon, { x: 2, y: 3 }, bounds);
   assert.deepEqual(translated.points[0], { x: 12, y: 13 });
 
+  const clampedTranslation = translatePolygon(polygon, { x: -20, y: -20 }, bounds);
+  assert.deepEqual(clampedTranslation.points, [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 20 },
+    { x: 0, y: 20 }
+  ]);
+
+  const clampedVertex = movePolygonVertex(polygon, 0, { x: -5, y: -2 }, bounds);
+  assert.deepEqual(clampedVertex.points[0], { x: 0, y: 0 });
+
+  const drawn = polygonFromPoints({ x: 5, y: 6 }, { x: 25, y: 26 }, bounds);
+  assert.deepEqual(drawn.points, [
+    { x: 5, y: 6 },
+    { x: 25, y: 6 },
+    { x: 25, y: 26 },
+    { x: 5, y: 26 }
+  ]);
+
   const deleted = deletePolygonVertex(inserted, 1, bounds);
   assert.equal(deleted.points.length, 4);
 
@@ -548,7 +578,7 @@ test('polygon geometry validates fail-closed policy and supports vertex edits', 
   assert.ok(outOfBounds.errors.includes('bounds'));
 });
 
-test('polygon adapter round-trips legacy PolygonPoints JSON and rejects invalid polygons', () => {
+test('polygon adapter round-trips legacy PolygonPoints JSON and falls back for invalid polygons', () => {
   const config = getOperatorRoiConfig({
     type: 'RoiManager',
     parameters: [
@@ -575,7 +605,19 @@ test('polygon adapter round-trips legacy PolygonPoints JSON and rejects invalid 
       { name: 'PolygonPoints', value: '[[10,10],[30,30],[30,10],[10,30]]' }
     ]
   });
-  assert.equal(invalidConfig.editable, false);
+  assert.equal(invalidConfig.editable, true);
+
+  const fallback = geometryFromParams({
+    X: 4,
+    Y: 6,
+    Width: 12,
+    Height: 10,
+    PolygonPoints: '[]'
+  }, invalidConfig, { width: 64, height: 64 });
+  assert.deepEqual(fallback, polygonFromRect({ x: 4, y: 6, width: 12, height: 10 }, { width: 64, height: 64 }));
+  assert.deepEqual(geometryToParams({ kind: 'rectangle', x: 4, y: 6, width: 12, height: 10 }, invalidConfig), {
+    PolygonPoints: '[[4,6],[16,6],[16,16],[4,16]]'
+  });
 });
 
 test('point sequence adapter preserves order enabled state and legacy PointPairs payload', () => {

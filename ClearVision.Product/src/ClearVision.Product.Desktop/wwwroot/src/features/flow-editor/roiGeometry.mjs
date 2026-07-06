@@ -371,6 +371,37 @@ export function normalizeCircleGeometry(circle, bounds, minRadius = 1) {
     };
 }
 
+function clampPointToBounds(point, bounds) {
+    const source = {
+        x: readNumber(point?.x, 0),
+        y: readNumber(point?.y, 0)
+    };
+    if (!bounds) {
+        return source;
+    }
+
+    const normalizedBounds = normalizeBounds(bounds);
+    return {
+        x: clamp(source.x, 0, normalizedBounds.width),
+        y: clamp(source.y, 0, normalizedBounds.height)
+    };
+}
+
+export function circleFromPoints(start, end, bounds = null, minRadius = 1) {
+    const minimum = Math.max(1, readNumber(minRadius, 1));
+    const startPoint = clampPointToBounds(start, bounds);
+    const endPoint = clampPointToBounds(end, bounds);
+    const rect = normalizeRectFromPoints(startPoint, endPoint);
+    const diameter = Math.max(minimum * 2, Math.min(rect.width, rect.height));
+
+    return normalizeCircleGeometry({
+        kind: 'circle',
+        centerX: rect.x + rect.width / 2,
+        centerY: rect.y + rect.height / 2,
+        radius: diameter / 2
+    }, bounds, minimum);
+}
+
 export function validateCircleGeometry(circle, bounds = null, minRadius = 1) {
     const minimum = Math.max(1, readNumber(minRadius, 1));
     const errors = [];
@@ -576,6 +607,35 @@ export function normalizePolygonGeometry(polygon) {
     };
 }
 
+export function polygonFromRect(rect, bounds = null, minSize = 2) {
+    const minimum = Math.max(POLYGON_MIN_EDGE_LENGTH + 1, readNumber(minSize, 2));
+    const rawRect = {
+        x: readNumber(rect?.x, 0),
+        y: readNumber(rect?.y, 0),
+        width: Math.max(minimum, readNumber(rect?.width, minimum)),
+        height: Math.max(minimum, readNumber(rect?.height, minimum))
+    };
+    const normalized = bounds
+        ? clampRectToBounds(rawRect, bounds, minimum)
+        : rawRect;
+
+    return normalizePolygonGeometry({
+        kind: 'polygon',
+        points: [
+            { x: normalized.x, y: normalized.y },
+            { x: normalized.x + normalized.width, y: normalized.y },
+            { x: normalized.x + normalized.width, y: normalized.y + normalized.height },
+            { x: normalized.x, y: normalized.y + normalized.height }
+        ]
+    });
+}
+
+export function polygonFromPoints(start, end, bounds = null, minSize = 2) {
+    const startPoint = clampPointToBounds(start, bounds);
+    const endPoint = clampPointToBounds(end, bounds);
+    return polygonFromRect(normalizeRectFromPoints(startPoint, endPoint), bounds, minSize);
+}
+
 export function validatePolygonGeometry(polygon, bounds = null, options = {}) {
     const minPoints = Math.max(POLYGON_MIN_POINTS, Math.floor(readNumber(options.minPoints, POLYGON_MIN_POINTS)));
     const minEdgeLength = Math.max(0, readNumber(options.minEdgeLength, POLYGON_MIN_EDGE_LENGTH));
@@ -725,9 +785,21 @@ export function hitTestPolygon(point, polygon) {
 }
 
 export function translatePolygon(polygon, delta, bounds = null) {
-    const points = normalizePolygonGeometry(polygon).points.map(point => ({
-        x: roundCoordinate(point.x + Number(delta?.x ?? 0)),
-        y: roundCoordinate(point.y + Number(delta?.y ?? 0))
+    const current = normalizePolygonGeometry(polygon);
+    let deltaX = Number(delta?.x ?? 0);
+    let deltaY = Number(delta?.y ?? 0);
+
+    if (bounds && current.points.length > 0) {
+        const normalizedBounds = normalizeBounds(bounds);
+        const xs = current.points.map(point => Number(point.x));
+        const ys = current.points.map(point => Number(point.y));
+        deltaX = clamp(deltaX, -Math.min(...xs), normalizedBounds.width - Math.max(...xs));
+        deltaY = clamp(deltaY, -Math.min(...ys), normalizedBounds.height - Math.max(...ys));
+    }
+
+    const points = current.points.map(point => ({
+        x: roundCoordinate(point.x + deltaX),
+        y: roundCoordinate(point.y + deltaY)
     }));
     const next = { kind: 'polygon', points };
     return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
@@ -740,11 +812,12 @@ export function movePolygonVertex(polygon, vertexIndex, point, bounds = null) {
         return normalizePolygonGeometry(polygon);
     }
 
+    const target = clampPointToBounds(point, bounds);
     const next = {
         kind: 'polygon',
         points: points.map((existing, currentIndex) =>
             currentIndex === index
-                ? { x: roundCoordinate(point.x), y: roundCoordinate(point.y) }
+                ? { x: roundCoordinate(target.x), y: roundCoordinate(target.y) }
                 : existing)
     };
     return validatePolygonGeometry(next, bounds).valid ? next : normalizePolygonGeometry(polygon);
@@ -757,11 +830,12 @@ export function insertPolygonVertex(polygon, insertIndex, point, bounds = null) 
         return normalizePolygonGeometry(polygon);
     }
 
+    const target = clampPointToBounds(point, bounds);
     const next = {
         kind: 'polygon',
         points: [
             ...points.slice(0, index),
-            { x: roundCoordinate(point.x), y: roundCoordinate(point.y) },
+            { x: roundCoordinate(target.x), y: roundCoordinate(target.y) },
             ...points.slice(index)
         ]
     };

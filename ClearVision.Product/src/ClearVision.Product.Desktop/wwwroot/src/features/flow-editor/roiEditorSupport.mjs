@@ -14,6 +14,7 @@ import {
     normalizeCircleGeometry,
     normalizePointSequenceGeometry,
     normalizePolygonGeometry,
+    polygonFromRect,
     parsePointPairs,
     parsePolygonPoints,
     pointPairsToParamsJson,
@@ -125,6 +126,47 @@ function roundGeometryNumber(value, digits = 3) {
     return Math.round(numberValue * scale) / scale;
 }
 
+function hasRectParam(values, key) {
+    return Object.prototype.hasOwnProperty.call(values || {}, key) &&
+        values?.[key] !== null &&
+        values?.[key] !== undefined &&
+        String(values[key]).trim() !== '';
+}
+
+function getFallbackPolygonRect(values, bounds = null) {
+    const hasExplicitRect = hasRectParam(values, DEFAULT_RECT_PARAM_KEYS.x) ||
+        hasRectParam(values, DEFAULT_RECT_PARAM_KEYS.y) ||
+        hasRectParam(values, DEFAULT_RECT_PARAM_KEYS.width) ||
+        hasRectParam(values, DEFAULT_RECT_PARAM_KEYS.height) ||
+        hasRectParam(values, 'x') ||
+        hasRectParam(values, 'y') ||
+        hasRectParam(values, 'width') ||
+        hasRectParam(values, 'height');
+
+    if (hasExplicitRect) {
+        return rectFromParams(values, DEFAULT_RECT_PARAM_KEYS);
+    }
+
+    const width = Number(bounds?.width);
+    const height = Number(bounds?.height);
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 2 && height > 2) {
+        const side = Math.max(2, Math.round(Math.min(width, height) * 0.5));
+        return {
+            x: Math.round((width - side) / 2),
+            y: Math.round((height - side) / 2),
+            width: side,
+            height: side
+        };
+    }
+
+    return { x: 0, y: 0, width: 20, height: 20 };
+}
+
+function fallbackPolygonFromParams(values, bounds = null) {
+    const polygon = polygonFromRect(getFallbackPolygonRect(values, bounds), bounds, 2);
+    return validatePolygonGeometry(polygon, bounds).valid ? polygon : null;
+}
+
 export function geometryFromParams(values, config, bounds = null) {
     const adapter = config?.geometryAdapter;
     if (!adapter) {
@@ -196,7 +238,7 @@ export function geometryFromParams(values, config, bounds = null) {
         const keys = adapter.paramKeys || POLYGON_PARAM_KEYS;
         const polygon = parsePolygonPoints(values?.[keys.points]);
         if (!polygon || !validatePolygonGeometry(polygon, bounds).valid) {
-            return null;
+            return fallbackPolygonFromParams(values, bounds);
         }
 
         return normalizePolygonGeometry(polygon);
@@ -264,8 +306,12 @@ export function geometryToParams(geometry, config) {
 
     if (adapter.kind === 'polygon') {
         const keys = adapter.paramKeys || POLYGON_PARAM_KEYS;
+        const normalized = normalizePolygonGeometry(geometry);
+        const polygon = normalized.points.length >= 3
+            ? normalized
+            : polygonFromRect(geometry, null, 2);
         return {
-            [keys.points]: polygonToParamsJson(geometry)
+            [keys.points]: polygonToParamsJson(polygon)
         };
     }
 
@@ -284,11 +330,7 @@ export function getOperatorRoiConfig(operator, options = {}) {
 
     if (type === 'RoiManager') {
         const shape = String(readOperatorValue(operator, 'Shape', 'Rectangle'));
-        const polygon = shape === 'Polygon'
-            ? parsePolygonPoints(readOperatorValue(operator, 'PolygonPoints', '[]'))
-            : null;
-        const polygonValidation = polygon ? validatePolygonGeometry(polygon) : { valid: false };
-        const editable = shape === 'Rectangle' || shape === 'Circle' || (shape === 'Polygon' && polygonValidation.valid);
+        const editable = shape === 'Rectangle' || shape === 'Circle' || shape === 'Polygon';
         const geometryAdapter = shape === 'Circle'
             ? { kind: 'circle', paramKeys: CIRCLE_PARAM_KEYS }
             : shape === 'Polygon'

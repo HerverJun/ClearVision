@@ -1,6 +1,8 @@
 import { expect, Page } from '@playwright/test';
 
 const E2E_USER = {
+  userId: 'e2e-admin',
+  id: 'e2e-admin',
   username: 'admin',
   displayName: 'E2E Admin',
   role: 'Admin',

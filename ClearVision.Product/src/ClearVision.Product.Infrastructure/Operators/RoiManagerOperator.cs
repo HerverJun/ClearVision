@@ -80,14 +80,6 @@ public class RoiManagerOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
 
-        // 边界检查
-        width = Math.Min(width, src.Width - x);
-        height = Math.Min(height, src.Height - y);
-        if (width <= 0 || height <= 0)
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
-        }
-
         var inputSpatialContext = ResolveInputSpatialContext(inputs);
         Mat resultImage;
         Mat mask = new Mat(src.Size(), MatType.CV_8UC1, Scalar.All(0));
@@ -98,16 +90,36 @@ public class RoiManagerOperator : OperatorBase
             switch (shape)
             {
                 case "Rectangle":
-                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height, out outputBounds);
+                    if (!TryCreateRectangleBounds(src, x, y, width, height, out var rectangleBounds))
+                    {
+                        return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
+                    }
+
+                    ProcessRectangle(src, out resultImage, mask, operation, rectangleBounds, out outputBounds);
                     break;
                 case "Circle":
-                    ProcessCircle(src, out resultImage, mask, operation, centerX, centerY, radius, out outputBounds);
+                    if (!TryCreateCircleBounds(src, centerX, centerY, radius, out var circleBounds))
+                    {
+                        return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
+                    }
+
+                    ProcessCircle(src, out resultImage, mask, operation, centerX, centerY, radius, circleBounds, out outputBounds);
                     break;
                 case "Polygon":
-                    ProcessPolygon(src, out resultImage, mask, operation, polygonPoints, out outputBounds);
+                    if (!TryResolvePolygonPoints(polygonPoints, src.Size(), out var resolvedPolygonPoints, out var polygonBounds))
+                    {
+                        return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
+                    }
+
+                    ProcessPolygon(src, out resultImage, mask, operation, resolvedPolygonPoints, polygonBounds, out outputBounds);
                     break;
                 default:
-                    ProcessRectangle(src, out resultImage, mask, operation, x, y, width, height, out outputBounds);
+                    if (!TryCreateRectangleBounds(src, x, y, width, height, out var defaultBounds))
+                    {
+                        return Task.FromResult(OperatorExecutionOutput.Failure("ROI区域超出图像边界"));
+                    }
+
+                    ProcessRectangle(src, out resultImage, mask, operation, defaultBounds, out outputBounds);
                     break;
             }
 
@@ -135,14 +147,9 @@ public class RoiManagerOperator : OperatorBase
         out Mat resultImage,
         Mat mask,
         string operation,
-        int x,
-        int y,
-        int width,
-        int height,
+        Rect rect,
         out Rect outputBounds)
     {
-        var rect = new Rect(x, y, width, height);
-
         if (operation == "Crop")
         {
             // 裁剪模式
@@ -169,26 +176,20 @@ public class RoiManagerOperator : OperatorBase
         int centerX,
         int centerY,
         int radius,
+        Rect bounds,
         out Rect outputBounds)
     {
         var center = new Point(centerX, centerY);
 
-        // 计算外接矩形
-        var rectX = Math.Max(0, centerX - radius);
-        var rectY = Math.Max(0, centerY - radius);
-        var rectWidth = Math.Min(radius * 2, src.Width - rectX);
-        var rectHeight = Math.Min(radius * 2, src.Height - rectY);
-
         // 在掩膜上绘制圆形
-        Cv2.Circle(mask, center, radius, Scalar.All(255), -1);
+        Cv2.Circle(mask, center, Math.Max(1, radius), Scalar.All(255), -1);
 
         if (operation == "Crop")
         {
             // 裁剪模式 - 裁剪外接矩形并应用圆形掩膜
-            var rect = new Rect(rectX, rectY, rectWidth, rectHeight);
-            outputBounds = rect;
-            using var cropped = new Mat(src, rect);
-            using var croppedMask = new Mat(mask, rect);
+            outputBounds = bounds;
+            using var cropped = new Mat(src, bounds);
+            using var croppedMask = new Mat(mask, bounds);
             resultImage = new Mat(cropped.Size(), src.Type(), Scalar.All(0));
             Cv2.BitwiseAnd(cropped, cropped, resultImage, croppedMask);
         }
@@ -206,50 +207,20 @@ public class RoiManagerOperator : OperatorBase
         out Mat resultImage,
         Mat mask,
         string operation,
-        string polygonPointsJson,
+        Point[] polygonPoints,
+        Rect bounds,
         out Rect outputBounds)
     {
-        Point[][]? points = null;
-        try
-        {
-            var pointArrays = JsonSerializer.Deserialize<int[][]>(polygonPointsJson);
-            if (pointArrays != null && pointArrays.Length >= 3)
-            {
-                points = new[] { pointArrays.Select(p => new Point(p[0], p[1])).ToArray() };
-            }
-        }
-        catch
-        {
-            points = null;
-        }
-
-        if (points == null)
-        {
-            // 解析失败，使用默认矩形
-            points = new[] { new[] { new Point(10, 10), new Point(200, 10), new Point(200, 200), new Point(10, 200) } };
-        }
+        var points = new[] { polygonPoints };
 
         // 在掩膜上填充多边形
         Cv2.FillPoly(mask, points, Scalar.All(255));
 
         if (operation == "Crop")
         {
-            // 裁剪模式 - 计算多边形外接矩形
-            var allPoints = points[0];
-            var minX = allPoints.Min(p => p.X);
-            var minY = allPoints.Min(p => p.Y);
-            var maxX = allPoints.Max(p => p.X);
-            var maxY = allPoints.Max(p => p.Y);
-
-            minX = Math.Max(0, minX);
-            minY = Math.Max(0, minY);
-            maxX = Math.Min(src.Width, maxX);
-            maxY = Math.Min(src.Height, maxY);
-
-            var rect = new Rect(minX, minY, maxX - minX, maxY - minY);
-            outputBounds = rect;
-            using var cropped = new Mat(src, rect);
-            using var croppedMask = new Mat(mask, rect);
+            outputBounds = bounds;
+            using var cropped = new Mat(src, bounds);
+            using var croppedMask = new Mat(mask, bounds);
             resultImage = new Mat(cropped.Size(), src.Type(), Scalar.All(0));
             Cv2.BitwiseAnd(cropped, cropped, resultImage, croppedMask);
         }
@@ -260,6 +231,190 @@ public class RoiManagerOperator : OperatorBase
             outputBounds = new Rect(0, 0, src.Width, src.Height);
             Cv2.BitwiseAnd(src, src, resultImage, mask);
         }
+    }
+
+    private static bool TryCreateRectangleBounds(Mat src, int x, int y, int width, int height, out Rect bounds)
+    {
+        bounds = default;
+        if (src.Width <= 0 || src.Height <= 0)
+        {
+            return false;
+        }
+
+        var left = Math.Max(0, x);
+        var top = Math.Max(0, y);
+        var right = Math.Min(src.Width, (long)x + Math.Max(1, width));
+        var bottom = Math.Min(src.Height, (long)y + Math.Max(1, height));
+        if (right <= left || bottom <= top)
+        {
+            return false;
+        }
+
+        bounds = new Rect(left, top, (int)(right - left), (int)(bottom - top));
+        return true;
+    }
+
+    private static bool TryCreateCircleBounds(Mat src, int centerX, int centerY, int radius, out Rect bounds)
+    {
+        bounds = default;
+        if (src.Width <= 0 || src.Height <= 0)
+        {
+            return false;
+        }
+
+        var safeRadius = Math.Max(1, radius);
+        var left = Math.Max(0, (long)centerX - safeRadius);
+        var top = Math.Max(0, (long)centerY - safeRadius);
+        var right = Math.Min(src.Width, (long)centerX + safeRadius);
+        var bottom = Math.Min(src.Height, (long)centerY + safeRadius);
+        if (right <= left || bottom <= top)
+        {
+            return false;
+        }
+
+        bounds = new Rect((int)left, (int)top, (int)(right - left), (int)(bottom - top));
+        return true;
+    }
+
+    private static bool TryResolvePolygonPoints(string polygonPointsJson, Size imageSize, out Point[] points, out Rect bounds)
+    {
+        points = TryParsePolygonPoints(polygonPointsJson) ?? [];
+        if (points.Length < 3)
+        {
+            points = CreateDefaultPolygonPoints(imageSize);
+        }
+
+        points = points
+            .Select(point => new Point(
+                Math.Clamp(point.X, 0, imageSize.Width),
+                Math.Clamp(point.Y, 0, imageSize.Height)))
+            .ToArray();
+
+        if (TryCreatePolygonBounds(points, imageSize, out bounds))
+        {
+            return true;
+        }
+
+        points = CreateDefaultPolygonPoints(imageSize);
+        return TryCreatePolygonBounds(points, imageSize, out bounds);
+    }
+
+    private static Point[]? TryParsePolygonPoints(string polygonPointsJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(polygonPointsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var points = new List<Point>();
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (TryReadPoint(item, out var point))
+                {
+                    points.Add(point);
+                }
+            }
+
+            return points.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool TryReadPoint(JsonElement item, out Point point)
+    {
+        point = default;
+        if (item.ValueKind == JsonValueKind.Array)
+        {
+            var coordinates = item.EnumerateArray().Take(2).ToArray();
+            if (coordinates.Length < 2 ||
+                !TryReadCoordinate(coordinates[0], out var x) ||
+                !TryReadCoordinate(coordinates[1], out var y))
+            {
+                return false;
+            }
+
+            point = new Point(x, y);
+            return true;
+        }
+
+        if (item.ValueKind == JsonValueKind.Object &&
+            TryReadNamedCoordinate(item, ["x", "X", "imageX", "ImageX", "pixelX", "PixelX"], out var objectX) &&
+            TryReadNamedCoordinate(item, ["y", "Y", "imageY", "ImageY", "pixelY", "PixelY"], out var objectY))
+        {
+            point = new Point(objectX, objectY);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadNamedCoordinate(JsonElement item, string[] names, out int value)
+    {
+        foreach (var name in names)
+        {
+            if (item.TryGetProperty(name, out var property) && TryReadCoordinate(property, out value))
+            {
+                return true;
+            }
+        }
+
+        value = 0;
+        return false;
+    }
+
+    private static bool TryReadCoordinate(JsonElement item, out int value)
+    {
+        value = 0;
+        if (item.ValueKind != JsonValueKind.Number || !item.TryGetDouble(out var number) || !double.IsFinite(number))
+        {
+            return false;
+        }
+
+        value = (int)Math.Round(Math.Clamp(number, int.MinValue, int.MaxValue));
+        return true;
+    }
+
+    private static Point[] CreateDefaultPolygonPoints(Size imageSize)
+    {
+        if (imageSize.Width <= 0 || imageSize.Height <= 0)
+        {
+            return [];
+        }
+
+        return
+        [
+            new Point(0, 0),
+            new Point(imageSize.Width, 0),
+            new Point(imageSize.Width, imageSize.Height),
+            new Point(0, imageSize.Height)
+        ];
+    }
+
+    private static bool TryCreatePolygonBounds(Point[] points, Size imageSize, out Rect bounds)
+    {
+        bounds = default;
+        if (imageSize.Width <= 0 || imageSize.Height <= 0 || points.Length < 3)
+        {
+            return false;
+        }
+
+        var minX = Math.Max(0, points.Min(point => point.X));
+        var minY = Math.Max(0, points.Min(point => point.Y));
+        var maxX = Math.Min(imageSize.Width, points.Max(point => point.X));
+        var maxY = Math.Min(imageSize.Height, points.Max(point => point.Y));
+        if (maxX <= minX || maxY <= minY)
+        {
+            return false;
+        }
+
+        bounds = new Rect(minX, minY, maxX - minX, maxY - minY);
+        return true;
     }
 
     private static SpatialContextV1 ResolveInputSpatialContext(Dictionary<string, object>? inputs)

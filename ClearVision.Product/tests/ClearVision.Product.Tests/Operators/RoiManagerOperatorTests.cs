@@ -129,6 +129,41 @@ public class RoiManagerOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_CircleCrop_ShouldIgnoreRectangleParamsAndClampIntersectingCircle()
+    {
+        using var image = TestHelpers.CreateTestImage(width: 10, height: 10);
+        var op = CreateOperator("Circle", "Crop");
+        AddParameter(op, "X", 1000);
+        AddParameter(op, "Y", 1000);
+        AddParameter(op, "Width", 5);
+        AddParameter(op, "Height", 5);
+        AddParameter(op, "CenterX", -2);
+        AddParameter(op, "CenterY", 5);
+        AddParameter(op, "Radius", 5);
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        try
+        {
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+            output.Width.Should().Be(3);
+            output.Height.Should().Be(10);
+
+            var context = Assert.IsType<SpatialContextV1>(result.OutputData[RoiManagerOperator.SpatialContextOutputKey]);
+            context.TryResolveTransform(context.CurrentFrame, FrameRefV1.ImageFull(), out var localToFull, out var error)
+                .Should().BeTrue(error);
+            localToFull.TryApply(0, 0, out var x, out var y, out error).Should().BeTrue(error);
+            x.Should().BeApproximately(0, 1e-12);
+            y.Should().BeApproximately(0, 1e-12);
+        }
+        finally
+        {
+            DisposeOutputImages(result.OutputData);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_PolygonCrop_ShouldUseClampedBoundingRectangleOffset()
     {
         using var image = TestHelpers.CreateTestImage(width: 12, height: 10);
@@ -150,6 +185,39 @@ public class RoiManagerOperatorTests
             localToFull.TryApply(0, 0, out var x, out var y, out error).Should().BeTrue(error);
             x.Should().BeApproximately(2, 1e-12);
             y.Should().BeApproximately(3, 1e-12);
+        }
+        finally
+        {
+            DisposeOutputImages(result.OutputData);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PolygonCrop_WithInvalidPoints_ShouldFallbackToImageBounds()
+    {
+        using var image = TestHelpers.CreateTestImage(width: 10, height: 8);
+        var op = CreateOperator("Polygon", "Crop");
+        AddParameter(op, "X", 1000);
+        AddParameter(op, "Y", 1000);
+        AddParameter(op, "Width", 5);
+        AddParameter(op, "Height", 5);
+        AddParameter(op, "PolygonPoints", "[]", "string");
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        try
+        {
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+            output.Width.Should().Be(10);
+            output.Height.Should().Be(8);
+
+            var context = Assert.IsType<SpatialContextV1>(result.OutputData[RoiManagerOperator.SpatialContextOutputKey]);
+            context.TryResolveTransform(context.CurrentFrame, FrameRefV1.ImageFull(), out var localToFull, out var error)
+                .Should().BeTrue(error);
+            localToFull.TryApply(0, 0, out var x, out var y, out error).Should().BeTrue(error);
+            x.Should().BeApproximately(0, 1e-12);
+            y.Should().BeApproximately(0, 1e-12);
         }
         finally
         {

@@ -1165,6 +1165,31 @@ test.describe('ROI Editor', () => {
     expect(circleState.overlay).toEqual({ type: 'circle', centerX: 30, centerY: 32, radius: 20 });
   });
 
+  test('circle ROI blank drag creates a circle from the selection box', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, { Shape: 'Circle', CenterX: 8, CenterY: 8, Radius: 4 });
+    await waitForRoiEditorReady(page);
+
+    await dispatchRoiDrag(page, { x: 20, y: 18 }, { x: 42, y: 40 });
+    const circleState = await getCircleState(page);
+
+    expect(circleState.params).toEqual({ centerX: 31, centerY: 29, radius: 11 });
+    expect(circleState.overlay).toEqual({ type: 'circle', centerX: 31, centerY: 29, radius: 11 });
+  });
+
   test('CircleMeasurement CaliperFitV2 groups parameters and mounts circle search geometry', async ({ page }) => {
     await page.route('**/api/flows/preview-node', async route => {
       await route.fulfill({
@@ -1375,6 +1400,85 @@ test.describe('ROI Editor', () => {
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Y' : 'Control+Y');
     polygonState = await getPolygonState(page);
     expect(polygonState.params.length).toBe(4);
+  });
+
+  test('polygon ROI stays editable with empty PolygonPoints and blank drag writes valid points', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, {
+      Shape: 'Polygon',
+      X: 5,
+      Y: 6,
+      Width: 12,
+      Height: 10,
+      PolygonPoints: '[]',
+    });
+    await waitForRoiEditorReady(page);
+    await expect(page.locator('#roi-editor-readonly')).toHaveClass(/hidden/);
+
+    let polygonState = await getPolygonState(page);
+    expect(polygonState.overlay?.type).toBe('polygon');
+    expect(polygonState.overlay?.points).toEqual([
+      { x: 5, y: 6 },
+      { x: 17, y: 6 },
+      { x: 17, y: 16 },
+      { x: 5, y: 16 },
+    ]);
+
+    await dispatchRoiDrag(page, { x: 30, y: 30 }, { x: 50, y: 48 });
+    polygonState = await getPolygonState(page);
+    expect(polygonState.params).toEqual([[30, 30], [50, 30], [50, 48], [30, 48]]);
+    expect(polygonState.overlay?.points).toEqual([
+      { x: 30, y: 30 },
+      { x: 50, y: 30 },
+      { x: 50, y: 48 },
+      { x: 30, y: 48 },
+    ]);
+  });
+
+  test('polygon ROI drag clamps at image bounds instead of freezing', async ({ page }) => {
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          inputImageBase64: PREVIEW_PNG_BASE64,
+          outputImageBase64: PREVIEW_PNG_BASE64,
+          outputData: { Width: 64, Height: 64 },
+          executionTimeMs: 10,
+        }),
+      });
+    });
+
+    await addAndSelectRoiNode(page, {
+      Shape: 'Polygon',
+      PolygonPoints: '[[5,5],[25,5],[25,25],[5,25]]',
+    });
+    await waitForRoiEditorReady(page);
+
+    await dispatchRoiDrag(page, { x: 15, y: 15 }, { x: -20, y: -20 });
+    const polygonState = await getPolygonState(page);
+
+    expect(polygonState.params).toEqual([[0, 0], [20, 0], [20, 20], [0, 20]]);
+    expect(polygonState.overlay?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 20 },
+      { x: 0, y: 20 },
+    ]);
   });
 
   test('NPoint draft workbench edits samples while ROI editor stays unmounted', async ({ page }) => {

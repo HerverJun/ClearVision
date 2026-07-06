@@ -1,5 +1,6 @@
 ﻿import {
     clampRectToBounds,
+    circleFromPoints,
     deletePointSequencePoint,
     deletePolygonVertex,
     getAnnulusHandlePoints,
@@ -30,6 +31,7 @@
     normalizePointSequenceGeometry,
     normalizePolygonGeometry,
     nudgeRect,
+    polygonFromPoints,
     reorderPointSequencePoint,
     resizeAnnulusByHandle,
     resizeCircleSearchV2ByHandle,
@@ -2209,6 +2211,16 @@ class ImageCanvas {
                         nominalRadius: this.minimumOverlaySize,
                         maxRadius: this.minimumOverlaySize
                     }
+                : drawKind === 'polygon'
+                    ? polygonFromPoints(
+                        imagePoint,
+                        {
+                            x: imagePoint.x + this.minimumOverlaySize * 2,
+                            y: imagePoint.y + this.minimumOverlaySize * 2
+                        },
+                        this.getImageBounds(),
+                        this.minimumOverlaySize * 2
+                    )
                 : {
                     kind: 'rectangle',
                     x: imagePoint.x,
@@ -2251,7 +2263,7 @@ class ImageCanvas {
         if (this.interactionState.type === 'draw') {
             const currentGeometry = this.readOverlayGeometry(overlay);
             if (currentGeometry.kind === 'circle') {
-                nextGeometry = resizeCircleByHandle(currentGeometry, 'radius', imagePoint, this.getImageBounds(), this.minimumOverlaySize);
+                nextGeometry = circleFromPoints(this.interactionState.startPoint, imagePoint, this.getImageBounds(), this.minimumOverlaySize);
             } else if (currentGeometry.kind === 'annulus' || currentGeometry.kind === 'arc') {
                 nextGeometry = resizeAnnulusByHandle(currentGeometry, 'outerRadius', imagePoint, this.getImageBounds(), {
                     minRadius: this.minimumOverlaySize
@@ -2260,6 +2272,13 @@ class ImageCanvas {
                 nextGeometry = resizeCircleSearchV2ByHandle(currentGeometry, 'maxRadius', imagePoint, this.getImageBounds(), {
                     minRadius: this.minimumOverlaySize
                 });
+            } else if (currentGeometry.kind === 'polygon') {
+                nextGeometry = polygonFromPoints(
+                    this.interactionState.startPoint,
+                    imagePoint,
+                    this.getImageBounds(),
+                    this.minimumOverlaySize * 2
+                );
             } else {
                 nextGeometry = {
                     kind: 'rectangle',
