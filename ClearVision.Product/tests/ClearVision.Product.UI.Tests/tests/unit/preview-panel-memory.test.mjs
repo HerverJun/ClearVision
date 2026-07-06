@@ -1140,6 +1140,11 @@ test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layere
     })
   });
 
+  emitIdleError('请先新建/保存/打开工程后再预览');
+  assert.match(harness.container.innerHTML, /data-status="idle-error">请先新建\/保存\/打开工程后再预览/);
+  assert.match(harness.container.innerHTML, /请先新建\/保存\/打开工程后再预览/);
+  assert.doesNotMatch(harness.container.innerHTML, /等待预览，暂无输出图像/);
+
   emitIdleError('请先配置文件路径');
   assert.match(harness.container.innerHTML, /data-status="idle-error">缺输入图或采集源/);
   assert.match(harness.container.innerHTML, /请先配置文件路径/);

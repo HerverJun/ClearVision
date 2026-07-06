@@ -141,6 +141,15 @@ function classifyIdlePreviewError(errorMessage) {
 
     const normalized = detail.toLowerCase();
 
+    if (/请先新建|保存\/打开工程|打开工程|未选择工程|project.*required|active projectid|required for execution/.test(normalized)) {
+        return {
+            reason: 'missing-project',
+            label: detail,
+            message: detail,
+            emptyMessage: detail
+        };
+    }
+
     if (/过大|too large|oversize|exceed|payload/.test(normalized)) {
         return {
             reason: 'input-too-large',

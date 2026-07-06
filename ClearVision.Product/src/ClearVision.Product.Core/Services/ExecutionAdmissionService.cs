@@ -238,7 +238,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 
         if (@operator.Type == OperatorType.ImageAcquisition)
         {
-            var sourceType = NormalizeOptionValue(TryReadStringParameter(@operator, "SourceType", "sourceType"));
+            var sourceType = NormalizeAcquisitionSourceType(TryReadStringParameter(@operator, "SourceType", "sourceType"));
             var filePath = TryReadStringParameter(@operator, "FilePath", "filePath");
             if (sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
             {
@@ -248,7 +248,8 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
                     "SourceType");
             }
 
-            if (!string.IsNullOrWhiteSpace(filePath))
+            if (!string.IsNullOrWhiteSpace(filePath) &&
+                surface != ExecutionAdmissionSurface.NodePreview)
             {
                 return CreateViolation(
                     @operator,
@@ -353,7 +354,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             ?.GetValue();
     }
 
-    private static string NormalizeOptionValue(string? value)
+    private static string NormalizeAcquisitionSourceType(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -362,8 +363,31 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 
         var normalized = value.Trim();
         var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
-        return separatorIndex >= 0
-            ? normalized[..separatorIndex].Trim()
-            : normalized;
+        if (separatorIndex >= 0)
+        {
+            normalized = normalized[..separatorIndex].Trim();
+        }
+
+        var token = normalized.ToLowerInvariant();
+        if (token == "camera" ||
+            token.Contains("cam", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("相机", StringComparison.Ordinal) ||
+            normalized.Contains("摄像", StringComparison.Ordinal))
+        {
+            return "Camera";
+        }
+
+        if (token == "file" ||
+            token.Contains("image", StringComparison.OrdinalIgnoreCase) ||
+            token.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("文件", StringComparison.Ordinal) ||
+            normalized.Contains("图像", StringComparison.Ordinal) ||
+            normalized.Contains("图片", StringComparison.Ordinal) ||
+            normalized.Contains("路径", StringComparison.Ordinal))
+        {
+            return "File";
+        }
+
+        return normalized;
     }
 }

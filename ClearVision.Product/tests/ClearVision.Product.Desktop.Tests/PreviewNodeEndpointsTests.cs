@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -241,6 +242,104 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithChineseFileImageAcquisitionFlowData_ReturnsOutputImageArtifact()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"ClearVision-预览链路-{Guid.NewGuid():N}");
+        var filePath = Path.Combine(directory, "中文文件名-样张.png");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            using var sourceImage = new Mat(12, 16, MatType.CV_8UC3, new Scalar(32, 128, 240));
+            File.WriteAllBytes(filePath, sourceImage.ToBytes(".png"));
+
+            var project = new Project("preview-image-acquisition");
+            var acquisitionId = Guid.NewGuid();
+            var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+            var thresholdId = Guid.NewGuid();
+            var thresholdInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+            var thresholdOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+            var debugSessionId = Guid.NewGuid();
+
+            var acquisition = CreateOperatorDto(
+                acquisitionId,
+                "ImageAcquisition",
+                OperatorType.ImageAcquisition,
+                outputPorts: [acquisitionOutputPort],
+                parameters: new Dictionary<string, object>
+                {
+                    ["SourceType"] = "文件",
+                    ["FilePath"] = filePath
+                });
+            var threshold = CreateOperatorDto(
+                thresholdId,
+                "Threshold",
+                OperatorType.Thresholding,
+                inputPorts: [thresholdInputPort],
+                outputPorts: [thresholdOutputPort],
+                parameters: new Dictionary<string, object>
+                {
+                    ["Threshold"] = 127.0,
+                    ["Type"] = "0",
+                    ["MaxValue"] = 255.0
+                });
+
+            await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+                project,
+                new ProjectVariableSessionRegistry(),
+                [
+                    new ImageAcquisitionOperator(
+                        NullLogger<ImageAcquisitionOperator>.Instance,
+                        Substitute.For<ICameraManager>()),
+                    new ThresholdOperator(NullLogger<ThresholdOperator>.Instance)
+                ]);
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = project.Id,
+                TargetNodeId = thresholdId,
+                DebugSessionId = debugSessionId,
+                ClientRequestSequence = 11,
+                FlowRevision = 22,
+                ArtifactMode = "references",
+                FlowData = CreateUpdateFlowRequest(
+                    acquisition,
+                    threshold,
+                    CreateConnection(acquisitionId, acquisitionOutputPort.Id, thresholdId, thresholdInputPort.Id))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+            document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+            document.RootElement.GetProperty("outputData").GetProperty("Width").GetInt32().Should().Be(16);
+            document.RootElement.GetProperty("outputData").GetProperty("Height").GetInt32().Should().Be(12);
+
+            var outputArtifact = document.RootElement
+                .GetProperty("artifacts")
+                .EnumerateArray()
+                .Single(artifact => artifact.GetProperty("role").GetString() == "outputImage");
+            outputArtifact.GetProperty("contentType").GetString().Should().Be("image/png");
+            outputArtifact.GetProperty("length").GetInt64().Should().BeGreaterThan(0);
+
+            var artifactId = outputArtifact.GetProperty("artifactId").GetString()!;
+            using var artifactResponse = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
+            artifactResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+            artifactResponse.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+            (await artifactResponse.Content.ReadAsByteArrayAsync()).Should().StartWith(
+                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldReturnObservationEnvelopeForSuccessfulPreview()
     {
         var projectId = Guid.NewGuid();
@@ -398,6 +497,26 @@ public class PreviewNodeEndpointsTests
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var payload = await response.Content.ReadAsStringAsync();
         payload.Should().Contain("clientRequestSequence");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldRejectEmptyProjectIdWithAdmissionMessage()
+    {
+        var targetNodeId = Guid.NewGuid();
+        await using var host = await PreviewNodeTestHost.CreateAsync(_ => { });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.Empty,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().Contain("ADMISSION_PROJECT_REQUIRED");
+        payload.Should().Contain("active projectId is required");
     }
 
     [Fact]

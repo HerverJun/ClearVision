@@ -162,6 +162,27 @@ test('NodePreviewCoordinator accepts localized file acquisition source when file
   }
 });
 
+test('NodePreviewCoordinator reports missing project instead of idling silently', async () => {
+  const { coordinator, node, getExecuteCount } = createCoordinator({
+    projectId: () => null
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    await waitFor(() => assert.equal(
+      coordinator.getState().errorMessage,
+      '请先新建/保存/打开工程后再预览'
+    ));
+
+    assert.equal(coordinator.getState().status, 'idle');
+    assert.equal(coordinator.getState().presenter.statusText, '请先新建/保存/打开工程后再预览');
+    assert.equal(coordinator.getState().request.projectId, null);
+    assert.equal(getExecuteCount(), 0);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
 test('NodePreviewCoordinator cache entries do not retain input image base64', async () => {
   const inputImageBase64 = 'A'.repeat(1024 * 1024);
   const { coordinator, node, getExecuteCount } = createCoordinator({ inputImageBase64 });

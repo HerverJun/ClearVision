@@ -127,6 +127,119 @@ public class FlowDataMappingTests
     }
 
     [Fact]
+    public void UpdateFlowRequest_ToPreviewEntity_PreservesFlowCanvasSerializedImageEdge()
+    {
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPortId = Guid.NewGuid();
+        var thresholdId = Guid.NewGuid();
+        var thresholdInputPortId = Guid.NewGuid();
+        var thresholdOutputPortId = Guid.NewGuid();
+
+        var flowData = new UpdateFlowRequest
+        {
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = acquisitionId,
+                    Name = "ImageAcquisition",
+                    Type = OperatorType.ImageAcquisition,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = acquisitionOutputPortId,
+                            Name = "Image",
+                            DataType = PortDataType.Image,
+                            Direction = PortDirection.Output
+                        }
+                    ],
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SourceType",
+                            DisplayName = "SourceType",
+                            DataType = "enum",
+                            Value = "File",
+                            DefaultValue = "File"
+                        },
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "FilePath",
+                            DisplayName = "FilePath",
+                            DataType = "file",
+                            Value = "C:\\Images\\part.png",
+                            DefaultValue = string.Empty
+                        }
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = thresholdId,
+                    Name = "Threshold",
+                    Type = OperatorType.Thresholding,
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = thresholdInputPortId,
+                            Name = "Image",
+                            DataType = PortDataType.Image,
+                            Direction = PortDirection.Input,
+                            IsRequired = true
+                        }
+                    ],
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = thresholdOutputPortId,
+                            Name = "Image",
+                            DataType = PortDataType.Image,
+                            Direction = PortDirection.Output
+                        }
+                    ],
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Threshold",
+                            DisplayName = "Threshold",
+                            DataType = "double",
+                            Value = 127.0,
+                            DefaultValue = 127.0
+                        }
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = acquisitionId,
+                    SourcePortId = acquisitionOutputPortId,
+                    TargetOperatorId = thresholdId,
+                    TargetPortId = thresholdInputPortId
+                }
+            ]
+        };
+
+        var flow = FlowEntityMapper.ToPreviewEntity(flowData, thresholdId);
+
+        flow.Operators.Select(op => op.Id).Should().BeEquivalentTo([acquisitionId, thresholdId]);
+        flow.Connections.Should().ContainSingle();
+        flow.Connections.Single().SourceOperatorId.Should().Be(acquisitionId);
+        flow.Connections.Single().SourcePortId.Should().Be(acquisitionOutputPortId);
+        flow.Connections.Single().TargetOperatorId.Should().Be(thresholdId);
+        flow.Connections.Single().TargetPortId.Should().Be(thresholdInputPortId);
+    }
+
+    [Fact]
     public void FlowDataDto_ToEntity_PreservesCanvasOperatorDisabledState()
     {
         var operatorId = Guid.NewGuid();

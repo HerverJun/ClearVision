@@ -16,6 +16,7 @@ const PREVIEW_OUTPUT_OBJECT_FIELD_LIMIT = 48;
 const PREVIEW_OUTPUT_STRING_LIMIT = 512;
 const PREVIEW_OUTPUT_MAX_DEPTH = 3;
 const PREVIEW_OUTPUT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+const MISSING_PROJECT_PREVIEW_MESSAGE = '请先新建/保存/打开工程后再预览';
 const HIGH_COST_OPERATOR_TYPE_HINTS = [
     'DeepLearning',
     'OnnxInference',
@@ -1276,7 +1277,7 @@ export class NodePreviewCoordinator {
                 this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
-                    errorMessage: null,
+                    errorMessage: MISSING_PROJECT_PREVIEW_MESSAGE,
                     inputImageBase64: null,
                     outputImageBase64: null,
                     outputData: null,
