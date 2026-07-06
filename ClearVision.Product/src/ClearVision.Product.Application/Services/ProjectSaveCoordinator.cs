@@ -17,7 +17,7 @@ public sealed class ProjectSaveCoordinator
     private const string VariableStateFileName = "variable-state.json";
     private const string ProjectAssetsFileName = "project-assets.json";
     private const string ManifestFileName = "manifest.json";
-    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> ProjectGates = new();
+    private static readonly ConcurrentDictionary<Guid, ProjectGate> ProjectGates = new();
     private static readonly ConcurrentDictionary<Guid, string> RecoveryRequired = new();
     private static readonly ConcurrentDictionary<Guid, ProjectAccessState> ProjectStates = new();
     private static readonly object StartupRecoveryGate = new();
@@ -67,28 +67,42 @@ public sealed class ProjectSaveCoordinator
     public async Task<ProjectAccessLease> AcquireProjectAccessAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
         await WaitForStartupRecoveryAsync(cancellationToken);
-        var gate = ProjectGates.GetOrAdd(projectId, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken);
+        var gate = await RentProjectGateAsync(projectId, cancellationToken);
+        var acquired = false;
         try
         {
+            await gate.WaitAsync(cancellationToken);
+            acquired = true;
             if (RecoveryRequired.TryGetValue(projectId, out var reason))
             {
                 throw new InvalidOperationException($"PSV001: project '{projectId}' requires save recovery before access: {reason}");
             }
 
-            return new ProjectAccessLease(gate);
+            return new ProjectAccessLease(() => ReleaseAcquiredProjectGate(projectId, gate));
         }
         catch
         {
-            gate.Release();
+            if (acquired)
+            {
+                gate.Release();
+            }
+
+            ReleaseProjectGateReference(projectId, gate);
             throw;
         }
     }
 
     public void ClearProjectState(Guid projectId)
     {
+        if (ProjectStates.TryGetValue(projectId, out var state) &&
+            (state == ProjectAccessState.Saving || state == ProjectAccessState.Recovering))
+        {
+            return;
+        }
+
         RecoveryRequired.TryRemove(projectId, out _);
         ProjectStates.TryRemove(projectId, out _);
+        RequestProjectGateCleanup(projectId);
     }
 
     public async Task<ProjectSaveResult> SaveExistingProjectAsync(ProjectSaveRequest request)
@@ -96,7 +110,7 @@ public sealed class ProjectSaveCoordinator
         ArgumentNullException.ThrowIfNull(request);
         await WaitForStartupRecoveryAsync();
 
-        var gate = ProjectGates.GetOrAdd(request.Project.Id, _ => new SemaphoreSlim(1, 1));
+        var gate = await RentProjectGateAsync(request.Project.Id);
         await gate.WaitAsync();
         try
         {
@@ -116,6 +130,7 @@ public sealed class ProjectSaveCoordinator
             }
 
             gate.Release();
+            ReleaseProjectGateReference(request.Project.Id, gate);
         }
     }
 
@@ -405,7 +420,7 @@ public sealed class ProjectSaveCoordinator
         }
 
         var manifest = DeserializeFile<ProjectSaveManifest>(manifestPath);
-        var gate = ProjectGates.GetOrAdd(manifest.ProjectId, _ => new SemaphoreSlim(1, 1));
+        var gate = await RentProjectGateAsync(manifest.ProjectId);
         await gate.WaitAsync();
         try
         {
@@ -445,6 +460,7 @@ public sealed class ProjectSaveCoordinator
             }
 
             gate.Release();
+            ReleaseProjectGateReference(manifest.ProjectId, gate);
         }
     }
 
@@ -710,6 +726,66 @@ public sealed class ProjectSaveCoordinator
         return source;
     }
 
+    private static async ValueTask<ProjectGate> RentProjectGateAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            var gate = ProjectGates.GetOrAdd(projectId, static _ => new ProjectGate());
+            if (gate.TryAddReference())
+            {
+                if (ProjectGates.TryGetValue(projectId, out var current) && ReferenceEquals(current, gate))
+                {
+                    return gate;
+                }
+
+                ReleaseProjectGateReference(projectId, gate);
+                continue;
+            }
+
+            if (gate.IsClosedAndIdle)
+            {
+                RemoveProjectGateIfCurrent(projectId, gate);
+            }
+
+            await gate.WaitUntilClosedAsync(cancellationToken);
+        }
+    }
+
+    private static void ReleaseAcquiredProjectGate(Guid projectId, ProjectGate gate)
+    {
+        gate.Release();
+        ReleaseProjectGateReference(projectId, gate);
+    }
+
+    private static void ReleaseProjectGateReference(Guid projectId, ProjectGate gate)
+    {
+        if (gate.ReleaseReference())
+        {
+            RemoveProjectGateIfCurrent(projectId, gate);
+        }
+    }
+
+    private static void RequestProjectGateCleanup(Guid projectId)
+    {
+        if (!ProjectGates.TryGetValue(projectId, out var gate))
+        {
+            return;
+        }
+
+        if (gate.RequestClose())
+        {
+            RemoveProjectGateIfCurrent(projectId, gate);
+        }
+    }
+
+    private static void RemoveProjectGateIfCurrent(Guid projectId, ProjectGate gate)
+    {
+        ((ICollection<KeyValuePair<Guid, ProjectGate>>)ProjectGates)
+            .Remove(new KeyValuePair<Guid, ProjectGate>(projectId, gate));
+    }
+
     internal static void ResetStaticStateForTests()
     {
         ProjectGates.Clear();
@@ -726,6 +802,8 @@ public sealed class ProjectSaveCoordinator
     internal static bool HasProjectStateForTests(Guid projectId) => ProjectStates.ContainsKey(projectId);
 
     internal static bool HasRecoveryRequiredForTests(Guid projectId) => RecoveryRequired.ContainsKey(projectId);
+
+    internal static bool HasProjectGateForTests(Guid projectId) => ProjectGates.ContainsKey(projectId);
 
     private static void VerifyProjectAtCandidate(Project project, ProjectCandidate candidate)
     {
@@ -990,14 +1068,95 @@ public enum ProjectAccessState
     RecoveryRequired = 3
 }
 
+internal sealed class ProjectGate
+{
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly object _sync = new();
+    private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _referenceCount;
+    private bool _closing;
+
+    public bool IsClosedAndIdle
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _closing && _referenceCount == 0;
+            }
+        }
+    }
+
+    public Task WaitAsync(CancellationToken cancellationToken = default) =>
+        _semaphore.WaitAsync(cancellationToken);
+
+    public void Release() => _semaphore.Release();
+
+    public bool TryAddReference()
+    {
+        lock (_sync)
+        {
+            if (_closing)
+            {
+                return false;
+            }
+
+            _referenceCount++;
+            return true;
+        }
+    }
+
+    public bool ReleaseReference()
+    {
+        var shouldRemove = false;
+        lock (_sync)
+        {
+            if (_referenceCount <= 0)
+            {
+                throw new InvalidOperationException("Project gate reference count cannot be negative.");
+            }
+
+            _referenceCount--;
+            shouldRemove = _closing && _referenceCount == 0;
+        }
+
+        if (shouldRemove)
+        {
+            _closed.TrySetResult();
+        }
+
+        return shouldRemove;
+    }
+
+    public bool RequestClose()
+    {
+        var shouldRemove = false;
+        lock (_sync)
+        {
+            _closing = true;
+            shouldRemove = _referenceCount == 0;
+        }
+
+        if (shouldRemove)
+        {
+            _closed.TrySetResult();
+        }
+
+        return shouldRemove;
+    }
+
+    public Task WaitUntilClosedAsync(CancellationToken cancellationToken) =>
+        _closed.Task.WaitAsync(cancellationToken);
+}
+
 public sealed class ProjectAccessLease : IAsyncDisposable, IDisposable
 {
-    private readonly SemaphoreSlim _gate;
+    private readonly Action _release;
     private bool _disposed;
 
-    internal ProjectAccessLease(SemaphoreSlim gate)
+    internal ProjectAccessLease(Action release)
     {
-        _gate = gate;
+        _release = release;
     }
 
     public void Dispose()
@@ -1008,7 +1167,7 @@ public sealed class ProjectAccessLease : IAsyncDisposable, IDisposable
         }
 
         _disposed = true;
-        _gate.Release();
+        _release();
     }
 
     public ValueTask DisposeAsync()

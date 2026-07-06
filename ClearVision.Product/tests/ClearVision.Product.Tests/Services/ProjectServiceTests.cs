@@ -673,6 +673,8 @@ public class ProjectServiceTests
             assetStorage.DeleteCount.Should().Be(1);
             assetStorage.Assets.CalibrationAssets.Should().BeEmpty();
             ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(project.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeFalse();
             await repository.Received(1).UpdateAsync(project);
         }
         finally

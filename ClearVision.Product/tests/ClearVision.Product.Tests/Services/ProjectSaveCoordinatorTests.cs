@@ -177,6 +177,10 @@ public sealed class ProjectSaveCoordinatorTests
 
             ProjectSaveCoordinator.HasRecoveryRequiredForTests(first.Id).Should().BeTrue();
             ProjectSaveCoordinator.HasRecoveryRequiredForTests(second.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(first.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(second.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectGateForTests(first.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectGateForTests(second.Id).Should().BeTrue();
 
             coordinator.ClearProjectState(first.Id);
 
@@ -184,11 +188,58 @@ public sealed class ProjectSaveCoordinatorTests
             coordinator.Invoking(item => item.EnsureProjectAvailable(second.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
             ProjectSaveCoordinator.HasRecoveryRequiredForTests(first.Id).Should().BeFalse();
             ProjectSaveCoordinator.HasRecoveryRequiredForTests(second.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(first.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasProjectStateForTests(second.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectGateForTests(first.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasProjectGateForTests(second.Id).Should().BeTrue();
         }
         finally
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task ClearProjectState_WhenLeaseIsHeld_ShouldPreserveSerialGateUntilWaitersRelease()
+    {
+        ProjectSaveCoordinator.ResetStaticStateForTests();
+        var project = new Project("demo");
+        var repository = new InMemoryProjectRepository(project);
+        var flowStorage = new InMemoryProjectFlowStorage();
+        var coordinator = new ProjectSaveCoordinator(repository, flowStorage);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var access = await coordinator.AcquireProjectAccessAsync(project.Id);
+        var competingAccess = Task.Run(async () =>
+        {
+            await using var lease = await coordinator.AcquireProjectAccessAsync(project.Id);
+            entered.TrySetResult();
+        });
+
+        try
+        {
+            await Task.Delay(75);
+            entered.Task.IsCompleted.Should().BeFalse();
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeTrue();
+
+            coordinator.ClearProjectState(project.Id);
+
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(project.Id).Should().BeFalse();
+            await Task.Delay(75);
+            entered.Task.IsCompleted.Should().BeFalse();
+
+            await access.DisposeAsync();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await competingAccess.WaitAsync(TimeSpan.FromSeconds(5));
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeFalse();
+        }
+        finally
+        {
+            await access.DisposeAsync();
+            await Task.WhenAny(competingAccess, Task.Delay(TimeSpan.FromSeconds(5)));
+            ProjectSaveCoordinator.ResetStaticStateForTests();
         }
     }
 
@@ -563,6 +614,12 @@ public sealed class ProjectSaveCoordinatorTests
                 null,
                 null));
             await blocker.WaitUntilHitAsync();
+
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeTrue();
+            coordinator.ClearProjectState(project.Id);
+            ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeTrue();
 
             var accessTask = coordinator.AcquireProjectAccessAsync(project.Id);
             await Task.Delay(75);
