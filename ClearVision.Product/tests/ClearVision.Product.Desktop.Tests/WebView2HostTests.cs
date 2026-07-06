@@ -116,4 +116,37 @@ public class WebView2HostTests
         script.Should().Contain("\"Studio:NPointCalibrationWorkbenchEnabled\":false");
         script.Should().Contain("Object.freeze(startup)");
     }
+
+    [Fact]
+    public void BuildAiWorkspaceFlushStartScript_ShouldStartPromiseAndReturnSynchronously()
+    {
+        var script = MainForm.BuildAiWorkspaceFlushStartScript("op-1", "host_close");
+
+        script.Should().Contain("Promise.resolve(flush(reason))");
+        script.Should().Contain("return true;");
+        script.Should().NotContain("async()=>");
+        script.Should().NotContain("await (window.__clearVisionFlushAiPanelWorkspace");
+        script.Should().Contain("__clearVisionAiWorkspaceFlushResults");
+    }
+
+    [Theory]
+    [InlineData("{\"status\":\"pending\",\"value\":false}", false, false)]
+    [InlineData("{\"status\":\"completed\",\"value\":true}", true, true)]
+    [InlineData("{\"status\":\"completed\",\"value\":false}", true, false)]
+    [InlineData("{\"status\":\"failed\",\"value\":false}", true, false)]
+    [InlineData("{\"status\":\"missing\",\"value\":false}", true, false)]
+    [InlineData("{}", true, false)]
+    [InlineData("true", true, true)]
+    [InlineData("false", true, false)]
+    [InlineData("null", true, false)]
+    public void ParseAiWorkspaceFlushStatus_ShouldClassifyTerminalState(
+        string rawResult,
+        bool expectedTerminal,
+        bool expectedSucceeded)
+    {
+        var status = MainForm.ParseAiWorkspaceFlushStatus(rawResult);
+
+        status.IsTerminal.Should().Be(expectedTerminal);
+        status.Succeeded.Should().Be(expectedSucceeded);
+    }
 }

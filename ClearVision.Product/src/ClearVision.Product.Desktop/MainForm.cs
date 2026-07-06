@@ -2,6 +2,7 @@
 // 初始化菜单栏
 // 作者：蘅芜君
 
+using System.Diagnostics;
 using System.Text.Json;
 using System.Windows.Forms;
 using ClearVision.Product.Desktop.Configuration;
@@ -212,22 +213,127 @@ public partial class MainForm : Form
     {
         try
         {
-            var scriptTask = _webView2Host.ExecuteScriptAsync(
-                "(async()=>{try{return await (window.__clearVisionFlushAiPanelWorkspace?.('host_close') ?? true);}catch{return false;}})()");
-            var completed = await Task.WhenAny(scriptTask, Task.Delay(timeout));
-            if (completed != scriptTask)
+            var stopwatch = Stopwatch.StartNew();
+            var operationId = Guid.NewGuid().ToString("N");
+            var startResult = await ExecuteScriptWithTimeoutAsync(
+                BuildAiWorkspaceFlushStartScript(operationId, "host_close"),
+                timeout);
+            if (!ParseBooleanScriptResult(startResult))
             {
                 return false;
             }
 
-            var rawResult = await scriptTask;
-            return ParseBooleanScriptResult(rawResult);
+            while (stopwatch.Elapsed < timeout)
+            {
+                var remaining = timeout - stopwatch.Elapsed;
+                var rawStatus = await ExecuteScriptWithTimeoutAsync(
+                    BuildAiWorkspaceFlushStatusScript(operationId),
+                    remaining);
+                var status = ParseAiWorkspaceFlushStatus(rawStatus);
+                if (status.IsTerminal)
+                {
+                    return status.Succeeded;
+                }
+
+                var delay = TimeSpan.FromMilliseconds(Math.Min(
+                    50,
+                    Math.Max(1, (timeout - stopwatch.Elapsed).TotalMilliseconds)));
+                await Task.Delay(delay);
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] AI workspace flush before close failed: {ex}");
             return false;
         }
+    }
+
+    private async Task<string?> ExecuteScriptWithTimeoutAsync(string script, TimeSpan timeout)
+    {
+        if (timeout <= TimeSpan.Zero)
+        {
+            return null;
+        }
+
+        var scriptTask = _webView2Host.ExecuteScriptAsync(script);
+        var completed = await Task.WhenAny(scriptTask, Task.Delay(timeout));
+        return completed == scriptTask
+            ? await scriptTask
+            : null;
+    }
+
+    internal static string BuildAiWorkspaceFlushStartScript(string operationId, string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+        var operationIdJson = JsonSerializer.Serialize(operationId);
+        var reasonJson = JsonSerializer.Serialize(string.IsNullOrWhiteSpace(reason) ? "host_close" : reason);
+        return $$"""
+            (() => {
+                const operationId = {{operationIdJson}};
+                const reason = {{reasonJson}};
+                const storeName = '__clearVisionAiWorkspaceFlushResults';
+                const store = window[storeName] || (window[storeName] = {});
+                store[operationId] = { status: 'pending', value: false, error: '', startedAt: Date.now() };
+                try {
+                    const flush = window.__clearVisionFlushAiPanelWorkspace;
+                    if (typeof flush !== 'function') {
+                        store[operationId] = {
+                            status: 'completed',
+                            value: true,
+                            error: '',
+                            startedAt: Date.now()
+                        };
+                        return true;
+                    }
+
+                    Promise.resolve(flush(reason))
+                        .then(value => {
+                            store[operationId] = {
+                                status: 'completed',
+                                value: value === true,
+                                error: '',
+                                startedAt: Date.now()
+                            };
+                        })
+                        .catch(error => {
+                            store[operationId] = {
+                                status: 'failed',
+                                value: false,
+                                error: String(error && (error.message || error) || 'unknown'),
+                                startedAt: Date.now()
+                            };
+                        });
+                    return true;
+                } catch (error) {
+                    store[operationId] = {
+                        status: 'failed',
+                        value: false,
+                        error: String(error && (error.message || error) || 'unknown'),
+                        startedAt: Date.now()
+                    };
+                    return false;
+                }
+            })()
+            """;
+    }
+
+    internal static string BuildAiWorkspaceFlushStatusScript(string operationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+        var operationIdJson = JsonSerializer.Serialize(operationId);
+        return $$"""
+            (() => {
+                const operationId = {{operationIdJson}};
+                const store = window.__clearVisionAiWorkspaceFlushResults || {};
+                const state = store[operationId] || { status: 'missing', value: false, error: '' };
+                if (state.status === 'completed' || state.status === 'failed' || state.status === 'missing') {
+                    delete store[operationId];
+                }
+                return state;
+            })()
+            """;
     }
 
     internal static bool ParseBooleanScriptResult(string? rawResult)
@@ -245,6 +351,65 @@ public partial class MainForm : Form
         {
             return string.Equals(rawResult.Trim(), "true", StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    internal static AiWorkspaceFlushStatus ParseAiWorkspaceFlushStatus(string? rawResult)
+    {
+        if (string.IsNullOrWhiteSpace(rawResult))
+        {
+            return AiWorkspaceFlushStatus.Failed;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawResult);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.True)
+            {
+                return AiWorkspaceFlushStatus.Success;
+            }
+
+            if (root.ValueKind == JsonValueKind.False)
+            {
+                return AiWorkspaceFlushStatus.Failed;
+            }
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return AiWorkspaceFlushStatus.Failed;
+            }
+
+            var status = root.TryGetProperty("status", out var statusElement)
+                ? statusElement.GetString()
+                : string.Empty;
+            status = status?.Trim().ToLowerInvariant();
+            if (status == "pending")
+            {
+                return AiWorkspaceFlushStatus.Pending;
+            }
+
+            if (status == "completed")
+            {
+                var succeeded = root.TryGetProperty("value", out var valueElement) &&
+                    valueElement.ValueKind == JsonValueKind.True;
+                return succeeded
+                    ? AiWorkspaceFlushStatus.Success
+                    : AiWorkspaceFlushStatus.Failed;
+            }
+
+            return AiWorkspaceFlushStatus.Failed;
+        }
+        catch (JsonException)
+        {
+            return AiWorkspaceFlushStatus.Failed;
+        }
+    }
+
+    internal readonly record struct AiWorkspaceFlushStatus(bool IsTerminal, bool Succeeded)
+    {
+        public static AiWorkspaceFlushStatus Pending { get; } = new(false, false);
+        public static AiWorkspaceFlushStatus Success { get; } = new(true, true);
+        public static AiWorkspaceFlushStatus Failed { get; } = new(true, false);
     }
 
     private async Task DisposeWebViewHostAsync()
