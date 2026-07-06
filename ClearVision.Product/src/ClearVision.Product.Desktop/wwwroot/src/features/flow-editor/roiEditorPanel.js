@@ -27,10 +27,21 @@ function sameGeometryValue(left, right) {
         JSON.stringify(comparableGeometryValue(right || null));
 }
 
+function getPreviewOperatorId(panel) {
+    const previewOperator = typeof panel.getPreviewOperator === 'function'
+        ? panel.getPreviewOperator()
+        : null;
+    const geometryOperator = typeof panel.getOperator === 'function'
+        ? panel.getOperator()
+        : null;
+    return previewOperator?.id || geometryOperator?.id || null;
+}
+
 export class RoiEditorPanel {
     constructor(container, options = {}) {
         this.container = container;
         this.getOperator = options.getOperator ?? (() => null);
+        this.getPreviewOperator = options.getPreviewOperator ?? this.getOperator;
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onRectChanged = options.onRectChanged ?? (() => {});
         this.onImageBoundsChanged = options.onImageBoundsChanged ?? (() => {});
@@ -271,7 +282,7 @@ export class RoiEditorPanel {
 
     resolveInputImageSrc() {
         const activeNodeId = this.previewState?.activeNodeId;
-        const operatorId = this.getOperator()?.id || null;
+        const operatorId = getPreviewOperatorId(this);
         if (!operatorId || activeNodeId !== operatorId) {
             return null;
         }
@@ -281,7 +292,7 @@ export class RoiEditorPanel {
 
     shouldRetainCurrentImageDuringPreviewTransition() {
         const activeNodeId = this.previewState?.activeNodeId;
-        const operatorId = this.getOperator()?.id || null;
+        const operatorId = getPreviewOperatorId(this);
         const status = this.previewState?.status;
         return Boolean(
             this.currentImageSource &&

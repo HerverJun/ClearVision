@@ -778,6 +778,29 @@ export class PropertyPanelCapabilityOwner {
         };
     }
 
+    getCaliperSearchRegionStatus(result) {
+        if (result?.updated !== false) {
+            return '卡尺搜索区域已通过 RectangleRegion 连接更新';
+        }
+
+        switch (result?.reason) {
+            case 'search_region_connected_to_non_rectangle_region':
+                return 'CaliperTool.SearchRegion 已连接到非 RectangleRegion 节点，请先断开该连接或改用 RectangleRegion。';
+            case 'search_region_connection_failed':
+                return 'RectangleRegion 创建后连接 CaliperTool.SearchRegion 失败，已回滚新节点。';
+            case 'rectangle_region_output_not_found':
+                return 'RectangleRegion 缺少 Rectangle 输出端口，已回滚新节点。';
+            case 'search_region_port_not_found':
+                return 'CaliperTool.SearchRegion 输入端口不存在，无法写入搜索区域。';
+            case 'flow_canvas_mutation_unavailable':
+                return '当前画布不支持自动创建 SearchRegion 连接。';
+            case 'rectangle_region_create_failed':
+                return 'RectangleRegion 创建失败，搜索区域未写入。';
+            default:
+                return '卡尺搜索区域未变更。';
+        }
+    }
+
     writeInputValue(input, rawValue) {
         const type = String(input.dataset.type || '').toLowerCase();
         if (type === 'boolean' || type === 'bool') {
@@ -830,12 +853,10 @@ export class PropertyPanelCapabilityOwner {
 
         if (this.isCaliperToolOperator()) {
             const result = this.propertyAdapter.upsertCaliperSearchRegion?.(this.currentNodeId, writeValues);
-            this.statusMessage = result?.updated === false
-                ? '卡尺搜索区域未变更'
-                : '卡尺搜索区域已通过 RectangleRegion 连接更新';
+            this.statusMessage = this.getCaliperSearchRegionStatus(result);
             this.dirty = result?.updated !== false;
             this.updateStatus();
-            if (result?.operator) {
+            if (result?.updated !== false && result?.operator) {
                 this.roiEditorPanel?.refreshFromOperator?.({ forceSyncOverlay: true });
             }
             return;
@@ -927,6 +948,7 @@ export class PropertyPanelCapabilityOwner {
 
         this.roiEditorPanel = new RoiEditorPanel(container, {
             getOperator: () => this.getGeometryEditorOperator(),
+            getPreviewOperator: () => this.currentOperator,
             getRoiConfig: operator => {
                 if (this.isCaliperToolOperator()) {
                     return this.getGeometryConfig(this.currentOperator);

@@ -649,6 +649,27 @@ export class PropertyPanelCapabilityAdapter {
         return config;
     }
 
+    removeNode(nodeId, reason = 'property-panel-adapter-remove-node') {
+        if (!nodeId) {
+            return false;
+        }
+
+        const canvas = this.getCanvas();
+        const removeNode = typeof this.flowCanvasAdapter?.removeNode === 'function'
+            ? this.flowCanvasAdapter.removeNode.bind(this.flowCanvasAdapter)
+            : canvas?.removeNode?.bind(canvas);
+        if (typeof removeNode !== 'function') {
+            return false;
+        }
+
+        const removed = removeNode(nodeId) === true;
+        if (removed && typeof this.flowCanvasAdapter?.removeNode !== 'function') {
+            this.flowCanvasAdapter?.markFlowStructureChanged?.(reason);
+        }
+
+        return removed;
+    }
+
     upsertCaliperSearchRegion(caliperNodeId, values = {}) {
         const binding = this.getCaliperSearchRegionBinding(caliperNodeId);
         if (!binding?.caliperNode || binding.targetPortIndex < 0) {
@@ -690,12 +711,24 @@ export class PropertyPanelCapabilityAdapter {
 
         const sourcePortIndex = (regionNode.outputs || []).findIndex(isRectanglePort);
         if (sourcePortIndex < 0) {
-            return { updated: false, reason: 'rectangle_region_output_not_found' };
+            const rolledBack = this.removeNode(regionNode.id, 'caliper-search-region-rollback');
+            return {
+                updated: false,
+                reason: 'rectangle_region_output_not_found',
+                operator: regionNode,
+                rolledBack
+            };
         }
 
         const connection = canvas.addConnection(regionNode.id, sourcePortIndex, caliperNodeId, binding.targetPortIndex);
         if (!connection) {
-            return { updated: false, reason: 'search_region_connection_failed', operator: regionNode };
+            const rolledBack = this.removeNode(regionNode.id, 'caliper-search-region-rollback');
+            return {
+                updated: false,
+                reason: 'search_region_connection_failed',
+                operator: regionNode,
+                rolledBack
+            };
         }
 
         this.flowCanvasAdapter?.markFlowStructureChanged?.('caliper-search-region-upsert');

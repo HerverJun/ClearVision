@@ -37,6 +37,29 @@ function collectOperatorParams() {
   return records;
 }
 
+async function loadPropertyPanelCapabilityOwner() {
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const previousWindow = globalThis.window;
+  if (!hadWindow) {
+    globalThis.window = {
+      chrome: null,
+      addEventListener() {},
+      removeEventListener() {}
+    };
+  }
+
+  try {
+    const module = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanelCapabilityOwner.mjs');
+    return module.PropertyPanelCapabilityOwner;
+  } finally {
+    if (!hadWindow) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = previousWindow;
+    }
+  }
+}
+
 test('PropertyPanelCapabilityAdapter projects selected node metadata and writes through FlowCanvasAdapter once', () => {
   const writeCalls = [];
   const fakeFlowCanvasAdapter = {
@@ -243,6 +266,190 @@ test('PropertyPanelCapabilityAdapter creates and reuses RectangleRegion for Cali
     Height: 17
   });
   assert.equal(propertyAdapter.getCaliperSearchRegionBinding('caliper-1').sourceNode.id, 'region-1');
+});
+
+test('PropertyPanelCapabilityAdapter rolls back created RectangleRegion when Caliper connection fails', () => {
+  const nodes = new Map([
+    ['caliper-1', {
+      id: 'caliper-1',
+      type: 'CaliperTool',
+      title: 'Caliper A',
+      x: 400,
+      y: 120,
+      inputs: [
+        { name: 'Image', dataType: 'Image' },
+        { name: 'SearchRegion', dataType: 'Rectangle' }
+      ],
+      outputs: [],
+      parameters: []
+    }]
+  ]);
+  const removedNodes = [];
+  const structureReasons = [];
+  const canvas = {
+    connections: [],
+    addConnection() {
+      return null;
+    },
+    removeNode(nodeId) {
+      removedNodes.push(nodeId);
+      return nodes.delete(nodeId);
+    }
+  };
+  const propertyAdapter = createPropertyPanelCapabilityAdapter({
+    flowCanvasAdapter: {
+      selectedNode: 'caliper-1',
+      nodes,
+      raw: canvas,
+      addNode(type, x, y, config) {
+        const node = {
+          id: 'region-1',
+          type,
+          title: config.title,
+          x,
+          y,
+          inputs: config.inputs,
+          outputs: config.outputs,
+          parameters: config.parameters
+        };
+        nodes.set(node.id, node);
+        return node;
+      },
+      patchNodeParameters() {
+        throw new Error('patchNodeParameters should not run when connection creation fails');
+      },
+      markFlowStructureChanged(reason) {
+        structureReasons.push(reason);
+      }
+    },
+    getOperatorMetadata(type) {
+      if (type === 'RectangleRegion') {
+        return {
+          displayName: 'Rectangle Region',
+          parameters: [
+            { name: 'X', dataType: 'int', value: 0 },
+            { name: 'Y', dataType: 'int', value: 0 },
+            { name: 'Width', dataType: 'int', value: 1 },
+            { name: 'Height', dataType: 'int', value: 1 }
+          ],
+          inputPorts: [],
+          outputPorts: [
+            { name: 'Rectangle', dataType: 'Rectangle' }
+          ]
+        };
+      }
+
+      return null;
+    }
+  });
+
+  const result = propertyAdapter.upsertCaliperSearchRegion('caliper-1', {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  });
+
+  assert.equal(result.updated, false);
+  assert.equal(result.reason, 'search_region_connection_failed');
+  assert.equal(result.rolledBack, true);
+  assert.deepEqual(removedNodes, ['region-1']);
+  assert.equal(nodes.has('region-1'), false);
+  assert.deepEqual(structureReasons, ['caliper-search-region-rollback']);
+});
+
+test('Caliper SearchRegion connected to non RectangleRegion returns explicit reason and owner status', async () => {
+  const nodes = new Map([
+    ['caliper-1', {
+      id: 'caliper-1',
+      type: 'CaliperTool',
+      inputs: [
+        { name: 'Image', dataType: 'Image' },
+        { name: 'SearchRegion', dataType: 'Rectangle' }
+      ],
+      outputs: [],
+      parameters: []
+    }],
+    ['shape-1', {
+      id: 'shape-1',
+      type: 'ShapeMatching',
+      inputs: [],
+      outputs: [
+        { name: 'Result', dataType: 'Any' }
+      ],
+      parameters: []
+    }]
+  ]);
+  const propertyAdapter = createPropertyPanelCapabilityAdapter({
+    flowCanvasAdapter: {
+      selectedNode: 'caliper-1',
+      nodes,
+      raw: {
+        connections: [
+          {
+            id: 'conn-1',
+            source: 'shape-1',
+            sourcePort: 0,
+            target: 'caliper-1',
+            targetPort: 1
+          }
+        ]
+      },
+      patchNodeParameters() {
+        throw new Error('patchNodeParameters should not run for non RectangleRegion SearchRegion binding');
+      }
+    }
+  });
+
+  const result = propertyAdapter.upsertCaliperSearchRegion('caliper-1', {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  });
+
+  assert.equal(result.updated, false);
+  assert.equal(result.reason, 'search_region_connected_to_non_rectangle_region');
+
+  let statusMessage = null;
+  const owner = {
+    currentNodeId: 'caliper-1',
+    currentOperator: { id: 'caliper-1', type: 'CaliperTool' },
+    disposed: false,
+    propertyAdapter: {
+      upsertCaliperSearchRegion() {
+        return result;
+      }
+    },
+    roiEditorPanel: {
+      refreshFromOperator() {
+        throw new Error('refreshFromOperator should not run after failed Caliper commit');
+      }
+    },
+    buildGeometryWriteValues(values) {
+      return values;
+    },
+    applyValuesToForm() {},
+    isCaliperToolOperator() {
+      return true;
+    },
+    updateStatus() {
+      statusMessage = this.statusMessage;
+    }
+  };
+
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  owner.getCaliperSearchRegionStatus = PropertyPanelCapabilityOwner.prototype.getCaliperSearchRegionStatus;
+  PropertyPanelCapabilityOwner.prototype.handleGeometryChanged.call(owner, {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  }, 'commit');
+
+  assert.equal(owner.dirty, false);
+  assert.match(statusMessage, /SearchRegion/);
+  assert.match(statusMessage, /非 RectangleRegion/);
 });
 
 test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface', () => {

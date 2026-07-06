@@ -830,6 +830,90 @@ test('RoiEditorPanel retains current image during same-node preview transitions'
   assert.equal(RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition.call(panel), false);
 });
 
+test('RoiEditorPanel can use Caliper preview node while reading RectangleRegion geometry', async () => {
+  const loadedImages = [];
+  let publishedBounds = null;
+  const panel = {
+    container: { querySelector: () => null },
+    currentImageSource: null,
+    currentConfig: { editable: true },
+    currentShape: 'Rectangle',
+    applyStateGeneration: 0,
+    previewState: {
+      activeNodeId: 'caliper-1',
+      status: 'success',
+      presenter: {
+        inputImageSrc: 'data:image/png;base64,caliper-input'
+      }
+    },
+    imageCanvas: {
+      image: null,
+      clear() {
+        throw new Error('clear should not run when Caliper input preview is available');
+      },
+      async loadImage(src) {
+        loadedImages.push(src);
+        this.image = { width: 128, height: 96 };
+      },
+      getPrimaryEditableOverlay() {
+        return null;
+      },
+      setEditableGeometry(geometry) {
+        this.geometry = geometry;
+      }
+    },
+    getOperator() {
+      return {
+        id: 'rectangle-region-1',
+        type: 'RectangleRegion',
+        parameters: [
+          { name: 'X', value: 12 },
+          { name: 'Y', value: 14 },
+          { name: 'Width', value: 40 },
+          { name: 'Height', value: 22 }
+        ]
+      };
+    },
+    getPreviewOperator() {
+      return {
+        id: 'caliper-1',
+        type: 'CaliperTool'
+      };
+    },
+    getRoiConfig() {
+      return {
+        editable: true,
+        shape: 'Rectangle',
+        geometryAdapter: { kind: 'rectangle', paramKeys: DEFAULT_RECT_PARAM_KEYS }
+      };
+    },
+    resolveInputImageSrc: RoiEditorPanel.prototype.resolveInputImageSrc,
+    shouldRetainCurrentImageDuringPreviewTransition: RoiEditorPanel.prototype.shouldRetainCurrentImageDuringPreviewTransition,
+    publishImageBounds: RoiEditorPanel.prototype.publishImageBounds,
+    hasEditableImage: RoiEditorPanel.prototype.hasEditableImage,
+    extractRectParams: RoiEditorPanel.prototype.extractRectParams,
+    syncOverlayFromOperator: RoiEditorPanel.prototype.syncOverlayFromOperator,
+    onImageBoundsChanged(bounds) {
+      publishedBounds = bounds;
+    }
+  };
+
+  await RoiEditorPanel.prototype.applyState.call(panel, { forceSyncOverlay: true });
+
+  assert.deepEqual(loadedImages, ['data:image/png;base64,caliper-input']);
+  assert.deepEqual(publishedBounds, { width: 128, height: 96 });
+  assert.deepEqual(panel.imageCanvas.geometry, {
+    kind: 'rectangle',
+    x: 12,
+    y: 14,
+    width: 40,
+    height: 22
+  });
+
+  panel.previewState.activeNodeId = 'rectangle-region-1';
+  assert.equal(RoiEditorPanel.prototype.resolveInputImageSrc.call(panel), null);
+});
+
 test('RoiEditorPanel does not resync overlay while retaining transition image', async () => {
   let syncCount = 0;
   let bounds = null;
