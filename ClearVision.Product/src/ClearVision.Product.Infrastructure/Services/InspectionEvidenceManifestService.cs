@@ -32,6 +32,7 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
     private readonly IInspectionResultRepository _repository;
     private readonly ILogger<InspectionEvidenceManifestService> _logger;
     private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
+    private readonly IProjectRepository? _projectRepository;
     private readonly StudioEvidenceRetentionOptions _options;
     private readonly string _rootPath;
     private readonly TimeProvider _timeProvider;
@@ -40,11 +41,13 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
         IInspectionResultRepository repository,
         ILogger<InspectionEvidenceManifestService> logger,
         IConfiguration? configuration = null,
-        ProjectSaveCoordinator? projectSaveCoordinator = null)
+        ProjectSaveCoordinator? projectSaveCoordinator = null,
+        IProjectRepository? projectRepository = null)
     {
         _repository = repository;
         _logger = logger;
         _projectSaveCoordinator = projectSaveCoordinator;
+        _projectRepository = projectRepository;
         _options = ResolveOptions(configuration);
         _rootPath = ResolveRootPath(_options.RootPath);
         _timeProvider = TimeProvider.System;
@@ -56,11 +59,13 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
         StudioEvidenceRetentionOptions options,
         string rootPath,
         TimeProvider? timeProvider = null,
-        ProjectSaveCoordinator? projectSaveCoordinator = null)
+        ProjectSaveCoordinator? projectSaveCoordinator = null,
+        IProjectRepository? projectRepository = null)
     {
         _repository = repository;
         _logger = logger;
         _projectSaveCoordinator = projectSaveCoordinator;
+        _projectRepository = projectRepository;
         _options = options;
         _rootPath = ResolveRootPath(rootPath);
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -227,6 +232,18 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
                 ErrorCode = "EvidenceDisabled",
                 Message = "Evidence manifest capture is disabled.",
                 Summary = DisabledSummary(projectId, resultId)
+            };
+        }
+
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return new InspectionEvidenceManifestReadResult
+            {
+                Found = false,
+                Status = "not-found",
+                ErrorCode = "InspectionResultNotFound",
+                Message = "Inspection history result was not found.",
+                Summary = MissingSummary(projectId, resultId, "Inspection history result was not found.")
             };
         }
 
@@ -891,6 +908,16 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
     private string GetResultRoot(Guid projectId, Guid resultId)
     {
         return Path.GetFullPath(Path.Combine(_rootPath, projectId.ToString("N"), resultId.ToString("N")));
+    }
+
+    private async Task<bool> IsActiveProjectAsync(Guid projectId)
+    {
+        if (_projectRepository == null)
+        {
+            return true;
+        }
+
+        return projectId != Guid.Empty && await _projectRepository.GetByIdFreshAsync(projectId) != null;
     }
 
     private static string BuildManifestReference(Guid projectId, Guid resultId)

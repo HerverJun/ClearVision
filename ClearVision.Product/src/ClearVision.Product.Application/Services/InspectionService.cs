@@ -519,6 +519,15 @@ public class InspectionService : IInspectionService
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
         await using (access)
         {
+            if (!await IsActiveProjectAsync(projectId))
+            {
+                return new InspectionHistoryPage
+                {
+                    PageIndex = pageIndex,
+                    PageSize = pageSize
+                };
+            }
+
             return await _resultRepository.GetHistoryPageAsync(
                 projectId,
                 startTime,
@@ -538,6 +547,11 @@ public class InspectionService : IInspectionService
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
         await using (access)
         {
+            if (!await IsActiveProjectAsync(projectId))
+            {
+                return null;
+            }
+
             return await _resultRepository.GetHistoryDetailAsync(projectId, resultId);
         }
     }
@@ -549,6 +563,11 @@ public class InspectionService : IInspectionService
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
         await using (access)
         {
+            if (!await IsActiveProjectAsync(projectId))
+            {
+                return null;
+            }
+
             var left = await _resultRepository.GetHistoryDetailAsync(projectId, leftId);
             var right = await _resultRepository.GetHistoryDetailAsync(projectId, rightId);
             return left == null || right == null
@@ -568,6 +587,11 @@ public class InspectionService : IInspectionService
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
         await using (access)
         {
+            if (!await IsActiveProjectAsync(projectId))
+            {
+                return null;
+            }
+
             var current = await _resultRepository.GetHistoryDetailAsync(projectId, resultId);
             if (current == null)
             {
@@ -625,7 +649,15 @@ public class InspectionService : IInspectionService
         string? status,
         string? defectType)
     {
-        return await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
+            return await IsActiveProjectAsync(projectId)
+                ? await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime, status, defectType)
+                : new InspectionStatistics();
+        }
     }
 
     #endregion
@@ -1012,6 +1044,16 @@ public class InspectionService : IInspectionService
     private static bool HasExecutableFlow(OperatorFlow? flow)
     {
         return flow?.Operators?.Count > 0;
+    }
+
+    private async Task<bool> IsActiveProjectAsync(Guid projectId)
+    {
+        if (projectId == Guid.Empty)
+        {
+            return false;
+        }
+
+        return await _projectRepository.GetByIdFreshAsync(projectId) != null;
     }
 
     private static void ThrowIfAdmissionRejected(ExecutionAdmissionResult admission)

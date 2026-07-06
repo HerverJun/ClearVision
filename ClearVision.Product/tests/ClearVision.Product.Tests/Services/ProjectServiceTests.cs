@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
@@ -112,6 +113,23 @@ public class ProjectServiceTests
         dto!.Assets.Should().NotBeNull();
         dto.Assets.CalibrationAssets.Should().BeEmpty();
         dto.Assets.SpatialAssets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenProjectIsNotActive_ShouldNotLoadFlowJsonOrAssets()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assets = Substitute.For<IProjectAssetStorage>();
+        var projectId = Guid.NewGuid();
+        repository.GetByIdAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+
+        var dto = await sut.GetByIdAsync(projectId);
+
+        dto.Should().BeNull();
+        await storage.DidNotReceive().LoadFlowJsonAsync(projectId);
+        await assets.DidNotReceive().LoadAssetsAsync(projectId);
     }
 
     [Fact]
@@ -557,13 +575,34 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task UpdateEntrypoints_WhenProjectIsNotActive_ShouldRejectWithoutLoadingDerivedState()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var projectId = Guid.NewGuid();
+        repository.GetByIdAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        var update = async () => await sut.UpdateAsync(projectId, new UpdateProjectRequest { Name = "deleted" });
+        var updateFlow = async () => await sut.UpdateFlowAsync(projectId, new UpdateFlowRequest());
+        var updateGlobalVariables = async () => await sut.UpdateGlobalVariablesAsync(projectId, new ProjectGlobalVariableSchema());
+
+        await update.Should().ThrowAsync<ProjectNotFoundException>();
+        await updateFlow.Should().ThrowAsync<ProjectNotFoundException>();
+        await updateGlobalVariables.Should().ThrowAsync<ProjectNotFoundException>();
+        await storage.DidNotReceive().LoadFlowJsonAsync(projectId);
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
     public async Task DeleteAsync_WhenProjectVariableStateExists_ShouldDeletePersistedStateFilesAndDropRegistrySession()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectDeleteState", Guid.NewGuid().ToString("N"));
         try
         {
             var repository = Substitute.For<IProjectRepository>();
-            var storage = Substitute.For<IProjectFlowStorage>();
+            var storage = new RecordingProjectFlowStorage();
+            var assetStorage = new RecordingProjectAssetStorage();
             var registry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
             var variableId = Guid.NewGuid();
             var project = new Project("demo");
@@ -572,7 +611,27 @@ public class ProjectServiceTests
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.UpdateAsync(Arg.Any<Project>()).Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
-            storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+            storage.Seed(project.Id, JsonSerializer.Serialize(CreateVariableReadFlow(variableId, "stats.count")), 0);
+            var assets = new ProjectAssetsDto
+            {
+                CalibrationAssets =
+                [
+                    new ProjectCalibrationAssetDto
+                    {
+                        AssetId = "calibration-a",
+                        Kind = "CalibrationBundleV2",
+                        Version = "1",
+                        Status = "authority",
+                        Payload = CreateCalibrationPayload()
+                    }
+                ]
+            };
+            await assetStorage.SaveAssetsAsync(
+                project.Id,
+                assets,
+                0,
+                Guid.NewGuid(),
+                ProjectAssetJson.ComputeAssetsHash(assets));
 
             var authoritative = registry.GetOrCreate(project.Id, project.GlobalVariables);
             authoritative.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
@@ -586,7 +645,20 @@ public class ProjectServiceTests
                 .BeTrue(seedError);
             Directory.EnumerateFileSystemEntries(root).Should().NotBeEmpty();
 
-            var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+            var coordinator = new ProjectSaveCoordinator(repository, storage, registry, projectAssetStorage: assetStorage);
+            await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo-renamed",
+                null,
+                project.GlobalVariables,
+                project.GlobalVariables,
+                storage.LastSavedFlowJson,
+                null,
+                null));
+            ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeTrue();
+            repository.ClearReceivedCalls();
+            var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry, coordinator, assetStorage);
 
             await sut.DeleteAsync(project.Id);
 
@@ -596,15 +668,59 @@ public class ProjectServiceTests
             Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)).Should().Be(1L);
             snapshot.Version.Should().Be(0);
             Directory.EnumerateFileSystemEntries(root).Should().BeEmpty();
+            storage.DeleteCount.Should().Be(1);
+            storage.LastSavedFlowJson.Should().BeNull();
+            assetStorage.DeleteCount.Should().Be(1);
+            assetStorage.Assets.CalibrationAssets.Should().BeEmpty();
+            ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeFalse();
             await repository.Received(1).UpdateAsync(project);
         }
         finally
         {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenCleanupFails_ShouldThrowAndNotReportSuccess()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assets = Substitute.For<IProjectAssetStorage>();
+        var project = new Project("demo");
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        storage.DeleteFlowJsonAsync(project.Id).Returns(_ => Task.FromException(new IOException("flow cleanup failed")));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+
+        var act = async () => await sut.DeleteAsync(project.Id);
+
+        await act.Should().ThrowAsync<IOException>().WithMessage("*flow cleanup failed*");
+        project.IsDeleted.Should().BeTrue();
+        await repository.Received(1).UpdateAsync(project);
+        await assets.DidNotReceive().DeleteAssetsAsync(project.Id);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenProjectAlreadyDeleted_ShouldReturnProjectNotFoundWithoutCleanup()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var assets = Substitute.For<IProjectAssetStorage>();
+        var projectId = Guid.NewGuid();
+        repository.GetByIdForUpdateAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+
+        var act = async () => await sut.DeleteAsync(projectId);
+
+        await act.Should().ThrowAsync<ProjectNotFoundException>();
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+        await storage.DidNotReceive().DeleteFlowJsonAsync(projectId);
+        await assets.DidNotReceive().DeleteAssetsAsync(projectId);
     }
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, string name = "stats.count")
@@ -729,6 +845,8 @@ public class ProjectServiceTests
 
         public ProjectAssetStorageMetadata? Metadata { get; private set; }
 
+        public int DeleteCount { get; private set; }
+
         public Task<ProjectAssetsDto> LoadAssetsAsync(Guid projectId) =>
             Task.FromResult(ProjectAssetJson.Clone(Assets));
 
@@ -755,6 +873,7 @@ public class ProjectServiceTests
 
         public Task DeleteAssetsAsync(Guid projectId)
         {
+            DeleteCount += 1;
             Assets = new ProjectAssetsDto();
             Metadata = null;
             return Task.CompletedTask;
@@ -834,6 +953,8 @@ public class ProjectServiceTests
 
         public int SaveCount { get; private set; }
 
+        public int DeleteCount { get; private set; }
+
         public void Seed(Guid projectId, string flowJson, long persistenceRevision)
         {
             _flowJson = flowJson;
@@ -859,6 +980,7 @@ public class ProjectServiceTests
 
         public Task DeleteFlowJsonAsync(Guid projectId)
         {
+            DeleteCount += 1;
             _flowJson = null;
             _metadata = null;
             LastSavedFlowJson = null;

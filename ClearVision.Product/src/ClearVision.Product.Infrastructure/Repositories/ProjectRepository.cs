@@ -28,6 +28,28 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
             .ToListAsync();
     }
 
+    public override async Task<Project?> GetByIdAsync(Guid id)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Project id cannot be empty.", nameof(id));
+        }
+
+        var project = await _dbSet
+            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        return project is { IsDeleted: false } ? project : null;
+    }
+
+    public override async Task<bool> ExistsAsync(Guid id)
+    {
+        if (id == Guid.Empty)
+        {
+            return false;
+        }
+
+        return await _dbSet.AnyAsync(p => p.Id == id && !p.IsDeleted);
+    }
+
     public async Task<Project?> GetByIdFreshAsync(Guid id)
     {
         if (id == Guid.Empty)

@@ -456,15 +456,28 @@ public class ProjectService
     public async Task DeleteAsync(Guid id)
     {
         await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
-        var project = await _projectRepository.GetByIdAsync(id)
+        var project = await _projectRepository.GetByIdForUpdateAsync(id)
             ?? throw new ProjectNotFoundException(id);
 
         project.MarkAsDeleted();
         await _projectRepository.UpdateAsync(project);
-        _projectVariableSessions?.Delete(id);
-        if (_projectAssetStorage != null)
+        try
         {
-            await _projectAssetStorage.DeleteAssetsAsync(id);
+            _projectVariableSessions?.Delete(id);
+            await _flowStorage.DeleteFlowJsonAsync(id);
+            if (_projectAssetStorage != null)
+            {
+                await _projectAssetStorage.DeleteAssetsAsync(id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to clean derived project state after deleting project {ProjectId}.", id);
+            throw;
+        }
+        finally
+        {
+            _saveCoordinator.ClearProjectState(id);
         }
     }
 

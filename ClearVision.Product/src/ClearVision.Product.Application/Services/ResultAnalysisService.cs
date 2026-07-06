@@ -67,15 +67,22 @@ public interface IResultAnalysisService
 public class ResultAnalysisService : IResultAnalysisService
 {
     private readonly IInspectionResultRepository _resultRepository;
+    private readonly IProjectRepository? _projectRepository;
 
-    public ResultAnalysisService(IInspectionResultRepository resultRepository)
+    public ResultAnalysisService(IInspectionResultRepository resultRepository, IProjectRepository? projectRepository = null)
     {
         _resultRepository = resultRepository ?? throw new ArgumentNullException(nameof(resultRepository));
+        _projectRepository = projectRepository;
     }
 
     /// <inheritdoc />
     public async Task<InspectionStatisticsDto> GetStatisticsAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return EmptyStatistics(projectId, startTime, endTime);
+        }
+
         var statistics = await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
         var distribution = await _resultRepository.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
 
@@ -99,6 +106,11 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<DefectDistributionDto> GetDefectDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return EmptyDefectDistribution(projectId, startTime, endTime);
+        }
+
         var distribution = await _resultRepository.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
         var total = distribution.Values.Sum();
 
@@ -122,6 +134,11 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<ConfidenceDistributionDto> GetConfidenceDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return EmptyConfidenceDistribution(projectId, startTime, endTime);
+        }
+
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
 
         // 按时间筛选
@@ -189,6 +206,11 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<TrendAnalysisDto> GetTrendAnalysisAsync(Guid projectId, TrendInterval interval, DateTime startTime, DateTime endTime, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return EmptyTrend(projectId, interval, startTime, endTime);
+        }
+
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime, endTime, status, defectType);
         var resultList = results.ToList();
 
@@ -249,6 +271,11 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<string> ExportToCsvAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return string.Empty;
+        }
+
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
 
         var csv = new System.Text.StringBuilder();
@@ -332,6 +359,17 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<string> ExportToJsonAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return System.Text.Json.JsonSerializer.Serialize(new InspectionExportDto
+            {
+                ProjectId = projectId,
+                ExportTime = DateTime.UtcNow,
+                StartTime = startTime,
+                EndTime = endTime
+            }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
+
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
 
         var exportData = new InspectionExportDto
@@ -370,6 +408,11 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<InspectionReportDto> GenerateReportAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return EmptyReport(projectId, startTime, endTime);
+        }
+
         var statistics = await GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
         var defectDistribution = await GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
         var confidenceDistribution = await GetConfidenceDistributionAsync(projectId, startTime, endTime, status, defectType);
@@ -399,6 +442,16 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<ComparisonAnalysisDto> ComparePeriodsAsync(Guid projectId, DateTime period1Start, DateTime period1End, DateTime period2Start, DateTime period2End)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return new ComparisonAnalysisDto
+            {
+                ProjectId = projectId,
+                Period1 = new ReportPeriodDto { StartTime = period1Start, EndTime = period1End },
+                Period2 = new ReportPeriodDto { StartTime = period2Start, EndTime = period2End }
+            };
+        }
+
         var period1Stats = await GetStatisticsAsync(projectId, period1Start, period1End);
         var period2Stats = await GetStatisticsAsync(projectId, period2Start, period2End);
 
@@ -451,6 +504,16 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<DefectHeatmapDto> GetDefectHeatmapAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        if (!await IsActiveProjectAsync(projectId))
+        {
+            return new DefectHeatmapDto
+            {
+                ProjectId = projectId,
+                StartTime = startTime,
+                EndTime = endTime
+            };
+        }
+
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
         var allDefects = results.SelectMany(r => r.Defects).ToList();
 
@@ -551,6 +614,61 @@ public class ResultAnalysisService : IResultAnalysisService
 
         return recommendations;
     }
+
+    private async Task<bool> IsActiveProjectAsync(Guid projectId)
+    {
+        if (_projectRepository == null)
+        {
+            return true;
+        }
+
+        return projectId != Guid.Empty && await _projectRepository.GetByIdFreshAsync(projectId) != null;
+    }
+
+    private static InspectionStatisticsDto EmptyStatistics(Guid projectId, DateTime? startTime, DateTime? endTime) =>
+        new()
+        {
+            ProjectId = projectId,
+            StartTime = startTime,
+            EndTime = endTime
+        };
+
+    private static DefectDistributionDto EmptyDefectDistribution(Guid projectId, DateTime? startTime, DateTime? endTime) =>
+        new()
+        {
+            ProjectId = projectId,
+            StartTime = startTime,
+            EndTime = endTime
+        };
+
+    private static ConfidenceDistributionDto EmptyConfidenceDistribution(Guid projectId, DateTime? startTime, DateTime? endTime) =>
+        new()
+        {
+            ProjectId = projectId,
+            StartTime = startTime,
+            EndTime = endTime
+        };
+
+    private static TrendAnalysisDto EmptyTrend(Guid projectId, TrendInterval interval, DateTime startTime, DateTime endTime) =>
+        new()
+        {
+            ProjectId = projectId,
+            Interval = interval.ToString(),
+            StartTime = startTime,
+            EndTime = endTime
+        };
+
+    private static InspectionReportDto EmptyReport(Guid projectId, DateTime? startTime, DateTime? endTime) =>
+        new()
+        {
+            ProjectId = projectId,
+            GeneratedAt = DateTime.UtcNow,
+            Period = new ReportPeriodDto { StartTime = startTime, EndTime = endTime },
+            Summary = EmptyStatistics(projectId, startTime, endTime),
+            DefectDistribution = EmptyDefectDistribution(projectId, startTime, endTime),
+            ConfidenceDistribution = EmptyConfidenceDistribution(projectId, startTime, endTime),
+            HourlyTrend = EmptyTrend(projectId, TrendInterval.Hour, startTime ?? DateTime.MinValue, endTime ?? DateTime.UtcNow)
+        };
 
     private string GenerateComparisonSummary(List<MetricComparisonDto> comparisons)
     {

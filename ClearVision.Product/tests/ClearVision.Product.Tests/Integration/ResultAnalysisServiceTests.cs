@@ -27,6 +27,27 @@ public class ResultAnalysisServiceIntegrationTests
     }
 
     [Fact]
+    public async Task AnalysisReads_WhenProjectIsNotActive_ShouldReturnEmptyDataWithoutReadingResults()
+    {
+        var projectId = Guid.NewGuid();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        var service = new ResultAnalysisService(resultRepository, projectRepository);
+
+        var statistics = await service.GetStatisticsAsync(projectId);
+        var distribution = await service.GetDefectDistributionAsync(projectId);
+        var trend = await service.GetTrendAnalysisAsync(projectId, TrendInterval.Hour, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow);
+        var report = await service.GenerateReportAsync(projectId);
+
+        statistics.TotalCount.Should().Be(0);
+        distribution.Items.Should().BeEmpty();
+        trend.DataPoints.Should().BeEmpty();
+        report.Summary.TotalCount.Should().Be(0);
+        resultRepository.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetStatisticsAsync_WithResults_ShouldReturnCorrectStatistics()
     {
         // Arrange

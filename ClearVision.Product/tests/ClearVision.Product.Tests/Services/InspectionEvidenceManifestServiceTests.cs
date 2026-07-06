@@ -257,10 +257,39 @@ public sealed class InspectionEvidenceManifestServiceTests
         }
     }
 
+    [Fact]
+    public async Task ManifestReads_WhenProjectIsNotActive_ShouldReturnNotFoundWithoutReadingResult()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var projectId = Guid.NewGuid();
+            var resultId = Guid.NewGuid();
+            var repository = Substitute.For<IInspectionResultRepository>();
+            var projectRepository = Substitute.For<IProjectRepository>();
+            projectRepository.GetByIdFreshAsync(projectId).Returns(Task.FromResult<Project?>(null));
+            var service = CreateService(root, repository, projectRepository: projectRepository);
+
+            var manifest = await service.GetManifestAsync(projectId, resultId);
+            var export = await service.ExportAsync(projectId, resultId);
+
+            manifest.Found.Should().BeFalse();
+            manifest.ErrorCode.Should().Be("InspectionResultNotFound");
+            export.Success.Should().BeFalse();
+            export.ErrorCode.Should().Be("InspectionResultNotFound");
+            repository.ReceivedCalls().Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
     private static InspectionEvidenceManifestService CreateService(
         string root,
         IInspectionResultRepository? repository = null,
-        Dictionary<string, string?>? additionalConfiguration = null)
+        Dictionary<string, string?>? additionalConfiguration = null,
+        IProjectRepository? projectRepository = null)
     {
         var configuration = new Dictionary<string, string?>
         {
@@ -277,7 +306,8 @@ public sealed class InspectionEvidenceManifestServiceTests
         return new InspectionEvidenceManifestService(
             repository ?? Substitute.For<IInspectionResultRepository>(),
             NullLogger<InspectionEvidenceManifestService>.Instance,
-            new ConfigurationBuilder().AddInMemoryCollection(configuration).Build());
+            new ConfigurationBuilder().AddInMemoryCollection(configuration).Build(),
+            projectRepository: projectRepository);
     }
 
     private static IInspectionResultRepository CreateRepository(Guid projectId, Guid resultId)

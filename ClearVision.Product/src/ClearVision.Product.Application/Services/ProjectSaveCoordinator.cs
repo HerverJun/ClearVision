@@ -85,6 +85,12 @@ public sealed class ProjectSaveCoordinator
         }
     }
 
+    public void ClearProjectState(Guid projectId)
+    {
+        RecoveryRequired.TryRemove(projectId, out _);
+        ProjectStates.TryRemove(projectId, out _);
+    }
+
     public async Task<ProjectSaveResult> SaveExistingProjectAsync(ProjectSaveRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -716,6 +722,10 @@ public sealed class ProjectSaveCoordinator
             StartupRecoveryHasRun = false;
         }
     }
+
+    internal static bool HasProjectStateForTests(Guid projectId) => ProjectStates.ContainsKey(projectId);
+
+    internal static bool HasRecoveryRequiredForTests(Guid projectId) => RecoveryRequired.ContainsKey(projectId);
 
     private static void VerifyProjectAtCandidate(Project project, ProjectCandidate candidate)
     {

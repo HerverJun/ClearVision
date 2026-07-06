@@ -63,6 +63,25 @@ public sealed class RepositoryBaseValidationTests : IDisposable
     }
 
     [Fact]
+    public async Task ProjectRepositoryActiveReads_WhenProjectIsSoftDeleted_ShouldReturnNull()
+    {
+        var project = new Project("deleted");
+        await _repository.AddAsync(project);
+        project.MarkAsDeleted();
+        await _repository.UpdateAsync(project);
+
+        var byId = await _repository.GetByIdAsync(project.Id);
+        var fresh = await _repository.GetByIdFreshAsync(project.Id);
+        var forUpdate = await _repository.GetByIdForUpdateAsync(project.Id);
+        var exists = await _repository.ExistsAsync(project.Id);
+
+        byId.Should().BeNull();
+        fresh.Should().BeNull();
+        forUpdate.Should().BeNull();
+        exists.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetByIdFreshAsync_WhenContextTracksOldProject_ShouldReturnDatabaseState()
     {
         var project = new Project("demo");

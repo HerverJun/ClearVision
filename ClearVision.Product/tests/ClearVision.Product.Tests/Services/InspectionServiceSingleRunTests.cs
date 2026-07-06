@@ -18,6 +18,43 @@ namespace ClearVision.Product.Tests.Services;
 public class InspectionServiceSingleRunTests
 {
     [Fact]
+    public async Task HistoryReads_WhenProjectIsNotActive_ShouldReturnEmptyAndNotReadResults()
+    {
+        var projectId = Guid.NewGuid();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            Substitute.For<IFlowExecutionService>(),
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var page = await service.GetInspectionHistoryAsync(projectId, null, null, null, null, 2, 25);
+        var detail = await service.GetInspectionHistoryDetailAsync(projectId, Guid.NewGuid());
+        var comparison = await service.CompareInspectionHistoryAsync(projectId, Guid.NewGuid(), Guid.NewGuid());
+        var previous = await service.FindPreviousSuccessfulInspectionAsync(projectId, Guid.NewGuid());
+        var statistics = await service.GetStatisticsAsync(projectId, null, null, null, null);
+
+        page.Items.Should().BeEmpty();
+        page.TotalCount.Should().Be(0);
+        page.PageIndex.Should().Be(2);
+        page.PageSize.Should().Be(25);
+        detail.Should().BeNull();
+        comparison.Should().BeNull();
+        previous.Should().BeNull();
+        statistics.TotalCount.Should().Be(0);
+        resultRepository.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WithExplicitFlow_ShouldPreferClientFlow()
     {
         var projectId = Guid.NewGuid();

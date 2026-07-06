@@ -141,6 +141,58 @@ public sealed class ProjectSaveCoordinatorTests
     }
 
     [Fact]
+    public async Task ClearProjectState_WhenProjectsAreFenced_ShouldClearOnlyRequestedProject()
+    {
+        var root = CreateTempPath();
+        ProjectSaveCoordinator.ResetStaticStateForTests();
+        try
+        {
+            var first = new Project("first");
+            var second = new Project("second");
+            var repository = new InMemoryProjectRepository(first, second);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: failure);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                first,
+                first.PersistenceRevision,
+                "first-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null)));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                second,
+                second.PersistenceRevision,
+                "second-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null)));
+
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(first.Id).Should().BeTrue();
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(second.Id).Should().BeTrue();
+
+            coordinator.ClearProjectState(first.Id);
+
+            coordinator.Invoking(item => item.EnsureProjectAvailable(first.Id)).Should().NotThrow();
+            coordinator.Invoking(item => item.EnsureProjectAvailable(second.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(first.Id).Should().BeFalse();
+            ProjectSaveCoordinator.HasRecoveryRequiredForTests(second.Id).Should().BeTrue();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
     public async Task SaveExistingProjectAsync_WhenExpectedRevisionIsStale_ShouldFailBeforeCommitIntent()
     {
         var root = CreateTempPath();
