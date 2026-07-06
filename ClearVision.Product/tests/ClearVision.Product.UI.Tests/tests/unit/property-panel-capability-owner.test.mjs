@@ -125,6 +125,32 @@ test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface',
   assert.match(panelSource, /auxiliaryWorkbenchesEnabled/);
 });
 
+test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () => {
+  const ownerSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanelCapabilityOwner.mjs');
+
+  for (const requiredText of [
+    'FilePickedEvent',
+    'PickFileCommand',
+    'btn-pick-file',
+    'data-camera-binding-select="true"',
+    'resolveParameterControlType',
+    'isPathLikeParameter',
+    'normalizeAcquisitionSourceType',
+    'syncImageAcquisitionSourceControls',
+    "httpClient.get('/cameras/bindings')",
+    'param-slider',
+    'form-color-hidden'
+  ]) {
+    assert.match(ownerSource, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+
+  assert.match(ownerSource, /controlType === 'file'[\s\S]*btn-pick-file/);
+  assert.match(ownerSource, /controlType === 'cameraBinding'[\s\S]*data-camera-binding-select="true"/);
+  assert.match(ownerSource, /webMessageBridge\.sendMessage\('PickFileCommand'/);
+  assert.match(ownerSource, /webMessageBridge\.on\('FilePickedEvent'/);
+  assert.match(ownerSource, /normalizeParameterName\(parameterName\) === 'filepath'/);
+});
+
 test('all backend operator parameter types are covered by migrated Inspector controls', () => {
   const panelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
   const params = collectOperatorParams();

@@ -1,7 +1,10 @@
 import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+import webMessageBridge from '../../core/messaging/webMessageBridge.js';
+import httpClient from '../../core/messaging/httpClient.js';
 import {
     collectEffectiveRequiredParameterErrors,
-    getParameterEffectiveState
+    getParameterEffectiveState,
+    normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
 
 export const PROPERTY_PANEL_CAPABILITY_OWNER_ID = 'property-panel-capability-v2';
@@ -32,6 +35,10 @@ function getParameterName(parameter) {
     return String(parameter?.name ?? parameter?.Name ?? '').trim();
 }
 
+function normalizeParameterName(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
 function getParameterLabel(parameter, fallbackName = '') {
     return String(
         parameter?.displayName ??
@@ -53,6 +60,41 @@ function getParameterDataType(parameter) {
         parameter?.Type ??
         'string'
     ).trim().toLowerCase();
+}
+
+function isPathLikeParameter(parameter) {
+    const normalizedName = normalizeParameterName(getParameterName(parameter));
+    if (!normalizedName || normalizedName === 'ipaddress') {
+        return false;
+    }
+
+    return normalizedName === 'filepath' ||
+        normalizedName === 'outputpath' ||
+        normalizedName === 'savepath' ||
+        normalizedName.endsWith('filepath') ||
+        normalizedName.endsWith('templatepath') ||
+        normalizedName.endsWith('modelpath') ||
+        normalizedName.endsWith('catalogpath') ||
+        normalizedName.endsWith('labelspath') ||
+        normalizedName.endsWith('bankpath') ||
+        normalizedName.endsWith('path');
+}
+
+function resolveParameterControlType(parameter) {
+    const dataType = getParameterDataType(parameter);
+    if (dataType === 'file') {
+        return 'file';
+    }
+
+    if (dataType === 'camerabinding') {
+        return 'cameraBinding';
+    }
+
+    if (dataType === 'string' && isPathLikeParameter(parameter)) {
+        return 'file';
+    }
+
+    return dataType;
 }
 
 function getParameterDescription(parameter) {
@@ -149,15 +191,23 @@ export class PropertyPanelCapabilityOwner {
         this.dirty = false;
         this.disposed = false;
         this.unsubscribes = [];
+        this.cameraBindingsCache = [];
+        this.cameraBindingsLoadingPromise = null;
 
         this.handleContainerChange = this.handleContainerChange.bind(this);
+        this.handleContainerClick = this.handleContainerClick.bind(this);
+        this.handleContainerInput = this.handleContainerInput.bind(this);
         this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
+        this.handleFilePickedEvent = this.handleFilePickedEvent.bind(this);
 
         this.container.dataset.propertyPanelOwner = PROPERTY_PANEL_CAPABILITY_OWNER_ID;
         this.container.addEventListener('change', this.handleContainerChange);
+        this.container.addEventListener('click', this.handleContainerClick);
+        this.container.addEventListener('input', this.handleContainerInput);
         this.container.addEventListener('submit', this.handleContainerSubmit);
 
         this.unsubscribes.push(
+            webMessageBridge.on('FilePickedEvent', this.handleFilePickedEvent),
             this.propertyAdapter.subscribeSelectedNode((operator, state) => {
                 this.handleSelectedNodeChanged(operator, state);
             }),
@@ -224,13 +274,103 @@ export class PropertyPanelCapabilityOwner {
         this.applyChanges();
     }
 
+    handleContainerClick(event) {
+        const button = event.target?.closest?.('.btn-pick-file');
+        if (!button || this.disposed) {
+            return;
+        }
+
+        event.preventDefault();
+        if (button.disabled) {
+            return;
+        }
+
+        const parameterName = button.dataset.param || '';
+        webMessageBridge.sendMessage('PickFileCommand', {
+            parameterName,
+            filter: this.getFilePickerFilter(parameterName)
+        });
+    }
+
+    handleContainerInput(event) {
+        const slider = event.target?.closest?.('.param-slider');
+        if (slider) {
+            const numberInput = slider.parentElement?.querySelector('input[type="number"][data-property-parameter="true"]');
+            if (numberInput && !numberInput.disabled && !numberInput.readOnly) {
+                numberInput.value = slider.value;
+                numberInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            return;
+        }
+
+        const colorInput = event.target?.closest?.('input[type="color"][data-property-parameter="true"]');
+        if (colorInput) {
+            const wrapper = colorInput.closest('.color-picker-wrapper');
+            const preview = wrapper?.querySelector('.color-preview-box');
+            const valueText = wrapper?.querySelector('.color-value');
+            if (preview) {
+                preview.style.backgroundColor = colorInput.value;
+            }
+            if (valueText) {
+                valueText.textContent = colorInput.value;
+            }
+        }
+    }
+
+    handleFilePickedEvent(event) {
+        if (this.disposed || !this.currentNodeId) {
+            return;
+        }
+
+        const payload = event?.payload || event?.data || event || {};
+        const isCancelled = Boolean(payload.IsCancelled ?? payload.isCancelled);
+        if (isCancelled) {
+            return;
+        }
+
+        const parameterName = String(payload.ParameterName ?? payload.parameterName ?? '').trim();
+        const filePathRaw = payload.FilePath ?? payload.filePath;
+        const filePath = filePathRaw == null ? '' : String(filePathRaw);
+        if (!parameterName) {
+            console.warn('[PropertyPanelCapabilityOwner] FilePickedEvent missing parameterName:', payload);
+            return;
+        }
+
+        const input = this.findParamInput(parameterName);
+        if (!input) {
+            console.warn('[PropertyPanelCapabilityOwner] File parameter input not found:', parameterName);
+            return;
+        }
+
+        if (this.isImageAcquisitionOperator() && normalizeParameterName(parameterName) === 'filepath') {
+            const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
+            if (sourceTypeInput && normalizeAcquisitionSourceType(sourceTypeInput.value) !== 'file') {
+                const fileOption = Array.from(sourceTypeInput.options || [])
+                    .find(option => normalizeAcquisitionSourceType(option.value) === 'file');
+                sourceTypeInput.value = fileOption?.value || 'File';
+                this.updateCurrentOperatorParameterValue(sourceTypeInput.name, sourceTypeInput.value);
+            }
+        }
+
+        input.value = filePath;
+        this.updateCurrentOperatorParameterValue(input.name, filePath);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (this.isImageAcquisitionOperator() && normalizeParameterName(parameterName) === 'filepath') {
+            this.syncImageAcquisitionSourceControls({ clearFilePathWhenCamera: false });
+        }
+
+        this.applyChanges({ showToast: false });
+    }
+
     handleContainerChange(event) {
         const input = event.target?.closest?.('[data-property-parameter="true"]');
         if (!input || !this.currentNodeId || this.disposed) {
             return;
         }
 
-        const values = this.collectFormValues();
+        let values = this.collectFormValues();
+        values = this.normalizeImageAcquisitionValues(values, input.name);
         const errors = this.validateValues(values);
         if (errors.length > 0) {
             this.validationErrors = errors;
@@ -241,9 +381,8 @@ export class PropertyPanelCapabilityOwner {
         }
 
         const parameterName = input.name;
-        const result = this.propertyAdapter.writeParameters(this.currentNodeId, {
-            [parameterName]: values[parameterName]
-        });
+        const writeValues = this.buildWriteValues(parameterName, values);
+        const result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
 
         if (result?.reason === 'node_not_found') {
             this.currentOperator = null;
@@ -256,8 +395,272 @@ export class PropertyPanelCapabilityOwner {
         this.statusMessage = '参数已更新';
         this.lastChangedParameterName = parameterName;
         this.dirty = result?.updated === true;
+        Object.entries(writeValues).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
+        this.syncImageAcquisitionSourceControls({
+            clearFilePathWhenCamera: normalizeParameterName(parameterName) === 'sourcetype'
+        });
         this.renderValidationErrors();
         this.updateStatus();
+    }
+
+    isImageAcquisitionOperator() {
+        return String(this.currentOperator?.type || this.currentOperator?.operatorType || '').trim() === 'ImageAcquisition';
+    }
+
+    findParamInput(...names) {
+        const normalizedNames = names.map(normalizeParameterName).filter(Boolean);
+        if (normalizedNames.length === 0) {
+            return null;
+        }
+
+        return Array.from(this.container.querySelectorAll('[data-property-parameter="true"]'))
+            .find(input => normalizedNames.includes(normalizeParameterName(input.name))) || null;
+    }
+
+    getCurrentParameterByName(name) {
+        const normalizedName = normalizeParameterName(name);
+        return (this.currentOperator?.parameters || [])
+            .find(parameter => normalizeParameterName(getParameterName(parameter)) === normalizedName) || null;
+    }
+
+    updateCurrentOperatorParameterValue(name, value) {
+        const parameter = this.getCurrentParameterByName(name);
+        if (!parameter) {
+            return;
+        }
+
+        parameter.value = value;
+        if (Object.prototype.hasOwnProperty.call(parameter, 'Value')) {
+            parameter.Value = value;
+        }
+    }
+
+    normalizeImageAcquisitionValues(values, changedName = '') {
+        if (!this.isImageAcquisitionOperator() || !values) {
+            return values;
+        }
+
+        const nextValues = { ...values };
+        const sourceKey = Object.keys(nextValues).find(key => normalizeParameterName(key) === 'sourcetype');
+        const filePathKey = Object.keys(nextValues).find(key => normalizeParameterName(key) === 'filepath');
+        if (!sourceKey) {
+            return nextValues;
+        }
+
+        const normalizedSource = normalizeAcquisitionSourceType(nextValues[sourceKey]);
+        if (normalizedSource === 'camera' && filePathKey) {
+            nextValues[filePathKey] = '';
+            const filePathInput = this.findParamInput(filePathKey);
+            if (filePathInput) {
+                filePathInput.value = '';
+            }
+        }
+
+        if (normalizeParameterName(changedName) === 'filepath' && filePathKey && nextValues[filePathKey]) {
+            nextValues[sourceKey] = this.findFileSourceValue(sourceKey);
+        }
+
+        return nextValues;
+    }
+
+    findFileSourceValue(sourceKey = 'SourceType') {
+        const sourceInput = this.findParamInput(sourceKey, 'SourceType', 'sourceType');
+        if (!sourceInput) {
+            return 'File';
+        }
+
+        const fileOption = Array.from(sourceInput.options || [])
+            .find(option => normalizeAcquisitionSourceType(option.value) === 'file');
+        return fileOption?.value || sourceInput.value || 'File';
+    }
+
+    buildWriteValues(parameterName, values) {
+        const writeValues = {
+            [parameterName]: values[parameterName]
+        };
+
+        if (!this.isImageAcquisitionOperator()) {
+            return writeValues;
+        }
+
+        const normalizedParameterName = normalizeParameterName(parameterName);
+        const sourceKey = Object.keys(values).find(key => normalizeParameterName(key) === 'sourcetype');
+        const filePathKey = Object.keys(values).find(key => normalizeParameterName(key) === 'filepath');
+
+        if (sourceKey && normalizedParameterName === 'filepath') {
+            writeValues[sourceKey] = values[sourceKey];
+        }
+
+        if (sourceKey && filePathKey && normalizedParameterName === 'sourcetype' && normalizeAcquisitionSourceType(values[sourceKey]) === 'camera') {
+            writeValues[filePathKey] = '';
+        }
+
+        return writeValues;
+    }
+
+    syncImageAcquisitionSourceControls(options = {}) {
+        if (!this.isImageAcquisitionOperator()) {
+            return;
+        }
+
+        const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
+        if (!sourceTypeInput) {
+            return;
+        }
+
+        let values = this.collectFormValues();
+        values = this.normalizeImageAcquisitionValues(values);
+        const isCameraMode = normalizeAcquisitionSourceType(sourceTypeInput.value) === 'camera';
+        ['FilePath', 'CameraId', 'CameraBindingId']
+            .map(name => this.findParamInput(name))
+            .filter(Boolean)
+            .filter((input, index, all) => all.indexOf(input) === index)
+            .forEach(input => {
+                const parameter = this.getCurrentParameterByName(input.name);
+                const state = getParameterEffectiveState(this.currentOperator, parameter || input.name, { values });
+                const group = input.closest('.form-group');
+                const pickerButton = group?.querySelector('.btn-pick-file');
+                const label = group?.querySelector('.form-label');
+                const requiredMark = label?.querySelector('.required');
+
+                if (
+                    isCameraMode &&
+                    state.effectiveDisabled &&
+                    normalizeParameterName(input.name) === 'filepath' &&
+                    options.clearFilePathWhenCamera !== false &&
+                    input.value
+                ) {
+                    input.value = '';
+                    this.updateCurrentOperatorParameterValue(input.name, '');
+                }
+
+                input.disabled = state.effectiveDisabled;
+                input.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+                if (pickerButton) {
+                    pickerButton.disabled = state.effectiveDisabled;
+                }
+
+                group?.classList.toggle('hidden', state.effectiveDisabled);
+                group?.classList.toggle('is-rule-disabled', state.effectiveDisabled);
+                group?.setAttribute('data-effective-disabled', state.effectiveDisabled ? 'true' : 'false');
+                group?.setAttribute('data-effective-required', state.effectiveRequired ? 'true' : 'false');
+
+                if (label && state.effectiveRequired && !requiredMark) {
+                    label.insertAdjacentHTML('beforeend', ' <span class="required">*</span>');
+                } else if (!state.effectiveRequired && requiredMark) {
+                    requiredMark.remove();
+                }
+            });
+    }
+
+    getFilePickerFilter(parameterName = '') {
+        const normalizedName = normalizeParameterName(parameterName);
+        if (
+            normalizedName.includes('model') ||
+            normalizedName.includes('embedding') ||
+            normalizedName.includes('onnx')
+        ) {
+            return 'Model Files|*.onnx;*.pt;*.pth;*.engine;*.xml;*.bin|All Files|*.*';
+        }
+
+        if (
+            normalizedName.includes('label') ||
+            normalizedName.includes('catalog') ||
+            normalizedName.includes('bank') ||
+            normalizedName.includes('json')
+        ) {
+            return 'Data Files|*.json;*.txt;*.yaml;*.yml;*.csv;*.bin|All Files|*.*';
+        }
+
+        if (
+            normalizedName === 'filepath' ||
+            normalizedName.includes('image') ||
+            normalizedName.includes('template')
+        ) {
+            return 'Image Files|*.bmp;*.jpg;*.png;*.jpeg;*.tif;*.tiff|All Files|*.*';
+        }
+
+        return 'All Files|*.*';
+    }
+
+    async loadCameraBindingsForSelects(forceRefresh = false) {
+        const cameraSelects = this.container.querySelectorAll('select[data-camera-binding-select="true"]');
+        if (cameraSelects.length === 0) {
+            return;
+        }
+
+        try {
+            const bindings = await this.fetchCameraBindings(forceRefresh);
+            this.populateCameraBindingSelects(cameraSelects, bindings);
+        } catch (error) {
+            console.error('[PropertyPanelCapabilityOwner] Failed to load camera bindings:', error);
+            this.populateCameraBindingSelects(cameraSelects, [], error?.message || 'Unknown error');
+        }
+    }
+
+    async fetchCameraBindings(forceRefresh = false) {
+        if (!forceRefresh && this.cameraBindingsCache.length > 0) {
+            return this.cameraBindingsCache;
+        }
+
+        if (!forceRefresh && this.cameraBindingsLoadingPromise) {
+            return this.cameraBindingsLoadingPromise;
+        }
+
+        this.cameraBindingsLoadingPromise = (async () => {
+            const bindings = await httpClient.get('/cameras/bindings');
+            this.cameraBindingsCache = Array.isArray(bindings) ? bindings : [];
+            return this.cameraBindingsCache;
+        })();
+
+        try {
+            return await this.cameraBindingsLoadingPromise;
+        } finally {
+            this.cameraBindingsLoadingPromise = null;
+        }
+    }
+
+    populateCameraBindingSelects(selects, bindings, errorMessage = '') {
+        const hasBindings = Array.isArray(bindings) && bindings.length > 0;
+
+        selects.forEach(select => {
+            const selectedCameraId = select.dataset.currentValue || select.value || '';
+            let optionsHtml = '<option value="">-- Select camera --</option>';
+
+            if (hasBindings) {
+                optionsHtml += bindings.map(binding => `
+                    <option value="${escapeAttribute(binding.id)}">
+                        ${escapeHtml(binding.displayName || binding.name || binding.id)} (${escapeHtml(binding.serialNumber || '-')})
+                    </option>
+                `).join('');
+            } else if (errorMessage) {
+                optionsHtml += '<option value="" disabled>Load failed</option>';
+            } else {
+                optionsHtml += '<option value="" disabled>No camera bindings</option>';
+            }
+
+            select.innerHTML = optionsHtml;
+            if (hasBindings && bindings.some(binding => String(binding.id) === String(selectedCameraId))) {
+                select.value = selectedCameraId;
+            } else {
+                select.value = '';
+            }
+
+            const hint = select.closest('.form-group')?.querySelector('[data-camera-binding-hint]');
+            if (!hint) {
+                return;
+            }
+
+            if (hasBindings) {
+                hint.remove();
+                return;
+            }
+
+            hint.textContent = errorMessage
+                ? `Failed to load camera bindings: ${errorMessage}`
+                : 'No camera bindings are available.';
+            hint.classList.add('error');
+        });
     }
 
     setOperator(operator) {
@@ -416,7 +819,8 @@ export class PropertyPanelCapabilityOwner {
             return true;
         }
 
-        const values = this.collectFormValues();
+        let values = this.collectFormValues();
+        values = this.normalizeImageAcquisitionValues(values);
         const errors = this.validateValues(values);
         if (errors.length > 0) {
             this.validationErrors = errors;
@@ -434,6 +838,8 @@ export class PropertyPanelCapabilityOwner {
         this.statusMessage = '参数已更新';
         this.lastChangedParameterName = null;
         this.dirty = result?.updated === true;
+        Object.entries(values).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
+        this.syncImageAcquisitionSourceControls();
         if (showToast) {
             this.showToast('参数已更新', 'success');
         }
@@ -514,6 +920,8 @@ export class PropertyPanelCapabilityOwner {
             </section>
         `;
         this.renderValidationErrors();
+        this.syncImageAcquisitionSourceControls();
+        void this.loadCameraBindingsForSelects();
         this.updateStatus();
     }
 
@@ -574,8 +982,9 @@ export class PropertyPanelCapabilityOwner {
         const inputId = `v2-param-${escapeAttribute(name)}`;
         const common = `id="${inputId}" name="${escapeAttribute(name)}" data-property-parameter="true"`;
         const currentValue = value ?? '';
+        const controlType = resolveParameterControlType(parameter);
 
-        if (dataType === 'boolean' || dataType === 'bool') {
+        if (controlType === 'boolean' || controlType === 'bool') {
             return `
                 <label class="property-toggle">
                     <input type="checkbox" ${common} data-type="boolean" ${toBoolean(currentValue) ? 'checked' : ''} ${disabled}>
@@ -584,7 +993,7 @@ export class PropertyPanelCapabilityOwner {
             `;
         }
 
-        if (dataType === 'enum' || dataType === 'select') {
+        if (controlType === 'enum' || controlType === 'select') {
             const options = getParameterOptions(parameter);
             if (options.length > 0) {
                 return `
@@ -599,20 +1008,90 @@ export class PropertyPanelCapabilityOwner {
             }
         }
 
-        if (['int', 'integer', 'double', 'float', 'number'].includes(dataType)) {
+        if (controlType === 'file') {
+            return `
+                <div class="file-picker-wrapper">
+                    <input type="text"
+                           ${common}
+                           value="${escapeAttribute(currentValue)}"
+                           class="form-input"
+                           readonly
+                           data-type="file"
+                           ${disabled}>
+                    <button type="button"
+                            class="btn btn-sm btn-secondary btn-pick-file"
+                            data-param="${escapeAttribute(name)}"
+                            ${disabled ? 'disabled' : ''}>...</button>
+                </div>
+            `;
+        }
+
+        if (controlType === 'cameraBinding') {
+            const bindings = this.cameraBindingsCache || [];
+            const hasBindings = bindings.length > 0;
+            return `
+                <select ${common}
+                        class="form-select"
+                        data-type="string"
+                        data-camera-binding-select="true"
+                        data-current-value="${escapeAttribute(currentValue)}"
+                        ${disabled}>
+                    <option value="">-- Select camera --</option>
+                    ${hasBindings
+                        ? bindings.map(binding => `
+                            <option value="${escapeAttribute(binding.id)}" ${String(binding.id) === String(currentValue) ? 'selected' : ''}>
+                                ${escapeHtml(binding.displayName || binding.name || binding.id)} (${escapeHtml(binding.serialNumber || '-')})
+                            </option>
+                        `).join('')
+                        : '<option value="" disabled>Loading...</option>'}
+                </select>
+                ${hasBindings ? '' : '<p class="form-description error" data-camera-binding-hint>Loading camera bindings...</p>'}
+            `;
+        }
+
+        if (controlType === 'color') {
+            const colorValue = currentValue || '#000000';
+            return `
+                <div class="color-picker-wrapper">
+                    <input type="color"
+                           ${common}
+                           value="${escapeAttribute(colorValue)}"
+                           class="form-color-hidden"
+                           data-type="color"
+                           ${disabled}>
+                    <div class="color-preview-box" style="background-color: ${escapeAttribute(colorValue)}">
+                        <span class="color-value">${escapeHtml(colorValue)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (['int', 'integer', 'double', 'float', 'number'].includes(controlType)) {
             const min = getParameterRangeValue(parameter, 'min', 'Min', 'minValue', 'MinValue');
             const max = getParameterRangeValue(parameter, 'max', 'Max', 'maxValue', 'MaxValue');
-            const step = parameter?.step ?? parameter?.Step ?? (dataType === 'int' || dataType === 'integer' ? 1 : 0.1);
+            const step = parameter?.step ?? parameter?.Step ?? (controlType === 'int' || controlType === 'integer' ? 1 : 0.1);
+            const hasRange = min !== null && max !== null;
             return `
-                <input type="number"
-                       ${common}
-                       value="${escapeAttribute(currentValue)}"
-                       ${min !== null ? `min="${min}"` : ''}
-                       ${max !== null ? `max="${max}"` : ''}
-                       step="${escapeAttribute(step)}"
-                       class="form-input number-input"
-                       data-type="${dataType}"
-                       ${disabled}>
+                <div class="number-input-wrapper">
+                    <input type="number"
+                           ${common}
+                           value="${escapeAttribute(currentValue)}"
+                           ${min !== null ? `min="${min}"` : ''}
+                           ${max !== null ? `max="${max}"` : ''}
+                           step="${escapeAttribute(step)}"
+                           class="form-input number-input"
+                           data-type="${controlType}"
+                           ${disabled}>
+                    ${hasRange ? `
+                        <input type="range"
+                               class="param-slider"
+                               min="${min}"
+                               max="${max}"
+                               step="${escapeAttribute(step)}"
+                               value="${escapeAttribute(currentValue)}"
+                               ${disabled}>
+                    ` : ''}
+                </div>
             `;
         }
 
@@ -621,7 +1100,7 @@ export class PropertyPanelCapabilityOwner {
                    ${common}
                    value="${escapeAttribute(currentValue)}"
                    class="form-input"
-                   data-type="${escapeAttribute(dataType || 'string')}"
+                   data-type="${escapeAttribute(dataType || controlType || 'string')}"
                    ${disabled}>
         `;
     }
@@ -685,6 +1164,8 @@ export class PropertyPanelCapabilityOwner {
         });
         this.unsubscribes = [];
         this.container.removeEventListener('change', this.handleContainerChange);
+        this.container.removeEventListener('click', this.handleContainerClick);
+        this.container.removeEventListener('input', this.handleContainerInput);
         this.container.removeEventListener('submit', this.handleContainerSubmit);
         delete this.container.dataset.propertyPanelOwner;
         this.container.innerHTML = '';
