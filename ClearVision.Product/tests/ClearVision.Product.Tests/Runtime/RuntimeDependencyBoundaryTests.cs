@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.DependencyInjection;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,6 +45,7 @@ public sealed class RuntimeDependencyBoundaryTests
         var executors = provider.GetServices<IOperatorExecutor>().ToList();
         Assert.True(executors.Count >= 100, $"Expected shared executor catalog, got {executors.Count}.");
         Assert.Equal(executors.Count, executors.Select(executor => executor.OperatorType).Distinct().Count());
+        Assert.Contains(executors, executor => executor is TcpCommunicationOperator);
     }
 
     private static string FindRepoRoot()
