@@ -386,6 +386,10 @@ function createPreviewCapabilityHarness(options = {}) {
     },
     requestActivePreview(requestOptions) {
       calls.requestPreview.push(requestOptions);
+      if (typeof options.requestActivePreview === 'function') {
+        return options.requestActivePreview(requestOptions);
+      }
+
       previewState = {
         ...successState(),
         status: 'loading',
@@ -1095,6 +1099,258 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   assert.equal(harness.container.innerHTML, '');
 });
 
+test('PreviewPanelCapabilityOwner restores manual preview controls when request throws', () => {
+  const toasts = [];
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      throw new Error('executor offline');
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+
+  assert.equal(harness.calls.requestPreview.length, 1);
+  assert.equal(owner.manualPreviewPending, false);
+  assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" aria-disabled="false"/);
+  assert.deepEqual(toasts, [{ message: '预览请求失败：executor offline', level: 'error' }]);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner restores manual preview controls when request promise rejects', async () => {
+  const toasts = [];
+  let rejectPreview;
+  const requestPromise = new Promise((_, reject) => {
+    rejectPreview = reject;
+  });
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      return requestPromise;
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+
+  assert.equal(harness.calls.requestPreview.length, 1);
+  assert.equal(owner.manualPreviewPending, true);
+  assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" disabled aria-disabled="true"/);
+
+  rejectPreview(new Error('queued executor offline'));
+  await requestPromise.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(owner.manualPreviewPending, false);
+  assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" aria-disabled="false"/);
+  assert.deepEqual(toasts, [{ message: '预览请求失败：queued executor offline', level: 'error' }]);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner allows canceling a pending manual preview before loading state', async () => {
+  const toasts = [];
+  let rejectPreview;
+  const requestPromise = new Promise((_, reject) => {
+    rejectPreview = reject;
+  });
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      return requestPromise;
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+
+  assert.equal(owner.manualPreviewPending, true);
+  assert.match(
+    harness.container.innerHTML,
+    /data-preview-action="cancel-preview" aria-disabled="false"/
+  );
+
+  owner.handleClick(previewActionEvent('cancel-preview'));
+
+  assert.equal(harness.calls.cancelPreview, 1);
+  assert.equal(owner.manualPreviewPending, false);
+  assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" aria-disabled="false"/);
+
+  rejectPreview(new Error('canceled executor offline'));
+  await requestPromise.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(toasts, []);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner ignores stale manual preview request rejections after node switch', async () => {
+  const toasts = [];
+  let rejectFirst;
+  let resolveSecond;
+  const firstRequest = new Promise((_, reject) => {
+    rejectFirst = reject;
+  });
+  const secondRequest = new Promise(resolve => {
+    resolveSecond = resolve;
+  });
+  const requests = [firstRequest, secondRequest];
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      return requests.shift();
+    }
+  });
+  harness.nodes.set('node-2', {
+    id: 'node-2',
+    type: 'Thresholding',
+    title: 'Threshold B',
+    parameters: [{ name: 'Threshold', value: 64 }],
+    outputs: [{ type: 'image' }]
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+  assert.equal(owner.manualPreviewPending, true);
+
+  harness.flowCanvasAdapter.selectNode('node-2');
+  owner.requestManualPreview();
+  assert.equal(owner.currentNodeId, 'node-2');
+  assert.equal(owner.manualPreviewPending, true);
+  assert.equal(harness.calls.requestPreview.length, 2);
+
+  rejectFirst(new Error('stale executor offline'));
+  await firstRequest.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(owner.currentNodeId, 'node-2');
+  assert.equal(owner.manualPreviewPending, true);
+  assert.deepEqual(toasts, []);
+
+  resolveSecond();
+  await secondRequest;
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner keeps manual preview pending when unrelated preview state arrives', async () => {
+  const toasts = [];
+  let rejectPreview;
+  const requestPromise = new Promise((_, reject) => {
+    rejectPreview = reject;
+  });
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      return requestPromise;
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+  assert.equal(owner.currentNodeId, 'node-1');
+  assert.equal(owner.manualPreviewPending, true);
+
+  harness.emitPreview({
+    ...successState({
+      activeNodeId: 'node-2',
+      request: {
+        projectId: 'project-1',
+        nodeId: 'node-2',
+        flowRevision: 3,
+        parameterSnapshot: [],
+        requestKey: 'request-node-2'
+      }
+    }),
+    presenter: {
+      statusText: '其他节点预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  assert.equal(owner.currentNodeId, 'node-1');
+  assert.equal(owner.manualPreviewPending, true);
+  assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" disabled aria-disabled="true"/);
+  assert.deepEqual(toasts, []);
+
+  owner.requestManualPreview();
+  assert.equal(harness.calls.requestPreview.length, 1);
+
+  rejectPreview(new Error('current executor offline'));
+  await requestPromise.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(owner.manualPreviewPending, false);
+  assert.equal(toasts.length, 1);
+  assert.match(toasts[0].message, /current executor offline/);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner ignores manual preview rejections after a terminal preview state', async () => {
+  const toasts = [];
+  let rejectPreview;
+  const requestPromise = new Promise((_, reject) => {
+    rejectPreview = reject;
+  });
+  const harness = createPreviewCapabilityHarness({
+    requestActivePreview() {
+      return requestPromise;
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  owner.requestManualPreview();
+  assert.equal(owner.manualPreviewPending, true);
+
+  harness.emitPreview({
+    ...successState(),
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+  assert.equal(owner.manualPreviewPending, false);
+
+  rejectPreview(new Error('late executor offline'));
+  await requestPromise.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(toasts, []);
+  assert.match(harness.container.innerHTML, /预览完成|棰勮瀹屾垚/);
+
+  owner.dispose();
+});
+
 test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layered empty states', () => {
   const harness = createPreviewCapabilityHarness();
   const owner = new PreviewPanelCapabilityOwner(harness.container, {
@@ -1156,7 +1412,7 @@ test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layere
   assert.match(harness.container.innerHTML, /输入图像过大，无法生成输出图像/);
   assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
 
-  emitIdleError('该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“刷新预览”手动执行。');
+  emitIdleError('该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“手动预览”执行。');
   assert.match(harness.container.innerHTML, /data-status="idle-error">需手动预览/);
   assert.match(harness.container.innerHTML, /需手动预览后生成输出图像/);
   assert.doesNotMatch(harness.container.innerHTML, /预览完成，但没有返回图像输出/);
@@ -1193,12 +1449,21 @@ test('PreviewPanelCapabilityOwner shows image operations and routes open image t
   assert.match(harness.container.innerHTML, /原始大小/);
   assert.match(harness.container.innerHTML, /打开大图/);
   assert.match(harness.container.innerHTML, /data-image-mode="fit"/);
+  assert.match(harness.container.innerHTML, /data-preview-action="image-fit" aria-pressed="true"/);
+  assert.match(harness.container.innerHTML, /data-preview-action="image-original" aria-pressed="false"/);
+
+  const disabledOpenEvent = previewActionEvent('open-image', { imageSource });
+  disabledOpenEvent.target.disabled = true;
+  owner.handleClick(disabledOpenEvent);
+  assert.deepEqual(harness.calls.openImages, []);
 
   owner.handleClick(previewActionEvent('image-original'));
   assert.match(harness.container.innerHTML, /data-image-mode="original"/);
+  assert.match(harness.container.innerHTML, /data-preview-action="image-original" aria-pressed="true"/);
 
   owner.handleClick(previewActionEvent('image-fit'));
   assert.match(harness.container.innerHTML, /data-image-mode="fit"/);
+  assert.match(harness.container.innerHTML, /data-preview-action="image-fit" aria-pressed="true"/);
 
   owner.handleClick(previewActionEvent('open-image', { imageSource }));
   assert.deepEqual(harness.calls.openImages, [imageSource]);
@@ -1324,6 +1589,148 @@ test('PreviewPanelCapabilityOwner reads artifacts only through coordinator with 
   assert.ok(!readState.text.includes('C:\\Users\\A'));
   assert.ok(readState.text.includes('[redacted-secret]'));
   assert.ok(readState.text.includes('[redacted-path]'));
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner ignores duplicate artifact reads while the same artifact is loading', async () => {
+  let resolveRead;
+  const readGate = new Promise(resolve => {
+    resolveRead = resolve;
+  });
+  const harness = createPreviewCapabilityHarness({
+    readArtifactForCurrentState: async artifactId => {
+      await readGate;
+      return {
+        artifact: {
+          artifactId,
+          kind: 'profile',
+          role: 'profile',
+          contentType: 'application/json',
+          length: 20
+        },
+        blob: {
+          size: 20,
+          slice() {
+            return {
+              async text() {
+                return JSON.stringify({ score: 1 });
+              }
+            };
+          }
+        }
+      };
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  harness.emitPreview({
+    ...successState(),
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  const firstRead = owner.readArtifactPreview('json-artifact');
+  const secondRead = owner.readArtifactPreview('json-artifact');
+
+  assert.equal(harness.calls.artifactReads.length, 1);
+  assert.match(
+    harness.container.innerHTML,
+    /data-preview-action="read-artifact"[\s\S]*data-artifact-id="json-artifact"[\s\S]*disabled aria-disabled="true"/
+  );
+
+  resolveRead();
+  await Promise.all([firstRead, secondRead]);
+
+  assert.equal(harness.calls.artifactReads.length, 1);
+  assert.equal(owner.artifactReadState.get('json-artifact').status, 'success');
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner clears previous artifact loading state when another artifact is read', async () => {
+  let resolveFirstRead;
+  const firstGate = new Promise(resolve => {
+    resolveFirstRead = resolve;
+  });
+  const harness = createPreviewCapabilityHarness({
+    readArtifactForCurrentState: async artifactId => {
+      if (artifactId === 'artifact-a') {
+        await firstGate;
+      }
+
+      return {
+        artifact: {
+          artifactId,
+          kind: 'profile',
+          role: 'profile',
+          contentType: 'application/json',
+          length: 20
+        },
+        blob: {
+          size: 20,
+          slice() {
+            return {
+              async text() {
+                return JSON.stringify({ artifactId });
+              }
+            };
+          }
+        }
+      };
+    }
+  });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  harness.emitPreview({
+    ...successState({
+      artifacts: [
+        {
+          artifactId: 'artifact-a',
+          kind: 'profile',
+          role: 'profile-a',
+          contentType: 'application/json',
+          length: 20
+        },
+        {
+          artifactId: 'artifact-b',
+          kind: 'profile',
+          role: 'profile-b',
+          contentType: 'application/json',
+          length: 20
+        }
+      ]
+    }),
+    presenter: {
+      statusText: '预览完成',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  const firstRead = owner.readArtifactPreview('artifact-a');
+  assert.equal(owner.artifactReadState.get('artifact-a').status, 'loading');
+
+  await owner.readArtifactPreview('artifact-b');
+
+  assert.equal(harness.calls.artifactReads.length, 2);
+  assert.equal(owner.artifactReadState.get('artifact-a'), undefined);
+  assert.equal(owner.artifactReadState.get('artifact-b').status, 'success');
+  assert.doesNotMatch(
+    harness.container.innerHTML,
+    /data-artifact-id="artifact-a"[\s\S]*disabled aria-disabled="true"/
+  );
+
+  resolveFirstRead();
+  await firstRead;
+
+  assert.equal(owner.artifactReadState.get('artifact-a'), undefined);
+  assert.equal(owner.artifactReadState.get('artifact-b').status, 'success');
 
   owner.dispose();
 });

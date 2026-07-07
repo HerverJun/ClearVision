@@ -47,6 +47,10 @@ function escapeAttribute(value) {
     return escapeHtml(value);
 }
 
+function renderButtonDisabledAttributes(disabled) {
+    return disabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
+}
+
 function resolveElement(target) {
     if (!target) {
         return null;
@@ -491,7 +495,7 @@ export class PreviewPanelCapabilityAdapter {
     }
 
     requestPreview(options = {}) {
-        this.previewCoordinator?.requestActivePreview?.(options);
+        return this.previewCoordinator?.requestActivePreview?.(options);
     }
 
     cancelPreview() {
@@ -574,6 +578,7 @@ export class PreviewPanelCapabilityOwner {
         this.previewState = this.previewAdapter.getPreviewState();
         this.autoPreviewEnabled = true;
         this.manualPreviewPending = false;
+        this.manualPreviewRequestToken = 0;
         this.previewImageMode = 'fit';
         this.previewImageSource = this.previewState?.presenter?.outputImageSrc || null;
         this.disposed = false;
@@ -611,6 +616,7 @@ export class PreviewPanelCapabilityOwner {
             : this.previewAdapter.getSelectedConnectionSnapshot?.(state?.selectedConnectionId) || null;
         this.nodeDeleted = false;
         this.manualPreviewPending = false;
+        this.manualPreviewRequestToken += 1;
         this.cancelArtifactRead();
         this.artifactReadState.clear();
 
@@ -637,6 +643,7 @@ export class PreviewPanelCapabilityOwner {
             this.currentOperator = null;
             this.currentConnection = null;
             this.manualPreviewPending = false;
+            this.manualPreviewRequestToken += 1;
             this.previewAdapter.clearActiveNode();
             this.render();
             return;
@@ -653,7 +660,14 @@ export class PreviewPanelCapabilityOwner {
         }
 
         this.previewState = state || null;
-        this.manualPreviewPending = false;
+        const activeNodeId = this.previewState?.activeNodeId || null;
+        const updatesCurrentSelection = !this.currentNodeId || !activeNodeId || activeNodeId === this.currentNodeId;
+        if (updatesCurrentSelection) {
+            this.manualPreviewPending = false;
+            if (this.previewState?.status !== 'loading') {
+                this.manualPreviewRequestToken += 1;
+            }
+        }
         const nextImageSource = this.previewState?.presenter?.outputImageSrc || null;
         if (nextImageSource !== this.previewImageSource) {
             this.previewImageSource = nextImageSource;
@@ -672,13 +686,17 @@ export class PreviewPanelCapabilityOwner {
 
         event.preventDefault?.();
 
+        if (target.disabled || target.getAttribute?.('aria-disabled') === 'true') {
+            return;
+        }
+
         if (action === 'manual-preview') {
             this.requestManualPreview();
             return;
         }
 
         if (action === 'cancel-preview') {
-            this.previewAdapter.cancelPreview();
+            this.cancelCurrentPreview();
             return;
         }
 
@@ -726,8 +744,7 @@ export class PreviewPanelCapabilityOwner {
 
         this.autoPreviewEnabled = Boolean(target.checked);
         if (!this.autoPreviewEnabled) {
-            this.previewAdapter.cancelPreview();
-            this.render();
+            this.cancelCurrentPreview({ showToast: false });
             return;
         }
 
@@ -762,12 +779,43 @@ export class PreviewPanelCapabilityOwner {
             autoPreview: false
         });
         this.manualPreviewPending = true;
+        const requestToken = ++this.manualPreviewRequestToken;
         this.render();
-        this.previewAdapter.requestPreview({
-            immediate: true,
-            force: true,
-            trigger: 'manual'
-        });
+        try {
+            const requestResult = this.previewAdapter.requestPreview({
+                immediate: true,
+                force: true,
+                trigger: 'manual'
+            });
+            if (requestResult && typeof requestResult.catch === 'function') {
+                requestResult.catch(error => this.handleManualPreviewRequestFailure(error, requestToken));
+            }
+        } catch (error) {
+            this.handleManualPreviewRequestFailure(error, requestToken);
+        }
+    }
+
+    cancelCurrentPreview(options = {}) {
+        this.manualPreviewRequestToken += 1;
+        this.manualPreviewPending = false;
+        try {
+            this.previewAdapter.cancelPreview();
+        } catch (error) {
+            if (options.showToast !== false) {
+                this.showToast(`取消预览失败：${error?.message || '未知错误'}`, 'error');
+            }
+        }
+        this.render();
+    }
+
+    handleManualPreviewRequestFailure(error, requestToken) {
+        if (this.disposed || requestToken !== this.manualPreviewRequestToken) {
+            return;
+        }
+
+        this.manualPreviewPending = false;
+        this.showToast(`预览请求失败：${error?.message || '未知错误'}`, 'error');
+        this.render();
     }
 
     resetArtifactReadsIfIdentityChanged() {
@@ -810,11 +858,15 @@ export class PreviewPanelCapabilityOwner {
             this.previewState?.activeNodeId === selectedNodeId);
         const liveNode = selectedNodeId ? this.previewAdapter.getNode(selectedNodeId) : null;
         const resultModel = this.buildResultViewModel(liveNode);
-        const isStale = belongsToSelectedNode && resultModel?.stale === true;
+        const hasCurrentIdleMessage = belongsToSelectedNode &&
+            this.previewState?.status === 'idle' &&
+            Boolean(this.previewState?.errorMessage);
+        const isStale = belongsToSelectedNode && resultModel?.stale === true && !hasCurrentIdleMessage;
         const statusInfo = getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted, isStale);
         const isLoadingForCurrentNode = this.isPreviewLoadingForCurrentNode(resultModel);
         const manualPreviewDisabled = !selectedNodeId || isLoadingForCurrentNode || this.manualPreviewPending;
         const manualPreviewLabel = isLoadingForCurrentNode || this.manualPreviewPending ? '预览中...' : '手动预览';
+        const cancelPreviewDisabled = !(isLoadingForCurrentNode || this.manualPreviewPending);
         const title = this.currentConnection
             ? '当前选中连线'
             : this.currentOperator
@@ -825,7 +877,7 @@ export class PreviewPanelCapabilityOwner {
             : this.currentOperator?.type || liveNode?.type || '-';
         const currentHeading = this.currentConnection ? '当前连线' : '当前算子';
         const currentMessage = this.currentConnection
-            ? '连线用于传递端口数据，不产生独立预览。请选择算子节点查看输出图像与中间结果。'
+            ? '连线用于传递端口数据，不产生独立预览。请选择算子节点查看输出图像与模块结果。'
             : statusInfo.message;
 
         this.container.innerHTML = `
@@ -840,8 +892,8 @@ export class PreviewPanelCapabilityOwner {
                             <input type="checkbox" data-preview-auto="true" ${this.autoPreviewEnabled ? 'checked' : ''}>
                             <span>自动预览</span>
                         </label>
-                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="manual-preview" ${manualPreviewDisabled ? 'disabled' : ''}>${escapeHtml(manualPreviewLabel)}</button>
-                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="cancel-preview" ${isLoadingForCurrentNode ? '' : 'disabled'}>取消预览</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="manual-preview" ${renderButtonDisabledAttributes(manualPreviewDisabled)}>${escapeHtml(manualPreviewLabel)}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-preview-action="cancel-preview" ${renderButtonDisabledAttributes(cancelPreviewDisabled)}>取消预览</button>
                     </div>
                 </header>
                 <div class="preview-capability-scroll" data-low-height-scroll="true">
@@ -877,6 +929,8 @@ export class PreviewPanelCapabilityOwner {
         const staleBadge = statusInfo.kind === 'stale'
             ? `<span class="preview-capability-image-badge">${escapeHtml(STALE_PREVIEW_MESSAGE)}</span>`
             : '';
+        const imageFitPressed = this.previewImageMode === 'fit';
+        const imageOriginalPressed = this.previewImageMode === 'original';
 
         return `
             <section class="preview-capability-media preview-capability-media-single">
@@ -884,9 +938,9 @@ export class PreviewPanelCapabilityOwner {
                     <div class="preview-capability-image-toolbar">
                         <span class="preview-capability-image-title">输出图像</span>
                         <div class="preview-capability-image-actions">
-                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-fit" ${hasImage ? '' : 'disabled'}>适应窗口</button>
-                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-original" ${hasImage ? '' : 'disabled'}>原始大小</button>
-                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="open-image" data-image-source="${escapeAttribute(outputImageSrc || '')}" ${hasImage ? '' : 'disabled'}>打开大图</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-fit" aria-pressed="${imageFitPressed ? 'true' : 'false'}" ${renderButtonDisabledAttributes(!hasImage)}>适应窗口</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-original" aria-pressed="${imageOriginalPressed ? 'true' : 'false'}" ${renderButtonDisabledAttributes(!hasImage)}>原始大小</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="open-image" data-image-source="${escapeAttribute(outputImageSrc || '')}" ${renderButtonDisabledAttributes(!hasImage)}>打开大图</button>
                         </div>
                     </div>
                     <div class="preview-capability-image-stage">
@@ -1162,6 +1216,7 @@ export class PreviewPanelCapabilityOwner {
             <div class="preview-capability-artifacts">
                 ${model.artifacts.map(artifact => {
                     const readState = this.artifactReadState.get(artifact.artifactId);
+                    const readDisabled = readState?.status === 'loading';
                     const formatted = formatPreviewOutputValue(artifact.role || artifact.kind || 'Artifact', formatByteLength(artifact.length), {
                         stringMaxLength: 80
                     });
@@ -1175,7 +1230,7 @@ export class PreviewPanelCapabilityOwner {
                                     class="btn btn-secondary btn-sm"
                                     data-preview-action="read-artifact"
                                     data-artifact-id="${escapeAttribute(artifact.artifactId)}"
-                                    ${readState?.status === 'loading' ? 'disabled' : ''}>
+                                    ${renderButtonDisabledAttributes(readDisabled)}>
                                 ${readState?.status === 'loading' ? '读取中' : '查看摘要'}
                             </button>
                             ${readState ? `<pre class="preview-capability-artifact-preview ${escapeAttribute(readState.status)}">${escapeHtml(readState.text)}</pre>` : ''}
@@ -1213,6 +1268,11 @@ export class PreviewPanelCapabilityOwner {
         this.artifactReadAbort?.abort?.();
         this.artifactReadAbort = null;
         this.artifactReadToken += 1;
+        Array.from(this.artifactReadState.entries()).forEach(([artifactId, state]) => {
+            if (state?.status === 'loading') {
+                this.artifactReadState.delete(artifactId);
+            }
+        });
     }
 
     isArtifactReadCurrent(token, identity, abortController = null) {
@@ -1232,6 +1292,10 @@ export class PreviewPanelCapabilityOwner {
         const artifact = normalizeArtifactReference(this.findArtifact(artifactId));
         const identity = getObservationIdentity(this.previewState);
         if (!artifact?.artifactId || !identity) {
+            return;
+        }
+
+        if (this.artifactReadState.get(artifact.artifactId)?.status === 'loading') {
             return;
         }
 
@@ -1363,6 +1427,7 @@ export class PreviewPanelCapabilityOwner {
         this.previewState = null;
         this.previewImageSource = null;
         this.manualPreviewPending = false;
+        this.manualPreviewRequestToken += 1;
     }
 }
 

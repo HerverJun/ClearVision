@@ -452,6 +452,1209 @@ test('Caliper SearchRegion connected to non RectangleRegion returns explicit rea
   assert.match(statusMessage, /非 RectangleRegion/);
 });
 
+test('PropertyPanelCapabilityOwner treats missing Caliper SearchRegion write result as failure', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let statusUpdated = false;
+  let appliedValues = null;
+  const owner = {
+    currentNodeId: 'caliper-empty-result',
+    currentOperator: { id: 'caliper-empty-result', type: 'CaliperTool' },
+    disposed: false,
+    dirty: true,
+    propertyAdapter: {},
+    roiEditorPanel: {
+      refreshFromOperator() {
+        throw new Error('refreshFromOperator should not run without a Caliper write result');
+      }
+    },
+    buildGeometryWriteValues(values) {
+      return values;
+    },
+    applyValuesToForm(values) {
+      appliedValues = values;
+    },
+    isCaliperToolOperator() {
+      return true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  };
+
+  owner.getCaliperSearchRegionStatus = PropertyPanelCapabilityOwner.prototype.getCaliperSearchRegionStatus;
+  PropertyPanelCapabilityOwner.prototype.handleGeometryChanged.call(owner, {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  }, 'commit');
+
+  assert.deepEqual(appliedValues, {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  });
+  assert.equal(owner.dirty, false);
+  assert.match(owner.statusMessage, /写入失败/);
+  assert.match(owner.statusMessage, /未收到写入结果/);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner marks Caliper SearchRegion write failures as status errors', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toggles = [];
+  const status = {
+    textContent: '',
+    classList: {
+      toggle(name, value) {
+        toggles.push({ name, value });
+      }
+    }
+  };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    statusMessage: 'CaliperTool.SearchRegion 写入失败：未收到写入结果。',
+    container: {
+      querySelector(selector) {
+        return selector === '[data-property-capability-status]' ? status : null;
+      }
+    }
+  });
+
+  owner.updateStatus();
+
+  assert.equal(status.textContent, 'CaliperTool.SearchRegion 写入失败：未收到写入结果。');
+  assert.deepEqual(toggles, [
+    { name: 'is-error', value: true },
+    { name: 'is-success', value: false }
+  ]);
+});
+
+test('PropertyPanelCapabilityOwner catches thrown geometry parameter writes', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let validationRendered = false;
+  let statusUpdated = false;
+  let appliedValues = null;
+  const owner = {
+    currentNodeId: 'roi-1',
+    currentOperator: { id: 'roi-1', type: 'Thresholding' },
+    disposed: false,
+    validationErrors: [{ name: 'RoiX', message: 'old' }],
+    dirty: true,
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('geometry adapter unavailable');
+      }
+    },
+    buildGeometryWriteValues(values) {
+      return values;
+    },
+    applyValuesToForm(values) {
+      appliedValues = values;
+    },
+    isCaliperToolOperator() {
+      return false;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  };
+
+  assert.doesNotThrow(() => PropertyPanelCapabilityOwner.prototype.handleGeometryChanged.call(owner, {
+    RoiX: 10,
+    RoiY: 12,
+    RoiWidth: 30,
+    RoiHeight: 16
+  }, 'commit'));
+  assert.deepEqual(appliedValues, {
+    RoiX: 10,
+    RoiY: 12,
+    RoiWidth: 30,
+    RoiHeight: 16
+  });
+  assert.equal(owner.dirty, false);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /geometry adapter unavailable/);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner reports failed geometry writes without mutating operator state', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let validationRendered = false;
+  let statusUpdated = false;
+  let appliedValues = null;
+  let parameterUpdated = false;
+  const owner = {
+    currentNodeId: 'roi-failed',
+    currentOperator: {
+      id: 'roi-failed',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'RoiX', label: 'ROI X', value: 2 },
+        { name: 'RoiY', label: 'ROI Y', value: 4 },
+        { name: 'RoiWidth', label: 'ROI 宽度', value: 20 },
+        { name: 'RoiHeight', label: 'ROI 高度', value: 10 }
+      ]
+    },
+    disposed: false,
+    validationErrors: [{ name: 'RoiX', message: 'old' }],
+    dirty: true,
+    propertyAdapter: {
+      writeParameters() {
+        return {
+          updated: false,
+          reason: 'parameter_not_found',
+          missingParameters: ['RoiWidth']
+        };
+      }
+    },
+    buildGeometryWriteValues(values) {
+      return values;
+    },
+    applyValuesToForm(values) {
+      appliedValues = values;
+    },
+    updateCurrentOperatorParameterValue() {
+      parameterUpdated = true;
+    },
+    isCaliperToolOperator() {
+      return false;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  };
+
+  PropertyPanelCapabilityOwner.prototype.handleGeometryChanged.call(owner, {
+    RoiX: 10,
+    RoiY: 12,
+    RoiWidth: 30,
+    RoiHeight: 16
+  }, 'commit');
+
+  assert.deepEqual(appliedValues, {
+    RoiX: 10,
+    RoiY: 12,
+    RoiWidth: 30,
+    RoiHeight: 16
+  });
+  assert.equal(parameterUpdated, false);
+  assert.equal(owner.currentOperator.parameters[2].value, 20);
+  assert.equal(owner.dirty, false);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /ROI 宽度/);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner catches thrown Caliper SearchRegion upserts', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = {
+    currentNodeId: 'caliper-throw',
+    currentOperator: { id: 'caliper-throw', type: 'CaliperTool' },
+    disposed: false,
+    validationErrors: [{ name: 'SearchRegion', message: 'old' }],
+    dirty: true,
+    propertyAdapter: {
+      upsertCaliperSearchRegion() {
+        throw new Error('caliper search region unavailable');
+      }
+    },
+    roiEditorPanel: {
+      refreshFromOperator() {
+        throw new Error('refreshFromOperator should not run after thrown Caliper upsert');
+      }
+    },
+    buildGeometryWriteValues(values) {
+      return values;
+    },
+    applyValuesToForm() {},
+    isCaliperToolOperator() {
+      return true;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  };
+
+  assert.doesNotThrow(() => PropertyPanelCapabilityOwner.prototype.handleGeometryChanged.call(owner, {
+    X: 10,
+    Y: 12,
+    Width: 30,
+    Height: 16
+  }, 'commit'));
+  assert.equal(owner.dirty, false);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /caliper search region unavailable/);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner catches thrown ROI clear writes', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let appliedValues = null;
+  let parameterUpdated = false;
+  let geometrySynced = false;
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = {
+    currentNodeId: 'roi-clear-throw',
+    currentOperator: {
+      id: 'roi-clear-throw',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'RoiX', value: 10 },
+        { name: 'RoiY', value: 12 },
+        { name: 'RoiWidth', value: 30 },
+        { name: 'RoiHeight', value: 16 }
+      ]
+    },
+    validationErrors: [{ name: 'RoiX', message: 'old' }],
+    dirty: true,
+    getGeometryConfig() {
+      return {
+        clearValues: {
+          RoiX: 0,
+          RoiY: 0,
+          RoiWidth: 0,
+          RoiHeight: 0
+        }
+      };
+    },
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('clear roi unavailable');
+      }
+    },
+    applyValuesToForm(values) {
+      appliedValues = values;
+    },
+    updateCurrentOperatorParameterValue() {
+      parameterUpdated = true;
+    },
+    syncGeometryEditorFromParams() {
+      geometrySynced = true;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  };
+
+  assert.doesNotThrow(() => PropertyPanelCapabilityOwner.prototype.handleGeometryClearRoi.call(owner));
+  assert.equal(appliedValues, null);
+  assert.equal(parameterUpdated, false);
+  assert.equal(geometrySynced, false);
+  assert.equal(owner.dirty, false);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /clear roi unavailable/);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner filters dependency-disabled values from full apply writes', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const writes = [];
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'template-1',
+    currentOperator: {
+      id: 'template-1',
+      type: 'TemplateMatching',
+      parameters: [
+        { name: 'TemplatePath', value: '', dataType: 'string' },
+        { name: 'TemplateId', value: 'tpl-01', dataType: 'string' }
+      ]
+    },
+    collectFormValues() {
+      return { TemplatePath: '', TemplateId: 'tpl-01' };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    validateValues() {
+      return [];
+    },
+    propertyAdapter: {
+      writeParameters(nodeId, values) {
+        writes.push({ nodeId, values });
+        return { updated: true };
+      }
+    },
+    syncParameterDependencyControls() {},
+    renderValidationErrors() {},
+    updateStatus() {}
+  });
+
+  assert.equal(owner.applyChanges({ showToast: false }), true);
+  assert.deepEqual(writes, [
+    { nodeId: 'template-1', values: { TemplateId: 'tpl-01' } }
+  ]);
+
+  owner.currentOperator.parameters[0].value = 'C:\\Templates\\old.tpl';
+  assert.deepEqual(
+    owner.buildEffectiveWriteValues({ TemplatePath: '', TemplateId: 'tpl-01' }),
+    { TemplatePath: '', TemplateId: 'tpl-01' }
+  );
+  const conflictErrors = owner.validateOperatorModel(owner.currentOperator, {
+    values: { TemplatePath: 'C:\\Templates\\old.tpl', TemplateId: 'tpl-02' }
+  });
+  assert.equal(conflictErrors.length, 1);
+  assert.equal(conflictErrors[0].kind, 'mutuallyExclusive');
+  assert.deepEqual(
+    [...conflictErrors[0].parameterNames].sort(),
+    ['TemplateId', 'TemplatePath'].sort()
+  );
+  assert.match(conflictErrors[0].message, /TemplatePath/);
+  assert.match(conflictErrors[0].message, /TemplateId/);
+  assert.deepEqual(
+    owner.buildWriteValues('TemplateId', { TemplatePath: 'C:\\Templates\\old.tpl', TemplateId: '' }),
+    { TemplateId: '' }
+  );
+});
+
+test('PropertyPanelCapabilityOwner skips full apply when dependency filtering leaves no writable values', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toasts = [];
+  let dependencySynced = false;
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'deep-learning-empty-write',
+    currentOperator: {
+      id: 'deep-learning-empty-write',
+      type: 'DeepLearning',
+      parameters: [
+        { name: 'UseGpu', value: false, dataType: 'bool' },
+        { name: 'GpuDeviceId', value: '', dataType: 'string' }
+      ]
+    },
+    validationErrors: [{ name: 'GpuDeviceId', message: 'old' }],
+    dirty: true,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    },
+    collectFormValues() {
+      return { GpuDeviceId: '' };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    validateValues() {
+      return [];
+    },
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('writeParameters should not run for an empty dependency-filtered write');
+      }
+    },
+    syncParameterDependencyControls() {
+      dependencySynced = true;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+
+  assert.equal(owner.applyChanges({ showToast: true }), true);
+  assert.equal(owner.statusMessage, '参数未变更');
+  assert.equal(owner.dirty, false);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.deepEqual(toasts, []);
+  assert.equal(dependencySynced, true);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner ignores stale camera binding loads after rerender', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let resolveFirst;
+  let resolveSecond;
+  const firstLoad = new Promise(resolve => {
+    resolveFirst = resolve;
+  });
+  const secondLoad = new Promise(resolve => {
+    resolveSecond = resolve;
+  });
+  const loads = [firstLoad, secondLoad];
+  const populated = [];
+  const firstSelect = { id: 'first-select' };
+  const secondSelect = { id: 'second-select' };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    disposed: false,
+    cameraBindingsLoadToken: 0,
+    currentSelects: [firstSelect],
+    container: {
+      querySelectorAll: selector => selector === 'select[data-camera-binding-select="true"]'
+        ? owner.currentSelects
+        : []
+    },
+    fetchCameraBindings() {
+      return loads.shift();
+    },
+    populateCameraBindingSelects(selects, bindings) {
+      populated.push({
+        selectIds: Array.from(selects).map(select => select.id),
+        bindingIds: bindings.map(binding => binding.id)
+      });
+    }
+  });
+
+  const first = owner.loadCameraBindingsForSelects();
+  owner.currentSelects = [secondSelect];
+  const second = owner.loadCameraBindingsForSelects();
+
+  resolveFirst([{ id: 'stale-camera' }]);
+  await first;
+  assert.deepEqual(populated, []);
+
+  resolveSecond([{ id: 'current-camera' }]);
+  await second;
+  assert.deepEqual(populated, [{
+    selectIds: ['second-select'],
+    bindingIds: ['current-camera']
+  }]);
+});
+
+test('PropertyPanelCapabilityOwner invalidates camera binding loads when rerender has no camera selects', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let resolveLoad;
+  const pendingLoad = new Promise(resolve => {
+    resolveLoad = resolve;
+  });
+  const populated = [];
+  const firstSelect = { id: 'camera-select' };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    disposed: false,
+    cameraBindingsLoadToken: 0,
+    currentSelects: [firstSelect],
+    container: {
+      querySelectorAll: selector => selector === 'select[data-camera-binding-select="true"]'
+        ? owner.currentSelects
+        : []
+    },
+    fetchCameraBindings() {
+      return pendingLoad;
+    },
+    populateCameraBindingSelects(selects, bindings) {
+      populated.push({
+        selectIds: Array.from(selects).map(select => select.id),
+        bindingIds: bindings.map(binding => binding.id)
+      });
+    }
+  });
+
+  const first = owner.loadCameraBindingsForSelects();
+  owner.currentSelects = [];
+  await owner.loadCameraBindingsForSelects();
+
+  resolveLoad([{ id: 'stale-camera' }]);
+  await first;
+
+  assert.deepEqual(populated, []);
+});
+
+test('PropertyPanelCapabilityOwner does not clear disabled file paths during passive dependency sync', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const fileRuleHint = { textContent: '', remove() {} };
+  const createGroup = ({ pickerButton = null, ruleHint = null } = {}) => ({
+    classList: {
+      toggle() {}
+    },
+    querySelector(selector) {
+      if (selector === '.btn-pick-file') {
+        return pickerButton;
+      }
+      if (selector === '[data-parameter-rule-hint="true"]') {
+        return ruleHint;
+      }
+      if (selector === '.form-label') {
+        return {
+          querySelector() {
+            return null;
+          },
+          insertAdjacentHTML() {}
+        };
+      }
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    setAttribute() {}
+  });
+  const pickerButton = {
+    disabled: false,
+    setAttribute(name, value) {
+      this[name] = value;
+    }
+  };
+  const sourceGroup = createGroup();
+  const fileGroup = createGroup({ pickerButton, ruleHint: fileRuleHint });
+  const sourceInput = {
+    name: 'SourceType',
+    value: 'Camera',
+    disabled: false,
+    setAttribute(name, value) {
+      this[name] = value;
+    },
+    closest() {
+      return sourceGroup;
+    }
+  };
+  const fileInput = {
+    name: 'FilePath',
+    value: 'C:\\Data\\stale.png',
+    disabled: false,
+    setAttribute(name, value) {
+      this[name] = value;
+    },
+    closest() {
+      return fileGroup;
+    }
+  };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentOperator: {
+      id: 'acq-passive-sync',
+      type: 'ImageAcquisition',
+      parameters: [
+        { name: 'SourceType', value: 'Camera', dataType: 'enum' },
+        { name: 'FilePath', value: 'C:\\Data\\stale.png', dataType: 'file' }
+      ]
+    },
+    container: {
+      querySelectorAll(selector) {
+        return selector === '[data-property-parameter="true"]'
+          ? [sourceInput, fileInput]
+          : [];
+      }
+    },
+    collectFormValues() {
+      return {
+        SourceType: 'Camera',
+        FilePath: 'C:\\Data\\stale.png'
+      };
+    }
+  });
+
+  owner.syncParameterDependencyControls();
+
+  assert.equal(fileInput.value, 'C:\\Data\\stale.png');
+  assert.equal(owner.currentOperator.parameters[1].value, 'C:\\Data\\stale.png');
+  assert.equal(fileInput.disabled, true);
+  assert.equal(fileInput['aria-disabled'], 'true');
+  assert.equal(pickerButton.disabled, true);
+  assert.equal(pickerButton['aria-disabled'], 'true');
+  assert.match(fileRuleHint.textContent, /相机模式/);
+});
+
+test('PropertyPanelCapabilityOwner clears stale selection when full apply target node is missing', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let rendered = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'deleted-node',
+    currentOperator: {
+      id: 'deleted-node',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [{ name: 'Threshold', message: 'old error' }],
+    statusMessage: '旧状态',
+    collectFormValues() {
+      return { Threshold: 128 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    propertyAdapter: {
+      writeParameters() {
+        return { updated: false, reason: 'node_not_found' };
+      }
+    },
+    render() {
+      rendered = true;
+    },
+    renderValidationErrors() {
+      throw new Error('renderValidationErrors should not run after node_not_found');
+    },
+    updateStatus() {
+      throw new Error('updateStatus should not run after node_not_found');
+    }
+  });
+
+  assert.equal(owner.applyChanges({ showToast: false }), false);
+  assert.equal(owner.currentNodeId, null);
+  assert.equal(owner.currentOperator, null);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.equal(owner.statusMessage, '');
+  assert.equal(rendered, true);
+});
+
+test('PropertyPanelCapabilityOwner reports write failures without mutating local parameter state', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toasts = [];
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'threshold-1',
+    currentOperator: {
+      id: 'threshold-1',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', label: '阈值', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [],
+    dirty: true,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    },
+    collectFormValues() {
+      return { Threshold: 180 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    propertyAdapter: {
+      writeParameters() {
+        return {
+          updated: false,
+          reason: 'parameter_not_found',
+          missingParameters: ['Threshold']
+        };
+      }
+    },
+    syncParameterDependencyControls() {
+      throw new Error('syncParameterDependencyControls should not run after failed write');
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+
+  assert.equal(owner.applyChanges({ showToast: true }), false);
+  assert.equal(owner.currentOperator.parameters[0].value, 128);
+  assert.equal(owner.dirty, false);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /阈值/);
+  assert.deepEqual(toasts, [{ message: owner.statusMessage, level: 'error' }]);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner treats missing write results as failed writes', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toasts = [];
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'threshold-missing-result',
+    currentOperator: {
+      id: 'threshold-missing-result',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [],
+    dirty: true,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    },
+    collectFormValues() {
+      return { Threshold: 180 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    propertyAdapter: {
+      writeParameters() {
+        return undefined;
+      }
+    },
+    syncParameterDependencyControls() {
+      throw new Error('syncParameterDependencyControls should not run without a write result');
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+
+  assert.equal(owner.applyChanges({ showToast: true }), false);
+  assert.equal(owner.currentOperator.parameters[0].value, 128);
+  assert.equal(owner.dirty, false);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /未收到写入结果/);
+  assert.deepEqual(toasts, [{ message: owner.statusMessage, level: 'error' }]);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner catches thrown full apply writes without mutating local parameter state', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toasts = [];
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'threshold-throw',
+    currentOperator: {
+      id: 'threshold-throw',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [],
+    dirty: true,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    },
+    collectFormValues() {
+      return { Threshold: 180 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('adapter unavailable');
+      }
+    },
+    syncParameterDependencyControls() {
+      throw new Error('syncParameterDependencyControls should not run after thrown write');
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+
+  assert.equal(owner.applyChanges({ showToast: true }), false);
+  assert.equal(owner.currentOperator.parameters[0].value, 128);
+  assert.equal(owner.dirty, false);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /adapter unavailable/);
+  assert.deepEqual(toasts, [{ message: owner.statusMessage, level: 'error' }]);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner catches thrown incremental writes without mutating local parameter state', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'threshold-change-throw',
+    currentOperator: {
+      id: 'threshold-change-throw',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [],
+    dirty: true,
+    disposed: false,
+    collectFormValues() {
+      return { Threshold: 180 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    validateValues() {
+      return [];
+    },
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('incremental adapter unavailable');
+      }
+    },
+    syncParameterDependencyControls() {
+      throw new Error('syncParameterDependencyControls should not run after thrown write');
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+  const input = {
+    name: 'Threshold',
+    closest(selector) {
+      return selector === '[data-property-parameter="true"]' ? input : null;
+    }
+  };
+
+  owner.handleContainerChange({ target: input });
+
+  assert.equal(owner.currentOperator.parameters[0].value, 128);
+  assert.equal(owner.dirty, false);
+  assert.match(owner.statusMessage, /参数写入失败/);
+  assert.match(owner.statusMessage, /incremental adapter unavailable/);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner clears stale dirty state when incremental write is filtered empty', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let dependencySynced = false;
+  let validationRendered = false;
+  let statusUpdated = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'empty-incremental-write',
+    currentOperator: {
+      id: 'empty-incremental-write',
+      type: 'DeepLearning',
+      parameters: [
+        { name: 'UseGpu', value: false, dataType: 'bool' },
+        { name: 'GpuDeviceId', value: '', dataType: 'string' }
+      ]
+    },
+    validationErrors: [],
+    dirty: true,
+    lastChangedParameterName: 'PreviousParameter',
+    disposed: false,
+    collectNormalizedFormValues() {
+      return { UseGpu: false, GpuDeviceId: '' };
+    },
+    validateValues() {
+      return [];
+    },
+    buildWriteValues() {
+      return {};
+    },
+    propertyAdapter: {
+      writeParameters() {
+        throw new Error('writeParameters should not run for an empty incremental write');
+      }
+    },
+    syncParameterDependencyControls() {
+      dependencySynced = true;
+    },
+    renderValidationErrors() {
+      validationRendered = true;
+    },
+    updateStatus() {
+      statusUpdated = true;
+    }
+  });
+  const input = {
+    name: 'GpuDeviceId',
+    disabled: false,
+    closest(selector) {
+      return selector === '[data-property-parameter="true"]' ? input : null;
+    },
+    getAttribute() {
+      return null;
+    }
+  };
+
+  owner.handleContainerChange({ target: input });
+
+  assert.equal(owner.statusMessage, '参数未变更');
+  assert.equal(owner.dirty, false);
+  assert.equal(owner.lastChangedParameterName, null);
+  assert.deepEqual(owner.validationErrors, []);
+  assert.equal(dependencySynced, true);
+  assert.equal(validationRendered, true);
+  assert.equal(statusUpdated, true);
+});
+
+test('PropertyPanelCapabilityOwner ignores disabled parameter change events', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let touchedWritePath = false;
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'disabled-change',
+    currentOperator: { id: 'disabled-change', type: 'Thresholding', parameters: [] },
+    disposed: false,
+    collectNormalizedFormValues() {
+      touchedWritePath = true;
+      return {};
+    },
+    validateValues() {
+      touchedWritePath = true;
+      return [];
+    },
+    propertyAdapter: {
+      writeParameters() {
+        touchedWritePath = true;
+        return { updated: true };
+      }
+    }
+  });
+  const input = {
+    name: 'Threshold',
+    disabled: false,
+    closest(selector) {
+      return selector === '[data-property-parameter="true"]' ? input : null;
+    },
+    getAttribute(name) {
+      return name === 'aria-disabled' ? 'true' : null;
+    }
+  };
+
+  owner.handleContainerChange({ target: input });
+
+  assert.equal(touchedWritePath, false);
+});
+
+test('PropertyPanelCapabilityOwner ignores late file picker results for disabled fields', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  let parameterUpdated = false;
+  let changeDispatched = false;
+  let applyCalled = false;
+  const input = {
+    name: 'FilePath',
+    disabled: true,
+    getAttribute(name) {
+      return name === 'aria-disabled' ? 'true' : null;
+    },
+    dispatchEvent() {
+      changeDispatched = true;
+    }
+  };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'file-disabled',
+    disposed: false,
+    findParamInput() {
+      return input;
+    },
+    updateCurrentOperatorParameterValue() {
+      parameterUpdated = true;
+    },
+    applyChanges() {
+      applyCalled = true;
+    },
+    syncParameterDependencyControls() {
+      throw new Error('syncParameterDependencyControls should not run for a disabled file input');
+    }
+  });
+
+  owner.handleFilePickedEvent({
+    payload: {
+      ParameterName: 'FilePath',
+      FilePath: 'C:\\Data\\late.png'
+    }
+  });
+
+  assert.equal(input.value, undefined);
+  assert.equal(parameterUpdated, false);
+  assert.equal(changeDispatched, false);
+  assert.equal(applyCalled, false);
+});
+
+test('PropertyPanelCapabilityOwner writes picked acquisition files once through incremental change path', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const writes = [];
+  let dispatchCalled = false;
+  let applyCalled = false;
+  let dependencySynced = false;
+  const fileInput = {
+    name: 'FilePath',
+    value: '',
+    disabled: false,
+    getAttribute() {
+      return null;
+    },
+    closest(selector) {
+      return selector === '[data-property-parameter="true"]' ? fileInput : null;
+    },
+    dispatchEvent() {
+      dispatchCalled = true;
+    }
+  };
+  const sourceInput = {
+    name: 'SourceType',
+    value: 'Camera',
+    options: [{ value: 'File' }, { value: 'Camera' }]
+  };
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'acquisition-file',
+    currentOperator: {
+      id: 'acquisition-file',
+      type: 'ImageAcquisition',
+      parameters: [
+        { name: 'SourceType', value: 'Camera', dataType: 'enum' },
+        { name: 'FilePath', value: '', dataType: 'file' }
+      ]
+    },
+    disposed: false,
+    validationErrors: [],
+    dirty: false,
+    findParamInput(...names) {
+      const normalized = names.map(name => String(name).toLowerCase());
+      if (normalized.includes('filepath')) {
+        return fileInput;
+      }
+      if (normalized.includes('sourcetype')) {
+        return sourceInput;
+      }
+      return null;
+    },
+    collectFormValues() {
+      return {
+        SourceType: sourceInput.value,
+        FilePath: fileInput.value
+      };
+    },
+    validateValues() {
+      return [];
+    },
+    propertyAdapter: {
+      writeParameters(nodeId, values) {
+        writes.push({ nodeId, values });
+        return { updated: true };
+      }
+    },
+    applyChanges() {
+      applyCalled = true;
+    },
+    syncParameterDependencyControls(options) {
+      dependencySynced = options?.clearFilePathWhenCamera === false;
+    },
+    renderValidationErrors() {},
+    updateStatus() {}
+  });
+
+  owner.handleFilePickedEvent({
+    payload: {
+      ParameterName: 'FilePath',
+      FilePath: 'C:\\Data\\sample.png'
+    }
+  });
+
+  assert.equal(fileInput.value, 'C:\\Data\\sample.png');
+  assert.equal(sourceInput.value, 'File');
+  assert.deepEqual(writes, [{
+    nodeId: 'acquisition-file',
+    values: {
+      FilePath: 'C:\\Data\\sample.png',
+      SourceType: 'File'
+    }
+  }]);
+  assert.equal(owner.currentOperator.parameters[0].value, 'File');
+  assert.equal(owner.currentOperator.parameters[1].value, 'C:\\Data\\sample.png');
+  assert.equal(owner.dirty, true);
+  assert.equal(dependencySynced, true);
+  assert.equal(dispatchCalled, false);
+  assert.equal(applyCalled, false);
+});
+
+test('PropertyPanelCapabilityOwner treats no-change writes as stable without success toast', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const toasts = [];
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentNodeId: 'threshold-1',
+    currentOperator: {
+      id: 'threshold-1',
+      type: 'Thresholding',
+      parameters: [
+        { name: 'Threshold', value: 128, dataType: 'int', min: 0, max: 255 }
+      ]
+    },
+    validationErrors: [],
+    showToast(message, level) {
+      toasts.push({ message, level });
+    },
+    collectFormValues() {
+      return { Threshold: 128 };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return values;
+    },
+    propertyAdapter: {
+      writeParameters() {
+        return { updated: false, reason: 'no_change', missingParameters: [] };
+      }
+    },
+    syncParameterDependencyControls() {},
+    renderValidationErrors() {},
+    updateStatus() {}
+  });
+
+  assert.equal(owner.applyChanges({ showToast: true }), true);
+  assert.equal(owner.currentOperator.parameters[0].value, 128);
+  assert.equal(owner.dirty, false);
+  assert.equal(owner.statusMessage, '参数未变更');
+  assert.deepEqual(toasts, []);
+});
+
+test('PropertyPanelCapabilityOwner validates normalized current form values', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  let validatedValues = null;
+  Object.assign(owner, {
+    currentOperator: { id: 'acq-1', type: 'ImageAcquisition', parameters: [] },
+    validationErrors: [],
+    collectFormValues() {
+      return { SourceType: 'Camera', FilePath: 'C:\\Data\\stale.png', CameraBindingId: 'line-camera-01' };
+    },
+    normalizeImageAcquisitionValues(values) {
+      return { ...values, FilePath: '' };
+    },
+    validateValues(values) {
+      validatedValues = values;
+      return [];
+    },
+    renderValidationErrors() {},
+    updateStatus() {}
+  });
+
+  assert.equal(owner.validateCurrentOperator({ showToast: false }), true);
+  assert.deepEqual(validatedValues, {
+    SourceType: 'Camera',
+    FilePath: '',
+    CameraBindingId: 'line-camera-01'
+  });
+});
+
 test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface', () => {
   const panelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
 
@@ -487,7 +1690,14 @@ test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () 
     'resolveParameterControlType',
     'isPathLikeParameter',
     'normalizeAcquisitionSourceType',
+    'isElementEffectivelyDisabled',
+    'getLocalizedDisabledReason',
+    'collectNormalizedFormValues',
+    'buildEffectiveWriteValues',
+    'shouldWriteParameterValue',
+    'syncParameterDependencyControls',
     'syncImageAcquisitionSourceControls',
+    'data-parameter-rule-hint="true"',
     "httpClient.get('/cameras/bindings')",
     'param-slider',
     'form-color-hidden',
@@ -504,6 +1714,7 @@ test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () 
   }
 
   assert.match(ownerSource, /controlType === 'file'[\s\S]*btn-pick-file/);
+  assert.match(ownerSource, /btn-pick-file[\s\S]*aria-disabled="\$\{isDisabled \? 'true' : 'false'\}"/);
   assert.match(ownerSource, /controlType === 'cameraBinding'[\s\S]*data-camera-binding-select="true"/);
   assert.match(ownerSource, /webMessageBridge\.sendMessage\('PickFileCommand'/);
   assert.match(ownerSource, /webMessageBridge\.on\('FilePickedEvent'/);

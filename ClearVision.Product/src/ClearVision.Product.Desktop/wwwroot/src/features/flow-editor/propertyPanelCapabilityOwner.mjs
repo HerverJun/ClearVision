@@ -37,8 +37,68 @@ function escapeAttribute(value) {
     return escapeHtml(value).replace(/"/g, '&quot;');
 }
 
+function isElementEffectivelyDisabled(element) {
+    return Boolean(element?.disabled) || element?.getAttribute?.('aria-disabled') === 'true';
+}
+
+function getPickerActionLabel(label, fallbackTarget) {
+    const trimmedLabel = String(label || '').trim();
+    if (trimmedLabel) {
+        return `选择${trimmedLabel}`;
+    }
+
+    return `选择${String(fallbackTarget || '参数').trim()}`;
+}
+
+const LOCALIZED_DISABLED_REASONS = Object.freeze({
+    'File path is disabled while SourceType is camera.': '相机模式下已禁用文件路径。',
+    'Camera id is disabled in file mode or when CameraBindingId is set.': '文件模式或已选择相机绑定时，相机选择已禁用。',
+    'Camera binding is disabled in file mode or when CameraId is set.': '文件模式或已选择相机时，相机绑定已禁用。',
+    'Camera exposure is disabled for file acquisition.': '文件采集模式下已禁用相机曝光。',
+    'Camera gain is disabled for file acquisition.': '文件采集模式下已禁用相机增益。',
+    'Trigger mode is disabled for file acquisition.': '文件采集模式下已禁用触发模式。',
+    'Template path is disabled when TemplateId is selected.': '已选择模板 ID，模板路径已禁用。',
+    'TemplateId is disabled when TemplatePath is selected.': '已填写模板路径，模板 ID 已禁用。',
+    'ROI X is disabled when UseRoi is false.': '未启用 ROI 时，ROI X 已禁用。',
+    'ROI Y is disabled when UseRoi is false.': '未启用 ROI 时，ROI Y 已禁用。',
+    'ROI width is disabled when UseRoi is false.': '未启用 ROI 时，ROI 宽度已禁用。',
+    'ROI height is disabled when UseRoi is false.': '未启用 ROI 时，ROI 高度已禁用。',
+    'Origin X is only editable when OriginMode is Custom.': '仅自定义原点模式可编辑 Origin X。',
+    'Origin Y is only editable when OriginMode is Custom.': '仅自定义原点模式可编辑 Origin Y。',
+    'Angle search is disabled when EnablePoseSearch is false.': '未启用姿态搜索时，角度搜索已禁用。',
+    'Angle extent is disabled when EnablePoseSearch is false.': '未启用姿态搜索时，角度范围已禁用。',
+    'Angle step is disabled when EnablePoseSearch is false.': '未启用姿态搜索时，角度步长已禁用。',
+    'Scale search is disabled when EnablePoseSearch is false.': '未启用姿态搜索时，尺度搜索已禁用。',
+    'Scale step is disabled when EnablePoseSearch is false.': '未启用姿态搜索时，尺度步长已禁用。',
+    'ModelPath is disabled when ModelId or ModelCatalogPath is selected.': '已选择模型 ID 或模型目录时，模型路径已禁用。',
+    'ModelId is disabled when ModelPath or ModelCatalogPath is selected.': '已填写模型路径或模型目录时，模型 ID 已禁用。',
+    'ModelCatalogPath is disabled when ModelPath or ModelId is selected.': '已填写模型路径或模型 ID 时，模型目录已禁用。',
+    'GPU device id is disabled when UseGpu is false.': '未启用 GPU 时，GPU 设备 ID 已禁用。',
+    'Internal NMS is owned by the exported model when OutputFormat is EndToEndNms.': '端到端 NMS 输出由模型接管，内部 NMS 已禁用。',
+    'NMS IoU is disabled when model-side NMS is trusted or internal NMS is off.': '使用模型侧 NMS 或关闭内部 NMS 时，NMS IoU 已禁用。',
+    'Channel is disabled when a concrete output channel id is selected.': '已选择具体输出通道 ID 时，通道已禁用。',
+    'OutputChannel is disabled when Channel or OutputChannelId is selected.': '已选择通道或输出通道 ID 时，输出通道已禁用。',
+    'OutputChannelId is disabled when Channel or OutputChannel is selected.': '已选择通道或输出通道时，输出通道 ID 已禁用。',
+    'File path is enabled only for file output.': '仅文件输出模式可编辑文件路径。',
+    'Output path is enabled only for file output.': '仅文件输出模式可编辑输出路径。',
+    'PLC metadata is enabled only for PLC output review.': '仅 PLC 输出复核模式可编辑 PLC 元数据。'
+});
+
+function getLocalizedDisabledReason(reason) {
+    const rawReason = String(reason || '').trim();
+    if (!rawReason) {
+        return '';
+    }
+
+    return LOCALIZED_DISABLED_REASONS[rawReason] || rawReason;
+}
+
 function getParameterName(parameter) {
     return String(parameter?.name ?? parameter?.Name ?? '').trim();
+}
+
+function getParameterInputId(name) {
+    return `param-${String(name ?? '').trim()}`;
 }
 
 function normalizeParameterName(name) {
@@ -154,6 +214,45 @@ function getParameterOptions(parameter) {
     return Array.isArray(options) ? options : [];
 }
 
+function findParameterByName(parameters = [], name = '') {
+    const normalizedName = normalizeParameterName(name);
+    return (Array.isArray(parameters) ? parameters : [])
+        .find(parameter => normalizeParameterName(getParameterName(parameter)) === normalizedName) || null;
+}
+
+function getParameterLabelByName(parameters = [], name = '') {
+    return getParameterLabel(findParameterByName(parameters, name), name);
+}
+
+function getValueByName(parameters = [], values = null, name = '') {
+    const normalizedName = normalizeParameterName(name);
+    if (!normalizedName) {
+        return null;
+    }
+
+    if (values && typeof values === 'object') {
+        const valueKey = Object.keys(values).find(key => normalizeParameterName(key) === normalizedName);
+        if (valueKey !== undefined) {
+            return values[valueKey];
+        }
+    }
+
+    const parameter = findParameterByName(parameters, name);
+    return parameter ? getParameterValue(parameter) : null;
+}
+
+function getNonEmptyMutuallyExclusiveNames(operator, parameters = [], values = null, names = []) {
+    return names.filter(name => {
+        const value = getValueByName(parameters, values, name);
+        if (!isEmptyValue(value)) {
+            return true;
+        }
+
+        const parameter = findParameterByName(parameters, name);
+        return !parameter && !isEmptyValue(getValueByName(operator?.parameters || [], values, name));
+    });
+}
+
 function getFormValue(input) {
     const dataType = String(input.dataset.type || '').toLowerCase();
     if (dataType === 'boolean' || dataType === 'bool') {
@@ -171,6 +270,155 @@ function getFormValue(input) {
     }
 
     return input.value;
+}
+
+function getPanelParameterEffectiveState(operator, paramOrName, options = {}) {
+    const state = getParameterEffectiveState(operator, paramOrName, options);
+    const groupNames = Array.isArray(state.rule?.atLeastOneOf) ? state.rule.atLeastOneOf : [];
+    if (!state.effectiveDisabled || groupNames.length < 2) {
+        return state;
+    }
+
+    const parameterName = state.parameterName;
+    const parameters = Array.isArray(operator?.parameters) ? operator.parameters : [];
+    const nonEmptyNames = getNonEmptyMutuallyExclusiveNames(operator, parameters, options.values || null, groupNames);
+    if (
+        nonEmptyNames.length > 1 &&
+        nonEmptyNames.some(name => normalizeParameterName(name) === normalizeParameterName(parameterName))
+    ) {
+        return {
+            ...state,
+            effectiveDisabled: false,
+            disabledReason: ''
+        };
+    }
+
+    return state;
+}
+
+function validationErrorTargetsParameter(error, parameterName) {
+    const normalizedParameterName = normalizeParameterName(parameterName);
+    if (!normalizedParameterName) {
+        return false;
+    }
+
+    const names = [
+        error?.name,
+        ...(Array.isArray(error?.parameterNames) ? error.parameterNames : [])
+    ];
+
+    return names.some(name => normalizeParameterName(name) === normalizedParameterName);
+}
+
+function isBlockingValidationErrorForParameter(error, parameterName) {
+    if (!validationErrorTargetsParameter(error, parameterName)) {
+        return false;
+    }
+
+    return error?.kind !== 'required' && error?.kind !== 'atLeastOneOf';
+}
+
+function buildValidationErrorMessage(error, operator, parameters = [], values = null) {
+    const operatorType = String(operator?.type || operator?.operatorType || '').trim();
+    const names = Array.isArray(error?.parameterNames) && error.parameterNames.length > 0
+        ? error.parameterNames
+        : [error?.name].filter(Boolean);
+    const normalizedNames = names.map(normalizeParameterName);
+
+    if (operatorType === 'ImageAcquisition') {
+        const sourceType = normalizeAcquisitionSourceType(getValueByName(parameters, values, 'SourceType'));
+        if (sourceType === 'file' && normalizedNames.includes('filepath')) {
+            return '请先配置文件路径';
+        }
+
+        if (
+            sourceType === 'camera' &&
+            (normalizedNames.includes('cameraid') || normalizedNames.includes('camerabindingid'))
+        ) {
+            return normalizedNames.length > 1
+                ? '请先选择相机或相机绑定'
+                : '请先选择相机';
+        }
+    }
+
+    if (error?.kind === 'required') {
+        const label = getParameterLabelByName(parameters, error.name);
+        return `${label} 必填`;
+    }
+
+    if (error?.kind === 'atLeastOneOf' && names.length > 0) {
+        const labels = names.map(name => getParameterLabelByName(parameters, name));
+        return `请至少填写 ${labels.join(' / ')} 中的一项`;
+    }
+
+    return error?.message || '参数校验失败';
+}
+
+function collectMutuallyExclusiveParameterErrors(operator, parameters = [], values = null) {
+    const errors = [];
+    const handledGroups = new Set();
+
+    parameters.forEach(parameter => {
+        const state = getPanelParameterEffectiveState(operator, parameter, { values });
+        const rule = state.rule;
+        const names = Array.isArray(rule?.atLeastOneOf) ? rule.atLeastOneOf : [];
+        if (!rule?.mutuallyExclusiveGroup || names.length < 2) {
+            return;
+        }
+
+        const groupKey = `${rule.mutuallyExclusiveGroup}:${names.map(normalizeParameterName).sort().join('|')}`;
+        if (handledGroups.has(groupKey)) {
+            return;
+        }
+        handledGroups.add(groupKey);
+
+        const nonEmptyNames = getNonEmptyMutuallyExclusiveNames(operator, parameters, values, names);
+        if (nonEmptyNames.length < 2) {
+            return;
+        }
+
+        const labels = nonEmptyNames.map(name => getParameterLabelByName(parameters, name));
+        errors.push({
+            name: nonEmptyNames[0],
+            parameterNames: nonEmptyNames,
+            kind: 'mutuallyExclusive',
+            message: `请只保留 ${labels.join(' / ')} 中的一项`
+        });
+    });
+
+    return errors;
+}
+
+function getParameterWriteFailureMessage(result, parameters = []) {
+    if (!result) {
+        return '参数写入失败：未收到写入结果';
+    }
+
+    if (result.updated !== false) {
+        return '';
+    }
+
+    const reason = String(result.reason || '').trim();
+    if (!reason || reason === 'no_change' || reason === 'node_not_found') {
+        return '';
+    }
+
+    if (reason === 'parameter_not_found') {
+        const names = Array.isArray(result.missingParameters)
+            ? result.missingParameters.filter(Boolean)
+            : [];
+        const labels = names.map(name => getParameterLabelByName(parameters, name));
+        return labels.length > 0
+            ? `参数写入失败：缺少参数 ${labels.join(' / ')}`
+            : '参数写入失败：缺少目标参数';
+    }
+
+    const detail = result.message || result.errorMessage || result.error || reason;
+    return `参数写入失败：${String(detail)}`;
+}
+
+function getParameterWriteExceptionMessage(error) {
+    return `参数写入失败：${error?.message || '未知错误'}`;
 }
 
 export class PropertyPanelCapabilityOwner {
@@ -211,12 +459,14 @@ export class PropertyPanelCapabilityOwner {
         this.unsubscribes = [];
         this.cameraBindingsCache = [];
         this.cameraBindingsLoadingPromise = null;
+        this.cameraBindingsLoadToken = 0;
         this.roiEditorPanel = null;
         this.geometryImageBounds = null;
 
         this.handleContainerChange = this.handleContainerChange.bind(this);
         this.handleContainerClick = this.handleContainerClick.bind(this);
         this.handleContainerInput = this.handleContainerInput.bind(this);
+        this.handleContainerKeyDown = this.handleContainerKeyDown.bind(this);
         this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
         this.handleFilePickedEvent = this.handleFilePickedEvent.bind(this);
 
@@ -224,6 +474,7 @@ export class PropertyPanelCapabilityOwner {
         this.container.addEventListener('change', this.handleContainerChange);
         this.container.addEventListener('click', this.handleContainerClick);
         this.container.addEventListener('input', this.handleContainerInput);
+        this.container.addEventListener('keydown', this.handleContainerKeyDown);
         this.container.addEventListener('submit', this.handleContainerSubmit);
 
         this.unsubscribes.push(
@@ -299,6 +550,13 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
+        const colorPreview = event.target?.closest?.('.color-preview-box');
+        if (colorPreview) {
+            event.preventDefault();
+            this.openColorPicker(colorPreview);
+            return;
+        }
+
         const clearRoiButton = event.target?.closest?.('[data-property-geometry-clear-roi]');
         if (clearRoiButton) {
             event.preventDefault();
@@ -314,7 +572,7 @@ export class PropertyPanelCapabilityOwner {
         }
 
         event.preventDefault();
-        if (button.disabled) {
+        if (isElementEffectivelyDisabled(button)) {
             return;
         }
 
@@ -323,6 +581,20 @@ export class PropertyPanelCapabilityOwner {
             parameterName,
             filter: this.getFilePickerFilter(parameterName)
         });
+    }
+
+    handleContainerKeyDown(event) {
+        if (this.disposed || (event.key !== 'Enter' && event.key !== ' ')) {
+            return;
+        }
+
+        const colorPreview = event.target?.closest?.('.color-preview-box');
+        if (!colorPreview) {
+            return;
+        }
+
+        event.preventDefault();
+        this.openColorPicker(colorPreview);
     }
 
     handleContainerInput(event) {
@@ -350,6 +622,22 @@ export class PropertyPanelCapabilityOwner {
         }
     }
 
+    openColorPicker(colorPreview) {
+        if (!colorPreview || colorPreview.getAttribute('aria-disabled') === 'true') {
+            return;
+        }
+
+        const input = colorPreview
+            .closest('.color-picker-wrapper')
+            ?.querySelector('input[type="color"][data-property-parameter="true"]');
+        if (!input || input.disabled || input.readOnly) {
+            return;
+        }
+
+        input.focus?.();
+        input.click?.();
+    }
+
     handleFilePickedEvent(event) {
         if (this.disposed || !this.currentNodeId) {
             return;
@@ -375,25 +663,21 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
+        if (isElementEffectivelyDisabled(input)) {
+            return;
+        }
+
         if (this.isImageAcquisitionOperator() && normalizeParameterName(parameterName) === 'filepath') {
             const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
             if (sourceTypeInput && normalizeAcquisitionSourceType(sourceTypeInput.value) !== 'file') {
                 const fileOption = Array.from(sourceTypeInput.options || [])
                     .find(option => normalizeAcquisitionSourceType(option.value) === 'file');
                 sourceTypeInput.value = fileOption?.value || 'File';
-                this.updateCurrentOperatorParameterValue(sourceTypeInput.name, sourceTypeInput.value);
             }
         }
 
         input.value = filePath;
-        this.updateCurrentOperatorParameterValue(input.name, filePath);
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-
-        if (this.isImageAcquisitionOperator() && normalizeParameterName(parameterName) === 'filepath') {
-            this.syncImageAcquisitionSourceControls({ clearFilePathWhenCamera: false });
-        }
-
-        this.applyChanges({ showToast: false });
+        this.handleContainerChange({ target: input });
     }
 
     handleContainerChange(event) {
@@ -401,11 +685,15 @@ export class PropertyPanelCapabilityOwner {
         if (!input || !this.currentNodeId || this.disposed) {
             return;
         }
+        if (isElementEffectivelyDisabled(input)) {
+            return;
+        }
 
-        let values = this.collectFormValues();
-        values = this.normalizeImageAcquisitionValues(values, input.name);
+        const values = this.collectNormalizedFormValues(input.name);
+        const parameterName = input.name;
         const errors = this.validateValues(values);
-        if (errors.length > 0) {
+        const hasBlockingError = errors.some(error => isBlockingValidationErrorForParameter(error, parameterName));
+        if (hasBlockingError) {
             this.validationErrors = errors;
             this.statusMessage = '参数校验失败';
             this.renderValidationErrors();
@@ -413,9 +701,31 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
-        const parameterName = input.name;
         const writeValues = this.buildWriteValues(parameterName, values);
-        const result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        if (Object.keys(writeValues).length === 0) {
+            this.validationErrors = errors;
+            this.statusMessage = errors.length > 0 ? '参数校验失败' : '参数未变更';
+            this.lastChangedParameterName = null;
+            this.dirty = false;
+            this.syncParameterDependencyControls({
+                clearFilePathWhenCamera: normalizeParameterName(parameterName) === 'sourcetype'
+            });
+            this.renderValidationErrors();
+            this.updateStatus();
+            return;
+        }
+
+        let result;
+        try {
+            result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        } catch (error) {
+            this.validationErrors = errors;
+            this.statusMessage = getParameterWriteExceptionMessage(error);
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
+            return;
+        }
 
         if (result?.reason === 'node_not_found') {
             this.currentOperator = null;
@@ -424,12 +734,23 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
-        this.validationErrors = [];
-        this.statusMessage = '参数已更新';
+        const writeFailureMessage = getParameterWriteFailureMessage(result, this.currentOperator?.parameters || []);
+        if (writeFailureMessage) {
+            this.validationErrors = errors;
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
+            return;
+        }
+
+        const updated = result?.updated === true;
+        this.validationErrors = errors;
+        this.statusMessage = errors.length > 0 ? '参数校验失败' : (updated ? '参数已更新' : '参数未变更');
         this.lastChangedParameterName = parameterName;
-        this.dirty = result?.updated === true;
+        this.dirty = updated;
         Object.entries(writeValues).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
-        this.syncImageAcquisitionSourceControls({
+        this.syncParameterDependencyControls({
             clearFilePathWhenCamera: normalizeParameterName(parameterName) === 'sourcetype'
         });
         this.renderValidationErrors();
@@ -483,10 +804,6 @@ export class PropertyPanelCapabilityOwner {
         const normalizedSource = normalizeAcquisitionSourceType(nextValues[sourceKey]);
         if (normalizedSource === 'camera' && filePathKey) {
             nextValues[filePathKey] = '';
-            const filePathInput = this.findParamInput(filePathKey);
-            if (filePathInput) {
-                filePathInput.value = '';
-            }
         }
 
         if (normalizeParameterName(changedName) === 'filepath' && filePathKey && nextValues[filePathKey]) {
@@ -513,7 +830,7 @@ export class PropertyPanelCapabilityOwner {
         };
 
         if (!this.isImageAcquisitionOperator()) {
-            return writeValues;
+            return this.filterWritableValues(writeValues, values);
         }
 
         const normalizedParameterName = normalizeParameterName(parameterName);
@@ -528,39 +845,96 @@ export class PropertyPanelCapabilityOwner {
             writeValues[filePathKey] = '';
         }
 
+        return this.filterWritableValues(writeValues, values);
+    }
+
+    filterWritableValues(writeValues = {}, values = {}) {
+        return Object.fromEntries(
+            Object.entries(writeValues)
+                .filter(([name, value]) => this.shouldWriteParameterValue(name, value, values))
+        );
+    }
+
+    shouldWriteParameterValue(name, value, values = {}) {
+        if (!this.currentOperator) {
+            return true;
+        }
+
+        const parameter = this.getCurrentParameterByName(name);
+        const state = getPanelParameterEffectiveState(this.currentOperator, parameter || name, { values });
+        if (!state.effectiveDisabled) {
+            return true;
+        }
+
+        const currentValue = parameter ? getParameterValue(parameter) : null;
+        return !isEmptyValue(currentValue) && isEmptyValue(value);
+    }
+
+    buildEffectiveWriteValues(values = {}) {
+        const writeValues = {};
+
+        Object.entries(values).forEach(([name, value]) => {
+            if (this.shouldWriteParameterValue(name, value, values)) {
+                writeValues[name] = value;
+            }
+        });
+
         return writeValues;
     }
 
-    syncImageAcquisitionSourceControls(options = {}) {
-        if (!this.isImageAcquisitionOperator()) {
+    shouldHideDisabledParameter(input, state) {
+        if (!state?.effectiveDisabled || !this.isImageAcquisitionOperator()) {
+            return false;
+        }
+
+        return ['filepath', 'cameraid', 'camerabindingid'].includes(normalizeParameterName(input?.name));
+    }
+
+    updateParameterRuleHint(group, state) {
+        if (!group) {
             return;
         }
 
-        const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
-        if (!sourceTypeInput) {
+        let hint = group.querySelector('[data-parameter-rule-hint="true"]');
+        const disabledReason = getLocalizedDisabledReason(state.disabledReason);
+        if (state.effectiveDisabled && disabledReason) {
+            if (!hint) {
+                hint = document.createElement('p');
+                hint.className = 'form-description parameter-rule-hint';
+                hint.dataset.parameterRuleHint = 'true';
+                group.appendChild(hint);
+            }
+
+            hint.textContent = disabledReason;
             return;
         }
 
-        let values = this.collectFormValues();
-        values = this.normalizeImageAcquisitionValues(values);
-        const isCameraMode = normalizeAcquisitionSourceType(sourceTypeInput.value) === 'camera';
-        ['FilePath', 'CameraId', 'CameraBindingId']
-            .map(name => this.findParamInput(name))
+        hint?.remove();
+    }
+
+    syncParameterDependencyControls(options = {}) {
+        if (!this.currentOperator) {
+            return;
+        }
+
+        const values = this.collectNormalizedFormValues();
+        Array.from(this.container.querySelectorAll('[data-property-parameter="true"]'))
             .filter(Boolean)
             .filter((input, index, all) => all.indexOf(input) === index)
             .forEach(input => {
                 const parameter = this.getCurrentParameterByName(input.name);
-                const state = getParameterEffectiveState(this.currentOperator, parameter || input.name, { values });
+                const state = getPanelParameterEffectiveState(this.currentOperator, parameter || input.name, { values });
                 const group = input.closest('.form-group');
                 const pickerButton = group?.querySelector('.btn-pick-file');
+                const colorPreview = group?.querySelector('.color-preview-box');
                 const label = group?.querySelector('.form-label');
                 const requiredMark = label?.querySelector('.required');
 
                 if (
-                    isCameraMode &&
+                    this.isImageAcquisitionOperator() &&
                     state.effectiveDisabled &&
                     normalizeParameterName(input.name) === 'filepath' &&
-                    options.clearFilePathWhenCamera !== false &&
+                    options.clearFilePathWhenCamera === true &&
                     input.value
                 ) {
                     input.value = '';
@@ -571,12 +945,22 @@ export class PropertyPanelCapabilityOwner {
                 input.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
                 if (pickerButton) {
                     pickerButton.disabled = state.effectiveDisabled;
+                    pickerButton.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+                }
+                group?.querySelectorAll('.param-slider').forEach(slider => {
+                    slider.disabled = state.effectiveDisabled;
+                    slider.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+                });
+                if (colorPreview) {
+                    colorPreview.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+                    colorPreview.setAttribute('tabindex', state.effectiveDisabled ? '-1' : '0');
                 }
 
-                group?.classList.toggle('hidden', state.effectiveDisabled);
+                group?.classList.toggle('hidden', this.shouldHideDisabledParameter(input, state));
                 group?.classList.toggle('is-rule-disabled', state.effectiveDisabled);
                 group?.setAttribute('data-effective-disabled', state.effectiveDisabled ? 'true' : 'false');
                 group?.setAttribute('data-effective-required', state.effectiveRequired ? 'true' : 'false');
+                this.updateParameterRuleHint(group, state);
 
                 if (label && state.effectiveRequired && !requiredMark) {
                     label.insertAdjacentHTML('beforeend', ' <span class="required">*</span>');
@@ -584,6 +968,10 @@ export class PropertyPanelCapabilityOwner {
                     requiredMark.remove();
                 }
             });
+    }
+
+    syncImageAcquisitionSourceControls(options = {}) {
+        this.syncParameterDependencyControls(options);
     }
 
     getFilePickerFilter(parameterName = '') {
@@ -617,6 +1005,7 @@ export class PropertyPanelCapabilityOwner {
     }
 
     async loadCameraBindingsForSelects(forceRefresh = false) {
+        const loadToken = ++this.cameraBindingsLoadToken;
         const cameraSelects = this.container.querySelectorAll('select[data-camera-binding-select="true"]');
         if (cameraSelects.length === 0) {
             return;
@@ -624,8 +1013,14 @@ export class PropertyPanelCapabilityOwner {
 
         try {
             const bindings = await this.fetchCameraBindings(forceRefresh);
+            if (this.disposed || loadToken !== this.cameraBindingsLoadToken) {
+                return;
+            }
             this.populateCameraBindingSelects(cameraSelects, bindings);
         } catch (error) {
+            if (this.disposed || loadToken !== this.cameraBindingsLoadToken) {
+                return;
+            }
             console.error('[PropertyPanelCapabilityOwner] Failed to load camera bindings:', error);
             this.populateCameraBindingSelects(cameraSelects, [], error?.message || 'Unknown error');
         }
@@ -730,6 +1125,10 @@ export class PropertyPanelCapabilityOwner {
         return values;
     }
 
+    collectNormalizedFormValues(changedName = '') {
+        return this.normalizeImageAcquisitionValues(this.collectFormValues(), changedName);
+    }
+
     isCircleSearchV2ToolFeatureEnabled() {
         return isCircleSearchV2ToolEnabled({
             circleSearchV2ToolEnabled: this.circleSearchV2ToolEnabled
@@ -779,6 +1178,10 @@ export class PropertyPanelCapabilityOwner {
     }
 
     getCaliperSearchRegionStatus(result) {
+        if (!result) {
+            return 'CaliperTool.SearchRegion 写入失败：未收到写入结果。';
+        }
+
         if (result?.updated !== false) {
             return '卡尺搜索区域已通过 RectangleRegion 连接更新';
         }
@@ -852,21 +1255,52 @@ export class PropertyPanelCapabilityOwner {
         }
 
         if (this.isCaliperToolOperator()) {
-            const result = this.propertyAdapter.upsertCaliperSearchRegion?.(this.currentNodeId, writeValues);
+            let result;
+            try {
+                result = this.propertyAdapter.upsertCaliperSearchRegion?.(this.currentNodeId, writeValues);
+            } catch (error) {
+                this.validationErrors = [];
+                this.statusMessage = getParameterWriteExceptionMessage(error);
+                this.dirty = false;
+                this.renderValidationErrors();
+                this.updateStatus();
+                return;
+            }
             this.statusMessage = this.getCaliperSearchRegionStatus(result);
-            this.dirty = result?.updated !== false;
+            this.dirty = result?.updated === true;
             this.updateStatus();
-            if (result?.updated !== false && result?.operator) {
+            if (result?.updated === true && result?.operator) {
                 this.roiEditorPanel?.refreshFromOperator?.({ forceSyncOverlay: true });
             }
             return;
         }
 
-        const result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        let result;
+        try {
+            result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        } catch (error) {
+            const writeFailureMessage = getParameterWriteExceptionMessage(error);
+            this.validationErrors = [];
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
+            return;
+        }
         if (result?.reason === 'node_not_found') {
             this.currentOperator = null;
             this.currentNodeId = null;
             this.render();
+            return;
+        }
+
+        const writeFailureMessage = getParameterWriteFailureMessage(result, this.currentOperator?.parameters || []);
+        if (writeFailureMessage) {
+            this.validationErrors = [];
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
             return;
         }
 
@@ -904,11 +1338,31 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
-        const result = this.propertyAdapter.writeParameters(this.currentNodeId, values);
+        let result;
+        try {
+            result = this.propertyAdapter.writeParameters(this.currentNodeId, values);
+        } catch (error) {
+            this.validationErrors = [];
+            this.statusMessage = getParameterWriteExceptionMessage(error);
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
+            return;
+        }
         if (result?.reason === 'node_not_found') {
             this.currentOperator = null;
             this.currentNodeId = null;
             this.render();
+            return;
+        }
+
+        const writeFailureMessage = getParameterWriteFailureMessage(result, this.currentOperator?.parameters || []);
+        if (writeFailureMessage) {
+            this.validationErrors = [];
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            this.renderValidationErrors();
+            this.updateStatus();
             return;
         }
 
@@ -1005,8 +1459,15 @@ export class PropertyPanelCapabilityOwner {
             values,
             getLabel: (parameter, fallbackName) => getParameterLabel(parameter, fallbackName)
         }).forEach(error => {
-            errors.push({ name: error.name, message: error.message });
+            errors.push({
+                ...error,
+                name: error.name,
+                message: buildValidationErrorMessage(error, operator, parameters, values)
+            });
         });
+
+        collectMutuallyExclusiveParameterErrors(operator, parameters, values)
+            .forEach(error => errors.push(error));
 
         parameters.forEach(parameter => {
             const name = getParameterName(parameter);
@@ -1014,7 +1475,7 @@ export class PropertyPanelCapabilityOwner {
                 return;
             }
 
-            const state = getParameterEffectiveState(operator, parameter, { values });
+            const state = getPanelParameterEffectiveState(operator, parameter, { values });
             if (state.effectiveDisabled) {
                 return;
             }
@@ -1055,7 +1516,7 @@ export class PropertyPanelCapabilityOwner {
     }
 
     validateCurrentOperator(options = {}) {
-        const errors = this.validateValues(this.collectFormValues());
+        const errors = this.validateValues(this.collectNormalizedFormValues());
         this.validationErrors = errors;
 
         if (errors.length > 0) {
@@ -1111,8 +1572,7 @@ export class PropertyPanelCapabilityOwner {
             return true;
         }
 
-        let values = this.collectFormValues();
-        values = this.normalizeImageAcquisitionValues(values);
+        const values = this.collectNormalizedFormValues();
         const errors = this.validateValues(values);
         if (errors.length > 0) {
             this.validationErrors = errors;
@@ -1125,19 +1585,68 @@ export class PropertyPanelCapabilityOwner {
             return false;
         }
 
-        const result = this.propertyAdapter.writeParameters(this.currentNodeId, values);
+        const writeValues = this.buildEffectiveWriteValues(values);
+        if (Object.keys(writeValues).length === 0) {
+            this.validationErrors = [];
+            this.statusMessage = '参数未变更';
+            this.lastChangedParameterName = null;
+            this.dirty = false;
+            this.syncParameterDependencyControls();
+            this.renderValidationErrors();
+            this.updateStatus();
+            return true;
+        }
+
+        let result;
+        try {
+            result = this.propertyAdapter.writeParameters(this.currentNodeId, writeValues);
+        } catch (error) {
+            const writeFailureMessage = getParameterWriteExceptionMessage(error);
+            this.validationErrors = [];
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            if (showToast) {
+                this.showToast(writeFailureMessage, 'error');
+            }
+            this.renderValidationErrors();
+            this.updateStatus();
+            return false;
+        }
+        if (result?.reason === 'node_not_found') {
+            this.currentOperator = null;
+            this.currentNodeId = null;
+            this.validationErrors = [];
+            this.statusMessage = '';
+            this.render();
+            return false;
+        }
+
+        const writeFailureMessage = getParameterWriteFailureMessage(result, this.currentOperator?.parameters || []);
+        if (writeFailureMessage) {
+            this.validationErrors = [];
+            this.statusMessage = writeFailureMessage;
+            this.dirty = false;
+            if (showToast) {
+                this.showToast(writeFailureMessage, 'error');
+            }
+            this.renderValidationErrors();
+            this.updateStatus();
+            return false;
+        }
+
+        const updated = result?.updated === true;
         this.validationErrors = [];
-        this.statusMessage = '参数已更新';
+        this.statusMessage = updated ? '参数已更新' : '参数未变更';
         this.lastChangedParameterName = null;
-        this.dirty = result?.updated === true;
-        Object.entries(values).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
-        this.syncImageAcquisitionSourceControls();
-        if (showToast) {
+        this.dirty = updated;
+        Object.entries(writeValues).forEach(([name, value]) => this.updateCurrentOperatorParameterValue(name, value));
+        this.syncParameterDependencyControls();
+        if (showToast && updated) {
             this.showToast('参数已更新', 'success');
         }
         this.renderValidationErrors();
         this.updateStatus();
-        return result?.reason !== 'node_not_found';
+        return true;
     }
 
     syncDraftChanges(options = {}) {
@@ -1216,7 +1725,7 @@ export class PropertyPanelCapabilityOwner {
             </section>
         `;
         this.renderValidationErrors();
-        this.syncImageAcquisitionSourceControls();
+        this.syncParameterDependencyControls();
         void this.loadCameraBindingsForSelects();
         this.updateStatus();
         this.initGeometryEditor();
@@ -1258,28 +1767,33 @@ export class PropertyPanelCapabilityOwner {
         const description = getParameterDescription(parameter);
         const value = getParameterValue(parameter);
         const values = this.currentOperator ? null : {};
-        const effectiveState = getParameterEffectiveState(this.currentOperator, parameter, { values });
+        const effectiveState = getPanelParameterEffectiveState(this.currentOperator, parameter, { values });
         const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
-        const disabled = effectiveState.effectiveDisabled ? 'disabled aria-disabled="true"' : '';
-        const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
-            ? `<p class="form-description parameter-rule-hint">${escapeHtml(effectiveState.disabledReason)}</p>`
+        const isDisabled = effectiveState.effectiveDisabled;
+        const disabled = isDisabled ? 'disabled aria-disabled="true"' : '';
+        const disabledReason = getLocalizedDisabledReason(effectiveState.disabledReason);
+        const disabledHint = effectiveState.effectiveDisabled && disabledReason
+            ? `<p class="form-description parameter-rule-hint" data-parameter-rule-hint="true">${escapeHtml(disabledReason)}</p>`
             : '';
 
         return `
             <div class="form-group ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-parameter-name="${escapeAttribute(name)}">
-                <label for="v2-param-${escapeAttribute(name)}" class="form-label">${escapeHtml(label)} ${requiredMark}</label>
-                ${this.renderInput(parameter, { name, dataType, value, disabled })}
+                <label for="${escapeAttribute(getParameterInputId(name))}" class="form-label">${escapeHtml(label)} ${requiredMark}</label>
+                ${this.renderInput(parameter, { name, label, dataType, value, disabled, isDisabled })}
                 ${description ? `<p class="form-description">${escapeHtml(description)}</p>` : ''}
                 ${disabledHint}
             </div>
         `;
     }
 
-    renderInput(parameter, { name, dataType, value, disabled }) {
-        const inputId = `v2-param-${escapeAttribute(name)}`;
+    renderInput(parameter, { name, label, dataType, value, disabled, isDisabled = false }) {
+        const inputId = escapeAttribute(getParameterInputId(name));
         const common = `id="${inputId}" name="${escapeAttribute(name)}" data-property-parameter="true"`;
         const currentValue = value ?? '';
         const controlType = resolveParameterControlType(parameter);
+        const safeLabel = label || name;
+        const filePickerLabel = getPickerActionLabel(safeLabel, '文件');
+        const colorPickerLabel = getPickerActionLabel(safeLabel, '颜色');
 
         if (controlType === 'boolean' || controlType === 'bool') {
             return `
@@ -1318,7 +1832,9 @@ export class PropertyPanelCapabilityOwner {
                     <button type="button"
                             class="btn btn-sm btn-secondary btn-pick-file"
                             data-param="${escapeAttribute(name)}"
-                            ${disabled ? 'disabled' : ''}>...</button>
+                            aria-label="${escapeAttribute(filePickerLabel)}"
+                            title="${escapeAttribute(filePickerLabel)}"
+                            ${isDisabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'}>...</button>
                 </div>
             `;
         }
@@ -1356,7 +1872,13 @@ export class PropertyPanelCapabilityOwner {
                            class="form-color-hidden"
                            data-type="color"
                            ${disabled}>
-                    <div class="color-preview-box" style="background-color: ${escapeAttribute(colorValue)}">
+                    <div class="color-preview-box"
+                         role="button"
+                         tabindex="${isDisabled ? '-1' : '0'}"
+                         aria-disabled="${isDisabled ? 'true' : 'false'}"
+                         aria-label="${escapeAttribute(colorPickerLabel)}"
+                         title="${escapeAttribute(colorPickerLabel)}"
+                         style="background-color: ${escapeAttribute(colorValue)}">
                         <span class="color-value">${escapeHtml(colorValue)}</span>
                     </div>
                 </div>
@@ -1407,27 +1929,50 @@ export class PropertyPanelCapabilityOwner {
             .find(input => String(input.name || '').toLowerCase() === String(name || '').toLowerCase()) || null;
     }
 
+    findInputsForError(error) {
+        const names = Array.isArray(error?.parameterNames) && error.parameterNames.length > 0
+            ? error.parameterNames
+            : [error?.name].filter(Boolean);
+        const inputs = names
+            .map(name => this.findInputForError(name))
+            .filter(Boolean);
+
+        return Array.from(new Set(inputs));
+    }
+
     renderValidationErrors() {
         this.container.querySelectorAll('.form-group.invalid').forEach(group => {
             group.classList.remove('invalid');
+        });
+        this.container.querySelectorAll('[data-property-parameter="true"][aria-invalid="true"]').forEach(input => {
+            input.removeAttribute('aria-invalid');
         });
         this.container.querySelectorAll('[data-validation-error="true"]').forEach(error => {
             error.remove();
         });
 
         this.validationErrors.forEach(error => {
-            const input = this.findInputForError(error.name);
-            const group = input?.closest?.('.form-group');
-            if (!group) {
+            const inputs = this.findInputsForError(error);
+            if (inputs.length === 0) {
                 return;
             }
 
-            group.classList.add('invalid');
-            const message = document.createElement('p');
-            message.className = 'form-description validation-error';
-            message.dataset.validationError = 'true';
-            message.textContent = error.message;
-            group.appendChild(message);
+            const renderedGroups = new Set();
+            inputs.forEach(input => {
+                input.setAttribute('aria-invalid', 'true');
+                const group = input.closest?.('.form-group');
+                if (!group || renderedGroups.has(group)) {
+                    return;
+                }
+
+                renderedGroups.add(group);
+                group.classList.add('invalid');
+                const message = document.createElement('p');
+                message.className = 'form-description validation-error';
+                message.dataset.validationError = 'true';
+                message.textContent = error.message;
+                group.appendChild(message);
+            });
         });
     }
 
@@ -1438,7 +1983,13 @@ export class PropertyPanelCapabilityOwner {
         }
 
         status.textContent = this.statusMessage || '';
-        status.classList.toggle('is-error', this.statusMessage === '参数校验失败');
+        const isErrorStatus = this.statusMessage === '参数校验失败' ||
+            this.statusMessage.includes('写入失败') ||
+            this.statusMessage.includes('未写回');
+        status.classList.toggle(
+            'is-error',
+            isErrorStatus
+        );
         status.classList.toggle('is-success', this.statusMessage === '参数已更新');
     }
 
@@ -1452,6 +2003,7 @@ export class PropertyPanelCapabilityOwner {
         }
 
         this.disposed = true;
+        this.cameraBindingsLoadToken += 1;
         this.unsubscribes.forEach(unsubscribe => {
             try {
                 unsubscribe?.();
@@ -1463,6 +2015,7 @@ export class PropertyPanelCapabilityOwner {
         this.container.removeEventListener('change', this.handleContainerChange);
         this.container.removeEventListener('click', this.handleContainerClick);
         this.container.removeEventListener('input', this.handleContainerInput);
+        this.container.removeEventListener('keydown', this.handleContainerKeyDown);
         this.container.removeEventListener('submit', this.handleContainerSubmit);
         this.teardownGeometryEditor();
         delete this.container.dataset.propertyPanelOwner;

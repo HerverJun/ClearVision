@@ -352,7 +352,7 @@ export function getOperatorPreviewCostPolicy(node, metadata = null) {
         return {
             level: 'high',
             autoPreviewAllowed: false,
-            reason: '相机采集会触发真实取帧，请点击“刷新预览”手动执行。',
+            reason: '相机采集会触发真实取帧，请点击“手动预览”执行。',
             timeoutMs: HIGH_COST_PREVIEW_TIMEOUT_MS
         };
     }
@@ -367,7 +367,7 @@ export function getOperatorPreviewCostPolicy(node, metadata = null) {
         return {
             level: 'high',
             autoPreviewAllowed: false,
-            reason: '该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“刷新预览”手动执行。',
+            reason: '该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“手动预览”执行。',
             timeoutMs: HIGH_COST_PREVIEW_TIMEOUT_MS
         };
     }
@@ -479,14 +479,20 @@ function shouldUseExternalInputImage(node) {
     return node?.type !== 'ImageAcquisition';
 }
 
+function getCameraAcquisitionBindingValue(node) {
+    const cameraId = String(getParameterValue(node?.parameters, 'CameraId', 'cameraId') || '').trim();
+    const cameraBindingId = String(getParameterValue(node?.parameters, 'CameraBindingId', 'cameraBindingId') || '').trim();
+    return cameraId || cameraBindingId;
+}
+
 function isLiveCameraAcquisitionNode(node) {
     if (node?.type !== 'ImageAcquisition') {
         return false;
     }
 
     const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
-    const cameraId = String(getParameterValue(node.parameters, 'CameraId', 'cameraId') || '').trim();
-    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera' && Boolean(cameraId);
+    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera' &&
+        Boolean(getCameraAcquisitionBindingValue(node));
 }
 
 function validatePreviewPrerequisites(node, inputImageBase64) {
@@ -502,7 +508,7 @@ function validatePreviewPrerequisites(node, inputImageBase64) {
         const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
         const sourceType = normalizeAcquisitionSourceType(sourceTypeRaw);
         const filePath = String(getParameterValue(node.parameters, 'FilePath', 'filePath') || '').trim();
-        const cameraId = String(getParameterValue(node.parameters, 'CameraId', 'cameraId') || '').trim();
+        const cameraBinding = getCameraAcquisitionBindingValue(node);
 
         if (sourceType === 'file' && filePath) {
             return null;
@@ -512,11 +518,11 @@ function validatePreviewPrerequisites(node, inputImageBase64) {
             return '请先配置文件路径';
         }
 
-        if (sourceType === 'camera' && !cameraId) {
+        if (sourceType === 'camera' && !cameraBinding) {
             return '请先选择相机';
         }
 
-        if (!filePath && !cameraId) {
+        if (!filePath && !cameraBinding) {
             return '请先配置采集源';
         }
 

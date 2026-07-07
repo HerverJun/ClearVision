@@ -21,6 +21,7 @@ const operators = [
       { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: 'File', options: [{ value: 'File', label: '文件' }, { value: 'Camera', label: '相机' }] },
       { name: 'FilePath', displayName: '文件路径', dataType: 'string', value: '' },
       { name: 'CameraId', displayName: '相机', dataType: 'cameraBinding', value: '' },
+      { name: 'CameraBindingId', displayName: '相机绑定', dataType: 'string', value: '' },
     ],
     inputPorts: [],
     outputPorts: [{ name: 'Image', dataType: 'Image' }],
@@ -30,9 +31,24 @@ const operators = [
     displayName: '阈值分割',
     category: '预处理',
     description: '按阈值生成二值图',
-    parameters: [{ name: 'Threshold', displayName: '阈值', dataType: 'int', value: 128, min: 0, max: 255 }],
+    parameters: [
+      { name: 'Threshold', displayName: '阈值', dataType: 'int', value: 128, min: 0, max: 255 },
+      { name: 'OverlayColor', displayName: '叠加颜色', dataType: 'color', value: '#ff0000' },
+    ],
     inputPorts: [{ name: 'Image', dataType: 'Image' }],
     outputPorts: [{ name: 'Mask', dataType: 'Image' }],
+  },
+  {
+    type: 'TemplateMatching',
+    displayName: '模板匹配',
+    category: '预处理',
+    description: '定位模板姿态',
+    parameters: [
+      { name: 'TemplatePath', displayName: '模板路径', dataType: 'string', value: '' },
+      { name: 'TemplateId', displayName: '模板ID', dataType: 'string', value: '' },
+    ],
+    inputPorts: [{ name: 'Image', dataType: 'Image' }],
+    outputPorts: [{ name: 'Pose', dataType: 'Object' }],
   },
   {
     type: 'GaussianBlur',
@@ -284,9 +300,14 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await expect(page.locator('.inspector-pane')).toContainText('阈值分割');
     await expect(page.locator('.inspector-pane')).toContainText('阈值');
+    await expect(page.locator('.inspector-pane #param-Threshold')).toBeVisible();
+    await expect(page.locator('.inspector-pane label[for="param-Threshold"]')).toContainText('阈值');
+    await expect(page.locator('.inspector-pane #param-OverlayColor')).toHaveAttribute('type', 'color');
+    await expect(page.locator('.inspector-pane .color-preview-box[role="button"]')).toHaveAttribute('tabindex', '0');
+    await expect(page.locator('.inspector-pane .color-preview-box[role="button"]')).toHaveAttribute('aria-label', '选择叠加颜色');
     await expect(page.locator('.preview-workbench-pane')).toContainText('预览工作台');
     await expect(page.locator('.preview-workbench-pane')).toContainText('端口与耗时');
-    await expect(page.locator('.preview-workbench-pane')).toContainText('中间结果');
+    await expect(page.locator('.preview-workbench-pane')).toContainText('模块结果');
     await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
   });
 
@@ -304,11 +325,17 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench.locator('[data-preview-action="image-fit"]')).toContainText('适应窗口');
     await expect(workbench.locator('[data-preview-action="image-original"]')).toContainText('原始大小');
     await expect(workbench.locator('[data-preview-action="open-image"]')).toContainText('打开大图');
+    await expect(workbench.locator('[data-preview-action="image-fit"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(workbench.locator('[data-preview-action="image-original"]')).toHaveAttribute('aria-pressed', 'false');
 
     await workbench.locator('[data-preview-action="image-original"]').click();
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'original');
+    await expect(workbench.locator('[data-preview-action="image-fit"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect(workbench.locator('[data-preview-action="image-original"]')).toHaveAttribute('aria-pressed', 'true');
     await workbench.locator('[data-preview-action="image-fit"]').click();
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'fit');
+    await expect(workbench.locator('[data-preview-action="image-fit"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(workbench.locator('[data-preview-action="image-original"]')).toHaveAttribute('aria-pressed', 'false');
     await assertNoHorizontalOverflow(page);
   });
 
@@ -374,6 +401,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(fileInput).toBeVisible();
     await expect(fileInput).toHaveAttribute('readonly', '');
     await expect(pickerButton).toBeVisible();
+    await expect(pickerButton).toHaveAttribute('aria-label', '选择文件路径');
     await expect(page.locator('.inspector-pane select[data-camera-binding-select="true"]')).toHaveCount(1);
     await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
     await expect(workbench).toContainText('缺输入图或采集源');
@@ -405,6 +433,35 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     })).toBe('C:\\Data\\sample.png');
   });
 
+  test('syncs dependency-controlled fields for template matching', async ({ page }) => {
+    await addNodeFromFlyout(page, '模板匹配');
+
+    const status = page.locator('.inspector-pane [data-property-capability-status]');
+    const templatePathGroup = page.locator('.inspector-pane .form-group[data-parameter-name="TemplatePath"]');
+    const templatePathInput = page.locator('.inspector-pane #param-TemplatePath');
+    const templatePathPicker = page.locator('.inspector-pane .btn-pick-file[data-param="TemplatePath"]');
+    const templateIdInput = page.locator('.inspector-pane #param-TemplateId');
+
+    await expect(templatePathInput).toBeEnabled();
+    await expect(templatePathPicker).toBeEnabled();
+    await expect(templateIdInput).toBeEnabled();
+
+    await templateIdInput.fill('tpl-01');
+    await templateIdInput.blur();
+
+    await expect(templatePathInput).toBeDisabled();
+    await expect(templatePathPicker).toBeDisabled();
+    await expect(templatePathGroup).toHaveClass(/is-rule-disabled/);
+    await expect(templatePathGroup).toHaveAttribute('data-effective-disabled', 'true');
+    await expect(templatePathGroup.locator('.required')).toHaveCount(0);
+    await expect(templatePathGroup.locator('[data-parameter-rule-hint="true"]')).toHaveCount(1);
+    await expect(templatePathGroup.locator('[data-parameter-rule-hint="true"]')).toContainText('已选择模板 ID，模板路径已禁用');
+    await expect(templatePathGroup).not.toContainText('Template path is disabled');
+    await expect(templateIdInput).toBeEnabled();
+    await expect(page.locator('.inspector-pane .validation-error')).toHaveCount(0);
+    await expect(status).toContainText('参数已更新');
+  });
+
   test('shows missing camera prerequisite for camera acquisition without CameraId', async ({ page }) => {
     await openInputFlyout(page);
     await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
@@ -414,10 +471,32 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await page.locator('.inspector-pane #param-SourceType').selectOption('Camera');
 
     const workbench = page.locator('.preview-workbench-pane');
+    const cameraGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraId"]');
+    const cameraBindingGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraBindingId"]');
+    await expect(page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机或相机绑定' })).toHaveCount(2);
+    await expect(cameraGroup).toHaveClass(/invalid/);
+    await expect(cameraBindingGroup).toHaveClass(/invalid/);
+    await expect(page.locator('.inspector-pane #param-CameraId')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('.inspector-pane #param-CameraBindingId')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数校验失败');
     await expect(workbench).toContainText('请先选择相机');
     await expect(workbench).toContainText('缺输入图或采集源');
     await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
     await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
+
+    previewMode.requests.length = 0;
+    await page.locator('.inspector-pane #param-CameraBindingId').fill('line-camera-01');
+    await page.locator('.inspector-pane #param-CameraBindingId').blur();
+
+    await expect(page.locator('.inspector-pane .validation-error')).toHaveCount(0);
+    await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数已更新');
+    await expect(workbench).toContainText('需手动预览');
+    await expect(workbench).not.toContainText('请先选择相机');
+    await expect(workbench).not.toContainText('刷新预览');
+
+    await workbench.locator('[data-preview-action="manual-preview"]').click();
+    await expect.poll(() => previewMode.requests.length).toBe(1);
+    await expect(workbench).toContainText('预览完成');
   });
 
   test('shows blank, no-image and preview-failure states', async ({ page }) => {
@@ -458,6 +537,8 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await expect(workbench).toContainText('当前连线');
     await expect(workbench).toContainText('连线用于传递端口数据');
+    await expect(workbench).toContainText('模块结果');
+    await expect(workbench).not.toContainText('中间结果');
     await expect(workbench).not.toContainText('Score');
 
     await page.evaluate(() => {
