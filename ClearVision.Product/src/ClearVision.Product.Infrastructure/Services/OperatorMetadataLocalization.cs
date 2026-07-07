@@ -22,6 +22,7 @@ internal static class OperatorMetadataLocalization
             [OperatorType.AngleMeasurement] = new("角度测量", "检测"),
             [OperatorType.ArrayIndexer] = new("数组索引器", "数据处理"),
             [OperatorType.BilateralFilter] = new("双边滤波", "预处理"),
+            [OperatorType.BinaryImageToRegion] = new("二值图转区域", "区域处理"),
             [OperatorType.BlobAnalysis] = new("Blob分析", "特征提取"),
             [OperatorType.BlobLabeling] = new("连通域标注", "定位"),
             [OperatorType.BoxFilter] = new("候选框筛选", "数据处理"),

@@ -3,11 +3,15 @@
 // 三层检查规则：结构合法性、语义安全、参数值合理性
 // 作者：蘅芜君
 
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
+using ClearVision.Product.Infrastructure.Operators;
 
 namespace ClearVision.Product.Infrastructure.Services;
 
@@ -21,6 +25,11 @@ namespace ClearVision.Product.Infrastructure.Services;
 /// </summary>
 public class FlowLinter
 {
+    private const string RegionImageMismatchSuggestion =
+        "区域闭运算需要 Region 输入，请先使用二值图转区域/区域生成算子；若要直接处理二值图，请使用图像形态学闭运算。";
+
+    private static readonly Lazy<IReadOnlySet<OperatorType>> ExecutableOperatorTypes = new(BuildExecutableOperatorTypes);
+
     private static readonly HashSet<OperatorType> CalibrationBundleConsumers = new()
     {
         OperatorType.CoordinateTransform,
@@ -118,6 +127,18 @@ public class FlowLinter
                     Suggestion = "请使用支持的算子类型，或更新算子注册表。"
                 };
             }
+            else if (!IsExecutableOperatorType(op.Type))
+            {
+                yield return new LintIssue
+                {
+                    Code = "STRUCT_005",
+                    Severity = LintSeverity.Error,
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    Message = $"算子 [{op.Name}] 的类型 {op.Type} 尚未接入执行器，不能运行。",
+                    Suggestion = "请从算子面板选择已接入的算子，或等待该算子执行器完成接入。"
+                };
+            }
         }
 
         // STRUCT_002: 端口连接检查（目标端口存在性）
@@ -174,7 +195,7 @@ public class FlowLinter
                     Code = "STRUCT_004",
                     Severity = LintSeverity.Error,
                     Message = $"端口类型不兼容: 源端口输出 {sourceType} 无法连接到目标端口输入 {targetType}",
-                    Suggestion = "请检查端口数据类型匹配，或使用 TypeConvert 算子进行转换。"
+                    Suggestion = BuildTypeMismatchSuggestion(sourceType.Value, targetType.Value)
                 };
             }
         }
@@ -205,6 +226,11 @@ public class FlowLinter
     private bool IsValidOperatorType(OperatorType type)
     {
         return Enum.IsDefined(typeof(OperatorType), type);
+    }
+
+    private static bool IsExecutableOperatorType(OperatorType type)
+    {
+        return ExecutableOperatorTypes.Value.Contains(type);
     }
 
     /// <summary>
@@ -286,17 +312,75 @@ public class FlowLinter
     /// </summary>
     private bool AreTypesCompatible(PortDataType source, PortDataType target)
     {
-        if (source == PortDataType.Any || target == PortDataType.Any)
-            return true;
+        return PortDataTypeCompatibility.AreCompatible(source, target);
+    }
 
-        if (source == target)
-            return true;
+    private static string BuildTypeMismatchSuggestion(PortDataType source, PortDataType target)
+    {
+        if (source == PortDataType.Image && target == PortDataType.Region)
+        {
+            return RegionImageMismatchSuggestion;
+        }
 
-        if ((source == PortDataType.Integer && target == PortDataType.Float) ||
-            (source == PortDataType.Float && target == PortDataType.Integer))
-            return true;
+        return "请检查端口数据类型匹配，或使用 TypeConvert 算子进行转换。";
+    }
 
-        return false;
+    private static IReadOnlySet<OperatorType> BuildExecutableOperatorTypes()
+    {
+        var executableTypes = typeof(ImageAcquisitionOperator).Assembly
+            .GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } &&
+                typeof(IOperatorExecutor).IsAssignableFrom(type) &&
+                TryResolveOperatorType(type, out _))
+            .Select(type =>
+            {
+                TryResolveOperatorType(type, out var operatorType);
+                return operatorType;
+            })
+            .ToHashSet();
+
+        foreach (var aliasType in Enum.GetValues<OperatorType>())
+        {
+            var resolvedType = OperatorTypeAliasResolver.Resolve(aliasType);
+            if (resolvedType != aliasType && executableTypes.Contains(resolvedType))
+            {
+                executableTypes.Add(aliasType);
+            }
+        }
+
+        return executableTypes;
+    }
+
+    private static bool TryResolveOperatorType(Type executorType, out OperatorType operatorType)
+    {
+        operatorType = default;
+
+        var property = executorType.GetProperty(nameof(IOperatorExecutor.OperatorType), BindingFlags.Public | BindingFlags.Instance);
+        if (property?.PropertyType == typeof(OperatorType) && property.GetMethod != null)
+        {
+            try
+            {
+                var uninitialized = RuntimeHelpers.GetUninitializedObject(executorType);
+                if (property.GetValue(uninitialized) is OperatorType resolvedType)
+                {
+                    operatorType = resolvedType;
+                    return true;
+                }
+            }
+            catch
+            {
+                // Fall back to class-name parsing.
+            }
+        }
+
+        const string suffix = "Operator";
+        var className = executorType.Name;
+        if (className.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            className = className[..^suffix.Length];
+        }
+
+        return Enum.TryParse(className, out operatorType);
     }
 
     #endregion

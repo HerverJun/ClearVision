@@ -186,11 +186,14 @@ public static class VisionRuntimeServiceCollectionExtensions
 
     private static void RegisterAllOperatorExecutors(IServiceCollection services)
     {
+        var rootNamespace = typeof(ImageAcquisitionOperator).Namespace!;
         var executorTypes = typeof(ImageAcquisitionOperator).Assembly
             .GetTypes()
             .Where(type => type is { IsClass: true, IsAbstract: false } &&
                 typeof(IOperatorExecutor).IsAssignableFrom(type) &&
-                string.Equals(type.Namespace, typeof(ImageAcquisitionOperator).Namespace, StringComparison.Ordinal))
+                type.Namespace != null &&
+                (string.Equals(type.Namespace, rootNamespace, StringComparison.Ordinal) ||
+                    type.Namespace.StartsWith(rootNamespace + ".", StringComparison.Ordinal)))
             .OrderBy(type => type.Name);
 
         foreach (var executorType in executorTypes)

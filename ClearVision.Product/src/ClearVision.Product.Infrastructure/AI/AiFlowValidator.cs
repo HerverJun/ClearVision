@@ -283,32 +283,7 @@ public class AiFlowValidator : IAiFlowValidator
 
     private bool AreTypesCompatible(PortDataType source, PortDataType target)
     {
-        // Any 类型与任何类型兼容
-        if (source == PortDataType.Any || target == PortDataType.Any)
-            return true;
-        // 相同类型兼容
-        if (source == target)
-            return true;
-
-        // 数值类型互通（Integer ↔ Float）
-        var numericTypes = new[] { PortDataType.Integer, PortDataType.Float };
-        if (numericTypes.Contains(source) && numericTypes.Contains(target))
-            return true;
-
-        // 几何类型互通（Point ↔ Rectangle）
-        var geometryTypes = new[] { PortDataType.Point, PortDataType.Rectangle };
-        if (geometryTypes.Contains(source) && geometryTypes.Contains(target))
-            return true;
-
-        // String 可以作为数值类型的输入（运行时转换）
-        if (source == PortDataType.String && numericTypes.Contains(target))
-            return true;
-
-        // Boolean 可以作为 Integer 的输入（true=1, false=0）
-        if (source == PortDataType.Boolean && target == PortDataType.Integer)
-            return true;
-
-        return false;
+        return PortDataTypeCompatibility.AreCompatible(source, target);
     }
 
     private void ValidateNoCycles(AiGeneratedFlowJson flow, AiValidationResult result)

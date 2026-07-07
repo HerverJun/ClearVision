@@ -521,7 +521,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         int? debugCacheMaxEntries = null,
         long? debugCacheMaxEntryBytes = null)
     {
-        _executors = executors.ToDictionary(e => e.OperatorType);
+        _executors = BuildExecutorLookup(executors);
         _logger = logger;
         _variableContext = variableContext;
         _projectVariableContextAccessor = projectVariableContextAccessor ?? new ProjectVariableExecutionContextAccessor();
@@ -531,6 +531,32 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             Math.Max(0, debugCacheMaxEntryBytes ?? DefaultDebugCacheMaxEntryBytes),
             _debugCacheMaxBytes);
         _debugCacheCleanupTimer = new Timer(CleanupStaleDebugSessions, null, DebugCleanupInterval, DebugCleanupInterval);
+    }
+
+    private static Dictionary<OperatorType, IOperatorExecutor> BuildExecutorLookup(IEnumerable<IOperatorExecutor> executors)
+    {
+        ArgumentNullException.ThrowIfNull(executors);
+
+        var executorList = executors.ToList();
+        var duplicateOperatorTypes = executorList
+            .GroupBy(executor => executor.OperatorType)
+            .Where(group => group.Count() > 1)
+            .Select(group => $"{group.Key}: {string.Join(", ", group.Select(executor => executor.GetType().FullName).OrderBy(name => name))}")
+            .OrderBy(item => item)
+            .ToList();
+
+        if (duplicateOperatorTypes.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Duplicate operator executors by OperatorType: " + string.Join("; ", duplicateOperatorTypes));
+        }
+
+        return executorList.ToDictionary(executor => executor.OperatorType);
+    }
+
+    private static string CreateMissingExecutorMessage(OperatorType operatorType)
+    {
+        return $"算子 {operatorType} 尚未接入执行器，不能运行。";
     }
 
     public Task<FlowExecutionResult> ExecuteFlowAsync(
@@ -800,7 +826,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     OperatorId = op.Id,
                     OperatorName = op.Name,
                     IsSuccess = false,
-                    ErrorMessage = $"未找到类型为 {op.Type} 的算子执行器"
+                    ErrorMessage = CreateMissingExecutorMessage(op.Type)
                 });
                 continue;
             }
@@ -1188,7 +1214,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 OperatorId = op.Id,
                 OperatorName = op.Name,
                 IsSuccess = false,
-                ErrorMessage = $"未找到类型为 {op.Type} 的算子执行器"
+                ErrorMessage = CreateMissingExecutorMessage(op.Type)
             };
 
             if (!cancellationToken.IsCancellationRequested && signalLayerFailure(missingExecutorResult))
@@ -1562,7 +1588,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 OperatorId = @operator.Id,
                 OperatorName = @operator.Name,
                 IsSuccess = false,
-                ErrorMessage = $"未找到类型为 {@operator.Type} 的算子执行器"
+                ErrorMessage = CreateMissingExecutorMessage(@operator.Type)
             };
         }
 
@@ -2801,7 +2827,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                         OperatorId = op.Id,
                         OperatorName = op.Name,
                         IsSuccess = false,
-                        ErrorMessage = $"未找到类型为 {op.Type} 的算子执行器",
+                        ErrorMessage = CreateMissingExecutorMessage(op.Type),
                         ExecutionOrder = completedCount,
                         IsBreakpoint = options.Breakpoints.Contains(op.Id)
                     };

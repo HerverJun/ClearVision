@@ -31,11 +31,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Unbounded geometric complement without a finite image domain." },
     KnownLimitations = new[] { "Explicit ImageWidth/ImageHeight or a reference image should be supplied for deterministic output bounds.", "Input runs outside the explicit bounds are clipped or ignored before complement generation." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
+[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
 [InputPort("ImageWidth", "Image Width", PortDataType.Integer, IsRequired = false)]
 [InputPort("ImageHeight", "Image Height", PortDataType.Integer, IsRequired = false)]
 [InputPort("Image", "Reference Image (optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Complement Region", PortDataType.Any)]
+[OutputPort("Region", "Complement Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Complement Area", PortDataType.Integer)]
 public class RegionComplementOperator : OperatorBase
@@ -51,8 +51,9 @@ public class RegionComplementOperator : OperatorBase
 
         // 获取图像尺寸
         int width = 0, height = 0;
-        if (inputs?.TryGetValue("Image", out var img) == true && img is Mat mat)
+        if (TryGetInputImage(inputs, "Image", out var imageWrapper) && imageWrapper != null)
         {
+            var mat = imageWrapper.GetMat();
             width = mat.Width;
             height = mat.Height;
         }

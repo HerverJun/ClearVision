@@ -14,6 +14,7 @@ export const OPERATOR_DISPLAY_NAMES = Object.freeze({
     ImageCompose: '图像合成',
     RoiManager: 'ROI管理',
     BlobAnalysis: '斑点分析',
+    BinaryImageToRegion: '二值图转区域',
     Thresholding: '阈值分割',
     Filtering: '滤波处理'
 });

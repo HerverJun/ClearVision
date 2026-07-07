@@ -22,6 +22,7 @@ public static class PortDataTypeCompatibility
             PortDataType.DetectionResult or PortDataType.DetectionList => CompatibilityFamily.Detection,
             PortDataType.CircleData => CompatibilityFamily.CircleData,
             PortDataType.LineData => CompatibilityFamily.LineData,
+            PortDataType.Region => CompatibilityFamily.Region,
             PortDataType.Any => CompatibilityFamily.Any,
             _ => CompatibilityFamily.Other
         };
@@ -38,6 +39,7 @@ public static class PortDataTypeCompatibility
         Detection,
         CircleData,
         LineData,
+        Region,
         Any,
         Other
     }

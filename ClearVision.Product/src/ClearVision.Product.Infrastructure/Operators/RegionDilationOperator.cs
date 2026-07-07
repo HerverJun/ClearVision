@@ -36,9 +36,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Workflows that require automatic clipping to the original image extent unless an explicit downstream clip is added." },
     KnownLimitations = new[] { "Dilation can emit coordinates outside the original region or image domain by design.", "Kernel shapes are discrete Rectangle/Ellipse/Cross rasterizations rather than analytic continuous geometry." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
+[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Dilated Region", PortDataType.Any)]
+[OutputPort("Region", "Dilated Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Dilated Area", PortDataType.Integer)]
 [OperatorParam("KernelShape", "Structuring Element Shape", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|Rectangle", "Ellipse|Ellipse", "Cross|Cross" })]

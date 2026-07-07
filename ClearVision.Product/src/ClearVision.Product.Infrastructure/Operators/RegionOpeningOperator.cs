@@ -32,9 +32,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Preserving tiny defects that are smaller than the selected structuring element." },
     KnownLimitations = new[] { "Opening can delete thin components or narrow bridges when the kernel is larger than the feature.", "The operation uses a single erosion+dilation pair; repeated opening requires explicit workflow repetition." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
+[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Opened Region", PortDataType.Any)]
+[OutputPort("Region", "Opened Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Opened Area", PortDataType.Integer)]
 [OperatorParam("KernelShape", "Structuring Element Shape", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|Rectangle", "Ellipse|Ellipse", "Cross|Cross" })]

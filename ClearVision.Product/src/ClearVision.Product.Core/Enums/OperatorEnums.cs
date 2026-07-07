@@ -307,6 +307,8 @@ public enum OperatorType
 
     RectangleRegion = 237,
 
+    BinaryImageToRegion = 238,
+
     // Phase 4.2: Region Processing and Measurement
     RegionErosion = 240,
 
@@ -412,6 +414,8 @@ public enum PortDataType
     CircleData = 11,
 
     LineData = 12,
+
+    Region = 13,
 
     Any = 99
 }

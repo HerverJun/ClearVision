@@ -31,9 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Semantic instance merging where labels or per-component identities must be preserved." },
     KnownLimitations = new[] { "Inputs must already be Region objects; labeled masks are flattened into one binary region.", "Visualization uses bounding-box-relative drawing and is diagnostic rather than a calibrated overlay." }
 )]
-[InputPort("Region1", "First Region", PortDataType.Any, IsRequired = true)]
-[InputPort("Region2", "Second Region", PortDataType.Any, IsRequired = true)]
-[OutputPort("Region", "Union Region", PortDataType.Any)]
+[InputPort("Region1", "First Region", PortDataType.Region, IsRequired = true)]
+[InputPort("Region2", "Second Region", PortDataType.Region, IsRequired = true)]
+[OutputPort("Region", "Union Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Union Area", PortDataType.Integer)]
 public class RegionUnionOperator : OperatorBase

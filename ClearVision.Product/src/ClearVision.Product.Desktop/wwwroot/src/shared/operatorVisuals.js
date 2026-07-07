@@ -65,6 +65,7 @@ blob|BlobAnalysis
 blob-label|BlobLabeling
 border|CopyMakeBorder
 branch|ConditionalBranch
+binary-image-to-region|Region
 calc|MathOperation
 calibration|CameraCalibration
 caliper|CaliperTool
@@ -434,6 +435,7 @@ SubpixelEdgeDetection|#722ed1
 TcpCommunication|#13c2c2
 TemplateMatching|#f5222d
 Thresholding|#eb2f96
+BinaryImageToRegion|#14b8a6
 `
 ];
 const CATEGORY_COLOR_BLOCKS = [

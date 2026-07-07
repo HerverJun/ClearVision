@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.DependencyInjection;
@@ -51,16 +52,75 @@ public sealed class RuntimeDependencyBoundaryTests
             .OrderBy(name => name)
             .ToList();
 
-        Assert.Empty(missingTypes);
+        Assert.True(
+            missingTypes.Count == 0,
+            "Concrete IOperatorExecutor implementations not resolved from DI: " + string.Join(", ", missingTypes));
         Assert.True(
             executors.Count >= executorImplementationTypes.Count,
             $"Expected at least {executorImplementationTypes.Count} shared executors, got {executors.Count}.");
-        Assert.Equal(executors.Count, executors.Select(executor => executor.OperatorType).Distinct().Count());
-        Assert.Contains(executors, executor => executor is TcpCommunicationOperator);
-        Assert.Contains(executors, executor => executor is RegionClosingOperator);
-        Assert.Contains(executors, executor => executor is DelayOperator);
-        Assert.Contains(executors, executor => executor is FisheyeCalibrationOperator);
-        Assert.Contains(executors, executor => executor is AnomalyDetectionOperator);
+
+        var duplicateOperatorTypes = executors
+            .GroupBy(executor => executor.OperatorType)
+            .Where(group => group.Count() > 1)
+            .Select(group => $"{group.Key}: {string.Join(", ", group.Select(executor => executor.GetType().Name).OrderBy(name => name))}")
+            .OrderBy(item => item)
+            .ToList();
+        Assert.True(
+            duplicateOperatorTypes.Count == 0,
+            "Duplicate operator executors by OperatorType: " + string.Join("; ", duplicateOperatorTypes));
+
+        var registeredOperatorTypes = executors.Select(executor => executor.OperatorType).ToHashSet();
+        var factory = provider.GetRequiredService<IOperatorFactory>();
+        var visibleWithoutExecutor = factory.GetAllMetadata()
+            .Select(metadata => metadata.Type)
+            .Distinct()
+            .Where(type => !registeredOperatorTypes.Contains(OperatorTypeAliasResolver.Resolve(type)))
+            .OrderBy(type => type)
+            .ToList();
+        Assert.True(
+            visibleWithoutExecutor.Count == 0,
+            "OperatorFactory exposes operator types without a registered executor: " + string.Join(", ", visibleWithoutExecutor));
+
+        var requiredOperatorTypes = new[]
+        {
+            OperatorType.BinaryImageToRegion,
+            OperatorType.RegionErosion,
+            OperatorType.RegionDilation,
+            OperatorType.RegionOpening,
+            OperatorType.RegionClosing,
+            OperatorType.RegionSkeleton,
+            OperatorType.RegionUnion,
+            OperatorType.RegionIntersection,
+            OperatorType.RegionDifference,
+            OperatorType.RegionComplement,
+            OperatorType.FisheyeCalibration,
+            OperatorType.FisheyeUndistort,
+            OperatorType.StereoCalibration,
+            OperatorType.PlanarMatching,
+            OperatorType.LocalDeformableMatching,
+            OperatorType.DistanceTransform,
+            OperatorType.MinEnclosingGeometry,
+            OperatorType.ArcCaliper,
+            OperatorType.ContourExtrema,
+            OperatorType.FFT1D,
+            OperatorType.FrequencyFilter,
+            OperatorType.InverseFFT1D,
+            OperatorType.PhaseClosure,
+            OperatorType.AnomalyDetection,
+            OperatorType.HandEyeCalibrationValidator,
+            OperatorType.Delay,
+            OperatorType.Comment,
+            OperatorType.Aggregator,
+            OperatorType.Comparator,
+            OperatorType.RoiTransform
+        };
+        var missingRequiredTypes = requiredOperatorTypes
+            .Where(type => !registeredOperatorTypes.Contains(type))
+            .OrderBy(type => type)
+            .ToList();
+        Assert.True(
+            missingRequiredTypes.Count == 0,
+            "Required operator executors not registered: " + string.Join(", ", missingRequiredTypes));
     }
 
     private static List<Type> GetRuntimeOperatorExecutorImplementationTypes()
@@ -69,7 +129,9 @@ public sealed class RuntimeDependencyBoundaryTests
             .GetTypes()
             .Where(type => type is { IsClass: true, IsAbstract: false } &&
                 typeof(IOperatorExecutor).IsAssignableFrom(type) &&
-                string.Equals(type.Namespace, typeof(ImageAcquisitionOperator).Namespace, StringComparison.Ordinal))
+                type.Namespace != null &&
+                (string.Equals(type.Namespace, typeof(ImageAcquisitionOperator).Namespace, StringComparison.Ordinal) ||
+                    type.Namespace.StartsWith(typeof(ImageAcquisitionOperator).Namespace + ".", StringComparison.Ordinal)))
             .OrderBy(type => type.Name)
             .ToList();
     }

@@ -31,9 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Maintaining strict separation between adjacent components closer than the selected kernel." },
     KnownLimitations = new[] { "Closing can bridge nearby components when the gap is within kernel reach.", "The operation uses a single dilation+erosion pair; repeated closing requires explicit workflow repetition." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
+[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Closed Region", PortDataType.Any)]
+[OutputPort("Region", "Closed Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Closed Area", PortDataType.Integer)]
 [OperatorParam("KernelShape", "Structuring Element Shape", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|Rectangle", "Ellipse|Ellipse", "Cross|Cross" })]

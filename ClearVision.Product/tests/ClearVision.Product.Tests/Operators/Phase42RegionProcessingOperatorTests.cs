@@ -2,6 +2,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -11,6 +12,140 @@ namespace ClearVision.Product.Tests.Operators;
 
 public class Phase42RegionProcessingOperatorTests
 {
+    [Fact]
+    public void RegionOperatorMetadata_ShouldExposeRegionPortTypes()
+    {
+        var metadataByType = new OperatorFactory()
+            .GetAllMetadata()
+            .ToDictionary(metadata => metadata.Type);
+
+        var expectedRegionPorts = new Dictionary<OperatorType, (string[] Inputs, string[] Outputs)>
+        {
+            [OperatorType.RegionErosion] = (["Region"], ["Region"]),
+            [OperatorType.RegionDilation] = (["Region"], ["Region"]),
+            [OperatorType.RegionOpening] = (["Region"], ["Region"]),
+            [OperatorType.RegionClosing] = (["Region"], ["Region"]),
+            [OperatorType.RegionSkeleton] = (["Region"], ["Region"]),
+            [OperatorType.RegionUnion] = (["Region1", "Region2"], ["Region"]),
+            [OperatorType.RegionIntersection] = (["Region1", "Region2"], ["Region"]),
+            [OperatorType.RegionDifference] = (["Region1", "Region2"], ["Region"]),
+            [OperatorType.RegionComplement] = (["Region"], ["Region"])
+        };
+
+        foreach (var (operatorType, ports) in expectedRegionPorts)
+        {
+            metadataByType.Should().ContainKey(operatorType);
+            var metadata = metadataByType[operatorType];
+
+            foreach (var inputName in ports.Inputs)
+            {
+                metadata.InputPorts.Should().ContainSingle(port =>
+                    port.Name == inputName &&
+                    port.DataType == PortDataType.Region);
+            }
+
+            foreach (var outputName in ports.Outputs)
+            {
+                metadata.OutputPorts.Should().ContainSingle(port =>
+                    port.Name == outputName &&
+                    port.DataType == PortDataType.Region);
+            }
+        }
+
+        metadataByType[OperatorType.RegionClosing].InputPorts
+            .Should().ContainSingle(port => port.Name == "Image" && port.DataType == PortDataType.Image && !port.IsRequired);
+
+        metadataByType[OperatorType.BinaryImageToRegion].InputPorts
+            .Should().ContainSingle(port => port.Name == "Image" && port.DataType == PortDataType.Image);
+        metadataByType[OperatorType.BinaryImageToRegion].OutputPorts
+            .Should().ContainSingle(port => port.Name == "Region" && port.DataType == PortDataType.Region);
+        metadataByType[OperatorType.BinaryImageToRegion].OutputPorts
+            .Should().ContainSingle(port => port.Name == "Image" && port.DataType == PortDataType.Image);
+    }
+
+    [Fact]
+    public void OperatorFlow_ShouldRejectImageOutputConnectedToRegionInput()
+    {
+        var factory = new OperatorFactory();
+        var threshold = factory.CreateOperator(OperatorType.Thresholding, "Threshold", 0, 0);
+        var closing = factory.CreateOperator(OperatorType.RegionClosing, "RegionClosing", 100, 0);
+        var flow = new OperatorFlow("Region Type Boundary");
+        flow.AddOperator(threshold);
+        flow.AddOperator(closing);
+
+        var connection = new OperatorConnection(
+            threshold.Id,
+            threshold.OutputPorts.Single(port => port.Name == "Image").Id,
+            closing.Id,
+            closing.InputPorts.Single(port => port.Name == "Region").Id);
+
+        var act = () => flow.AddConnection(connection);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Image -> Region*");
+    }
+
+    [Fact]
+    public void FlowLinter_ShouldRejectImageToRegionWithProductPathSuggestion()
+    {
+        var factory = new OperatorFactory();
+        var threshold = factory.CreateOperator(OperatorType.Thresholding, "Threshold", 0, 0);
+        var closing = factory.CreateOperator(OperatorType.RegionClosing, "RegionClosing", 100, 0);
+        var flow = new OperatorFlow("Region Type Boundary");
+        flow.AddOperator(threshold);
+        flow.AddOperator(closing);
+        flow.Connections.Add(new OperatorConnection(
+            threshold.Id,
+            threshold.OutputPorts.Single(port => port.Name == "Image").Id,
+            closing.Id,
+            closing.InputPorts.Single(port => port.Name == "Region").Id));
+
+        var result = new FlowLinter().Lint(flow);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().ContainSingle(issue =>
+            issue.Code == "STRUCT_004" &&
+            issue.Suggestion.Contains("二值图转区域", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task BinaryImageToRegion_ShouldCreateRegionUsableByRegionClosing()
+    {
+        using var mat = new Mat(32, 32, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(8, 8, 10, 10), Scalar.White, -1);
+
+        var converter = new BinaryImageToRegionOperator(Substitute.For<ILogger<BinaryImageToRegionOperator>>());
+        var convertResult = await converter.ExecuteAsync(
+            new Operator("BinaryImageToRegion", OperatorType.BinaryImageToRegion, 0, 0),
+            new Dictionary<string, object> { ["Image"] = new ImageWrapper(mat.Clone()) });
+
+        try
+        {
+            convertResult.IsSuccess.Should().BeTrue();
+            var region = convertResult.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+            region.Area.Should().Be(100);
+
+            var closing = new RegionClosingOperator(Substitute.For<ILogger<RegionClosingOperator>>());
+            var closeResult = await closing.ExecuteAsync(
+                new Operator("RegionClosing", OperatorType.RegionClosing, 0, 0),
+                new Dictionary<string, object> { ["Region"] = region });
+
+            try
+            {
+                closeResult.IsSuccess.Should().BeTrue();
+                closeResult.OutputData!["Region"].Should().BeOfType<Region>();
+            }
+            finally
+            {
+                DisposeOutputImage(closeResult.OutputData);
+            }
+        }
+        finally
+        {
+            DisposeOutputImage(convertResult.OutputData);
+        }
+    }
+
     [Fact]
     public async Task RegionErosion_ShouldReduceArea()
     {
@@ -571,6 +706,14 @@ public class Phase42RegionProcessingOperatorTests
             {
                 yield return (x, run.Y);
             }
+        }
+    }
+
+    private static void DisposeOutputImage(Dictionary<string, object>? outputData)
+    {
+        if (outputData?.TryGetValue("Image", out var image) == true && image is ImageWrapper imageWrapper)
+        {
+            imageWrapper.Dispose();
         }
     }
 }

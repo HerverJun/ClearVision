@@ -908,7 +908,10 @@ export class FlowEditorInteraction {
                 );
 
             if (!isTypeCompatible) {
-                showToast(`端口类型不匹配：${sourceType} -> ${targetType}`, 'warning');
+                const message = typeof this.canvas.getPortTypeMismatchMessage === 'function'
+                    ? this.canvas.getPortTypeMismatchMessage(sourceType, targetType)
+                    : `端口类型不匹配：${sourceType} -> ${targetType}`;
+                showToast(message, 'warning');
                 this.cancelConnection();
                 return;
             }
@@ -946,7 +949,9 @@ export class FlowEditorInteraction {
                         ? '该连接会形成环路'
                         : (validationError === 'self-connection'
                             ? '不能连接到同一节点'
-                            : '连接已存在或无效'));
+                            : (validationError === 'incompatible-port-type' && typeof this.canvas.getPortTypeMismatchMessage === 'function'
+                                ? this.canvas.getPortTypeMismatchMessage(sourceType, targetType)
+                                : '连接已存在或无效')));
                 showToast(message, 'warning');
             }
         } else {

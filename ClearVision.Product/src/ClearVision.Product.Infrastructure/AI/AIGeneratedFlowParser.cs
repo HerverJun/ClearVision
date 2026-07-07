@@ -156,6 +156,16 @@ public class AIGeneratedFlowParser
             "ResultJudgment" => OperatorType.ResultJudgment,
             "ModbusCommunication" => OperatorType.ModbusCommunication,
             "SiemensS7Communication" => OperatorType.SiemensS7Communication,
+            "BinaryImageToRegion" => OperatorType.BinaryImageToRegion,
+            "RegionErosion" => OperatorType.RegionErosion,
+            "RegionDilation" => OperatorType.RegionDilation,
+            "RegionOpening" => OperatorType.RegionOpening,
+            "RegionClosing" => OperatorType.RegionClosing,
+            "RegionSkeleton" => OperatorType.RegionSkeleton,
+            "RegionUnion" => OperatorType.RegionUnion,
+            "RegionIntersection" => OperatorType.RegionIntersection,
+            "RegionDifference" => OperatorType.RegionDifference,
+            "RegionComplement" => OperatorType.RegionComplement,
             _ => throw new ArgumentException($"未知的算子类型: {typeString}")
         };
     }
@@ -233,6 +243,7 @@ public class AIGeneratedFlowParser
             "detectionlist" or "detection_list" => PortDataType.DetectionList,
             "circledata" or "circle_data" => PortDataType.CircleData,
             "linedata" or "line_data" => PortDataType.LineData,
+            "region" => PortDataType.Region,
             _ => PortDataType.Any
         };
     }

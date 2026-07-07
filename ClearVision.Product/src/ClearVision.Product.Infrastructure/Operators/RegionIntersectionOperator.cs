@@ -31,9 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "High-fragmentation masks that need guaranteed indexed-row performance without profiling." },
     KnownLimitations = new[] { "The current implementation performs a simple same-row lookup per Region1 run, so dense fragmented masks should be profiled.", "Only binary region overlap is represented; source labels and confidence values are not preserved." }
 )]
-[InputPort("Region1", "First Region", PortDataType.Any, IsRequired = true)]
-[InputPort("Region2", "Second Region", PortDataType.Any, IsRequired = true)]
-[OutputPort("Region", "Intersection Region", PortDataType.Any)]
+[InputPort("Region1", "First Region", PortDataType.Region, IsRequired = true)]
+[InputPort("Region2", "Second Region", PortDataType.Region, IsRequired = true)]
+[OutputPort("Region", "Intersection Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Intersection Area", PortDataType.Integer)]
 public class RegionIntersectionOperator : OperatorBase

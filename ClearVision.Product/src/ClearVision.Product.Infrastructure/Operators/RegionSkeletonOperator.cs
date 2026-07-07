@@ -31,9 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Subpixel centerline extraction, metrology-grade medial-axis fitting, or topology guarantees beyond the implemented Zhang-Suen rules." },
     KnownLimitations = new[] { "Endpoint and branchpoint counts are based on discrete 8-neighborhood diagnostics and may over-count near thick junctions.", "PreserveTopology is reported in output metadata, but the execution path currently always uses the Zhang-Suen thinning implementation." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
+[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Skeleton Region", PortDataType.Any)]
+[OutputPort("Region", "Skeleton Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("SkeletonLength", "Skeleton Length", PortDataType.Integer)]
 [OutputPort("BranchPoints", "Branch Point Count", PortDataType.Integer)]

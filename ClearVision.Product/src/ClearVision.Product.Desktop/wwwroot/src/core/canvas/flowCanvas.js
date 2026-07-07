@@ -1,3 +1,10 @@
+import {
+    arePortTypesCompatible,
+    formatPortTypeForMessage,
+    getPortTypeMismatchMessage,
+    normalizePortType as normalizeFlowPortType
+} from './portTypeCompatibility.mjs';
+
 /**
  * Flow canvas rendering and interaction controller.
  * Set `window.__FLOW_CANVAS_DEBUG__ = true` to enable debug logging.
@@ -24,12 +31,13 @@ const PORT_TYPE_COLORS = {
     'DetectionList':   '#13c2c2', // 检测结果列表
     'CircleData':      '#2f54eb',  // 圆数据
     'LineData':        '#2f54eb', // 线数据
+    'Region':          '#8b5cf6', // 区域
     'Any':             '#bfbfbf', // 任意类型
     // 兼容后端枚举值。
     0: '#52c41a',
     1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
     4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
-    8: '#eb2f96', 9: '#13c2c2', 10: '#13c2c2', 11: '#2f54eb', 12: '#2f54eb',
+    8: '#eb2f96', 9: '#13c2c2', 10: '#13c2c2', 11: '#2f54eb', 12: '#2f54eb', 13: '#8b5cf6',
     99: '#bfbfbf'
 };
 
@@ -455,6 +463,12 @@ class FlowCanvas {
 
         if (!sourceNode.outputs?.[sourcePort] || !targetNode.inputs?.[targetPort]) {
             return 'missing-port';
+        }
+
+        const sourcePortDefinition = sourceNode.outputs[sourcePort];
+        const targetPortDefinition = targetNode.inputs[targetPort];
+        if (!this.checkTypeCompatibility(this.readPortType(sourcePortDefinition), this.readPortType(targetPortDefinition))) {
+            return 'incompatible-port-type';
         }
 
         const existingConn = this.connections.find(conn =>
@@ -1261,7 +1275,7 @@ class FlowCanvas {
         const targetPort = targetNode.inputs[portIndex];
 
         if (!this.checkTypeCompatibility(sourcePort.type, targetPort.type)) {
-            const incompatibilityMessage = `端口类型不匹配：${sourcePort.type} -> ${targetPort.type}`;
+            const incompatibilityMessage = this.getPortTypeMismatchMessage(sourcePort.type, targetPort.type);
             console.warn(incompatibilityMessage);
             if (window.showToast) window.showToast(incompatibilityMessage, 'warning');
             this.cancelConnection();
@@ -1341,26 +1355,19 @@ class FlowCanvas {
      * 检查端口类型兼容性。
      */
     checkTypeCompatibility(sourceType, targetType) {
-        // 将等价类型归一化后再比较。
-        const normalize = (t) => {
-            if (t === 'Any' || t === 99) return 'Any';
-            if (t === 'Image' || t === 0) return 'Image';
-            if (t === 'Integer' || t === 1 || t === 'Float' || t === 2) return 'Number';
-            if (t === 'Boolean' || t === 3) return 'Boolean';
-            if (t === 'String' || t === 4) return 'String';
-            if (t === 'Point' || t === 5 || t === 'Rectangle' || t === 6 || t === 'PointList' || t === 8) return 'Geometry';
-            if (t === 'Contour' || t === 7) return 'Contour';
-            if (t === 'DetectionResult' || t === 9 || t === 'DetectionList' || t === 10) return 'Detection';
-            if (t === 'CircleData' || t === 11) return 'CircleData';
-            if (t === 'LineData' || t === 12) return 'LineData';
-            return t;
-        };
+        return arePortTypesCompatible(sourceType, targetType);
+    }
 
-        const s = normalize(sourceType);
-        const t = normalize(targetType);
+    readPortType(port) {
+        return port?.type ?? port?.dataType ?? port?.DataType ?? port?.Type ?? 'Any';
+    }
 
-        if (s === 'Any' || t === 'Any') return true;
-        return s === t;
+    getPortTypeMismatchMessage(sourceType, targetType) {
+        return getPortTypeMismatchMessage(sourceType, targetType);
+    }
+
+    formatPortTypeForMessage(type) {
+        return formatPortTypeForMessage(type);
     }
 
     /**
@@ -1754,23 +1761,7 @@ class FlowCanvas {
      * Encoding cleanup: previous comment text was unreadable.
      */
     normalizePortType(type) {
-        if (!type) return 'Any';
-        // Encoding cleanup: previous comment text was unreadable.
-        if (typeof type === 'number') return type;
-        
-        const map = {
-            'any': 'Any',
-            'image': 'Image',
-            'string': 'String',
-            'integer': 'Integer',
-            'float': 'Float',
-            'boolean': 'Boolean',
-            'point': 'Point',
-            'rectangle': 'Rectangle',
-            'contour': 'Contour'
-        };
-        
-        return map[type.toLowerCase()] || type;
+        return normalizeFlowPortType(type);
     }
 
     normalizeOperatorType(type) {

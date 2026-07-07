@@ -31,9 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Label-aware subtraction where different source classes must remain distinct." },
     KnownLimitations = new[] { "The current implementation does not pre-index Region2 rows, so dense fragmented masks should be profiled.", "The output is a binary Region and does not preserve source labels or confidence values." }
 )]
-[InputPort("Region1", "First Region (Minuend)", PortDataType.Any, IsRequired = true)]
-[InputPort("Region2", "Second Region (Subtrahend)", PortDataType.Any, IsRequired = true)]
-[OutputPort("Region", "Difference Region", PortDataType.Any)]
+[InputPort("Region1", "First Region (Minuend)", PortDataType.Region, IsRequired = true)]
+[InputPort("Region2", "Second Region (Subtrahend)", PortDataType.Region, IsRequired = true)]
+[OutputPort("Region", "Difference Region", PortDataType.Region)]
 [OutputPort("Image", "Visualization", PortDataType.Image)]
 [OutputPort("Area", "Difference Area", PortDataType.Integer)]
 public class RegionDifferenceOperator : OperatorBase
