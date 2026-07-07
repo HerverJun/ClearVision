@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
@@ -10,6 +12,10 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class WorkflowDraftBuilder
 {
+    private const string AgentTempIdMetadataKey = "agentTempId";
+    private static readonly Regex LegacyTempIdNamePattern = new(
+        "^(op|operator|temp)_[A-Za-z0-9][A-Za-z0-9_-]*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
 
     public WorkflowDraftBuilder()
@@ -201,10 +207,7 @@ public sealed class WorkflowDraftBuilder
             .Select(step => step.TempId)
             .Where(tempId => !string.IsNullOrWhiteSpace(tempId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var operatorsByTempId = flow.Operators
-            .Where(op => !string.IsNullOrWhiteSpace(op.Name) && pipelineTempIds.Contains(op.Name))
-            .GroupBy(op => op.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var operatorsByTempId = MapExistingOperatorsByTempId(flow.Operators, pipelineTempIds);
         foreach (var step in pipeline.Steps)
         {
             if (operatorsByTempId.ContainsKey(step.TempId))
@@ -219,6 +222,36 @@ public sealed class WorkflowDraftBuilder
 
         AddCanvasConnections(flow, connectionSpecs, operatorsByTempId);
         return flow;
+    }
+
+    private static Dictionary<string, OperatorDto> MapExistingOperatorsByTempId(
+        IEnumerable<OperatorDto> operators,
+        ISet<string> pipelineTempIds)
+    {
+        var result = new Dictionary<string, OperatorDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var op in operators)
+        {
+            var tempId = ReadAgentTempId(op);
+            var legacyTempId = op.Name?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(tempId) &&
+                IsLegacyTempIdName(legacyTempId) &&
+                pipelineTempIds.Contains(legacyTempId))
+            {
+                tempId = legacyTempId;
+            }
+
+            if (string.IsNullOrWhiteSpace(tempId) ||
+                !pipelineTempIds.Contains(tempId) ||
+                result.ContainsKey(tempId))
+            {
+                continue;
+            }
+
+            EnsureAgentTempIdMetadata(op, tempId);
+            result[tempId] = op;
+        }
+
+        return result;
     }
 
     private OperatorDto BuildCanvasOperator(
@@ -239,6 +272,7 @@ public sealed class WorkflowDraftBuilder
             Id = Guid.NewGuid(),
             Name = CanvasOperatorName(contract, step.OperatorType),
             Type = ToOperatorType(step.OperatorType),
+            Metadata = CreateAgentMetadata(step.TempId),
             X = 160 + index * 180,
             Y = 180,
             InputPorts = contract.InputPorts.Select(port => new PortDto
@@ -545,6 +579,66 @@ public sealed class WorkflowDraftBuilder
             contract.OperatorType,
             requestedOperatorType,
             "Operator");
+    }
+
+    private static Dictionary<string, object?> CreateAgentMetadata(string tempId)
+    {
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentTempIdMetadataKey] = tempId
+        };
+    }
+
+    private static void EnsureAgentTempIdMetadata(OperatorDto op, string tempId)
+    {
+        op.Metadata ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        op.Metadata[AgentTempIdMetadataKey] = tempId;
+    }
+
+    private static string ReadAgentTempId(OperatorDto op)
+    {
+        return ReadMetadataString(op.Metadata, AgentTempIdMetadataKey, "AgentTempId");
+    }
+
+    private static string ReadMetadataString(
+        IReadOnlyDictionary<string, object?>? metadata,
+        params string[] keys)
+    {
+        if (metadata == null || metadata.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        foreach (var key in keys)
+        {
+            foreach (var item in metadata)
+            {
+                if (string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return MetadataValueAsString(item.Value);
+                }
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static string MetadataValueAsString(object? value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            string text => text.Trim(),
+            JsonElement { ValueKind: JsonValueKind.String } element => (element.GetString() ?? string.Empty).Trim(),
+            JsonElement element => element.ToString().Trim(),
+            _ => value.ToString()?.Trim() ?? string.Empty
+        };
+    }
+
+    private static bool IsLegacyTempIdName(string? name)
+    {
+        return !string.IsNullOrWhiteSpace(name) &&
+               LegacyTempIdNamePattern.IsMatch(name.Trim());
     }
 
     private OperatorType ToOperatorType(string operatorType)

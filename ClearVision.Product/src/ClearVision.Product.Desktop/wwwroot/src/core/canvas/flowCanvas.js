@@ -1794,41 +1794,47 @@ class FlowCanvas {
         }
 
         // Encoding cleanup: previous comment text was unreadable.
-        const operators = Array.from(this.nodes.values()).map(node => ({
-            id: node.id,
-            name: node.title,
-            type: this.normalizeOperatorType(node.type),
-            x: node.x,
-            y: node.y,
-            inputPorts: (node.inputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
-                name: p.name,
-                dataType: this.normalizePortType(p.type), // PortDataType enum
-                direction: 0, // Input
-                isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
-            })),
-            outputPorts: (node.outputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
-                name: p.name,
-                dataType: this.normalizePortType(p.type),
-                direction: 1, // Output
-                isRequired: false
-            })),
-            parameters: (node.parameters || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(),
-                name: p.name,
-                displayName: p.displayName || p.DisplayName || p.name,
-                description: p.description || p.Description || null,
-                value: p.value !== undefined ? p.value : p.defaultValue,
-                defaultValue: p.defaultValue ?? p.DefaultValue ?? null,
-                minValue: p.minValue ?? p.MinValue ?? p.min ?? p.Min ?? null,
-                maxValue: p.maxValue ?? p.MaxValue ?? p.max ?? p.Max ?? null,
-                dataType: p.dataType || p.DataType || p.type || p.Type,
-                isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false),
-                options: p.options || p.Options || null
-            })),
-            isEnabled: node.disabled !== true
-        }));
+        const operators = Array.from(this.nodes.values()).map(node => {
+            const metadata = node.metadata && typeof node.metadata === 'object'
+                ? { ...node.metadata }
+                : null;
+            return {
+                id: node.id,
+                name: node.title,
+                type: this.normalizeOperatorType(node.type),
+                x: node.x,
+                y: node.y,
+                ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
+                inputPorts: (node.inputs || []).map(p => ({
+                    id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
+                    name: p.name,
+                    dataType: this.normalizePortType(p.type), // PortDataType enum
+                    direction: 0, // Input
+                    isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
+                })),
+                outputPorts: (node.outputs || []).map(p => ({
+                    id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
+                    name: p.name,
+                    dataType: this.normalizePortType(p.type),
+                    direction: 1, // Output
+                    isRequired: false
+                })),
+                parameters: (node.parameters || []).map(p => ({
+                    id: p.id || p.Id || this.generateUUID(),
+                    name: p.name,
+                    displayName: p.displayName || p.DisplayName || p.name,
+                    description: p.description || p.Description || null,
+                    value: p.value !== undefined ? p.value : p.defaultValue,
+                    defaultValue: p.defaultValue ?? p.DefaultValue ?? null,
+                    minValue: p.minValue ?? p.MinValue ?? p.min ?? p.Min ?? null,
+                    maxValue: p.maxValue ?? p.MaxValue ?? p.max ?? p.Max ?? null,
+                    dataType: p.dataType || p.DataType || p.type || p.Type,
+                    isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false),
+                    options: p.options || p.Options || null
+                })),
+                isEnabled: node.disabled !== true
+            };
+        });
 
         // Encoding cleanup: previous comment text was unreadable.
         const debug = flowDebugEnabled();
@@ -1961,6 +1967,7 @@ class FlowCanvas {
                     inputs: inputs,
                     outputs: outputs,
                     parameters: op.parameters || op.Parameters || [],
+                    metadata: op.metadata || op.Metadata || undefined,
                     disabled: (op.isEnabled ?? op.IsEnabled) === false,
                     color: '#1890ff' // Default
                 };

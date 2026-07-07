@@ -6557,6 +6557,11 @@ export const aiPanelAgentWorkspaceMixin = {
         const op = this._asObject?.(operator) || {};
         const id = String(op.id || op.Id || op.tempId || op.TempId || `op_${index + 1}`).trim();
         const type = this._normalizeDraftCanvasOperatorType(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning');
+        const rawMetadata = this._asObject?.(op.metadata || op.Metadata) || {};
+        const agentTempId = String(rawMetadata.agentTempId || rawMetadata.AgentTempId || op.agentTempId || op.AgentTempId || op.tempId || op.TempId || '').trim();
+        const metadata = agentTempId
+            ? { ...rawMetadata, agentTempId }
+            : rawMetadata;
         const systemName = AI_OPERATOR_LABELS[type] || type || '未命名算子';
         const name = this._sanitizeDraftCanvasLabel(
             systemName,
@@ -6582,6 +6587,7 @@ export const aiPanelAgentWorkspaceMixin = {
             Type: type,
             operatorType: type,
             OperatorType: type,
+            metadata,
             x: Number(op.x ?? op.X ?? 160 + index * 180),
             y: Number(op.y ?? op.Y ?? 180),
             inputPorts,

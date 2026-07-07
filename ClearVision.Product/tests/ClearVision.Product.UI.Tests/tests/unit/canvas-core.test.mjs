@@ -501,6 +501,45 @@ test('FlowCanvas deserialize rebuilds connection index', async () => {
   fc.destroy();
 });
 
+test('FlowCanvas preserves agent temp id metadata through title edits', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  fc.deserialize({
+    operators: [
+      {
+        id: 'op_1',
+        name: '图像采集',
+        type: 'ImageAcquisition',
+        x: 0,
+        y: 0,
+        metadata: { agentTempId: 'op_1' },
+        inputPorts: [],
+        outputPorts: [{ id: 'p1', name: 'Image', dataType: 'Image' }]
+      }
+    ],
+    connections: []
+  });
+
+  const node = fc.nodes.get('op_1');
+  assert.equal(node.title, '图像采集');
+  assert.equal(node.metadata.agentTempId, 'op_1');
+
+  node.title = '用户自定义名称';
+  const serialized = fc.serialize();
+  assert.equal(serialized.operators[0].name, '用户自定义名称');
+  assert.equal(serialized.operators[0].metadata.agentTempId, 'op_1');
+  assert.doesNotMatch(JSON.stringify({ name: serialized.operators[0].name }), /\bop_1\b/);
+
+  fc.destroy();
+});
+
 test('FlowCanvas persists disabled node state through serialize and deserialize', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

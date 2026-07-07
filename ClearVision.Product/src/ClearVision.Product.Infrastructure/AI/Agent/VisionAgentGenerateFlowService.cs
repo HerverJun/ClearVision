@@ -487,6 +487,10 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 Id = operatorIds[op.TempId],
                 Name = displayName,
                 Type = ResolveOperatorType(op.OperatorType),
+                Metadata = new Dictionary<string, object?>
+                {
+                    ["agentTempId"] = op.TempId
+                },
                 X = 160 * index,
                 Y = 0,
                 IsEnabled = true,

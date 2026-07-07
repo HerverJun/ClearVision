@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
+using System.Text.Json.Serialization;
 
 namespace ClearVision.Product.Application.DTOs;
 
@@ -26,6 +27,9 @@ public class OperatorDto
     /// 算子类型
     /// </summary>
     public OperatorType Type { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, object?>? Metadata { get; set; }
 
     /// <summary>
     /// X坐标

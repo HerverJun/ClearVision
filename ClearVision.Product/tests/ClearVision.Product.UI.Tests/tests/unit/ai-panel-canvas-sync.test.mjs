@@ -277,11 +277,17 @@ test('AI draft normalization ignores leaked tempId labels', async () => {
   assert.equal(operator.title, friendlyName);
   assert.equal(operator.displayName, friendlyName);
   assert.equal(operator.id, 'op_1');
+  assert.equal(operator.metadata.agentTempId, 'op_1');
   assert.doesNotMatch(JSON.stringify({
     name: operator.name,
     title: operator.title,
     displayName: operator.displayName
   }), /\bop_1\b/);
+
+  operator.name = '用户自定义名称';
+  operator.title = '用户自定义名称';
+  operator.displayName = '用户自定义名称';
+  assert.equal(operator.metadata.agentTempId, 'op_1');
 });
 
 test('AiPanel undo notifies canvas flow change with restored snapshot', async () => {
