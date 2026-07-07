@@ -309,6 +309,75 @@ test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', 
   await expect(page.locator('#studio2-v2-root')).toHaveCount(0);
 });
 
+test('legacy flow editor connection toast reads alternate port type fields', async ({ page }) => {
+  await page.route('**/flow-editor-interaction-host.html', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><meta charset="utf-8"><canvas id="flow-canvas" width="800" height="500"></canvas>'
+    });
+  });
+
+  await page.goto('/flow-editor-interaction-host.html', { waitUntil: 'domcontentloaded' });
+
+  const toastMessage = await page.evaluate(async () => {
+    const { FlowEditorInteraction } = await import('/src/features/flow-editor/flowEditorInteraction.js');
+    const {
+      arePortTypesCompatible,
+      getPortTypeMismatchMessage
+    } = await import('/src/core/canvas/portTypeCompatibility.mjs');
+
+    const canvasElement = document.getElementById('flow-canvas');
+    const canvas = {
+      canvas: canvasElement,
+      scale: 1,
+      offset: { x: 0, y: 0 },
+      nodes: new Map(),
+      connections: [],
+      selectedNode: null,
+      mousePosition: { x: 0, y: 0 },
+      isConnecting: false,
+      connectingFrom: null,
+      hoveredPort: null,
+      handleMouseDown() {},
+      handleMouseMove() {},
+      handleMouseUp() {},
+      checkTypeCompatibility: arePortTypesCompatible,
+      getPortTypeMismatchMessage,
+      readPortType(port) {
+        return port?.type ?? port?.dataType ?? port?.DataType ?? port?.Type ?? 'Any';
+      },
+      invalidate() {},
+      notifyViewStateChanged() {},
+      getNodeAt() {
+        return null;
+      },
+      addConnection() {
+        throw new Error('A mismatched Image -> Region connection should not be added.');
+      }
+    };
+
+    const interaction = new FlowEditorInteraction(canvas);
+    interaction.connectionStart = {
+      type: 'output',
+      nodeId: 'thresholding',
+      portIndex: 0,
+      port: { name: 'Image', dataType: 'Image' }
+    };
+    interaction.isConnecting = true;
+    interaction.endConnection(null, {
+      type: 'input',
+      nodeId: 'region-closing',
+      portIndex: 0,
+      port: { name: 'Region', DataType: 'Region' }
+    });
+
+    return document.querySelector('.cv-toast-message')?.textContent ?? '';
+  });
+
+  expect(toastMessage).toBe('区域闭运算需要 Region 输入，请先使用二值图转区域/区域生成算子；若要直接处理二值图，请使用图像形态学闭运算。');
+});
+
 async function installStudio2FrontendV2Routes(page: Page): Promise<void> {
   test.skip(!existsSync(join(frontendV2Dist, 'index.html')), `FrontendV2 dist not found: ${frontendV2Dist}`);
 

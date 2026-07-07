@@ -897,8 +897,11 @@ export class FlowEditorInteraction {
             const source = this.connectionStart.type === 'output' ? this.connectionStart : endPort;
             const target = this.connectionStart.type === 'input' ? this.connectionStart : endPort;
 
-            const sourceType = source?.port?.type ?? 'Any';
-            const targetType = target?.port?.type ?? 'Any';
+            const readPortType = typeof this.canvas.readPortType === 'function'
+                ? port => this.canvas.readPortType(port)
+                : port => port?.type ?? port?.dataType ?? port?.DataType ?? port?.Type ?? 'Any';
+            const sourceType = readPortType(source?.port);
+            const targetType = readPortType(target?.port);
             const isTypeCompatible = typeof this.canvas.checkTypeCompatibility === 'function'
                 ? this.canvas.checkTypeCompatibility(sourceType, targetType)
                 : (
