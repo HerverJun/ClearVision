@@ -274,6 +274,17 @@ function normalizeOperatorTitle(operator, liveNode = null) {
         '未命名算子');
 }
 
+function normalizeParameterDisplayName(parameter) {
+    return String(
+        parameter?.displayName ||
+        parameter?.DisplayName ||
+        parameter?.label ||
+        parameter?.Label ||
+        parameter?.name ||
+        parameter?.Name ||
+        '参数').trim();
+}
+
 function normalizePortType(value) {
     if (value === 0 || value === '0') {
         return 'image';
@@ -897,19 +908,48 @@ export class PreviewPanelCapabilityOwner {
                     </div>
                 </header>
                 <div class="preview-capability-scroll" data-low-height-scroll="true">
-                    <section class="preview-capability-current">
-                        <h5>${escapeHtml(currentHeading)}</h5>
-                        <div class="preview-capability-current-title">${escapeHtml(title)}</div>
-                        <div class="preview-capability-current-type">${escapeHtml(type)}</div>
-                        <p class="preview-capability-message">${escapeHtml(currentMessage)}</p>
-                    </section>
                     ${this.renderPreviewMedia(belongsToSelectedNode, statusInfo, resultModel, liveNode)}
-                    ${this.renderPortsAndTiming(belongsToSelectedNode)}
+                    <section class="preview-capability-current">
+                        <div class="preview-capability-current-heading">
+                            <span>${escapeHtml(currentHeading)}</span>
+                            <strong title="${escapeAttribute(title)}">${escapeHtml(title)}</strong>
+                            <em title="${escapeAttribute(type)}">${escapeHtml(type)}</em>
+                        </div>
+                        <p class="preview-capability-message">${escapeHtml(currentMessage)}</p>
+                        ${this.renderCurrentParameterSummary()}
+                    </section>
                     ${this.renderPreviewSummary(belongsToSelectedNode, statusInfo)}
                     ${this.renderModuleResult(belongsToSelectedNode, resultModel)}
+                    ${this.renderPortsAndTiming(belongsToSelectedNode)}
                 </div>
             </section>
         `;
+    }
+
+    renderCurrentParameterSummary() {
+        if (this.currentConnection || !Array.isArray(this.currentOperator?.parameters)) {
+            return '';
+        }
+
+        const items = this.currentOperator.parameters
+            .filter(parameter => getParameterName(parameter))
+            .slice(0, 4)
+            .map(parameter => {
+                const name = normalizeParameterDisplayName(parameter);
+                const value = getParameterValue(parameter);
+                const formatted = formatPreviewOutputValue(name, value, {
+                    stringMaxLength: 32
+                });
+                return `
+                    <span class="preview-capability-param-chip">
+                        <em>${escapeHtml(name)}</em>
+                        <strong title="${escapeAttribute(formatted.title || formatted.text)}">${escapeHtml(formatted.text)}</strong>
+                    </span>
+                `;
+            })
+            .join('');
+
+        return items ? `<div class="preview-capability-parameter-summary">${items}</div>` : '';
     }
 
     renderPreviewMedia(belongsToSelectedNode, statusInfo, model, liveNode) {
@@ -987,8 +1027,11 @@ export class PreviewPanelCapabilityOwner {
             : `${executionTime} ms`;
 
         return `
-            <section class="preview-capability-section" data-preview-section="ports">
-                <h5>端口与耗时</h5>
+            <details class="preview-capability-section preview-capability-secondary" data-preview-section="ports">
+                <summary>
+                    <span>端口与耗时</span>
+                    <em>${escapeHtml(timeText)}</em>
+                </summary>
                 <div class="preview-capability-kv-grid">
                     <div class="preview-capability-kv">
                         <span>输入端口</span>
@@ -1003,7 +1046,7 @@ export class PreviewPanelCapabilityOwner {
                         <strong>${escapeHtml(timeText)}</strong>
                     </div>
                 </div>
-            </section>
+            </details>
         `;
     }
 

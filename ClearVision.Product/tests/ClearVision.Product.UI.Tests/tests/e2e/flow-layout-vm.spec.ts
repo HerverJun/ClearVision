@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
@@ -10,6 +11,9 @@ type PreviewMode = {
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
 const STALE_PREVIEW_TEXT = '参数或流程已变更，需重新预览';
+const PROPERTY_RESIZER_SELECTOR = '[data-sidebar-resizer="property"]';
+const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
+const OLD_PREVIEW_WORKBENCH_MAX_WIDTH = 560;
 
 const operators = [
   {
@@ -93,6 +97,7 @@ async function installStudio2Flags(page: Page) {
         'Studio2.PreviewPanel': true,
       },
     };
+    localStorage.removeItem('cv_flow_property_sidebar_width');
     Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
       value: startup,
       writable: false,
@@ -286,14 +291,123 @@ async function assertPreviewButtonDisabledState(page: Page) {
   expect(mismatches).toEqual([]);
 }
 
+async function collectFlowLayoutMeasurements(page: Page) {
+  return page.evaluate(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      if (!element) {
+        return null;
+      }
+      const value = element.getBoundingClientRect();
+      return {
+        x: value.x,
+        y: value.y,
+        width: value.width,
+        height: value.height,
+        top: value.top,
+        bottom: value.bottom,
+        left: value.left,
+        right: value.right,
+      };
+    };
+    const main = document.querySelector('#main-content') as HTMLElement | null;
+    return {
+      preview: rect('.preview-workbench-pane'),
+      workspace: rect('.workspace'),
+      inspector: rect('.inspector-pane'),
+      imageStage: rect('.preview-workbench-pane .preview-capability-image-stage'),
+      imageSurface: rect('.preview-workbench-pane .preview-capability-main-image'),
+      manualButton: rect('.preview-workbench-pane [data-preview-action="manual-preview"]'),
+      cancelButton: rect('.preview-workbench-pane [data-preview-action="cancel-preview"]'),
+      fitButton: rect('.preview-workbench-pane [data-preview-action="image-fit"]'),
+      originalButton: rect('.preview-workbench-pane [data-preview-action="image-original"]'),
+      openImageButton: rect('.preview-workbench-pane [data-preview-action="open-image"]'),
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      overflow: {
+        document: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
+        body: document.body.scrollWidth > document.body.clientWidth + 2,
+        main: main ? main.scrollWidth > main.clientWidth + 2 : true,
+      },
+    };
+  });
+}
+
+async function dragPreviewWorkbench(page: Page, deltaX: number) {
+  const resizer = page.locator(PROPERTY_RESIZER_SELECTOR);
+  await expect(resizer).toBeVisible();
+
+  const box = await resizer.boundingBox();
+  if (!box) {
+    throw new Error('Preview workbench resizer is not visible.');
+  }
+
+  const startX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+
+  await page.mouse.move(startX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(startX + deltaX, centerY, { steps: 18 });
+  await page.mouse.up();
+}
+
+async function expandPreviewWorkbench(page: Page, deltaX = -420) {
+  const before = await collectFlowLayoutMeasurements(page);
+  await dragPreviewWorkbench(page, deltaX);
+  await expect.poll(async () => {
+    const after = await collectFlowLayoutMeasurements(page);
+    return Math.round(after.preview?.width ?? 0);
+  }).toBeGreaterThan(Math.round((before.preview?.width ?? 0) + 80));
+  const after = await collectFlowLayoutMeasurements(page);
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await expect.poll(async () => {
+    const current = await collectFlowLayoutMeasurements(page);
+    return Math.round(current.preview?.width ?? 0);
+  }).toBe(Math.round(after.preview?.width ?? 0));
+  return { before, after };
+}
+
+async function assertCorePreviewControlsInViewport(page: Page) {
+  await expect(page.locator('.preview-workbench-pane [data-preview-action="manual-preview"]')).toBeVisible();
+  await expect(page.locator('.preview-workbench-pane [data-preview-action="cancel-preview"]')).toBeVisible();
+  await expect(page.locator('.preview-workbench-pane [data-preview-action="image-fit"]')).toBeVisible();
+  await expect(page.locator('.preview-workbench-pane [data-preview-action="image-original"]')).toBeVisible();
+  await expect(page.locator('.preview-workbench-pane [data-preview-action="open-image"]')).toBeVisible();
+
+  const measurements = await collectFlowLayoutMeasurements(page);
+  const viewportHeight = measurements.viewport.height;
+  const mustBeFullyVisible = [
+    measurements.manualButton,
+    measurements.cancelButton,
+    measurements.fitButton,
+    measurements.originalButton,
+    measurements.openImageButton,
+  ];
+  for (const item of mustBeFullyVisible) {
+    expect(item).toBeTruthy();
+    expect(item?.top ?? viewportHeight + 1).toBeGreaterThanOrEqual(0);
+    expect(item?.bottom ?? viewportHeight + 1).toBeLessThanOrEqual(viewportHeight + 2);
+  }
+  expect(measurements.imageStage).toBeTruthy();
+  expect(measurements.imageStage?.top ?? viewportHeight + 1).toBeLessThan(viewportHeight);
+  expect(measurements.imageStage?.bottom ?? 0).toBeGreaterThan(0);
+}
+
 async function captureFlowLayoutState(page: Page, testInfo: TestInfo, name: string) {
+  await page.evaluate(() => {
+    document.querySelector('#cv-toast-container')?.replaceChildren();
+  });
+  await page.waitForTimeout(50);
   await expect(page.locator('.preview-workbench-pane')).toBeVisible();
   await assertChineseTextRenderable(page);
   await assertNoHorizontalOverflow(page);
   await assertPreviewButtonDisabledState(page);
+  await assertCorePreviewControlsInViewport(page);
   await page.screenshot({
     path: testInfo.outputPath(`flow-layout-vm-${name}.png`),
-    fullPage: true,
+    fullPage: false,
   });
 }
 
@@ -372,6 +486,37 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
   });
 
+  test('resizes the preview workbench wider with a real splitter drag and keeps core controls first-screen', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+
+    await expect(page.locator('.preview-workbench-pane')).toContainText('预览完成');
+    await expect(page.locator('.preview-workbench-pane .preview-capability-main-image img')).toBeVisible();
+    await captureFlowLayoutState(page, testInfo, 'default-layout');
+
+    const { before, after } = await expandPreviewWorkbench(page);
+    expect(after.preview?.width ?? 0).toBeGreaterThan((before.preview?.width ?? 0) + 80);
+    expect(after.preview?.width ?? 0).toBeGreaterThan(OLD_PREVIEW_WORKBENCH_MAX_WIDTH + 30);
+    expect(after.workspace?.width ?? 0).toBeLessThan((before.workspace?.width ?? 0) - 60);
+    expect(after.workspace?.width ?? 0).toBeGreaterThanOrEqual(300);
+    expect(after.inspector?.width ?? 0).toBeGreaterThanOrEqual(250);
+    expect(after.imageStage?.width ?? 0).toBeGreaterThan((before.imageStage?.width ?? 0) + 80);
+    expect(after.imageStage?.height ?? 0).toBeGreaterThan((before.imageStage?.height ?? 0) + 40);
+    expect(after.overflow).toEqual({ document: false, body: false, main: false });
+
+    const storedWidth = await page.evaluate(storageKey => localStorage.getItem(storageKey), PROPERTY_SIDEBAR_STORAGE_KEY);
+    expect(storedWidth).toBe(String(Math.round(after.preview?.width ?? 0)));
+    await writeFile(testInfo.outputPath('flow-layout-vm-resize-metrics.json'), JSON.stringify({
+      oldPreviewWorkbenchMaxWidth: OLD_PREVIEW_WORKBENCH_MAX_WIDTH,
+      storedWidth,
+      before,
+      after,
+    }, null, 2), 'utf8');
+    await captureFlowLayoutState(page, testInfo, 'preview-workbench-resized-wider');
+    await captureFlowLayoutState(page, testInfo, 'success-output-image-expanded');
+  });
+
   test('shows output image summary and debug image operations in the right workbench', async ({ page }, testInfo) => {
     previewMode.value = 'success-image';
     await addNodeFromFlyout(page);
@@ -406,6 +551,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await addNodeFromFlyout(page);
     const workbench = page.locator('.preview-workbench-pane');
     await expect(workbench).toContainText('预览完成');
+    await expandPreviewWorkbench(page);
 
     await page.evaluate(() => {
       (window as any).nodePreviewCoordinator.debounceMs = 5000;
@@ -418,7 +564,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText(STALE_PREVIEW_TEXT, { timeout: 1000 });
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-stale', 'true');
     expect(previewMode.requests).toHaveLength(0);
-    await captureFlowLayoutState(page, testInfo, 'stale-after-parameter-change');
+    await captureFlowLayoutState(page, testInfo, 'stale-old-preview-expanded');
 
     previewMode.delayMs = 0;
     await workbench.locator('[data-preview-action="manual-preview"]').click();
@@ -432,6 +578,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await addNodeFromFlyout(page);
     const workbench = page.locator('.preview-workbench-pane');
     await expect(workbench).toContainText('预览完成');
+    await expandPreviewWorkbench(page);
 
     previewMode.requests.length = 0;
     previewMode.delayMs = 600;
@@ -443,7 +590,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(manualButton).toContainText('预览中...');
     await expect(cancelButton).toBeEnabled();
     await expect.poll(() => previewMode.requests.length).toBe(1);
-    await captureFlowLayoutState(page, testInfo, 'manual-preview-loading');
+    await captureFlowLayoutState(page, testInfo, 'manual-preview-loading-expanded');
 
     await cancelButton.click();
     await expect(cancelButton).toBeDisabled();
@@ -472,6 +619,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText('缺输入图或采集源');
     await expect(workbench).toContainText('请先配置文件路径');
     await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
+    await expandPreviewWorkbench(page);
 
     await captureFlowLayoutState(page, testInfo, 'image-acquisition-file-missing-path');
 
@@ -551,6 +699,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText('缺输入图或采集源');
     await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
     await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
+    await expandPreviewWorkbench(page);
     await captureFlowLayoutState(page, testInfo, 'camera-missing-camera');
 
     previewMode.requests.length = 0;
@@ -563,14 +712,14 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).not.toContainText('请先选择相机');
     await expect(workbench).not.toContainText('刷新预览');
 
-    await captureFlowLayoutState(page, testInfo, 'camera-binding-manual-required');
+    await captureFlowLayoutState(page, testInfo, 'camera-binding-manual-required-expanded');
 
     await workbench.locator('[data-preview-action="manual-preview"]').click();
     await expect.poll(() => previewMode.requests.length).toBe(1);
     await expect(workbench.locator('.preview-capability-owner')).toHaveAttribute('data-status', 'success');
-    await page.setViewportSize({ width: 1366, height: 360 });
+    await page.setViewportSize({ width: 1366, height: 420 });
     await assertLowHeightScrollability(page);
-    await captureFlowLayoutState(page, testInfo, 'low-height-scrollable');
+    await captureFlowLayoutState(page, testInfo, '1366x420-low-height-compact');
     await expect(workbench).toContainText('预览完成');
   });
 
@@ -582,11 +731,13 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await addNodeFromFlyout(page);
     await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
+    await expandPreviewWorkbench(page);
 
     previewMode.value = 'error';
     await page.locator('.preview-workbench-pane [data-preview-action="manual-preview"]').click();
     await expect(page.locator('.preview-workbench-pane')).toContainText('预览失败');
     await expect(page.locator('.preview-workbench-pane')).toContainText('模拟预览失败');
+    await captureFlowLayoutState(page, testInfo, 'preview-failure-error-expanded');
   });
 
   test('clears current preview state for connection, blank selection and deleted selected node', async ({ page }) => {
@@ -655,6 +806,18 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     const text = await workbench.textContent();
     expect(text ?? '').not.toContain('C:\\Users\\A');
     expect(text ?? '').toContain('[redacted-path]');
+  });
+
+  test('keeps the 1024x768 narrow layout usable without horizontal overflow', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    previewMode.value = 'success-image';
+    await addNodeFromFlyout(page);
+
+    const measurements = await collectFlowLayoutMeasurements(page);
+    expect(measurements.preview?.width ?? 0).toBeGreaterThanOrEqual(300);
+    expect(measurements.workspace?.width ?? 0).toBeGreaterThanOrEqual(280);
+    expect(measurements.overflow).toEqual({ document: false, body: false, main: false });
+    await captureFlowLayoutState(page, testInfo, '1024x768-narrow-layout');
   });
 
   test('keeps 1366 and 1920 layouts within viewport and drag-drop coordinates stable', async ({ page }) => {

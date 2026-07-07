@@ -5,6 +5,18 @@ const PROPERTY_SIDEBAR_SELECTOR = '[data-sidebar="property"]';
 const PROPERTY_RESIZER_SELECTOR = '[data-sidebar-resizer="property"]';
 const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
 const OPERATOR_LIBRARY_EXPANDED_STORAGE_KEY = 'operator-library-expanded-categories-v2';
+const PROPERTY_SIDEBAR_MIN_WIDTH = 320;
+const PROPERTY_SIDEBAR_MAX_WIDTH = 920;
+const PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO = 0.62;
+const PROPERTY_SIDEBAR_MIN_REMAINING_FLOW_WIDTH = 760;
+
+function expectedSidebarMaxWidth(viewportWidth: number) {
+  return Math.min(
+    PROPERTY_SIDEBAR_MAX_WIDTH,
+    Math.round(viewportWidth * PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO),
+    Math.max(PROPERTY_SIDEBAR_MIN_WIDTH, Math.round(viewportWidth - PROPERTY_SIDEBAR_MIN_REMAINING_FLOW_WIDTH)),
+  );
+}
 
 async function stubGroupedOperatorLibrary(page: Page) {
   const metadataByType: Record<string, {
@@ -238,7 +250,7 @@ test.describe('Flow Editor', () => {
 
     await page.keyboard.press('End');
     const viewportWidth = page.viewportSize()?.width ?? 1280;
-    await expect.poll(() => getSidebarWidth(page)).toBe(Math.min(560, Math.round(viewportWidth * 0.45)));
+    await expect.poll(() => getSidebarWidth(page)).toBe(expectedSidebarMaxWidth(viewportWidth));
 
     await page.keyboard.press('Home');
     await expect.poll(() => getSidebarWidth(page)).toBe(320);
@@ -253,7 +265,7 @@ test.describe('Flow Editor', () => {
 
   test('clamps the property sidebar width to the configured min and max bounds', async ({ page }) => {
     const viewportWidth = page.viewportSize()?.width ?? 1280;
-    const expectedMaxWidth = Math.min(560, Math.round(viewportWidth * 0.45));
+    const expectedMaxWidth = expectedSidebarMaxWidth(viewportWidth);
 
     await dragPropertySidebar(page, -2000);
     await expect.poll(() => getSidebarWidth(page)).toBe(expectedMaxWidth);

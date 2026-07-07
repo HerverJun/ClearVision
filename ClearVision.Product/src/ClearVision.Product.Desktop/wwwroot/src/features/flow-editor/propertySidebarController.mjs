@@ -3,10 +3,11 @@ import { buildOperatorNodeConfig } from '../../shared/operatorVisuals.js';
 export const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
 export const PROPERTY_SIDEBAR_DEFAULT_WIDTH = 380;
 export const PROPERTY_SIDEBAR_MIN_WIDTH = 320;
-export const PROPERTY_SIDEBAR_MAX_WIDTH = 560;
+export const PROPERTY_SIDEBAR_MAX_WIDTH = 920;
 export const PROPERTY_SIDEBAR_DESKTOP_BREAKPOINT = 768;
 
-const PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO = 0.45;
+const PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO = 0.62;
+const PROPERTY_SIDEBAR_MIN_REMAINING_FLOW_WIDTH = 760;
 const DRAGGING_BODY_CLASS = 'property-sidebar-resizing';
 const DRAGGING_HANDLE_CLASS = 'is-dragging';
 const KEYBOARD_STEP = 16;
@@ -164,9 +165,16 @@ function readStoredWidthCandidate(storage = getStorage()) {
 }
 
 export function getMaxWidth(viewportWidth = getViewportWidth()) {
+    const safeViewportWidth = getViewportWidth(viewportWidth);
+    const maxByRemainingFlow = Math.max(
+        PROPERTY_SIDEBAR_MIN_WIDTH,
+        Math.round(safeViewportWidth - PROPERTY_SIDEBAR_MIN_REMAINING_FLOW_WIDTH)
+    );
+
     return Math.min(
         PROPERTY_SIDEBAR_MAX_WIDTH,
-        Math.round(getViewportWidth(viewportWidth) * PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO)
+        Math.round(safeViewportWidth * PROPERTY_SIDEBAR_MAX_VIEWPORT_RATIO),
+        maxByRemainingFlow
     );
 }
 
