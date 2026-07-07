@@ -132,6 +132,68 @@ public class OperatorMetadataMigrationTests
     }
 
     [Fact]
+    public void MetadataCatalog_ShouldLocalizeVmStyleCommunicationAndVariableLabels()
+    {
+        var metadataByType = new OperatorFactory()
+            .GetAllMetadata()
+            .ToDictionary(m => m.Type, m => m);
+
+        var tcp = metadataByType[OperatorType.TcpCommunication];
+        Output(tcp, "NormalizedResponse").DisplayName.Should().Be("归一化响应");
+        Output(tcp, "RequestPayload").DisplayName.Should().Be("请求报文");
+        Output(tcp, "ParseSuccess").DisplayName.Should().Be("解析成功");
+        Output(tcp, "ParsedValue").DisplayName.Should().Be("解析值");
+        Output(tcp, "ParsedFields").DisplayName.Should().Be("解析字段");
+        Output(tcp, "ParseError").DisplayName.Should().Be("解析错误");
+        Output(tcp, "MissingResponseFields").DisplayName.Should().Be("缺失响应字段");
+        Output(tcp, "ResponseAccepted").DisplayName.Should().Be("响应通过");
+        Output(tcp, "ResponseMatchError").DisplayName.Should().Be("响应匹配错误");
+        Output(tcp, "ResponseMatchValue").DisplayName.Should().Be("响应匹配值");
+        Parameter(tcp, "ResponseParseMode").DisplayName.Should().Be("响应解析模式");
+        Parameter(tcp, "ResponseParseMode").Description.Should().Contain("响应解析方式");
+        Parameter(tcp, "ResponseFieldName").DisplayName.Should().Be("响应字段名");
+        Parameter(tcp, "ExpectedResponse").DisplayName.Should().Be("期望响应");
+        Parameter(tcp, "ExpectedResponse").Description.Should().Contain("期望响应");
+        Parameter(tcp, "RejectedResponse").DisplayName.Should().Be("拒绝响应");
+        Parameter(tcp, "ResponseParseMode").Options!.Single(option => option.Value == "JsonPath").Label.Should().Be("JSON路径");
+        Parameter(tcp, "ResponseMatchSource").Options!.Single(option => option.Value == "NormalizedResponse").Label.Should().Be("归一化响应");
+
+        var branch = metadataByType[OperatorType.ConditionalBranch];
+        Output(branch, "EvaluationSuccess").DisplayName.Should().Be("判定成功");
+        Output(branch, "EvaluationError").DisplayName.Should().Be("判定错误");
+        Output(branch, "ActualSource").DisplayName.Should().Be("实际值来源");
+        Input(branch, "Compare").DisplayName.Should().Be("比较值");
+        Parameter(branch, "CompareFieldName").DisplayName.Should().Be("比较字段名");
+        Parameter(branch, "CompareFieldName").Description.Should().Contain("字段路径");
+        Parameter(branch, "FailOnMissingField").DisplayName.Should().Be("字段缺失时失败");
+        Parameter(branch, "FailOnEvaluationError").DisplayName.Should().Be("判定错误时失败");
+
+        var read = metadataByType[OperatorType.VariableRead];
+        Output(read, "RawValue").DisplayName.Should().Be("原始值");
+        Output(read, "VariableId").DisplayName.Should().Be("变量ID");
+        Output(read, "ValueType").DisplayName.Should().Be("值类型");
+        Output(read, "Version").DisplayName.Should().Be("版本");
+        Output(read, "UpdatedAtUtc").DisplayName.Should().Be("更新时间(UTC)");
+        Output(read, "UpdatedBy").DisplayName.Should().Be("更新来源");
+        Output(read, "ReadSource").DisplayName.Should().Be("读取来源");
+        Parameter(read, "OutputFieldName").DisplayName.Should().Be("输出字段名");
+        Parameter(read, "OutputFieldName").Description.Should().Contain("变量原始值");
+
+        var write = metadataByType[OperatorType.VariableWrite];
+        Output(write, "VariableId").DisplayName.Should().Be("变量ID");
+        Output(write, "ValueType").DisplayName.Should().Be("值类型");
+        Output(write, "Version").DisplayName.Should().Be("版本");
+        Output(write, "UpdatedAtUtc").DisplayName.Should().Be("更新时间(UTC)");
+        Output(write, "UpdatedBy").DisplayName.Should().Be("更新来源");
+        Output(write, "WriteSkipped").DisplayName.Should().Be("已跳过写入");
+        Output(write, "SkipReason").DisplayName.Should().Be("跳过原因");
+        Output(write, "InputStatusValue").DisplayName.Should().Be("输入状态值");
+        Parameter(write, "InputFieldName").DisplayName.Should().Be("输入字段名");
+        Parameter(write, "InputFieldName").Description.Should().Contain("上游字段路径");
+        Parameter(write, "RequireInputStatus").DisplayName.Should().Be("要求输入状态");
+    }
+
+    [Fact]
     public void MetadataCatalog_ShouldUseSupportedOperatorLibraryCategories()
     {
         var supportedCategories = new HashSet<string>
@@ -223,5 +285,20 @@ public class OperatorMetadataMigrationTests
     private static bool IsCjk(char value)
     {
         return value is >= '\u3400' and <= '\u9fff';
+    }
+
+    private static PortDefinition Input(OperatorMetadata metadata, string name)
+    {
+        return metadata.InputPorts.Single(port => port.Name == name);
+    }
+
+    private static PortDefinition Output(OperatorMetadata metadata, string name)
+    {
+        return metadata.OutputPorts.Single(port => port.Name == name);
+    }
+
+    private static ParameterDefinition Parameter(OperatorMetadata metadata, string name)
+    {
+        return metadata.Parameters.Single(parameter => parameter.Name == name);
     }
 }

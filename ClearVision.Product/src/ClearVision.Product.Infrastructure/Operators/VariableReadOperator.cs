@@ -98,7 +98,7 @@ public class VariableReadOperator : OperatorBase
         var rawValue = exists
             ? _variableContext.GetValue<object?>(variableName, null) ?? string.Empty
             : defaultValue;
-        if (!TryResolveReadValue(rawValue, variableName, defaultValue, dataType, outputFieldName, failOnMissingOutputField, out var value, out var outputFieldFound, out var readSourceSuffix, out var readError))
+        if (!TryResolveReadValue(rawValue, variableName, defaultValue, dataType, outputFieldName, failOnMissingOutputField, conversionMode, out var value, out var outputFieldFound, out var readSourceSuffix, out var readError))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure(readError));
         }
@@ -165,6 +165,7 @@ public class VariableReadOperator : OperatorBase
         string dataType,
         string outputFieldName,
         bool failOnMissingOutputField,
+        ProjectVariableConversionMode? integerConversionMode,
         out object value,
         out bool outputFieldFound,
         out string readSourceSuffix,
@@ -192,7 +193,7 @@ public class VariableReadOperator : OperatorBase
         }
 
         var conversionDefaultValue = outputFieldFound ? string.Empty : defaultValue;
-        if (!TryConvertReadValue(selectedValue, dataType, conversionDefaultValue, out value, out var convertError))
+        if (!TryConvertReadValue(selectedValue, dataType, conversionDefaultValue, integerConversionMode, out value, out var convertError))
         {
             error = string.IsNullOrWhiteSpace(outputFieldName)
                 ? $"Variable '{variableName}' cannot be read as {dataType}: {convertError}"
@@ -207,6 +208,7 @@ public class VariableReadOperator : OperatorBase
         object? raw,
         string dataType,
         string defaultValue,
+        ProjectVariableConversionMode? integerConversionMode,
         out object value,
         out string error)
     {
@@ -219,14 +221,30 @@ public class VariableReadOperator : OperatorBase
             {
                 case "int":
                 case "integer":
-                    if (TryConvertToInt64(raw, out var intValue) ||
-                        TryConvertToInt64(defaultValue, out intValue))
+                    if (integerConversionMode.HasValue)
+                    {
+                        if (TryConvertToInt64(raw, integerConversionMode, out var convertedValue, out var convertedError))
+                        {
+                            value = convertedValue;
+                            return true;
+                        }
+
+                        error = string.IsNullOrWhiteSpace(convertedError)
+                            ? $"'{FormatScalar(raw)}' is not an integer."
+                            : convertedError;
+                        return false;
+                    }
+
+                    if (TryConvertToInt64(raw, null, out var intValue, out var intError) ||
+                        TryConvertToInt64(defaultValue, null, out intValue, out _))
                     {
                         value = intValue;
                         return true;
                     }
 
-                    error = $"'{FormatScalar(raw)}' is not an integer.";
+                    error = string.IsNullOrWhiteSpace(intError)
+                        ? $"'{FormatScalar(raw)}' is not an integer."
+                        : intError;
                     return false;
                 case "double":
                 case "float":
@@ -266,6 +284,51 @@ public class VariableReadOperator : OperatorBase
         }
     }
 
+    private static bool TryConvertToInt64(
+        object? raw,
+        ProjectVariableConversionMode? conversionMode,
+        out long value,
+        out string error)
+    {
+        value = 0L;
+        error = string.Empty;
+        if (!conversionMode.HasValue)
+        {
+            return TryConvertToInt64(raw, out value);
+        }
+
+        if (!TryReadDecimal(raw, out var number))
+        {
+            error = $"'{FormatScalar(raw)}' is not an integer.";
+            return false;
+        }
+
+        var hasFraction = decimal.Truncate(number) != number;
+        if (hasFraction && conversionMode.Value == ProjectVariableConversionMode.Exact)
+        {
+            error = "Fractional numeric values require an explicit Round, Floor, Ceiling or Truncate conversion mode.";
+            return false;
+        }
+
+        var converted = conversionMode.Value switch
+        {
+            ProjectVariableConversionMode.Round => decimal.Round(number, 0, MidpointRounding.AwayFromZero),
+            ProjectVariableConversionMode.Floor => decimal.Floor(number),
+            ProjectVariableConversionMode.Ceiling => decimal.Ceiling(number),
+            ProjectVariableConversionMode.Truncate => decimal.Truncate(number),
+            _ => number
+        };
+
+        if (converted < long.MinValue || converted > long.MaxValue)
+        {
+            error = "Converted integer value is outside Int64 range.";
+            return false;
+        }
+
+        value = decimal.ToInt64(converted);
+        return true;
+    }
+
     private static bool TryConvertToInt64(object? raw, out long value)
     {
         value = 0L;
@@ -282,6 +345,52 @@ public class VariableReadOperator : OperatorBase
             JsonElement jsonElement => TryConvertToInt64(ConvertJsonElement(jsonElement), out value),
             _ => long.TryParse(FormatScalar(raw), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
         };
+    }
+
+    private static bool TryReadDecimal(object? raw, out decimal number)
+    {
+        number = 0m;
+        try
+        {
+            switch (raw)
+            {
+                case null:
+                    return false;
+                case decimal decimalValue:
+                    number = decimalValue;
+                    return true;
+                case JsonElement jsonElement:
+                    return TryReadDecimal(ConvertJsonElement(jsonElement), out number);
+                case byte byteValue:
+                    number = byteValue;
+                    return true;
+                case short shortValue:
+                    number = shortValue;
+                    return true;
+                case int intValue:
+                    number = intValue;
+                    return true;
+                case long longValue:
+                    number = longValue;
+                    return true;
+                case float floatValue when float.IsFinite(floatValue):
+                    number = Convert.ToDecimal(floatValue);
+                    return true;
+                case double doubleValue when double.IsFinite(doubleValue):
+                    number = Convert.ToDecimal(doubleValue);
+                    return true;
+            }
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        return decimal.TryParse(
+            FormatScalar(raw),
+            NumberStyles.Float | NumberStyles.AllowThousands,
+            CultureInfo.InvariantCulture,
+            out number);
     }
 
     private static bool TryConvertToDouble(object? raw, out double value)
@@ -643,7 +752,7 @@ public class VariableReadOperator : OperatorBase
             rawValue = ProjectVariableValueConverter.ToObject(snapshot.Value) ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(outputFieldName))
             {
-                if (!TryResolveReadValue(rawValue, definition.Name, defaultValue, dataType, outputFieldName, failOnMissingOutputField, out value, out outputFieldFound, out readSourceSuffix, out var readError))
+                if (!TryResolveReadValue(rawValue, definition.Name, defaultValue, dataType, outputFieldName, failOnMissingOutputField, null, out value, out outputFieldFound, out readSourceSuffix, out var readError))
                 {
                     return OperatorExecutionOutput.Failure(readError);
                 }

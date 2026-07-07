@@ -123,6 +123,22 @@ public class DelayOperatorTests
 
 public class VariableReadOperatorTests
 {
+    public static IEnumerable<object[]> RunIntegerConversionCases()
+    {
+        yield return new object[] { 2.5d, "Round", 3L };
+        yield return new object[] { 2.9m, "Floor", 2L };
+        yield return new object[] { "2.1", "Ceiling", 3L };
+        yield return new object[] { "-2.9", "Truncate", -2L };
+        yield return new object[] { "42", "Exact", 42L };
+    }
+
+    public static IEnumerable<object[]> RunIntegerExactFractionCases()
+    {
+        yield return new object[] { 2.5d };
+        yield return new object[] { 2.5m };
+        yield return new object[] { "2.5" };
+    }
+
     [Fact]
     public async Task ExecuteAsync_ShouldReadTypedValueFromContext()
     {
@@ -138,6 +154,46 @@ public class VariableReadOperatorTests
         result.IsSuccess.Should().BeTrue();
         result.OutputData!["Exists"].Should().Be(true);
         result.OutputData["Value"].Should().Be(42.5);
+    }
+
+    [Theory]
+    [MemberData(nameof(RunIntegerConversionCases))]
+    public async Task ExecuteAsync_WithRunScopeIntConversionMode_ShouldConvertFractionalNumericValues(
+        object rawValue,
+        string conversionMode,
+        long expectedValue)
+    {
+        var context = new VariableContext();
+        context.SetValue("score", rawValue);
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ConversionMode", conversionMode, "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Value"].Should().Be(expectedValue);
+        result.OutputData["ReadSource"].Should().Be("RunVariable");
+    }
+
+    [Theory]
+    [MemberData(nameof(RunIntegerExactFractionCases))]
+    public async Task ExecuteAsync_WithRunScopeIntExactAndFraction_ShouldFailWithoutDefaultFallback(object rawValue)
+    {
+        var context = new VariableContext();
+        context.SetValue("score", rawValue);
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ConversionMode", "Exact", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Fractional numeric values require");
     }
 
     [Fact]
