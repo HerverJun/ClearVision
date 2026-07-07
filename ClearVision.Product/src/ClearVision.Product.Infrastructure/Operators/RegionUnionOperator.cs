@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Region",
     IconName = "region-union",
     Keywords = new[] { "Region", "Union", "Boolean", "Merge", "Combine" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Run-length region union",

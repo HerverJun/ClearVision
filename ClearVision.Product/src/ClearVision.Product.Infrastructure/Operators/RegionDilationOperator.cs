@@ -23,7 +23,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Morphology",
     IconName = "region-dilation",
     Keywords = new[] { "Region", "Dilation", "Morphology", "Expand", "Grow", "RLE" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Region morphology dilation",

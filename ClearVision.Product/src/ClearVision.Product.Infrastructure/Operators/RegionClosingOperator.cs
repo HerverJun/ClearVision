@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Morphology",
     IconName = "region-closing",
     Keywords = new[] { "Region", "Closing", "Morphology", "HoleFilling", "Connect" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Region morphology closing",

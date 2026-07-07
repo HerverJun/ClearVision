@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Morphology",
     IconName = "region-skeleton",
     Keywords = new[] { "Region", "Skeleton", "Thinning", "ZhangSuen", "Topology" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Zhang-Suen thinning",

@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Region",
     IconName = "region-difference",
     Keywords = new[] { "Region", "Difference", "Boolean", "Subtract" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Run-length row subtraction",

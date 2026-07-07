@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Region",
     IconName = "region-intersection",
     Keywords = new[] { "Region", "Intersection", "Boolean", "Overlap" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Run-length row intersection",

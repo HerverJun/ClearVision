@@ -19,7 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Morphology",
     IconName = "region-opening",
     Keywords = new[] { "Region", "Opening", "Morphology", "NoiseRemoval", "Smooth" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Region morphology opening",

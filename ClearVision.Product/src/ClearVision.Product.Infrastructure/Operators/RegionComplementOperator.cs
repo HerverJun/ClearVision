@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "Region",
     IconName = "region-complement",
     Keywords = new[] { "Region", "Complement", "Invert", "Background" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Bounded run-length complement",
