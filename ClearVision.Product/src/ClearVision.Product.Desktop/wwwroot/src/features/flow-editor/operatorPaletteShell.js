@@ -1,7 +1,24 @@
 import {
     createCategoryIconElement,
-    createOperatorIconElement
+    createOperatorIconElement,
+    createPathIconElement
 } from '../../shared/operatorIconRenderer.js';
+import {
+    buildOperatorSearchText,
+    searchOperators
+} from '../../shared/operatorSearch.js';
+
+export const GLOBAL_SEARCH_GROUP_KEY = 'global-search';
+
+const SEARCH_ICON_PATH =
+    'M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.45-1.41 1.41-4.45-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z';
+
+const GLOBAL_SEARCH_GROUP = {
+    key: GLOBAL_SEARCH_GROUP_KEY,
+    label: '搜索',
+    kind: 'global-search',
+    operators: []
+};
 
 const STATIC_GROUPS = [
     {
@@ -51,55 +68,7 @@ function getOperatorCategory(operator) {
     return normalizeText(operator?.category || operator?.Category || '其他') || '其他';
 }
 
-function buildSearchText(operator) {
-    const ports = [
-        ...(Array.isArray(operator?.inputPorts) ? operator.inputPorts : []),
-        ...(Array.isArray(operator?.InputPorts) ? operator.InputPorts : []),
-        ...(Array.isArray(operator?.outputPorts) ? operator.outputPorts : []),
-        ...(Array.isArray(operator?.OutputPorts) ? operator.OutputPorts : [])
-    ];
-    const parameters = [
-        ...(Array.isArray(operator?.parameters) ? operator.parameters : []),
-        ...(Array.isArray(operator?.Parameters) ? operator.Parameters : [])
-    ];
-    const tags = [
-        ...(Array.isArray(operator?.tags) ? operator.tags : []),
-        ...(Array.isArray(operator?.Tags) ? operator.Tags : []),
-        ...(Array.isArray(operator?.keywords) ? operator.keywords : []),
-        ...(Array.isArray(operator?.Keywords) ? operator.Keywords : [])
-    ];
-
-    return [
-        getOperatorTitle(operator),
-        getOperatorType(operator),
-        getOperatorCategory(operator),
-        operator?.description,
-        operator?.Description,
-        ...tags,
-        ...ports.flatMap(port => [
-            port?.name,
-            port?.Name,
-            port?.displayName,
-            port?.DisplayName,
-            port?.dataType,
-            port?.DataType,
-            port?.type,
-            port?.Type
-        ]),
-        ...parameters.flatMap(parameter => [
-            parameter?.name,
-            parameter?.Name,
-            parameter?.displayName,
-            parameter?.DisplayName,
-            parameter?.description,
-            parameter?.Description,
-            parameter?.dataType,
-            parameter?.DataType,
-            parameter?.type,
-            parameter?.Type
-        ])
-    ].filter(Boolean).join(' ').toLowerCase();
-}
+export { buildOperatorSearchText };
 
 export function buildOperatorGroups(operators = []) {
     const buckets = new Map();
@@ -123,12 +92,93 @@ export function buildOperatorGroups(operators = []) {
 }
 
 export function filterOperatorsForFlyout(operators = [], keyword = '') {
-    const term = normalizeText(keyword).toLowerCase();
-    if (!term) {
-        return operators.slice();
-    }
+    return searchOperators(operators, keyword);
+}
 
-    return operators.filter(operator => buildSearchText(operator).includes(term));
+export function buildPaletteGroupsFromCategories(categoryGroups = []) {
+    return [
+        { ...GLOBAL_SEARCH_GROUP },
+        ...STATIC_GROUPS.map(group => ({
+            ...group,
+            kind: 'static',
+            operators: []
+        })),
+        ...(Array.isArray(categoryGroups) ? categoryGroups : [])
+    ];
+}
+
+export function buildPaletteGroups(operators = []) {
+    return buildPaletteGroupsFromCategories(buildOperatorGroups(operators));
+}
+
+export function isGlobalSearchGroupKey(groupKey) {
+    return groupKey === GLOBAL_SEARCH_GROUP_KEY;
+}
+
+export function clampScrollValue(value = 0, scrollSize = 0, clientSize = 0) {
+    const numericValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+    const max = Math.max(0, Number(scrollSize || 0) - Number(clientSize || 0));
+    return Math.min(Math.max(0, numericValue), max);
+}
+
+export function clampScrollState(scrollState = {}, metrics = {}) {
+    return {
+        scrollTop: clampScrollValue(scrollState.scrollTop, metrics.scrollHeight, metrics.clientHeight),
+        scrollLeft: clampScrollValue(scrollState.scrollLeft, metrics.scrollWidth, metrics.clientWidth)
+    };
+}
+
+export function createFlyoutViewModel({
+    activeGroup = null,
+    allOperators = [],
+    searchTerm = ''
+} = {}) {
+    const term = normalizeText(searchTerm);
+    const globalMode = isGlobalSearchGroupKey(activeGroup?.key);
+    const sourceOperators = globalMode
+        ? (Array.isArray(allOperators) ? allOperators : [])
+        : (Array.isArray(activeGroup?.operators) ? activeGroup.operators : []);
+    const operators = filterOperatorsForFlyout(sourceOperators, term);
+    const hasSearch = term.length > 0;
+    const scopeLabel = globalMode ? '全部算子' : (activeGroup?.label || '当前分组');
+    const title = globalMode ? '全部算子' : (activeGroup?.label || '算子');
+    const subtitle = globalMode
+        ? `搜索范围：全部算子 · ${hasSearch ? `${operators.length} 个匹配结果` : `${sourceOperators.length} 个算子`}`
+        : activeGroup?.kind === 'category'
+            ? (hasSearch
+                ? `搜索范围：${scopeLabel} · ${operators.length} 个匹配结果`
+                : `${sourceOperators.length} 个算子`)
+            : (activeGroup?.kind === 'static'
+                ? '静态入口'
+                : `搜索范围：${scopeLabel}`);
+    const emptyTitle = hasSearch
+        ? '未找到匹配算子'
+        : (activeGroup?.emptyTitle || '该分组暂无算子');
+    const emptyText = hasSearch
+        ? '未找到匹配算子，可尝试输入算子名称、类型、端口或参数。'
+        : globalMode
+            ? '请输入关键词搜索全部算子，或直接浏览全部算子。'
+            : (activeGroup?.emptyText || '该分组当前没有可添加的算子。');
+
+    return {
+        mode: globalMode ? 'global' : 'category',
+        globalMode,
+        hasSearch,
+        sourceOperators,
+        operators,
+        title,
+        subtitle,
+        emptyTitle,
+        emptyText,
+        placeholder: globalMode
+            ? '搜索全部算子：名称、类型、端口、参数'
+            : '搜索本分类算子',
+        showCategoryLabels: globalMode
+    };
+}
+
+export function createOperatorPayload(operator) {
+    return operator && typeof operator === 'object' ? { ...operator } : null;
 }
 
 export class OperatorPaletteShell {
@@ -200,14 +250,7 @@ export class OperatorPaletteShell {
     }
 
     getAllGroups() {
-        return [
-            ...STATIC_GROUPS.map(group => ({
-                ...group,
-                kind: 'static',
-                operators: []
-            })),
-            ...this.groups
-        ];
+        return buildPaletteGroupsFromCategories(this.groups);
     }
 
     getActiveGroup() {
@@ -215,11 +258,64 @@ export class OperatorPaletteShell {
         return allGroups.find(group => group.key === this.activeGroupKey) || allGroups[0] || null;
     }
 
+    isGlobalSearchActive() {
+        return isGlobalSearchGroupKey(this.activeGroupKey);
+    }
+
+    getRailScroller() {
+        return this.rail?.querySelector?.('.operator-rail-inner') || this.rail || null;
+    }
+
+    getFlyoutListScroller() {
+        return this.flyout?.querySelector?.('[data-palette-list="true"]') || null;
+    }
+
+    captureScrollState(element) {
+        if (!element) {
+            return null;
+        }
+
+        return {
+            scrollTop: element.scrollTop || 0,
+            scrollLeft: element.scrollLeft || 0
+        };
+    }
+
+    restoreScrollState(getElement, scrollState) {
+        if (!scrollState || typeof getElement !== 'function') {
+            return;
+        }
+
+        const restore = () => {
+            const element = getElement();
+            if (!element) {
+                return;
+            }
+
+            const next = clampScrollState(scrollState, {
+                scrollHeight: element.scrollHeight,
+                clientHeight: element.clientHeight,
+                scrollWidth: element.scrollWidth,
+                clientWidth: element.clientWidth
+            });
+            element.scrollTop = next.scrollTop;
+            element.scrollLeft = next.scrollLeft;
+        };
+
+        const win = globalThis.window;
+        if (typeof win?.requestAnimationFrame === 'function') {
+            win.requestAnimationFrame(restore);
+        } else {
+            restore();
+        }
+    }
+
     renderRail() {
         if (!this.rail) {
             return;
         }
 
+        const railScroll = this.captureScrollState(this.getRailScroller());
         const groups = this.getAllGroups();
         this.rail.innerHTML = `
             <div class="operator-rail-inner" data-testid="operator-rail">
@@ -227,6 +323,7 @@ export class OperatorPaletteShell {
                     <button type="button"
                             class="operator-rail-item"
                             data-palette-group="${escapeHtml(group.key)}"
+                            data-palette-kind="${escapeHtml(group.kind || '')}"
                             aria-pressed="${group.key === this.activeGroupKey ? 'true' : 'false'}"
                             title="${escapeHtml(group.label)}">
                         <span class="operator-rail-icon" data-rail-icon="${escapeHtml(group.key)}"></span>
@@ -243,6 +340,11 @@ export class OperatorPaletteShell {
                 return;
             }
 
+            if (group.kind === 'global-search') {
+                iconHost.replaceChildren(createPathIconElement(SEARCH_ICON_PATH, 'operator-rail-svg', '#d4a853'));
+                return;
+            }
+
             if (group.kind === 'static') {
                 iconHost.textContent = group.key === 'recent' ? '近' : '藏';
                 return;
@@ -250,42 +352,35 @@ export class OperatorPaletteShell {
 
             iconHost.replaceChildren(createCategoryIconElement(group.label, 'operator-rail-svg'));
         });
+
+        this.restoreScrollState(() => this.getRailScroller(), railScroll);
     }
 
-    renderFlyout() {
+    renderFlyout({ preserveListScroll = true } = {}) {
         if (!this.flyout) {
             return;
         }
 
+        const listScroll = preserveListScroll
+            ? this.captureScrollState(this.getFlyoutListScroller())
+            : null;
         const activeGroup = this.getActiveGroup();
         const allOperators = this.getOperators();
-        const searching = normalizeText(this.searchTerm).length > 0;
-        const sourceOperators = searching
-            ? allOperators
-            : (activeGroup?.operators || []);
-        const operators = filterOperatorsForFlyout(sourceOperators, this.searchTerm);
+        const viewModel = createFlyoutViewModel({
+            activeGroup,
+            allOperators,
+            searchTerm: this.searchTerm
+        });
+        const operators = viewModel.operators;
         this.renderedOperators = operators;
 
-        const title = searching ? '搜索算子' : (activeGroup?.label || '算子');
-        const subtitle = searching
-            ? `共 ${operators.length} 个匹配结果`
-            : activeGroup?.kind === 'category'
-                ? `${operators.length} 个算子`
-                : '静态入口';
-        const emptyTitle = searching
-            ? '未找到匹配算子'
-            : (activeGroup?.emptyTitle || '该分组暂无算子');
-        const emptyText = searching
-            ? '请换一个关键词，或从左侧分组浏览。'
-            : (activeGroup?.emptyText || '该分组当前没有可添加的算子。');
-
         this.flyout.innerHTML = `
-            <section class="operator-group-flyout-panel" data-testid="operator-group-flyout">
+            <section class="operator-group-flyout-panel" data-testid="operator-group-flyout" data-palette-mode="${escapeHtml(viewModel.mode)}">
                 <header class="operator-flyout-header">
                     <div>
                         <div class="operator-flyout-eyebrow">算子组</div>
-                        <h3>${escapeHtml(title)}</h3>
-                        <p>${escapeHtml(subtitle)}</p>
+                        <h3>${escapeHtml(viewModel.title)}</h3>
+                        <p>${escapeHtml(viewModel.subtitle)}</p>
                     </div>
                     <button type="button" class="operator-flyout-close" data-palette-close="true" aria-label="关闭算子组">×</button>
                 </header>
@@ -294,17 +389,20 @@ export class OperatorPaletteShell {
                     <input type="search"
                            class="cv-input"
                            data-palette-search="true"
-                           placeholder="搜索算子名称、类型、端口"
+                           placeholder="${escapeHtml(viewModel.placeholder)}"
                            autocomplete="off"
                            value="${escapeHtml(this.searchTerm)}">
                 </label>
                 <div class="operator-flyout-list" data-palette-list="true">
                     ${operators.length > 0
-                        ? operators.map((operator, index) => this.renderOperatorItem(operator, index)).join('')
+                        ? operators.map((operator, index) =>
+                            this.renderOperatorItem(operator, index, {
+                                showCategory: viewModel.showCategoryLabels
+                            })).join('')
                         : `
                             <div class="operator-flyout-empty">
-                                <strong>${escapeHtml(emptyTitle)}</strong>
-                                <span>${escapeHtml(emptyText)}</span>
+                                <strong>${escapeHtml(viewModel.emptyTitle)}</strong>
+                                <span>${escapeHtml(viewModel.emptyText)}</span>
                             </div>
                         `}
                 </div>
@@ -315,11 +413,14 @@ export class OperatorPaletteShell {
             const iconHost = this.flyout.querySelector(`[data-operator-icon="${index}"]`);
             iconHost?.replaceChildren(createOperatorIconElement(operator, 'operator-flyout-svg'));
         });
+
+        this.restoreScrollState(() => this.getFlyoutListScroller(), listScroll);
     }
 
-    renderOperatorItem(operator, index) {
+    renderOperatorItem(operator, index, { showCategory = false } = {}) {
         const title = getOperatorTitle(operator);
         const type = getOperatorType(operator);
+        const category = getOperatorCategory(operator);
         const description = operator?.description || operator?.Description || '暂无说明';
         const inputCount = (operator?.inputPorts || operator?.InputPorts || []).length;
         const outputCount = (operator?.outputPorts || operator?.OutputPorts || []).length;
@@ -336,6 +437,7 @@ export class OperatorPaletteShell {
                 <span class="operator-flyout-main">
                     <strong>${escapeHtml(title)}</strong>
                     <em>${escapeHtml(description)}</em>
+                    ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
                 </span>
                 <span class="operator-flyout-meta">
                     ${escapeHtml(inputCount)} 入 / ${escapeHtml(outputCount)} 出
@@ -374,7 +476,12 @@ export class OperatorPaletteShell {
             return;
         }
 
-        this.onOperatorAdd({ ...operator });
+        const payload = createOperatorPayload(operator);
+        if (!payload) {
+            return;
+        }
+
+        this.onOperatorAdd(payload);
         this.closeFlyout();
     }
 
@@ -384,8 +491,15 @@ export class OperatorPaletteShell {
         }
 
         this.searchTerm = event.target.value || '';
-        this.renderFlyout();
-        this.flyout?.querySelector('[data-palette-search="true"]')?.focus();
+        this.renderFlyout({ preserveListScroll: true });
+        const searchInput = this.flyout?.querySelector('[data-palette-search="true"]');
+        searchInput?.focus();
+        try {
+            const cursor = searchInput?.value?.length ?? 0;
+            searchInput?.setSelectionRange?.(cursor, cursor);
+        } catch {
+            // Some browser search inputs do not support selection ranges.
+        }
     }
 
     handleFlyoutDragStart(event) {
@@ -399,7 +513,11 @@ export class OperatorPaletteShell {
             return;
         }
 
-        const payload = { ...operator };
+        const payload = createOperatorPayload(operator);
+        if (!payload) {
+            return;
+        }
+
         event.dataTransfer?.setData('application/json', JSON.stringify(payload));
         if (event.dataTransfer) {
             event.dataTransfer.effectAllowed = 'copy';
@@ -437,10 +555,13 @@ export class OperatorPaletteShell {
     }
 
     openGroup(groupKey) {
+        const isSameGroup = this.activeGroupKey === groupKey;
         this.activeGroupKey = groupKey;
-        this.searchTerm = '';
+        if (!isSameGroup) {
+            this.searchTerm = '';
+        }
         this.renderRail();
-        this.renderFlyout();
+        this.renderFlyout({ preserveListScroll: isSameGroup });
         this.flyout?.classList.remove('hidden');
         this.flyout?.setAttribute('aria-hidden', 'false');
         this.flyout?.querySelector('[data-palette-search="true"]')?.focus();

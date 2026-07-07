@@ -374,6 +374,21 @@
     font-style: normal;
 }
 
+.operator-flyout-category {
+    width: max-content;
+    max-width: 100%;
+    padding: 2px 6px;
+    border: 1px solid rgba(212, 168, 83, 0.24);
+    border-radius: 6px;
+    color: var(--gold-accent);
+    background: rgba(212, 168, 83, 0.08);
+    font-size: 11px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .operator-flyout-meta {
     padding-right: 10px;
     color: var(--text-muted);

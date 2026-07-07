@@ -19,6 +19,7 @@ export class TreeView {
             onCollapse: null,
             onDoubleClick: null,
             renderNode: null,
+            preserveScroll: false,
             ...options
         };
 
@@ -51,10 +52,32 @@ export class TreeView {
      * 渲染树
      */
     render() {
+        const scrollState = this.options.preserveScroll
+            ? {
+                scrollTop: this.container.scrollTop || 0,
+                scrollLeft: this.container.scrollLeft || 0
+            }
+            : null;
+
         this.container.innerHTML = '';
         if (this.root && this.root.children) {
             const ul = this.createNodeList(this.root.children, 0);
             this.container.appendChild(ul);
+        }
+
+        if (scrollState) {
+            const restore = () => {
+                const maxTop = Math.max(0, this.container.scrollHeight - this.container.clientHeight);
+                const maxLeft = Math.max(0, this.container.scrollWidth - this.container.clientWidth);
+                this.container.scrollTop = Math.min(Math.max(0, scrollState.scrollTop), maxTop);
+                this.container.scrollLeft = Math.min(Math.max(0, scrollState.scrollLeft), maxLeft);
+            };
+            const win = globalThis.window;
+            if (typeof win?.requestAnimationFrame === 'function') {
+                win.requestAnimationFrame(restore);
+            } else {
+                restore();
+            }
         }
     }
 

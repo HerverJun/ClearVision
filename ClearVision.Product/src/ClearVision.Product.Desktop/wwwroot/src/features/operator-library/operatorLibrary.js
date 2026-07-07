@@ -30,6 +30,10 @@ import {
     normalizeOperatorIconName,
     renderOperatorIconInto
 } from '../../shared/operatorIconRenderer.js';
+import {
+    buildOperatorSearchText,
+    searchOperators
+} from '../../shared/operatorSearch.js';
 
 export class OperatorLibraryPanel {
     constructor(containerId) {
@@ -107,6 +111,7 @@ export class OperatorLibraryPanel {
             selectable: true,
             multiSelect: false,
             draggable: false,
+            preserveScroll: true,
             onSelect: (node) => {
                 if (node.type === 'operator') {
                     if (this.onOperatorSelected) {
@@ -564,65 +569,18 @@ export class OperatorLibraryPanel {
      * 搜索算子
      */
     searchOperators(keyword) {
-        if (!keyword.trim()) {
-            this.filteredOperators = this.operators;
-        } else {
-            const lowerKeyword = keyword.toLowerCase();
-            this.filteredOperators = this.operators.filter(op =>
-                this.buildOperatorSearchText(op).includes(lowerKeyword)
-            );
-        }
+        this.filteredOperators = searchOperators(this.operators, keyword);
         
         this.renderOperatorTree();
         
         // 显示搜索结果
-        if (keyword.trim()) {
+        if (String(keyword ?? '').trim()) {
             showToast(`找到 ${this.filteredOperators.length} 个算子`, 'info');
         }
     }
 
     buildOperatorSearchText(operator) {
-        const collectPortText = port => [
-            port?.name,
-            port?.Name,
-            port?.displayName,
-            port?.DisplayName,
-            port?.dataType,
-            port?.DataType,
-            port?.type,
-            port?.Type,
-            port?.description,
-            port?.Description
-        ].filter(Boolean).join(' ');
-        const collectParameterText = param => [
-            param?.name,
-            param?.Name,
-            param?.displayName,
-            param?.DisplayName,
-            param?.description,
-            param?.Description,
-            param?.dataType,
-            param?.DataType,
-            param?.type,
-            param?.Type,
-            ...((Array.isArray(param?.options || param?.Options) ? (param.options || param.Options) : [])
-                .map(option => typeof option === 'string'
-                    ? option
-                    : `${option?.label || option?.Label || ''} ${option?.value ?? option?.Value ?? ''}`))
-        ].filter(Boolean).join(' ');
-
-        return [
-            operator?.displayName,
-            operator?.name,
-            operator?.type,
-            operator?.description,
-            operator?.category,
-            ...(operator?.tags || []),
-            ...(operator?.keywords || []),
-            ...(operator?.inputPorts || []).map(collectPortText),
-            ...(operator?.outputPorts || []).map(collectPortText),
-            ...(operator?.parameters || []).map(collectParameterText)
-        ].filter(Boolean).join(' ').toLowerCase();
+        return buildOperatorSearchText(operator);
     }
 
     /**

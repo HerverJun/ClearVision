@@ -193,7 +193,7 @@ test.describe('Flow Editor', () => {
     await page.reload();
     await expect(page.locator('#loading-screen')).toBeHidden();
 
-    await expect(page.locator('#operator-rail .operator-rail-item')).toContainText(['最近', '收藏', '输入', '预处理']);
+    await expect(page.locator('#operator-rail .operator-rail-item')).toContainText(['搜索', '最近', '收藏', '输入', '预处理']);
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
 
     await page.locator('#operator-rail .operator-rail-item', { hasText: '预处理' }).click();

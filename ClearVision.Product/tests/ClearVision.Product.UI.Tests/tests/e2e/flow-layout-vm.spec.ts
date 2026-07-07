@@ -145,6 +145,12 @@ function buildObservation(request: any, success: boolean) {
 }
 
 async function installRoutes(page: Page, previewMode: PreviewMode) {
+  await page.route('**/favicon.ico', async route => {
+    await route.fulfill({
+      status: 204,
+    });
+  });
+
   await page.route('**/api/operators/library', async route => {
     await route.fulfill({
       status: 200,
@@ -185,6 +191,14 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
       status: 200,
       contentType: 'application/json',
       body: '[]',
+    });
+  });
+
+  await page.route('**/api/projects/*/global-variable-values', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{}',
     });
   });
 
@@ -411,6 +425,17 @@ async function captureFlowLayoutState(page: Page, testInfo: TestInfo, name: stri
   });
 }
 
+async function captureOperatorPaletteState(page: Page, testInfo: TestInfo, name: string) {
+  await page.evaluate(() => {
+    document.querySelector('#cv-toast-container')?.replaceChildren();
+  });
+  await page.waitForTimeout(50);
+  await page.screenshot({
+    path: testInfo.outputPath(`operator-palette-${name}.png`),
+    fullPage: false,
+  });
+}
+
 async function assertLowHeightScrollability(page: Page) {
   const scrollState = await page.evaluate(() => {
     const read = (selector: string) => {
@@ -453,7 +478,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
   test('renders group rail and opens/closes operator flyout with search', async ({ page }) => {
     await expect(page.locator('#operator-rail')).toBeVisible();
-    await expect(page.locator('#operator-rail .operator-rail-item')).toContainText(['最近', '收藏', '输入', '预处理']);
+    await expect(page.locator('#operator-rail .operator-rail-item')).toContainText(['搜索', '最近', '收藏', '输入', '预处理']);
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
 
     await openPreprocessFlyout(page);
@@ -466,6 +491,114 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
+  });
+
+  test('supports global operator search, scoped category search, drag-add, and rail scroll retention', async ({ page }, testInfo) => {
+    const consoleErrors: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        const location = message.location();
+        consoleErrors.push(`${message.text()} ${location.url}:${location.lineNumber}:${location.columnNumber}`);
+      }
+    });
+
+    await expect(page.locator('#operator-rail .operator-rail-item', { hasText: '搜索' })).toBeVisible();
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '搜索' }).click();
+    await expect(page.locator('#operator-group-flyout')).toBeVisible();
+    await expect(page.locator('#operator-group-flyout')).toContainText('全部算子');
+    await expect(page.locator('#operator-group-flyout')).toContainText('搜索范围：全部算子');
+    await expect(page.locator('[data-palette-search="true"]')).toHaveAttribute('placeholder', '搜索全部算子：名称、类型、端口、参数');
+
+    await page.locator('[data-palette-search="true"]').fill('Image');
+    await expect(page.locator('#operator-group-flyout')).toContainText('图像采集');
+    await expect(page.locator('#operator-group-flyout')).toContainText('阈值分割');
+    await expect(page.locator('#operator-group-flyout')).toContainText('预处理');
+    await captureOperatorPaletteState(page, testInfo, 'global-search-results');
+
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '预处理' }).click();
+    await page.locator('[data-palette-search="true"]').fill('采集源');
+    await expect(page.locator('#operator-group-flyout')).toContainText('搜索范围：预处理');
+    await expect(page.locator('#operator-group-flyout')).toContainText('未找到匹配算子，可尝试输入算子名称、类型、端口或参数。');
+
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '搜索' }).click();
+    await page.locator('[data-palette-search="true"]').fill('采集源');
+    await expect(page.locator('#operator-group-flyout .operator-flyout-item')).toHaveCount(1);
+    await expect(page.locator('#operator-group-flyout')).toContainText('图像采集');
+
+    const dropResult = await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      const canvas = document.querySelector('#flow-canvas') as HTMLCanvasElement;
+      const item = document.querySelector('.operator-flyout-item[data-operator-type="ImageAcquisition"]') as HTMLElement;
+      if (!flowCanvas || !canvas || !item) {
+        throw new Error('缺少全局搜索拖拽验证元素');
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const clientX = rect.left + 220;
+      const clientY = rect.top + 180;
+      const beforeIds = new Set(Array.from(flowCanvas.nodes.keys()));
+      const dataTransfer = new DataTransfer();
+
+      item.dispatchEvent(new DragEvent('dragstart', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+      }));
+      canvas.dispatchEvent(new DragEvent('dragover', {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+        clientY,
+        dataTransfer,
+      }));
+      canvas.dispatchEvent(new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+        clientY,
+        dataTransfer,
+      }));
+
+      const added = Array.from(flowCanvas.nodes.values()).find((node: any) => !beforeIds.has(node.id)) as any;
+      return {
+        count: flowCanvas.nodes.size,
+        addedType: added?.type ?? null,
+      };
+    });
+    expect(dropResult.count).toBeGreaterThan(0);
+    expect(dropResult.addedType).toBe('ImageAcquisition');
+
+    await page.evaluate(async () => {
+      const module = await import('/src/core/app/serviceRegistry.js');
+      const shell = module.default.get('operatorPaletteShell');
+      if (!shell) {
+        throw new Error('operatorPaletteShell 未注册');
+      }
+      const extras = Array.from({ length: 18 }, (_, index) => ({
+        key: `category:scroll-test-${index}`,
+        label: `测试${String(index).padStart(2, '0')}`,
+        kind: 'category',
+        operators: []
+      }));
+      shell.groups = [...shell.groups.filter((group: any) => !String(group.key).includes('scroll-test')), ...extras];
+      shell.renderRail();
+    });
+
+    const railScroller = page.locator('#operator-rail .operator-rail-inner');
+    const scrollBeforeClick = await railScroller.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+      return element.scrollTop;
+    });
+    expect(scrollBeforeClick).toBeGreaterThan(0);
+
+    await page.locator('#operator-rail .operator-rail-item', { hasText: '测试17' }).click();
+    await page.waitForTimeout(100);
+    const scrollAfterClick = await railScroller.evaluate(element => element.scrollTop);
+    expect(scrollAfterClick).toBeGreaterThan(0);
+    expect(Math.abs(scrollAfterClick - scrollBeforeClick)).toBeLessThanOrEqual(2);
+    await captureOperatorPaletteState(page, testInfo, 'rail-scroll-preserved');
+
+    expect(consoleErrors).toEqual([]);
   });
 
   test('adds an operator from flyout and switches inspector and preview workbench', async ({ page }) => {
