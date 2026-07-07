@@ -366,18 +366,28 @@ const AI_CODE_TEXT_MAP = {
 
 const AI_OPERATOR_LABELS = {
     ImageAcquisition: '图像采集',
+    ROIManager: 'ROI管理器',
     SurfaceDefectDetection: '表面缺陷检测',
     BlobAnalysis: '斑点分析',
+    Threshold: '二值化',
+    BinaryImageToRegion: '二值图转区域',
+    RegionClosing: '区域闭运算',
+    Grayscale: '灰度化',
+    GaussianBlur: '高斯滤波',
     DeepLearning: '深度学习检测',
+    TemplateMatch: '模板匹配',
     TemplateMatching: '模板匹配',
     CircleMeasurement: '圆测量',
+    GeoMeasurement: '几何距离测量',
     Measurement: '几何测量',
     MeasureDistance: '距离测量',
     UnitConvert: '单位换算',
+    ConditionJudge: '条件判断',
     DetectionSequenceJudge: '序列判定',
     ImageAdd: '图像叠加',
     ResultJudgment: '结果判定',
-    ResultOutput: '结果输出'
+    ResultOutput: '结果输出',
+    TcpCommunication: 'TCP通讯'
 };
 
 const AI_PARAMETER_LABELS = {

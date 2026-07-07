@@ -288,6 +288,32 @@ test('AI draft normalization ignores leaked tempId labels', async () => {
   operator.title = '用户自定义名称';
   operator.displayName = '用户自定义名称';
   assert.equal(operator.metadata.agentTempId, 'op_1');
+
+  const normalizedChain = panel._normalizeWorkflowDraftForCanvas({
+    operators: [
+      { tempId: 'op_1', operatorType: 'ImageAcquisition', name: 'op_1', parameters: [] },
+      { tempId: 'op_2', operatorType: 'ROIManager', name: 'op_2', parameters: [] },
+      { tempId: 'op_3', operatorType: 'Threshold', name: 'op_3', parameters: [] },
+      { tempId: 'op_4', operatorType: 'BinaryImageToRegion', name: 'op_4', parameters: [] },
+      { tempId: 'op_5', operatorType: 'BlobAnalysis', name: 'op_5', parameters: [] },
+      { tempId: 'op_6', operatorType: 'ConditionJudge', name: 'op_6', parameters: [] },
+      { tempId: 'op_7', operatorType: 'ResultOutput', name: 'op_7', parameters: [] }
+    ],
+    connections: []
+  });
+
+  assert.deepEqual(
+    normalizedChain.operators.map(item => item.name),
+    ['图像采集', 'ROI管理器', '二值化', '二值图转区域', '斑点分析', '条件判断', '结果输出']
+  );
+  assert.deepEqual(
+    normalizedChain.operators.map(item => item.metadata.agentTempId),
+    ['op_1', 'op_2', 'op_3', 'op_4', 'op_5', 'op_6', 'op_7']
+  );
+  assert.doesNotMatch(
+    JSON.stringify(normalizedChain.operators.map(item => item.name)),
+    /ROIManager|Threshold|BinaryImageToRegion|ConditionJudge|\bop_\d+\b/
+  );
 });
 
 test('AiPanel undo notifies canvas flow change with restored snapshot', async () => {

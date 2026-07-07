@@ -249,14 +249,14 @@ test.describe('Node Preview Overlay', () => {
     });
 
     await expect(page.locator('#preview-output-list')).toContainText('Detections');
-    await expect(page.locator('#preview-output-list')).toContainText('2 detections');
-    await expect(page.locator('#preview-output-list')).toContainText('1 suppressed');
-    await expect(page.locator('#preview-output-list')).toContainText('2 fields');
+    await expect(page.locator('#preview-output-list')).toContainText('2 个检测结果');
+    await expect(page.locator('#preview-output-list')).toContainText('1 个已抑制');
+    await expect(page.locator('#preview-output-list')).toContainText('2 个字段');
     await expect(page.locator('#preview-output-list')).not.toContainText('Wire_Black');
     await expect(page.locator('#preview-output-list')).not.toContainText('{"detections"');
 
-    await expect(page.locator('.node-preview-summary')).toContainText('2 detections');
-    await expect(page.locator('.node-preview-summary')).toContainText('1 suppressed');
+    await expect(page.locator('.node-preview-summary')).toContainText('2 个检测结果');
+    await expect(page.locator('.node-preview-summary')).toContainText('1 个已抑制');
     await expect(page.locator('#preview-diagnostics-panel .ac-card').first()).toBeVisible();
 
     const outputListFits = await page.locator('#preview-output-list').evaluate(node =>
@@ -476,7 +476,9 @@ test.describe('Node Preview Inspector flag', () => {
       title: 'Inspector Node',
       outputs: [{ name: 'Image', type: 'Image' }],
     });
-    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+    await page.evaluate(() => {
+      void (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true });
+    });
 
     await expect(page.locator('.node-preview-inspector-card')).toBeVisible();
     await expect(page.locator('.node-preview-card')).toHaveCount(0);
