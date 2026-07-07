@@ -30,6 +30,21 @@ function formatCountLabel({ blocking, warnings, missing, executed, skipped, arti
 }
 
 export const aiPanelValidationPreviewMixin = {
+    _sanitizeValidationPreviewText(value, maxChars = 260) {
+        let text = String(value ?? '').trim();
+        if (!text) return '';
+        text = this._redactPublicDiagnosticText?.(text) || text;
+        return text
+            .replace(/(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)\s*[:=]\s*["']?[^"'\n,;}]+/gi, '[redacted]')
+            .replace(/(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)/gi, '[redacted]')
+            .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [redacted]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
+            .replace(/\bhttps?:\/\/[^\s"'<>|]+/gi, '[redacted:url]')
+            .replace(/\bsk-[A-Za-z0-9_-]{8,}/gi, '[redacted]')
+            .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[redacted]')
+            .slice(0, maxChars);
+    },
+
     _getObjectValue(source, names) {
         if (!source || typeof source !== 'object') {
             return undefined;
@@ -155,10 +170,10 @@ export const aiPanelValidationPreviewMixin = {
 
                 return {
                     actionType: String(item?.actionType ?? item?.ActionType ?? item?.type ?? item?.Type ?? 'pending').trim(),
-                    summary: String(item?.summary ?? item?.Summary ?? item?.message ?? item?.Message ?? item?.description ?? item?.Description ?? '').trim(),
-                    resourceKey: String(item?.resourceKey ?? item?.ResourceKey ?? '').trim(),
-                    operatorId: String(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '').trim(),
-                    parameterName: String(item?.parameterName ?? item?.ParameterName ?? '').trim()
+                    summary: this._sanitizeValidationPreviewText(item?.summary ?? item?.Summary ?? item?.message ?? item?.Message ?? item?.description ?? item?.Description ?? '', 260),
+                    resourceKey: this._sanitizeValidationPreviewText(item?.resourceKey ?? item?.ResourceKey ?? '', 140),
+                    operatorId: this._sanitizeValidationPreviewText(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '', 120),
+                    parameterName: this._sanitizeValidationPreviewText(item?.parameterName ?? item?.ParameterName ?? '', 120)
                 };
             })
             .filter(item => item.actionType || item.summary || item.resourceKey || item.operatorId || item.parameterName);
@@ -176,9 +191,9 @@ export const aiPanelValidationPreviewMixin = {
                     return { message: item, code: '', operatorId: '' };
                 }
                 return {
-                    message: String(item?.message ?? item?.Message ?? item?.summary ?? item?.Summary ?? item?.description ?? item?.Description ?? item?.resourceKey ?? item?.ResourceKey ?? '').trim(),
-                    code: String(item?.code ?? item?.Code ?? item?.resourceType ?? item?.ResourceType ?? '').trim(),
-                    operatorId: String(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '').trim()
+                    message: this._sanitizeValidationPreviewText(item?.message ?? item?.Message ?? item?.summary ?? item?.Summary ?? item?.description ?? item?.Description ?? item?.resourceKey ?? item?.ResourceKey ?? '', 260),
+                    code: this._sanitizeValidationPreviewText(item?.code ?? item?.Code ?? item?.resourceType ?? item?.ResourceType ?? '', 120),
+                    operatorId: this._sanitizeValidationPreviewText(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '', 120)
                 };
             })
             .filter(item => item.message || item.code || item.operatorId);
@@ -214,15 +229,15 @@ export const aiPanelValidationPreviewMixin = {
         const executed = this._getArrayValue(section, ['executedOperators', 'ExecutedOperators']);
         const skipped = this._getArrayValue(section, ['skippedOperators', 'SkippedOperators']);
         const artifacts = this._getArrayValue(section, ['artifacts', 'Artifacts']);
-        const summary = String(this._getObjectValue(section, ['summary', 'Summary', 'precheckSummary', 'PrecheckSummary', 'dryRunSummary', 'DryRunSummary']) ?? '').trim();
+        const summary = this._sanitizeValidationPreviewText(this._getObjectValue(section, ['summary', 'Summary', 'precheckSummary', 'PrecheckSummary', 'dryRunSummary', 'DryRunSummary']) ?? '', 320);
         const readyForDeployment = this._getBooleanValue(section, ['readyForDeployment', 'ReadyForDeployment']);
         const workflowDraftAllowed = this._getBooleanValue(section, ['workflowDraftAllowed', 'WorkflowDraftAllowed']);
         const previewReady = this._getBooleanValue(section, ['previewReady', 'PreviewReady']);
         const deployed = this._getBooleanValue(section, ['deployed', 'Deployed']);
         const packageCreated = this._getBooleanValue(section, ['packageCreated', 'PackageCreated']);
         const stationTouched = this._getBooleanValue(section, ['stationTouched', 'StationTouched']);
-        const adapterName = String(this._getObjectValue(section, ['adapterName', 'AdapterName']) ?? '').trim();
-        const previewMode = String(this._getObjectValue(section, ['previewMode', 'PreviewMode']) ?? '').trim();
+        const adapterName = this._sanitizeValidationPreviewText(this._getObjectValue(section, ['adapterName', 'AdapterName']) ?? '', 120);
+        const previewMode = this._sanitizeValidationPreviewText(this._getObjectValue(section, ['previewMode', 'PreviewMode']) ?? '', 120);
         const structureDryRunState = sectionKey === 'dryRun'
             ? this._getStructureDryRunState(section)
             : null;
@@ -329,7 +344,7 @@ export const aiPanelValidationPreviewMixin = {
         const missing = this._getArrayValue(dryRun, ['missingResources', 'MissingResources']);
         const executed = this._getArrayValue(dryRun, ['executedOperators', 'ExecutedOperators']);
         const skipped = this._getArrayValue(dryRun, ['skippedOperators', 'SkippedOperators']);
-        const summary = String(this._getObjectValue(dryRun, ['dryRunSummary', 'DryRunSummary', 'summary', 'Summary']) ?? '').trim();
+        const summary = this._sanitizeValidationPreviewText(this._getObjectValue(dryRun, ['dryRunSummary', 'DryRunSummary', 'summary', 'Summary']) ?? '', 320);
         const countLabel = formatCountLabel({
             blocking: blocking.length,
             warnings: warnings.length,
@@ -445,8 +460,8 @@ export const aiPanelValidationPreviewMixin = {
                         <div class="ai-agent-preview-header"><span title="missingResources">缺失资源</span><small>${missingResources.length}</small></div>
                         ${missingResources.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span title="${this._escapeHtml(item.resourceKey || item.parameterName || item.resourceType || 'missing')}">${this._escapeHtml(getParameterDisplayName(item.parameterName, { fallback: getResourceDisplayName(item.resourceType, { fallback: '缺失资源' }) }))}</span>
-                                <small>${this._escapeHtml(item.description || item.operatorId || '')}</small>
+                                <span title="${this._escapeHtml(this._sanitizeValidationPreviewText(item.resourceKey || item.parameterName || item.resourceType || 'missing', 140))}">${this._escapeHtml(this._sanitizeValidationPreviewText(getParameterDisplayName(item.parameterName, { fallback: getResourceDisplayName(item.resourceType, { fallback: '缺失资源' }) }), 160))}</span>
+                                <small>${this._escapeHtml(this._sanitizeValidationPreviewText(item.description || item.operatorId || '', 220))}</small>
                             </div>
                         `).join('')}
                     </div>
@@ -457,7 +472,7 @@ export const aiPanelValidationPreviewMixin = {
                         ${pendingActions.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
                                 <span title="${this._escapeHtml(item.actionType || 'pending')}">${this._escapeHtml(getStatusDisplayName(item.actionType, { fallback: '待处理动作' }))}</span>
-                                <small>${this._escapeHtml(item.summary || item.resourceKey || [item.operatorId, item.parameterName].filter(Boolean).join('.'))}</small>
+                                <small>${this._escapeHtml(this._sanitizeValidationPreviewText(item.summary || item.resourceKey || [item.operatorId, item.parameterName].filter(Boolean).join('.'), 260))}</small>
                             </div>
                         `).join('')}
                     </div>
@@ -498,8 +513,8 @@ export const aiPanelValidationPreviewMixin = {
             sections.push(`
                 <div class="ai-validation-retry-banner">
                     <div class="ai-validation-retry-title">需要手动确认</div>
-                    <div class="ai-validation-retry-summary">${this._escapeHtml(manualRetry.summary || manualRetry.repairTarget || '')}</div>
-                    <div class="ai-validation-retry-stage">失败阶段：${this._escapeHtml(manualRetry.stage || '未知')}</div>
+                    <div class="ai-validation-retry-summary">${this._escapeHtml(this._sanitizeValidationPreviewText(manualRetry.summary || manualRetry.repairTarget || '', 260))}</div>
+                    <div class="ai-validation-retry-stage">失败阶段：${this._escapeHtml(this._sanitizeValidationPreviewText(manualRetry.stage || '未知', 120))}</div>
                 </div>
             `);
         }
@@ -510,11 +525,11 @@ export const aiPanelValidationPreviewMixin = {
                 const issues = d.issues || d.Issues || [];
                 return issues.map(issue => ({
                     severity: issue.severity || issue.Severity || 'error',
-                    category: issue.category || issue.Category || '',
-                    code: issue.code || issue.Code || '',
-                    message: issue.message || issue.Message || '',
-                    repairHint: issue.repairHint || issue.RepairHint || '',
-                    operatorId: issue.operatorId || issue.OperatorId || ''
+                    category: this._sanitizeValidationPreviewText(issue.category || issue.Category || '', 120),
+                    code: this._sanitizeValidationPreviewText(issue.code || issue.Code || '', 120),
+                    message: this._sanitizeValidationPreviewText(issue.message || issue.Message || '', 260),
+                    repairHint: this._sanitizeValidationPreviewText(issue.repairHint || issue.RepairHint || '', 260),
+                    operatorId: this._sanitizeValidationPreviewText(issue.operatorId || issue.OperatorId || '', 120)
                 }));
             });
 
@@ -556,10 +571,10 @@ export const aiPanelValidationPreviewMixin = {
                         const isWarning = severity === 'warning';
                         const icon = isWarning ? '&#9888;' : '&#10007;';
                         const cls = isWarning ? 'is-warning' : 'is-error';
-                        const message = d.message || d.Message || '';
-                        const code = d.code || d.Code || '';
-                        const operatorId = d.operatorId || d.OperatorId || '';
-                        const repairHint = d.repairHint || d.RepairHint || '';
+                        const message = this._sanitizeValidationPreviewText(d.message || d.Message || '', 260);
+                        const code = this._sanitizeValidationPreviewText(d.code || d.Code || '', 120);
+                        const operatorId = this._sanitizeValidationPreviewText(d.operatorId || d.OperatorId || '', 120);
+                        const repairHint = this._sanitizeValidationPreviewText(d.repairHint || d.RepairHint || '', 260);
                         return `
                             <div class="ai-validation-issue ${cls}">
                                 <span class="ai-validation-issue-icon">${icon}</span>

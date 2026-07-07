@@ -1570,6 +1570,275 @@ function assertNoSensitiveLeak(text) {
   assert.doesNotMatch(text, /C:\\|D:\\|\\.onnx|192\\.168\\.|DB1\\.DBX|base64|data:image|sk-secret|token|key/i);
 }
 
+test('Assistant failure cards redact unsafe backend diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+
+  panel._renderAssistantFailure(turn, {
+    errorMessage: 'Build failed rawPrompt=secret systemPrompt=hidden chainOfThought=private baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token',
+    failureSummary: {
+      Message: 'Build failed with token=super-secret-value',
+      RepairTarget: 'Retry with public metadata only. apiKey=super-secret-value',
+      LastOutputSummary: 'Generated D:\\models\\secret.onnx'
+    },
+    lastAttemptDiagnostics: [
+      {
+        issues: [
+          {
+            category: 'planner',
+            code: 'rawPrompt=secret',
+            message: 'headers={Authorization: Bearer abcdefghijklmnop} plc://line1/DB1.DBX0.0',
+            repairHint: 'Remove baseUrl=http://example.invalid and C:\\factory\\secret.onnx'
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(turn.failureSection.hidden, false);
+  assert.match(turn.failureBody.innerHTML, /redacted/);
+  assertNoSensitiveLeak(turn.failureBody.innerHTML);
+});
+
+test('Firewall blocked alert redacts unsafe backend details', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chatContainer = createFakeElement();
+  panel.container = createContainer({ '#ai-chat-container': chatContainer });
+  const turn = attachAgentRunTurn(panel);
+
+  panel._handleFirewallBlocked({
+    payload: {
+      message: 'Proxy blocked rawPrompt=secret systemPrompt=hidden token=super-secret-value http://192.168.1.8/v1',
+      detail: 'Check C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token'
+    }
+  });
+
+  assert.equal(turn.failureSection.hidden, false);
+  assert.match(`${chatContainer.innerHTML} ${turn.failureBody.innerHTML}`, /redacted/);
+  assertNoSensitiveLeak(`${chatContainer.innerHTML} ${turn.failureBody.innerHTML}`);
+});
+
+test('System chat messages redact unsafe backend text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chatContainer = createFakeElement();
+  panel.container = createContainer({ '#ai-chat-container': chatContainer });
+  panel._addMessage = AiPanel.prototype._addMessage;
+
+  const message = panel._addMessage(
+    'system',
+    '历史加载失败: rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token'
+  );
+
+  assert.match(message.innerHTML, /redacted/);
+  assertNoSensitiveLeak(message.innerHTML);
+});
+
+test('Cancel and system error handlers redact unsafe boundary text before projection', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const capturedFailures = [];
+  panel._renderAssistantFailure = (_turn, failure) => capturedFailures.push(failure);
+
+  panel.isGenerating = true;
+  panel._handleCancelResult({ payload: { status: 'cancelled', message: `Cancel requested ${unsafe}` } });
+  panel.isGenerating = true;
+  panel._handleCancelResult({ payload: { status: 'failed', errorMessage: `Cancel failed ${unsafe}` } });
+
+  attachAgentRunTurn(panel);
+  panel._handleError(`Backend error ${unsafe}`);
+  panel._handleError(`Detached backend error ${unsafe}`);
+
+  const combined = `${(panel.messages || []).map(item => item.text).join('\n')}\n${JSON.stringify(capturedFailures)}`;
+  assert.match(combined, /redacted/);
+  assertNoSensitiveLeak(combined);
+});
+
+test('Result status notes redact unsafe backend text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const note = createFakeElement();
+  panel.container = createContainer({ '#ai-result-status-note': note });
+  panel._setResultStatusNote = AiPanel.prototype._setResultStatusNote;
+
+  panel._setResultStatusNote(
+    'Plan 状态已变化 rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token',
+    'warning'
+  );
+
+  assert.equal(note.hidden, false);
+  assert.equal(note.classList.contains('is-warning'), true);
+  assert.match(note.textContent, /redacted/);
+  assertNoSensitiveLeak(note.textContent);
+});
+
+test('Assistant public replies redact unsafe backend text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chatContainer = createFakeElement();
+  panel.container = createContainer({ '#ai-chat-container': chatContainer });
+  panel._addMessage = AiPanel.prototype._addMessage;
+  const unsafe = 'AI reply rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+
+  const message = panel._addMessage('ai', unsafe);
+  const turn = attachAgentRunTurn(panel);
+  panel._setAssistantSectionText(turn, 'reply', unsafe);
+
+  const rendered = `${message.innerHTML} ${turn.replyBody.textContent}`;
+  assert.match(rendered, /redacted/);
+  assertNoSensitiveLeak(rendered);
+});
+
+test('Assistant progress and status helpers redact unsafe public boundary text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+
+  const item = panel._updateThinkingStep(`run ${unsafe}`, `step ${unsafe}`, `Running public step ${unsafe}`);
+  panel._setAssistantTurnStatus(turn, `Unsafe status ${unsafe}`, `bad tone ${unsafe}`);
+
+  const rendered = [
+    item?.textContent,
+    item?.dataset?.stepKey,
+    turn.statusEl.textContent,
+    turn.statusEl.className,
+    turn.card.dataset.turnTone
+  ].join('\n');
+
+  assert.match(rendered, /redacted/);
+  assert.equal(turn.card.dataset.turnTone, 'streaming');
+  assertNoSensitiveLeak(rendered);
+});
+
+test('Requirement brief and clarification copy redact unsafe backend metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const card = createFakeElement();
+  const briefElement = createFakeElement();
+  const confidence = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-requirement-brief-card': card,
+    '#ai-result-requirement-brief': briefElement,
+    '#ai-requirement-confidence': confidence
+  });
+  panel._scrollToBottom = () => {};
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const payload = {
+    requirementBrief: {
+      scenarioName: `surface check ${unsafe}`,
+      intentType: `detect ${unsafe}`,
+      draftRiskLevel: `medium ${unsafe}`,
+      knownFacts: [`inspect scratches ${unsafe}`],
+      missingFacts: [`camera source pending ${unsafe}`],
+      attachmentFacts: [`sample image ${unsafe}`],
+      objectName: `panel ${unsafe}`,
+      imageSource: `camera ${unsafe}`,
+      outputTarget: `PLC result ${unsafe}`,
+      decisionRule: `OK when no scratch ${unsafe}`,
+      nonBlockingMissingFields: [`model_path ${unsafe}`],
+      blockingClarificationFields: [`image_source ${unsafe}`],
+      clarificationQuestions: [
+        {
+          field: `image_source ${unsafe}`,
+          question: `Which image source should be used? ${unsafe}`,
+          reason: `Need deployment-safe source ${unsafe}`,
+          priority: `high ${unsafe}`,
+          required: true,
+          options: [`camera-1 ${unsafe}`]
+        }
+      ]
+    }
+  };
+
+  const brief = panel._renderRequirementBrief(payload);
+  const followup = panel._buildClarificationFollowupText(brief);
+  const safeHint = panel._buildClarificationSafeHint(brief);
+  const turn = attachAgentRunTurn(panel);
+  turn.clarificationSection = createFakeElement();
+  turn.clarificationBody = createFakeElement();
+  panel._renderAssistantClarification(turn, {
+    aiExplanation: `Need clarification ${unsafe}`,
+    requirementBrief: payload.requirementBrief
+  });
+  const combined = `${briefElement.innerHTML}\n${followup}\n${safeHint}\n${turn.clarificationBody.innerHTML}`;
+
+  assert.match(combined, /redacted/);
+  assertNoSensitiveLeak(combined);
+  assert.doesNotMatch(combined, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
+});
+
+test('Apply preview redacts unsafe risk and diff metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createFakeElement();
+  panel._setWorkbenchState = state => { panel.workbenchState = state; };
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const diff = {
+    added: [
+      { displayName: `Detect scratches ${unsafe}`, operatorType: `DeepLearning ${unsafe}` }
+    ],
+    removed: [
+      { displayName: `Old detector ${unsafe}`, operatorType: `TemplateMatching ${unsafe}` }
+    ],
+    modified: [
+      {
+        op: { displayName: `Classifier ${unsafe}`, operatorType: 'DeepLearning' },
+        changes: [
+          { name: `ModelPath ${unsafe}`, old: `C:\\factory\\old.onnx ${unsafe}`, new: `/models/new.onnx ${unsafe}` }
+        ]
+      }
+    ],
+    addedConnections: [
+      { sourceTempId: `op_a ${unsafe}`, sourcePortName: 'Output', targetTempId: 'op_b', targetPortName: `Input ${unsafe}` }
+    ],
+    removedConnections: []
+  };
+  const applyRisk = {
+    hasWarnings: true,
+    totalCount: 3,
+    pending: [{ actualOperatorId: `op_detect ${unsafe}`, parameterNames: [`ModelPath ${unsafe}`] }],
+    missing: [{ description: `Upload model resource ${unsafe}` }],
+    nonBlockingFields: [`model_path ${unsafe}`]
+  };
+
+  panel._showApplyPreview(diff, { operators: [] }, { applyRisk });
+  const html = panel.container.children[0].innerHTML;
+
+  assert.match(html, /redacted/);
+  assertNoSensitiveLeak(html);
+  assert.doesNotMatch(html, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|old\.onnx|new\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
+});
+
+test('Apply undo failure redacts unsafe canvas diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  panel._preApplySnapshot = { operators: [] };
+  panel._preApplyCanvasRevision = 0;
+  panel.flowCanvas = {
+    getFlowRevision: () => 0,
+    deserialize: () => {
+      throw new Error(`Restore failed ${unsafe}`);
+    }
+  };
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    panel._undoApply();
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  const messages = (panel.messages || []).map(item => item.text).join('\n');
+  assert.match(messages, /撤销失败/);
+  assert.match(messages, /redacted/);
+  assertNoSensitiveLeak(messages);
+});
+
 test('default UI does not render Agent GenerateFlow controls', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -1628,6 +1897,99 @@ test('Prompt Trace debug view hides raw prompts and sensitive metadata', async (
   assert.match(promptTrace.innerHTML, /用户提示状态/);
   assert.doesNotMatch(promptTrace.innerHTML, /raw system prompt|raw user prompt|example\.invalid|super-secret-value/);
   assertNoSensitiveLeak(promptTrace.innerHTML);
+});
+
+test('AI attachment UI redacts local paths and unsafe report metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const attachments = createFakeElement();
+  const attachmentCard = createFakeElement();
+  const attachmentPanel = createFakeElement();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|raw-key|192\.168\.1\.8|C:\\factory|D:\\models|secret\.onnx|other\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token|data-path=/i;
+  panel.container = createContainer({
+    '#ai-attachments': attachments,
+    '#ai-result-attachment-card': attachmentCard,
+    '#ai-result-attachments': attachmentPanel
+  });
+  panel._shouldHandleGenerateRealtimePayload = () => true;
+  panel.attachments = [
+    { path: 'C:\\factory\\secret.onnx', name: `C:\\factory\\secret.onnx ${unsafe}`, status: 'ready', reason: unsafe },
+    { path: 'D:\\models\\other.onnx', name: `other.onnx ${unsafe}`, status: 'ready', reason: '' }
+  ];
+
+  panel._handleAttachmentReport({
+    sent: [{ path: 'C:\\factory\\secret.onnx', name: `C:\\factory\\secret.onnx ${unsafe}` }],
+    skipped: [{ path: 'D:\\models\\other.onnx', name: `D:\\models\\other.onnx ${unsafe}`, reason: `read_failed ${unsafe}` }]
+  });
+  panel._renderAttachmentPanel();
+
+  const combined = [
+    attachments.innerHTML,
+    attachmentPanel.innerHTML,
+    (panel.messages || []).map(item => item.text).join('\n')
+  ].join('\n');
+
+  assert.equal(attachmentCard.hidden, false);
+  assert.match(combined, /redacted/);
+  assertNoSensitiveLeak(combined);
+  assert.doesNotMatch(combined, unsafePattern);
+});
+
+test('Generate user message redacts unsafe attachment display names', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const input = createFakeElement();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|raw-key|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  input.value = '检测瓶盖外观';
+  panel.container = createContainer({ '#ai-input': input });
+  panel.attachments = [
+    { path: 'C:\\factory\\secret.onnx', name: `C:\\factory\\secret.onnx ${unsafe}`, status: 'ready', reason: '' }
+  ];
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  await panel._handleGenerate();
+
+  assert.deepEqual(captured.attachmentPaths, ['C:\\factory\\secret.onnx']);
+  assert.match(captured.userMessage, /附件/);
+  assert.match(captured.userMessage, /redacted/);
+  assertNoSensitiveLeak(captured.userMessage);
+  assert.doesNotMatch(captured.userMessage, unsafePattern);
+});
+
+test('AI capability owner redacts unsafe AgentRun public projection text', async () => {
+  const { AiPanelCapabilityOwner } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs');
+  const container = createFakeElement();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|raw-key|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const owner = new AiPanelCapabilityOwner(container, {
+    adapter: {
+      loadLatestRun: async () => null,
+      loadRun: async () => null,
+      cancelRun: async () => null,
+      buildEventStreamUrl: () => ''
+    }
+  });
+
+  owner.errorMessage = `load failed ${unsafe}`;
+  owner.activeRunId = `run ${unsafe}`;
+  owner.replay = { summary: { status: `failed ${unsafe}` } };
+  owner.events = [{
+    sequence: 1,
+    eventType: `tool.failed ${unsafe}`,
+    title: `Validate flow ${unsafe}`,
+    summary: `Tool failed ${unsafe}`
+  }];
+  owner.render();
+
+  assert.match(container.innerHTML, /redacted/);
+  assertNoSensitiveLeak(container.innerHTML);
+  assert.doesNotMatch(container.innerHTML, unsafePattern);
 });
 
 test('developer mode payload includes useVisionAgentGenerateFlow=true', async () => {
@@ -1718,6 +2080,17 @@ test('developer latest replay control invokes AgentRun replay entry', async () =
 
   assert.equal(replayed, true);
   assert.equal(replayButton.disabled, false);
+
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  panel._replayLatestAgentRunPublicEvents = async () => {
+    throw new Error(`Replay failed ${unsafe}`);
+  };
+  handlers.get('click')();
+  await flushAsync(3);
+
+  assert.match(panel.lastResultStatusNote.text, /回放最近一次 AgentRun 失败/);
+  assert.match(panel.lastResultStatusNote.text, /redacted/);
+  assertNoSensitiveLeak(panel.lastResultStatusNote.text);
 });
 
 test('developer mode renders RuntimePreview consent switch', async () => {
@@ -1798,6 +2171,44 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.deepEqual(payload.attachments, []);
   assert.equal(payload.existingFlowJson, '{"operators":[]}');
   assert.deepEqual(payload.templateSelection, { mode: 'template_fill', templateId: 'tmpl-1' });
+});
+
+test('Generate request additional context redacts unsafe queued hint metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true, mode: 'planner' });
+  panel.container = createContainer({
+    '#ai-chat-container': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._shouldRouteIntentBeforeGenerate = () => false;
+  panel._shouldOpenPlanModeBeforeBuild = () => false;
+  panel._shouldUseAgentRunEventStream = () => true;
+  panel._startAssistantTurn = () => attachAgentRunTurn(panel);
+  panel._renderManualRetryBanner = () => {};
+  panel._renderAgentRuntime = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  let capturedPayload = null;
+  panel._dispatchAgentRunGenerateRequest = payload => {
+    capturedPayload = payload;
+    return Promise.resolve();
+  };
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+
+  const accepted = panel._dispatchGenerateRequest({
+    description: '检测工件划痕',
+    hint: `queued clarification ${unsafe}`,
+    userMessage: '检测工件划痕',
+    skipPlan: true,
+    skipPlanSource: 'test'
+  });
+
+  assert.equal(accepted, true);
+  assert.ok(capturedPayload);
+  assert.match(capturedPayload.additionalContext, /redacted/);
+  assertNoSensitiveLeak(capturedPayload.additionalContext);
+  assert.doesNotMatch(capturedPayload.additionalContext, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
 });
 
 test('ordinary send runs Intent Router before Plan planner', async () => {
@@ -2222,10 +2633,11 @@ test('abstract visual goal with canonical shouldOpenPlan enters requirement deco
 test('local Intent Router fallback opens Plan for explicit unknown slots and reports degraded routing', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
 
   const route = panel._buildLocalIntentRouterFallback(
     '检测目标是外星人，识别内容是额头上的第三只竖眼',
-    new Error('router unavailable')
+    new Error(`router unavailable ${unsafe}`)
   );
 
   assert.equal(route.intent, 'actionable_vision_plan');
@@ -2240,6 +2652,8 @@ test('local Intent Router fallback opens Plan for explicit unknown slots and rep
   assert.deepEqual(route.requirementMaturity.taskSignals, ['额头上的第三只竖眼']);
   assert.ok(!route.requirementMaturity.missingFields.includes('inspection_object'));
   assert.ok(!route.requirementMaturity.missingFields.includes('task_type'));
+  assert.match(`${route.fallbackReason}\n${route.decisionTrace.fallbackReason}`, /redacted/);
+  assertNoSensitiveLeak(`${route.fallbackReason}\n${route.decisionTrace.fallbackReason}`);
 });
 
 test('Plan Mode captures vague inspection request without starting Build', async () => {
@@ -2402,6 +2816,135 @@ test('Plan Mode diagnostics redact sensitive planner failure details', async () 
   assert.match(plan.innerHTML, /completion_request_failed/);
   assert.match(plan.innerHTML, /请检查网络、Planner 接口地址配置、模型服务和中转站状态/);
   assert.doesNotMatch(plan.innerHTML, /token=abc123|api_key=secret|baseUrl|https:\/\/planner\.example|C:\\factory|192\.168\.1\.10|DB1\.DBX0\.0|plc:\/\/line1|data:image|base64|AAAA/i);
+});
+
+test('Plan Mode request failure redacts unsafe assistant reply and status note', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chatContainer = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': chatContainer,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const sectionTexts = [];
+  const originalSetAssistantSectionText = panel._setAssistantSectionText;
+  panel._setAssistantSectionText = (turn, field, text, options) => {
+    sectionTexts.push(String(text || ''));
+    return originalSetAssistantSectionText.call(panel, turn, field, text, options);
+  };
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async () => {
+    throw new Error(`Planner request failed ${unsafe}`);
+  };
+
+  panel._enterPlanModeFromPrompt({
+    description: 'detect board defects',
+    userMessage: 'detect board defects',
+    input: panel.container.querySelector('#ai-input')
+  });
+  await flushAsync();
+
+  const rendered = `${sectionTexts.join('\n')}\n${panel.lastResultStatusNote?.text || ''}`;
+  assert.match(rendered, /redacted/);
+  assert.match(rendered, /规划模式失败/);
+  assertNoSensitiveLeak(rendered);
+});
+
+test('Plan workspace public fields redact unsafe backend metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.agentWorkspaceMode = 'plan';
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|raw-key|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token|baseUrl=/i;
+  const normalized = panel._normalizeBackendPlanResult(backendPlanResult({
+    planHash: `sha256:public-fields ${unsafe}`,
+    originalUserPrompt: `preserve user build input ${unsafe}`,
+    goal: `surface inspection ${unsafe}`,
+    nextAction: `accept defaults ${unsafe}`,
+    requirementUnderstanding: [`Need defect inspection ${unsafe}`],
+    recommendedRoute: {
+      routeId: `route_${unsafe}`,
+      title: `Unsafe route ${unsafe}`,
+      summary: `Route summary ${unsafe}`,
+      operators: [`ImageAcquisition ${unsafe}`, `SurfaceDefectDetection ${unsafe}`],
+      templateDecision: `Template decision ${unsafe}`
+    },
+    clarificationQuestions: [
+      {
+        id: 'unsafe_question',
+        title: `Question title ${unsafe}`,
+        why: `Question why ${unsafe}`,
+        defaultValue: 'unsafe_answer',
+        defaultAssumption: `Default assumption ${unsafe}`,
+        impact: `Question impact ${unsafe}`,
+        options: [
+          {
+            value: 'unsafe_answer',
+            label: `Unsafe label ${unsafe}`,
+            recommended: true,
+            description: `Unsafe description ${unsafe}`,
+            impact: `Unsafe impact ${unsafe}`
+          }
+        ]
+      }
+    ],
+    recommendedDefaults: [
+      { id: 'unsafe_default', label: `Default label ${unsafe}`, value: `Default value ${unsafe}`, impact: `Default impact ${unsafe}` }
+    ],
+    risks: [`Risk text ${unsafe}`],
+    acceptanceCriteria: [`Acceptance text ${unsafe}`],
+    executablePlan: [`Step text ${unsafe}`],
+    buildReadiness: {
+      contractVersion: 'v2',
+      canBuild: false,
+      primaryMessage: `Readiness message ${unsafe}`,
+      blockers: [
+        { id: 'unsafe_blocker', category: 'hard_requirement', field: 'inspection_object', publicLabel: `Blocker label ${unsafe}`, blocksBuild: true }
+      ]
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: [`metal ${unsafe}`],
+      taskSignals: [`scratch ${unsafe}`],
+      missingFields: ['inspection_object'],
+      blockingReasons: [`blocking reason ${unsafe}`],
+      publicReason: `Maturity reason ${unsafe}`
+    }
+  }));
+
+  panel.pendingVisionPlan = normalized;
+  panel._renderPlanWorkspace(normalized);
+  const displayProjection = JSON.stringify({
+    goal: normalized.goal,
+    route: normalized.route,
+    questions: normalized.questions,
+    assumptions: normalized.assumptions,
+    steps: normalized.steps,
+    risks: normalized.risks,
+    acceptanceCriteria: normalized.acceptanceCriteria,
+    buildReadiness: normalized.buildReadiness,
+    requirementMaturity: normalized.requirementMaturity
+  });
+  const combined = `${planWorkspace.innerHTML}\n${displayProjection}`;
+
+  assert.match(combined, /redacted/);
+  assert.doesNotMatch(combined, unsafePattern);
+  assert.match(normalized.originalDescription, /C:\\factory\\secret\.onnx/);
 });
 
 test('ordinary build prompt stays Plan-first even when Tool Loop mode is selected', async () => {
@@ -2902,6 +3445,47 @@ test('Workbench state changes publish matching right-side public events', async 
   assert.match(collectProcessText(turn), /工作台进入失败状态/);
   assert.equal(panel.publicLiveEvents.find(evt => evt.eventType === 'workbench.state.ready_to_apply')?.visibility, 'persistent');
   assert.equal(panel.publicLiveEvents.find(evt => evt.eventType === 'workbench.state.dry_running')?.visibility, 'ephemeral');
+});
+
+test('Workbench runtime and stage timeline redact unsafe backend metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const runtime = createFakeElement();
+  const stageCard = createFakeElement();
+  const stageTimeline = createFakeElement();
+  const stageSummary = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-runtime': runtime,
+    '#ai-result-stage-timeline-card': stageCard,
+    '#ai-result-stage-timeline': stageTimeline,
+    '#ai-stage-timeline-summary': stageSummary
+  });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+
+  panel._renderAgentRuntime({
+    turnIntent: `custom_intent ${unsafe}`,
+    interactionState: `custom_state ${unsafe}`,
+    routerConfidence: `custom_confidence ${unsafe}`,
+    performanceBudget: {
+      totalDurationMs: 1234,
+      estimatedInputTokens: 200,
+      estimatedOutputTokens: 100,
+      budgetStatus: 'warning',
+      warnings: [`Slow stage ${unsafe}`]
+    }
+  });
+  panel._renderStageTimeline([
+    {
+      stage: `custom_stage ${unsafe}`,
+      status: 'warning',
+      durationMs: `17 ${unsafe}`,
+      summary: `Stage emitted unsafe diagnostics ${unsafe}`
+    }
+  ]);
+
+  const combined = `${runtime.innerHTML}\n${stageTimeline.innerHTML}\n${stageSummary.textContent}`;
+  assert.match(combined, /redacted/);
+  assert.doesNotMatch(combined, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
 });
 
 test('Public live event snapshot can replay and rebuild the assistant public stream', async () => {
@@ -4924,6 +5508,63 @@ test('Plan readiness preview accepts only latest revision and fails closed on pr
   assert.equal(panel.planQuestionAnswers.image_source.value, 'file_sample');
 });
 
+test('Plan readiness and cancel failures redact unsafe backend diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const httpClient = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js')).default;
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const panel = createPanel(AiPanel, {
+    developer: false,
+    enabled: true,
+    useProductionPreview: true,
+    planReadinessPreview: async () => {
+      throw new Error(`Preview failed ${unsafe}`);
+    }
+  });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': createFakeButton(),
+      '#ai-plan-build-status': createFakeElement()
+    },
+    { '.ai-plan-action': [createFakeButton()] }
+  );
+  const plan = pendingFieldPlan(panel, {
+    questionId: 'image_source',
+    field: 'image_source',
+    pendingValue: 'camera_pending',
+    concreteValue: 'file_sample'
+  });
+  panel.pendingVisionPlan = plan;
+  panel._selectPlanQuestionOption('image_source', 'file_sample');
+  await flushAsync();
+
+  const previewText = `${panel.lastPlanReadinessPreviewError}\n${plan.previewError}\n${planWorkspace.innerHTML}`;
+  assert.match(previewText, /redacted/);
+  assertNoSensitiveLeak(previewText);
+
+  panel.activePlanRunId = 'plan-run-redacted';
+  panel.isGenerating = true;
+  const originalPost = httpClient.post;
+  httpClient.post = async () => {
+    throw new Error(`Cancel plan failed ${unsafe}`);
+  };
+  try {
+    const cancelled = await panel._cancelActivePlanRun();
+    assert.equal(cancelled, false);
+  } finally {
+    httpClient.post = originalPost;
+  }
+
+  const messages = (panel.messages || []).map(item => item.text).join('\n');
+  assert.match(messages, /取消规划未生效/);
+  assert.match(messages, /redacted/);
+  assertNoSensitiveLeak(messages);
+});
+
 test('Plan main CTA ignores model NextAction and uses canonical readiness', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -5159,6 +5800,43 @@ test('Build clarification preserves pending Plan and confirmed answers', async (
   assert.equal(panel.pendingVisionPlan.planHash, 'sha256:keep-plan');
   assert.deepEqual(panel.planQuestionAnswers.model_or_rule_strategy, answerBefore);
   assert.equal(panel.pendingClarificationPayload, null);
+});
+
+test('Clarification result summary redacts unsafe assistant explanation', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const summary = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-result-summary': summary
+  });
+  panel._renderAgentRuntime = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._renderManualRetryBanner = () => {};
+  panel._setAssistantTurnStatus = () => {};
+  panel._setAssistantSectionText = () => {};
+  panel._shouldHandleGenerateTerminalPayload = () => true;
+  panel.activeAssistantTurn = { clarificationSection: createFakeElement() };
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+
+  panel._handleResult({
+    payload: {
+      success: false,
+      status: 'clarification_required',
+      failureType: 'clarification_required',
+      clarificationRequired: true,
+      aiExplanation: `Need clarification ${unsafe}`,
+      shouldResetPendingPlan: false
+    }
+  });
+
+  assert.match(summary.textContent, /redacted/);
+  assertNoSensitiveLeak(summary.textContent);
 });
 
 test('Router local HTTP fallback preserves Pending Plan by default', async () => {
@@ -6079,6 +6757,95 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   ].join('\n'));
 });
 
+test('Build Workspace redacts unsafe operator chain and parameter mapping text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const payload = buildResultContractPayload();
+  payload.buildResult.selectionSource = `accepted_recommended ${unsafe}`;
+  payload.buildResult.effectiveRouteId = `attribute_classification_deep_learning ${unsafe}`;
+  payload.buildResult.parameterStrategy = `deep_learning_classification ${unsafe}`;
+  payload.buildResult.strategyConfirmationSource = `confirmed_by_user ${unsafe}`;
+  payload.buildResult.unresolvedStrategyBlockers = [`missing operator decision ${unsafe}`];
+  payload.buildResult.operatorPipeline = [
+    {
+      tempId: `op_detect ${unsafe}`,
+      operatorType: 'SurfaceDefectDetection',
+      source: `template_skeleton ${unsafe}`,
+      status: `selected ${unsafe}`,
+      repairNote: `invalid operator was repaired ${unsafe}`
+    }
+  ];
+  payload.buildResult.parameterMapping = [
+    {
+      tempId: `op_detect ${unsafe}`,
+      operatorType: 'SurfaceDefectDetection',
+      parameterName: `ModelPath ${unsafe}`,
+      valueSummary: `<pending-model-resource> ${unsafe}`,
+      source: `missing_resource ${unsafe}`,
+      pending: true
+    }
+  ];
+  panel.activeAgentRunEvents = [{
+    runId: 'ar_build_contract_redacted_ops',
+    sequence: 20,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Build completed.',
+    status: 'completed',
+    payload,
+    metadataOnly: true,
+    redactionPass: false
+  }];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const rendered = `${elements['#ai-build-operator-chain'].innerHTML} ${elements['#ai-build-parameters'].innerHTML}`;
+  assert.match(rendered, /redacted/);
+  assert.doesNotMatch(rendered, unsafePattern);
+});
+
+test('Build Workspace redacts unsafe workflow diff text in final draft', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const payload = buildResultContractPayload();
+  payload.buildResult.workflowDiff = {
+    addedNodes: [`op_added ${unsafe}`],
+    preservedNodes: [`existing_node ${unsafe}`],
+    pendingParameters: [`op_detect.ModelPath ${unsafe}`],
+    deploymentBlockers: [`op_output.PlcAddress ${unsafe}`],
+    metadataOnly: true
+  };
+  panel.activeAgentRunEvents = [{
+    runId: 'ar_build_diff_redacted',
+    sequence: 20,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Build completed.',
+    status: 'completed',
+    payload,
+    metadataOnly: true,
+    redactionPass: false
+  }];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const rendered = elements['#ai-build-final-draft'].innerHTML;
+  assert.match(rendered, /redacted/);
+  assert.doesNotMatch(rendered, unsafePattern);
+});
+
 test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chain sources', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -6155,6 +6922,67 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
   assert.match(timelineHtml, /回退构建链路/);
   assert.match(timelineHtml, /Tool Loop 草稿不完整，已回退稳定构建链路/);
   assert.match(timelineHtml, /未找到匹配模板骨架，已改用算子链生成/);
+});
+
+test('Build Workspace redacts unsafe tool evidence template and readiness check text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const payload = buildResultContractPayload();
+  delete payload.buildResult.applyGate;
+  payload.buildResult.toolEvidenceTimeline = [
+    {
+      stage: `template_strategy ${unsafe}`,
+      toolName: `get_flow_template_skeleton ${unsafe}`,
+      source: `fixed_build_orchestrator ${unsafe}`,
+      status: `warning ${unsafe}`,
+      warningCode: `template_not_found ${unsafe}`,
+      durationMs: 6,
+      outputSummary: `Template fallback used. ${unsafe}`,
+      metadataOnly: true,
+      redactionPass: false
+    }
+  ];
+  panel.activeAgentRunEvents = [
+    {
+      runId: 'ar_tool_evidence_redacted',
+      sequence: 18,
+      eventType: 'readiness.checked',
+      stage: 'readiness',
+      title: `Readiness checked ${unsafe}`,
+      summary: `Readiness blocked by missing model resource. ${unsafe}`,
+      status: 'warning',
+      payload: { firstFixRecommendation: `Bind resource metadata. ${unsafe}` },
+      metadataOnly: true,
+      redactionPass: false
+    },
+    {
+      runId: 'ar_tool_evidence_redacted',
+      sequence: 20,
+      eventType: 'run.completed',
+      stage: 'run',
+      title: 'Run completed',
+      summary: `Build completed. ${unsafe}`,
+      status: 'completed',
+      payload,
+      metadataOnly: true,
+      redactionPass: false
+    }
+  ];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const rendered = [
+    elements['#ai-build-event-timeline'].innerHTML,
+    elements['#ai-build-template-match'].innerHTML,
+    elements['#ai-build-checks'].innerHTML
+  ].join('\n');
+  assert.match(rendered, /redacted/);
+  assert.doesNotMatch(rendered, unsafePattern);
 });
 
 test('Build Workspace displays Tool Loop execution path and fallback reason', async () => {
@@ -6275,6 +7103,58 @@ test('parameter review copy makes AI review optional and removes submit audit wo
   assert.match(combined, /人工确认后的参数可直接应用到画布/);
   assert.doesNotMatch(combined, /提交审核/);
   assert.doesNotMatch(combined, /确认全部参数/);
+});
+
+test('followup hint copy and template summary redact unsafe metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  panel.currentResult.recommendedTemplate = {
+    templateName: `scratch-template ${unsafe}`,
+    matchReason: `matched by unsafe metadata ${unsafe}`,
+    confidence: 0.91
+  };
+  panel.currentResult.missingResources = [
+    {
+      resourceType: `model_resource ${unsafe}`,
+      resourceKey: `op_detect.ModelPath ${unsafe}`,
+      operatorId: `op_detect ${unsafe}`,
+      parameterName: `ModelPath ${unsafe}`,
+      description: `Upload model metadata ${unsafe}`
+    }
+  ];
+  panel.currentResult.flow.operators.push({
+    id: 'op_custom',
+    type: `CustomVisionTool ${unsafe}`,
+    displayName: `Custom detector ${unsafe}`,
+    parameters: {}
+  });
+  panel._rebuildPendingOperatorBindings({
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    flow: panel.currentResult.flow,
+    preferIndexFallback: true
+  });
+  panel._setPendingDraftConfirmedValue('op_detect', 'ModelPath', `C:\\factory\\secret.onnx token=abc123 ${unsafe}`, 'text', 'user_input');
+
+  const operators = panel._getPendingOperatorSourceOperators(panel.currentResult.flow);
+  const hint = panel._buildFollowupHintText({
+    recommended: panel.currentResult.recommendedTemplate,
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    missing: panel._normalizeMissingResources(panel.currentResult.missingResources),
+    operators,
+    nonBlockingFields: [`custom_field ${unsafe}`]
+  });
+  const summary = panel._buildTemplateFirstSummary(panel.currentResult);
+  panel._renderFollowupChecklist(panel.currentResult, panel.currentResult.flow);
+  const combined = `${hint}\n${summary}\n${elements['#ai-result-followups'].innerHTML}`;
+
+  assert.match(combined, /redacted/);
+  assertNoSensitiveLeak(combined);
+  assert.doesNotMatch(combined, /super-secret-value|raw-key|abc123|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD/i);
 });
 
 test('apply hint separates canvas apply from DeploymentReady gate', async () => {
@@ -6444,6 +7324,59 @@ test('canvas manual edit audit redacts sensitive values', async () => {
   assert.doesNotMatch(combined, /192\.168\.1\.8/);
   assert.doesNotMatch(combined, /DB1\.DBX0\.0/);
   assert.doesNotMatch(combined, /data:image/);
+});
+
+test('canvas manual edit replay records redact unsafe metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel.currentResult.CanvasManualEditRecords = [
+    {
+      ChangeKey: 'op_detect::ModelPath::C:\\factory\\secret.onnx token=abc123',
+      OperatorId: 'op_detect 192.168.1.8',
+      DisplayName: 'Detector C:\\factory\\secret.onnx token=abc123',
+      OperatorType: 'DeepLearning apiKey=raw-key',
+      ParameterName: 'ModelPath DB1.DBX0.0',
+      OldValueSummary: 'C:\\models\\old.onnx',
+      NewValueSummary: 'https://internal.local/model.onnx Bearer secretBearer999 data:image/png;base64,AAAA',
+      ChangedAtUtc: '2026-07-07T00:00:00Z',
+      Actor: 'operator token=abc123',
+      SourceLabel: 'canvas replay C:\\factory\\edit.json secret=raw',
+      IsPendingParameter: 'true',
+      AffectsApplyGate: 'true',
+      AffectsDeploymentReady: 'true',
+      MetadataOnly: 'true'
+    }
+  ];
+  panel._rebuildPendingOperatorBindings({
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    flow: panel.currentResult.flow,
+    preferIndexFallback: true
+  });
+
+  panel._renderFollowupChecklist(panel.currentResult, panel.currentResult.flow);
+  const review = panel._buildPendingParameterReviewRequest();
+  const combined = [
+    JSON.stringify(panel._getCanvasManualEditRecords(panel.currentResult)),
+    elements['#ai-result-followups'].innerHTML,
+    review.hint,
+    review.userMessage
+  ].join('\n');
+
+  assert.match(combined, /pendingParameter=true/);
+  assert.doesNotMatch(combined, /C:\\factory/);
+  assert.doesNotMatch(combined, /C:\\models/);
+  assert.doesNotMatch(combined, /secret\.onnx/);
+  assert.doesNotMatch(combined, /abc123/);
+  assert.doesNotMatch(combined, /raw-key/);
+  assert.doesNotMatch(combined, /192\.168\.1\.8/);
+  assert.doesNotMatch(combined, /DB1\.DBX0\.0/);
+  assert.doesNotMatch(combined, /internal\.local/);
+  assert.doesNotMatch(combined, /data:image/);
+  assert.doesNotMatch(combined, /edit\.json/);
 });
 
 test('AgentRun completed payload restores BuildResult fallback flow and keeps Apply state after replay', async () => {
@@ -6647,6 +7580,51 @@ test('AgentRun failed readiness blocker with BuildResult keeps real blocker and 
   assert.doesNotMatch(elements['#ai-build-checks'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
 });
 
+test('AgentRun Build workspace redacts unsafe blocker and first fix text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.activeAgentRunId = 'ar_readiness_redacted';
+  panel.agentWorkspaceMode = 'build';
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.success = false;
+  payload.status = 'failed';
+  payload.completionStatus = 'failed';
+  payload.failureType = 'readiness_blocked';
+  payload.buildResult.applyGate = {
+    canvasApplyReady: false,
+    runtimeDraftReady: false,
+    deploymentReady: false,
+    blocked: true,
+    status: 'readiness_blocked',
+    metadataOnly: true
+  };
+  payload.buildResult.firstFixRecommendation = `Bind metadata before applying. ${unsafe}`;
+  panel.activeAgentRunEvents = [{
+    runId: 'ar_readiness_redacted',
+    sequence: 31,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: `Readiness blocked by missing model resource. ${unsafe}`,
+    status: 'failed',
+    payload,
+    metadataOnly: true,
+    redactionPass: false
+  }];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const rendered = `${elements['#ai-build-checks'].innerHTML} ${elements['#ai-build-final-draft'].innerHTML}`;
+  assert.match(rendered, /redacted/);
+  assert.doesNotMatch(rendered, unsafePattern);
+});
+
 test('AgentRun cancelled payload with BuildResult and no Flow stays cancelled', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -6737,6 +7715,31 @@ test('Session failure projection with BuildResult and no Flow keeps original fai
   assert.match(elements['#ai-result-ops'].innerHTML, /Historical session system error/);
   assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
   assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
+});
+
+test('Session failure projection redacts unsafe result summary and empty ops text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.kind = 'assistant_agent_failure';
+  payload.status = 'failed';
+  payload.success = false;
+  payload.completionStatus = 'failed';
+  payload.failureType = 'system_error';
+  payload.failureSummary = { message: `Historical session system error. ${unsafe}`, repairTarget: `Retry the build. ${unsafe}` };
+  payload.aiExplanation = `Historical session system error. ${unsafe}`;
+
+  panel._displayResult(payload, { appendChatMessage: false });
+
+  const rendered = `${elements['#ai-result-summary'].innerHTML} ${elements['#ai-result-ops'].innerHTML}`;
+  assert.match(rendered, /redacted/);
+  assert.doesNotMatch(rendered, unsafePattern);
 });
 
 test('Session completed projection without Flow restores compatibility without active events', async () => {
@@ -6872,6 +7875,124 @@ test('Apply fallback sends editable draft to canvas without dropping node types 
   assert.match(panel.lastResultStatusNote.text, /已应用到画布/);
   assert.match(panel.lastResultStatusNote.text, /部署前待补齐或确认/);
   assert.equal(panel.lastWorkbenchState, 'applied');
+});
+
+test('Apply flow sanitizes draft canvas display labels before canvas handoff', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { container } = createBuildWorkspaceContainer();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  const draftFlow = {
+    operators: [
+      {
+        id: 'op_detect',
+        type: `SurfaceDefectDetection ${unsafe}`,
+        title: `Detector title ${unsafe}`,
+        displayName: `Detect scratches ${unsafe}`,
+        description: `Operator description ${unsafe}`,
+        inputPorts: [{ id: 'op_detect_in_image', name: `Image ${unsafe}`, displayName: `Input image ${unsafe}`, dataType: `Image ${unsafe}`, description: `Input description ${unsafe}`, direction: 0 }],
+        outputPorts: [{ id: 'op_detect_out_result', name: `Result ${unsafe}`, displayName: `Output result ${unsafe}`, dataType: `Object ${unsafe}`, description: `Output description ${unsafe}`, direction: 1 }],
+        parameters: [
+          {
+            name: 'ModelId',
+            displayName: `Model resource ${unsafe}`,
+            dataType: `string ${unsafe}`,
+            Type: `string ${unsafe}`,
+            description: `Parameter description ${unsafe}`,
+            value: 'model-resource-approved',
+            defaultValue: 'model-resource-approved',
+            isRequired: true
+          }
+        ]
+      }
+    ],
+    connections: [],
+    metadataOnly: true
+  };
+  const payload = buildResultContractPayload();
+  payload.flow = draftFlow;
+  payload.Flow = draftFlow;
+  payload.pendingParameters = [];
+  payload.PendingParameters = [];
+  payload.missingResources = [];
+  payload.MissingResources = [];
+  payload.buildResult.flow = draftFlow;
+  payload.buildResult.pendingParameters = [];
+  payload.buildResult.missingResources = [];
+  payload.buildResult.workflowDiff.pendingParameters = [];
+  payload.buildResult.workflowDiff.deploymentBlockers = [];
+  let appliedFlow = null;
+
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas({ operators: [], connections: [] });
+  panel.currentResult = payload;
+  panel.currentResultVersion = 4;
+  panel.options.onApplied = flow => {
+    appliedFlow = flow;
+  };
+  panel._showApplyPreview = (diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderFollowupChecklist = () => {};
+  panel._renderParameterDraftEditor = () => {};
+  panel._syncPendingParameterDrafts = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+
+  panel._handleApplyFlow();
+
+  const [operator] = panel._extractOperators(appliedFlow);
+  const [inputPort] = operator.inputPorts;
+  const [outputPort] = operator.outputPorts;
+  const [parameter] = operator.parameters;
+  const visibleCanvasText = [
+    operator.name,
+    operator.Name,
+    operator.title,
+    operator.Title,
+    operator.displayName,
+    operator.DisplayName,
+    operator.description,
+    operator.Description,
+    operator.type,
+    operator.Type,
+    operator.operatorType,
+    operator.OperatorType,
+    inputPort.name,
+    inputPort.Name,
+    inputPort.portName,
+    inputPort.PortName,
+    inputPort.displayName,
+    inputPort.dataType,
+    inputPort.Type,
+    inputPort.description,
+    inputPort.Description,
+    outputPort.name,
+    outputPort.Name,
+    outputPort.portName,
+    outputPort.PortName,
+    outputPort.displayName,
+    outputPort.dataType,
+    outputPort.Type,
+    outputPort.description,
+    outputPort.Description,
+    parameter.displayName,
+    parameter.DisplayName,
+    parameter.dataType,
+    parameter.DataType,
+    parameter.type,
+    parameter.Type,
+    parameter.description,
+    parameter.Description
+  ].join('\n');
+
+  assert.equal(operator.type, 'SurfaceDefectDetection');
+  assert.equal(operator.Type, 'SurfaceDefectDetection');
+  assert.equal(parameter.value, 'model-resource-approved');
+  assert.equal(parameter.dataType, 'string');
+  assert.equal(parameter.Type, 'string');
+  assert.equal(inputPort.DataType, 'Image');
+  assert.equal(outputPort.dataType, 'Any');
+  assert.match(visibleCanvasText, /redacted/);
+  assertNoSensitiveLeak(visibleCanvasText);
 });
 
 test('AgentRun fetch stream is preferred and sends Authorization header', async () => {
@@ -7066,6 +8187,33 @@ test('AgentRun assistant brief appends immediate public summary', async () => {
   assert.doesNotMatch(turn.replyBody.textContent, /chain.?of.?thought|hidden reasoning/i);
 });
 
+test('AgentRun assistant brief payload fallback is public and redacted', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_brief_payload';
+  const unsafe = 'rawPrompt=SYSTEM chainOfThought=hidden C:\\factory\\secret.onnx 192.168.1.8 DB1.DBX0.0 plc://line1 data:image/png;base64,QUJD sk-secret-token';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_brief_payload',
+    sequence: 2,
+    eventType: 'assistant.brief',
+    stage: 'brief',
+    summary: '',
+    status: 'completed',
+    payload: {
+      brief: `I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: Detect scratches ${unsafe}`
+    },
+    metadataOnly: true,
+    redactionPass: false
+  });
+
+  assert.match(turn.replyBody.textContent, /已创建安全的视觉智能体流程草稿任务/);
+  assert.match(turn.replyBody.textContent, /Detect scratches/);
+  assert.doesNotMatch(turn.replyBody.textContent, /rawPrompt=|chainOfThought|C:\\factory|secret\.onnx|192\.168\.1\.8|DB1\.DBX0\.0|plc:\/\/line1|data:image|QUJD|sk-secret-token/i);
+  assert.match(turn.replyBody.textContent, /redacted|已隐藏/);
+});
+
 test('AgentRun stage events render public execution process steps', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
@@ -7089,6 +8237,38 @@ test('AgentRun stage events render public execution process steps', async () => 
   const copy = turn.processBody.children[0].querySelector('.ai-agent-run-step-copy');
   assert.match(copy.textContent, /规划器已开始/);
   assert.match(copy.textContent, /正在生成公开执行计划/);
+});
+
+test('AgentRun transport and cancel failure messages redact unsafe diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const httpClient = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js')).default;
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  panel.activeAgentRunId = 'ar_transport_redacted';
+  panel.isGenerating = true;
+
+  panel._setAgentRunTransportStatus(`Transport fallback ${unsafe}`, 'warning', `Event stream failed ${unsafe}`);
+
+  const processText = `${collectProcessText(turn)}\n${turn.processBody.innerHTML}\n${turn.statusEl.textContent}`;
+  assert.match(processText, /redacted/);
+  assertNoSensitiveLeak(processText);
+
+  const originalPost = httpClient.post;
+  httpClient.post = async () => {
+    throw new Error(`Cancel failed ${unsafe}`);
+  };
+  try {
+    const cancelled = await panel._cancelActiveAgentRun();
+    assert.equal(cancelled, false);
+  } finally {
+    httpClient.post = originalPost;
+  }
+
+  const messages = (panel.messages || []).map(item => item.text).join('\n');
+  assert.match(messages, /取消生成未生效/);
+  assert.match(messages, /redacted/);
+  assertNoSensitiveLeak(messages);
 });
 
 test('AgentRun tool_loop events render realtime public progress with fallback copy', async () => {
@@ -7438,6 +8618,61 @@ test('AgentRun run.failed renders failure diagnosis and first fix only', async (
   assert.match(turn.failureBody.innerHTML, /Provide missing model metadata/);
   assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
   assert.equal(panel.lastWorkbenchState, 'failed');
+  assert.equal(turn.statusEl.textContent, '构建失败');
+});
+
+test('AgentRun public renderers redact unsafe event and payload text', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_redacted_public';
+  const unsafe = 'rawPrompt=SYSTEM systemPrompt=ROOT chainOfThought=hidden C:\\factory\\secret.onnx 192.168.1.8 DB1.DBX0.0 plc://line1 data:image/png;base64,QUJD sk-secret-token Authorization: Bearer super-secret-value https://example.invalid/v1?token=secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|chainOfThought|C:\\factory|secret\.onnx|192\.168\.1\.8|DB1\.DBX0\.0|plc:\/\/line1|data:image|QUJD|sk-secret-token|super-secret-value|secret-token|example\.invalid/i;
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_redacted_public',
+    sequence: 7,
+    eventType: 'tool.call.failed',
+    stage: 'readiness',
+    title: `Tool failed: manifest_dryrun ${unsafe}`,
+    summary: `Manifest dry-run blocked. ${unsafe}`,
+    status: 'failed',
+    payload: {
+      toolName: `manifest_dryrun ${unsafe}`,
+      durationMs: 9,
+      reportId: `report-unsafe ${unsafe}`,
+      blockedReasons: [`missing operator contract ${unsafe}`],
+      firstFixRecommendation: `Remove unsafe config ${unsafe}`
+    },
+    metadataOnly: true,
+    redactionPass: false
+  });
+
+  const toolText = `${collectProcessText(turn)} ${turn.toolsBody.innerHTML} ${turn.failureBody.innerHTML}`;
+  assert.doesNotMatch(toolText, unsafePattern);
+  assert.match(toolText, /redacted|已隐藏/);
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_redacted_public',
+    sequence: 8,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: `Run failed ${unsafe}`,
+    summary: `Build failed before completion. ${unsafe}`,
+    status: 'failed',
+    payload: {
+      firstFixRecommendation: `Fix metadata only. ${unsafe}`,
+      diagnostic: {
+        firstFixRecommendation: `Nested fix should also be safe. ${unsafe}`
+      }
+    },
+    metadataOnly: true,
+    redactionPass: false
+  });
+
+  const failureText = `${turn.failureBody.innerHTML} ${panel.lastResultStatusNote?.text || ''}`;
+  assert.doesNotMatch(failureText, unsafePattern);
+  assert.match(failureText, /redacted|已隐藏/);
   assert.equal(turn.statusEl.textContent, '构建失败');
 });
 
@@ -8234,6 +9469,114 @@ test('RuntimePreview UI redacts bytes paths IP BaseUrl and key fragments', async
   assert.match(validation.innerHTML, /&lt;redacted&gt;/);
 });
 
+test('RuntimePreview UI redacts raw prompt PLC and model diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true });
+  const { validation } = attachValidationPanel(panel);
+  const response = agentResponse();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden chainOfThought=private baseUrl=http://192.168.1.8/v1 plc://line1/DB1.DBX0.0 DB1.DBX0.0 model.onnx sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|chainOfThought=|baseUrl=|192\.168\.1\.8|plc:\/\/|DB1\.DBX0\.0|model\.onnx|sk-secret-token/i;
+  response.validationPreview.runtimePreview = {
+    previewReady: false,
+    adapterName: `pilot_runtime_preview ${unsafe}`,
+    previewMode: `metadata_only ${unsafe}`,
+    permissionDecision: {
+      allowed: false,
+      reasonCode: `runtime_preview_denied ${unsafe}`,
+      reason: `deny because ${unsafe}`,
+      effectiveAdapterName: `offline_runtime_preview ${unsafe}`,
+      pilotEnabled: true,
+      metadataOnly: true
+    },
+    resourceTrace: {
+      allowed: false,
+      reasonCode: `resource_denied ${unsafe}`,
+      resourceType: `model_resource ${unsafe}`,
+      resourceId: `model.onnx ${unsafe}`,
+      normalizedKey: `op_detect.ModelPath ${unsafe}`,
+      missingResources: [{ resourceKey: `op_detect.ModelPath ${unsafe}`, description: `Missing model ${unsafe}` }]
+    },
+    readiness: {
+      status: `not_ready ${unsafe}`,
+      blockingIssues: [{ code: `blocker_${unsafe}`, message: `Blocked ${unsafe}`, operatorId: `op_detect ${unsafe}` }],
+      missingResources: [{ resourceKey: `model ${unsafe}`, description: `Missing ${unsafe}` }],
+      unsafeFindings: [{ message: `Unsafe ${unsafe}` }],
+      pendingActions: [{ actionType: `RuntimePreviewReview ${unsafe}`, summary: `Review ${unsafe}` }],
+      resourceTrace: { allowed: false, reasonCode: `resource_trace ${unsafe}`, resourceType: `model ${unsafe}` },
+      allowlistCoverage: { detail: unsafe }
+    },
+    fallback: {
+      used: true,
+      fallbackAdapterName: `offline_runtime_preview ${unsafe}`,
+      reason: `fallback ${unsafe}`,
+      errorCode: `runtime_preview_error ${unsafe}`
+    },
+    warnings: [{ message: `Warning ${unsafe}` }],
+    issues: [{ description: `Issue ${unsafe}` }],
+    pendingActions: [{ actionType: `RuntimePreviewPilotReadinessReview ${unsafe}`, summary: `Review ${unsafe}` }],
+    artifacts: [{ artifactId: `artifact ${unsafe}`, artifactType: `operator_result_metadata ${unsafe}`, metadataOnly: true, binaryIncluded: false, byteLength: 0 }]
+  };
+
+  panel._renderValidationConsole(response);
+
+  assert.match(validation.innerHTML, /&lt;redacted&gt;/);
+  assert.doesNotMatch(validation.innerHTML, unsafePattern);
+});
+
+test('validation preview redacts unsafe operator diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false });
+  const { validation } = attachValidationPanel(panel);
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=super-secret-value';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+
+  panel._renderValidationConsole({
+    validationPreview: {
+      structuralValidation: {
+        summary: `Structure blocked ${unsafe}`,
+        blockingIssues: [{ message: `Model path invalid ${unsafe}`, code: `code_${unsafe}`, operatorId: `op_${unsafe}` }],
+        warnings: [{ description: `Warning detail ${unsafe}` }]
+      },
+      dryRun: {
+        dryRunSucceeded: false,
+        dryRunSummary: `Dry run failed ${unsafe}`,
+        missingResources: [{ resourceKey: `resource_${unsafe}`, description: `Missing resource ${unsafe}` }]
+      }
+    },
+    missingResources: [{ resourceType: `model_${unsafe}`, parameterName: `ModelPath ${unsafe}`, description: `Upload model ${unsafe}` }],
+    pendingActions: [{ actionType: 'ProvideModelPath', summary: `Provide resource ${unsafe}` }],
+    toolTrace: [{
+      toolName: `validate_flow ${unsafe}`,
+      permission: `allowed ${unsafe}`,
+      adapterName: `offline_adapter ${unsafe}`,
+      status: `failed ${unsafe}`,
+      errorCode: `ERR_MODEL ${unsafe}`,
+      permissionDecision: { reasonCode: `policy_reason ${unsafe}` },
+      durationMs: 11
+    }],
+    manualRetry: { required: true, summary: `Retry summary ${unsafe}`, stage: `stage_${unsafe}` },
+    lastAttemptDiagnostics: [{
+      issues: [{
+        severity: 'error',
+        category: `category_${unsafe}`,
+        message: `Issue message ${unsafe}`,
+        repairHint: `Repair hint ${unsafe}`,
+        operatorId: `operator_${unsafe}`
+      }]
+    }],
+    knowledgeDiagnostics: [{
+      severity: 'warning',
+      code: `knowledge_${unsafe}`,
+      message: `Knowledge message ${unsafe}`,
+      repairHint: `Knowledge repair ${unsafe}`,
+      operatorId: `kg_${unsafe}`
+    }]
+  });
+
+  assert.match(validation.innerHTML, /redacted/);
+  assert.doesNotMatch(validation.innerHTML, unsafePattern);
+});
+
 test('response mapping displays folded toolTrace summary only', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -8356,6 +9699,32 @@ test('AI followup renders actionable resource binding entries in Chinese', async
   assert.match(followups.innerHTML, /仅记录 metadata，不触发真实 PLC 写入/);
   assert.doesNotMatch(followups.innerHTML, /自动绑定|自动选择|自动部署|智能自动补齐/);
   assert.doesNotMatch(followups.innerHTML, /rawPrompt|systemPrompt|chainOfThought|data:image\/png;base64|sk-secret|192\.168\./i);
+});
+
+test('AI followup resource audit cards redact unsafe missing resource metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const followups = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-followups': followups
+  });
+  const response = resourceBindingResponse();
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  response.missingResources = [{
+    resourceType: `model_resource ${unsafe}`,
+    resourceKey: `op_detect.ModelPath ${unsafe}`,
+    operatorId: `op_detect ${unsafe}`,
+    parameterName: `ModelPath ${unsafe}`,
+    description: `Model metadata is missing. ${unsafe}`
+  }];
+
+  panel._renderFollowupChecklist(response, response.flow);
+
+  assert.match(followups.innerHTML, /redacted/);
+  assert.doesNotMatch(followups.innerHTML, unsafePattern);
 });
 
 test('resource binding action writes metadata and updates pending, missing, and apply gate state', async () => {
@@ -8610,6 +9979,45 @@ test('manual confirmation records render and survive replay payload rendering', 
   assert.match(followups.innerHTML, /metadataOnly=true/);
   assert.match(followups.innerHTML, /model-resource:scratch-v1/);
   assert.doesNotMatch(followups.innerHTML, /rawPrompt|systemPrompt|chainOfThought|C:\\|192\.168\.|base64|token|key/i);
+});
+
+test('manual confirmation records redact unsafe replay metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const followups = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-followups': followups
+  });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token';
+  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
+  const response = {
+    flow: { operators: [], connections: [], metadataOnly: true },
+    pendingParameters: [],
+    missingResources: [],
+    manualResourceConfirmations: [
+      {
+        confirmedAtUtc: `2026-06-09T00:00:00Z ${unsafe}`,
+        actor: `local-user ${unsafe}`,
+        resourceType: `model_resource ${unsafe}`,
+        affectedOperator: `op_detect ${unsafe}`,
+        affectedParameters: [`ModelPath ${unsafe}`],
+        resourceKey: `op_detect.ModelPath ${unsafe}`,
+        writebackSummary: `model-resource:scratch-v1 ${unsafe}`,
+        metadataOnly: true,
+        applyGateChange: {
+          from: `canvas_apply_ready ${unsafe}`,
+          to: `deployment_ready ${unsafe}`,
+          clearedBlockers: [`op_detect.ModelPath ${unsafe}`]
+        },
+        deploymentBlocked: false
+      }
+    ]
+  };
+
+  panel._renderFollowupChecklist(response, response.flow);
+
+  assert.match(followups.innerHTML, /redacted/);
+  assert.doesNotMatch(followups.innerHTML, unsafePattern);
 });
 
 test('template artifact binding stays metadata-only and does not create fake TemplatePath parameter', async () => {
@@ -10907,6 +12315,81 @@ function testPlan({ planId = 'plan-a', planHash = 'sha256:plan-a' } = {}) {
     questions: []
   };
 }
+
+test('AI session history list redacts unsafe persisted summaries', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const list = createFakeElement();
+  panel.container = createContainer({ '#ai-history-list': list });
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+  panel.initialAutoRestoreSessionId = '';
+
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [
+      {
+        sessionId: 'session-redacted',
+        lastMessage: `Build failed ${unsafe}`,
+        templateName: `scratch-template ${unsafe}`,
+        generationMode: `agent ${unsafe}`,
+        updatedAtUtc: '2026-01-01T00:00:00Z',
+        turnCount: 2,
+        applied: true
+      }
+    ]
+  });
+
+  assert.match(list.innerHTML, /redacted/);
+  assertNoSensitiveLeak(`${list.innerHTML}\n${panel.history[0].lastMessage}\n${panel.history[0].templateName}\n${panel.history[0].generationMode}`);
+  assert.doesNotMatch(list.innerHTML, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
+
+  panel.history = [{
+    sessionId: 'legacy-session',
+    lastMessage: `Legacy summary ${unsafe}`,
+    templateName: `Legacy template ${unsafe}`,
+    generationMode: `Legacy mode ${unsafe}`,
+    updatedAtUtc: '2026-01-02T00:00:00Z',
+    turnCount: 1
+  }];
+  panel._filterHistory('');
+
+  assert.match(list.innerHTML, /redacted/);
+  assertNoSensitiveLeak(list.innerHTML);
+  assert.doesNotMatch(list.innerHTML, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
+
+  panel._filterHistory('super-secret-value');
+  assert.equal(panel.filteredHistory.length, 0);
+});
+
+test('AI session history errors redact unsafe backend diagnostics before chat messages', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
+
+  panel._handleListAiSessionsResult({ success: false, errorMessage: `List failed ${unsafe}` });
+  panel.pendingSessionLoad = { sessionId: 'auto-session', source: 'auto_restore', epoch: 1, requestId: 'req-auto' };
+  panel._handleGetAiSessionResult({
+    success: false,
+    sessionId: 'auto-session',
+    requestId: 'req-auto',
+    navigationEpoch: 1,
+    errorMessage: `Auto restore failed ${unsafe}`
+  });
+  panel.pendingSessionLoad = { sessionId: 'manual-session', source: 'history_switch', epoch: 2, requestId: 'req-manual' };
+  panel._handleGetAiSessionResult({
+    success: false,
+    sessionId: 'manual-session',
+    requestId: 'req-manual',
+    navigationEpoch: 2,
+    errorMessage: `Manual restore failed ${unsafe}`
+  });
+  panel._handleDeleteAiSessionResult({ success: false, errorMessage: `Delete failed ${unsafe}` });
+
+  const combined = (panel.messages || []).map(item => item.text).join('\n');
+  assert.match(combined, /redacted/);
+  assert.match(combined, /历史加载失败|自动恢复上次会话失败|会话恢复失败|删除会话失败/);
+  assertNoSensitiveLeak(combined);
+});
 
 test('AI session history auto restores stored active session exactly once', async () => {
   const { AiPanel } = await loadAiPanel();

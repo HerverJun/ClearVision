@@ -17,7 +17,7 @@ export const aiPanelGenerateRequestMixin = {
     }) {
         const input = this.container.querySelector('#ai-input');
         const normalizedDescription = String(description || '').trim();
-        const normalizedHint = String(hint || '').trim();
+        const normalizedHint = this._sanitizeGenerateRequestHint(hint);
         const requestId = this._createGenerateRequestId();
 
         if (!normalizedDescription) {
@@ -194,6 +194,14 @@ export const aiPanelGenerateRequestMixin = {
             this._handleError(err.message);
             return false;
         }
+    },
+
+    _sanitizeGenerateRequestHint(value, maxChars = 1600) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars);
     },
 
     _hasCurrentFlowContext() {
@@ -583,7 +591,7 @@ export const aiPanelGenerateRequestMixin = {
                 this._replayLatestAgentRunPublicEvents?.()
                     .catch(error => {
                         this._setResultStatusNote?.(
-                            `回放最近一次 AgentRun 失败：${error?.message || '未知错误'}`,
+                            `回放最近一次 AgentRun 失败：${this._sanitizeGenerateRequestHint(error?.message || '未知错误', 260) || '未知错误'}`,
                             'warning'
                         );
                     })
@@ -627,8 +635,11 @@ export const aiPanelGenerateRequestMixin = {
         const attachmentPaths = this.attachments.map(item => item.path);
         const hint = this.nextHintDraft.trim();
         const templateSelection = this.nextTemplateSelection ? { ...this.nextTemplateSelection } : null;
+        const attachmentDisplayNames = this.attachments
+            .map(item => this._getAttachmentDisplayName?.(item, '') || '')
+            .filter(Boolean);
         const userMessage = attachmentPaths.length > 0
-            ? `${description}\n\n[附件] ${this.attachments.map(item => item.name).join('，')}`
+            ? `${description}\n\n[附件] ${attachmentDisplayNames.join('，') || `${attachmentPaths.length} 个附件`}`
             : description;
         const directBuildDebug = this._consumeDirectBuildDebugRequest?.() === true;
         return this._dispatchGenerateRequest({

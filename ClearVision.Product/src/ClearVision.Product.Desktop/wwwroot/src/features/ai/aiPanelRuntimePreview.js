@@ -43,11 +43,27 @@ function redactDisplayValue(value) {
         return '';
     }
 
-    if (/base64|data:image|authorization|bearer|x-api-key|api[_-]?key|token=/i.test(text)) {
+    if (/base64|data:image|authorization|bearer|x-api-key|api[_-]?key|token\s*[:=]|secret\s*[:=]/i.test(text)) {
+        return '<redacted>';
+    }
+
+    if (/\b(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content|baseUrl|base_url|headers?)\b/i.test(text)) {
+        return '<redacted>';
+    }
+
+    if (/\bsk-[A-Za-z0-9_-]{8,}\b/i.test(text)) {
         return '<redacted>';
     }
 
     if (/(^|[^0-9])(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/\S*)?/i.test(text)) {
+        return '<redacted>';
+    }
+
+    if (/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b|plc:\/\/[^\s"'<>|]+/i.test(text)) {
+        return '<redacted>';
+    }
+
+    if (/\.(?:onnx|pt|pth|engine|plan|png|jpg|jpeg|bmp|tif|tiff)\b/i.test(text)) {
         return '<redacted>';
     }
 

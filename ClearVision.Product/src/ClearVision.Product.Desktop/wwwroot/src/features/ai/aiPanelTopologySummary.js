@@ -1,6 +1,14 @@
 import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
 
 export const aiPanelTopologySummaryMixin = {
+    _sanitizeTopologySummaryText(value, maxChars = 160) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars);
+    },
+
     _extractTopologySummary(flow) {
         if (!flow) return '';
         const ops = this._extractOperators(flow);
@@ -57,7 +65,9 @@ export const aiPanelTopologySummaryMixin = {
             .filter(Boolean)
             .map(op => {
                 const operatorType = op.operatorType || op.OperatorType || op.type || op.Type || '';
-                return getOperatorTypeDisplayName(operatorType) || op.displayName || op.DisplayName || '?';
+                const displayName = op.displayName || op.DisplayName || op.name || op.Name || '';
+                const label = getOperatorTypeDisplayName(operatorType) || displayName || '?';
+                return this._sanitizeTopologySummaryText(label, 160) || '?';
             })
             .join(' -> ');
     }

@@ -129,16 +129,19 @@ export const aiPanelResourceBindingMixin = {
 
     _renderResourceAuditTaskCard(item, actionModel, index) {
         const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item || {};
-        const resourceType = normalizedItem.resourceType || 'resource';
+        const resourceTypeRaw = normalizedItem.resourceType || 'resource';
+        const resourceType = this._sanitizeResourceAuditDisplayText(resourceTypeRaw, 100) || 'resource';
         const resourceLabel = getResourceDisplayName(resourceType, { fallback: '资源' });
-        const operatorId = normalizedItem.operatorId || normalizedItem.actualOperatorId || this._inferPendingOperatorIdFromResourceKey?.(normalizedItem.resourceKey) || '';
-        const parameterName = normalizedItem.parameterName || this._inferPendingParameterNameFromMissingResource?.(normalizedItem) || actionModel?.parameterName || '';
+        const operatorIdRaw = normalizedItem.operatorId || normalizedItem.actualOperatorId || this._inferPendingOperatorIdFromResourceKey?.(normalizedItem.resourceKey) || '';
+        const operatorId = this._sanitizeResourceAuditDisplayText(operatorIdRaw, 120);
+        const parameterNameRaw = normalizedItem.parameterName || this._inferPendingParameterNameFromMissingResource?.(normalizedItem) || actionModel?.parameterName || '';
+        const parameterName = this._sanitizeResourceAuditDisplayText(parameterNameRaw, 120);
         const parameterLabel = getParameterDisplayName(parameterName, { fallback: parameterName || '影响参数' });
         const blockerReason = normalizedItem.description || normalizedItem.resourceKey || '部署前资源元数据缺失，必须人工确认后才能进入部署就绪。';
         const suggestion = this._getResourceAuditSuggestion(normalizedItem, actionModel);
         const technical = [
             resourceType ? `resourceType=${resourceType}` : '',
-            normalizedItem.resourceKey ? `resourceRef=${normalizedItem.resourceKey}` : '',
+            normalizedItem.resourceKey ? `resourceRef=${this._sanitizeResourceAuditDisplayText(normalizedItem.resourceKey, 160)}` : '',
             operatorId ? `operator=${operatorId}` : '',
             parameterName ? `parameter=${parameterName}` : ''
         ].filter(Boolean).join('；');
@@ -170,7 +173,7 @@ export const aiPanelResourceBindingMixin = {
 
     _getResourceAuditSuggestion(item = {}, actionModel = {}) {
         const type = String(item?.resourceType || '').trim().toLowerCase();
-        const parameterName = actionModel?.parameterName || item?.parameterName || '';
+        const parameterName = this._sanitizeResourceAuditDisplayText(actionModel?.parameterName || item?.parameterName || '', 120);
         if (type.includes('model')) return `请人工核对模型资源与 ${parameterName || '模型参数'} 的适配性，AI 建议仅作参考。`;
         if (type.includes('template')) return '请人工选择模板资源并确认版本，AI 不会替用户选择模板文件。';
         if (type.includes('measurement') || type.includes('calibration')) return '请人工填写标定或像素比例，并确认单位来源。';
@@ -412,8 +415,15 @@ export const aiPanelResourceBindingMixin = {
         return text.length > 80 ? `${text.slice(0, 77)}...` : text;
     },
 
+    _sanitizeResourceAuditDisplayText(value, maxChars = 220) {
+        const text = this._sanitizeAuditText(value);
+        return text ? text.slice(0, maxChars) : '';
+    },
+
     _sanitizeAuditText(value) {
-        return String(value ?? '')
+        const raw = String(value ?? '');
+        const text = this._sanitizeAssistantFailureText?.(raw, 1200) || raw;
+        return text
             .replace(/[a-z]:\\[^\s"'<>]+/gi, '<本地路径已隐藏>')
             .replace(/\\\\[^\s"'<>]+/g, '<网络路径已隐藏>')
             .replace(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g, '<IP已隐藏>')
@@ -730,11 +740,22 @@ export const aiPanelResourceBindingMixin = {
             });
         const rows = merged.length
             ? merged.slice().reverse().map(record => {
-                const resourceType = record.resourceType || record.ResourceType || '';
-                const operatorId = record.affectedOperator || record.AffectedOperator || record.operatorId || record.OperatorId || '';
-                const parameters = record.affectedParameters || record.AffectedParameters || [record.parameterName || record.ParameterName || ''];
-                const gate = record.applyGateChange || record.ApplyGateChange || {};
+                const resourceType = this._sanitizeResourceAuditDisplayText(record.resourceType || record.ResourceType || '', 100);
+                const operatorId = this._sanitizeResourceAuditDisplayText(record.affectedOperator || record.AffectedOperator || record.operatorId || record.OperatorId || '', 120);
+                const parameters = (this._toArray?.(record.affectedParameters || record.AffectedParameters || [record.parameterName || record.ParameterName || '']) || []).map(item => this._sanitizeResourceAuditDisplayText(item, 120)).filter(Boolean);
+                const gate = { ...(record.applyGateChange || record.ApplyGateChange || {}) };
                 const cleared = this._toArray?.(gate.clearedBlockers || gate.ClearedBlockers) || [];
+                const displayResourceType = this._sanitizeResourceAuditDisplayText(resourceType, 100) || resourceType;
+                const displayOperatorId = this._sanitizeResourceAuditDisplayText(operatorId, 120);
+                const displayParameters = (this._toArray?.(parameters) || []).map(item => this._sanitizeResourceAuditDisplayText(item, 120)).filter(Boolean);
+                const displayWriteback = this._sanitizeResourceAuditDisplayText(record.writebackSummary || record.WritebackSummary || '', 200);
+                const displayActor = this._sanitizeResourceAuditDisplayText(record.actor || record.Actor || 'local-user', 100) || 'local-user';
+                const displayConfirmedAt = this._sanitizeResourceAuditDisplayText(record.confirmedAtUtc || record.ConfirmedAtUtc || '', 80);
+                const gateFrom = this._sanitizeResourceAuditDisplayText(gate.from || gate.From || '', 80);
+                const gateTo = this._sanitizeResourceAuditDisplayText(gate.to || gate.To || '', 80);
+                record = { ...record, confirmedAtUtc: displayConfirmedAt, ConfirmedAtUtc: displayConfirmedAt, actor: displayActor, Actor: displayActor, writebackSummary: displayWriteback, WritebackSummary: displayWriteback };
+                gate.from = gate.From = gateFrom;
+                gate.to = gate.To = gateTo;
                 return `
                     <div class="ai-manual-confirmation-record">
                         <div>

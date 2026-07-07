@@ -23,6 +23,29 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function sanitizePublicText(value, maxChars = 360) {
+    const text = String(value ?? '').trim();
+    if (!text) {
+        return '';
+    }
+
+    return text
+        .replace(/\b(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)\b\s*[:=]\s*["']?[^"'\n,;}]+/gi, '[redacted]')
+        .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [redacted]')
+        .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
+        .replace(/\bhttps?:\/\/[^\s"'<>|]+/gi, '[redacted:url]')
+        .replace(/\bsk-[A-Za-z0-9_-]{8,}/gi, '[redacted]')
+        .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?::\d+)?\b/g, '[redacted:ip]')
+        .replace(/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b/gi, '[redacted:plc]')
+        .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[redacted:path]')
+        .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[redacted:path]')
+        .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[redacted:image]')
+        .replace(/;base64,[a-z0-9+/=\r\n]+/gi, '[redacted:image]')
+        .replace(/\b[\w.-]*\.(?:onnx|pt|pth|engine|caffemodel|weights|bin)\b/gi, '[redacted:model]')
+        .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[redacted]')
+        .slice(0, maxChars);
+}
+
 function resolveRunId(replay) {
     return replay?.runId || replay?.RunId || replay?.summary?.runId || replay?.Summary?.RunId || '';
 }
@@ -132,7 +155,7 @@ export class AiPanelCapabilityOwner {
             this.applyReplay(replay);
         } catch (error) {
             if (requestId === this.requestId) {
-                this.errorMessage = error?.message || 'AI 运行状态加载失败';
+                this.errorMessage = sanitizePublicText(error?.message || 'AI 运行状态加载失败');
             }
         } finally {
             if (requestId === this.requestId) {
@@ -248,7 +271,7 @@ export class AiPanelCapabilityOwner {
                 this.showToast('AI 运行已请求取消', 'success');
                 this.render();
             } catch (error) {
-                this.errorMessage = error?.message || 'AI 运行取消失败';
+                this.errorMessage = sanitizePublicText(error?.message || 'AI 运行取消失败');
                 this.showToast(this.errorMessage, 'error');
                 this.render();
             }
@@ -276,8 +299,8 @@ export class AiPanelCapabilityOwner {
             return;
         }
 
-        const runId = this.activeRunId || resolveRunId(this.replay) || '';
-        const status = resolveStatus(this.replay);
+        const runId = sanitizePublicText(this.activeRunId || resolveRunId(this.replay) || '', 180);
+        const status = sanitizePublicText(resolveStatus(this.replay), 120);
         this.container.innerHTML = `
             <section class="ai-panel ai-panel-capability-owner" data-owner="${AI_PANEL_CAPABILITY_OWNER_ID}">
                 <header class="ai-panel-header">
@@ -290,7 +313,7 @@ export class AiPanelCapabilityOwner {
                         <button type="button" class="btn btn-danger" data-ai-action="cancel" ${runId ? '' : 'disabled'}>取消运行</button>
                     </div>
                 </header>
-                ${this.errorMessage ? `<div class="ai-error" role="alert">${escapeHtml(this.errorMessage)}</div>` : ''}
+                ${this.errorMessage ? `<div class="ai-error" role="alert">${escapeHtml(sanitizePublicText(this.errorMessage))}</div>` : ''}
                 <div class="ai-agent-run-summary">
                     <dl>
                         <div><dt>Run</dt><dd>${runId ? escapeHtml(runId) : '暂无运行'}</dd></div>
@@ -306,9 +329,9 @@ export class AiPanelCapabilityOwner {
 
     renderEvent(event) {
         const sequence = event?.sequence ?? event?.Sequence ?? '';
-        const type = event?.eventType ?? event?.EventType ?? event?.type ?? event?.Type ?? 'event';
-        const title = event?.title ?? event?.Title ?? type;
-        const summary = event?.summary ?? event?.Summary ?? event?.message ?? event?.Message ?? '';
+        const type = sanitizePublicText(event?.eventType ?? event?.EventType ?? event?.type ?? event?.Type ?? 'event', 120);
+        const title = sanitizePublicText(event?.title ?? event?.Title ?? type, 180);
+        const summary = sanitizePublicText(event?.summary ?? event?.Summary ?? event?.message ?? event?.Message ?? '', 360);
         return `
             <li class="ai-agent-event">
                 <span>${escapeHtml(sequence)}</span>

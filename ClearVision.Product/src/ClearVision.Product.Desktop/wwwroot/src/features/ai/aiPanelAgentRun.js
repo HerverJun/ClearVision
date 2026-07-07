@@ -500,9 +500,12 @@ export const aiPanelAgentRunMixin = {
         agentGenerateFlowPayload,
         buildFromPlan = null
     }) {
+        const safeAdditionalContext = this._sanitizeGenerateRequestHint?.(normalizedHint) ||
+            this._sanitizeAssistantFailureText?.(normalizedHint, 1600) ||
+            String(normalizedHint || '').trim().slice(0, 1600);
         return {
             description: normalizedDescription,
-            additionalContext: normalizedHint || null,
+            additionalContext: safeAdditionalContext || null,
             mode: resolvedMode,
             requirementMode: this.requirementMode,
             templateSelection: normalizedTemplateSelection,
@@ -701,18 +704,19 @@ export const aiPanelAgentRunMixin = {
     },
 
     _setAgentRunTransportStatus(statusText, tone = 'streaming', detail = '') {
+        const safeStatusText = this._sanitizeAgentRunPublicText(statusText, 120) || 'AgentRun 事件状态';
         const turn = this.activeAssistantTurn;
         if (turn) {
-            this._setAssistantTurnStatus(turn, statusText, tone);
+            this._setAssistantTurnStatus(turn, safeStatusText, tone);
         }
 
-        const summary = String(detail || '').trim();
+        const summary = this._sanitizeAgentRunPublicText(detail, 260);
         this._appendAgentRunProcessLine({
             runId: this.activeAgentRunId || this.activePlanRunId || 'agent-run',
             sequence: `transport-${Date.now()}`,
             stage: 'run',
             status: tone === 'warning' ? 'blocked' : 'running',
-            title: statusText,
+            title: safeStatusText,
             summary
         });
     },
@@ -725,19 +729,46 @@ export const aiPanelAgentRunMixin = {
         if (!runId || !eventType) return null;
 
         const sequence = Number(rawEvent.sequence ?? rawEvent.Sequence ?? 0);
+        const title = this._sanitizeAgentRunPublicText(rawEvent.title ?? rawEvent.Title ?? '', 120);
+        const summary = this._sanitizeAgentRunPublicText(rawEvent.summary ?? rawEvent.Summary ?? '', 260);
         return {
             runId,
             sequence: Number.isFinite(sequence) ? sequence : 0,
             timestamp: rawEvent.timestamp ?? rawEvent.Timestamp ?? '',
             eventType,
             stage: String(rawEvent.stage ?? rawEvent.Stage ?? '').trim(),
-            title: String(rawEvent.title ?? rawEvent.Title ?? '').trim(),
-            summary: String(rawEvent.summary ?? rawEvent.Summary ?? '').trim(),
+            title,
+            summary,
             status: String(rawEvent.status ?? rawEvent.Status ?? '').trim().toLowerCase(),
             payload: rawEvent.payload ?? rawEvent.Payload ?? null,
             metadataOnly: Boolean(rawEvent.metadataOnly ?? rawEvent.MetadataOnly),
             redactionPass: Boolean(rawEvent.redactionPass ?? rawEvent.RedactionPass)
         };
+    },
+
+    _sanitizeAgentRunPublicText(value, maxChars = 220) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+
+        if (this._sanitizePublicLiveEventText) {
+            return this._sanitizePublicLiveEventText(text, maxChars);
+        }
+
+        const redacted = this._redactPublicDiagnosticText?.(text) || text;
+        return redacted
+            .replace(/\bsk-[A-Za-z0-9_-]{8,}/gi, '[redacted]')
+            .slice(0, maxChars);
+    },
+
+    _sanitizeAgentRunDiagnosticCode(value, maxChars = 96) {
+        if (this._sanitizePublicLiveDiagnosticCode) {
+            return this._sanitizePublicLiveDiagnosticCode(value).slice(0, maxChars);
+        }
+
+        return this._sanitizeAgentRunPublicText(value, maxChars)
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '')
+            .replace(/[^A-Za-z0-9_.:-]/g, '')
+            .slice(0, maxChars);
     },
 
     _buildAgentRunTerminalEventFromSummary(runId, summary = null) {
@@ -770,9 +801,11 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunBrief(evt) {
-        const text = this._localizeAgentRunBriefText(
+        const localizedText = this._localizeAgentRunBriefText(
             evt.summary || this._payloadString(evt.payload, 'brief') || ''
         );
+        const text = this._sanitizeAgentRunPublicText(localizedText, 360) ||
+            this._localizeAgentRunBriefText('');
         const body = this.activeAssistantTurn?.replyBody;
         if (!body?.textContent?.includes(text)) {
             this._appendAssistantStreamText('reply', `${text}\n`);
@@ -814,8 +847,14 @@ export const aiPanelAgentRunMixin = {
         const stepId = this._getAgentRunStepId(evt);
         const stageLabel = this._getAgentRunStageLabel(evt.stage);
         const statusLabel = this._getAgentRunStatusLabel(evt.status);
-        const title = this._localizeDisplayText?.(evt.title || stageLabel) || evt.title || stageLabel;
-        const summary = this._localizeDisplayText?.(evt.summary || '') || evt.summary || '';
+        const title = this._sanitizeAgentRunPublicText(
+            this._localizeDisplayText?.(evt.title || stageLabel) || evt.title || stageLabel,
+            120
+        );
+        const summary = this._sanitizeAgentRunPublicText(
+            this._localizeDisplayText?.(evt.summary || '') || evt.summary || '',
+            260
+        );
         const text = this._formatAgentRunProcessText?.(evt, { stageLabel, statusLabel, title, summary }) ||
             `${stageLabel} / ${statusLabel} / ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
         const item = this._updateThinkingStep(evt.runId, stepId, text);
@@ -831,13 +870,18 @@ export const aiPanelAgentRunMixin = {
         if (!turn?.toolsSection || !turn?.toolsBody) return;
 
         const payload = this._asObject(evt.payload);
-        const toolName = this._payloadString(payload, 'toolName') ||
+        const rawToolName = this._payloadString(payload, 'toolName') ||
             this._payloadString(payload, 'name') ||
             this._deriveToolNameFromTitle(evt.title);
-        const toolLabel = this._formatToolName?.(toolName) ||
-            this._localizeDisplayText?.(toolName) ||
-            toolName ||
-            '视觉智能体工具';
+        const toolName = this._sanitizeAgentRunDiagnosticCode(rawToolName, 96) ||
+            this._sanitizeAgentRunPublicText(rawToolName, 80);
+        const toolLabel = this._sanitizeAgentRunPublicText(
+            this._formatToolName?.(rawToolName) ||
+            this._localizeDisplayText?.(rawToolName) ||
+            rawToolName ||
+            '视觉智能体工具',
+            120
+        );
         const toolKey = `${evt.runId}:${toolName || evt.sequence}`;
         this.agentRunToolMap = this.agentRunToolMap instanceof Map
             ? this.agentRunToolMap
@@ -853,13 +897,18 @@ export const aiPanelAgentRunMixin = {
         }
 
         const durationMs = this._payloadNumber(payload, 'durationMs');
-        const reportId = this._payloadString(payload, 'reportId');
-        const blockedReasons = this._payloadArray(payload, 'blockedReasons');
-        const firstFix = this._payloadString(payload, 'firstFixRecommendation');
-        const resultSummary = this._payloadString(payload, 'summary') ||
+        const reportId = this._sanitizeAgentRunDiagnosticCode(this._payloadString(payload, 'reportId'), 96);
+        const blockedReasons = this._payloadArray(payload, 'blockedReasons')
+            .map(reason => this._sanitizeAgentRunPublicText(reason, 100))
+            .filter(Boolean);
+        const firstFix = this._sanitizeAgentRunPublicText(this._payloadString(payload, 'firstFixRecommendation'), 180);
+        const resultSummary = this._sanitizeAgentRunPublicText(
+            this._payloadString(payload, 'summary') ||
             this._payloadString(payload, 'resultSummary') ||
             evt.summary ||
-            '工具状态已更新。';
+            '工具状态已更新。',
+            220
+        );
         const tone = this._getAgentRunTone(evt.status, evt.eventType);
         card.className = `ai-agent-run-tool-card is-${tone}`;
         card.innerHTML = `
@@ -880,14 +929,18 @@ export const aiPanelAgentRunMixin = {
 
     _formatAgentRunProcessText(evt, fallback = {}) {
         const payload = this._asObject(evt.payload);
-        const toolName = this._payloadString(payload, 'toolName') ||
+        const rawToolName = this._payloadString(payload, 'toolName') ||
             this._deriveToolNameFromTitle(evt.title);
-        const toolLabel = toolName
-            ? (this._formatToolName?.(toolName) || this._localizeDisplayText?.(toolName) || toolName)
+        const toolLabel = rawToolName
+            ? this._sanitizeAgentRunPublicText(
+                this._formatToolName?.(rawToolName) || this._localizeDisplayText?.(rawToolName) || rawToolName,
+                120)
             : '';
         const round = this._payloadNumber(payload, 'round');
         const reason = this._payloadString(payload, evt.eventType === 'tool_loop.draft.rejected' ? 'rejectionReason' : 'fallbackReason');
-        const reasonLabel = reason ? (this._localizeDisplayText?.(reason) || reason) : '';
+        const reasonLabel = reason
+            ? this._sanitizeAgentRunPublicText(this._localizeDisplayText?.(reason) || reason, 120)
+            : '';
         const summary = fallback.summary || '';
 
         switch (evt.eventType) {
@@ -923,11 +976,13 @@ export const aiPanelAgentRunMixin = {
         if (!turn?.artifactsSection || !turn?.artifactsBody) return;
 
         const payload = this._asObject(evt.payload);
-        const reportId = this._payloadString(payload, 'reportId') ||
+        const reportId = this._sanitizeAgentRunDiagnosticCode(this._payloadString(payload, 'reportId') ||
             this._payloadString(payload, 'manifestId') ||
-            this._payloadString(payload, 'reviewId');
-        const blockedReasons = this._payloadArray(payload, 'blockedReasons');
-        const firstFix = this._payloadString(payload, 'firstFixRecommendation');
+            this._payloadString(payload, 'reviewId'), 96);
+        const blockedReasons = this._payloadArray(payload, 'blockedReasons')
+            .map(reason => this._sanitizeAgentRunPublicText(reason, 100))
+            .filter(Boolean);
+        const firstFix = this._sanitizeAgentRunPublicText(this._payloadString(payload, 'firstFixRecommendation'), 180);
         const artifactKey = `${evt.runId}:${evt.eventType}:${reportId || evt.stage || evt.sequence}`;
         this.agentRunArtifactMap = this.agentRunArtifactMap instanceof Map
             ? this.agentRunArtifactMap
@@ -943,13 +998,25 @@ export const aiPanelAgentRunMixin = {
         }
 
         const tone = this._getAgentRunTone(evt.status, evt.eventType);
+        const artifactTitle = this._sanitizeAgentRunPublicText(
+            this._localizeDisplayText?.(evt.title || this._getAgentRunStageLabel(evt.stage)) ||
+            evt.title ||
+            this._getAgentRunStageLabel(evt.stage),
+            120
+        );
+        const artifactSummary = this._sanitizeAgentRunPublicText(
+            this._localizeDisplayText?.(evt.summary || '') ||
+            evt.summary ||
+            '已发布可回放的元数据报告事件。',
+            220
+        );
         card.className = `ai-agent-run-artifact-card is-${tone}`;
         card.innerHTML = `
             <div class="ai-agent-run-artifact-title">
-                <span>${this._escapeHtml(this._localizeDisplayText?.(evt.title || this._getAgentRunStageLabel(evt.stage)) || evt.title || this._getAgentRunStageLabel(evt.stage))}</span>
+                <span>${this._escapeHtml(artifactTitle)}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
-            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(this._localizeDisplayText?.(evt.summary || '') || evt.summary || '已发布可回放的元数据报告事件。')}</div>
+            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(artifactSummary)}</div>
             ${reportId ? `<div class="ai-agent-run-report-id">报告 ${this._escapeHtml(reportId)}</div>` : ''}
             ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(this._localizeDisplayText?.(reason) || reason)}</span>`).join('')}</div>` : ''}
             ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(this._localizeDisplayText?.(firstFix) || firstFix)}</div>` : ''}
@@ -958,13 +1025,14 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunFailure(evt) {
-        const firstFix = this._payloadString(evt.payload, 'firstFixRecommendation') ||
+        const firstFix = this._sanitizeAgentRunPublicText(this._payloadString(evt.payload, 'firstFixRecommendation') ||
             this._payloadString(this._asObject(evt.payload)?.diagnostic, 'firstFixRecommendation') ||
-            '请复核公开诊断，补齐缺失元数据后重试。';
+            '请复核公开诊断，补齐缺失元数据后重试。', 180);
+        const summary = this._sanitizeAgentRunPublicText(evt.summary || '视觉智能体运行失败。', 260);
         this._renderAssistantFailure(this.activeAssistantTurn, {
-            errorMessage: evt.summary || '视觉智能体运行失败。',
+            errorMessage: summary,
             failureSummary: {
-                message: evt.summary || '视觉智能体运行失败。',
+                message: summary,
                 repairTarget: firstFix
             },
             manualRetry: null
@@ -983,7 +1051,10 @@ export const aiPanelAgentRunMixin = {
                 this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
                 this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成', 'success');
                 if (evt.summary) {
-                    this._setResultStatusNote(this._localizeDisplayText?.(evt.summary) || evt.summary, 'info');
+                    this._setResultStatusNote(
+                        this._sanitizeAgentRunPublicText(this._localizeDisplayText?.(evt.summary) || evt.summary, 260),
+                        'info'
+                    );
                 }
                 this._showDraftBuildCompletionNotice?.(
                     this.currentResult,
@@ -1027,14 +1098,14 @@ export const aiPanelAgentRunMixin = {
                 this._setAssistantTurnStatus(this.activeAssistantTurn, '构建失败', 'failed');
             }
             if (evt.summary) {
-                this._setResultStatusNote(evt.summary, 'warning');
+                this._setResultStatusNote(this._sanitizeAgentRunPublicText(evt.summary, 260), 'warning');
             }
         }
 
         if (this.sessionId) {
             this._addToHistory({
                 sessionId: this.sessionId,
-                lastMessage: this.lastUserPrompt || evt.summary || '视觉智能体运行',
+                lastMessage: this.lastUserPrompt || this._sanitizeAgentRunPublicText(evt.summary, 180) || '视觉智能体运行',
                 updatedAtUtc: new Date().toISOString(),
                 turnCount: 0,
                 generationMode: 'agent_run_event_stream',
@@ -1062,7 +1133,10 @@ export const aiPanelAgentRunMixin = {
             this._setResultStatusNote('Tool Loop 草稿未通过验收，已回退稳定构建链路。', 'warning');
         } else if (evt.eventType === 'tool_loop.failed') {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '实验失败', 'failed');
-            this._setResultStatusNote(evt.summary || 'Tool Loop 实验失败，已等待稳定链路或终止事件收尾。', 'warning');
+            this._setResultStatusNote(
+                this._sanitizeAgentRunPublicText(evt.summary || 'Tool Loop 实验失败，已等待稳定链路或终止事件收尾。', 260),
+                'warning'
+            );
         } else if (evt.eventType === 'tool_loop.draft.accepted') {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '草稿验收通过', 'success');
             this._setResultStatusNote('Tool Loop 草稿已通过验收，稳定构建链路正在补全 BuildResult。', 'info');
@@ -1327,7 +1401,7 @@ export const aiPanelAgentRunMixin = {
             .catch(error => {
                 this.isCancellingGenerate = false;
                 this._setGeneratingState(this.isGenerating);
-                this._addMessage('system', `取消生成未生效: ${error?.message || '未知错误'}`);
+                this._addMessage('system', `取消生成未生效: ${this._sanitizeAgentRunPublicText(error?.message || '未知错误', 260) || '未知错误'}`);
                 return false;
             });
     }

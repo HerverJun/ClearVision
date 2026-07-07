@@ -214,32 +214,41 @@ export const aiPanelApplyPreviewMixin = {
         }
     },
 
+    _sanitizeApplyPreviewText(value, maxChars = 180) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars);
+    },
+
     _formatApplyPendingItem(item) {
         const operatorLabel = item.actualOperatorId || item.operatorId || '未定位算子';
         const names = item.parameterNames?.length > 0
             ? item.parameterNames.map(name => getParameterDisplayName(name, { fallback: name })).join('、')
             : '待确认参数';
-        return `${operatorLabel}：${names}`;
+        return this._sanitizeApplyPreviewText(`${operatorLabel}：${names}`, 220);
     },
 
     _formatApplyOperatorLabel(op) {
         const rawType = op?.operatorType || op?.OperatorType || op?.type || op?.Type || '';
-        return op?.displayName || op?.DisplayName || op?.name || op?.Name ||
+        const label = op?.displayName || op?.DisplayName || op?.name || op?.Name ||
             getOperatorTypeDisplayName(rawType, { fallback: '未命名算子' });
+        return this._sanitizeApplyPreviewText(label, 160);
     },
 
     _formatApplyChangeLabel(name) {
         const rawName = String(name || '').trim();
         if (rawName === 'displayName') return '显示名称';
         if (rawName === 'operatorType') return '算子类型';
-        return getParameterDisplayName(rawName, { fallback: rawName || '参数' });
+        return this._sanitizeApplyPreviewText(getParameterDisplayName(rawName, { fallback: rawName || '参数' }), 120);
     },
 
     _formatApplyChangeValue(change, value) {
         if (change?.name === 'operatorType') {
-            return getOperatorTypeDisplayName(value, { fallback: String(value ?? '--') });
+            return this._sanitizeApplyPreviewText(getOperatorTypeDisplayName(value, { fallback: String(value ?? '--') }), 180);
         }
-        return String(value ?? '--');
+        return this._sanitizeApplyPreviewText(value ?? '--', 180);
     },
 
     _renderApplyRiskSummary(applyRisk) {
@@ -251,11 +260,11 @@ export const aiPanelApplyPreviewMixin = {
             .join('');
         const missingItems = (applyRisk.missing || [])
             .slice(0, 4)
-            .map(item => `<li>${this._escapeHtml(item.description || item.resourceKey || item.resourceType || '缺失资源')}</li>`)
+            .map(item => `<li>${this._escapeHtml(this._sanitizeApplyPreviewText(item.description || item.resourceKey || item.resourceType || '缺失资源', 220))}</li>`)
             .join('');
         const nonBlockingItems = (applyRisk.nonBlockingFields || [])
             .slice(0, 6)
-            .map(field => `<li>${this._escapeHtml(this._getRequirementFieldLabel(field))}</li>`)
+            .map(field => `<li>${this._escapeHtml(this._sanitizeApplyPreviewText(this._getRequirementFieldLabel(field), 160))}</li>`)
             .join('');
 
         return `
@@ -318,7 +327,7 @@ export const aiPanelApplyPreviewMixin = {
             || connection.TargetPort
             || 'Input';
 
-        return `${source}.${sourcePort} -> ${target}.${targetPort}`;
+        return this._sanitizeApplyPreviewText(`${source}.${sourcePort} -> ${target}.${targetPort}`, 220);
     },
 
     _showApplyPreview(diff, newFlow, options = {}) {
@@ -346,13 +355,13 @@ export const aiPanelApplyPreviewMixin = {
                     ${diff.added.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
-                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add" title="${this._escapeHtml(op.operatorType || op.OperatorType || op.type || op.Type || '')}">+ ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
+                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add" title="${this._escapeHtml(this._sanitizeApplyPreviewText(op.operatorType || op.OperatorType || op.type || op.Type || '', 120))}">+ ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.removed.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-remove">删除算子 (${diff.removed.length})</div>
-                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove" title="${this._escapeHtml(op.operatorType || op.OperatorType || op.type || op.Type || '')}">- ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
+                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove" title="${this._escapeHtml(this._sanitizeApplyPreviewText(op.operatorType || op.OperatorType || op.type || op.Type || '', 120))}">- ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.modified.length > 0 ? `
@@ -361,7 +370,7 @@ export const aiPanelApplyPreviewMixin = {
                             ${diff.modified.map(m => `
                                 <div class="ai-apply-preview-item is-modify">
                                     ${this._escapeHtml(this._formatApplyOperatorLabel(m.op))}
-                                    ${m.changes.map(c => `<div class="ai-apply-preview-param" title="${this._escapeHtml(`${c.name}: ${String(c.old ?? '--')} -> ${String(c.new ?? '--')}`)}">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}: ${this._escapeHtml(this._formatApplyChangeValue(c, c.old))} &rarr; ${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</div>`).join('')}
+                                    ${m.changes.map(c => `<div class="ai-apply-preview-param" title="${this._escapeHtml(this._sanitizeApplyPreviewText(`${this._formatApplyChangeLabel(c.name)}: ${this._formatApplyChangeValue(c, c.old)} -> ${this._formatApplyChangeValue(c, c.new)}`, 260))}">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}: ${this._escapeHtml(this._formatApplyChangeValue(c, c.old))} &rarr; ${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</div>`).join('')}
                                 </div>
                             `).join('')}
                         </div>
@@ -445,7 +454,7 @@ export const aiPanelApplyPreviewMixin = {
             }
         } catch (err) {
             console.error('应用流程失败:', err);
-            const message = err?.message || '未知错误';
+            const message = this._sanitizeApplyPreviewText(err?.message || '未知错误', 260);
             this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
             this._setResultStatusNote(`应用流程失败：${message}`, 'warning');
             this._addMessage('system', `应用流程失败：${message}`);
@@ -486,7 +495,7 @@ export const aiPanelApplyPreviewMixin = {
             this._addMessage('system', '已撤销应用，画布已恢复到应用前状态。');
         } catch (err) {
             console.error('撤销应用失败:', err);
-            this._addMessage('system', `撤销失败：${err.message}`);
+            this._addMessage('system', `撤销失败：${this._sanitizeApplyPreviewText(err?.message || '未知错误', 260)}`);
         }
     }
 };

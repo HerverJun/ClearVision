@@ -1,5 +1,23 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 export const aiPanelAttachmentsMixin = {
+    _sanitizeAttachmentDisplayText(value, maxChars = 180) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return (this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars))
+            .replace(/\b[\w.-]*\.(?:onnx|pt|pth|engine|caffemodel|weights|bin)\b/gi, '[redacted:model]');
+    },
+
+    _getAttachmentDisplayName(item, fallback = '未知文件') {
+        return this._sanitizeAttachmentDisplayText(item?.name || item?.Name || this._getFileName(item?.path || item?.Path || ''), 160) || fallback;
+    },
+
+    _normalizeAttachmentStatus(status) {
+        const value = String(status || 'ready').trim().toLowerCase();
+        return ['ready', 'pending', 'sent', 'skipped'].includes(value) ? value : 'ready';
+    },
+
     _handleAttachmentClick() {
         if (this.isGenerating) return;
         webMessageBridge.sendMessage('PickFileCommand', {
@@ -49,7 +67,7 @@ export const aiPanelAttachmentsMixin = {
         };
         this.attachments.push(attachment);
         this._renderAttachments();
-        this._addMessage('system', `已添加附件：${attachment.name}`);
+        this._addMessage('system', `已添加附件：${this._getAttachmentDisplayName(attachment)}`);
     },
 
     _handleAttachmentReport(data) {
@@ -93,10 +111,10 @@ export const aiPanelAttachmentsMixin = {
 
         this._renderAttachments();
 
-        const sentNames = sent.map(item => item?.name).filter(Boolean);
+        const sentNames = sent.map(item => this._getAttachmentDisplayName(item, '')).filter(Boolean);
         const skippedNames = skipped.map(item => {
-            const name = item?.name || this._getFileName(item?.path || '');
-            const reason = this._formatSkipReason(item?.reason);
+            const name = this._getAttachmentDisplayName(item, '');
+            const reason = this._sanitizeAttachmentDisplayText(this._formatSkipReason(item?.reason), 180);
             return reason ? `${name}(${reason})` : name;
         }).filter(Boolean);
 
@@ -126,22 +144,25 @@ export const aiPanelAttachmentsMixin = {
             return;
         }
 
-        const chips = this.attachments.map(item => {
-            const title = item.reason ? `${item.path}\n${item.reason}` : item.path;
-            const statusLabel = this._getAttachmentStatusLabel(item.status, item.reason);
-            const statusClass = `status-${item.status || 'ready'}`;
+        const chips = this.attachments.map((item, index) => {
+            const status = this._normalizeAttachmentStatus(item.status);
+            const safeName = this._getAttachmentDisplayName(item);
+            const safeReason = this._sanitizeAttachmentDisplayText(item.reason, 180);
+            const title = safeReason ? `${safeName}\n${safeReason}` : safeName;
+            const statusLabel = this._getAttachmentStatusLabel(status, safeReason);
+            const statusClass = `status-${status}`;
             return `
                 <div class="ai-attachment-chip" title="${this._escapeHtml(title)}">
-                    <span class="ai-attachment-name">${this._escapeHtml(item.name)}</span>
+                    <span class="ai-attachment-name">${this._escapeHtml(safeName)}</span>
                     <span class="ai-attachment-status ${statusClass}">${this._escapeHtml(statusLabel)}</span>
-                    <button class="ai-attachment-remove" data-path="${this._escapeHtml(item.path)}" type="button" aria-label="remove attachment">×</button>
+                    <button class="ai-attachment-remove" data-attachment-index="${this._escapeHtml(String(index))}" type="button" aria-label="remove attachment">×</button>
                 </div>
             `;
         }).join('');
 
         container.innerHTML = `<div class="ai-attachment-list">${chips}</div>`;
         container.querySelectorAll('.ai-attachment-remove').forEach(btn => {
-            btn.addEventListener('click', () => this._removeAttachment(btn.dataset.path || ''));
+            btn.addEventListener('click', () => this._removeAttachment(this.attachments[Number(btn.dataset.attachmentIndex)]?.path || ''));
             btn.disabled = this.isGenerating;
         });
     },
@@ -214,7 +235,7 @@ export const aiPanelAttachmentsMixin = {
                     ${sent.map(item => `
                         <div class="ai-attachment-item is-sent">
                             <span class="ai-attachment-icon">&#128206;</span>
-                            <span class="ai-attachment-name">${this._escapeHtml(item.name || item.Name || '未知文件')}</span>
+                            <span class="ai-attachment-name">${this._escapeHtml(this._getAttachmentDisplayName(item))}</span>
                         </div>
                     `).join('')}
                 </div>
@@ -230,8 +251,8 @@ export const aiPanelAttachmentsMixin = {
                     ${skipped.map(item => `
                         <div class="ai-attachment-item is-skipped">
                             <span class="ai-attachment-icon">&#9888;</span>
-                            <span class="ai-attachment-name">${this._escapeHtml(item.name || item.Name || '未知文件')}</span>
-                            <span class="ai-attachment-reason">${this._escapeHtml(item.reason || item.Reason || '未知原因')}</span>
+                            <span class="ai-attachment-name">${this._escapeHtml(this._getAttachmentDisplayName(item))}</span>
+                            <span class="ai-attachment-reason">${this._escapeHtml(this._sanitizeAttachmentDisplayText(item.reason || item.Reason || '未知原因', 180))}</span>
                         </div>
                     `).join('')}
                 </div>
@@ -244,10 +265,10 @@ export const aiPanelAttachmentsMixin = {
                 <div class="ai-attachment-section">
                     <div class="ai-attachment-section-header">附件 (${attachments.length})</div>
                     ${attachments.map(item => `
-                        <div class="ai-attachment-item is-${this._escapeHtml(item.status || 'pending')}">
+                        <div class="ai-attachment-item is-${this._escapeHtml(this._normalizeAttachmentStatus(item.status || 'pending'))}">
                             <span class="ai-attachment-icon">&#128206;</span>
-                            <span class="ai-attachment-name">${this._escapeHtml(item.name || '未知文件')}</span>
-                            ${item.reason ? `<span class="ai-attachment-reason">${this._escapeHtml(item.reason)}</span>` : ''}
+                            <span class="ai-attachment-name">${this._escapeHtml(this._getAttachmentDisplayName(item))}</span>
+                            ${item.reason ? `<span class="ai-attachment-reason">${this._escapeHtml(this._sanitizeAttachmentDisplayText(item.reason, 180))}</span>` : ''}
                         </div>
                     `).join('')}
                 </div>

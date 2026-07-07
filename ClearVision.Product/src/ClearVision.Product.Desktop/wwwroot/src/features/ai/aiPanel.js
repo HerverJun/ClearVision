@@ -943,7 +943,7 @@ export class AiPanel {
                 if (!this.currentResult?.flow) {
                     const summary = this.container.querySelector('#ai-result-summary');
                     if (summary) {
-                        summary.textContent = payload.aiExplanation || payload.AiExplanation || '当前需求需要先澄清。';
+                        summary.textContent = this._sanitizeAssistantFailureText?.(payload.aiExplanation || payload.AiExplanation || '当前需求需要先澄清。', 360) || '当前需求需要先澄清。';
                     }
                 }
                 if (this.currentResult?.flow) {
@@ -1065,34 +1065,37 @@ export class AiPanel {
 
         const status = this._normalizeGenerateStatus(payload);
         if (status === 'cancelled' || status === 'canceled') {
-            this._addMessage('system', payload.message || '已发送取消请求，正在等待后端停止当前生成。');
+            this._addMessage('system', this._sanitizeAssistantFailureText?.(payload.message || '已发送取消请求，正在等待后端停止当前生成。', 220) || '已发送取消请求，正在等待后端停止当前生成。');
             return;
         }
 
         this.isCancellingGenerate = false;
-        this._addMessage('system', `取消生成未生效: ${payload.errorMessage || payload.message || '未知错误'}`);
+        this._addMessage('system', `取消生成未生效: ${this._sanitizeAssistantFailureText?.(payload.errorMessage || payload.message || '未知错误', 220) || '未知错误'}`);
     }
 
     _handleFirewallBlocked(data) {
         this._setGeneratingState(false);
         this._clearActiveRequestState();
+        const payload = data?.payload || {};
+        const title = this._sanitizeAssistantFailureText?.(payload.message || '网络连接被拦截', 160) || '网络连接被拦截';
+        const detail = this._sanitizeAssistantFailureText?.(payload.detail || '请检查防火墙设置或网络代理。', 260) || '请检查防火墙设置或网络代理。';
         if (this.activeAssistantTurn) {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '连接受阻', 'failed');
             this._renderAssistantFailure(this.activeAssistantTurn, {
-                errorMessage: data?.payload?.message || '网络连接被拦截'
+                errorMessage: title
             });
             this.activeAssistantTurn = null;
         }
         const chatContainer = this.container.querySelector('#ai-chat-container');
+        if (!chatContainer) return;
         const alert = document.createElement('div');
         alert.className = 'firewall-alert';
-        alert.innerHTML = `
-            <div class="firewall-icon">🚫</div>
-            <div class="firewall-content">
-                <div class="firewall-title">${data.payload?.message || '网络连接被拦截'}</div>
-                <div class="firewall-desc">${data.payload?.detail || '请检查防火墙设置或网络代理。'}</div>
-            </div>
-        `;
+        const part = (className, text = '') => Object.assign(document.createElement('div'), { className, textContent: text });
+        const content = part('firewall-content');
+        content.appendChild(part('firewall-title', title));
+        content.appendChild(part('firewall-desc', detail));
+        alert.appendChild(part('firewall-icon', '!'));
+        alert.appendChild(content);
         chatContainer.appendChild(alert);
         this._scrollToBottom();
     }
@@ -1103,7 +1106,7 @@ export class AiPanel {
         if (this.activeAssistantTurn) {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '系统错误', 'failed');
             this._renderAssistantFailure(this.activeAssistantTurn, {
-                errorMessage: `系统错误: ${msg}`
+                errorMessage: `系统错误: ${this._sanitizeAssistantFailureText?.(msg, 260) || '未知错误'}`
             });
             if (this.currentResult?.flow) {
                 this._setResultStatusNote('本轮修改失败，右侧仍显示上一版可应用方案。', 'warning');
@@ -1111,7 +1114,7 @@ export class AiPanel {
             this.activeAssistantTurn = null;
             return;
         }
-        this._addMessage('system', `❌ 系统错误: ${msg}`);
+        this._addMessage('system', `❌ 系统错误: ${this._sanitizeAssistantFailureText?.(msg, 260) || '未知错误'}`);
     }
 
     _displayResult(data, options = {}) {
@@ -1149,7 +1152,7 @@ export class AiPanel {
         const clarificationRequired = this._isClarificationResult(data);
         const requirementBrief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
         const failureSummary = data?.failureSummary || data?.FailureSummary || null;
-        const terminalSummary = String(
+        const terminalSummary = this._sanitizeAssistantFailureText?.(String(
             failureSummary?.message ||
             failureSummary?.Message ||
             data?.errorMessage ||
@@ -1159,10 +1162,12 @@ export class AiPanel {
             data?.message ||
             data?.Message ||
             '构建未返回可应用画布流程，已保留原始终态。'
-        ).trim();
+        ).trim(), 360) || '构建未返回可应用画布流程，已保留原始终态。';
+        const compatibilityMessage = this._sanitizeAssistantFailureText?.(buildFlowCompatibility?.publicMessage || '', 360) ||
+            buildFlowCompatibility?.publicMessage || '';
         const summaryLines = legacyMissingCanonicalFlow
             ? [
-                this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')
+                this._escapeHtml(compatibilityMessage).replace(/\n/g, '<br/>')
             ]
             : nonCompletedBuildTerminalWithoutFlow
             ? [
@@ -1199,12 +1204,13 @@ export class AiPanel {
         if (clarificationRequired && !flow) {
             opsContainer.innerHTML = '<div class="ai-followup-empty">构建尚未开始。请先确认计划或开始构建，生成算子链后会显示在这里。</div>';
         } else if (legacyMissingCanonicalFlow) {
-            opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')}</div>`;
+            opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(compatibilityMessage).replace(/\n/g, '<br/>')}</div>`;
         } else if (nonCompletedBuildTerminalWithoutFlow) {
             opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(terminalSummary)}</div>`;
         } else {
             ops.forEach((op, i) => {
-                const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';
+                const rawOpName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';
+                const opName = this._sanitizeAssistantFailureText?.(rawOpName, 120) || '未命名算子';
                 const opType = op?.operatorType || op?.OperatorType || op?.type || op?.Type || '';
                 const opTypeDisplay = getOperatorTypeDisplayName(opType);
                 const opId = op?.tempId || op?.TempId || op?.id || op?.Id || '';
@@ -1396,8 +1402,8 @@ export class AiPanel {
 
         const parts = [];
         if (recommended && recommended.templateName) {
-            const templateName = this._escapeHtml(String(recommended.templateName));
-            const reason = this._escapeHtml(String(recommended.matchReason || '命中高频场景'));
+            const templateName = this._escapeHtml(this._sanitizeAssistantFailureText?.(recommended.templateName, 160) || String(recommended.templateName));
+            const reason = this._escapeHtml(this._sanitizeAssistantFailureText?.(recommended.matchReason || '命中高频场景', 220) || String(recommended.matchReason || '命中高频场景'));
             const confidence = Number(recommended.confidence);
             const confidenceText = Number.isFinite(confidence) && confidence > 0
                 ? `，置信度 ${(confidence * 100).toFixed(0)}%`
@@ -1412,7 +1418,7 @@ export class AiPanel {
         if (missing.length > 0) {
             const missingPreview = missing
                 .slice(0, 2)
-                .map(item => this._escapeHtml(String(item?.resourceKey || item?.description || '未知资源')))
+                .map(item => this._escapeHtml(this._sanitizeAssistantFailureText?.(item?.resourceKey || item?.description || '未知资源', 160) || String(item?.resourceKey || item?.description || '未知资源')))
                 .join('、');
             const suffix = missing.length > 2 ? '...' : '';
             parts.push(`缺失资源：<span class="result-count">${missing.length}</span> 项（${missingPreview}${suffix}）`);
@@ -1434,7 +1440,7 @@ export class AiPanel {
         const generationMode = this._getGenerationMode(data);
         const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
-        const pendingGroups = this._collectPendingDraftGroups(pending, operators);
+        const pendingGroups = this._collectPendingDraftGroups(pending, operators).map(group => ({ ...group, groupKey: this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey, label: this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label, operatorId: this._sanitizeResourceAuditDisplayText?.(group.operatorId, 120) || group.operatorId, fields: (group.fields || []).map(field => ({ ...field, parameterName: this._sanitizeResourceAuditDisplayText?.(field.parameterName, 120) || field.parameterName })) }));
         const effectivePending = pendingGroups.map(group => ({
             operatorId: group.operatorId,
             parameterNames: group.fields.map(field => field.parameterName)
@@ -1442,7 +1448,6 @@ export class AiPanel {
         const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
         const manualRecords = this._getManualResourceConfirmationRecords?.(data) || [];
         const canvasManualEditRecords = this._getCanvasManualEditRecords?.(data) || [];
-
         if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0 && manualRecords.length === 0 && canvasManualEditRecords.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
@@ -1450,6 +1455,7 @@ export class AiPanel {
         }
 
         const followupText = this._buildFollowupHintText({ recommended, pending: effectivePending, missing, operators, nonBlockingFields });
+        const safeTemplateText = (value, maxChars = 180) => this._sanitizeAssistantFailureText?.(value, maxChars) || String(value ?? '').trim().slice(0, maxChars);
         const strategyText = this._formatTemplateStrategy(generationMode, templateLockLevel);
         const primaryTemplate = recommended || candidates[0] || null;
         const candidatesHtml = candidates.length > 0
@@ -1459,19 +1465,19 @@ export class AiPanel {
                         const confidence = Number.isFinite(candidate.confidence) && candidate.confidence > 0
                             ? ` · ${(candidate.confidence * 100).toFixed(0)}%`
                             : '';
-                        const meta = [candidate.scenarioKey, candidate.industry, candidate.templateVersion ? `v${candidate.templateVersion}` : '']
+                        const meta = [safeTemplateText(candidate.scenarioKey, 120), safeTemplateText(candidate.industry, 80), candidate.templateVersion ? `v${safeTemplateText(candidate.templateVersion, 60)}` : '']
                             .filter(Boolean)
                             .join(' · ');
                         return `
                             <div class="ai-followup-template-candidate">
                                 <div class="ai-followup-template-candidate-main">
-                                    <div class="ai-followup-template-name">${this._escapeHtml(candidate.templateName)}</div>
-                                    <div class="ai-followup-template-reason">${this._escapeHtml(candidate.matchReason || `候选 ${index + 1}`)}${this._escapeHtml(confidence)}</div>
+                                    <div class="ai-followup-template-name">${this._escapeHtml(safeTemplateText(candidate.templateName, 160))}</div>
+                                    <div class="ai-followup-template-reason">${this._escapeHtml(safeTemplateText(candidate.matchReason || `候选 ${index + 1}`, 220))}${this._escapeHtml(confidence)}</div>
                                     ${meta ? `<div class="ai-followup-item-meta">${this._escapeHtml(meta)}</div>` : ''}
                                 </div>
                                 <div class="ai-followup-template-actions">
-                                    <button class="ai-followup-template-action" type="button" data-template-action="fill" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(candidate.templateName)}">严格沿用</button>
-                                    <button class="ai-followup-template-action" type="button" data-template-action="adapt" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(candidate.templateName)}">参考改造</button>
+                                    <button class="ai-followup-template-action" type="button" data-template-action="fill" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(safeTemplateText(candidate.templateName, 160))}">严格沿用</button>
+                                    <button class="ai-followup-template-action" type="button" data-template-action="adapt" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(safeTemplateText(candidate.templateName, 160))}">参考改造</button>
                                 </div>
                             </div>
                         `;
@@ -1488,11 +1494,11 @@ export class AiPanel {
                         <div class="ai-followup-section-tip">${this._escapeHtml(strategyText)}</div>
                     </div>
                     ${primaryTemplate ? `
-                        <div class="ai-followup-template-name">${this._escapeHtml(primaryTemplate.templateName)}</div>
-                        <div class="ai-followup-template-reason">${this._escapeHtml(primaryTemplate.matchReason || '建议延续当前模板骨架继续补齐缺失项。')}</div>
-                        ${primaryTemplate.matchMode ? `<div class="ai-followup-item-meta">匹配模式：${this._escapeHtml(primaryTemplate.matchMode)}</div>` : ''}
-                        ${primaryTemplate.matchedFields && primaryTemplate.matchedFields.length > 0 ? `<div class="ai-followup-item-meta">匹配字段：${this._escapeHtml(primaryTemplate.matchedFields.join('、'))}</div>` : ''}
-                        ${primaryTemplate.missingSignals && primaryTemplate.missingSignals.length > 0 ? `<div class="ai-followup-item-meta">缺失信号：${this._escapeHtml(primaryTemplate.missingSignals.join('、'))}</div>` : ''}
+                        <div class="ai-followup-template-name">${this._escapeHtml(safeTemplateText(primaryTemplate.templateName, 160))}</div>
+                        <div class="ai-followup-template-reason">${this._escapeHtml(safeTemplateText(primaryTemplate.matchReason || '建议延续当前模板骨架继续补齐缺失项。', 220))}</div>
+                        ${primaryTemplate.matchMode ? `<div class="ai-followup-item-meta">匹配模式：${this._escapeHtml(safeTemplateText(primaryTemplate.matchMode, 120))}</div>` : ''}
+                        ${primaryTemplate.matchedFields && primaryTemplate.matchedFields.length > 0 ? `<div class="ai-followup-item-meta">匹配字段：${this._escapeHtml(primaryTemplate.matchedFields.map(field => safeTemplateText(field, 80)).join('、'))}</div>` : ''}
+                        ${primaryTemplate.missingSignals && primaryTemplate.missingSignals.length > 0 ? `<div class="ai-followup-item-meta">缺失信号：${this._escapeHtml(primaryTemplate.missingSignals.map(signal => safeTemplateText(signal, 80)).join('、'))}</div>` : ''}
                     ` : `
                         <div class="ai-followup-template-reason">本轮按自由生成处理，可在候选出现后手动指定模板。</div>
                     `}
@@ -1515,10 +1521,10 @@ export class AiPanel {
                     <div class="ai-followup-list">
                         ${pendingGroups.map(group => {
                             return `
-                            <button class="ai-followup-item ai-followup-nav ai-resource-audit-card is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">
+                            <button class="ai-followup-item ai-followup-nav ai-resource-audit-card is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey)}">
                                 <div class="ai-resource-audit-card-head">
                                     <div>
-                                        <div class="ai-followup-item-title">${this._escapeHtml(group.label)}</div>
+                                        <div class="ai-followup-item-title">${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label)}</div>
                                         <div class="ai-followup-item-body">资源类型：测量参数 / 业务参数；点击定位到下方人工确认输入区。</div>
                                     </div>
                                     <span class="ai-resource-audit-badge">人工确认</span>
@@ -1764,16 +1770,16 @@ export class AiPanel {
     }
 
     _buildFollowupHintText({ recommended, pending, missing, operators, nonBlockingFields = [] }) {
-        const lines = ['请基于上一轮流程继续完善，优先补齐待确认参数和缺失资源，不要重建无关结构。'];
+        const lines = ['请基于上一轮流程继续完善，优先补齐待确认参数和缺失资源，不要重建无关结构。'], safeHintText = (value, maxChars = 220) => this._sanitizeAssistantFailureText?.(value, maxChars) || String(value ?? '').trim().slice(0, maxChars);
 
         if (recommended?.templateName) {
-            lines.push(`优先沿用模板：${recommended.templateName}${recommended.matchReason ? `（${recommended.matchReason}）` : ''}。`);
+            lines.push(`优先沿用模板：${safeHintText(recommended.templateName, 160)}${recommended.matchReason ? `（${safeHintText(recommended.matchReason, 220)}）` : ''}。`);
         }
 
         if (pending.length > 0) {
             lines.push('待确认参数：');
             pending.forEach(item => {
-                const label = this._resolvePendingOperatorLabel(item.operatorId, operators);
+                const label = safeHintText(this._resolvePendingOperatorLabel(item.operatorId, operators), 160);
                 const filledPairs = [];
                 const missingNames = [];
                 const context = this._resolvePendingOperatorContext(item.operatorId, operators);
@@ -1783,9 +1789,9 @@ export class AiPanel {
                     const fieldType = this._normalizePendingFieldType(this._findMetadataParameter(metadata, parameterName));
                     const value = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
                     if (this._hasPendingDraftValue(value, fieldType)) {
-                        filledPairs.push(`${parameterName}=${this._stringifyPendingDraftValue(value, fieldType)}`);
+                        filledPairs.push(`${safeHintText(parameterName, 80)}=${safeHintText(this._stringifyPendingDraftValue(value, fieldType), 180)}`);
                     } else {
-                        missingNames.push(parameterName);
+                        missingNames.push(safeHintText(parameterName, 80));
                     }
                 });
 
@@ -1802,14 +1808,14 @@ export class AiPanel {
         if (missing.length > 0) {
             lines.push('缺失资源：');
             missing.forEach(item => {
-                const name = item.resourceType || '资源';
-                const detail = item.description || item.resourceKey || '缺少必要资源';
-                lines.push(`- ${name}${item.resourceKey ? `（${item.resourceKey}）` : ''}：${detail}`);
+                const name = safeHintText(item.resourceType || '资源', 80);
+                const detail = safeHintText(item.description || item.resourceKey || '缺少必要资源', 220);
+                lines.push(`- ${name}${item.resourceKey ? `（${safeHintText(item.resourceKey, 160)}）` : ''}：${detail}`);
             });
         }
 
         if (Array.isArray(nonBlockingFields) && nonBlockingFields.length > 0) {
-            lines.push(`非阻断待补字段：${nonBlockingFields.map(field => this._getRequirementFieldLabel(field)).join('、')}`);
+            lines.push(`非阻断待补字段：${nonBlockingFields.map(field => safeHintText(this._getRequirementFieldLabel(field), 80)).join('、')}`);
         }
 
         lines.push('如果仍缺文件、模型、地址或标定数据，请明确告诉我还需要补什么。');
@@ -1891,7 +1897,7 @@ export class AiPanel {
         const note = this.container?.querySelector('#ai-result-status-note');
         if (!note) return;
 
-        const normalizedText = String(text || '').trim();
+        const normalizedText = String(allowHtml ? text : (this._sanitizeAssistantFailureText?.(text, 900) || text) || '').trim();
         note.className = 'ai-result-status-note';
         if (!normalizedText) {
             note.textContent = '';

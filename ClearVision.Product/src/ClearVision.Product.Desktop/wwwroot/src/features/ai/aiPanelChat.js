@@ -19,7 +19,10 @@ export const aiPanelChatMixin = {
         const msg = document.createElement('div');
         msg.className = `ai-message ${role}`;
 
-        const safeText = this._escapeHtml(text);
+        const displayText = role === 'system' || role === 'ai'
+            ? (this._sanitizeAssistantFailureText?.(text, 900) || '')
+            : text;
+        const safeText = this._escapeHtml(displayText);
 
         if (role === 'ai') {
             msg.innerHTML = `<div class="ai-bubble">${safeText}</div>`;
@@ -120,10 +123,20 @@ export const aiPanelChatMixin = {
         const turn = this.activeAssistantTurn;
         if (!turn?.processSection || !turn?.processBody) return null;
 
-        const value = String(text || '').trim();
+        const rawValue = String(text || '').trim();
+        const value = this._sanitizeAssistantFailureText?.(rawValue, 1200) ||
+            this._redactPublicDiagnosticText?.(rawValue)?.slice(0, 1200) ||
+            rawValue.slice(0, 1200);
         if (!value) return null;
 
-        const key = `${String(chainId || 'agent-run').trim()}:${String(stepId || 'step').trim()}`;
+        const safeKeyPart = (part, fallback) => {
+            const raw = String(part || fallback).trim();
+            return this._sanitizeAssistantFailureText?.(raw, 120) ||
+                this._redactPublicDiagnosticText?.(raw)?.slice(0, 120) ||
+                raw.slice(0, 120) ||
+                fallback;
+        };
+        const key = `${safeKeyPart(chainId, 'agent-run')}:${safeKeyPart(stepId, 'step')}`;
         this.agentRunStepMap = this.agentRunStepMap instanceof Map
             ? this.agentRunStepMap
             : new Map();
@@ -160,11 +173,17 @@ export const aiPanelChatMixin = {
 
     _setAssistantTurnStatus(turn, statusText, tone = 'streaming') {
         if (!turn?.statusEl || !turn?.card) return;
-        turn.statusEl.textContent = statusText;
-        turn.statusEl.className = `ai-assistant-status is-${tone}`;
-        turn.card.dataset.turnTone = tone;
+        const safeStatusText = this._sanitizeAssistantFailureText?.(statusText, 120) ||
+            String(statusText || '').trim().slice(0, 120) ||
+            '处理中';
+        const safeTone = /^[a-z0-9_-]+$/i.test(String(tone || ''))
+            ? String(tone)
+            : 'streaming';
+        turn.statusEl.textContent = safeStatusText;
+        turn.statusEl.className = `ai-assistant-status is-${safeTone}`;
+        turn.card.dataset.turnTone = safeTone;
 
-        if (tone !== 'streaming') {
+        if (safeTone !== 'streaming') {
             this._clearAssistantLiveStatus?.(turn);
             [turn.reasoningCursor, turn.replyCursor].forEach(cursor => {
                 if (!cursor) return;
@@ -213,7 +232,10 @@ export const aiPanelChatMixin = {
         const section = field === 'reasoning' ? turn.reasoningSection : turn.replySection;
         if (!body || !section) return;
 
-        const value = String(text || '').trim();
+        const rawValue = String(text || '').trim();
+        const value = field === 'reply'
+            ? (this._sanitizeAssistantFailureText?.(rawValue, 1200) || '')
+            : rawValue;
         if (!value) {
             section.hidden = true;
             body.textContent = '';
@@ -330,6 +352,29 @@ export const aiPanelChatMixin = {
             .trim();
     },
 
+    _sanitizeAssistantFailureText(value, maxChars = 360) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+
+        return (this._redactPublicDiagnosticText?.(text) || text)
+            .replace(/\b(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)\b\s*[:=]\s*["']?[^"'\n,;}]+/gi, '[redacted]')
+            .replace(/chain[-_\s]?of[-_\s]?thought/gi, '[redacted]')
+            .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [redacted]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
+            .replace(/\bhttps?:\/\/[^\s"'<>|]+/gi, '[redacted:url]')
+            .replace(/\bsk-[A-Za-z0-9_-]{8,}/gi, '[redacted]')
+            .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?::\d+)?\b/g, '[redacted:ip]')
+            .replace(/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b/gi, '[redacted:plc]')
+            .replace(/\bM\d+(?:\.\d+)?\b/gi, '[redacted:plc]')
+            .replace(/\bD\d+\b/gi, '[redacted:plc]')
+            .replace(/plc:\/\/[^\s"'<>|]+/gi, '[redacted:plc]')
+            .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[redacted:path]')
+            .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[redacted:path]')
+            .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[redacted:image]')
+            .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[redacted]')
+            .slice(0, maxChars);
+    },
+
     _renderAssistantFailure(turn, payload = {}) {
         if (!turn?.failureSection || !turn?.failureBody) return;
 
@@ -350,27 +395,38 @@ export const aiPanelChatMixin = {
         const summaryText = failurePayload?.summary
             || failurePayload?.Summary
             || failureSummary?.message
-            || payload.failureSummary
+            || failureSummary?.Message
+            || (typeof payload.failureSummary === 'string' ? payload.failureSummary : '')
+            || (typeof payload.FailureSummary === 'string' ? payload.FailureSummary : '')
             || payload.errorMessage
+            || payload.ErrorMessage
             || payload.message
+            || payload.Message
             || '生成失败';
-        const repairTarget = failureSummary?.repairTarget || manualRetry?.repairTarget || '';
-        const lastOutputSummary = failureSummary?.lastOutputSummary || manualRetry?.lastOutputSummary || '';
+        const safeSummaryText = this._sanitizeAssistantFailureText(summaryText, 420) || '生成失败';
+        const repairTarget = this._sanitizeAssistantFailureText(
+            failureSummary?.repairTarget || failureSummary?.RepairTarget || manualRetry?.repairTarget || manualRetry?.RepairTarget || '',
+            260
+        );
+        const lastOutputSummary = this._sanitizeAssistantFailureText(
+            failureSummary?.lastOutputSummary || failureSummary?.LastOutputSummary || manualRetry?.lastOutputSummary || manualRetry?.LastOutputSummary || '',
+            260
+        );
         const issueLines = diagnostics
             .flatMap(item => Array.isArray(item?.issues) ? item.issues : (Array.isArray(item?.Issues) ? item.Issues : []))
             .slice(0, 6);
 
         turn.failureSection.hidden = false;
         turn.failureBody.innerHTML = `
-            <div class="ai-assistant-failure-summary">${this._escapeHtml(String(summaryText))}</div>
+            <div class="ai-assistant-failure-summary">${this._escapeHtml(safeSummaryText)}</div>
             ${repairTarget ? `<div class="ai-assistant-failure-meta"><span>关键修复</span>${this._escapeHtml(String(repairTarget))}</div>` : ''}
             ${lastOutputSummary ? `<div class="ai-assistant-failure-meta"><span>上一轮输出摘要</span>${this._escapeHtml(String(lastOutputSummary))}</div>` : ''}
             ${issueLines.length > 0 ? `
                 <div class="ai-assistant-failure-list">
                     ${issueLines.map(issue => `
                         <div class="ai-assistant-failure-item">
-                            <div class="ai-assistant-failure-item-title">${this._escapeHtml(`[${issue?.category || issue?.Category || '--'}/${issue?.code || issue?.Code || '--'}] ${issue?.message || issue?.Message || ''}`)}</div>
-                            ${(issue?.repairHint || issue?.RepairHint) ? `<div class="ai-assistant-failure-item-hint">${this._escapeHtml(String(issue?.repairHint || issue?.RepairHint || ''))}</div>` : ''}
+                            <div class="ai-assistant-failure-item-title">${this._escapeHtml(`[${this._sanitizeAssistantFailureText(issue?.category || issue?.Category || '--', 80) || '--'}/${this._sanitizeAssistantFailureText(issue?.code || issue?.Code || '--', 80) || '--'}] ${this._sanitizeAssistantFailureText(issue?.message || issue?.Message || '', 260)}`)}</div>
+                            ${(issue?.repairHint || issue?.RepairHint) ? `<div class="ai-assistant-failure-item-hint">${this._escapeHtml(this._sanitizeAssistantFailureText(issue?.repairHint || issue?.RepairHint || '', 260))}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
@@ -386,44 +442,49 @@ export const aiPanelChatMixin = {
             ? item.clarificationQuestions
             : (Array.isArray(item.ClarificationQuestions) ? item.ClarificationQuestions : []);
 
-        const normalizeStringList = (value) => Array.isArray(value)
-            ? [...new Set(value.map(item => String(item || '').trim()).filter(Boolean))]
+        const sanitizeBriefText = (value, maxChars = 180) => {
+            const text = String(value ?? '').trim();
+            if (!text) return '';
+            return this._sanitizeAssistantFailureText?.(text, maxChars) || text.slice(0, maxChars);
+        };
+        const normalizeStringList = (value, maxChars = 160) => Array.isArray(value)
+            ? [...new Set(value.map(item => sanitizeBriefText(item, maxChars)).filter(Boolean))]
             : [];
 
         return {
-            scenarioKey: String(item.scenarioKey ?? item.ScenarioKey ?? '').trim(),
-            scenarioName: String(item.scenarioName ?? item.ScenarioName ?? '').trim(),
-            intentType: String(item.intentType ?? item.IntentType ?? '').trim(),
+            scenarioKey: sanitizeBriefText(item.scenarioKey ?? item.ScenarioKey ?? '', 120),
+            scenarioName: sanitizeBriefText(item.scenarioName ?? item.ScenarioName ?? '', 160),
+            intentType: sanitizeBriefText(item.intentType ?? item.IntentType ?? '', 120),
             requirementMode: this._normalizeRequirementMode(item.requirementMode ?? item.RequirementMode ?? 'strict'),
             confidence: Number(item.confidence ?? item.Confidence ?? 0),
             hasOpenQuestions: Boolean(item.hasOpenQuestions ?? item.HasOpenQuestions),
             clarificationRequired: Boolean(item.clarificationRequired ?? item.ClarificationRequired),
             canGenerateDraftNow: Boolean(item.canGenerateDraftNow ?? item.CanGenerateDraftNow),
-            draftRiskLevel: String(item.draftRiskLevel ?? item.DraftRiskLevel ?? 'medium').trim() || 'medium',
-            requiredFields: normalizeStringList(item.requiredFields ?? item.RequiredFields),
-            blockingClarificationFields: normalizeStringList(item.blockingClarificationFields ?? item.BlockingClarificationFields),
-            nonBlockingMissingFields: normalizeStringList(item.nonBlockingMissingFields ?? item.NonBlockingMissingFields),
-            knownFacts: normalizeStringList(item.knownFacts ?? item.KnownFacts),
-            missingFacts: normalizeStringList(item.missingFacts ?? item.MissingFacts),
-            attachmentFacts: normalizeStringList(item.attachmentFacts ?? item.AttachmentFacts),
-            objectName: String(item.objectName ?? item.ObjectName ?? '').trim(),
-            imageSource: String(item.imageSource ?? item.ImageSource ?? '').trim(),
-            outputTarget: String(item.outputTarget ?? item.OutputTarget ?? '').trim(),
-            decisionRule: String(item.decisionRule ?? item.DecisionRule ?? '').trim(),
-            roiRequirement: String(item.roiRequirement ?? item.RoiRequirement ?? '').trim(),
-            calibrationRequirement: String(item.calibrationRequirement ?? item.CalibrationRequirement ?? '').trim(),
-            objectTypes: normalizeStringList(item.objectTypes ?? item.ObjectTypes),
-            defectTypes: normalizeStringList(item.defectTypes ?? item.DefectTypes),
-            measurementTargets: normalizeStringList(item.measurementTargets ?? item.MeasurementTargets),
-            requiredResources: normalizeStringList(item.requiredResources ?? item.RequiredResources),
+            draftRiskLevel: sanitizeBriefText(item.draftRiskLevel ?? item.DraftRiskLevel ?? 'medium', 80) || 'medium',
+            requiredFields: normalizeStringList(item.requiredFields ?? item.RequiredFields, 100),
+            blockingClarificationFields: normalizeStringList(item.blockingClarificationFields ?? item.BlockingClarificationFields, 100),
+            nonBlockingMissingFields: normalizeStringList(item.nonBlockingMissingFields ?? item.NonBlockingMissingFields, 100),
+            knownFacts: normalizeStringList(item.knownFacts ?? item.KnownFacts, 180),
+            missingFacts: normalizeStringList(item.missingFacts ?? item.MissingFacts, 180),
+            attachmentFacts: normalizeStringList(item.attachmentFacts ?? item.AttachmentFacts, 160),
+            objectName: sanitizeBriefText(item.objectName ?? item.ObjectName ?? '', 160),
+            imageSource: sanitizeBriefText(item.imageSource ?? item.ImageSource ?? '', 120),
+            outputTarget: sanitizeBriefText(item.outputTarget ?? item.OutputTarget ?? '', 160),
+            decisionRule: sanitizeBriefText(item.decisionRule ?? item.DecisionRule ?? '', 180),
+            roiRequirement: sanitizeBriefText(item.roiRequirement ?? item.RoiRequirement ?? '', 140),
+            calibrationRequirement: sanitizeBriefText(item.calibrationRequirement ?? item.CalibrationRequirement ?? '', 140),
+            objectTypes: normalizeStringList(item.objectTypes ?? item.ObjectTypes, 120),
+            defectTypes: normalizeStringList(item.defectTypes ?? item.DefectTypes, 120),
+            measurementTargets: normalizeStringList(item.measurementTargets ?? item.MeasurementTargets, 120),
+            requiredResources: normalizeStringList(item.requiredResources ?? item.RequiredResources, 120),
             clarificationQuestions: clarificationQuestions
                 .map(question => ({
-                    field: String(question?.field ?? question?.Field ?? '').trim(),
-                    question: String(question?.question ?? question?.Question ?? '').trim(),
+                    field: sanitizeBriefText(question?.field ?? question?.Field ?? '', 100),
+                    question: sanitizeBriefText(question?.question ?? question?.Question ?? '', 240),
                     required: Boolean(question?.required ?? question?.Required),
-                    reason: String(question?.reason ?? question?.Reason ?? '').trim(),
-                    priority: String(question?.priority ?? question?.Priority ?? '').trim(),
-                    options: normalizeStringList(question?.options ?? question?.Options)
+                    reason: sanitizeBriefText(question?.reason ?? question?.Reason ?? '', 220),
+                    priority: sanitizeBriefText(question?.priority ?? question?.Priority ?? '', 80),
+                    options: normalizeStringList(question?.options ?? question?.Options, 140)
                 }))
                 .filter(question => question.question || question.field || question.reason)
         };
@@ -724,7 +785,8 @@ export const aiPanelChatMixin = {
         if (!turn?.clarificationSection || !turn?.clarificationBody) return;
 
         const brief = this._normalizeRequirementBrief(payload.requirementBrief ?? payload.RequirementBrief ?? null);
-        const summary = String(payload.aiExplanation ?? payload.AiExplanation ?? payload.errorMessage ?? payload.message ?? '').trim()
+        const rawSummary = String(payload.aiExplanation ?? payload.AiExplanation ?? payload.errorMessage ?? payload.message ?? '').trim();
+        const summary = this._sanitizeAssistantFailureText?.(rawSummary, 420)
             || (brief ? this._buildClarificationFollowupText(brief).split('\n')[0] : '当前需求需要先补充信息。');
         const questionItems = brief?.clarificationQuestions || [];
         const missingFacts = brief?.missingFacts || [];

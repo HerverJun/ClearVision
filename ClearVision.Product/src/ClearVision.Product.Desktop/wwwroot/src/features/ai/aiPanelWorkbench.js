@@ -44,6 +44,14 @@ export const aiPanelWorkbenchMixin = {
         return [...new Set(value.map(item => String(item || '').trim()).filter(Boolean))];
     },
 
+    _sanitizeWorkbenchDisplayText(value, maxChars = 220) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars);
+    },
+
     _normalizePerformanceBudget(value) {
         if (!value || typeof value !== 'object') return null;
 
@@ -58,7 +66,7 @@ export const aiPanelWorkbenchMixin = {
 
         const warnings = Array.isArray(value.warnings || value.Warnings)
             ? [...new Set((value.warnings || value.Warnings)
-                .map(item => String(item || '').trim())
+                .map(item => this._sanitizeWorkbenchDisplayText(item, 160))
                 .filter(Boolean))]
             : [];
 
@@ -69,7 +77,7 @@ export const aiPanelWorkbenchMixin = {
             estimatedInputTokens: readNumber('estimatedInputTokens', 'EstimatedInputTokens'),
             estimatedOutputTokens: readNumber('estimatedOutputTokens', 'EstimatedOutputTokens'),
             budgetStatus: String(value.budgetStatus || value.BudgetStatus || '').trim().toLowerCase(),
-            slowestStage: String(value.slowestStage || value.SlowestStage || '').trim(),
+            slowestStage: this._sanitizeWorkbenchDisplayText(value.slowestStage || value.SlowestStage || '', 80),
             slowestStageDurationMs: readNumber('slowestStageDurationMs', 'SlowestStageDurationMs'),
             warnings
         };
@@ -249,11 +257,11 @@ export const aiPanelWorkbenchMixin = {
         });
         const perfStatusText = performanceBudget?.budgetStatus === 'warning' ? '预警' : '正常';
         const perfWarningText = performanceBudget?.warnings?.length > 0
-            ? `性能提示：${performanceBudget.warnings.slice(0, 2).join('、')}`
+            ? this._sanitizeWorkbenchDisplayText(`性能提示：${performanceBudget.warnings.slice(0, 2).join('、')}`, 220)
             : '';
         const runtimeMetrics = [
-            { label: '意图', value: intentLabels[turnIntent] || turnIntent },
-            { label: '置信度', value: confidenceLabels[routerConfidence] || routerConfidence || '--' },
+            { label: '意图', value: intentLabels[turnIntent] || this._sanitizeWorkbenchDisplayText(turnIntent, 80) || '待判定' },
+            { label: '置信度', value: confidenceLabels[routerConfidence] || this._sanitizeWorkbenchDisplayText(routerConfidence, 80) || '--' },
             { label: '阻断', value: blockingCount },
             { label: '待补', value: effectiveNonBlockingFields.length }
         ];
@@ -274,14 +282,14 @@ export const aiPanelWorkbenchMixin = {
         el.innerHTML = `
             <div class="ai-agent-runtime-main">
                 <span class="ai-agent-runtime-kicker">Agent 状态机</span>
-                <strong>${this._escapeHtml(stateLabels[interactionState] || interactionState || '待机')}</strong>
+                <strong>${this._escapeHtml(stateLabels[interactionState] || this._sanitizeWorkbenchDisplayText(interactionState, 80) || '待机')}</strong>
                 <span>${this._escapeHtml(summary)}</span>
             </div>
             <div class="ai-agent-runtime-metrics">
                 ${runtimeMetrics.map(metric => `
                     <span>
                         <small>${this._escapeHtml(String(metric.label))}</small>
-                        <b>${this._escapeHtml(String(metric.value))}</b>
+                        <b>${this._escapeHtml(this._sanitizeWorkbenchDisplayText(metric.value, 120) || '--')}</b>
                     </span>
                 `).join('')}
             </div>
@@ -387,7 +395,10 @@ export const aiPanelWorkbenchMixin = {
         }
 
         card.hidden = false;
-        const totalMs = timeline.reduce((sum, s) => sum + (s.durationMs || 0), 0);
+        const totalMs = timeline.reduce((sum, s) => {
+            const duration = Number(s?.durationMs ?? s?.DurationMs ?? 0);
+            return sum + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+        }, 0);
         const totalSec = (totalMs / 1000).toFixed(1);
         if (summaryBadge) {
             summaryBadge.textContent = `${timeline.length} 阶段 · ${totalSec}s`;
@@ -398,9 +409,12 @@ export const aiPanelWorkbenchMixin = {
                 <summary>${timeline.length} 个阶段，总耗时 ${totalSec}s</summary>
                 <div class="ai-stage-timeline-list">
                     ${timeline.map(stage => {
-                        const label = STAGE_DIAGNOSTIC_LABELS[stage.stage] || stage.stage;
-                        const status = stage.status || 'completed';
-                        const duration = stage.durationMs != null ? `${stage.durationMs}ms` : '--';
+                        const stageKey = String(stage?.stage ?? stage?.Stage ?? '').trim();
+                        const label = STAGE_DIAGNOSTIC_LABELS[stageKey] || this._sanitizeWorkbenchDisplayText(stageKey, 100) || '阶段';
+                        const status = String(stage?.status ?? stage?.Status ?? 'completed').trim().toLowerCase();
+                        const durationValue = Number(stage?.durationMs ?? stage?.DurationMs ?? NaN);
+                        const duration = Number.isFinite(durationValue) && durationValue >= 0 ? `${Math.round(durationValue)}ms` : '--';
+                        const summary = this._sanitizeWorkbenchDisplayText(stage?.summary ?? stage?.Summary ?? '', 220);
                         const statusIcon = status === 'completed' ? '&#10003;'
                             : status === 'failed' ? '&#10007;'
                             : status === 'warning' ? '&#9888;'
@@ -412,8 +426,8 @@ export const aiPanelWorkbenchMixin = {
                             <div class="ai-stage-timeline-item ${statusClass}">
                                 <span class="ai-stage-icon">${statusIcon}</span>
                                 <span class="ai-stage-label">${this._escapeHtml(label)}</span>
-                                <span class="ai-stage-summary">${this._escapeHtml(stage.summary || '')}</span>
-                                <span class="ai-stage-duration">${duration}</span>
+                                <span class="ai-stage-summary">${this._escapeHtml(summary)}</span>
+                                <span class="ai-stage-duration">${this._escapeHtml(duration)}</span>
                             </div>
                         `;
                     }).join('')}

@@ -860,7 +860,7 @@ export const aiPanelAgentWorkspaceMixin = {
             return false;
         }
         if (preview.contractValid === false) {
-            const message = preview.failureMessage || '构建条件校验失败，请重试';
+            const message = this._sanitizePlanDiagnosticText(preview.failureMessage || '构建条件校验失败，请重试', 260) || '构建条件校验失败，请重试';
             this.lastPlanReadinessPreviewError = message;
             plan.previewError = message;
             plan.executable = false;
@@ -936,7 +936,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     return;
                 }
                 if (!this._applyPlanReadinessPreviewResult(plan, result)) {
-                    const message = this.lastPlanReadinessPreviewError || '构建条件校验失败，请重试';
+                    const message = this._sanitizePlanDiagnosticText(this.lastPlanReadinessPreviewError || '构建条件校验失败，请重试', 260) || '构建条件校验失败，请重试';
                     this.previewState = 'failed';
                     this.lastPlanReadinessPreviewError = message;
                     plan.previewState = 'failed';
@@ -961,7 +961,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) {
                     return;
                 }
-                const message = error?.message || '构建条件校验失败，请重试';
+                const message = this._sanitizePlanDiagnosticText(error?.message || '构建条件校验失败，请重试', 260) || '构建条件校验失败，请重试';
                 this.previewState = 'failed';
                 this.lastPlanReadinessPreviewError = message;
                 plan.previewState = 'failed';
@@ -1748,6 +1748,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 : isActionable
                     ? 'actionable_vision_plan'
                     : 'ambiguous_vision_requirement';
+        const safeFallbackReason = this._sanitizePlanDiagnosticText(error?.message || 'router_unavailable', 180) || 'router_unavailable';
         const routedMaturity = (isHelp || isCasual)
             ? {
                 ...maturity,
@@ -1787,7 +1788,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 : [],
             fallbackAllowed: true,
             routerSource: 'local_rule_fallback',
-            fallbackReason: error?.message || 'router_unavailable',
+            fallbackReason: safeFallbackReason,
             shouldResetPendingPlan,
             requirementMaturity: routedMaturity,
             decisionTrace: {
@@ -1802,7 +1803,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 taskType: routedMaturity.taskType,
                 canPlan: routedMaturity.canPlan === true,
                 canBuild: routedMaturity.canBuild === true,
-                fallbackReason: error?.message || 'router_unavailable',
+                fallbackReason: safeFallbackReason,
                 blockingReasons: routedMaturity.blockingReasons || [],
                 metadataOnly: true
             },
@@ -1935,12 +1936,13 @@ export const aiPanelAgentWorkspaceMixin = {
                     input.style.height = 'auto';
                 }
                 this._setAssistantTurnStatus(turn, '规划失败', 'failed');
+                const message = this._sanitizePlanDiagnosticText(error?.message || String(error || '未知错误'), 260) || '未知错误';
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    `规划模式失败：${error?.message || String(error || '未知错误')}`
+                    `规划模式失败：${message}`
                 );
-                this._setResultStatusNote(error?.message || '规划模式失败，请检查后端连接后重试。', 'warning');
+                this._setResultStatusNote(message || '规划模式失败，请检查后端连接后重试。', 'warning');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
                 this._updatePlanBuildActionState();
@@ -2603,7 +2605,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .catch(error => {
                 this.isCancellingGenerate = false;
                 this._setGeneratingState?.(this.isGenerating);
-                this._addMessage('system', `取消规划未生效：${error?.message || '未知错误'}`);
+                this._addMessage('system', `取消规划未生效：${this._sanitizePlanDiagnosticText(error?.message || '未知错误', 260) || '未知错误'}`);
                 return false;
             });
     },
@@ -2634,7 +2636,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const maturityCanPlan = requirementMaturity?.canPlan === true;
         const requirementMode = 'strict';
         const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
-            .map(item => this._localizeDisplayText(item))
+            .map(item => this._sanitizePlanDisplayText(item))
             .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route, requirementMode));
         const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
             .map(evt => this._normalizePlanPublicEvent(evt));
@@ -2663,11 +2665,11 @@ export const aiPanelAgentWorkspaceMixin = {
             mode: AgentWorkspaceModes.PLAN,
             originalDescription: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
             buildPrompt: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
-            goal: this._localizeDisplayText(plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿'),
-            intent: plan.intent || plan.Intent || '',
+            goal: this._sanitizePlanDisplayText(plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿', 220),
+            intent: this._sanitizePlanDiagnosticCode(plan.intent || plan.Intent || ''),
             confidence: plan.confidence || plan.Confidence || 'medium',
             requirementMode,
-            planSource: plan.planSource || plan.PlanSource || '',
+            planSource: this._sanitizePlanDiagnosticCode(plan.planSource || plan.PlanSource || ''),
             rawFallbackReason,
             fallbackReason: this._formatPlanFallbackReason(rawFallbackReason),
             plannerFailure,
@@ -2683,7 +2685,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 .filter(Boolean),
             publicEvents,
             blockerCount: blockingReasons.length,
-            nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
+            nextAction: this._sanitizePlanDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
             executable: buildReadiness.canBuild === true,
             buildReadiness,
@@ -2696,23 +2698,23 @@ export const aiPanelAgentWorkspaceMixin = {
                 .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
                 .filter(Boolean),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
-                ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
-                : [`用户目标：${fallbackDescription || '视觉流程草稿'}`],
+                ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._sanitizePlanDisplayText(item, 220))
+                : [this._sanitizePlanDisplayText(`用户目标：${fallbackDescription || '视觉流程草稿'}`, 220)],
             route: {
-                routeId: route.routeId || route.RouteId || '',
-                title: this._localizeDisplayText(route.title || route.Title || '视觉方案路线'),
-                summary: this._localizeDisplayText(route.summary || route.Summary || ''),
-                operators: this._toArray(route.operators || route.Operators),
-                templateDecision: this._localizeDisplayText(route.templateDecision || route.TemplateDecision || '')
+                routeId: this._sanitizePlanDiagnosticCode(route.routeId || route.RouteId || ''),
+                title: this._sanitizePlanDisplayText(route.title || route.Title || '视觉方案路线', 180),
+                summary: this._sanitizePlanDisplayText(route.summary || route.Summary || '', 260),
+                operators: this._toArray(route.operators || route.Operators).map(op => this._sanitizePlanDiagnosticText(op, 80)).filter(Boolean),
+                templateDecision: this._sanitizePlanDisplayText(route.templateDecision || route.TemplateDecision || '', 160)
             },
             questions: normalizedQuestions,
             assumptions: normalizedDefaults.length
-                ? normalizedDefaults.map(item => `${item.label}: ${this._localizeDisplayText(item.value)}${item.impact ? `（${item.impact}）` : ''}`)
+                ? normalizedDefaults.map(item => this._sanitizePlanDisplayText(`${item.label}: ${this._localizeDisplayText(item.value)}${item.impact ? `（${item.impact}）` : ''}`, 220))
                 : ['保留公开元数据边界，缺失资源在确认前保持为待补项。'],
             recommendedDefaults: normalizedDefaults,
-            steps: this._toArray(plan.executablePlan || plan.ExecutablePlan).map(item => this._localizeDisplayText(item)),
-            risks: this._toArray(plan.risks || plan.Risks).map(item => this._localizeDisplayText(item)),
-            acceptanceCriteria: this._toArray(plan.acceptanceCriteria || plan.AcceptanceCriteria).map(item => this._localizeDisplayText(item)),
+            steps: this._toArray(plan.executablePlan || plan.ExecutablePlan).map(item => this._sanitizePlanDisplayText(item, 220)),
+            risks: this._toArray(plan.risks || plan.Risks).map(item => this._sanitizePlanDisplayText(item, 220)),
+            acceptanceCriteria: this._toArray(plan.acceptanceCriteria || plan.AcceptanceCriteria).map(item => this._sanitizePlanDisplayText(item, 220)),
             contextSummary,
             operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
             templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
@@ -2720,8 +2722,8 @@ export const aiPanelAgentWorkspaceMixin = {
             semanticExtraction,
             requirementMaturity,
             decisionTrace,
-            stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
-            plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
+            stationBoundarySummary: this._sanitizePlanDisplayText(plan.stationBoundarySummary || plan.StationBoundarySummary || '', 220),
+            plcOutputPolicy: this._sanitizePlanDisplayText(plan.plcOutputPolicy || plan.PlcOutputPolicy || '', 220),
             rawPlanSnapshot: plan,
             effectiveReadiness: null,
             previewState: 'idle',
@@ -2762,7 +2764,7 @@ export const aiPanelAgentWorkspaceMixin = {
             remainingFields: this._toArray(item.remainingFields || item.RemainingFields)
                 .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
                 .filter(Boolean),
-            primaryMessage: this._localizeDisplayText(item.primaryMessage || item.PrimaryMessage || ''),
+            primaryMessage: this._sanitizePlanDisplayText(item.primaryMessage || item.PrimaryMessage || '', 220),
             contractVersion: String(item.contractVersion || item.ContractVersion || 'v2').trim()
         };
     },
@@ -2880,7 +2882,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const category = String(item.category || item.Category || '').trim().toLowerCase();
         const field = this._inferPlanQuestionField(item.field || item.Field || '') ||
             String(item.field || item.Field || '').trim().toLowerCase();
-        const publicLabel = this._localizeDisplayText(item.publicLabel || item.PublicLabel || '');
+        const publicLabel = this._sanitizePlanDisplayText(item.publicLabel || item.PublicLabel || '', 160);
         if (!id && !category && !field && !publicLabel) return null;
         return {
             id,
@@ -4203,7 +4205,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!item || typeof item !== 'object') return null;
         const maturity = String(item.maturity || item.Maturity || '').trim();
         const taskType = String(item.taskType || item.TaskType || '').trim();
-        const publicReason = this._localizeDisplayText(item.publicReason || item.PublicReason || '');
+        const publicReason = this._sanitizePlanDisplayText(item.publicReason || item.PublicReason || '', 220);
         const missingFields = this._toArray(item.missingFields || item.MissingFields).map(field => String(field || '').trim()).filter(Boolean);
         const blockingReasons = this._toArray(item.blockingReasons || item.BlockingReasons).map(field => String(field || '').trim()).filter(Boolean);
         return {
@@ -4211,10 +4213,10 @@ export const aiPanelAgentWorkspaceMixin = {
             taskType,
             canPlan: (item.canPlan ?? item.CanPlan) === true,
             canBuild: (item.canBuild ?? item.CanBuild) === true,
-            objectSignals: this._toArray(item.objectSignals || item.ObjectSignals).map(signal => String(signal || '').trim()).filter(Boolean),
-            taskSignals: this._toArray(item.taskSignals || item.TaskSignals).map(signal => String(signal || '').trim()).filter(Boolean),
+            objectSignals: this._toArray(item.objectSignals || item.ObjectSignals).map(signal => this._sanitizePlanDisplayText(signal, 80)).filter(Boolean),
+            taskSignals: this._toArray(item.taskSignals || item.TaskSignals).map(signal => this._sanitizePlanDisplayText(signal, 80)).filter(Boolean),
             missingFields,
-            blockingReasons,
+            blockingReasons: blockingReasons.map(reason => this._sanitizePlanDisplayText(reason, 160)).filter(Boolean),
             publicReason,
             metadataOnly: Boolean(item.metadataOnly ?? item.MetadataOnly)
         };
@@ -4235,8 +4237,8 @@ export const aiPanelAgentWorkspaceMixin = {
             taskType: String(item.taskType || item.TaskType || '').trim(),
             canPlan: (item.canPlan ?? item.CanPlan) === true,
             canBuild: (item.canBuild ?? item.CanBuild) === true,
-            fallbackReason: String(item.fallbackReason || item.FallbackReason || '').trim(),
-            blockingReasons: this._toArray(item.blockingReasons || item.BlockingReasons).map(String),
+            fallbackReason: this._sanitizePlanDiagnosticCode(item.fallbackReason || item.FallbackReason || ''),
+            blockingReasons: this._toArray(item.blockingReasons || item.BlockingReasons).map(reason => this._sanitizePlanDisplayText(reason, 160)).filter(Boolean),
             metadataOnly: Boolean(item.metadataOnly ?? item.MetadataOnly)
         };
     },
@@ -4317,9 +4319,12 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!text) return '';
         text = this._redactPublicDiagnosticText?.(text) || text;
         text = text
+            .replace(/\b(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)\b\s*[:=]\s*["']?[^"'\n,;}]+/gi, '[redacted]')
+            .replace(/chain[-_\s]?of[-_\s]?thought/gi, '[redacted]')
             .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[redacted]')
-            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|apiKey|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
             .replace(/\bhttps?:\/\/[^\s"'<>|]+/gi, '[redacted]')
+            .replace(/\bsk-[A-Za-z0-9_-]{8,}/gi, '[redacted]')
             .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?::\d+)?\b/g, '[redacted]')
             .replace(/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b/gi, '[redacted]')
             .replace(/\bM\d+(?:\.\d+)?\b/gi, '[redacted]')
@@ -4330,6 +4335,52 @@ export const aiPanelAgentWorkspaceMixin = {
             .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[redacted]')
             .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[redacted]');
         return text.slice(0, maxChars);
+    },
+
+    _sanitizePlanDisplayText(value, maxChars = 200) {
+        return this._sanitizePlanDiagnosticText(this._localizeDisplayText(value), maxChars);
+    },
+
+    _sanitizeBuildWorkspaceText(value, maxChars = 220) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._sanitizePlanDiagnosticText?.(text, maxChars) ||
+            text.slice(0, maxChars);
+    },
+
+    _sanitizeDraftCanvasLabel(value, fallback = '', maxChars = 160) {
+        const safe = this._sanitizeBuildWorkspaceText?.(value, maxChars) || '';
+        if (safe) return safe;
+        const fallbackText = String(fallback ?? '').trim();
+        return fallbackText && fallbackText !== String(value ?? '').trim()
+            ? (this._sanitizeBuildWorkspaceText?.(fallbackText, maxChars) || '')
+            : '';
+    },
+
+    _normalizeDraftCanvasOperatorType(value, fallback = 'DeepLearning') {
+        const raw = String(value ?? '').trim();
+        if (!raw) return fallback;
+
+        const knownTypes = Object.keys(AI_OPERATOR_LABELS);
+        const exact = knownTypes.find(type => type.toLowerCase() === raw.toLowerCase());
+        if (exact) return exact;
+
+        const embedded = knownTypes.find(type => new RegExp(`\\b${type}\\b`, 'i').test(raw));
+        if (embedded) return embedded;
+
+        const safe = this._sanitizeDraftCanvasLabel(raw, '', 80);
+        return safe && !/[\[<]redacted[\]>]/i.test(safe) ? safe : fallback;
+    },
+
+    _normalizeDraftCanvasDataType(value, fallback = 'string') {
+        const safe = this._sanitizeDraftCanvasLabel(value || fallback, fallback, 80);
+        return safe && !/[\[<]redacted[\]>]/i.test(safe) ? safe : fallback;
+    },
+
+    _formatBuildWorkspaceText(value, maxChars = 220) {
+        const text = this._sanitizeBuildWorkspaceText(value, maxChars);
+        return text ? this._localizeDisplayText(text) : '';
     },
 
     _formatPlannerFailureStage(stage, code = '') {
@@ -4371,11 +4422,11 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             id: question.id || question.Id || '',
             field: this._inferPlanQuestionField(question.field || question.Field || question.id || question.Id),
-            title: this._localizeDisplayText(question.title || question.Title || ''),
-            why: this._localizeDisplayText(question.why || question.Why || ''),
+            title: this._sanitizePlanDisplayText(question.title || question.Title || '', 160),
+            why: this._sanitizePlanDisplayText(question.why || question.Why || '', 220),
             defaultValue: defaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
-            defaultAssumption: this._localizeDisplayText(question.defaultAssumption || question.DefaultAssumption || ''),
-            impact: this._localizeDisplayText(question.impact || question.Impact || ''),
+            defaultAssumption: this._sanitizePlanDisplayText(question.defaultAssumption || question.DefaultAssumption || '', 220),
+            impact: this._sanitizePlanDisplayText(question.impact || question.Impact || '', 220),
             options
         };
     },
@@ -4386,12 +4437,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const answerEffect = this._normalizePlanAnswerEffect(option.answerEffect || option.AnswerEffect, value);
         return {
             value,
-            label: this._localizeDisplayText(option.label || option.Label || value || ''),
+            label: this._sanitizePlanDisplayText(option.label || option.Label || value || '', 160),
             recommended: Boolean(option.recommended ?? option.Recommended),
             answerEffect,
             recommendationReason: this._sanitizePlanDiagnosticText(option.recommendationReason || option.RecommendationReason || '', 160),
-            description: this._localizeDisplayText(option.description || option.Description || ''),
-            impact: this._localizeDisplayText(option.impact || option.Impact || '')
+            description: this._sanitizePlanDisplayText(option.description || option.Description || '', 220),
+            impact: this._sanitizePlanDisplayText(option.impact || option.Impact || '', 220)
         };
     },
 
@@ -4419,9 +4470,9 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!item) return null;
         return {
             id: item.id || item.Id || '',
-            label: this._localizeDisplayText(item.label || item.Label || ''),
-            value: this._localizeDisplayText(item.value || item.Value || ''),
-            impact: this._localizeDisplayText(item.impact || item.Impact || '')
+            label: this._sanitizePlanDisplayText(item.label || item.Label || '', 120),
+            value: this._sanitizePlanDisplayText(item.value || item.Value || '', 160),
+            impact: this._sanitizePlanDisplayText(item.impact || item.Impact || '', 180)
         };
     },
 
@@ -4577,7 +4628,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatToolName(value) {
-        const text = String(value || '').trim();
+        const text = this._sanitizeBuildWorkspaceText?.(value, 80) || String(value || '').trim();
         if (!text) return '工具步骤';
         const normalized = text.toLowerCase();
         const map = {
@@ -4631,7 +4682,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatWorkflowDiffValue(value, kind = '') {
-        const text = String(value || '').trim();
+        const text = this._sanitizeBuildWorkspaceText(value, 160);
         if (!text) return '';
         if (kind === 'pending' || kind === 'blocker' || text.includes('.')) {
             return this._formatResourceReference(text);
@@ -5032,7 +5083,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
-                        <span class="ai-plan-tech-code">${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
+                        <span class="ai-plan-tech-code">${this._escapeHtml(this._sanitizePlanDiagnosticCode(plan.planHash) || '计划哈希待生成')}</span>
                     </div>
                     ${plannerFailureDiagnostics}
                     ${plan.nextAction ? `<div class="ai-build-note"><strong>模型 NextAction</strong>${this._escapeHtml(plan.nextAction)}</div>` : ''}
@@ -5707,7 +5758,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span class="ai-build-timeline-dot"></span>
                     <div>
                         <strong>${this._escapeHtml(BUILD_STAGE_LABELS[item.stage] || this._localizeDisplayText(item.stage))}</strong>
-                        <span>${this._escapeHtml(this._localizeDisplayText(item.summary || item.title || ''))}</span>
+                        <span>${this._escapeHtml(this._formatBuildWorkspaceText(item.summary || item.title || '', 220))}</span>
                     </div>
                 </div>
             `;
@@ -5729,13 +5780,13 @@ export const aiPanelAgentWorkspaceMixin = {
         return `
             <div class="ai-workspace-section-title">Build 工具证据</div>
             ${evidence.slice(-16).map(item => {
-                const stage = item.stage || item.Stage || '';
-                const toolName = item.toolName || item.ToolName || '';
-                const status = item.status || item.Status || '';
-                const source = item.source || item.Source || '';
+                const stage = this._sanitizeBuildWorkspaceText(item.stage || item.Stage || '', 80);
+                const toolName = this._sanitizeBuildWorkspaceText(item.toolName || item.ToolName || '', 80);
+                const status = this._sanitizeBuildWorkspaceText(item.status || item.Status || '', 80);
+                const source = this._sanitizeBuildWorkspaceText(item.source || item.Source || '', 120);
                 const duration = item.durationMs ?? item.DurationMs ?? '';
-                const warning = item.warningCode || item.WarningCode || '';
-                const summary = item.outputSummary || item.OutputSummary || '';
+                const warning = this._sanitizeBuildWorkspaceText(item.warningCode || item.WarningCode || '', 120);
+                const summary = this._formatBuildWorkspaceText(item.outputSummary || item.OutputSummary || '', 260);
                 const stageLabel = BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage);
                 const toolLabel = this._formatToolName(toolName);
                 const warningLabel = this._localizeDisplayText(warning);
@@ -5744,7 +5795,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(stageLabel)}${toolName ? ` / ${this._escapeHtml(toolLabel)}` : ''}</b>
                         <span>${this._escapeHtml(this._formatBuildStatus(status))}${source ? ` / ${this._escapeHtml(sourceLabel)}` : ''}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warningLabel)}` : ''}</span>
-                        <small>${this._escapeHtml(this._localizeDisplayText(summary))}</small>
+                        <small>${this._escapeHtml(summary)}</small>
                     </div>
                 `;
             }).join('')}
@@ -5759,7 +5810,7 @@ export const aiPanelAgentWorkspaceMixin = {
             return templateEvidence.map(item => `
                 <div class="ai-build-compact-row">
                     <b>${this._escapeHtml(this._formatToolName(item.toolName || item.ToolName || 'template_strategy'))}</b>
-                    <span>${this._escapeHtml(this._localizeDisplayText(item.outputSummary || item.OutputSummary || ''))}</span>
+                    <span>${this._escapeHtml(this._formatBuildWorkspaceText(item.outputSummary || item.OutputSummary || '', 260))}</span>
                 </div>
             `).join('');
         }
@@ -5768,7 +5819,11 @@ export const aiPanelAgentWorkspaceMixin = {
             const payload = this._asObject?.(evt.payload) || {};
             const name = String(payload.toolName || payload.ToolName || evt.title || '').toLowerCase();
             return name.includes('template') || evt.stage === 'planner';
-        }).slice(-4);
+        }).slice(-4).map(evt => ({
+            ...evt,
+            title: this._formatBuildWorkspaceText(evt.title || 'template event', 120),
+            summary: this._formatBuildWorkspaceText(evt.summary || '', 260)
+        }));
 
         if (!tools.length) {
             return '<div class="ai-followup-empty">模板策略尚未发布。</div>';
@@ -5777,7 +5832,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return tools.map(evt => `
             <div class="ai-build-compact-row">
                 <b>${this._escapeHtml(this._localizeDisplayText(evt.title || '模板事件'))}</b>
-                <span>${this._escapeHtml(this._localizeDisplayText(evt.summary || ''))}</span>
+                <span>${this._escapeHtml(this._formatBuildWorkspaceText(evt.summary || '', 260))}</span>
             </div>
         `).join('');
     },
@@ -5786,12 +5841,14 @@ export const aiPanelAgentWorkspaceMixin = {
         const buildResult = this._getBuildResult(events);
         const pipeline = this._toArray(buildResult?.operatorPipeline || buildResult?.OperatorPipeline);
         if (pipeline.length) {
-            const selectionSource = buildResult?.selectionSource || buildResult?.SelectionSource || '';
-            const effectiveRouteId = buildResult?.effectiveRouteId || buildResult?.EffectiveRouteId || '';
+            const selectionSource = this._sanitizeBuildWorkspaceText(buildResult?.selectionSource || buildResult?.SelectionSource || '', 120);
+            const effectiveRouteId = this._sanitizeBuildWorkspaceText(buildResult?.effectiveRouteId || buildResult?.EffectiveRouteId || '', 120);
             const strategyConfirmed = this._readBooleanField(buildResult, 'strategyConfirmed', 'StrategyConfirmed');
-            const strategyConfirmationSource = buildResult?.strategyConfirmationSource || buildResult?.StrategyConfirmationSource || '';
-            const parameterStrategy = buildResult?.parameterStrategy || buildResult?.ParameterStrategy || '';
-            const unresolvedStrategyBlockers = this._toArray(buildResult?.unresolvedStrategyBlockers || buildResult?.UnresolvedStrategyBlockers);
+            const strategyConfirmationSource = this._sanitizeBuildWorkspaceText(buildResult?.strategyConfirmationSource || buildResult?.StrategyConfirmationSource || '', 120);
+            const parameterStrategy = this._sanitizeBuildWorkspaceText(buildResult?.parameterStrategy || buildResult?.ParameterStrategy || '', 120);
+            const unresolvedStrategyBlockers = this._toArray(buildResult?.unresolvedStrategyBlockers || buildResult?.UnresolvedStrategyBlockers)
+                .map(value => this._formatBuildWorkspaceText(value, 160))
+                .filter(Boolean);
             return `
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
@@ -5805,8 +5862,15 @@ export const aiPanelAgentWorkspaceMixin = {
                     ${unresolvedStrategyBlockers.length ? `<div class="ai-build-compact-row"><b>未解除策略阻断</b><span>${this._escapeHtml(unresolvedStrategyBlockers.join(', '))}</span></div>` : ''}
                 </div>
                 <div class="ai-plan-chain">
-                    ${pipeline.map(item => {
-                        const rawType = item.operatorType || item.OperatorType || '';
+                    ${pipeline.map(rawItem => {
+                        const item = { ...(this._asObject?.(rawItem) || rawItem || {}) };
+                        item.source = this._formatBuildWorkspaceText(item.source || item.Source || '', 120);
+                        item.Source = '';
+                        item.repairNote = this._formatBuildWorkspaceText(item.repairNote || item.RepairNote || '', 180);
+                        item.RepairNote = '';
+                        item.status = this._sanitizeBuildWorkspaceText(item.status || item.Status || '', 80);
+                        item.Status = '';
+                        const rawType = this._sanitizeBuildWorkspaceText(item.operatorType || item.OperatorType || '', 80);
                         return `<span title="${this._escapeHtml([
                         rawType,
                         this._localizeDisplayText(item.source || item.Source || ''),
@@ -5816,11 +5880,11 @@ export const aiPanelAgentWorkspaceMixin = {
                     }).join('')}
                 </div>
                 ${pipeline.slice(0, 8).map(item => {
-                    const source = item.source || item.Source || 'plan';
-                    const repair = item.repairNote || item.RepairNote || '';
-                    const status = item.status || item.Status || '';
-                    const rawType = item.operatorType || item.OperatorType || '';
-                    const tempId = item.tempId || item.TempId || '';
+                    const source = this._formatBuildWorkspaceText(item.source || item.Source || 'plan', 120);
+                    const repair = this._formatBuildWorkspaceText(item.repairNote || item.RepairNote || '', 180);
+                    const status = this._sanitizeBuildWorkspaceText(item.status || item.Status || '', 80);
+                    const rawType = this._sanitizeBuildWorkspaceText(item.operatorType || item.OperatorType || '', 80);
+                    const tempId = this._sanitizeBuildWorkspaceText(item.tempId || item.TempId || '', 80);
                     return `
                         <div class="ai-build-compact-row" title="${this._escapeHtml([tempId, rawType].filter(Boolean).join(' / '))}">
                             <b>${this._escapeHtml(this._formatOperatorType(rawType) || '算子')}</b>
@@ -5837,15 +5901,20 @@ export const aiPanelAgentWorkspaceMixin = {
         const operatorTypes = Array.isArray(payload.operatorTypes || payload.OperatorTypes)
             ? (payload.operatorTypes || payload.OperatorTypes)
             : [];
-        if (!operatorTypes.length) {
-            const planOps = this.pendingVisionPlan?.route?.operators || [];
+        const safeOperatorTypes = operatorTypes
+            .map(op => this._sanitizeBuildWorkspaceText(op, 80))
+            .filter(Boolean);
+        if (!safeOperatorTypes.length) {
+            const planOps = this._toArray(this.pendingVisionPlan?.route?.operators)
+                .map(op => this._sanitizeBuildWorkspaceText(op, 80))
+                .filter(Boolean);
             if (!planOps.length) {
                 return '<div class="ai-followup-empty">流程草稿生成后会显示算子链。</div>';
             }
             return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
         }
 
-        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
+        return `<div class="ai-plan-chain">${safeOperatorTypes.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
     },
 
     _renderBuildParameterSummary(events) {
@@ -5863,11 +5932,11 @@ export const aiPanelAgentWorkspaceMixin = {
         const missingCount = Number(latestPayload.missingResourceCount ?? latestPayload.MissingResourceCount ?? effectiveMissing.length);
         const pendingCount = Number(latestPayload.pendingParameterCount ?? latestPayload.PendingParameterCount ?? effectivePending.length);
         const mappingRows = mappings.slice(0, 8).map(item => {
-            const tempId = item.tempId || item.TempId || '';
-            const operatorType = item.operatorType || item.OperatorType || '';
-            const parameterName = item.parameterName || item.ParameterName || item.name || item.Name || '';
-            const valueSummary = item.valueSummary ?? item.ValueSummary ?? item.value ?? item.Value ?? '';
-            const source = item.source || item.Source || 'mapped';
+            const tempId = this._sanitizeBuildWorkspaceText(item.tempId || item.TempId || '', 80);
+            const operatorType = this._sanitizeBuildWorkspaceText(item.operatorType || item.OperatorType || '', 80);
+            const parameterName = this._sanitizeBuildWorkspaceText(item.parameterName || item.ParameterName || item.name || item.Name || '', 80);
+            const valueSummary = this._formatBuildWorkspaceText(item.valueSummary ?? item.ValueSummary ?? item.value ?? item.Value ?? '', 220);
+            const source = this._formatBuildWorkspaceText(item.source || item.Source || 'mapped', 120);
             const pendingLabel = item.pending || item.Pending ? ' / 待确认' : '';
             const titleParts = [tempId, operatorType, parameterName, source]
                 .filter(Boolean)
@@ -5896,10 +5965,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const resultPayload = this._getAgentRunResultPayload(events);
         const compatibilityState = this._getBuildArtifactFlowCompatibilityState(resultPayload, events);
         if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+            const publicMessage = this._sanitizeAssistantFailureText?.(compatibilityState.publicMessage, 360) ||
+                compatibilityState.publicMessage;
             return `
                 <div class="ai-build-check is-blocked">
                     <strong>应用门禁：已阻断</strong>
-                    <span>${this._escapeHtml(compatibilityState.publicMessage)}</span>
+                    <span>${this._escapeHtml(publicMessage)}</span>
                 </div>
             `;
         }
@@ -5907,7 +5978,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const buildResult = this._getBuildResult(events);
         const applyGate = buildResult?.applyGate || buildResult?.ApplyGate || resultPayload?.applyGate;
         const readiness = buildResult?.readinessReport || buildResult?.ReadinessReport || null;
-        const firstFix = buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || resultPayload?.firstFixRecommendation || '';
+        const firstFix = this._sanitizeAssistantFailureText?.(buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || resultPayload?.firstFixRecommendation || '', 240) || '';
         if (applyGate) {
             const gate = this._asObject?.(applyGate) || {};
             const canvasReady = this._readBooleanField(gate, 'canvasApplyReady', 'CanvasApplyReady');
@@ -5940,11 +6011,13 @@ export const aiPanelAgentWorkspaceMixin = {
         return checks.map(evt => {
             const tone = this._getAgentRunTone?.(evt.status, evt.eventType) || 'running';
             const payload = this._asObject?.(evt.payload) || {};
-            const firstFix = payload.firstFixRecommendation || payload.FirstFixRecommendation || '';
+            const firstFix = this._sanitizeAssistantFailureText?.(payload.firstFixRecommendation || payload.FirstFixRecommendation || '', 240) || '';
+            const title = this._formatBuildWorkspaceText(evt.title || BUILD_STAGE_LABELS[evt.stage] || evt.stage, 160);
+            const summary = this._formatBuildWorkspaceText(evt.summary || '', 260);
             return `
                 <div class="ai-build-check is-${this._escapeHtml(tone)}">
-                    <strong>${this._escapeHtml(this._localizeDisplayText(evt.title || BUILD_STAGE_LABELS[evt.stage] || evt.stage))}</strong>
-                    <span>${this._escapeHtml(this._localizeDisplayText(evt.summary || ''))}</span>
+                    <strong>${this._escapeHtml(title)}</strong>
+                    <span>${this._escapeHtml(summary)}</span>
                     ${firstFix ? `<em>${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
                 </div>
             `;
@@ -5967,10 +6040,12 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+            const publicMessage = this._sanitizeAssistantFailureText?.(compatibilityState.publicMessage, 360) ||
+                compatibilityState.publicMessage;
             return `
                 <div class="ai-build-check is-blocked">
                     <strong>无法应用构建结果</strong>
-                    <span>${this._escapeHtml(compatibilityState.publicMessage)}</span>
+                    <span>${this._escapeHtml(publicMessage)}</span>
                 </div>
                 <details class="ai-plan-diagnostics">
                     <summary>兼容诊断</summary>
@@ -5980,7 +6055,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         if (!flow) {
-            return `<div class="ai-build-note">${this._escapeHtml(terminal.summary || '构建完成，但未收到流程草稿。')}</div>`;
+            return `<div class="ai-build-note">${this._escapeHtml(this._sanitizeAssistantFailureText?.(terminal.summary || '构建完成，但未收到流程草稿。', 360) || '构建完成，但未收到流程草稿。')}</div>`;
         }
 
         return `
@@ -6481,8 +6556,13 @@ export const aiPanelAgentWorkspaceMixin = {
     _normalizeDraftOperatorForCanvas(operator, index) {
         const op = this._asObject?.(operator) || {};
         const id = String(op.id || op.Id || op.tempId || op.TempId || `op_${index + 1}`).trim();
-        const type = String(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning').trim();
-        const name = String(op.name || op.Name || op.displayName || op.DisplayName || op.title || op.Title || id || type).trim();
+        const type = this._normalizeDraftCanvasOperatorType(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning');
+        const name = this._sanitizeDraftCanvasLabel(
+            op.name || op.Name || op.displayName || op.DisplayName || op.title || op.Title || id || type,
+            AI_OPERATOR_LABELS[type] || id || type || '未命名算子',
+            160
+        ) || AI_OPERATOR_LABELS[type] || '未命名算子';
+        const description = this._sanitizeDraftCanvasLabel(op.description || op.Description || '', '', 260);
         const parameters = this._normalizeDraftParametersForCanvas(op.parameters || op.Parameters);
         const inputPorts = this._normalizeDraftPortsForCanvas(op.inputPorts || op.InputPorts || op.inputs || op.Inputs, id, type, false);
         const outputPorts = this._normalizeDraftPortsForCanvas(op.outputPorts || op.OutputPorts || op.outputs || op.Outputs, id, type, true);
@@ -6490,7 +6570,17 @@ export const aiPanelAgentWorkspaceMixin = {
             ...op,
             id,
             name,
+            Name: name,
+            title: name,
+            Title: name,
+            displayName: name,
+            DisplayName: name,
+            description,
+            Description: description,
             type,
+            Type: type,
+            operatorType: type,
+            OperatorType: type,
             x: Number(op.x ?? op.X ?? 160 + index * 180),
             y: Number(op.y ?? op.Y ?? 180),
             inputPorts,
@@ -6506,13 +6596,23 @@ export const aiPanelAgentWorkspaceMixin = {
                 const param = this._asObject?.(item) || {};
                 const name = param.name || param.Name || '';
                 const value = param.value ?? param.Value ?? param.defaultValue ?? param.DefaultValue ?? '';
+                const displayName = this._sanitizeDraftCanvasLabel(param.displayName || param.DisplayName || name, name || '参数', 120) || '参数';
+                const dataType = this._normalizeDraftCanvasDataType(param.dataType || param.DataType || param.type || param.Type || 'string', 'string');
+                const description = this._sanitizeDraftCanvasLabel(param.description || param.Description || '', '', 220);
                 return {
                     ...param,
                     name,
-                    displayName: param.displayName || param.DisplayName || name,
+                    Name: name,
+                    displayName,
+                    DisplayName: displayName,
+                    description,
+                    Description: description,
                     value,
                     defaultValue: param.defaultValue ?? param.DefaultValue ?? value,
-                    dataType: param.dataType || param.DataType || param.type || param.Type || 'string',
+                    dataType,
+                    DataType: dataType,
+                    type: dataType,
+                    Type: dataType,
                     isRequired: Boolean(param.isRequired ?? param.IsRequired ?? this._isPendingValueSummary(value))
                 };
             });
@@ -6521,12 +6621,20 @@ export const aiPanelAgentWorkspaceMixin = {
         const obj = this._asObject?.(parameters) || {};
         return Object.keys(obj).map(name => {
             const value = obj[name];
+            const displayName = this._sanitizeDraftCanvasLabel(name, '参数', 120) || '参数';
             return {
                 name,
-                displayName: name,
+                Name: name,
+                displayName,
+                DisplayName: displayName,
+                description: '',
+                Description: '',
                 value,
                 defaultValue: value,
                 dataType: 'string',
+                DataType: 'string',
+                type: 'string',
+                Type: 'string',
                 isRequired: this._isPendingValueSummary(value)
             };
         });
@@ -6537,13 +6645,29 @@ export const aiPanelAgentWorkspaceMixin = {
         if (raw.length) {
             return raw.map((port, index) => {
                 const item = this._asObject?.(port) || {};
-                const name = item.name || item.Name || item.portName || item.PortName || (isOutput ? 'Output' : 'Input');
+                const fallbackName = isOutput ? 'Output' : 'Input';
+                const name = this._sanitizeDraftCanvasLabel(item.name || item.Name || item.portName || item.PortName || fallbackName, fallbackName, 80) || fallbackName;
+                const displayName = this._sanitizeDraftCanvasLabel(item.displayName || item.DisplayName || name, name, 80) || name;
+                const dataType = this._normalizeDraftCanvasDataType(
+                    item.dataType || item.DataType || item.type || item.Type || (String(name).toLowerCase().includes('image') ? 'Image' : 'Any'),
+                    String(name).toLowerCase().includes('image') ? 'Image' : 'Any'
+                );
+                const description = this._sanitizeDraftCanvasLabel(item.description || item.Description || '', '', 180);
                 return {
                     ...item,
                     id: item.id || item.Id || `${operatorId}_${isOutput ? 'out' : 'in'}_${index}`,
                     name,
-                    displayName: item.displayName || item.DisplayName || name,
-                    dataType: item.dataType || item.DataType || item.type || item.Type || (String(name).toLowerCase().includes('image') ? 'Image' : 'Any'),
+                    Name: name,
+                    portName: name,
+                    PortName: name,
+                    displayName,
+                    DisplayName: displayName,
+                    dataType,
+                    DataType: dataType,
+                    type: dataType,
+                    Type: dataType,
+                    description,
+                    Description: description,
                     direction: item.direction ?? item.Direction ?? (isOutput ? 1 : 0),
                     isRequired: Boolean(item.isRequired ?? item.IsRequired ?? !isOutput)
                 };

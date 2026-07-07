@@ -1323,8 +1323,37 @@ export const aiPanelPendingParametersMixin = {
     },
 
     _sanitizeCanvasAuditText(value) {
-        const text = String(value ?? '').trim();
+        const raw = String(value ?? '').trim();
+        const text = this._sanitizeAssistantFailureText?.(raw, 1200) || raw;
         return this._redactPublicDiagnosticText?.(text) || text;
+    },
+
+    _sanitizeCanvasAuditDisplayText(value, maxChars = 220) {
+        const text = this._sanitizeCanvasAuditText(value);
+        return text ? text.slice(0, maxChars) : '';
+    },
+
+    _normalizeCanvasManualEditRecordForDisplay(record = {}) {
+        const safe = (value, maxChars = 220) => this._sanitizeCanvasAuditDisplayText(value, maxChars);
+        const truthy = (...values) => values.some(value => value === true || String(value ?? '').trim().toLowerCase() === 'true');
+        const falsy = (...values) => values.some(value => value === false || String(value ?? '').trim().toLowerCase() === 'false');
+        return {
+            changeKey: safe(record.changeKey || record.ChangeKey || '', 220),
+            operatorId: safe(record.operatorId || record.OperatorId || '', 120),
+            displayName: safe(record.displayName || record.DisplayName || record.operatorId || record.OperatorId || '', 160),
+            operatorType: safe(record.operatorType || record.OperatorType || '', 120),
+            parameterName: safe(record.parameterName || record.ParameterName || '', 120),
+            oldValueSummary: safe(record.oldValueSummary || record.OldValueSummary || '', 160),
+            newValueSummary: safe(record.newValueSummary || record.NewValueSummary || '', 160),
+            changedAtUtc: safe(record.changedAtUtc || record.ChangedAtUtc || '', 80),
+            actor: safe(record.actor || record.Actor || 'local-user', 100) || 'local-user',
+            source: safe(record.source || record.Source || 'canvas_manual_edit', 80) || 'canvas_manual_edit',
+            sourceLabel: safe(record.sourceLabel || record.SourceLabel || '', 160),
+            isPendingParameter: truthy(record.isPendingParameter, record.IsPendingParameter),
+            affectsApplyGate: truthy(record.affectsApplyGate, record.AffectsApplyGate),
+            affectsDeploymentReady: truthy(record.affectsDeploymentReady, record.AffectsDeploymentReady),
+            metadataOnly: !falsy(record.metadataOnly, record.MetadataOnly)
+        };
     },
 
     _summarizeCanvasManualEditValue(value) {
@@ -1337,7 +1366,8 @@ export const aiPanelPendingParametersMixin = {
 
     _getCanvasManualEditRecords(target = this.currentResult) {
         const explicit = this._toArray?.(target?.canvasManualEditRecords ?? target?.CanvasManualEditRecords) || [];
-        return explicit.length ? explicit : (this.canvasManualEditRecords || []);
+        const records = explicit.length ? explicit : (this.canvasManualEditRecords || []);
+        return records.map(record => this._normalizeCanvasManualEditRecordForDisplay(record));
     },
 
     _renderCanvasManualEditRecords(target = this.currentResult) {

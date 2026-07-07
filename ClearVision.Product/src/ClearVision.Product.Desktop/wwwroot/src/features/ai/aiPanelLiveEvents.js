@@ -1273,6 +1273,8 @@ export const aiPanelLiveEventsMixin = {
         if (!text) return '';
         text = this._redactPublicDiagnosticText?.(text) || text;
         return text
+            .replace(/\b(?:rawPrompt|systemPrompt|userPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content)\b\s*[:=]\s*["']?[^"'\n,;}]+/gi, '')
+            .replace(/chain[-_\s]?of[-_\s]?thought/gi, '')
             .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '')
             .replace(/[^A-Za-z0-9_.:-]/g, '')
             .slice(0, 96);

@@ -26,16 +26,29 @@ export const aiPanelSessionHistoryMixin = {
         this._filterHistory(this.historyKeyword);
     },
 
+    _sanitizeSessionHistoryText(value, maxChars = 220) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        return this._sanitizeAssistantFailureText?.(text, maxChars) ||
+            this._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+            text.slice(0, maxChars);
+    },
+
     _normalizeSessionSummary(entry) {
         const sessionId = String(entry?.sessionId ?? entry?.SessionId ?? '').trim();
         if (!sessionId) return null;
 
-        const lastMessage = String(entry?.lastMessage ?? entry?.LastMessage ?? '').trim();
+        const lastMessage = this._sanitizeSessionHistoryText(entry?.lastMessage ?? entry?.LastMessage ?? '', 220);
+        const templateName = this._sanitizeSessionHistoryText(entry?.templateName ?? entry?.TemplateName ?? '', 120);
+        const generationMode = this._sanitizeSessionHistoryText(entry?.generationMode ?? entry?.GenerationMode ?? '', 80);
         const updatedAtUtc = String(entry?.updatedAtUtc ?? entry?.UpdatedAtUtc ?? new Date().toISOString());
         const turnCountRaw = Number(entry?.turnCount ?? entry?.TurnCount ?? 0);
         return {
             sessionId,
             lastMessage: lastMessage || '（空会话）',
+            templateName,
+            generationMode,
+            applied: Boolean(entry?.applied ?? entry?.Applied),
             updatedAtUtc,
             turnCount: Number.isFinite(turnCountRaw) ? turnCountRaw : 0
         };
@@ -47,7 +60,7 @@ export const aiPanelSessionHistoryMixin = {
             this.filteredHistory = [...this.history];
         } else {
             this.filteredHistory = this.history.filter(item => {
-                const text = `${item.lastMessage} ${item.sessionId}`.toLowerCase();
+                const text = `${this._sanitizeSessionHistoryText(item.lastMessage, 220)} ${item.sessionId}`.toLowerCase();
                 return text.includes(this.historyKeyword);
             });
         }
@@ -67,16 +80,19 @@ export const aiPanelSessionHistoryMixin = {
         }
 
         list.innerHTML = rows.map(item => {
-            const templateBadge = item.templateName
-                ? `<span class="history-template-badge">${this._escapeHtml(item.templateName)}</span>`
+            const lastMessage = this._sanitizeSessionHistoryText(item.lastMessage, 220) || '（空会话）';
+            const templateName = this._sanitizeSessionHistoryText(item.templateName, 120);
+            const generationMode = this._sanitizeSessionHistoryText(item.generationMode, 80);
+            const templateBadge = templateName
+                ? `<span class="history-template-badge">${this._escapeHtml(templateName)}</span>`
                 : '';
-            const modeChip = item.generationMode
-                ? `<span class="history-mode-chip">${this._escapeHtml(item.generationMode)}</span>`
+            const modeChip = generationMode
+                ? `<span class="history-mode-chip">${this._escapeHtml(generationMode)}</span>`
                 : '';
             const appliedIcon = item.applied ? '<span class="history-applied-icon" title="已应用">&#10003;</span>' : '';
             return `
             <div class="ai-history-item ${item.sessionId === this.sessionId ? 'active' : ''}" data-session-id="${this._escapeHtml(item.sessionId)}">
-                <div class="history-desc">${this._escapeHtml(item.lastMessage)}</div>
+                <div class="history-desc">${this._escapeHtml(lastMessage)}</div>
                 <div class="history-badges">${templateBadge}${modeChip}${appliedIcon}</div>
                 <div class="history-meta">
                     <span>${this._escapeHtml(this._formatHistoryTime(item.updatedAtUtc))}</span>
@@ -116,7 +132,7 @@ export const aiPanelSessionHistoryMixin = {
         const payload = data?.payload || data || {};
         if (!payload.success) {
             if (payload.errorMessage) {
-                this._addMessage('system', `历史加载失败: ${payload.errorMessage}`);
+                this._addMessage('system', `历史加载失败: ${this._sanitizeSessionHistoryText(payload.errorMessage, 260) || '未知错误'}`);
             }
             return;
         }
@@ -208,13 +224,13 @@ export const aiPanelSessionHistoryMixin = {
                 this._saveSessionId?.(null);
                 if (!this.autoRestoreNoticeShown) {
                     this.autoRestoreNoticeShown = true;
-                    this._addMessage('system', `自动恢复上次会话失败：${payload.errorMessage || '未知错误'}。已进入新会话。`);
+                    this._addMessage('system', `自动恢复上次会话失败：${this._sanitizeSessionHistoryText(payload.errorMessage, 260) || '未知错误'}。已进入新会话。`);
                 }
                 return;
             }
 
             this.pendingSessionLoad = null;
-            this._addMessage('system', `会话恢复失败: ${payload.errorMessage || '未知错误'}`);
+            this._addMessage('system', `会话恢复失败: ${this._sanitizeSessionHistoryText(payload.errorMessage, 260) || '未知错误'}`);
             return;
         }
 
@@ -604,7 +620,7 @@ export const aiPanelSessionHistoryMixin = {
     _handleDeleteAiSessionResult(data) {
         const payload = data?.payload || data || {};
         if (!payload.success) {
-            this._addMessage('system', `删除会话失败: ${payload.errorMessage || '未知错误'}`);
+            this._addMessage('system', `删除会话失败: ${this._sanitizeSessionHistoryText(payload.errorMessage, 260) || '未知错误'}`);
             return;
         }
 

@@ -46,6 +46,15 @@ function normalizeToolStatus(item) {
     return { kind: 'unknown', label: '已记录/状态不可用', title: 'status-unavailable', success: null };
 }
 
+function sanitizeToolTraceDisplay(panel, value, maxChars = 160) {
+    const text = String(value ?? '').trim();
+    if (!text) return '';
+    return panel?._sanitizeValidationPreviewText?.(text, maxChars) ||
+        panel?._sanitizeAssistantFailureText?.(text, maxChars) ||
+        panel?._redactPublicDiagnosticText?.(text)?.slice(0, maxChars) ||
+        text.slice(0, maxChars);
+}
+
 export function normalizeAgentToolTrace(items) {
     if (!Array.isArray(items)) return [];
 
@@ -81,20 +90,38 @@ export function renderAgentToolTrace(panel, toolTrace) {
         return '';
     }
 
-    const toolSummary = toolTrace
-        .map(item => `${getToolDisplayName(item.toolName, { fallback: '工具' })} ${item.statusLabel || '已记录/状态不可用'} ${item.durationMs}ms`)
+    const safeItems = toolTrace.map(item => {
+        const rawToolName = String(item?.toolName ?? '').trim();
+        const rawToolSummaryLabel = getToolDisplayName(rawToolName, { fallback: '工具' });
+        const rawToolLabel = getToolDisplayName(rawToolName, { fallback: rawToolName || '工具' });
+        return {
+            ...item,
+            toolName: sanitizeToolTraceDisplay(panel, rawToolName, 160),
+            toolSummaryLabel: sanitizeToolTraceDisplay(panel, rawToolSummaryLabel, 160) || '工具',
+            toolLabel: sanitizeToolTraceDisplay(panel, rawToolLabel, 160) || '工具',
+            permission: sanitizeToolTraceDisplay(panel, item?.permission, 120),
+            adapterName: sanitizeToolTraceDisplay(panel, item?.adapterName, 120),
+            permissionReason: sanitizeToolTraceDisplay(panel, item?.permissionReason, 160),
+            statusLabel: sanitizeToolTraceDisplay(panel, item?.statusLabel, 120),
+            statusTitle: sanitizeToolTraceDisplay(panel, item?.statusTitle || item?.statusKind || 'status-unavailable', 160),
+            errorCode: sanitizeToolTraceDisplay(panel, item?.errorCode, 160)
+        };
+    });
+
+    const toolSummary = safeItems
+        .map(item => `${item.toolSummaryLabel} ${item.statusLabel || '已记录/状态不可用'} ${item.durationMs}ms`)
         .join(' · ');
 
     return `
         <details class="ai-agent-tool-trace" data-agent-artifact="toolTrace">
-            <summary title="${panel._escapeHtml(toolTrace.map(item => item.toolName).join(' | '))}">工具轨迹（${toolTrace.length}）${panel._escapeHtml(toolSummary ? ` ${toolSummary}` : '')}</summary>
+            <summary title="${panel._escapeHtml(safeItems.map(item => item.toolName).join(' | '))}">工具轨迹（${safeItems.length}）${panel._escapeHtml(toolSummary ? ` ${toolSummary}` : '')}</summary>
             <div class="ai-agent-tool-trace-list">
-                ${toolTrace.map(item => `
+                ${safeItems.map(item => `
                     <div class="ai-agent-tool-trace-row">
-                        <span title="${panel._escapeHtml(item.toolName)}">${panel._escapeHtml(getToolDisplayName(item.toolName, { fallback: item.toolName }))}</span>
+                        <span title="${panel._escapeHtml(item.toolName)}">${panel._escapeHtml(item.toolLabel)}</span>
                         <span title="${panel._escapeHtml(item.permission || '--')}">${panel._escapeHtml(getStatusDisplayName(item.permission, { fallback: item.permission || '--' }))}</span>
                         <span title="${panel._escapeHtml(item.adapterName || '--')}">${panel._escapeHtml(getStatusDisplayName(item.adapterName, { fallback: item.adapterName ? '元数据适配器' : '--' }))}</span>
-                        <span title="${panel._escapeHtml(item.statusTitle || item.statusKind || 'status-unavailable')}">${panel._escapeHtml(item.statusLabel || '已记录/状态不可用')}</span>
+                        <span title="${panel._escapeHtml(item.statusTitle || 'status-unavailable')}">${panel._escapeHtml(item.statusLabel || '已记录/状态不可用')}</span>
                         <span>${panel._escapeHtml(String(item.durationMs))}ms</span>
                         <span title="${panel._escapeHtml(item.errorCode || '--')}">${panel._escapeHtml(item.errorCode ? getStatusDisplayName(item.errorCode, { fallback: '错误码' }) : '--')}</span>
                         <span title="${panel._escapeHtml(item.permissionReason || '--')}">${panel._escapeHtml(item.permissionReason ? getStatusDisplayName(item.permissionReason, { fallback: '权限原因' }) : '--')}</span>
