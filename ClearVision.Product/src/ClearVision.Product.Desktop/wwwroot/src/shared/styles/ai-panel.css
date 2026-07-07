@@ -3182,10 +3182,11 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 /* ---- Apply Button ---- */
 .apply-container {
-    margin-top: 0;
+    margin: 0 0 10px;
     flex-shrink: 0;
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 0 10px;
+    border-top: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .btn-apply-flow {
@@ -5079,7 +5080,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 
 .apply-container {
-    border-top-color: var(--ai-border);
+    border-bottom-color: var(--ai-border);
 }
 
 .btn-apply-flow {

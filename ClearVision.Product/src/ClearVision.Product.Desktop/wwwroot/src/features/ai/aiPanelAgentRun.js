@@ -551,14 +551,6 @@ export const aiPanelAgentRunMixin = {
         }
         this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
-        if (payload?.buildFromPlan || payload?.BuildFromPlan) {
-            this.agentWorkspaceMode = 'build';
-            this._setWorkspaceViewMode?.('build', { render: false });
-            this._renderAgentWorkspaceOverview?.();
-            this._renderPlanWorkspace?.(this.pendingVisionPlan);
-            this._renderBuildWorkspaceFromAgentRun?.();
-            this._setResultStatusNote?.('构建模式已启动，进度来自后端 AgentRun 公开事件。', 'info');
-        }
 
         this.activeAgentRunId = runId;
         this.activeAgentRunEvents = [];
@@ -567,6 +559,15 @@ export const aiPanelAgentRunMixin = {
         this.agentRunToolMap = new Map();
         this.agentRunArtifactMap = new Map();
         this._resetPublicLiveEventState?.();
+
+        if (payload?.buildFromPlan || payload?.BuildFromPlan) {
+            this.agentWorkspaceMode = 'build';
+            this._setWorkspaceViewMode?.('build', { render: false });
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+            this._setResultStatusNote?.('构建模式已启动，进度来自后端 AgentRun 公开事件。', 'info');
+        }
 
         const initialEvents = createResult?.events || createResult?.Events || [];
         initialEvents.forEach(evt => this._handleAgentRunEvent(evt));

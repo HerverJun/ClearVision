@@ -488,6 +488,15 @@ export class AiPanel {
                         <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
                         <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
                         <div class="ai-result-status-note" id="ai-result-status-note"></div>
+                        <div class="apply-container">
+                            <button class="btn-apply-flow" id="ai-btn-apply" disabled>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
+                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                </svg>
+                                应用到画布
+                            </button>
+                            <div class="ai-apply-gate-hint">确认人工参数后，可应用到画布继续编辑；部署仍受资源确认和 DeploymentReady 门禁约束。</div>
+                        </div>
                         <div class="ai-build-dashboard">
                             <section class="result-card ai-build-card">
                                 <div class="card-title">构建时间线</div>
@@ -578,16 +587,6 @@ export class AiPanel {
                             <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
                         </div>
                     </div>
-
-                        <div class="apply-container">
-                            <button class="btn-apply-flow" id="ai-btn-apply" disabled>
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
-                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                                </svg>
-                                应用到画布
-                            </button>
-                            <div class="ai-apply-gate-hint">确认人工参数后，可应用到画布继续编辑；部署仍受资源确认和 DeploymentReady 门禁约束。</div>
-                        </div>
                     </div>
                 </aside>
             </div>

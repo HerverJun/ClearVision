@@ -7077,6 +7077,78 @@ test('Canvas apply remains enabled when deployment is blocked by missing resourc
   assert.equal(gate.blocked, false);
 });
 
+test('ready_to_apply state reveals build workspace so Apply entry is visible', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = buildResultContractPayload();
+  panel.currentResultVersion = 2;
+  panel.appliedResultVersion = 0;
+  panel.activeAgentRunId = 'agent-run-visible-apply';
+  panel.agentWorkspaceMode = 'build';
+  panel.workspaceViewMode = 'plan';
+  elements['#ai-build-workspace'].hidden = true;
+  elements['#ai-plan-workspace'].hidden = false;
+
+  panel._setWorkbenchState('ready_to_apply');
+  panel._updateApplyButtonState();
+
+  assert.equal(panel.workbenchState, 'ready_to_apply');
+  assert.equal(panel.workspaceViewMode, 'build');
+  assert.equal(elements['#ai-build-workspace'].hidden, false);
+  assert.equal(elements['#ai-plan-workspace'].hidden, true);
+  assert.equal(elements['#ai-btn-apply'].disabled, false);
+  assert.equal(elements['#ai-btn-apply'].getAttribute('aria-disabled'), 'false');
+  assert.match(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
+});
+
+test('Apply button remains disabled for no flow, blocked gate, generating, and applied states', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+
+  panel.currentResult = { flow: { operators: [], connections: [] } };
+  panel.currentResultVersion = 1;
+  panel.appliedResultVersion = 0;
+  panel.isGenerating = false;
+  panel._updateApplyButtonState();
+  assert.equal(elements['#ai-btn-apply'].disabled, true);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /暂无可应用方案/);
+
+  panel.currentResult = {
+    flow: { operators: [{ id: 'op_1', type: 'ImageAcquisition' }], connections: [] },
+    buildResult: {
+      applyGate: {
+        canvasApplyReady: false,
+        blocked: true,
+        status: 'schema_invalid',
+        firstFixRecommendation: '修复结构校验错误'
+      }
+    }
+  };
+  panel.currentResultVersion = 2;
+  panel._updateApplyButtonState();
+  assert.equal(elements['#ai-btn-apply'].disabled, true);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /当前草稿暂不可应用/);
+
+  panel.currentResult = {
+    flow: { operators: [{ id: 'op_1', type: 'ImageAcquisition' }], connections: [] },
+    buildResult: { applyGate: { canvasApplyReady: true, blocked: false } }
+  };
+  panel.currentResultVersion = 3;
+  panel.isGenerating = true;
+  panel._updateApplyButtonState();
+  assert.equal(elements['#ai-btn-apply'].disabled, true);
+
+  panel.isGenerating = false;
+  panel.appliedResultVersion = 3;
+  panel._updateApplyButtonState();
+  assert.equal(elements['#ai-btn-apply'].disabled, true);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /已应用到画布/);
+});
+
 test('parameter review copy makes AI review optional and removes submit audit wording', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

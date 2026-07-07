@@ -1,5 +1,406 @@
 import { test, expect, Page } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { bootAuthenticatedApp } from './authHelper';
+
+const applyEvidenceDir = path.resolve(process.cwd(), 'test-results', 'agent-apply-visible');
+
+const applyReadyFlow = {
+  operators: [
+    {
+      id: 'op_image',
+      name: '图像采集',
+      type: 'ImageAcquisition',
+      x: 80,
+      y: 96,
+      inputPorts: [],
+      outputPorts: [{ id: 'op_image_out', name: 'Image', dataType: 'Image' }],
+      parameters: [{ name: 'Source', displayName: '图像源', value: 'sample-image' }],
+      isEnabled: true,
+    },
+    {
+      id: 'op_roi',
+      name: 'ROI管理器',
+      type: 'RoiManager',
+      x: 360,
+      y: 96,
+      inputPorts: [{ id: 'op_roi_in', name: 'Image', dataType: 'Image', isRequired: true }],
+      outputPorts: [{ id: 'op_roi_out', name: 'Image', dataType: 'Image' }],
+      parameters: [{ name: 'Region', displayName: 'ROI区域', value: 'full-frame' }],
+      isEnabled: true,
+    },
+    {
+      id: 'op_threshold',
+      name: '二值化',
+      type: 'Threshold',
+      x: 640,
+      y: 96,
+      inputPorts: [{ id: 'op_threshold_in', name: 'Image', dataType: 'Image', isRequired: true }],
+      outputPorts: [{ id: 'op_threshold_out', name: 'BinaryImage', dataType: 'Image' }],
+      parameters: [{ name: 'Threshold', displayName: '阈值', value: 128 }],
+      isEnabled: true,
+    },
+  ],
+  connections: [
+    {
+      id: 'conn_image_roi',
+      sourceOperatorId: 'op_image',
+      sourcePortId: 'op_image_out',
+      targetOperatorId: 'op_roi',
+      targetPortId: 'op_roi_in',
+    },
+    {
+      id: 'conn_roi_threshold',
+      sourceOperatorId: 'op_roi',
+      sourcePortId: 'op_roi_out',
+      targetOperatorId: 'op_threshold',
+      targetPortId: 'op_threshold_in',
+    },
+  ],
+};
+
+function createApplyReadyPlanResult() {
+  return {
+    planId: 'plan_apply_visible',
+    planHash: 'sha256:apply-visible',
+    originalUserPrompt: '检测产品表面划痕并输出二值化结果',
+    goal: '检测产品表面划痕并输出二值化结果',
+    intent: 'surface_defect',
+    confidence: 'high',
+    requirementMode: 'strict',
+    planSource: 'model_router',
+    requirementUnderstanding: ['目标是表面缺陷检测。', '需要图像采集、ROI管理器和二值化处理。'],
+    recommendedRoute: {
+      routeId: 'surface_defect_apply_visible',
+      title: '表面缺陷检测路线',
+      summary: '采集图像后限定 ROI，再进行二值化。',
+      operators: ['ImageAcquisition', 'RoiManager', 'Threshold'],
+    },
+    clarificationQuestions: [],
+    recommendedDefaults: [],
+    risks: [],
+    acceptanceCriteria: ['画布包含图像采集、ROI管理器、二值化节点。'],
+    executablePlan: ['按确认计划构建可应用流程草稿。'],
+    canPlan: true,
+    canBuild: true,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: '构建条件已满足。',
+      contractVersion: 'v2',
+    },
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: true,
+      objectSignals: ['产品表面'],
+      taskSignals: ['划痕', '二值化'],
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: '需求足够明确，可以进入构建。',
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model_router',
+      taskType: 'surface_defect',
+      confidence: 0.92,
+      taskTypeConfidence: 0.92,
+      inspectionObject: '产品表面',
+      defectType: '划痕',
+      imageSource: 'sample-image',
+      okCondition: '无明显划痕',
+      ngCondition: '存在划痕',
+      outputTarget: '二值化结果',
+      missingFields: [],
+    },
+    publicEvents: [],
+    metadataOnly: true,
+  };
+}
+
+function createApplyReadyBuildPayload() {
+  return {
+    success: true,
+    status: 'completed',
+    completionStatus: 'completed',
+    interactionState: 'completed',
+    planId: 'plan_apply_visible',
+    planHash: 'sha256:apply-visible',
+    buildFromPlan: {
+      planId: 'plan_apply_visible',
+      planHash: 'sha256:apply-visible',
+      metadataOnly: true,
+    },
+    requirementMode: 'strict',
+    aiExplanation: '构建完成，可应用到画布。',
+    flow: applyReadyFlow,
+    buildResult: {
+      buildId: 'build_apply_visible',
+      buildIntent: 'new',
+      workflowDraft: {
+        operatorCount: applyReadyFlow.operators.length,
+        connectionCount: applyReadyFlow.connections.length,
+      },
+      operatorPipeline: applyReadyFlow.operators.map(operator => ({
+        tempId: operator.id,
+        operatorType: operator.type,
+        displayName: operator.name,
+        status: 'completed',
+        source: 'plan',
+      })),
+      parameterMapping: [
+        { tempId: 'op_threshold', operatorType: 'Threshold', parameterName: 'Threshold', valueSummary: '128', source: 'default' },
+      ],
+      applyGate: {
+        canvasApplyReady: true,
+        runtimeDraftReady: true,
+        deploymentReady: true,
+        blocked: false,
+        status: 'ready',
+        metadataOnly: true,
+      },
+      metadataOnly: true,
+    },
+    applyGate: {
+      canvasApplyReady: true,
+      runtimeDraftReady: true,
+      deploymentReady: true,
+      blocked: false,
+      status: 'ready',
+      metadataOnly: true,
+    },
+    pendingParameters: [],
+    missingResources: [],
+    metadataOnly: true,
+  };
+}
+
+async function mockAgentPlanAndApplyReadyBuild(page: Page): Promise<void> {
+  const planResult = createApplyReadyPlanResult();
+  await page.route('**/api/ai/agent-intent-router-runs', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        intent: 'actionable_vision_plan',
+        confidence: 'high',
+        shouldOpenPlan: true,
+        shouldBuildDirectly: false,
+        canBuild: true,
+        needsClarification: false,
+        publicReason: '需求已明确，先进入 Plan。',
+        assistantReply: '已生成工程计划，请确认后开始构建。',
+        semanticExtraction: planResult.semanticExtraction,
+        metadataOnly: true,
+      }),
+    });
+  });
+  await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
+    const request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        planId: request.planId,
+        planHash: request.planHash,
+        requirementMode: request.requirementMode || 'strict',
+        answerRevision: request.answerRevision || 0,
+        buildReadiness: {
+          canBuild: true,
+          blockers: [],
+          resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+          remainingFields: [],
+          primaryMessage: '构建条件已满足。',
+          contractVersion: 'v2',
+        },
+        pendingConfirmationCount: 0,
+        resourcePendingCount: 0,
+        hardBlockerCount: 0,
+        contractValid: true,
+        metadataOnly: true,
+      }),
+    });
+  });
+  await page.route('**/api/ai/agent-plan-runs', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        runId: 'plan_apply_visible_run',
+        events: [
+          {
+            runId: 'plan_apply_visible_run',
+            sequence: 1,
+            eventType: 'run.started',
+            stage: 'run',
+            status: 'running',
+            payload: { metadataOnly: true },
+          },
+        ],
+      }),
+    });
+  });
+  await page.route('**/api/ai/agent-runs**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && url.pathname.endsWith('/agent-runs/plan_apply_visible_run/events')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          'event: run.completed',
+          `data: ${JSON.stringify({
+            runId: 'plan_apply_visible_run',
+            sequence: 2,
+            eventType: 'run.completed',
+            stage: 'run',
+            status: 'completed',
+            payload: { planResult, metadataOnly: true },
+          })}`,
+          '',
+          '',
+        ].join('\n'),
+      });
+      return;
+    }
+
+    if (request.method() === 'POST' && url.pathname.endsWith('/api/ai/agent-runs')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runId: 'build_apply_visible_run',
+          brief: 'Build started',
+          events: [
+            {
+              runId: 'build_apply_visible_run',
+              sequence: 1,
+              eventType: 'run.started',
+              stage: 'run',
+              status: 'running',
+              payload: { metadataOnly: true },
+            },
+          ],
+        }),
+      });
+      return;
+    }
+
+    if (request.method() === 'GET' && url.pathname.endsWith('/agent-runs/build_apply_visible_run/events')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          'event: run.completed',
+          `data: ${JSON.stringify({
+            runId: 'build_apply_visible_run',
+            sequence: 2,
+            eventType: 'run.completed',
+            stage: 'run',
+            status: 'completed',
+            summary: 'Build completed.',
+            payload: createApplyReadyBuildPayload(),
+          })}`,
+          '',
+          '',
+        ].join('\n'),
+      });
+      return;
+    }
+
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'unexpected agent run route' }) });
+  });
+}
+
+async function collectApplyButtonState(page: Page) {
+  return await page.evaluate(() => {
+    const rectOf = (element: Element | null) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        top: Math.round(rect.top),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left),
+      };
+    };
+    const describe = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      const style = element ? window.getComputedStyle(element) : null;
+      return {
+        selector,
+        exists: Boolean(element),
+        hidden: element?.hidden ?? null,
+        display: style?.display ?? null,
+        visibility: style?.visibility ?? null,
+        height: style?.height ?? null,
+        overflow: style ? `${style.overflow}/${style.overflowY}` : null,
+        className: element?.className?.toString?.() ?? '',
+        rect: rectOf(element),
+      };
+    };
+    const button = document.querySelector('#ai-btn-apply') as HTMLButtonElement | null;
+    const panel = (window as any).aiPanel;
+    const gate = panel?._getPayloadApplyGate?.(panel.currentResult) ||
+      panel?.currentResult?.applyGate ||
+      panel?.currentResult?.ApplyGate ||
+      panel?.currentResult?.buildResult?.applyGate ||
+      null;
+    const parentVisibilityChain = [];
+    let current: HTMLElement | null = button;
+    while (current) {
+      const style = window.getComputedStyle(current);
+      parentVisibilityChain.push({
+        tag: current.tagName.toLowerCase(),
+        id: current.id || '',
+        className: current.className?.toString?.() || '',
+        hidden: current.hidden,
+        display: style.display,
+        visibility: style.visibility,
+        height: style.height,
+        overflow: `${style.overflow}/${style.overflowY}`,
+        rect: rectOf(current),
+      });
+      current = current.parentElement;
+    }
+
+    const appliedNodeNames = Array.from((window as any).flowCanvas?.nodes?.values?.() || [])
+      .map((node: any) => node.title || node.displayName || node.name || node.type || '')
+      .filter(Boolean);
+    return {
+      workbenchState: panel?.workbenchState || null,
+      workspaceViewMode: panel?._getWorkspaceViewMode?.() || panel?.workspaceViewMode || null,
+      agentWorkspaceMode: panel?.agentWorkspaceMode || null,
+      canvasApplyReady: panel?._isCanvasApplyReadyForResult?.(panel.currentResult) ?? gate?.canvasApplyReady ?? null,
+      disabled: button?.disabled ?? null,
+      ariaDisabled: button?.getAttribute('aria-disabled') ?? null,
+      text: button?.textContent?.replace(/\s+/g, ' ').trim() || '',
+      className: button?.className || '',
+      rect: rectOf(button),
+      tracked: {
+        applyContainer: describe('.apply-container'),
+        buildWorkspace: describe('#ai-build-workspace'),
+        resultPane: describe('#ai-result-pane'),
+        overview: describe('#ai-agent-workspace-overview'),
+        planWorkspace: describe('#ai-plan-workspace'),
+      },
+      parentVisibilityChain,
+      appliedNodeNames,
+    };
+  });
+}
+
+async function writeApplyEvidence(name: string, payload: unknown): Promise<void> {
+  await mkdir(applyEvidenceDir, { recursive: true });
+  await writeFile(path.join(applyEvidenceDir, name), JSON.stringify(payload, null, 2), 'utf8');
+}
 
 async function mockShellApis(page: Page): Promise<void> {
   await page.route('**/api/settings', async route => {
@@ -1063,4 +1464,121 @@ test('AI panel posts Build through AgentRun even when WebView2 is available', as
   expect(Object.prototype.hasOwnProperty.call(agentRunPayloads[0], 'sessionId')).toBe(true);
   const webMessages = await page.evaluate(() => (window as any).__cvWebViewMessages || []);
   expect(webMessages.some((message: any) => message.messageType === 'GenerateFlow')).toBe(false);
+});
+
+test('AI agent Plan to Build exposes visible Apply button and applies through real click path', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await mkdir(applyEvidenceDir, { recursive: true });
+
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  const networkErrors: string[] = [];
+  page.on('console', message => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on('pageerror', error => {
+    pageErrors.push(error.message);
+  });
+  page.on('requestfailed', request => {
+    networkErrors.push(`${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`.trim());
+  });
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      networkErrors.push(`${response.status()} ${response.url()}`);
+    }
+  });
+
+  await installFakeWebView2(page);
+  await mockShellApis(page);
+  await mockAgentPlanAndApplyReadyBuild(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').click();
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-input')));
+
+  await page.locator('#ai-input').fill('检测产品表面划痕并输出二值化结果');
+  await page.locator('#ai-btn-gen').click();
+
+  const buildButton = page.locator('#ai-btn-start-build');
+  await expect(buildButton).toBeVisible({ timeout: 15_000 });
+  await expect(buildButton).toBeEnabled({ timeout: 15_000 });
+  await buildButton.click();
+
+  await page.waitForFunction(() => (window as any).aiPanel?.workbenchState === 'ready_to_apply', null, { timeout: 15_000 });
+  const applyButton = page.locator('#ai-btn-apply');
+  await expect(applyButton).toBeEnabled();
+  await expect(applyButton).toHaveAttribute('aria-disabled', 'false');
+
+  const beforeClickState = await collectApplyButtonState(page);
+  await writeApplyEvidence('apply-button-state.before-click.json', beforeClickState);
+  await page.screenshot({ path: path.join(applyEvidenceDir, 'before-apply-button-visible.png'), fullPage: true });
+  if (!beforeClickState.rect || beforeClickState.rect.width === 0 || beforeClickState.rect.height === 0) {
+    await writeApplyEvidence('apply-button-state.before-fix.json', beforeClickState);
+  }
+
+  const applyBox = await applyButton.boundingBox();
+  expect(applyBox).not.toBeNull();
+  expect(applyBox?.width || 0).toBeGreaterThan(0);
+  expect(applyBox?.height || 0).toBeGreaterThan(0);
+
+  await applyButton.click();
+  const confirmPreview = page.locator('.ai-apply-preview-confirm');
+  if (await confirmPreview.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await confirmPreview.click();
+  }
+
+  await page.waitForFunction(() => ((window as any).flowCanvas?.nodes?.size || 0) >= 3, null, { timeout: 10_000 });
+  await page.screenshot({ path: path.join(applyEvidenceDir, 'after-apply-canvas-nodes.png'), fullPage: true });
+  const appliedNodeNames = await page.evaluate(() =>
+    Array.from((window as any).flowCanvas?.nodes?.values?.() || [])
+      .map((node: any) => node.title || node.displayName || node.name || node.type || '')
+      .filter(Boolean));
+  expect(appliedNodeNames).toEqual(expect.arrayContaining(['图像采集', 'ROI管理器', '二值化']));
+  expect(appliedNodeNames).toHaveLength(3);
+
+  await page.locator('.nav-btn[data-view="ai"]').click();
+  await page.waitForFunction(() => (window as any).aiPanel?.workbenchState === 'applied', null, { timeout: 10_000 });
+  await expect(applyButton).toBeDisabled();
+  await expect(applyButton).toContainText('已应用到画布');
+
+  const finalState = await collectApplyButtonState(page);
+  await writeApplyEvidence('apply-button-state.json', {
+    ...finalState,
+    beforeClick: beforeClickState,
+  });
+  await writeApplyEvidence('console-errors.json', {
+    consoleErrors,
+    pageErrors,
+    networkErrors,
+  });
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  expect(networkErrors).toEqual([]);
+});
+
+test('AI agent Apply button keeps dimensions on narrow viewport after Build ready', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFakeWebView2(page);
+  await mockShellApis(page);
+  await mockAgentPlanAndApplyReadyBuild(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').click();
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-input')));
+
+  await page.locator('#ai-input').fill('检测产品表面划痕并输出二值化结果');
+  await page.locator('#ai-btn-gen').click();
+  await expect(page.locator('#ai-btn-start-build')).toBeEnabled({ timeout: 15_000 });
+  await page.locator('#ai-btn-start-build').click();
+  await page.waitForFunction(() => (window as any).aiPanel?.workbenchState === 'ready_to_apply', null, { timeout: 15_000 });
+
+  const state = await collectApplyButtonState(page);
+  expect(state.workspaceViewMode).toBe('build');
+  expect(state.tracked.buildWorkspace.hidden).toBe(false);
+  expect(state.rect?.width || 0).toBeGreaterThan(0);
+  expect(state.rect?.height || 0).toBeGreaterThan(0);
+  await expect(page.locator('#ai-btn-apply')).toBeEnabled();
 });

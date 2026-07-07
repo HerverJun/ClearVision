@@ -308,6 +308,18 @@ export const aiPanelWorkbenchMixin = {
             this._lastActiveWorkbenchState = state;
         }
         this.workbenchState = state;
+        if ([
+            AiWorkbenchStates.READY_TO_APPLY,
+            AiWorkbenchStates.APPLYING,
+            AiWorkbenchStates.APPLIED
+        ].includes(state) &&
+            this._canViewBuildWorkspace?.()) {
+            this.agentWorkspaceMode = 'build';
+            this._setWorkspaceViewMode?.('build', { persist: true, render: false });
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+        }
         this._renderWorkbenchStateBar();
         this._publishWorkbenchStatePublicEvent?.(state, previousState);
     },
