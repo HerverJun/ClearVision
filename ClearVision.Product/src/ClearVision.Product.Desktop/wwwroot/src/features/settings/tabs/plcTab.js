@@ -168,7 +168,9 @@ export function installPlcTab(SettingsView) {
                 return workingCommunication;
             }
 
-            const savedCommunication = this.mergePlcProfileDrafts(this.savedCommunicationConfig || this.getDefaultConfig().communication);
+            const savedCommunication = this.cloneCommunicationConfig(
+                this.normalizeCommunicationConfig(this.savedCommunicationConfig || this.getDefaultConfig().communication)
+            );
             const activeProtocol = this.getActivePlcProtocol();
             const profileKey = this.getPlcProfileKey(activeProtocol);
             savedCommunication.activeProtocol = activeProtocol;
@@ -209,9 +211,28 @@ export function installPlcTab(SettingsView) {
             }
         }
         ,
+        normalizePlcValidationErrors(errors) {
+            if (!Array.isArray(errors)) {
+                return [];
+            }
+
+            return errors.map(error => {
+                const rawIndex = error?.index ?? error?.Index;
+                const parsedIndex = Number.parseInt(`${rawIndex ?? ''}`, 10);
+                return {
+                    protocol: this.normalizePlcProtocol(error?.protocol ?? error?.Protocol ?? this.getActivePlcProtocol()),
+                    section: `${error?.section ?? error?.Section ?? ''}`,
+                    field: `${error?.field ?? error?.Field ?? ''}`,
+                    index: Number.isFinite(parsedIndex) ? parsedIndex : null,
+                    message: `${error?.message ?? error?.Message ?? ''}`
+                };
+            }).filter(error => error.section && error.field && error.message);
+        }
+        ,
         getCurrentProtocolValidationErrors() {
             const protocol = this.getActivePlcProtocol();
-            return (this.plcValidationErrors || []).filter(error => this.normalizePlcProtocol(error?.protocol) === protocol);
+            return this.normalizePlcValidationErrors(this.plcValidationErrors)
+                .filter(error => this.normalizePlcProtocol(error?.protocol) === protocol);
         }
         ,
         getPlcFieldErrors(section, field, index = null) {
@@ -235,7 +256,7 @@ export function installPlcTab(SettingsView) {
             if (!Array.isArray(this.plcMappings) || this.plcMappings.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align:center; padding: 24px; color: #94a3b8;">
+                        <td colspan="6" class="plc-empty-state">
                             暂无映射，点击“添加变量”创建首个 PLC 地址映射。
                         </td>
                     </tr>
@@ -375,7 +396,7 @@ export function installPlcTab(SettingsView) {
                 const success = !!result?.success;
                 const normalizedSettings = this.normalizeCommunicationConfig(result?.settings || payload);
 
-                this.plcValidationErrors = Array.isArray(result?.errors) ? result.errors : [];
+                this.plcValidationErrors = this.normalizePlcValidationErrors(result?.errors);
                 this.config.communication = this.cloneCommunicationConfig(normalizedSettings);
                 this.syncPlcMappingsFromActiveProfile();
                 this.refreshCommunicationPanel();
@@ -416,6 +437,22 @@ export function installPlcTab(SettingsView) {
             }
         }
         ,
+        setPlcTestButtonLoading(button, isLoading) {
+            if (!button) return;
+            button.disabled = isLoading;
+            button.classList?.toggle?.('is-loading', isLoading);
+            if (isLoading) {
+                button.setAttribute?.('aria-busy', 'true');
+            } else {
+                button.removeAttribute?.('aria-busy');
+            }
+
+            const label = button.querySelector?.('.plc-test-label');
+            if (label) {
+                label.textContent = isLoading ? '测试中...' : '连接测试';
+            }
+        }
+        ,
         async testPlcConnection() {
             try {
                 this.validateActivePlcConnectionForm();
@@ -449,8 +486,9 @@ export function installPlcTab(SettingsView) {
             }
 
             if (testButton) {
-                testButton.disabled = true;
+                this.setPlcTestButtonLoading(testButton, true);
             }
+            this.updatePlcConnectionBadge('testing', '正在使用当前表单参数测试连接');
 
             try {
                 const result = await settingsApi.testPlcConnection(payload);
@@ -463,7 +501,7 @@ export function installPlcTab(SettingsView) {
                 showToast('连接测试失败: ' + error.message, 'error');
             } finally {
                 if (testButton) {
-                    testButton.disabled = false;
+                    this.setPlcTestButtonLoading(testButton, false);
                 }
             }
         }
@@ -477,6 +515,10 @@ export function installPlcTab(SettingsView) {
                 return { className: 'status-disconnected', text: '连接失败' };
             }
 
+            if (status === 'testing') {
+                return { className: 'status-pending', text: '测试中' };
+            }
+
             return { className: 'status-disconnected', text: '未测试' };
         }
         ,
@@ -486,7 +528,7 @@ export function installPlcTab(SettingsView) {
             if (!badge) return;
 
             const meta = this.getPlcConnectionBadgeMeta(status);
-            badge.classList.remove('status-connected', 'status-disconnected', 'status-error');
+            badge.classList.remove('status-connected', 'status-disconnected', 'status-error', 'status-pending');
             badge.classList.add(meta.className);
             badge.innerHTML = `<span class="status-dot"></span> ${meta.text}`;
             badge.title = message || '';
@@ -521,37 +563,39 @@ export function installPlcTab(SettingsView) {
                 : activeProtocol === 'FINS'
                     ? '使用 Omron FINS/TCP 与 CP/CJ/NJ/NX 系列 PLC 通讯。'
                     : '使用 Siemens S7 协议与 S7-1200/1500 等 PLC 通讯。';
+            const isTesting = this.plcConnectionStatus === 'testing';
 
             return `
-                <div class="settings-section-title">
+                <div class="settings-section-title plc-settings-title">
                     <h2>PLC 通讯配置</h2>
                     <p>聚焦已落地的厂牌协议栈，配置连接参数与地址映射。</p>
                 </div>
                 ${this.renderScopeNotice('communication')}
 
-                <div class="settings-modern-card">
-                    <div class="settings-card-header has-badge">
+                <div class="plc-settings-stack">
+                <div class="settings-modern-card plc-settings-card">
+                    <div class="settings-card-header plc-card-header has-badge">
                         <div class="settings-header-left">
                             <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M19 15v4H5v-4h14m1-2H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 18.5c-.82 0-1.5-.67-1.5-1.5s.68-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM19 5v4H5V5h14m1-2H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 8.5c-.82 0-1.5-.67-1.5-1.5S6.18 5.5 7 5.5s1.5.67 1.5 1.5S7.82 8.5 7 8.5z"/></svg>
                             <span>通讯连接设置</span>
                         </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
+                        <div class="plc-header-actions">
                             <div class="settings-status-badge ${badgeMeta.className}" id="plc-connection-badge">
                                 <span class="status-dot"></span> ${badgeMeta.text}
                             </div>
                         </div>
                     </div>
 
-                    <div class="settings-card-body">
-                        <div class="settings-field-hint" style="margin-bottom: 16px;">${protocolHint}</div>
+                    <div class="settings-card-body plc-card-body">
+                        <div class="plc-protocol-note">${protocolHint}</div>
                         ${activeErrors.length > 0 ? `
                             <div class="plc-validation-summary">
                                 <strong>${protocolLabel} 配置存在 ${activeErrors.length} 个问题</strong>
                                 <span>请修正当前协议的连接参数或地址映射后再保存。</span>
                             </div>
                         ` : ''}
-                        <div class="horizontal-flex">
-                        <div class="settings-fieldset" style="flex:1.5;">
+                        <div class="plc-connection-grid">
+                        <div class="settings-fieldset plc-fieldset plc-field-protocol">
                             <label>通讯协议</label>
                             <select class="cv-input" id="cfg-protocol">
                                 <option value="S7" ${activeProtocol === 'S7' ? 'selected' : ''}>Siemens S7</option>
@@ -559,7 +603,7 @@ export function installPlcTab(SettingsView) {
                                 <option value="FINS" ${activeProtocol === 'FINS' ? 'selected' : ''}>Omron FINS</option>
                             </select>
                         </div>
-                        <div class="settings-fieldset" style="flex:2;">
+                        <div class="settings-fieldset plc-fieldset plc-field-host">
                             <label>PLC IP地址</label>
                             <div class="input-with-icon">
                                 <svg class="input-icon" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
@@ -567,21 +611,21 @@ export function installPlcTab(SettingsView) {
                             </div>
                             ${this.renderPlcErrorText(connectionErrors.ipAddress)}
                         </div>
-                        <div class="settings-fieldset" style="flex:1;">
+                        <div class="settings-fieldset plc-fieldset plc-field-port">
                             <label>端口号</label>
                             <input type="number" class="cv-input ${connectionErrors.port.length ? 'plc-invalid-input' : ''}" id="cfg-plcPort" value="${profile?.port || ''}">
                             ${this.renderPlcErrorText(connectionErrors.port)}
                         </div>
-                        <div class="settings-fieldset-action">
-                            <button class="cv-btn settings-btn-dark" id="btn-plc-test">
+                        <div class="settings-fieldset-action plc-fieldset-action">
+                            <button class="cv-btn settings-btn-dark" id="btn-plc-test" ${isTesting ? 'disabled aria-busy="true"' : ''}>
                                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                                连接测试
+                                <span class="plc-test-label">${isTesting ? '测试中...' : '连接测试'}</span>
                             </button>
                         </div>
                         </div>
                         ${activeProtocol === 'S7' ? `
-                            <div class="horizontal-flex" style="margin-top: 16px;">
-                                <div class="settings-fieldset" style="flex:1.2;">
+                            <div class="plc-s7-grid">
+                                <div class="settings-fieldset plc-fieldset">
                                     <label>CPU 类型</label>
                                     <select class="cv-input ${connectionErrors.cpuType.length ? 'plc-invalid-input' : ''}" id="cfg-s7-cpuType">
                                         <option value="S7-1200" ${profile?.cpuType === 'S7-1200' ? 'selected' : ''}>S7-1200</option>
@@ -593,12 +637,12 @@ export function installPlcTab(SettingsView) {
                                     </select>
                                     ${this.renderPlcErrorText(connectionErrors.cpuType)}
                                 </div>
-                                <div class="settings-fieldset" style="flex:0.8;">
+                                <div class="settings-fieldset plc-fieldset">
                                     <label>Rack</label>
                                     <input type="number" class="cv-input ${connectionErrors.rack.length ? 'plc-invalid-input' : ''}" id="cfg-s7-rack" value="${Number.isFinite(profile?.rack) ? profile.rack : 0}">
                                     ${this.renderPlcErrorText(connectionErrors.rack)}
                                 </div>
-                                <div class="settings-fieldset" style="flex:0.8;">
+                                <div class="settings-fieldset plc-fieldset">
                                     <label>Slot</label>
                                     <input type="number" class="cv-input ${connectionErrors.slot.length ? 'plc-invalid-input' : ''}" id="cfg-s7-slot" value="${Number.isFinite(profile?.slot) ? profile.slot : 1}">
                                     ${this.renderPlcErrorText(connectionErrors.slot)}
@@ -608,25 +652,25 @@ export function installPlcTab(SettingsView) {
                     </div>
                 </div>
 
-                <div class="settings-modern-card" style="margin-top: 24px;">
-                    <div class="settings-card-header">
+                <div class="settings-modern-card plc-settings-card plc-mapping-card">
+                    <div class="settings-card-header plc-card-header">
                         <div class="settings-header-left">
                             <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
                             <span>${protocolLabel} 地址映射表</span>
                         </div>
                         <div class="settings-header-actions">
-                            <button class="cv-btn settings-btn-light" style="padding: 4px 12px; margin-left: 8px;" id="btn-add-plc-mapping">
-                                <span style="font-size: 16px; margin-right: 4px;">+</span> 添加变量
+                            <button class="cv-btn settings-btn-light plc-add-mapping-btn" id="btn-add-plc-mapping">
+                                <span aria-hidden="true">+</span> 添加变量
                             </button>
                         </div>
                     </div>
 
-                    <div class="settings-card-body" style="padding-bottom: 0;">
+                    <div class="settings-card-body plc-mapping-hint">
                         <span class="settings-field-hint">地址格式示例：${addressPlaceholder}</span>
                     </div>
 
-                    <div class="settings-card-table-wrapper">
-                        <table class="settings-modern-table">
+                    <div class="settings-card-table-wrapper plc-mapping-table-scroll">
+                        <table class="settings-modern-table plc-mapping-table">
                             <thead>
                                 <tr>
                                     <th>变量名称</th>
@@ -642,12 +686,13 @@ export function installPlcTab(SettingsView) {
                     </div>
                 </div>
 
-                <div class="settings-floating-footer">
-                    <button class="cv-btn settings-btn-light" style="width: 100px;" id="btn-reset-plc">取消</button>
-                    <button class="cv-btn settings-btn-danger" style="width: 140px;" id="btn-save-plc">
+                <div class="plc-settings-actions" data-testid="plc-settings-actions">
+                    <button class="cv-btn settings-btn-light plc-cancel-btn" id="btn-reset-plc">取消</button>
+                    <button class="cv-btn settings-btn-danger plc-save-btn" id="btn-save-plc">
                         <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; margin-right: 6px; fill: currentColor;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
                         保存当前协议
                     </button>
+                </div>
                 </div>
             `;
         }

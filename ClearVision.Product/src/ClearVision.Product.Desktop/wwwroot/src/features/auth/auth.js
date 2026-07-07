@@ -13,16 +13,35 @@ import {
 import httpClient from '../../core/messaging/httpClient.js';
 import { clearAuthSession, getStoredToken, storeAuthSession } from './authStorage.js';
 
+function getAuthWindow() {
+    if (typeof window !== 'undefined') {
+        return window;
+    }
+
+    if (!globalThis.__clearVisionAuthWindow) {
+        globalThis.__clearVisionAuthWindow = {
+            currentUser: null,
+            location: {
+                href: 'http://localhost/index.html',
+                pathname: '/index.html'
+            },
+            sessionStorage: null
+        };
+    }
+
+    return globalThis.__clearVisionAuthWindow;
+}
+
 function buildAppUrl(relativePath) {
-    return new URL(relativePath, window.location.href).toString();
+    return new URL(relativePath, getAuthWindow().location?.href || 'http://localhost/index.html').toString();
 }
 
 function isLoginPage() {
-    return window.location.pathname.includes('/login.html');
+    return String(getAuthWindow().location?.pathname || '').includes('/login.html');
 }
 
 function applyCurrentUser(user) {
-    window.currentUser = user || null;
+    getAuthWindow().currentUser = user || null;
 }
 
 function normalizeServerUser(payload) {
@@ -68,13 +87,14 @@ function clearCurrentUser() {
 const LOGOUT_NOTICE_KEY = 'cv_logout_notice';
 
 function writeLogoutNotice(message) {
+    const authWindow = getAuthWindow();
     try {
         if (!message) {
-            window.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
+            authWindow.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
             return;
         }
 
-        window.sessionStorage?.setItem(LOGOUT_NOTICE_KEY, message);
+        authWindow.sessionStorage?.setItem(LOGOUT_NOTICE_KEY, message);
     } catch {
         // Ignore storage failures and continue logout flow.
     }
@@ -82,7 +102,7 @@ function writeLogoutNotice(message) {
 
 function redirectToLogin() {
     if (!isLoginPage()) {
-        window.location.href = buildAppUrl('./login.html');
+        getAuthWindow().location.href = buildAppUrl('./login.html');
     }
 }
 
@@ -96,7 +116,7 @@ export function getToken() {
 }
 
 export function getCurrentUser() {
-    return window.currentUser || null;
+    return getAuthWindow().currentUser || null;
 }
 
 export function isAuthenticated() {
@@ -131,14 +151,15 @@ export async function logout() {
         writeLogoutNotice('服务端登出失败，但本地会话已清理。若其他终端仍在线，请稍后确认会话状态。');
     } finally {
         clearAuthSession();
-        window.location.href = buildAppUrl('./login.html');
+        getAuthWindow().location.href = buildAppUrl('./login.html');
     }
 }
 
 export function consumeLogoutNotice() {
+    const authWindow = getAuthWindow();
     try {
-        const message = window.sessionStorage?.getItem(LOGOUT_NOTICE_KEY) || '';
-        window.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
+        const message = authWindow.sessionStorage?.getItem(LOGOUT_NOTICE_KEY) || '';
+        authWindow.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
         return message;
     } catch {
         return '';
@@ -226,8 +247,9 @@ async function refreshAuthenticatedUserAsync() {
     if (!token) return null;
 
     try {
-        if (window.__API_BASE_URL__) {
-            const response = await fetch(`${window.__API_BASE_URL__}/auth/me`, {
+        const authWindow = getAuthWindow();
+        if (authWindow.__API_BASE_URL__) {
+            const response = await fetch(`${authWindow.__API_BASE_URL__}/auth/me`, {
                 method: 'GET',
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -265,7 +287,7 @@ async function refreshAuthenticatedUserAsync() {
             return null;
         }
 
-        const { protocol, hostname, port } = window.location;
+        const { protocol, hostname, port } = authWindow.location;
         const response = await fetch(`${protocol}//${hostname}:${port || DEFAULT_API_PORT}/api/auth/me`, {
             method: 'GET',
             headers: { Authorization: `Bearer ${token}` }

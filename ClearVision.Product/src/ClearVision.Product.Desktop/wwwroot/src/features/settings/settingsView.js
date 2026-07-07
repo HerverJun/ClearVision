@@ -518,7 +518,7 @@ export class SettingsView {
         }
 
         if (activeTabName === 'communication') {
-            await this.savePlcSettings();
+            await this.savePlcSettings({ persistAllProfiles: true });
             return;
         }
 
