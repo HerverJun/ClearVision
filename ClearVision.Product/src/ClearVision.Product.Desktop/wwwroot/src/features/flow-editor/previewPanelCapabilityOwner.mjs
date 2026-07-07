@@ -1180,7 +1180,6 @@ export class PreviewPanelCapabilityOwner {
                     <span>${escapeHtml(this.nodeDeleted ? '节点已删除' : model.statusText)}</span>
                 </div>
                 <div class="preview-capability-empty">${escapeHtml(stateMessage)}</div>
-                ${this.renderNodeResultList(model)}
                 ${this.renderOverview(model)}
                 ${outputSections}
                 ${this.renderArtifacts(model)}
@@ -1213,91 +1212,131 @@ export class PreviewPanelCapabilityOwner {
     }
 
     renderOverview(model) {
-        const rows = (model.overviewItems || [])
-            .filter(([, value]) => value !== null && value !== undefined && value !== '')
+        const rows = (model.executionSummaryItems || [])
+            .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
             .slice(0, 8)
-            .map(([label, value]) => `
+            .map(item => `
                 <div class="preview-capability-kv">
-                    <span>${escapeHtml(label)}</span>
-                    <strong>${escapeHtml(value)}</strong>
+                    <span>${escapeHtml(item.label)}</span>
+                    <strong>${escapeHtml(item.value)}</strong>
                 </div>
             `)
             .join('');
 
-        return rows ? `<div class="preview-capability-kv-grid">${rows}</div>` : '';
+        return rows
+            ? `<div class="preview-capability-output-heading">结果摘要</div><div class="preview-capability-kv-grid">${rows}</div>`
+            : '';
     }
 
     renderOutputSections(model) {
-        if (!Array.isArray(model.outputSections) || model.outputSections.length === 0) {
-            return '';
+        if (!Array.isArray(model.keyOutputs) || model.keyOutputs.length === 0) {
+            return `
+                <div class="preview-capability-output-heading">关键输出</div>
+                <div class="preview-capability-empty">${model.status === 'success'
+                    ? '执行成功，但没有可展示的关键输出；可在高级诊断中查看原始结果。'
+                    : '暂无可展示的关键输出'}</div>
+            `;
         }
 
         return `
+            <div class="preview-capability-output-heading">关键输出</div>
             <div class="preview-capability-output-groups">
-                ${model.outputSections.map(section => `
-                    <div class="preview-capability-output-group" data-output-group="${escapeAttribute(section.kind)}">
-                        <div class="preview-capability-output-heading">${escapeHtml(section.kind)}</div>
-                        ${section.items.slice(0, 8).map(item => `
-                            <div class="preview-capability-output-row">
-                                <span>${escapeHtml(item.key || item.pathHint || '-')}</span>
-                                <strong>${escapeHtml(item.value || '-')}</strong>
-                                <em>${escapeHtml(item.resultPath || item.meta || item.pathHint || '')}</em>
-                            </div>
-                        `).join('')}
-                    </div>
-                `).join('')}
+                <div class="preview-capability-output-group" data-output-group="key-output">
+                    ${model.keyOutputs.map(item => `
+                        <div class="preview-capability-output-row" data-output-kind="${escapeAttribute(item.kind || 'value')}">
+                            <span>${escapeHtml(item.label || item.key || '-')}</span>
+                            <strong title="${escapeAttribute(item.title || item.value || '')}">${escapeHtml(item.value || '-')}</strong>
+                            <em>${escapeHtml(item.meta || (item.declared ? '声明输出' : item.resultPath || ''))}</em>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         `;
     }
 
     renderArtifacts(model) {
-        if (!Array.isArray(model.artifacts) || model.artifacts.length === 0) {
-            return '';
+        const imageItems = Array.isArray(model.imageSummaries) ? model.imageSummaries : [];
+        const scene = model.sceneSummary || {};
+        if (imageItems.length === 0 && !scene.available) {
+            return `
+                <div class="preview-capability-output-heading">图像与附件</div>
+                <div class="preview-capability-empty">${escapeHtml(scene.message || '暂无图像/区域附件')}</div>
+            `;
         }
 
         return `
+            <div class="preview-capability-output-heading">图像与附件</div>
             <div class="preview-capability-artifacts">
-                ${model.artifacts.map(artifact => {
-                    const readState = this.artifactReadState.get(artifact.artifactId);
+                ${imageItems.map(item => {
+                    const artifact = item.artifact || {};
+                    const readState = artifact.artifactId ? this.artifactReadState.get(artifact.artifactId) : null;
                     const readDisabled = readState?.status === 'loading';
-                    const formatted = formatPreviewOutputValue(artifact.role || artifact.kind || 'Artifact', formatByteLength(artifact.length), {
-                        stringMaxLength: 80
-                    });
                     return `
-                        <div class="preview-capability-artifact" data-artifact-id="${escapeAttribute(artifact.artifactId)}">
+                        <div class="preview-capability-artifact" data-artifact-id="${escapeAttribute(artifact.artifactId || '')}">
                             <div>
-                                <strong>${escapeHtml(artifact.role || artifact.kind || 'Artifact')}</strong>
-                                <span>${escapeHtml(artifact.contentType || '-')} · ${escapeHtml(formatted.text)}</span>
+                                <strong>${escapeHtml(item.label || '图像/附件')}</strong>
+                                <span>${escapeHtml(item.summary || '图像内容已省略')}</span>
                             </div>
-                            <button type="button"
-                                    class="btn btn-secondary btn-sm"
-                                    data-preview-action="read-artifact"
-                                    data-artifact-id="${escapeAttribute(artifact.artifactId)}"
-                                    ${renderButtonDisabledAttributes(readDisabled)}>
-                                ${readState?.status === 'loading' ? '读取中' : '查看摘要'}
-                            </button>
+                            ${artifact.artifactId ? `
+                                <button type="button"
+                                        class="btn btn-secondary btn-sm"
+                                        data-preview-action="read-artifact"
+                                        data-artifact-id="${escapeAttribute(artifact.artifactId)}"
+                                        ${renderButtonDisabledAttributes(readDisabled)}>
+                                    ${readState?.status === 'loading' ? '读取中' : '查看摘要'}
+                                </button>
+                            ` : ''}
                             ${readState ? `<pre class="preview-capability-artifact-preview ${escapeAttribute(readState.status)}">${escapeHtml(readState.text)}</pre>` : ''}
                         </div>
                     `;
                 }).join('')}
+                ${scene.available ? `
+                    <div class="preview-capability-artifact" data-artifact-id="">
+                        <div>
+                            <strong>区域/叠加</strong>
+                            <span>${escapeHtml(scene.primitiveCount ?? scene.primitives?.length ?? 0)} 项${scene.imageSize ? ` · ${escapeHtml(scene.imageSize)}` : ''}</span>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     }
 
     renderDiagnostics(model) {
-        if (!Array.isArray(model.diagnostics) || model.diagnostics.length === 0) {
-            return '';
-        }
-
-        return `
-            <div class="preview-capability-diagnostics">
-                ${model.diagnostics.slice(0, 8).map(item => `
+        const diagnostics = Array.isArray(model.advancedDiagnostics) ? model.advancedDiagnostics : [];
+        const diagnosticRows = diagnostics.slice(0, 12).map(item => `
                     <div class="preview-capability-diagnostic">
-                        <span>${escapeHtml(item.code || item.source || 'diagnostic')}</span>
+                        <span>${escapeHtml(item.label || item.code || item.source || '诊断')}</span>
                         <strong>${escapeHtml(item.message || '')}</strong>
+                    </div>
+                `).join('');
+        const rawRows = (model.rawDataSections || []).map(section => `
+            <div class="preview-capability-output-group" data-output-group="${escapeAttribute(section.kind)}">
+                <div class="preview-capability-output-heading">${escapeHtml(section.label)}${section.omittedCount > 0 ? ` · 已折叠 ${escapeHtml(section.omittedCount)} 项` : ''}</div>
+                ${section.items.map(item => `
+                    <div class="preview-capability-output-row">
+                        <span>${escapeHtml(item.label || '-')}</span>
+                        <strong>${escapeHtml(item.value || '-')}</strong>
+                        <em>${escapeHtml(item.meta || '')}</em>
                     </div>
                 `).join('')}
             </div>
+        `).join('');
+        const rawJson = model.rawJsonPreview?.text
+            ? `<pre class="preview-capability-artifact-preview">${escapeHtml(model.rawJsonPreview.text)}</pre>`
+            : '<div class="preview-capability-empty">暂无原始 JSON</div>';
+
+        return `
+            <details class="preview-capability-secondary preview-capability-advanced" data-preview-section="advanced">
+                <summary>
+                    <span>高级诊断</span>
+                    <em>${escapeHtml(diagnostics.length)} 条诊断 · ${escapeHtml((model.rawDataSections || []).length)} 组原始数据</em>
+                </summary>
+                ${diagnosticRows ? `<div class="preview-capability-diagnostics">${diagnosticRows}</div>` : '<div class="preview-capability-empty">暂无诊断信息</div>'}
+                ${rawRows}
+                <div class="preview-capability-output-heading">原始数据摘要</div>
+                ${rawJson}
+            </details>
         `;
     }
 

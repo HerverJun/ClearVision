@@ -1,5 +1,132 @@
 const DETECTION_KEYS = new Set(['detections']);
 const SUPPRESSED_DETECTION_KEYS = new Set(['suppresseddetections']);
+const IMAGE_OUTPUT_KEYS = new Set([
+    'inputimage',
+    'outputimage',
+    'previewimage',
+    'originalimage',
+    'currentframe',
+    'image',
+    'mask',
+    'binaryimage'
+]);
+const KEY_OUTPUT_KEYS = new Set([
+    ...IMAGE_OUTPUT_KEYS,
+    'region',
+    'roi',
+    'area',
+    'height',
+    'width',
+    'length',
+    'center',
+    'centerx',
+    'centery',
+    'radius',
+    'score',
+    'result',
+    'ok',
+    'ng',
+    'passed',
+    'success',
+    'detections',
+    'detectionlist',
+    'objects',
+    'defects',
+    'spatialcontext',
+    'transform',
+    'transforms',
+    'calibration',
+    'calibrationdata',
+    'binding',
+    'bindings',
+    'matrix3x3',
+    'count',
+    'objectcount',
+    'detectioncount'
+]);
+const FRIENDLY_FIELD_LABELS = new Map([
+    ['inputimage', '输入图像'],
+    ['outputimage', '输出图像'],
+    ['previewimage', '预览图像'],
+    ['originalimage', '原始图像'],
+    ['currentframe', '当前帧'],
+    ['image', '图像'],
+    ['mask', '掩膜'],
+    ['binaryimage', '二值图像'],
+    ['region', '区域'],
+    ['roi', 'ROI 区域'],
+    ['area', '面积'],
+    ['height', '高度'],
+    ['width', '宽度'],
+    ['length', '长度'],
+    ['center', '圆心/中心'],
+    ['centerx', '中心 X'],
+    ['centery', '中心 Y'],
+    ['radius', '半径'],
+    ['score', '分数'],
+    ['result', '结果'],
+    ['ok', 'OK'],
+    ['ng', 'NG'],
+    ['success', '是否成功'],
+    ['passed', '是否通过'],
+    ['diagnostics', '诊断'],
+    ['profile', '附件摘要'],
+    ['artifact', '附件'],
+    ['resourcedescriptor', '资源描述'],
+    ['executiontimems', '耗时'],
+    ['operatortype', '算子类型'],
+    ['operatorid', '算子 ID'],
+    ['projectid', '工程 ID'],
+    ['previewsequence', '预览序号'],
+    ['spatialcontext', '空间上下文'],
+    ['transform', '坐标变换'],
+    ['transforms', '坐标变换'],
+    ['calibration', '标定数据'],
+    ['calibrationdata', '标定数据'],
+    ['binding', '绑定信息'],
+    ['bindings', '绑定信息'],
+    ['matrix3x3', '3x3 矩阵'],
+    ['resultpath', '结果路径'],
+    ['filepath', '文件路径'],
+    ['detections', '检测结果'],
+    ['detectionlist', '检测结果'],
+    ['objects', '对象列表'],
+    ['defects', '缺陷列表'],
+    ['count', '数量'],
+    ['objectcount', '对象数量'],
+    ['detectioncount', '检测数量']
+]);
+const INTERNAL_TYPE_LABELS = new Map([
+    ['system.int32', '整数'],
+    ['system.int64', '整数'],
+    ['system.single', '浮点数'],
+    ['system.double', '浮点数'],
+    ['system.decimal', '小数'],
+    ['system.string', '字符串'],
+    ['system.boolean', '布尔值'],
+    ['system.datetime', '时间'],
+    ['system.guid', 'GUID'],
+    ['system.text.json.jsonelement', 'JSON 对象']
+]);
+const DIAGNOSTIC_TRANSLATIONS = [
+    {
+        pattern: /^image artifact; content omitted\.?$/i,
+        message: '图像内容已省略，可点击查看摘要/预览。'
+    },
+    {
+        pattern: /^Observation detail omitted because depth-limit was reached\.?$/i,
+        message: '详情过深，已自动折叠。'
+    },
+    {
+        pattern: /^Observation output key does not match a declared output port; canonical ResultPath metadata omitted\.?$/i,
+        message: '输出键不属于声明端口，已作为诊断信息折叠。'
+    },
+    {
+        pattern: /<truncated>/ig,
+        message: '已截断'
+    }
+];
+const TECHNICAL_DIAGNOSTIC_PATTERN = /(depth-limit|resource-descriptor|resultpath-port-missing|System\.Text\.Json\.JsonElement|Observation detail omitted|canonical ResultPath metadata omitted)/i;
 
 function hasKnownImageSignature(base64Text) {
     const sanitized = String(base64Text || '').replace(/\s+/g, '');
@@ -56,8 +183,16 @@ function truncateText(text, maxLength) {
         };
     }
 
+    if (maxLength <= 6) {
+        return {
+            text: `${value.slice(0, Math.max(1, maxLength - 3))}...`,
+            title: value,
+            truncated: true
+        };
+    }
+
     return {
-        text: `${value.slice(0, maxLength)}...`,
+        text: `${value.slice(0, Math.ceil((maxLength - 3) * 0.58))}...${value.slice(-(Math.floor((maxLength - 3) * 0.42)))}`,
         title: value,
         truncated: true
     };
@@ -103,6 +238,77 @@ function countNestedArrayItems(value) {
     return 0;
 }
 
+function extractReadableKey(key) {
+    const text = String(key ?? '').trim();
+    const pathMatch = Array.from(text.matchAll(/\["([^"]+)"\]/g)).at(-1);
+    return pathMatch?.[1] || text;
+}
+
+export function getPreviewResultLabel(key, fallback = '结果') {
+    const readableKey = extractReadableKey(key);
+    const normalizedKey = normalizeOutputKey(readableKey);
+    if (!normalizedKey) {
+        return fallback;
+    }
+
+    return FRIENDLY_FIELD_LABELS.get(normalizedKey) || readableKey || fallback;
+}
+
+export function getPreviewTypeLabel(typeName) {
+    const text = String(typeName ?? '').trim();
+    if (!text) {
+        return null;
+    }
+
+    const normalized = text.toLowerCase();
+    if (INTERNAL_TYPE_LABELS.has(normalized)) {
+        return INTERNAL_TYPE_LABELS.get(normalized);
+    }
+
+    if (normalized.endsWith('[]')) {
+        return '数组';
+    }
+
+    if (normalized.includes('json')) {
+        return 'JSON 对象';
+    }
+
+    return text.replace(/^ClearVision\.Product\.[\w.]+/i, '内部对象');
+}
+
+export function formatPreviewDiagnosticMessage(message) {
+    let text = String(message ?? '').trim();
+    if (!text) {
+        return '';
+    }
+
+    for (const translation of DIAGNOSTIC_TRANSLATIONS) {
+        if (translation.pattern.global) {
+            text = text.replace(translation.pattern, translation.message);
+        } else if (translation.pattern.test(text)) {
+            text = translation.message;
+        }
+    }
+
+    for (const [typeName, label] of INTERNAL_TYPE_LABELS.entries()) {
+        text = text.replace(new RegExp(typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), label);
+    }
+
+    return text;
+}
+
+export function isPreviewTechnicalDiagnostic(value) {
+    return TECHNICAL_DIAGNOSTIC_PATTERN.test(String(value ?? ''));
+}
+
+export function isPreviewImageOutputKey(key) {
+    return IMAGE_OUTPUT_KEYS.has(normalizeOutputKey(key));
+}
+
+export function isPreviewKeyOutputKey(key) {
+    return KEY_OUTPUT_KEYS.has(normalizeOutputKey(key));
+}
+
 export function isPreviewImageLikePayload(value) {
     if (typeof value !== 'string') {
         return false;
@@ -133,7 +339,7 @@ export function formatPreviewOutputValue(key, value, options = {}) {
 
     if (DETECTION_KEYS.has(normalizedKey)) {
         return {
-            text: `${countNestedArrayItems(value)} detections`,
+            text: `${countNestedArrayItems(value)} 个检测结果`,
             title: null,
             kind: 'detections'
         };
@@ -141,7 +347,7 @@ export function formatPreviewOutputValue(key, value, options = {}) {
 
     if (SUPPRESSED_DETECTION_KEYS.has(normalizedKey)) {
         return {
-            text: `${countNestedArrayItems(value)} suppressed`,
+            text: `${countNestedArrayItems(value)} 个已抑制`,
             title: null,
             kind: 'suppressed'
         };
@@ -157,7 +363,7 @@ export function formatPreviewOutputValue(key, value, options = {}) {
 
     if (typeof value === 'boolean') {
         return {
-            text: value ? 'true' : 'false',
+            text: value ? '是' : '否',
             title: null,
             kind: 'boolean'
         };
@@ -175,7 +381,7 @@ export function formatPreviewOutputValue(key, value, options = {}) {
 
     if (Array.isArray(value)) {
         return {
-            text: `${value.length} items`,
+            text: `${value.length} 项`,
             title: null,
             kind: 'array'
         };
@@ -184,14 +390,14 @@ export function formatPreviewOutputValue(key, value, options = {}) {
     if (value && typeof value === 'object') {
         const fieldCount = Object.keys(value).length;
         return {
-            text: fieldCount > 0 ? `${fieldCount} fields` : 'Object',
+            text: fieldCount > 0 ? `${fieldCount} 个字段` : '对象',
             title: null,
             kind: 'object'
         };
     }
 
     return {
-        text: '--',
+        text: '无',
         title: null,
         kind: 'null'
     };
@@ -214,13 +420,22 @@ export function buildPreviewSummaryItems(outputs, options = {}) {
             break;
         }
 
-        if (skipImageLikeValues && typeof value === 'string' && isPreviewImageLikePayload(value)) {
+        if (isPreviewTechnicalDiagnostic(key) ||
+            isPreviewTechnicalDiagnostic(value) ||
+            normalizeOutputKey(key) === 'diagnostics') {
+            continue;
+        }
+
+        if (skipImageLikeValues &&
+            (isPreviewImageOutputKey(key) ||
+                (typeof value === 'string' && isPreviewImageLikePayload(value)))) {
             continue;
         }
 
         const formattedValue = formatPreviewOutputValue(key, value, { stringMaxLength });
         items.push({
-            key,
+            key: getPreviewResultLabel(key),
+            rawKey: key,
             value: formattedValue.text,
             title: formattedValue.title,
             kind: formattedValue.kind

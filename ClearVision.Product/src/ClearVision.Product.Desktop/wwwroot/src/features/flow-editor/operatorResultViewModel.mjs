@@ -1,5 +1,11 @@
 import {
+    formatPreviewDiagnosticMessage,
     formatPreviewOutputValue,
+    getPreviewResultLabel,
+    getPreviewTypeLabel,
+    isPreviewImageOutputKey,
+    isPreviewKeyOutputKey,
+    isPreviewTechnicalDiagnostic,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
 import { buildPreviewParameterSnapshot } from './previewCoordinator.js';
@@ -11,6 +17,8 @@ export const MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES = 64 * 1024;
 export const MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS = 4096;
 export const STALE_PREVIEW_MESSAGE = '参数或流程已变更，需重新预览';
 
+const PRODUCTIZED_KEY_OUTPUT_LIMIT = 10;
+const RAW_DATA_SECTION_ITEM_LIMIT = 8;
 const SECRET_KEY_PATTERN = /(password|passwd|pwd|secret|token|api[-_]?key|authorization|credential|private[-_]?key|connectionstring)/i;
 const WINDOWS_ABSOLUTE_PATH_PATTERN = /\b[A-Za-z]:[\\/][^\s"'<>|]+/g;
 const UNC_PATH_PATTERN = /\\\\[^\\/\s"'<>|]+[\\/][^\s"'<>|]+/g;
@@ -322,7 +330,7 @@ export function sanitizeResultValue(value, options = {}, path = '$', seen = new 
 
     if (typeof value === 'string') {
         if (isPreviewImageLikePayload(value)) {
-            return '[image omitted]';
+            return '[图像内容已省略]';
         }
 
         return clipText(redactLocalAbsolutePaths(value), maxStringChars);
@@ -333,13 +341,13 @@ export function sanitizeResultValue(value, options = {}, path = '$', seen = new 
     }
 
     if (seen.has(value)) {
-        return '[circular]';
+        return '[循环引用]';
     }
 
     if (depth >= maxDepth) {
         return Array.isArray(value)
-            ? `[${value.length} items]`
-            : `{${Object.keys(value).length} fields}`;
+            ? `[${value.length} 项]`
+            : `{${Object.keys(value).length} 个字段}`;
     }
 
     seen.add(value);
@@ -352,7 +360,7 @@ export function sanitizeResultValue(value, options = {}, path = '$', seen = new 
                 depth: depth + 1
             }, `${path}[${index}]`, seen));
         if (value.length > result.length) {
-            result.push(`[+${value.length - result.length} more]`);
+            result.push(`[还有 ${value.length - result.length} 项]`);
         }
         return result;
     }
@@ -472,7 +480,7 @@ function normalizeDiagnostic(item, source = 'diagnostic') {
         return {
             source,
             code: source,
-            message: clipDiagnosticText(item),
+            message: formatPreviewDiagnosticMessage(clipDiagnosticText(item)),
             pathHint: null
         };
     }
@@ -484,15 +492,17 @@ function normalizeDiagnostic(item, source = 'diagnostic') {
     return {
         source,
         code: asString(readDefined(item, 'code', 'Code'), source),
-        message: clipDiagnosticText(
-            readDefined(item, 'message', 'Message', 'description', 'Description', 'reason', 'Reason') ??
-            readDefined(item, 'displayValue', 'DisplayValue') ??
-            JSON.stringify(sanitizeResultValue(item, {
-                maxDepth: 2,
-                maxArrayItems: 6,
-                maxObjectFields: 12,
-                maxStringChars: 120
-            }))
+        message: formatPreviewDiagnosticMessage(
+            clipDiagnosticText(
+                readDefined(item, 'message', 'Message', 'description', 'Description', 'reason', 'Reason') ??
+                readDefined(item, 'displayValue', 'DisplayValue') ??
+                JSON.stringify(sanitizeResultValue(item, {
+                    maxDepth: 2,
+                    maxArrayItems: 6,
+                    maxObjectFields: 12,
+                    maxStringChars: 120
+                }))
+            )
         ),
         pathHint: readDefined(item, 'pathHint', 'PathHint') === undefined
             ? null
@@ -694,6 +704,18 @@ function collectDiagnostics(state, observation, scene) {
     return result.slice(0, 16);
 }
 
+function getObservationDisplayValue(normalized, formatted) {
+    if (normalized.childCount > 0 &&
+        (isPreviewTechnicalDiagnostic(normalized.displayValue) ||
+            ['array', 'dictionary', 'object', 'jsonelement', 'detectionlist'].includes(normalized.kindKey))) {
+        return normalized.kindKey === 'array' || normalized.kindKey === 'detectionlist'
+            ? `${normalized.childCount} 项`
+            : `${normalized.childCount} 个字段`;
+    }
+
+    return formatted.text || clipText(normalized.displayValue, 96);
+}
+
 function buildOutputSections(observation, outputData, artifacts) {
     const detail = getObservationDetail(observation);
     const collected = collectObservationRows(detail);
@@ -714,15 +736,25 @@ function buildOutputSections(observation, outputData, artifacts) {
         const formatted = formatPreviewOutputValue(normalized.name || normalized.pathHint, normalized.displayValue, {
             stringMaxLength: 96
         });
+        const outputName = normalized.outputPortName || normalized.name || normalized.pathHint;
         const item = {
             key: normalized.name || normalized.pathHint,
+            label: getPreviewResultLabel(outputName),
             pathHint: normalized.pathHint,
             kind: normalized.kind,
-            value: formatted.text || clipText(normalized.displayValue, 96),
-            meta: normalized.originalType || null,
+            depth: row.depth,
+            value: getObservationDisplayValue(normalized, formatted),
+            title: formatted.title || null,
+            meta: getPreviewTypeLabel(normalized.originalType),
+            rawMeta: normalized.originalType || null,
+            outputPortId: normalized.outputPortId,
+            outputPortName: normalized.outputPortName,
             resultPathVersion: normalized.resultPathVersion,
             resultPath: normalized.resultPath,
-            artifact: normalized.artifact
+            artifact: normalized.artifact,
+            truncated: normalized.truncated,
+            technical: isPreviewTechnicalDiagnostic(`${normalized.name || ''} ${normalized.kind || ''} ${normalized.displayValue || ''} ${normalized.originalType || ''}`) &&
+                !isPreviewKeyOutputKey(outputName)
         };
 
         sections[row.category]?.push(item);
@@ -733,13 +765,21 @@ function buildOutputSections(observation, outputData, artifacts) {
             if (!sections.artifact.some(item => item.artifact?.artifactId === artifact.artifactId)) {
                 sections.artifact.push({
                     key: artifact.role || artifact.kind || artifact.artifactId,
+                    label: getPreviewResultLabel(artifact.role || artifact.kind || artifact.artifactId, '附件'),
                     pathHint: artifact.pathHint,
                     kind: artifact.kind || 'artifact',
+                    depth: null,
                     value: `${artifact.contentType || 'artifact'} ${formatByteLength(artifact.length)}`,
+                    title: null,
                     meta: artifact.artifactId,
+                    rawMeta: artifact.artifactId,
+                    outputPortId: null,
+                    outputPortName: null,
                     resultPathVersion: null,
                     resultPath: null,
-                    artifact
+                    artifact,
+                    truncated: false,
+                    technical: false
                 });
             }
         });
@@ -758,13 +798,21 @@ function buildOutputSections(observation, outputData, artifacts) {
                     : (value && typeof value === 'object' ? 'json' : 'scalar');
                 sections[category].push({
                     key,
+                    label: getPreviewResultLabel(key),
                     pathHint: `$["${key}"]`,
                     kind: formatted.kind,
+                    depth: 1,
                     value: formatted.text,
+                    title: formatted.title || null,
                     meta: formatted.title || null,
+                    rawMeta: formatted.title || null,
+                    outputPortId: null,
+                    outputPortName: null,
                     resultPathVersion: null,
                     resultPath: null,
-                    artifact: null
+                    artifact: null,
+                    truncated: false,
+                    technical: isPreviewTechnicalDiagnostic(`${key} ${formatted.text}`)
                 });
             });
     }
@@ -772,13 +820,21 @@ function buildOutputSections(observation, outputData, artifacts) {
     if (collected.truncated) {
         sections.json.push({
             key: 'truncated',
+            label: '截断',
             pathHint: '$',
             kind: 'bounded',
-            value: '输出树过大，已截断',
+            depth: 0,
+            value: '结果较大，已自动折叠部分详情',
+            title: null,
             meta: null,
+            rawMeta: null,
+            outputPortId: null,
+            outputPortName: null,
             resultPathVersion: null,
             resultPath: null,
-            artifact: null
+            artifact: null,
+            truncated: true,
+            technical: true
         });
     }
 
@@ -788,6 +844,238 @@ function buildOutputSections(observation, outputData, artifacts) {
             items: items.slice(0, 24)
         }))
         .filter(section => section.items.length > 0);
+}
+
+function flattenOutputSectionItems(outputSections) {
+    return (Array.isArray(outputSections) ? outputSections : [])
+        .flatMap(section => (Array.isArray(section.items) ? section.items : [])
+            .map(item => ({
+                ...item,
+                sectionKind: section.kind
+            })));
+}
+
+function normalizeDedupKey(value) {
+    return asString(value)
+        .trim()
+        .replace(/[\s_-]+/g, '')
+        .toLowerCase();
+}
+
+function isDeclaredOutputItem(item) {
+    return Boolean(item?.outputPortId || item?.outputPortName);
+}
+
+function isImageOutputItem(item) {
+    const key = item?.outputPortName || item?.key || item?.label || '';
+    const kind = normalizeKind(item?.kind);
+    return Boolean(item?.artifact) ||
+        isPreviewImageOutputKey(key) ||
+        ['image', 'mask', 'binary', 'stream', 'resource'].includes(kind);
+}
+
+function isProductizedKeyOutputItem(item) {
+    if (!item || item.technical) {
+        return false;
+    }
+
+    if (isImageOutputItem(item)) {
+        return false;
+    }
+
+    const depth = Number.isFinite(item.depth) ? item.depth : 1;
+    return isDeclaredOutputItem(item) ||
+        (depth <= 1 && (
+            isPreviewKeyOutputKey(item.outputPortName || item.key || item.label) ||
+            ['scalar', 'geometry'].includes(item.sectionKind)
+        ));
+}
+
+function outputItemPriority(item) {
+    if (isDeclaredOutputItem(item)) {
+        return 0;
+    }
+
+    if (isPreviewKeyOutputKey(item.outputPortName || item.key || item.label)) {
+        return 1;
+    }
+
+    if (item.sectionKind === 'geometry') {
+        return 2;
+    }
+
+    if (item.sectionKind === 'scalar') {
+        return 3;
+    }
+
+    return 9;
+}
+
+function buildKeyOutputs(outputSections, statusInfo) {
+    if (statusInfo.kind === 'loading') {
+        return [];
+    }
+
+    const seen = new Set();
+    return flattenOutputSectionItems(outputSections)
+        .filter(isProductizedKeyOutputItem)
+        .sort((left, right) => outputItemPriority(left) - outputItemPriority(right))
+        .filter(item => {
+            const key = normalizeDedupKey(item.outputPortName || item.label || item.key || item.pathHint);
+            if (!key || seen.has(key)) {
+                return false;
+            }
+
+            seen.add(key);
+            return true;
+        })
+        .slice(0, PRODUCTIZED_KEY_OUTPUT_LIMIT)
+        .map(item => ({
+            key: item.key,
+            label: item.label || getPreviewResultLabel(item.outputPortName || item.key),
+            value: formatPreviewDiagnosticMessage(item.value || '-'),
+            title: item.title,
+            kind: item.sectionKind || item.kind || 'value',
+            pathHint: item.pathHint,
+            resultPath: item.resultPath,
+            meta: item.meta ? `类型：${item.meta}` : null,
+            declared: isDeclaredOutputItem(item)
+        }));
+}
+
+function buildImageSummaries(outputSections, artifacts) {
+    const items = [];
+    const seen = new Set();
+
+    const pushItem = item => {
+        const key = item.artifact?.artifactId ||
+            normalizeDedupKey(item.outputPortName || item.label || item.key || item.pathHint);
+        if (!key || seen.has(key)) {
+            return;
+        }
+
+        seen.add(key);
+        const artifact = item.artifact || null;
+        const dimensions = artifact?.width && artifact?.height
+            ? `${artifact.width} x ${artifact.height}${artifact.channels ? ` x ${artifact.channels}` : ''}`
+            : null;
+        const size = artifact ? formatByteLength(artifact.length) : null;
+        const formattedValue = item.value ? formatPreviewDiagnosticMessage(item.value) : null;
+        const summary = [
+            dimensions,
+            size,
+            formattedValue && !isPreviewTechnicalDiagnostic(formattedValue) ? formattedValue : null
+        ].filter(Boolean).join('，') || '图像内容已省略';
+
+        items.push({
+            label: item.label || getPreviewResultLabel(item.outputPortName || item.key || artifact?.role || artifact?.kind, '图像/附件'),
+            summary,
+            kind: artifact?.kind || item.kind || 'artifact',
+            contentType: artifact?.contentType || null,
+            artifact,
+            pathHint: item.pathHint,
+            resultPath: item.resultPath
+        });
+    };
+
+    flattenOutputSectionItems(outputSections)
+        .filter(isImageOutputItem)
+        .forEach(pushItem);
+
+    (Array.isArray(artifacts) ? artifacts : []).forEach(artifact => {
+        pushItem({
+            label: getPreviewResultLabel(artifact.role || artifact.kind || 'artifact', '图像/附件'),
+            key: artifact.role || artifact.kind || artifact.artifactId,
+            kind: artifact.kind || 'artifact',
+            value: '附件内容可按需查看',
+            artifact,
+            pathHint: artifact.pathHint
+        });
+    });
+
+    return items.slice(0, 8);
+}
+
+function buildRawDataSections(outputSections) {
+    const labels = {
+        scalar: '标量输出',
+        table: '表格/列表',
+        geometry: '几何结果',
+        artifact: '图像/附件',
+        json: '复杂对象'
+    };
+
+    return (Array.isArray(outputSections) ? outputSections : [])
+        .map(section => ({
+            kind: section.kind,
+            label: labels[section.kind] || section.kind,
+            items: (section.items || []).slice(0, RAW_DATA_SECTION_ITEM_LIMIT).map(item => ({
+                label: item.label || getPreviewResultLabel(item.key || item.pathHint),
+                value: formatPreviewDiagnosticMessage(item.value || '-'),
+                meta: item.meta ? `类型：${item.meta}` : (item.resultPath || item.pathHint || ''),
+                pathHint: item.pathHint,
+                resultPath: item.resultPath,
+                technical: Boolean(item.technical)
+            })),
+            omittedCount: Math.max(0, (section.items || []).length - RAW_DATA_SECTION_ITEM_LIMIT)
+        }))
+        .filter(section => section.items.length > 0);
+}
+
+function pushAdvancedDiagnostic(target, item) {
+    if (!item?.message) {
+        return;
+    }
+
+    const message = formatPreviewDiagnosticMessage(item.message);
+    const code = asString(item.code || item.source || 'diagnostic');
+    const key = `${code}|${message}|${item.pathHint || ''}`;
+    const existing = target.find(candidate => candidate.key === key);
+    if (existing) {
+        existing.count += 1;
+        existing.message = existing.count > 1 && /详情过深|已自动折叠/.test(message)
+            ? `详情过深，已自动折叠 ${existing.count} 项`
+            : message;
+        return;
+    }
+
+    target.push({
+        key,
+        source: item.source || 'diagnostic',
+        code,
+        label: getPreviewResultLabel(code, code),
+        message,
+        pathHint: item.pathHint || null,
+        technical: Boolean(item.technical || isPreviewTechnicalDiagnostic(`${code} ${message}`)),
+        count: 1
+    });
+}
+
+function buildAdvancedDiagnostics(diagnostics, outputSections, rawJsonPreview) {
+    const result = [];
+    (Array.isArray(diagnostics) ? diagnostics : [])
+        .forEach(item => pushAdvancedDiagnostic(result, item));
+
+    flattenOutputSectionItems(outputSections)
+        .filter(item => item.technical || item.truncated || isPreviewTechnicalDiagnostic(`${item.key} ${item.value} ${item.rawMeta || ''}`))
+        .forEach(item => pushAdvancedDiagnostic(result, {
+            source: item.sectionKind || 'output',
+            code: item.key || item.kind || 'diagnostic',
+            message: item.value || item.rawMeta || item.pathHint,
+            pathHint: item.pathHint,
+            technical: true
+        }));
+
+    if (rawJsonPreview?.truncated) {
+        pushAdvancedDiagnostic(result, {
+            source: 'raw-json',
+            code: 'truncated',
+            message: '结果较大，已自动折叠部分详情',
+            technical: true
+        });
+    }
+
+    return result.slice(0, 16).map(({ key, ...item }) => item);
 }
 
 function getOperatorTitle(operator, liveNode) {
@@ -952,6 +1240,53 @@ function detectStale({ operator, liveNode, state, flowRevision, projectId, input
     };
 }
 
+function formatExecutionTime(value) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? `${numberValue} ms` : asString(value, '-');
+}
+
+function buildExecutionSummaryItems({
+    operator,
+    liveNode,
+    state,
+    observation,
+    statusInfo
+}) {
+    const outcome = getObservationOutcome(observation) || {};
+    const observedAtUtc = readOwn(observation, 'observedAtUtc', 'ObservedAtUtc');
+    return [
+        {
+            label: '状态',
+            value: statusInfo.label,
+            kind: statusInfo.kind
+        },
+        {
+            label: '耗时',
+            value: formatExecutionTime(state?.executionTimeMs ?? readOwn(outcome, 'executionTimeMs', 'ExecutionTimeMs')),
+            kind: 'duration'
+        },
+        {
+            label: '节点名称',
+            value: getOperatorTitle(operator, liveNode),
+            kind: 'text'
+        },
+        {
+            label: '算子类型',
+            value: operator?.type || liveNode?.type || '-',
+            kind: 'text'
+        },
+        {
+            label: '最近运行时间',
+            value: observedAtUtc || '-',
+            kind: 'time'
+        }
+    ];
+}
+
 function buildOverviewItems({
     operator,
     liveNode,
@@ -1086,6 +1421,17 @@ export function buildOperatorResultViewModel(operator, previewState, options = {
         : buildSafeJsonPreview(rawSource, {
             maxChars: options.rawJsonMaxChars || MAX_OPERATOR_RESULT_RAW_JSON_CHARS
         });
+    const executionSummaryItems = buildExecutionSummaryItems({
+        operator,
+        liveNode,
+        state: previewState,
+        observation,
+        statusInfo
+    });
+    const keyOutputs = buildKeyOutputs(outputSections, statusInfo);
+    const imageSummaries = buildImageSummaries(outputSections, artifacts);
+    const rawDataSections = buildRawDataSections(outputSections);
+    const advancedDiagnostics = buildAdvancedDiagnostics(diagnostics, outputSections, rawJsonPreview);
     const nodes = typeof options.getNodes === 'function'
         ? options.getNodes()
         : (Array.isArray(options.nodes) ? options.nodes : []);
@@ -1100,6 +1446,9 @@ export function buildOperatorResultViewModel(operator, previewState, options = {
         stateMessage: statusInfo.message,
         stale,
         staleReasons,
+        executionSummaryItems,
+        keyOutputs,
+        imageSummaries,
         overviewItems: buildOverviewItems({
             operator,
             liveNode,
@@ -1112,6 +1461,8 @@ export function buildOperatorResultViewModel(operator, previewState, options = {
         }),
         outputSections,
         diagnostics,
+        advancedDiagnostics,
+        rawDataSections,
         artifacts,
         sceneSummary,
         rawJsonPreview,

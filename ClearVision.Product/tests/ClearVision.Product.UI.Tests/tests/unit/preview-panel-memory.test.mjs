@@ -954,11 +954,99 @@ test('OperatorResultViewModel summarizes observation outputs, artifacts, scene, 
   assert.ok(model.outputSections.some(section => section.kind === 'table'));
   assert.ok(model.outputSections.some(section => section.kind === 'geometry'));
   assert.ok(model.outputSections.some(section => section.kind === 'artifact'));
+  assert.ok(model.executionSummaryItems.some(item => item.label === '节点名称' && item.value === 'Threshold'));
+  assert.ok(model.keyOutputs.some(item => item.label === '分数' && item.value === '0.98'));
+  assert.ok(model.keyOutputs.some(item => item.label === 'Circle' && item.value.includes('center')));
+  assert.ok(model.imageSummaries.some(item => item.label === '掩膜'));
+  assert.ok(model.rawDataSections.some(section => section.label === '标量输出'));
+  assert.ok(model.advancedDiagnostics.some(item => item.code === 'low-contrast'));
   assert.equal(model.artifacts.length, 2);
   assert.equal(model.sceneSummary.available, true);
   assert.equal(model.sceneSummary.primitiveCount, 1);
   assert.ok(model.diagnostics.some(item => item.code === 'low-contrast'));
   assert.deepEqual(model.nodeResults.map(item => item.statusKind), ['success', 'disabled']);
+});
+
+test('OperatorResultViewModel productizes noisy preview observations without losing raw data', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'RegionClosing',
+    title: 'Region Closing',
+    parameters: []
+  };
+  const noisyObservation = observation({
+    diagnostics: [
+      'Observation detail omitted because depth-limit was reached.',
+      'Observation detail omitted because depth-limit was reached.',
+      'Observation output key does not match a declared output port; canonical ResultPath metadata omitted.'
+    ]
+  });
+  noisyObservation.detail = node('dictionary', {
+    pathHint: '$',
+    children: [
+      node('object', {
+        name: 'spatialContext',
+        displayValue: 'System.Text.Json.JsonElement',
+        originalType: 'System.Text.Json.JsonElement',
+        children: [node('string', { name: 'FrameId', displayValue: 'frame-1' })]
+      }),
+      node('number', {
+        name: 'Area',
+        displayValue: '42',
+        outputPortId: 'area-port',
+        outputPortName: 'Area',
+        resultPathVersion: 1,
+        resultPath: '$["Area"]'
+      }),
+      node('string', {
+        name: 'depth-limit',
+        displayValue: 'Observation detail omitted because depth-limit was reached.'
+      }),
+      node('image', {
+        name: 'outputImage',
+        displayValue: 'image artifact; content omitted.',
+        artifact: {
+          artifactId: 'image-artifact',
+          kind: 'image',
+          role: 'outputImage',
+          contentType: 'image/png',
+          length: 4_608_000,
+          width: 1280,
+          height: 960
+        }
+      })
+    ]
+  });
+
+  const model = buildOperatorResultViewModel(operator, successState({
+    observation: noisyObservation,
+    outputData: {
+      outputImage: 'data:image/png;base64,IMAGE',
+      Area: 42,
+      spatialContext: { frameId: 'frame-1', matrix: [1, 0, 0] },
+      diagnostics: ['resource-descriptor']
+    },
+    artifacts: [{
+      artifactId: 'image-artifact',
+      kind: 'image',
+      role: 'outputImage',
+      contentType: 'image/png',
+      length: 4_608_000,
+      width: 1280,
+      height: 960
+    }]
+  }), { flowRevision: 3 });
+
+  assert.ok(model.keyOutputs.some(item => item.label === '面积' && item.value === '42'));
+  assert.ok(model.keyOutputs.some(item => item.label === '空间上下文' && item.value === '1 个字段'));
+  const outputImageSummary = model.imageSummaries.find(item => item.label === '输出图像');
+  assert.match(outputImageSummary?.summary || '', /4\.4 MB/);
+  assert.match(outputImageSummary?.summary || '', /图像内容已省略/);
+  assert.doesNotMatch(outputImageSummary?.summary || '', /image artifact; content omitted/i);
+  assert.ok(model.advancedDiagnostics.some(item => /详情过深，已自动折叠/.test(item.message)));
+  assert.ok(model.advancedDiagnostics.some(item => /输出键不属于声明端口/.test(item.message)));
+  assert.ok(model.rawDataSections.some(section => section.items.some(item => item.meta === '类型：JSON 对象')));
+  assert.doesNotMatch(model.keyOutputs.map(item => `${item.label}:${item.value}:${item.meta}`).join('\n'), /System\.Text\.Json\.JsonElement|depth-limit|resource-descriptor/);
 });
 
 test('OperatorResultViewModel fails soft when scene is missing', () => {

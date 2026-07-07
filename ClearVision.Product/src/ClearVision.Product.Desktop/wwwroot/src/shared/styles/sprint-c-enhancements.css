@@ -907,6 +907,23 @@
     text-transform: none;
 }
 
+.preview-capability-advanced {
+    margin-top: 8px;
+    border-top: 1px dashed var(--template-border);
+}
+
+.preview-capability-advanced .preview-capability-diagnostics,
+.preview-capability-advanced .preview-capability-output-group,
+.preview-capability-advanced .preview-capability-artifact-preview,
+.preview-capability-advanced .preview-capability-empty,
+.preview-capability-advanced > .preview-capability-output-heading {
+    margin-inline: 8px;
+}
+
+.preview-capability-advanced .preview-capability-artifact-preview {
+    margin-bottom: 8px;
+}
+
 .preview-capability-secondary {
     padding: 0;
 }
@@ -1184,7 +1201,7 @@
 .operator-result-scene-row,
 .operator-result-diagnostic {
     display: grid;
-    grid-template-columns: minmax(70px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(72px, 0.75fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
     gap: 8px;
     padding: 6px 8px;
     border-top: 1px dashed var(--template-border);
@@ -1205,6 +1222,56 @@
 .operator-result-output-value,
 .operator-result-output-meta {
     font-family: var(--font-mono);
+}
+
+.operator-result-advanced {
+    padding: 0;
+}
+
+.operator-result-advanced summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 34px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--template-text);
+    font-size: 12px;
+    font-weight: 700;
+    list-style: none;
+}
+
+.operator-result-advanced summary::-webkit-details-marker {
+    display: none;
+}
+
+.operator-result-advanced summary::after {
+    content: '+';
+    color: var(--template-text-muted);
+    font-family: var(--font-mono);
+    font-weight: 700;
+}
+
+.operator-result-advanced[open] summary::after {
+    content: '-';
+}
+
+.operator-result-advanced summary em {
+    margin-left: auto;
+    color: var(--template-text-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 600;
+}
+
+.operator-result-advanced .operator-result-diagnostic-list,
+.operator-result-advanced .operator-result-output-group,
+.operator-result-advanced .operator-result-output-heading,
+.operator-result-advanced .operator-result-raw-json,
+.operator-result-advanced .operator-result-empty {
+    margin: 0 10px 8px;
 }
 
 .operator-result-artifact {

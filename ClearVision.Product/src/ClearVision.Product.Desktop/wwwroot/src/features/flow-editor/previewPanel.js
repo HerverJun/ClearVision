@@ -430,32 +430,29 @@ export class PreviewPanel {
                     <span class="operator-result-status" data-status="${escapeHtml(model.status)}">${escapeHtml(model.statusText)}</span>
                 </header>
                 <div class="operator-result-state" data-status="${escapeHtml(model.status)}">${escapeHtml(model.stateMessage)}</div>
-                ${this._renderNodeResultList(model)}
                 ${this._renderOverview(model)}
                 ${this._renderOutputSections(model)}
                 ${this._renderSceneSection(model)}
-                ${this._renderArtifacts(model)}
                 ${this._renderDiagnostics(model)}
-                ${this._renderRawJson(model)}
             </section>
         `;
         this._bindResultPanelEvents();
     }
 
     _renderOverview(model) {
-        const rows = model.overviewItems
-            .filter(([, value]) => value !== null && value !== undefined && value !== '')
-            .map(([label, value]) => `
+        const rows = (model.executionSummaryItems || [])
+            .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
+            .map(item => `
                 <div class="operator-result-kv">
-                    <span>${escapeHtml(label)}</span>
-                    <strong>${escapeHtml(value)}</strong>
+                    <span>${escapeHtml(item.label)}</span>
+                    <strong>${escapeHtml(item.value)}</strong>
                 </div>
             `)
             .join('');
 
         return `
             <section class="operator-result-section">
-                <h5>概览</h5>
+                <h5>结果摘要</h5>
                 <div class="operator-result-kv-grid">${rows}</div>
             </section>
         `;
@@ -498,86 +495,92 @@ export class PreviewPanel {
         if (model.status === 'loading') {
             return `
                 <section class="operator-result-section">
-                    <h5>输出</h5>
+                    <h5>关键输出</h5>
                     <div class="operator-result-empty">预览运行中...</div>
                 </section>
             `;
         }
 
-        if (!Array.isArray(model.outputSections) || model.outputSections.length === 0) {
+        if (!Array.isArray(model.keyOutputs) || model.keyOutputs.length === 0) {
             return `
                 <section class="operator-result-section">
-                    <h5>输出</h5>
-                    <div class="operator-result-empty">暂无可解析输出</div>
+                    <h5>关键输出</h5>
+                    <div class="operator-result-empty">${model.status === 'success'
+                        ? '执行成功，但没有可展示的关键输出；可在高级诊断中查看原始结果。'
+                        : '暂无可展示的关键输出'}</div>
                 </section>
             `;
         }
 
-        const labels = {
-            scalar: 'Scalar / Key-value',
-            table: 'Table / List',
-            geometry: 'Geometry',
-            artifact: 'Image / Artifact',
-            json: 'JSON'
-        };
-        const sections = model.outputSections.map(section => `
-            <div class="operator-result-output-group" data-output-group="${escapeHtml(section.kind)}">
-                <div class="operator-result-output-heading">${escapeHtml(labels[section.kind] || section.kind)}</div>
-                ${section.items.map(item => `
-                    <div class="operator-result-output-row">
-                        <span class="operator-result-output-key">${escapeHtml(item.key || item.pathHint || '-')}</span>
-                        <span class="operator-result-output-value">${escapeHtml(item.value || '-')}</span>
-                        <span class="operator-result-output-meta">${escapeHtml(item.resultPath || item.meta || item.pathHint || '')}</span>
-                    </div>
-                `).join('')}
+        const rows = model.keyOutputs.map(item => `
+            <div class="operator-result-output-row" data-output-kind="${escapeHtml(item.kind || 'value')}">
+                <span class="operator-result-output-key">${escapeHtml(item.label || item.key || '-')}</span>
+                <span class="operator-result-output-value" title="${escapeHtml(item.title || item.value || '')}">${escapeHtml(item.value || '-')}</span>
+                <span class="operator-result-output-meta">${escapeHtml(item.meta || (item.declared ? '声明输出' : item.resultPath || ''))}</span>
             </div>
         `).join('');
 
         return `
             <section class="operator-result-section">
-                <h5>输出</h5>
-                ${sections}
+                <h5>关键输出</h5>
+                <div class="operator-result-output-group" data-output-group="key-output">${rows}</div>
             </section>
         `;
     }
 
     _renderSceneSection(model) {
         const scene = model.sceneSummary || {};
-        if (!scene.available) {
+        const imageItems = Array.isArray(model.imageSummaries) ? model.imageSummaries : [];
+        if (!scene.available && imageItems.length === 0) {
             return `
                 <section class="operator-result-section">
-                    <h5>图像与叠加</h5>
-                    <div class="operator-result-empty">${escapeHtml(scene.message || '该算子暂无可视化叠加')}</div>
+                    <h5>图像与附件</h5>
+                    <div class="operator-result-empty">${escapeHtml(scene.message || '暂无图像/区域附件')}</div>
                 </section>
             `;
         }
 
-        const summary = [
-            ['CoordinateSpace', scene.coordinateSpace || '-'],
-            ['FrameId', scene.frameId || '-'],
-            ['Unit', scene.unit || '-'],
-            ['ImageSize', scene.imageSize || '-'],
-            ['Primitive', scene.primitiveCount ?? scene.primitives?.length ?? 0],
-            ['Truncated', scene.truncated ? 'yes' : 'no']
-        ].map(([label, value]) => `
-            <div class="operator-result-kv">
-                <span>${escapeHtml(label)}</span>
-                <strong>${escapeHtml(value)}</strong>
-            </div>
-        `).join('');
+        const attachments = imageItems.map(item => {
+            const readState = item.artifact?.artifactId
+                ? this.artifactReadState.get(item.artifact.artifactId)
+                : null;
+            return `
+                <div class="operator-result-artifact" data-artifact-id="${escapeHtml(item.artifact?.artifactId || '')}">
+                    <div class="operator-result-artifact-main">
+                        <strong>${escapeHtml(item.label || '图像/附件')}</strong>
+                        <span>${escapeHtml(item.summary || '图像内容已省略')}</span>
+                        <span>${escapeHtml(item.contentType || item.kind || '')}</span>
+                    </div>
+                    ${item.artifact?.artifactId ? `
+                        <button type="button"
+                                class="operator-result-artifact-read"
+                                data-artifact-read="${escapeHtml(item.artifact.artifactId)}"
+                                ${readState?.status === 'loading' ? 'disabled' : ''}>
+                            ${readState?.status === 'loading' ? '读取中' : '查看摘要'}
+                        </button>
+                    ` : ''}
+                    ${readState ? `<pre class="operator-result-artifact-preview ${escapeHtml(readState.status)}">${escapeHtml(readState.text)}</pre>` : ''}
+                </div>
+            `;
+        }).join('');
+
         const primitives = (scene.primitives || []).map(item => `
             <div class="operator-result-scene-row">
                 <span>${escapeHtml(item.label || item.primitiveId || item.kind)}</span>
-                <span>${escapeHtml(item.kind || '-')}</span>
+                <span>${escapeHtml(item.kind || '区域')}</span>
                 <span>${escapeHtml(item.resultPath || item.layer || '')}</span>
             </div>
         `).join('');
+        const sceneSummary = scene.available
+            ? `<div class="operator-result-output-heading">区域/叠加：${escapeHtml(scene.primitiveCount ?? scene.primitives?.length ?? 0)} 项${scene.imageSize ? ` · ${escapeHtml(scene.imageSize)}` : ''}</div>`
+            : '';
 
         return `
             <section class="operator-result-section">
-                <h5>图像与叠加</h5>
-                <div class="operator-result-kv-grid">${summary}</div>
-                <div class="operator-result-scene-list">${primitives}</div>
+                <h5>图像与附件</h5>
+                ${attachments ? `<div class="operator-result-artifact-list">${attachments}</div>` : ''}
+                ${sceneSummary}
+                ${primitives ? `<div class="operator-result-scene-list">${primitives}</div>` : ''}
             </section>
         `;
     }
@@ -624,28 +627,43 @@ export class PreviewPanel {
     }
 
     _renderDiagnostics(model) {
-        if (!Array.isArray(model.diagnostics) || model.diagnostics.length === 0) {
-            return `
-                <section class="operator-result-section">
-                    <h5>诊断</h5>
-                    <div class="operator-result-empty">暂无 diagnostics / warnings / errors</div>
-                </section>
-            `;
-        }
-
-        const rows = model.diagnostics.map(item => `
+        const diagnostics = Array.isArray(model.advancedDiagnostics) ? model.advancedDiagnostics : [];
+        const diagnosticRows = diagnostics.map(item => `
             <div class="operator-result-diagnostic">
-                <span>${escapeHtml(item.code || item.source || 'diagnostic')}</span>
+                <span>${escapeHtml(item.label || item.code || item.source || '诊断')}</span>
                 <strong>${escapeHtml(item.message || '')}</strong>
                 <small>${escapeHtml(item.pathHint || item.source || '')}</small>
             </div>
         `).join('');
+        const rawSections = (model.rawDataSections || []).map(section => `
+            <div class="operator-result-output-group" data-output-group="${escapeHtml(section.kind)}">
+                <div class="operator-result-output-heading">${escapeHtml(section.label)}${section.omittedCount > 0 ? ` · 已折叠 ${escapeHtml(section.omittedCount)} 项` : ''}</div>
+                ${section.items.map(item => `
+                    <div class="operator-result-output-row">
+                        <span class="operator-result-output-key">${escapeHtml(item.label || '-')}</span>
+                        <span class="operator-result-output-value">${escapeHtml(item.value || '-')}</span>
+                        <span class="operator-result-output-meta">${escapeHtml(item.meta || '')}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+        const rawJson = model.rawJsonPreview?.text
+            ? `<pre class="operator-result-raw-json">${escapeHtml(model.rawJsonPreview.text)}</pre>`
+            : '<div class="operator-result-empty">暂无原始 JSON</div>';
 
         return `
-            <section class="operator-result-section">
-                <h5>诊断</h5>
-                <div class="operator-result-diagnostic-list">${rows}</div>
-            </section>
+            <details class="operator-result-section operator-result-advanced">
+                <summary>
+                    <span>高级诊断</span>
+                    <em>${escapeHtml(diagnostics.length)} 条诊断 · ${escapeHtml((model.rawDataSections || []).length)} 组原始数据</em>
+                </summary>
+                ${diagnosticRows
+                    ? `<div class="operator-result-diagnostic-list">${diagnosticRows}</div>`
+                    : '<div class="operator-result-empty">暂无诊断信息</div>'}
+                ${rawSections}
+                <div class="operator-result-output-heading">原始数据摘要</div>
+                ${rawJson}
+            </details>
         `;
     }
 
