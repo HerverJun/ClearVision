@@ -174,6 +174,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, LawsTextureFilterOperator>();
         services.AddSingleton<IOperatorExecutor, GlcmTextureOperator>();
         services.AddSingleton<IOperatorExecutor, SemanticSegmentationOperator>();
+        RegisterAllOperatorExecutors(services);
 
         services.AddSingleton<FlowLinter>();
         services.TryAddSingleton<ISerialPhotoelectricTriggerInputService>(NoOpSerialPhotoelectricTriggerInputService.Instance);
@@ -181,6 +182,21 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<ICameraFrameStreamCoordinator, CameraFrameStreamCoordinator>();
 
         return services;
+    }
+
+    private static void RegisterAllOperatorExecutors(IServiceCollection services)
+    {
+        var executorTypes = typeof(ImageAcquisitionOperator).Assembly
+            .GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } &&
+                typeof(IOperatorExecutor).IsAssignableFrom(type) &&
+                string.Equals(type.Namespace, typeof(ImageAcquisitionOperator).Namespace, StringComparison.Ordinal))
+            .OrderBy(type => type.Name);
+
+        foreach (var executorType in executorTypes)
+        {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IOperatorExecutor), executorType));
+        }
     }
 
     /// <summary>
