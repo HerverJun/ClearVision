@@ -42,10 +42,36 @@ public sealed class RuntimeDependencyBoundaryTests
         await using var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetRequiredService<IFlowExecutionService>());
 
+        var executorImplementationTypes = GetRuntimeOperatorExecutorImplementationTypes();
         var executors = provider.GetServices<IOperatorExecutor>().ToList();
-        Assert.True(executors.Count >= 100, $"Expected shared executor catalog, got {executors.Count}.");
+        var registeredTypes = executors.Select(executor => executor.GetType()).ToHashSet();
+        var missingTypes = executorImplementationTypes
+            .Where(type => !registeredTypes.Contains(type))
+            .Select(type => type.Name)
+            .OrderBy(name => name)
+            .ToList();
+
+        Assert.Empty(missingTypes);
+        Assert.True(
+            executors.Count >= executorImplementationTypes.Count,
+            $"Expected at least {executorImplementationTypes.Count} shared executors, got {executors.Count}.");
         Assert.Equal(executors.Count, executors.Select(executor => executor.OperatorType).Distinct().Count());
         Assert.Contains(executors, executor => executor is TcpCommunicationOperator);
+        Assert.Contains(executors, executor => executor is RegionClosingOperator);
+        Assert.Contains(executors, executor => executor is DelayOperator);
+        Assert.Contains(executors, executor => executor is FisheyeCalibrationOperator);
+        Assert.Contains(executors, executor => executor is AnomalyDetectionOperator);
+    }
+
+    private static List<Type> GetRuntimeOperatorExecutorImplementationTypes()
+    {
+        return typeof(ImageAcquisitionOperator).Assembly
+            .GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } &&
+                typeof(IOperatorExecutor).IsAssignableFrom(type) &&
+                string.Equals(type.Namespace, typeof(ImageAcquisitionOperator).Namespace, StringComparison.Ordinal))
+            .OrderBy(type => type.Name)
+            .ToList();
     }
 
     private static string FindRepoRoot()
