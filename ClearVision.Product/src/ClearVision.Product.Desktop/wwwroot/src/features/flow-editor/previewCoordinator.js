@@ -798,6 +798,7 @@ export class NodePreviewCoordinator {
         this.cache = new Map();
         this.state = createEmptyState();
         this.pendingTimer = null;
+        this.pendingPreviewRequest = null;
         this.activeAbortController = null;
         this.requestVersion = 0;
         this.debugSessionId = null;
@@ -817,11 +818,65 @@ export class NodePreviewCoordinator {
         this.activeAbortController = null;
     }
 
-    cancelPreview(reason = '预览已取消') {
+    observePreviewRequestPromise(promise) {
+        promise.catch(() => {});
+        return promise;
+    }
+
+    cancelPendingPreviewRequest(result = { status: 'canceled' }) {
         if (this.pendingTimer) {
             clearTimeout(this.pendingTimer);
             this.pendingTimer = null;
         }
+
+        const pending = this.pendingPreviewRequest;
+        if (!pending) {
+            return;
+        }
+
+        this.pendingPreviewRequest = null;
+        pending.resolve(result);
+    }
+
+    failCurrentPreviewRequest(error, context = {}) {
+        const {
+            scheduledVersion = this.requestVersion,
+            activeNode = null,
+            request = this.state?.request || null,
+            inputImageBase64 = null,
+            previewCost = this.state?.previewCost || null,
+            timedOut = false,
+            effectiveTimeoutMs = null
+        } = context;
+
+        if (scheduledVersion !== this.requestVersion) {
+            return false;
+        }
+
+        if (activeNode?.id && this.state.activeNodeId !== activeNode.id) {
+            return false;
+        }
+
+        const timeoutSeconds = Number.isFinite(effectiveTimeoutMs)
+            ? Math.round(effectiveTimeoutMs / 1000)
+            : Math.round(DEFAULT_PREVIEW_TIMEOUT_MS / 1000);
+        this.replacePreviewState(withClearedPreviewResources({
+            status: 'error',
+            executionTimeMs: null,
+            errorMessage: timedOut
+                ? `预览超时（${timeoutSeconds} 秒），已取消本次请求。`
+                : (error?.message || '预览请求失败'),
+            request,
+            inputImageBase64: inputImageBase64 || null,
+            outputImageBase64: null,
+            outputData: null,
+            previewCost: previewCost || this.state.previewCost
+        }));
+        return true;
+    }
+
+    cancelPreview(reason = '预览已取消') {
+        this.cancelPendingPreviewRequest({ status: 'canceled', reason });
 
         this.requestVersion += 1;
         this.cancelActivePreviewRequest();
@@ -1090,10 +1145,7 @@ export class NodePreviewCoordinator {
     }
 
     destroy() {
-        if (this.pendingTimer) {
-            clearTimeout(this.pendingTimer);
-            this.pendingTimer = null;
-        }
+        this.cancelPendingPreviewRequest({ status: 'destroyed' });
 
         this.requestVersion += 1;
         this.cancelActivePreviewRequest();
@@ -1141,10 +1193,7 @@ export class NodePreviewCoordinator {
     }
 
     setActiveNode(node, options = {}) {
-        if (this.pendingTimer) {
-            clearTimeout(this.pendingTimer);
-            this.pendingTimer = null;
-        }
+        this.cancelPendingPreviewRequest({ status: 'superseded' });
 
         this.requestVersion += 1;
         this.cancelActivePreviewRequest();
@@ -1204,7 +1253,7 @@ export class NodePreviewCoordinator {
     }
 
     invalidateActivePreview(options = {}) {
-        this.requestActivePreview({
+        return this.requestActivePreview({
             ...options,
             force: true
         });
@@ -1219,35 +1268,45 @@ export class NodePreviewCoordinator {
             timeoutMs = null
         } = options;
         if (!this.state.activeNodeId) {
-            return;
-        }
-
-        const scheduledNode = this.getNodeById(this.state.activeNodeId);
-        if (!scheduledNode) {
-            this.setActiveNode(null);
-            return;
-        }
-
-        const scheduledProjectId = this.getProjectId();
-        const scheduledScopeKey = buildPreviewScopeKey({
-            projectId: scheduledProjectId,
-            node: scheduledNode
-        });
-        if (this.activeScopeKey !== scheduledScopeKey) {
-            this.releaseArtifactResourcesForNodeSwitch();
-            this.activeScopeKey = scheduledScopeKey;
-            this.updateState({
-                ...this.buildReleasedArtifactStatePatch(),
-                staleScopeKey: scheduledScopeKey
-            });
+            return Promise.resolve({ status: 'idle' });
         }
 
         const scheduledVersion = ++this.requestVersion;
         this.cancelActivePreviewRequest();
+        this.cancelPendingPreviewRequest({ status: 'superseded' });
 
-        if (this.pendingTimer) {
-            clearTimeout(this.pendingTimer);
-            this.pendingTimer = null;
+        let scheduledNode = null;
+        try {
+            scheduledNode = this.getNodeById(this.state.activeNodeId);
+        } catch (error) {
+            this.failCurrentPreviewRequest(error, { scheduledVersion });
+            return this.observePreviewRequestPromise(Promise.reject(error));
+        }
+        if (!scheduledNode) {
+            this.setActiveNode(null);
+            return Promise.resolve({ status: 'cleared' });
+        }
+
+        try {
+            const scheduledProjectId = this.getProjectId();
+            const scheduledScopeKey = buildPreviewScopeKey({
+                projectId: scheduledProjectId,
+                node: scheduledNode
+            });
+            if (this.activeScopeKey !== scheduledScopeKey) {
+                this.releaseArtifactResourcesForNodeSwitch();
+                this.activeScopeKey = scheduledScopeKey;
+                this.updateState({
+                    ...this.buildReleasedArtifactStatePatch(),
+                    staleScopeKey: scheduledScopeKey
+                });
+            }
+        } catch (error) {
+            this.failCurrentPreviewRequest(error, {
+                scheduledVersion,
+                activeNode: scheduledNode
+            });
+            return this.observePreviewRequestPromise(Promise.reject(error));
         }
 
         const execute = async () => {
@@ -1518,15 +1577,30 @@ export class NodePreviewCoordinator {
             }
         };
 
+        const executeRequest = () => execute().catch(error => {
+            this.failCurrentPreviewRequest(error, {
+                scheduledVersion,
+                activeNode: scheduledNode
+            });
+            throw error;
+        });
+
         if (immediate) {
-            void execute();
-            return;
+            return this.observePreviewRequestPromise(executeRequest());
         }
 
-        this.pendingTimer = setTimeout(() => {
-            this.pendingTimer = null;
-            void execute();
-        }, debounceMs);
+        const deferred = new Promise((resolve, reject) => {
+            const pending = { resolve, reject };
+            this.pendingPreviewRequest = pending;
+            this.pendingTimer = setTimeout(() => {
+                this.pendingTimer = null;
+                if (this.pendingPreviewRequest === pending) {
+                    this.pendingPreviewRequest = null;
+                }
+                executeRequest().then(resolve, reject);
+            }, debounceMs);
+        });
+        return this.observePreviewRequestPromise(deferred);
     }
 
     handleStructureChanged() {

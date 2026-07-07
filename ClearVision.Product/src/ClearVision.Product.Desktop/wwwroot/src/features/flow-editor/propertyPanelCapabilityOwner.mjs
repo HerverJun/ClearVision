@@ -802,7 +802,7 @@ export class PropertyPanelCapabilityOwner {
         }
 
         const normalizedSource = normalizeAcquisitionSourceType(nextValues[sourceKey]);
-        if (normalizedSource === 'camera' && filePathKey) {
+        if (normalizedSource === 'camera' && filePathKey && normalizeParameterName(changedName) === 'sourcetype') {
             nextValues[filePathKey] = '';
         }
 

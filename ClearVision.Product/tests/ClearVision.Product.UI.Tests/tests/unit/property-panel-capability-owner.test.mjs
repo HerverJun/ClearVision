@@ -1636,8 +1636,8 @@ test('PropertyPanelCapabilityOwner validates normalized current form values', as
     collectFormValues() {
       return { SourceType: 'Camera', FilePath: 'C:\\Data\\stale.png', CameraBindingId: 'line-camera-01' };
     },
-    normalizeImageAcquisitionValues(values) {
-      return { ...values, FilePath: '' };
+    normalizeImageAcquisitionValues(values, changedName) {
+      return PropertyPanelCapabilityOwner.prototype.normalizeImageAcquisitionValues.call(this, values, changedName);
     },
     validateValues(values) {
       validatedValues = values;
@@ -1649,6 +1649,31 @@ test('PropertyPanelCapabilityOwner validates normalized current form values', as
 
   assert.equal(owner.validateCurrentOperator({ showToast: false }), true);
   assert.deepEqual(validatedValues, {
+    SourceType: 'Camera',
+    FilePath: 'C:\\Data\\stale.png',
+    CameraBindingId: 'line-camera-01'
+  });
+});
+
+test('PropertyPanelCapabilityOwner clears acquisition file path only for explicit SourceType camera changes', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  Object.assign(owner, {
+    currentOperator: {
+      id: 'acq-clear-boundary',
+      type: 'ImageAcquisition',
+      parameters: []
+    }
+  });
+  const values = {
+    SourceType: 'Camera',
+    FilePath: 'C:\\Data\\stale.png',
+    CameraBindingId: 'line-camera-01'
+  };
+
+  assert.deepEqual(owner.normalizeImageAcquisitionValues(values), values);
+  assert.deepEqual(owner.normalizeImageAcquisitionValues(values, 'CameraBindingId'), values);
+  assert.deepEqual(owner.normalizeImageAcquisitionValues(values, 'SourceType'), {
     SourceType: 'Camera',
     FilePath: '',
     CameraBindingId: 'line-camera-01'

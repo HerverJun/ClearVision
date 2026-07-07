@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, TestInfo } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
 type PreviewMode = {
@@ -265,6 +265,67 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(overflow).toEqual({ document: false, body: false, main: false });
 }
 
+async function assertChineseTextRenderable(page: Page) {
+  const text = await page.locator('.inspector-pane, .preview-workbench-pane').evaluateAll(elements =>
+    elements.map(element => (element as HTMLElement).innerText).join('\n')
+  );
+  expect(text).not.toContain('\uFFFD');
+  expect(text).toMatch(/预览|算子|图像|属性|文件|相机/);
+}
+
+async function assertPreviewButtonDisabledState(page: Page) {
+  const mismatches = await page.locator('.preview-workbench-pane button[data-preview-action]').evaluateAll(buttons =>
+    buttons
+      .map(button => ({
+        action: button.getAttribute('data-preview-action'),
+        disabled: (button as HTMLButtonElement).disabled,
+        ariaDisabled: button.getAttribute('aria-disabled') === 'true',
+      }))
+      .filter(item => item.disabled !== item.ariaDisabled)
+  );
+  expect(mismatches).toEqual([]);
+}
+
+async function captureFlowLayoutState(page: Page, testInfo: TestInfo, name: string) {
+  await expect(page.locator('.preview-workbench-pane')).toBeVisible();
+  await assertChineseTextRenderable(page);
+  await assertNoHorizontalOverflow(page);
+  await assertPreviewButtonDisabledState(page);
+  await page.screenshot({
+    path: testInfo.outputPath(`flow-layout-vm-${name}.png`),
+    fullPage: true,
+  });
+}
+
+async function assertLowHeightScrollability(page: Page) {
+  const scrollState = await page.evaluate(() => {
+    const read = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      if (!element) {
+        return null;
+      }
+      const style = getComputedStyle(element);
+      return {
+        overflowY: style.overflowY,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      };
+    };
+
+    return {
+      property: read('.property-capability-scroll'),
+      preview: read('.preview-capability-scroll'),
+    };
+  });
+
+  expect(scrollState.property).toBeTruthy();
+  expect(scrollState.preview).toBeTruthy();
+  expect(scrollState.property?.overflowY).toMatch(/auto|scroll/);
+  expect(scrollState.preview?.overflowY).toMatch(/auto|scroll/);
+  expect(scrollState.property?.scrollHeight).toBeGreaterThan(scrollState.property?.clientHeight ?? 0);
+  expect(scrollState.preview?.scrollHeight).toBeGreaterThan(scrollState.preview?.clientHeight ?? 0);
+}
+
 test.describe('Flow layout VisionMaster-style shell', () => {
   let previewMode: PreviewMode;
 
@@ -311,7 +372,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(page.locator('.preview-workbench-pane')).toContainText('没有返回图像输出');
   });
 
-  test('shows output image summary and debug image operations in the right workbench', async ({ page }) => {
+  test('shows output image summary and debug image operations in the right workbench', async ({ page }, testInfo) => {
     previewMode.value = 'success-image';
     await addNodeFromFlyout(page);
 
@@ -337,9 +398,10 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench.locator('[data-preview-action="image-fit"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(workbench.locator('[data-preview-action="image-original"]')).toHaveAttribute('aria-pressed', 'false');
     await assertNoHorizontalOverflow(page);
+    await captureFlowLayoutState(page, testInfo, 'success-output-image');
   });
 
-  test('marks old preview stale after parameter edit and clears stale after manual preview', async ({ page }) => {
+  test('marks old preview stale after parameter edit and clears stale after manual preview', async ({ page }, testInfo) => {
     previewMode.value = 'success-image';
     await addNodeFromFlyout(page);
     const workbench = page.locator('.preview-workbench-pane');
@@ -356,6 +418,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText(STALE_PREVIEW_TEXT, { timeout: 1000 });
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-stale', 'true');
     expect(previewMode.requests).toHaveLength(0);
+    await captureFlowLayoutState(page, testInfo, 'stale-after-parameter-change');
 
     previewMode.delayMs = 0;
     await workbench.locator('[data-preview-action="manual-preview"]').click();
@@ -364,7 +427,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-stale', 'false');
   });
 
-  test('prevents duplicate manual preview while loading and exposes cancel state', async ({ page }) => {
+  test('prevents duplicate manual preview while loading and exposes cancel state', async ({ page }, testInfo) => {
     previewMode.value = 'success-image';
     await addNodeFromFlyout(page);
     const workbench = page.locator('.preview-workbench-pane');
@@ -380,15 +443,17 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(manualButton).toContainText('预览中...');
     await expect(cancelButton).toBeEnabled();
     await expect.poll(() => previewMode.requests.length).toBe(1);
+    await captureFlowLayoutState(page, testInfo, 'manual-preview-loading');
 
     await cancelButton.click();
     await expect(cancelButton).toBeDisabled();
+    await captureFlowLayoutState(page, testInfo, 'manual-preview-canceled');
     await expect(workbench).toContainText('预览已取消');
     expect(previewMode.requests).toHaveLength(1);
     previewMode.delayMs = 0;
   });
 
-  test('keeps migrated acquisition file picker and writes picked file path back to the node', async ({ page }) => {
+  test('keeps migrated acquisition file picker and writes picked file path back to the node', async ({ page }, testInfo) => {
     await openInputFlyout(page);
     await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
@@ -407,6 +472,8 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText('缺输入图或采集源');
     await expect(workbench).toContainText('请先配置文件路径');
     await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
+
+    await captureFlowLayoutState(page, testInfo, 'image-acquisition-file-missing-path');
 
     await pickerButton.click();
     const pickMessage = await page.evaluate(() => (window as any).__pickFileMessages.at(-1));
@@ -431,6 +498,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
       const parameter = node.parameters.find((item: any) => item.name === 'FilePath');
       return parameter?.value;
     })).toBe('C:\\Data\\sample.png');
+    await captureFlowLayoutState(page, testInfo, 'image-acquisition-file-picked');
   });
 
   test('syncs dependency-controlled fields for template matching', async ({ page }) => {
@@ -462,7 +530,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(status).toContainText('参数已更新');
   });
 
-  test('shows missing camera prerequisite for camera acquisition without CameraId', async ({ page }) => {
+  test('shows missing camera prerequisite for camera acquisition without CameraId', async ({ page }, testInfo) => {
     await openInputFlyout(page);
     await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
@@ -483,6 +551,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).toContainText('缺输入图或采集源');
     await expect(workbench).not.toContainText('预览完成，但没有返回图像输出');
     await expect(page.locator('.inspector-pane #operator-preview-container')).toHaveCount(0);
+    await captureFlowLayoutState(page, testInfo, 'camera-missing-camera');
 
     previewMode.requests.length = 0;
     await page.locator('.inspector-pane #param-CameraBindingId').fill('line-camera-01');
@@ -494,12 +563,20 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench).not.toContainText('请先选择相机');
     await expect(workbench).not.toContainText('刷新预览');
 
+    await captureFlowLayoutState(page, testInfo, 'camera-binding-manual-required');
+
     await workbench.locator('[data-preview-action="manual-preview"]').click();
     await expect.poll(() => previewMode.requests.length).toBe(1);
+    await expect(workbench.locator('.preview-capability-owner')).toHaveAttribute('data-status', 'success');
+    await page.setViewportSize({ width: 1366, height: 360 });
+    await assertLowHeightScrollability(page);
+    await captureFlowLayoutState(page, testInfo, 'low-height-scrollable');
     await expect(workbench).toContainText('预览完成');
   });
 
-  test('shows blank, no-image and preview-failure states', async ({ page }) => {
+  test('shows blank, no-image and preview-failure states', async ({ page }, testInfo) => {
+    await captureFlowLayoutState(page, testInfo, 'no-operator-selected');
+
     await expect(page.locator('.inspector-pane')).toContainText('未选择算子');
     await expect(page.locator('.preview-workbench-pane')).toContainText('请选择一个算子');
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  NodePreviewCoordinator,
   buildPreviewInputImageHash,
   buildPreviewParameterSnapshot
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
@@ -21,6 +22,26 @@ import {
 
 function readRepoText(relativeUrl) {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
+}
+
+function waitFor(assertion, timeoutMs = 1000) {
+  const startedAt = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      try {
+        assertion();
+        resolve();
+      } catch (error) {
+        if (Date.now() - startedAt > timeoutMs) {
+          reject(error);
+          return;
+        }
+        setTimeout(tick, 0);
+      }
+    };
+
+    tick();
+  });
 }
 
 function identity(overrides = {}) {
@@ -481,6 +502,175 @@ function createPreviewCapabilityHarness(options = {}) {
         flowRevision: options.flowRevision ?? 3,
         reason: 'test'
       }));
+    }
+  };
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
+function buildRealPreviewResponse(nodeId, options, overrides = {}) {
+  return {
+    success: true,
+    executionTimeMs: 12,
+    outputImageBase64: 'OUTPUT_IMAGE',
+    outputData: { Score: 0.98 },
+    artifacts: [],
+    observation: {
+      schemaVersion: 'execution-observation.v1',
+      identity: {
+        projectId: 'project-1',
+        targetNodeId: nodeId,
+        debugSessionId: options.debugSessionId,
+        clientRequestSequence: options.clientRequestSequence,
+        flowRevision: options.flowRevision
+      },
+      outcome: {
+        success: true,
+        executionTimeMs: 12,
+        executedOperatorCount: 1
+      },
+      summary: [],
+      detail: {
+        kind: 'dictionary',
+        displayValue: '1 field',
+        children: []
+      },
+      diagnostics: []
+    },
+    ...overrides
+  };
+}
+
+function createRealPreviewOwnerHarness(options = {}) {
+  const listeners = {
+    selection: new Set(),
+    structure: new Set()
+  };
+  const defaultNode = options.node ?? {
+    id: 'node-1',
+    type: 'TemplateMatching',
+    title: 'Template',
+    parameters: [{ name: 'Threshold', value: 128 }],
+    outputs: [{ type: 'image' }]
+  };
+  const nodes = options.nodes instanceof Map
+    ? options.nodes
+    : new Map([[defaultNode.id, defaultNode]]);
+  let selectedNodeId = options.selectedNodeId ?? defaultNode.id;
+  let flowRevision = options.flowRevision ?? 3;
+  const executorCalls = [];
+  const toasts = [];
+  const flowCanvasAdapter = {
+    nodes,
+    get selectedNode() {
+      return selectedNodeId;
+    },
+    set selectedNode(value) {
+      selectedNodeId = value;
+    },
+    getFlowRevision: () => flowRevision,
+    subscribeSelection(listener) {
+      listeners.selection.add(listener);
+      listener({
+        selectedNodeId,
+        reason: 'initial',
+        flowRevision
+      });
+      return () => listeners.selection.delete(listener);
+    },
+    subscribeStructureState(listener) {
+      listeners.structure.add(listener);
+      return () => listeners.structure.delete(listener);
+    },
+    selectNode(nodeId) {
+      if (!nodes.has(nodeId)) {
+        return false;
+      }
+      selectedNodeId = nodeId;
+      listeners.selection.forEach(listener => listener({
+        selectedNodeId,
+        reason: 'selectNode',
+        flowRevision
+      }));
+      return true;
+    }
+  };
+  const coordinator = new NodePreviewCoordinator({
+    getProjectId: () => options.projectId ?? 'project-1',
+    getFlowRevision: () => flowRevision,
+    getNodeById: nodeId => nodes.get(nodeId) || null,
+    getOperatorMetadata: type => ({
+      displayName: type,
+      outputPorts: [{ dataType: 'image' }]
+    }),
+    getInputImageBase64: options.getInputImageBase64 ?? (() => options.inputImageBase64 ?? 'INPUT_IMAGE'),
+    previewExecutor: async (nodeId, executorOptions) => {
+      executorCalls.push({ nodeId, options: executorOptions });
+      if (typeof options.previewExecutor === 'function') {
+        return options.previewExecutor(nodeId, executorOptions, executorCalls.length);
+      }
+      return buildRealPreviewResponse(nodeId, executorOptions);
+    },
+    artifactClient: {
+      getPreviewArtifactBlob: async () => ({ blob: { size: 0 } }),
+      deletePreviewArtifact: async () => {}
+    },
+    debounceMs: options.debounceMs ?? 0
+  });
+  const adapter = createPreviewPanelCapabilityAdapter({
+    flowCanvasAdapter,
+    previewCoordinator: coordinator,
+    getOperatorMetadata: type => ({
+      displayName: type,
+      outputPorts: [{ dataType: 'image' }]
+    }),
+    getProjectId: () => options.projectId ?? 'project-1',
+    getInputImageBase64: () => options.inputImageHashBase64 ?? 'INPUT_IMAGE'
+  });
+  const container = {
+    innerHTML: '',
+    dataset: {},
+    listeners: new Map(),
+    addEventListener(type, listener) {
+      this.listeners.set(type, listener);
+    },
+    removeEventListener(type, listener) {
+      if (this.listeners.get(type) === listener) {
+        this.listeners.delete(type);
+      }
+    }
+  };
+  const owner = new PreviewPanelCapabilityOwner(container, {
+    previewAdapter: adapter,
+    showToast(message, level) {
+      toasts.push({ message, level });
+    }
+  });
+
+  return {
+    owner,
+    adapter,
+    coordinator,
+    container,
+    nodes,
+    flowCanvasAdapter,
+    executorCalls,
+    toasts,
+    setFlowRevision(value) {
+      flowRevision = value;
+    },
+    destroy() {
+      owner.dispose();
+      coordinator.destroy();
     }
   };
 }
@@ -1349,6 +1539,170 @@ test('PreviewPanelCapabilityOwner ignores manual preview rejections after a term
   assert.match(harness.container.innerHTML, /预览完成|棰勮瀹屾垚/);
 
   owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner with real coordinator restores controls when input image provider fails', async () => {
+  for (const mode of ['throw', 'reject']) {
+    const harness = createRealPreviewOwnerHarness({
+      getInputImageBase64() {
+        if (mode === 'throw') {
+          throw new Error('input provider throw');
+        }
+        return Promise.reject(new Error('input provider reject'));
+      }
+    });
+
+    try {
+      harness.owner.requestManualPreview();
+      await waitFor(() => {
+        assert.equal(harness.coordinator.getState().status, 'error');
+        assert.match(harness.coordinator.getState().errorMessage, /input provider/);
+      });
+
+      assert.equal(harness.owner.manualPreviewPending, false);
+      assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" aria-disabled="false"/);
+      assert.deepEqual(harness.toasts, []);
+    } finally {
+      harness.destroy();
+    }
+  }
+});
+
+test('PreviewPanelCapabilityOwner with real coordinator reports preview executor rejection as controlled state', async () => {
+  const harness = createRealPreviewOwnerHarness({
+    previewExecutor: async () => {
+      throw new Error('executor rejected');
+    }
+  });
+
+  try {
+    harness.owner.requestManualPreview();
+    await waitFor(() => {
+      assert.equal(harness.coordinator.getState().status, 'error');
+      assert.match(harness.coordinator.getState().errorMessage, /executor rejected/);
+    });
+
+    assert.equal(harness.owner.manualPreviewPending, false);
+    assert.match(harness.container.innerHTML, /data-preview-action="manual-preview" aria-disabled="false"/);
+    assert.deepEqual(harness.toasts, []);
+  } finally {
+    harness.destroy();
+  }
+});
+
+test('PreviewPanelCapabilityOwner with real coordinator ignores canceled manual preview rejection toasts', async () => {
+  const deferred = createDeferred();
+  const harness = createRealPreviewOwnerHarness({
+    previewExecutor: () => deferred.promise
+  });
+
+  try {
+    harness.owner.requestManualPreview();
+    await waitFor(() => assert.equal(harness.coordinator.getState().status, 'loading'));
+
+    harness.owner.cancelCurrentPreview();
+    await waitFor(() => assert.equal(harness.coordinator.getState().status, 'canceled'));
+
+    deferred.reject(new Error('late canceled rejection'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(harness.coordinator.getState().status, 'canceled');
+    assert.deepEqual(harness.toasts, []);
+  } finally {
+    harness.destroy();
+  }
+});
+
+test('PreviewPanelCapabilityOwner with real coordinator ignores stale rejection after node switch', async () => {
+  const firstRequest = createDeferred();
+  const node1 = {
+    id: 'node-1',
+    type: 'TemplateMatching',
+    title: 'Template A',
+    parameters: [{ name: 'Threshold', value: 128 }],
+    outputs: [{ type: 'image' }]
+  };
+  const node2 = {
+    id: 'node-2',
+    type: 'TemplateMatching',
+    title: 'Template B',
+    parameters: [{ name: 'Threshold', value: 64 }],
+    outputs: [{ type: 'image' }]
+  };
+  const harness = createRealPreviewOwnerHarness({
+    node: node1,
+    nodes: new Map([[node1.id, node1], [node2.id, node2]]),
+    previewExecutor: async (nodeId, executorOptions) => {
+      if (nodeId === 'node-1') {
+        return firstRequest.promise;
+      }
+      return buildRealPreviewResponse(nodeId, executorOptions, {
+        outputData: { Score: 0.75 }
+      });
+    }
+  });
+
+  try {
+    harness.owner.requestManualPreview();
+    await waitFor(() => {
+      assert.equal(harness.coordinator.getState().activeNodeId, 'node-1');
+      assert.equal(harness.coordinator.getState().status, 'loading');
+    });
+
+    harness.flowCanvasAdapter.selectNode('node-2');
+    harness.owner.requestManualPreview();
+    await waitFor(() => {
+      assert.equal(harness.coordinator.getState().activeNodeId, 'node-2');
+      assert.equal(harness.coordinator.getState().status, 'success');
+    });
+
+    firstRequest.reject(new Error('stale node rejection'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(harness.coordinator.getState().activeNodeId, 'node-2');
+    assert.equal(harness.coordinator.getState().status, 'success');
+    assert.deepEqual(harness.coordinator.getState().outputData, { Score: 0.75 });
+    assert.deepEqual(harness.toasts, []);
+  } finally {
+    harness.destroy();
+  }
+});
+
+test('PreviewPanelCapabilityOwner with real coordinator keeps debounced auto and immediate manual versions isolated', async () => {
+  const node = {
+    id: 'node-1',
+    type: 'Thresholding',
+    title: 'Threshold',
+    parameters: [{ name: 'Threshold', value: 128 }],
+    outputs: [{ type: 'image' }]
+  };
+  const harness = createRealPreviewOwnerHarness({
+    node,
+    debounceMs: 100,
+    previewExecutor: async (nodeId, executorOptions) => buildRealPreviewResponse(nodeId, executorOptions)
+  });
+
+  try {
+    const autoPromise = harness.coordinator.requestActivePreview({
+      immediate: false,
+      debounceMs: 100,
+      trigger: 'auto'
+    });
+
+    harness.owner.requestManualPreview();
+    const autoResult = await autoPromise;
+    await waitFor(() => assert.equal(harness.coordinator.getState().status, 'success'));
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    assert.equal(autoResult.status, 'superseded');
+    assert.equal(harness.executorCalls.length, 1);
+    assert.equal(harness.coordinator.getState().activeNodeId, 'node-1');
+    assert.equal(harness.coordinator.getState().status, 'success');
+  } finally {
+    harness.destroy();
+  }
 });
 
 test('PreviewPanelCapabilityOwner renders idle prerequisite failures with layered empty states', () => {
