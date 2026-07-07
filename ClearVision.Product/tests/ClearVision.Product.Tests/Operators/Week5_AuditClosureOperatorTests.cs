@@ -141,6 +141,110 @@ public class VariableReadOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithOutputFieldName_ShouldReadNestedRunVariableField()
+    {
+        var context = new VariableContext();
+        var rawValue = new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["Score"] = 98.5,
+                ["Status"] = "OK"
+            }
+        };
+        context.SetValue("tcp.lastResult", rawValue);
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastResult", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("OutputFieldName", "ParsedFields.Score", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Value"].Should().Be(98.5);
+        result.OutputData["RawValue"].Should().BeSameAs(rawValue);
+        result.OutputData["ReadSource"].Should().Be("RunVariableField");
+        result.OutputData["OutputFieldName"].Should().Be("ParsedFields.Score");
+        result.OutputData["OutputFieldFound"].Should().Be(true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithJsonStringOutputFieldName_ShouldReadStatusAsBool()
+    {
+        var context = new VariableContext();
+        context.SetValue("tcp.lastJson", """{"ParsedFields":{"Score":98.5,"Status":"OK"}}""");
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastJson", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Bool", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("OutputFieldName", "ParsedFields.Status", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Value"].Should().Be(true);
+        result.OutputData["RawValue"].Should().Be("""{"ParsedFields":{"Score":98.5,"Status":"OK"}}""");
+        result.OutputData["ReadSource"].Should().Be("RunVariableField");
+        result.OutputData["OutputFieldFound"].Should().Be(true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMissingOutputFieldName_ShouldFailByDefault()
+    {
+        var context = new VariableContext();
+        context.SetValue("tcp.lastResult", new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>()
+        });
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastResult", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("OutputFieldName", "ParsedFields.Score", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Variable 'tcp.lastResult' field 'ParsedFields.Score' was not found.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMissingRunVariable_ShouldReturnDefaultValueSource()
+    {
+        var context = new VariableContext();
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "threshold.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DefaultValue", "98.0", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Exists"].Should().Be(false);
+        result.OutputData["Value"].Should().Be(98.0);
+        result.OutputData["ReadSource"].Should().Be("DefaultValue");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithFailOnMissingRunVariable_ShouldFailClosed()
+    {
+        var context = new VariableContext();
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "threshold.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DefaultValue", "98.0", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnMissingVariable", true, "bool"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("threshold.score");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ShouldLogRunScopeReadsAtDebugLevel()
     {
         var context = new VariableContext();
@@ -199,6 +303,47 @@ public class VariableReadOperatorTests
         result.OutputData!["Value"].Should().Be(5L);
         result.OutputData["Exists"].Should().Be(true);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProjectScopeReadsValue_ShouldExposeSnapshotMetadata()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "tcp.lastScore",
+                    DisplayName = "Last TCP Score",
+                    ValueType = ProjectGlobalVariableValueType.Double,
+                    InitialValue = JsonSerializer.SerializeToElement(0.0)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 98.5, ProjectVariableUpdatedBy.VariableWrite, Guid.NewGuid(), Guid.NewGuid());
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Value"].Should().Be(98.5);
+        result.OutputData["VariableId"].Should().Be(variableId.ToString("D"));
+        result.OutputData["ValueType"].Should().Be(ProjectGlobalVariableValueType.Double.ToString());
+        result.OutputData["Version"].Should().Be(1L);
+        result.OutputData["UpdatedBy"].Should().Be(ProjectVariableUpdatedBy.VariableWrite.ToString());
+        result.OutputData["UpdatedAtUtc"].Should().BeOfType<string>().Which.Should().NotBeNullOrWhiteSpace();
+        result.OutputData["ReadSource"].Should().Be("ProjectVariable");
+    }
 }
 
 public class VariableWriteOperatorTests
@@ -219,6 +364,208 @@ public class VariableWriteOperatorTests
 
         result.IsSuccess.Should().BeTrue();
         context.GetValue<string>("batchId").Should().Be("LAB-001");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInputFieldName_ShouldWriteNestedValueIntoContext()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["score"] = 98.5
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        context.GetValue<double>("lastScore").Should().Be(98.5);
+        result.OutputData!["Value"].Should().Be(98.5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRunScopeObject_ShouldPreserveStructuredTcpFieldsForLaterReads()
+    {
+        var context = new VariableContext();
+        var writeOperator = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var writeOp = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        writeOp.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastFields", "string"));
+        writeOp.AddParameter(TestHelpers.CreateParameter("DataType", "Object", "string"));
+        writeOp.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields", "string"));
+        var parsedFields = new Dictionary<string, object>
+        {
+            ["Score"] = 98.5,
+            ["Status"] = "OK"
+        };
+
+        var writeResult = await writeOperator.ExecuteAsync(writeOp, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = parsedFields
+        });
+
+        writeResult.IsSuccess.Should().BeTrue(writeResult.ErrorMessage);
+        writeResult.OutputData!["Value"].Should().BeSameAs(parsedFields);
+        context.GetValue<object>("tcp.lastFields").Should().BeSameAs(parsedFields);
+
+        var readOperator = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), context);
+        var readOp = new Operator("read", OperatorType.VariableRead, 0, 0);
+        readOp.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastFields", "string"));
+        readOp.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        readOp.AddParameter(TestHelpers.CreateParameter("OutputFieldName", "Score", "string"));
+
+        var readResult = await readOperator.ExecuteAsync(readOp);
+
+        readResult.IsSuccess.Should().BeTrue(readResult.ErrorMessage);
+        readResult.OutputData!["Value"].Should().Be(98.5);
+        readResult.OutputData["RawValue"].Should().BeSameAs(parsedFields);
+        readResult.OutputData["ReadSource"].Should().Be("RunVariableField");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMissingInputFieldName_ShouldFailWithoutStaticFallback()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("StaticValue", "12.5", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>()
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("ParsedFields.score");
+        context.Contains("lastScore").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithJsonStringInputFieldAndStatusPath_ShouldWriteIndexedField()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "Payload.Results.1.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("RequireInputStatus", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("InputStatusFieldName", "Payload.Status", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Payload"] = """{"Status":"OK","Results":[{"score":97.0},{"score":98.5}]}"""
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        context.GetValue<double>("lastScore").Should().Be(98.5);
+        result.OutputData!["Value"].Should().Be(98.5);
+        result.OutputData["InputStatusValue"].Should().Be("OK");
+        result.OutputData["WriteSkipped"].Should().Be(false);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidRunScopeInputConversion_ShouldFailWithoutWrite()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["score"] = "not-a-number"
+            }
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("lastScore");
+        result.ErrorMessage.Should().Contain("Double");
+        context.Contains("lastScore").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidStaticValueConversion_ShouldFailWithoutWrite()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastCount", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("UseInputValue", false, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("StaticValue", "12.5", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("StaticValue");
+        context.Contains("lastCount").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRunScopeIntAndFloorConversion_ShouldWriteFlooredValue()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastCount", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ConversionMode", "Floor", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Value"] = 12.9
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        context.GetValue<long>("lastCount").Should().Be(12L);
+        result.OutputData!["Value"].Should().Be(12L);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRunScopeIntAndExactFraction_ShouldFailWithoutWrite()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastCount", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Value"] = 12.9
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("explicit Round, Floor, Ceiling or Truncate");
+        context.Contains("lastCount").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ValidateParameters_WithProjectScopeObjectDataType_ShouldBeInvalid()
+    {
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), new VariableContext());
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastFields", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Object", "string"));
+
+        var result = sut.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.Contains("Run scope", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -285,6 +632,221 @@ public class VariableWriteOperatorTests
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(3L);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProjectScopeUsesInputFieldName_ShouldWriteParsedFieldValue()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "tcp.lastCode",
+                    DisplayName = "Last TCP Code",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(0L)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastCode", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.code", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["code"] = 7L
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(7L);
+        result.OutputData!["Value"].Should().Be(7L);
+        result.OutputData["VariableId"].Should().Be(variableId.ToString("D"));
+        result.OutputData["ValueType"].Should().Be(ProjectGlobalVariableValueType.Int64.ToString());
+        result.OutputData["Version"].Should().Be(1L);
+        result.OutputData["UpdatedBy"].Should().Be(ProjectVariableUpdatedBy.VariableWrite.ToString());
+        result.OutputData["UpdatedAtUtc"].Should().BeOfType<string>().Which.Should().NotBeNullOrWhiteSpace();
+    }
+    [Fact]
+    public async Task ExecuteAsync_WithRequireInputStatusAndFalseStatus_ShouldSkipRunScopeWrite()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("RequireInputStatus", true, "bool"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Status"] = false,
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["score"] = 98.5
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["WriteSkipped"].Should().Be(true);
+        result.OutputData["InputStatusValue"].Should().Be("False");
+        result.OutputData["SkipReason"].Should().Be("Input status field 'Status' is false.");
+        context.Contains("lastScore").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRequireInputStatusAndOkText_ShouldWriteProjectParsedFieldValue()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "tcp.acceptedScore",
+                    DisplayName = "Accepted TCP Score",
+                    ValueType = ProjectGlobalVariableValueType.Double,
+                    InitialValue = JsonSerializer.SerializeToElement(0.0)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.acceptedScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("RequireInputStatus", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("InputStatusFieldName", "ResponseAccepted", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ResponseAccepted"] = "OK",
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["score"] = 98.5
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(98.5);
+        result.OutputData!["WriteSkipped"].Should().Be(false);
+        result.OutputData["InputStatusValue"].Should().Be("OK");
+        result.OutputData["Value"].Should().Be(98.5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRequireInputStatusAndFailOnFalse_ShouldFailWithoutWrite()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastScore", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("RequireInputStatus", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnInputStatusFalse", true, "bool"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Status"] = "NG",
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["score"] = 98.5
+            }
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Input status field 'Status' is false.");
+        context.Contains("lastScore").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRunScopeBoolAndOkText_ShouldWriteTrue()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastOk", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Bool", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.status", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["status"] = "OK"
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        context.GetValue<bool>("lastOk").Should().BeTrue();
+        result.OutputData!["Value"].Should().Be(true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithProjectScopeBooleanAndNgText_ShouldWriteFalse()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "tcp.lastOk",
+                    DisplayName = "Last TCP OK",
+                    ValueType = ProjectGlobalVariableValueType.Boolean,
+                    InitialValue = JsonSerializer.SerializeToElement(true)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "tcp.lastOk", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Bool", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("InputFieldName", "ParsedFields.status", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ParsedFields"] = new Dictionary<string, object>
+            {
+                ["status"] = "NG"
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(false);
+        result.OutputData!["Value"].Should().Be(false);
+        result.OutputData["ValueType"].Should().Be(ProjectGlobalVariableValueType.Boolean.ToString());
     }
 }
 

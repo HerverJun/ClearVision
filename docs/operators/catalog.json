@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-06T22:52:02.0510182+08:00",
+  "generatedAt": "2026-07-07T08:45:40.9653060+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -4912,13 +4912,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
@@ -5114,13 +5114,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ConditionalBranch.md"
     },
@@ -8832,13 +8832,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/VariableRead.md"
     },

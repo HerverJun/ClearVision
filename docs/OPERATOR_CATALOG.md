@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-06 22:52:02 +08:00`
+> 生成时间 / Generated At: `2026-07-07 08:45:40 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 分类统计 / Category Summary
@@ -39,7 +39,7 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.4**
+- 平均分 / Average: **95.5**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
@@ -146,7 +146,7 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 96 (A) | `1.0.0` | 该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置… | [CycleCounter](./operators/CycleCounter.md) |
 | `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 7 | 100 (A) | `1.0.0` | 该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析… | [VariableIncrement](./operators/VariableIncrement.md) |
-| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 7 | 96 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./operators/VariableRead.md) |
+| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 7 | 100 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./operators/VariableRead.md) |
 | `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 8 | 90 (A) | `1.0.0` | 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析… | [VariableWrite](./operators/VariableWrite.md) |
 
 ### 图像处理 (4)
@@ -230,7 +230,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 89 (A) | `1.0.0` | 该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数… | [Comparator](./operators/Comparator.md) |
-| `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 90 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./operators/ConditionalBranch.md) |
+| `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 100 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./operators/ConditionalBranch.md) |
 | `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 94 (A) | `1.0.0` | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | [Delay](./operators/Delay.md) |
 | `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./operators/ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配… | [TryCatch](./operators/TryCatch.md) |
@@ -269,7 +269,7 @@
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 1 | 2 | 13 | 98 (A) | `1.0.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
 | `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
 | `OperatorType.SiemensS7Communication` | 西门子S7通信 | 1 | 2 | 15 | 98 (A) | `1.0.0` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./operators/SiemensS7Communication.md) |
-| `OperatorType.TcpCommunication` | TCP通信 | 1 | 2 | 6 | 94 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
+| `OperatorType.TcpCommunication` | TCP通信 | 1 | 2 | 6 | 100 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
 
 ### 通用 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
