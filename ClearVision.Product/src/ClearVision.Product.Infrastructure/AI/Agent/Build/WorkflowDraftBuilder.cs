@@ -197,22 +197,27 @@ public sealed class WorkflowDraftBuilder
             ? VisionAgentBuildSupport.FirstNonEmpty(load.Plan?.Goal, "Vision Agent workflow draft")
             : flow.Name;
 
-        var existingNames = flow.Operators
-            .Select(op => op.Name)
+        var pipelineTempIds = pipeline.Steps
+            .Select(step => step.TempId)
+            .Where(tempId => !string.IsNullOrWhiteSpace(tempId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var operatorsByTempId = flow.Operators
+            .Where(op => !string.IsNullOrWhiteSpace(op.Name) && pipelineTempIds.Contains(op.Name))
+            .GroupBy(op => op.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         foreach (var step in pipeline.Steps)
         {
-            if (existingNames.Contains(step.TempId))
+            if (operatorsByTempId.ContainsKey(step.TempId))
             {
                 continue;
             }
 
             var op = BuildCanvasOperator(step, parameters, flow.Operators.Count);
             flow.Operators.Add(op);
-            existingNames.Add(step.TempId);
+            operatorsByTempId[step.TempId] = op;
         }
 
-        AddCanvasConnections(flow, connectionSpecs);
+        AddCanvasConnections(flow, connectionSpecs, operatorsByTempId);
         return flow;
     }
 
@@ -232,7 +237,7 @@ public sealed class WorkflowDraftBuilder
         return new OperatorDto
         {
             Id = Guid.NewGuid(),
-            Name = step.TempId,
+            Name = CanvasOperatorName(contract, step.OperatorType),
             Type = ToOperatorType(step.OperatorType),
             X = 160 + index * 180,
             Y = 180,
@@ -494,17 +499,13 @@ public sealed class WorkflowDraftBuilder
 
     private static void AddCanvasConnections(
         OperatorFlowDto flow,
-        IReadOnlyList<ConnectionSpec> connectionSpecs)
+        IReadOnlyList<ConnectionSpec> connectionSpecs,
+        IReadOnlyDictionary<string, OperatorDto> operatorsByTempId)
     {
-        var byName = flow.Operators
-            .Where(op => !string.IsNullOrWhiteSpace(op.Name))
-            .GroupBy(op => op.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-
         foreach (var spec in connectionSpecs)
         {
-            if (!byName.TryGetValue(spec.SourceTempId, out var source) ||
-                !byName.TryGetValue(spec.TargetTempId, out var target))
+            if (!operatorsByTempId.TryGetValue(spec.SourceTempId, out var source) ||
+                !operatorsByTempId.TryGetValue(spec.TargetTempId, out var target))
             {
                 continue;
             }
@@ -533,6 +534,17 @@ public sealed class WorkflowDraftBuilder
                 TargetPortId = targetPort.Id
             });
         }
+    }
+
+    private static string CanvasOperatorName(
+        VisionAgentOperatorContract contract,
+        string requestedOperatorType)
+    {
+        return VisionAgentBuildSupport.FirstNonEmpty(
+            contract.DisplayName,
+            contract.OperatorType,
+            requestedOperatorType,
+            "Operator");
     }
 
     private OperatorType ToOperatorType(string operatorType)

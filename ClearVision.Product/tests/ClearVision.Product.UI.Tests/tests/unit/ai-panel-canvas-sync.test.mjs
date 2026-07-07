@@ -91,6 +91,7 @@ function createFakeElement() {
     textContent: '',
     className: '',
     attributes: new Map(),
+    dataset: {},
     classList: new FakeClassList(),
     style: {},
     focus() {
@@ -101,6 +102,9 @@ function createFakeElement() {
     },
     getAttribute(name) {
       return this.attributes.get(name);
+    },
+    removeAttribute(name) {
+      this.attributes.delete(name);
     },
     addEventListener() {},
     querySelector() { return null; },
@@ -160,6 +164,124 @@ test('AiPanel apply callback receives serialized canvas flow after deserialize',
   assert.equal(panel.flowCanvas.lastDeserialized, incomingFlow);
   assert.equal(applied.length, 1);
   assert.equal(applied[0], serializedFlow);
+});
+
+test('AI generated canvas titles stay friendly through apply, property panel, and preview results', async () => {
+  installDom();
+  const friendlyName = '图像采集';
+  const { AiPanel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  );
+  const { PropertyPanelCapabilityOwner } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanelCapabilityOwner.mjs'
+  );
+  const { buildOperatorResultViewModel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorResultViewModel.mjs'
+  );
+
+  const generatedFlow = {
+    operators: [
+      {
+        id: 'node-1',
+        type: 'ImageAcquisition',
+        name: friendlyName,
+        title: friendlyName,
+        displayName: friendlyName,
+        parameters: []
+      }
+    ],
+    connections: []
+  };
+  const panel = Object.create(AiPanel.prototype);
+  panel.flowCanvas = {
+    deserialize(flow) {
+      this.lastDeserialized = flow;
+    },
+    serialize() {
+      return this.lastDeserialized;
+    },
+    getFlowRevision() {
+      return 1;
+    }
+  };
+  panel.options = { showToast() {} };
+  panel.currentResult = { flow: generatedFlow };
+  panel.container = { querySelector() { return null; } };
+  panel._markCurrentResultAppliedToCanvas = () => {};
+  panel._syncPendingParameterDrafts = () => {};
+  panel._renderFollowupChecklist = () => {};
+  panel._renderParameterDraftEditor = () => {};
+  panel._setWorkbenchState = () => {};
+  panel._setResultStatusNote = () => {};
+
+  panel._executeApplyFlow(generatedFlow);
+  const appliedOperator = panel.flowCanvas.lastDeserialized.operators[0];
+
+  assert.equal(appliedOperator.title, friendlyName);
+  assert.equal(appliedOperator.name, friendlyName);
+  assert.doesNotMatch(JSON.stringify(appliedOperator), /\bop_1\b/);
+
+  const propertyContainer = createFakeElement();
+  const propertyAdapter = {
+    subscribeSelectedNode() { return () => {}; },
+    subscribeFlowChanges() { return () => {}; },
+    getSelectedConnectionSnapshot() { return null; }
+  };
+  const owner = new PropertyPanelCapabilityOwner(propertyContainer, {
+    propertyAdapter,
+    previewResourcesEnabled: false
+  });
+  owner.handleSelectedNodeChanged(appliedOperator);
+
+  assert.match(propertyContainer.innerHTML, new RegExp(friendlyName));
+  assert.doesNotMatch(propertyContainer.innerHTML, /\bop_1\b/);
+
+  const viewModel = buildOperatorResultViewModel(
+    appliedOperator,
+    { status: 'success', activeNodeId: 'node-1' },
+    { nodes: [appliedOperator] }
+  );
+
+  assert.equal(viewModel.operatorName, friendlyName);
+  assert.equal(viewModel.nodeResults[0].title, friendlyName);
+  assert.doesNotMatch(JSON.stringify({
+    operatorName: viewModel.operatorName,
+    nodeResults: viewModel.nodeResults
+  }), /\bop_1\b/);
+});
+
+test('AI draft normalization ignores leaked tempId labels', async () => {
+  installDom();
+  const friendlyName = '\u56fe\u50cf\u91c7\u96c6';
+  const { AiPanel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  );
+
+  const panel = Object.create(AiPanel.prototype);
+  const normalized = panel._normalizeWorkflowDraftForCanvas({
+    operators: [
+      {
+        tempId: 'op_1',
+        operatorType: 'ImageAcquisition',
+        name: 'op_1',
+        displayName: 'op_1',
+        title: 'op_1',
+        parameters: []
+      }
+    ],
+    connections: []
+  });
+
+  const operator = normalized.operators[0];
+  assert.equal(operator.name, friendlyName);
+  assert.equal(operator.title, friendlyName);
+  assert.equal(operator.displayName, friendlyName);
+  assert.equal(operator.id, 'op_1');
+  assert.doesNotMatch(JSON.stringify({
+    name: operator.name,
+    title: operator.title,
+    displayName: operator.displayName
+  }), /\bop_1\b/);
 });
 
 test('AiPanel undo notifies canvas flow change with restored snapshot', async () => {

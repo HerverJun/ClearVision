@@ -29,6 +29,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
     private readonly AgentWorkflowDraftEditor _draftEditor;
     private readonly IConfigurationService? _configurationService;
     private readonly IAgentRunEventSink? _eventSink;
+    private static readonly IVisionAgentOperatorContractCatalog OperatorContractCatalog =
+        new VisionAgentOperatorContractCatalog();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -474,6 +476,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             var schema = VisionAgentReadOnlyCatalog.Schemas.TryGetValue(op.OperatorType, out var foundSchema)
                 ? foundSchema
                 : null;
+            var displayName = ResolveSystemOperatorDisplayName(op.OperatorType, schema);
             var inputs = schema?.InputPorts.ToList() ?? new List<string>();
             var outputs = schema?.OutputPorts.ToList() ?? new List<string>();
             inputPorts[op.TempId] = inputs.ToDictionary(name => name, _ => Guid.NewGuid(), StringComparer.OrdinalIgnoreCase);
@@ -482,7 +485,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             flow.Operators.Add(new OperatorDto
             {
                 Id = operatorIds[op.TempId],
-                Name = string.IsNullOrWhiteSpace(op.DisplayName) ? op.OperatorType : op.DisplayName,
+                Name = displayName,
                 Type = ResolveOperatorType(op.OperatorType),
                 X = 160 * index,
                 Y = 0,
@@ -588,6 +591,25 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         }
 
         return parameters.Values.ToList();
+    }
+
+    private static string ResolveSystemOperatorDisplayName(
+        string operatorType,
+        OperatorSchemaItem? schema)
+    {
+        if (OperatorContractCatalog.TryGet(operatorType, out var contract))
+        {
+            return FirstNonEmpty(
+                contract.DisplayName,
+                contract.OperatorType,
+                operatorType,
+                "Operator");
+        }
+
+        return FirstNonEmpty(
+            schema?.OperatorType,
+            operatorType,
+            "Operator");
     }
 
     private static Guid EnsurePort(
@@ -959,7 +981,6 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         return new DraftOperator(
             ReadString(element, "tempId") ?? Guid.NewGuid().ToString("N"),
             ReadString(element, "operatorType") ?? "ResultJudgment",
-            ReadString(element, "displayName") ?? ReadString(element, "operatorType") ?? "Operator",
             parameters);
     }
 
@@ -1030,10 +1051,22 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         };
     }
 
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
     private sealed record DraftOperator(
         string TempId,
         string OperatorType,
-        string DisplayName,
         IReadOnlyDictionary<string, string?> Parameters);
 
     private sealed record DraftConnection(

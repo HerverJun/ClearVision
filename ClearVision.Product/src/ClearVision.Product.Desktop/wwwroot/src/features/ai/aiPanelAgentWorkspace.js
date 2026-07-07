@@ -6557,11 +6557,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const op = this._asObject?.(operator) || {};
         const id = String(op.id || op.Id || op.tempId || op.TempId || `op_${index + 1}`).trim();
         const type = this._normalizeDraftCanvasOperatorType(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning');
+        const systemName = AI_OPERATOR_LABELS[type] || type || '未命名算子';
         const name = this._sanitizeDraftCanvasLabel(
-            op.name || op.Name || op.displayName || op.DisplayName || op.title || op.Title || id || type,
-            AI_OPERATOR_LABELS[type] || id || type || '未命名算子',
+            systemName,
+            type || '未命名算子',
             160
-        ) || AI_OPERATOR_LABELS[type] || '未命名算子';
+        ) || systemName || '未命名算子';
         const description = this._sanitizeDraftCanvasLabel(op.description || op.Description || '', '', 260);
         const parameters = this._normalizeDraftParametersForCanvas(op.parameters || op.Parameters);
         const inputPorts = this._normalizeDraftPortsForCanvas(op.inputPorts || op.InputPorts || op.inputs || op.Inputs, id, type, false);

@@ -3988,7 +3988,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             return new OperatorDto
             {
                 Id = operatorId,
-                Name = op.DisplayName,
+                Name = string.IsNullOrWhiteSpace(metadata.DisplayName)
+                    ? metadata.Type.ToString()
+                    : metadata.DisplayName,
                 Type = metadata.Type,
                 X = 0, // 由 AutoLayoutService 填充
                 Y = 0,

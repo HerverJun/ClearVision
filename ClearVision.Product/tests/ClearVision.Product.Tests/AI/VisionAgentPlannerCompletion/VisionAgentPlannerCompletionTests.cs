@@ -172,6 +172,25 @@ public sealed class VisionAgentPlannerCompletionTests
         flow.Operators.Select(op => op.Type).Should().Contain(OperatorType.Measurement);
     }
 
+    [Fact(DisplayName = "Planner final workflowDraft should ignore AI supplied operator names")]
+    public async Task PlannerFinalWorkflowDraft_ShouldIgnoreAiSuppliedOperatorNames()
+    {
+        var connector = new FakeConnector(FinalWorkflowDraft(FlowWithLeakingDisplayNames()));
+        var service = CreatePlannerGenerateFlowService(connector);
+
+        var result = await service.GenerateFlowAsync(
+            PlannerRequest("image acquisition display name"),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var flow = Flow(result);
+        var imageAcquisition = flow.Operators.Single(op => op.Type == OperatorType.ImageAcquisition);
+
+        imageAcquisition.Name.Should().Be(ContractDisplayName("ImageAcquisition"));
+        imageAcquisition.Name.Should().NotBe("op_1");
+        JsonSerializer.Serialize(flow).Should().NotContain("\"Name\":\"op_1\"");
+    }
+
     [Fact(DisplayName = "Planner final draftEdits should edit existingFlowJson")]
     public async Task PlannerFinalDraftEdits_ShouldEditExistingFlow()
     {
@@ -530,6 +549,41 @@ public sealed class VisionAgentPlannerCompletionTests
         };
     }
 
+    private static object FlowWithLeakingDisplayNames()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new
+                {
+                    tempId = "op_1",
+                    operatorType = "ImageAcquisition",
+                    displayName = "op_1",
+                    name = "op_1",
+                    title = "op_1",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["CameraBindingId"] = "<pending-camera-binding>"
+                    }
+                },
+                new
+                {
+                    tempId = "op_2",
+                    operatorType = "ResultOutput",
+                    displayName = "op_2",
+                    name = "op_2",
+                    title = "op_2",
+                    parameters = new Dictionary<string, string>()
+                }
+            },
+            connections = new object[]
+            {
+                Connection("op_1", "Image", "op_2", "Image")
+            }
+        };
+    }
+
     private static object Operator(
         string tempId,
         string operatorType,
@@ -617,6 +671,13 @@ public sealed class VisionAgentPlannerCompletionTests
     {
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(value));
         return doc.RootElement.Clone();
+    }
+
+    private static string ContractDisplayName(string operatorType)
+    {
+        var catalog = new VisionAgentOperatorContractCatalog();
+        catalog.TryGet(operatorType, out var contract).Should().BeTrue();
+        return contract.DisplayName;
     }
 
     private static JsonElement Element(object value)
