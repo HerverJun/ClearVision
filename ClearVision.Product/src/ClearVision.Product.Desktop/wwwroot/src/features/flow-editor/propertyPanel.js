@@ -1040,6 +1040,7 @@ class PropertyPanel {
                         ${shouldRenderSlider ? `
                             <input type="range" 
                                    class="param-slider"
+                                   name="${name}"
                                    min="${min}" 
                                    max="${max}" 
                                    step="${stepValue}"
@@ -1221,22 +1222,6 @@ class PropertyPanel {
      * 初始化滑块同步
      */
     initSliders() {
-        const sliders = this.container.querySelectorAll('.param-slider');
-        sliders.forEach(slider => {
-            const targetInput = slider.parentElement.querySelector('input[type="number"]');
-            if (targetInput) {
-                slider.addEventListener('input', () => {
-                    targetInput.value = slider.value;
-                    targetInput.dispatchEvent(new Event('change'));
-                });
-
-                // 输入框改变时更新滑块
-                targetInput.addEventListener('input', () => {
-                    slider.value = targetInput.value;
-                });
-            }
-        });
-        
         // 颜色选择器预览更新
         const colorInputs = this.container.querySelectorAll('input[type="color"]');
         colorInputs.forEach(input => {
@@ -1290,7 +1275,76 @@ class PropertyPanel {
             this.syncImageAcquisitionSourceControls({ clearFilePathWhenCamera: true });
         });
 
+        const findSliderNumberInput = (slider) => {
+            const wrapper = slider.closest?.('.number-input-wrapper') || slider.parentElement;
+            if (!wrapper) {
+                return null;
+            }
+
+            const numberInputs = Array.from(wrapper.querySelectorAll?.('input[type="number"]') || []);
+            return numberInputs.find(item => item.name === slider.name) || numberInputs[0] || null;
+        };
+
+        const findNumberInputSlider = (numberInput) => {
+            const wrapper = numberInput.closest?.('.number-input-wrapper') || numberInput.parentElement;
+            if (!wrapper) {
+                return null;
+            }
+
+            const sliders = Array.from(wrapper.querySelectorAll?.('.param-slider') || []);
+            return sliders.find(item => item.name === numberInput.name) || sliders[0] || null;
+        };
+
+        const notifyInputChanged = (input) => {
+            if (this.shouldRerenderForCircleMeasurementParameter(input.name)) {
+                this._notifyValueChanged({ schedulePreview: false, syncRoiEditor: false });
+                this.render();
+                return;
+            }
+
+            this._notifyValueChanged();
+        };
+
+        Array.from(form.querySelectorAll('.param-slider')).forEach(slider => {
+            const numberInput = findSliderNumberInput(slider);
+            if (!numberInput) {
+                return;
+            }
+
+            slider.addEventListener('input', () => {
+                if (numberInput.value !== slider.value) {
+                    numberInput.value = slider.value;
+                }
+            });
+
+            slider.addEventListener('change', () => {
+                if (numberInput.value !== slider.value) {
+                    numberInput.value = slider.value;
+                }
+                notifyInputChanged(numberInput);
+            });
+        });
+
         inputs.forEach(input => {
+            if (input.type === 'range') {
+                return;
+            }
+
+            const slider = input.type === 'number' ? findNumberInputSlider(input) : null;
+            if (slider) {
+                input.addEventListener('input', () => {
+                    if (slider.value !== input.value) {
+                        slider.value = input.value;
+                    }
+                });
+
+                input.addEventListener('change', () => {
+                    if (slider.value !== input.value) {
+                        slider.value = input.value;
+                    }
+                });
+            }
+
             input.addEventListener('change', () => {
                 if (input.classList.contains('gv-binding-select')) {
                     this.applyGlobalVariableInputState();
@@ -1298,13 +1352,7 @@ class PropertyPanel {
                     return;
                 }
 
-                if (this.shouldRerenderForCircleMeasurementParameter(input.name)) {
-                    this._notifyValueChanged({ schedulePreview: false, syncRoiEditor: false });
-                    this.render();
-                    return;
-                }
-
-                this._notifyValueChanged();
+                notifyInputChanged(input);
             });
         });
 

@@ -218,6 +218,143 @@ function renderEnhancedParameter(param) {
   return panel.renderParameterEnhanced(param);
 }
 
+class PropertyPanelFakeInput {
+  constructor({ name, type, value = '', dataset = {}, classes = [] }) {
+    this.name = name;
+    this.type = type;
+    this.value = String(value);
+    this.dataset = dataset;
+    this.parentElement = null;
+    this.listeners = new Map();
+    this.classList = {
+      contains: className => classes.includes(className)
+    };
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
+    this.listeners.get(type).push(listener);
+  }
+
+  dispatchEvent(event) {
+    const type = typeof event === 'string' ? event : event?.type;
+    for (const listener of this.listeners.get(type) || []) {
+      listener({ type, target: this });
+    }
+  }
+
+  closest(selector) {
+    return selector === '.number-input-wrapper' ? this.parentElement : null;
+  }
+}
+
+class PropertyPanelFakeWrapper {
+  constructor(elements) {
+    this.elements = elements;
+    for (const element of elements) {
+      element.parentElement = this;
+    }
+  }
+
+  querySelectorAll(selector) {
+    if (selector === 'input[type="number"]') {
+      return this.elements.filter(element => element.type === 'number');
+    }
+    if (selector === '.param-slider') {
+      return this.elements.filter(element => element.classList.contains('param-slider'));
+    }
+    return [];
+  }
+}
+
+class PropertyPanelFakeForm {
+  constructor(elements) {
+    this.elements = elements;
+  }
+
+  querySelector(selector) {
+    if (selector === '#param-SourceType, #param-sourceType, select[name="SourceType"], select[name="sourceType"]') {
+      return null;
+    }
+    return null;
+  }
+
+  querySelectorAll(selector) {
+    if (selector === 'input, select' || selector === 'input[name], select[name]') {
+      return this.elements;
+    }
+    if (selector === '.param-slider') {
+      return this.elements.filter(element => element.classList.contains('param-slider'));
+    }
+    return [];
+  }
+}
+
+function createSliderSyncHarness() {
+  const numberInput = new PropertyPanelFakeInput({
+    name: 'Gain',
+    type: 'number',
+    value: '42',
+    dataset: { type: 'double' }
+  });
+  const slider = new PropertyPanelFakeInput({
+    name: 'Gain',
+    type: 'range',
+    value: '42',
+    classes: ['param-slider']
+  });
+  const wrapper = new PropertyPanelFakeWrapper([numberInput, slider]);
+  const form = new PropertyPanelFakeForm([numberInput, slider]);
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    getElementById(id) {
+      return id === 'property-form' ? form : null;
+    }
+  };
+
+  const notifications = [];
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    container: { querySelectorAll: () => [] },
+    currentOperator: {
+      id: 'property-node',
+      type: 'CaliperTool',
+      parameters: [{ name: 'Gain', dataType: 'double', value: 42 }]
+    },
+    shouldRerenderForCircleMeasurementParameter() {
+      return false;
+    },
+    _notifyValueChanged() {
+      notifications.push(this.getValues());
+    },
+    validateCurrentOperator() {
+      return true;
+    },
+    syncGlobalVariableTargetBindings() {},
+    showToast() {}
+  });
+
+  panel.bindEvents();
+
+  return {
+    form,
+    numberInput,
+    panel,
+    restoreDocument() {
+      if (previousDocument === undefined) {
+        delete globalThis.document;
+      } else {
+        globalThis.document = previousDocument;
+      }
+    },
+    slider,
+    notifications,
+    wrapper
+  };
+}
+
 test('PropertyPanel renders ranged numeric parameters as number inputs without sliders by default', () => {
   for (const param of [
     { name: 'ExpectedCount', displayName: '期望数量', dataType: 'int', value: 3, min: 1, max: 12 },
@@ -265,6 +402,53 @@ test('PropertyPanel renders sliders for explicit uiControl control or editor met
     });
 
     assert.match(html, /class="param-slider"/);
+  }
+});
+
+test('PropertyPanel explicit slider input syncs the sibling number input without notifying', () => {
+  const harness = createSliderSyncHarness();
+  try {
+    harness.slider.value = '64';
+    harness.slider.dispatchEvent('input');
+
+    assert.equal(harness.numberInput.value, '64');
+    assert.deepEqual(harness.notifications, []);
+  } finally {
+    harness.restoreDocument();
+  }
+});
+
+test('PropertyPanel number input input and change sync the sibling explicit slider', () => {
+  const harness = createSliderSyncHarness();
+  try {
+    harness.numberInput.value = '55';
+    harness.numberInput.dispatchEvent('input');
+    assert.equal(harness.slider.value, '55');
+    assert.deepEqual(harness.notifications, []);
+
+    harness.numberInput.value = '71';
+    harness.numberInput.dispatchEvent('change');
+    assert.equal(harness.slider.value, '71');
+    assert.deepEqual(harness.notifications, [{ Gain: 71 }]);
+  } finally {
+    harness.restoreDocument();
+  }
+});
+
+test('PropertyPanel slider changes are read through the synchronized number input', () => {
+  const harness = createSliderSyncHarness();
+  try {
+    harness.slider.value = '88';
+    harness.slider.dispatchEvent('change');
+
+    assert.equal(harness.numberInput.value, '88');
+    assert.equal(harness.panel.getValues().Gain, 88);
+    assert.deepEqual(harness.notifications, [{ Gain: 88 }]);
+
+    assert.equal(harness.panel.applyChanges({ showToast: false }), true);
+    assert.deepEqual(harness.notifications, [{ Gain: 88 }, { Gain: 88 }]);
+  } finally {
+    harness.restoreDocument();
   }
 });
 
