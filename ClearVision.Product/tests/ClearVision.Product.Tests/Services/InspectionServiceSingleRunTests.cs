@@ -5,9 +5,11 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -460,6 +462,149 @@ public class InspectionServiceSingleRunTests
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.TryGetProperty("MissingJudgmentSignal", out var missingSignal).Should().BeTrue();
         missingSignal.GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenResultOutputMissingJudgmentAndResultJudgmentOk_ShouldUseResultJudgment()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["JudgmentResult"] = "OK"
+            },
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-output",
+                ["Payload"] = "business-only"
+            });
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        result.ErrorMessage.Should().BeNull();
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DerivedFromJudgmentResult");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenResultOutputMissingJudgmentAndResultJudgmentNg_ShouldUseResultJudgment()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["JudgmentResult"] = "NG"
+            },
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-output",
+                ["Payload"] = "business-only"
+            });
+
+        result.Status.Should().Be(InspectionStatus.NG);
+        result.ErrorMessage.Should().BeNull();
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenResultOutputHasValidJudgment_ShouldPreferResultOutput()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["JudgmentResult"] = "NG"
+            },
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-output",
+                ["Result"] = true
+            });
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        result.ErrorMessage.Should().BeNull();
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Result");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DerivedFromResult");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenResultOutputHasInvalidJudgment_ShouldNotFallbackToResultJudgment()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["JudgmentResult"] = "OK"
+            },
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-output",
+                ["IsOk"] = "not-bool"
+            });
+
+        result.Status.Should().Be(InspectionStatus.Error);
+        result.ErrorMessage.Should().Contain("InvalidJudgmentType:IsOk");
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("IsOk");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenOnlyResultJudgmentExists_ShouldKeepUsingResultJudgment()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["JudgmentResult"] = "OK"
+            },
+            resultOutputData: null);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        result.ErrorMessage.Should().BeNull();
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WhenResultOutputAndResultJudgmentBothMissingJudgment_ShouldKeepMissingSignalError()
+    {
+        var result = await ExecuteResultSelectionInspectionAsync(
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-judgment",
+                ["Payload"] = "judge-business-only"
+            },
+            new Dictionary<string, object>
+            {
+                ["SelectedSource"] = "result-output",
+                ["Payload"] = "output-business-only"
+            });
+
+        result.Status.Should().Be(InspectionStatus.Error);
+        result.ErrorMessage.Should().Be("MissingJudgmentSignal");
+
+        using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("None");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("MissingJudgmentSignal");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -1256,6 +1401,104 @@ public class InspectionServiceSingleRunTests
             .Should()
             .ContainSingle()
             .Subject;
+    }
+
+    private static async Task<InspectionResult> ExecuteResultSelectionInspectionAsync(
+        Dictionary<string, object> resultJudgmentData,
+        Dictionary<string, object>? resultOutputData)
+    {
+        var projectId = Guid.NewGuid();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var executors = new List<IOperatorExecutor>
+        {
+            CreateStaticOutputExecutor(OperatorType.ResultJudgment, resultJudgmentData)
+        };
+
+        if (resultOutputData != null)
+        {
+            executors.Add(CreateStaticOutputExecutor(OperatorType.ResultOutput, resultOutputData));
+        }
+
+        using var flowExecution = new FlowExecutionService(
+            executors,
+            NullLogger<FlowExecutionService>.Instance,
+            Substitute.For<IVariableContext>());
+
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
+        coordinator
+            .TryStartAsync(projectId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(StartResult.Success));
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            coordinator,
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        return await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            CreateResultSelectionFlow(includeResultOutput: resultOutputData != null));
+    }
+
+    private static IOperatorExecutor CreateStaticOutputExecutor(
+        OperatorType operatorType,
+        IReadOnlyDictionary<string, object> outputData)
+    {
+        var executor = Substitute.For<IOperatorExecutor>();
+        executor.OperatorType.Returns(operatorType);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        executor
+            .ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(OperatorExecutionOutput.Success(
+                new Dictionary<string, object>(outputData, StringComparer.OrdinalIgnoreCase),
+                executionTimeMs: 1)));
+
+        return executor;
+    }
+
+    private static OperatorFlow CreateResultSelectionFlow(bool includeResultOutput)
+    {
+        var flow = new OperatorFlow("result-selection-flow");
+        var judgment = CreateResultSelectionOperator("Judge", OperatorType.ResultJudgment);
+        flow.AddOperator(judgment);
+
+        if (!includeResultOutput)
+        {
+            return flow;
+        }
+
+        var output = CreateResultSelectionOperator("Output", OperatorType.ResultOutput);
+        flow.AddOperator(output);
+        flow.AddConnection(new OperatorConnection(
+            judgment.Id,
+            judgment.OutputPorts.Single().Id,
+            output.Id,
+            output.InputPorts.Single().Id));
+        return flow;
+    }
+
+    private static Operator CreateResultSelectionOperator(string name, OperatorType operatorType)
+    {
+        var op = new Operator(Guid.NewGuid(), name, operatorType, 0, 0);
+        op.AddInputPort("Input", PortDataType.Any, isRequired: false);
+        op.AddOutputPort("Output", PortDataType.Any);
+        return op;
     }
 
     private static OperatorFlow CreateFlow(string operatorName)
