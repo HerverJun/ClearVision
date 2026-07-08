@@ -13,6 +13,60 @@ namespace ClearVision.Product.Tests.Services;
 public class TcpDeviceManagerTests
 {
     [Fact]
+    public async Task SendTransientAsync_WithSameIdAsPersistentSession_ShouldNotCloseOrAffectPersistentConnection()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = RunConcurrentEchoServerAsync(listener, cts.Token);
+
+        // 同一个 profile.Id ("robot") 既用于持久连接，也用于 transient 发送，
+        // 用来覆盖 transient 误关闭同 Id 持久连接的隔离边界。
+        var profile = CreateClientProfile("robot", port);
+        await using var manager = CreateManager(profile);
+
+        try
+        {
+            // 1. 建立持久连接。
+            var connect = await manager.ConnectAsync("robot", cts.Token);
+            connect.Success.Should().BeTrue(connect.Message);
+
+            var connectedStatus = await manager.GetStatusAsync("robot", cts.Token);
+            connectedStatus.IsConnected.Should().BeTrue();
+
+            // 2. 使用相同 profile.Id 的 transient 发送。
+            var transient = await manager.SendTransientAsync(
+                CreateClientProfile("robot", port),
+                new TcpDeviceSendRequest("PING", WaitResponse: true, ResponseTimeoutMs: 2500),
+                cts.Token);
+            transient.Success.Should().BeTrue(transient.Message);
+            transient.Response.Should().Be("PING");
+
+            // 3. transient 成功后持久连接仍应存在，不被误关闭。
+            var statusAfterTransient = await manager.GetStatusAsync("robot", cts.Token);
+            statusAfterTransient.IsConnected.Should().BeTrue("transient 发送不得关闭同 profile.Id 的持久连接");
+            statusAfterTransient.RemoteEndpoint.Should().NotBeNull();
+
+            // 4. 持久连接后续 SendAsync 仍可继续发送成功。
+            var persistentSend = await manager.SendAsync(
+                "robot",
+                new TcpDeviceSendRequest("PONG", WaitResponse: true, ResponseTimeoutMs: 2500),
+                cts.Token);
+            persistentSend.Success.Should().BeTrue(persistentSend.Message);
+            persistentSend.Response.Should().Be("PONG");
+            persistentSend.Status.Should().NotBeNull();
+            persistentSend.Status!.IsConnected.Should().BeTrue();
+        }
+        finally
+        {
+            cts.Cancel();
+            listener.Stop();
+            await IgnoreServerTerminationAsync(serverTask);
+        }
+    }
+
+    [Fact]
     public async Task SendAsync_ClientProfile_ShouldConnectSendAndReceiveLoopbackResponse()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -361,6 +415,47 @@ public class TcpDeviceManagerTests
 
             await stream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
             await stream.FlushAsync(cancellationToken);
+        }
+    }
+
+    // 并发 echo 服务器：每个连接在独立任务里读取一次请求并原样回显。
+    // 与 RunEchoServerLoopAsync 不同，它不会在单个连接上阻塞，
+    // 因此允许持久连接与 transient 连接同时在线（覆盖同 profile.Id 隔离场景）。
+    private static async Task RunConcurrentEchoServerAsync(TcpListener listener, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var client = await listener.AcceptTcpClientAsync(cancellationToken);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using (client)
+                    await using (var stream = client.GetStream())
+                    {
+                        var buffer = new byte[256];
+                        while (!cancellationToken.IsCancellationRequested)
+                        {
+                            var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+                            if (read == 0)
+                            {
+                                break;
+                            }
+
+                            await stream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                            await stream.FlushAsync(cancellationToken);
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected on test cleanup.
+                }
+                catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or InvalidOperationException)
+                {
+                    // Connection torn down during cleanup.
+                }
+            }, CancellationToken.None);
         }
     }
 

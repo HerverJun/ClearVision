@@ -402,6 +402,20 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
             return await SendServerAsync(profile, request, cancellationToken);
         }
 
+        // Transient 与 persistent 走完全独立的客户端路径：
+        // - persistent 复用 / 建立 _clients 中的持久连接（ConnectAsync + SendAsync）；
+        // - transient 使用一次性临时连接，绝不读取、复用或删除 _clients 中同 profile.Id
+        //   的持久连接，因此即便二者 profile.Id 相同也不会互相影响。
+        return persistSession
+            ? await SendPersistentClientAsync(profile, request, cancellationToken)
+            : await SendTransientClientAsync(profile, request, cancellationToken);
+    }
+
+    private async Task<TcpDeviceSendResult> SendPersistentClientAsync(
+        TcpCommunicationProfile profile,
+        TcpDeviceSendRequest request,
+        CancellationToken cancellationToken)
+    {
         var payloadBytesResult = TryBuildPayloadBytes(profile, request.Payload, request.IsHex, out var payloadBytes, out var payloadError);
         if (!payloadBytesResult)
         {
@@ -455,11 +469,8 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
                     response = DecodeFrameText(profile, responseBytes);
                 }
 
-                // Transient 发送成功后不保留连接，返回的状态也必须体现"已释放"，
-                // 否则调用方会误以为存在可复用连接。
-                var successStatus = persistSession
-                    ? BuildClientStatus(profile, session)
-                    : BuildReleasedStatus(profile);
+                // Persistent 发送成功后保留连接，返回真实连接状态。
+                var successStatus = BuildClientStatus(profile, session);
                 return TcpDeviceSendResult.Ok("发送成功。", response, successStatus);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -487,12 +498,116 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
         finally
         {
             session.RequestLock.Release();
-            if (removeSessionAfterRelease || !persistSession)
+            if (removeSessionAfterRelease)
             {
                 await RemoveClientSessionAsync(profile.Id);
                 // 释放后把存储的状态也收敛为"未连接"，确保后续 GetStatusAsync 不会
                 // 报告一个已不存在的可复用连接。
                 MarkReleasedStatus(profile.Id, profile.Mode);
+            }
+        }
+    }
+
+    // Transient 客户端发送：使用独立的一次性 TcpClient，完成后只释放自己创建的连接。
+    // 关键约束：绝不读取、复用或删除 _clients 中同 profile.Id 的持久连接，也不覆盖其
+    // _statuses 记录。因此即便 transient profile.Id 与已有 persistent profile.Id 相同，
+    // transient 发送也不会误关闭持久连接或篡改其状态。
+    private async Task<TcpDeviceSendResult> SendTransientClientAsync(
+        TcpCommunicationProfile profile,
+        TcpDeviceSendRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (profile.Mode != TcpCommunicationProfile.ModeClient)
+        {
+            return TcpDeviceSendResult.Fail("当前 Profile 是 Server 模式，请在全局 TCP 通讯页启动监听。", CreateStatus(profile.Id, profile.Mode));
+        }
+
+        var validation = TcpCommunicationConfigValidator.ValidateProfileForOperation(profile);
+        if (!validation.IsValid)
+        {
+            return TcpDeviceSendResult.Fail("TCP Profile 校验失败。", CreateStatus(profile.Id, profile.Mode), validation.Errors);
+        }
+
+        var payloadBytesResult = TryBuildPayloadBytes(profile, request.Payload, request.IsHex, out var payloadBytes, out var payloadError);
+        if (!payloadBytesResult)
+        {
+            return TcpDeviceSendResult.Fail(payloadError, CreateStatus(profile.Id, profile.Mode));
+        }
+
+        var client = new TcpClient
+        {
+            NoDelay = true,
+            ReceiveTimeout = profile.TimeoutMs,
+            SendTimeout = profile.TimeoutMs
+        };
+        ApplyKeepAlive(client, profile.KeepAlive);
+
+        try
+        {
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            connectCts.CancelAfter(profile.TimeoutMs);
+
+            try
+            {
+                await client.ConnectAsync(profile.RemoteHost, profile.RemotePort, connectCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return TcpDeviceSendResult.Fail("连接超时。", CreateStatus(profile.Id, profile.Mode));
+            }
+            catch (SocketException ex)
+            {
+                return TcpDeviceSendResult.Fail($"连接失败: {ex.Message}", CreateStatus(profile.Id, profile.Mode));
+            }
+
+            var remoteEndpoint = client.Client.RemoteEndPoint?.ToString();
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(ResolveOperationTimeout(profile, request.ResponseTimeoutMs));
+
+            try
+            {
+                var stream = client.GetStream();
+                await stream.WriteAsync(payloadBytes, timeoutCts.Token);
+                await stream.FlushAsync(timeoutCts.Token);
+                AddFrame(profile, "Tx", payloadBytes, remoteEndpoint);
+
+                var response = string.Empty;
+                if (request.WaitResponse)
+                {
+                    var responseBytes = await ReadOneFrameAsync(stream, profile, timeoutCts.Token);
+                    if (responseBytes.Length == 0)
+                    {
+                        return TcpDeviceSendResult.Fail("连接已关闭。", CreateStatus(profile.Id, profile.Mode));
+                    }
+
+                    AddFrame(profile, "Rx", responseBytes, remoteEndpoint);
+                    response = DecodeFrameText(profile, responseBytes);
+                }
+
+                // Transient 成功后即释放连接，返回的状态必须体现"未连接"，不得暗示可复用连接。
+                return TcpDeviceSendResult.Ok("发送成功。", response, CreateStatus(profile.Id, profile.Mode));
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return TcpDeviceSendResult.Fail("通信超时。", CreateStatus(profile.Id, profile.Mode));
+            }
+            catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or InvalidOperationException)
+            {
+                _logger.LogError(ex, "TCP transient send failed for profile {ProfileId}", profile.Id);
+                return TcpDeviceSendResult.Fail($"通信错误: {ex.Message}", CreateStatus(profile.Id, profile.Mode));
+            }
+        }
+        finally
+        {
+            // 只释放本方法创建的临时连接，不触碰 _clients / _statuses。
+            try
+            {
+                client.Close();
+                client.Dispose();
+            }
+            catch
+            {
+                // Ignore cleanup exceptions.
             }
         }
     }
@@ -1042,12 +1157,6 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
         };
         _statuses[profile.Id] = status;
         return status;
-    }
-
-    // Transient 发送释放连接后对外呈现的状态：未连接、无端点，明确表示不存在可复用连接。
-    private TcpProfileStatus BuildReleasedStatus(TcpCommunicationProfile profile)
-    {
-        return MarkReleasedStatus(profile.Id, profile.Mode);
     }
 
     private TcpProfileStatus MarkReleasedStatus(string profileId, string mode)
