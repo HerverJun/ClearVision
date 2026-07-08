@@ -408,16 +408,32 @@ static class Program
 
     private static StaticFileOptions CreateDesktopStaticFileOptions(IFileProvider provider)
     {
-        var staticFileOptions = new StaticFileOptions { FileProvider = provider };
-#if DEBUG
-        staticFileOptions.OnPrepareResponse = context =>
+        var staticFileOptions = new StaticFileOptions
         {
-            context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
-            context.Context.Response.Headers.Pragma = "no-cache";
-            context.Context.Response.Headers.Expires = "0";
+            FileProvider = provider,
+            OnPrepareResponse = context =>
+            {
+                if (!ShouldDisableDesktopStaticFileCaching(context.File.Name))
+                {
+                    return;
+                }
+
+                context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+                context.Context.Response.Headers.Pragma = "no-cache";
+                context.Context.Response.Headers.Expires = "0";
+            }
         };
-#endif
+
         return staticFileOptions;
+    }
+
+    private static bool ShouldDisableDesktopStaticFileCaching(string? fileName)
+    {
+        var extension = Path.GetExtension(fileName);
+        return string.Equals(extension, ".html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".js", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".mjs", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".css", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void InitializeVisionDatabase(IServiceProvider services)

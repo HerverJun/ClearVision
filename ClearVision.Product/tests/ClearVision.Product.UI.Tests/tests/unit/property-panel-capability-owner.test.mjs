@@ -37,6 +37,41 @@ function collectOperatorParams() {
   return records;
 }
 
+function installFakeDocument() {
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document');
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement() {
+      return {
+        _text: '',
+        innerHTML: '',
+        set textContent(value) {
+          this._text = value == null ? '' : String(value);
+          this.innerHTML = this._text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        },
+        get textContent() {
+          return this._text;
+        }
+      };
+    }
+  };
+
+  return () => {
+    if (hadDocument) {
+      globalThis.document = previousDocument;
+    } else {
+      delete globalThis.document;
+    }
+  };
+}
+
+function countSliderMarkup(html) {
+  return (String(html).match(/class="param-slider"/g) || []).length;
+}
+
 async function loadPropertyPanelCapabilityOwner() {
   const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
   const previousWindow = globalThis.window;
@@ -1678,6 +1713,207 @@ test('PropertyPanelCapabilityOwner clears acquisition file path only for explici
     FilePath: '',
     CameraBindingId: 'line-camera-01'
   });
+});
+
+test('PropertyPanelCapabilityOwner does not render implicit sliders for ranged Caliper numeric parameters', async () => {
+  const cleanupDocument = installFakeDocument();
+  try {
+    const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+    const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+    owner.currentOperator = {
+      id: 'caliper-1',
+      type: 'CaliperTool',
+      parameters: []
+    };
+    const params = [
+      { name: 'Angle', displayName: 'Angle', dataType: 'double', value: 0, min: -180, max: 180 },
+      { name: 'EdgeThreshold', displayName: 'Edge threshold', dataType: 'float', value: 10, Min: 0, Max: 255 },
+      { name: 'ExpectedCount', displayName: 'Expected count', dataType: 'int', value: 1, minValue: 1, maxValue: 10 }
+    ];
+
+    const html = params.map(param => owner.renderParameterField(param)).join('\n');
+
+    assert.equal(countSliderMarkup(html), 0);
+    assert.equal((html.match(/type="number"/g) || []).length, 3);
+    assert.match(html, /name="Angle"[\s\S]*min="-180"[\s\S]*max="180"/);
+    assert.match(html, /name="EdgeThreshold"[\s\S]*min="0"[\s\S]*max="255"/);
+    assert.match(html, /name="ExpectedCount"[\s\S]*min="1"[\s\S]*max="10"/);
+    for (const param of params) {
+      assert.equal(owner.shouldRenderParameterSlider(param), false);
+    }
+  } finally {
+    cleanupDocument();
+  }
+});
+
+test('PropertyPanelCapabilityOwner renders sliders only for explicit slider metadata', async () => {
+  const cleanupDocument = installFakeDocument();
+  try {
+    const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+    const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+    owner.currentOperator = {
+      id: 'slider-fixture',
+      type: 'SyntheticTool',
+      parameters: []
+    };
+    const explicitParams = [
+      { name: 'ShowSlider', dataType: 'double', value: 3, min: 0, max: 10, showSlider: true },
+      { name: 'PascalShowSlider', dataType: 'double', value: 3, min: 0, max: 10, ShowSlider: true },
+      { name: 'UiControlSlider', dataType: 'double', value: 3, min: 0, max: 10, UIControl: 'Slider' },
+      { name: 'ControlSlider', dataType: 'double', value: 3, min: 0, max: 10, control: 'slider' },
+      { name: 'EditorSlider', dataType: 'double', value: 3, min: 0, max: 10, editor: 'SLIDER' }
+    ];
+
+    for (const param of explicitParams) {
+      const html = owner.renderParameterField(param);
+      assert.equal(countSliderMarkup(html), 1);
+      assert.match(html, new RegExp(`type="range"[\\s\\S]*name="${param.name}"`));
+      assert.equal(owner.shouldRenderParameterSlider(param), true);
+    }
+
+    const inferredNameHtml = owner.renderParameterField({
+      name: 'ThresholdWithRange',
+      dataType: 'double',
+      value: 3,
+      min: 0,
+      max: 10
+    });
+    assert.equal(countSliderMarkup(inferredNameHtml), 0);
+  } finally {
+    cleanupDocument();
+  }
+});
+
+test('PropertyPanelCapabilityOwner keeps required marker separate from slider rendering', async () => {
+  const cleanupDocument = installFakeDocument();
+  try {
+    const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+    const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+    owner.currentOperator = {
+      id: 'required-fixture',
+      type: 'SyntheticTool',
+      parameters: []
+    };
+
+    const html = owner.renderParameterField({
+      name: 'RequiredCount',
+      displayName: 'Required count',
+      dataType: 'int',
+      value: 1,
+      min: 0,
+      max: 10,
+      isRequired: true
+    });
+
+    assert.match(html, /<span class="required">\*<\/span>/);
+    assert.equal(countSliderMarkup(html), 0);
+  } finally {
+    cleanupDocument();
+  }
+});
+
+test('PropertyPanelCapabilityOwner synchronizes explicit sliders with number inputs without input write storms', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  const writes = [];
+  let collectedChangedName = null;
+  let numberInput;
+  let slider;
+  const wrapper = {
+    querySelectorAll(selector) {
+      if (selector === 'input[type="number"][data-property-parameter="true"]') {
+        return [numberInput];
+      }
+      if (selector === '.param-slider') {
+        return [slider];
+      }
+      return [];
+    },
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] || null;
+    }
+  };
+  numberInput = {
+    name: 'Gain',
+    type: 'number',
+    value: '4',
+    disabled: false,
+    readOnly: false,
+    dataset: { type: 'double' },
+    parentElement: wrapper,
+    closest(selector) {
+      return selector === '[data-property-parameter="true"]' ||
+        selector === 'input[type="number"][data-property-parameter="true"]'
+        ? numberInput
+        : null;
+    },
+    getAttribute() {
+      return null;
+    }
+  };
+  slider = {
+    name: 'Gain',
+    value: '7',
+    disabled: false,
+    readOnly: false,
+    parentElement: wrapper,
+    closest(selector) {
+      return selector === '.param-slider' ? slider : null;
+    },
+    getAttribute(name) {
+      return name === 'name' ? 'Gain' : null;
+    },
+    dispatchEvent() {
+      throw new Error('slider sync should not dispatch nested events');
+    }
+  };
+  Object.assign(owner, {
+    currentNodeId: 'slider-fixture',
+    currentOperator: {
+      id: 'slider-fixture',
+      type: 'SyntheticTool',
+      parameters: [
+        { name: 'Gain', value: 4, dataType: 'double', min: 0, max: 10, showSlider: true }
+      ]
+    },
+    validationErrors: [],
+    dirty: false,
+    disposed: false,
+    collectNormalizedFormValues(changedName) {
+      collectedChangedName = changedName;
+      return { Gain: Number(numberInput.value) };
+    },
+    validateValues() {
+      return [];
+    },
+    buildWriteValues(parameterName, values) {
+      return { [parameterName]: values[parameterName] };
+    },
+    propertyAdapter: {
+      writeParameters(nodeId, values) {
+        writes.push({ nodeId, values });
+        return { updated: true };
+      }
+    },
+    syncParameterDependencyControls() {},
+    renderValidationErrors() {},
+    updateStatus() {}
+  });
+
+  owner.handleContainerInput({ target: slider });
+  assert.equal(numberInput.value, '7');
+  assert.deepEqual(writes, []);
+
+  owner.handleContainerChange({ target: slider });
+  assert.equal(collectedChangedName, 'Gain');
+  assert.deepEqual(writes, [
+    { nodeId: 'slider-fixture', values: { Gain: 7 } }
+  ]);
+  assert.equal(owner.currentOperator.parameters[0].value, 7);
+
+  numberInput.value = '5';
+  owner.handleContainerInput({ target: numberInput });
+  assert.equal(slider.value, '5');
 });
 
 test('Studio2 Inspector keeps the full legacy PropertyPanel capability surface', () => {

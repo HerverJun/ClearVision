@@ -184,6 +184,24 @@ function getParameterRangeValue(parameter, ...keys) {
     return null;
 }
 
+function shouldRenderParameterSlider(parameter) {
+    if (!parameter || typeof parameter !== 'object') {
+        return false;
+    }
+
+    const metadata = new Map(
+        Object.entries(parameter).map(([key, value]) => [String(key).toLowerCase(), value])
+    );
+
+    if (metadata.get('showslider') === true) {
+        return true;
+    }
+
+    return ['uicontrol', 'control', 'editor'].some(key =>
+        String(metadata.get(key) ?? '').trim().toLowerCase() === 'slider'
+    );
+}
+
 function isEmptyValue(value) {
     return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 }
@@ -600,12 +618,13 @@ export class PropertyPanelCapabilityOwner {
     handleContainerInput(event) {
         const slider = event.target?.closest?.('.param-slider');
         if (slider) {
-            const numberInput = slider.parentElement?.querySelector('input[type="number"][data-property-parameter="true"]');
-            if (numberInput && !numberInput.disabled && !numberInput.readOnly) {
-                numberInput.value = slider.value;
-                numberInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+            this.syncNumberInputFromSlider(slider);
             return;
+        }
+
+        const numberInput = event.target?.closest?.('input[type="number"][data-property-parameter="true"]');
+        if (numberInput) {
+            this.syncSliderFromNumberInput(numberInput);
         }
 
         const colorInput = event.target?.closest?.('input[type="color"][data-property-parameter="true"]');
@@ -680,13 +699,79 @@ export class PropertyPanelCapabilityOwner {
         this.handleContainerChange({ target: input });
     }
 
+    findNumberInputForSlider(slider) {
+        const parent = slider?.parentElement;
+        if (!parent) {
+            return null;
+        }
+
+        const selector = 'input[type="number"][data-property-parameter="true"]';
+        const sliderName = String(slider.name || slider.getAttribute?.('name') || '').trim();
+        const candidates = Array.from(parent.querySelectorAll?.(selector) || []);
+        if (sliderName) {
+            const namedInput = candidates.find(input =>
+                String(input.name || input.getAttribute?.('name') || '').trim() === sliderName
+            );
+            if (namedInput) {
+                return namedInput;
+            }
+        }
+
+        return candidates[0] || parent.querySelector?.(selector) || null;
+    }
+
+    findSliderForNumberInput(input) {
+        const parent = input?.parentElement;
+        if (!parent) {
+            return null;
+        }
+
+        const inputName = String(input.name || input.getAttribute?.('name') || '').trim();
+        const candidates = Array.from(parent.querySelectorAll?.('.param-slider') || []);
+        if (inputName) {
+            const namedSlider = candidates.find(slider =>
+                String(slider.name || slider.getAttribute?.('name') || '').trim() === inputName
+            );
+            if (namedSlider) {
+                return namedSlider;
+            }
+        }
+
+        return candidates[0] || parent.querySelector?.('.param-slider') || null;
+    }
+
+    syncNumberInputFromSlider(slider) {
+        const numberInput = this.findNumberInputForSlider(slider);
+        if (numberInput && !numberInput.disabled && !numberInput.readOnly) {
+            numberInput.value = slider.value;
+        }
+
+        return numberInput;
+    }
+
+    syncSliderFromNumberInput(input) {
+        const slider = this.findSliderForNumberInput(input);
+        if (slider && !slider.disabled && !slider.readOnly) {
+            slider.value = input.value;
+        }
+
+        return slider;
+    }
+
     handleContainerChange(event) {
-        const input = event.target?.closest?.('[data-property-parameter="true"]');
+        const slider = event.target?.closest?.('.param-slider');
+        const input = slider
+            ? this.syncNumberInputFromSlider(slider)
+            : event.target?.closest?.('[data-property-parameter="true"]');
         if (!input || !this.currentNodeId || this.disposed) {
             return;
         }
         if (isElementEffectivelyDisabled(input)) {
             return;
+        }
+
+        if (!slider && input.type === 'number') {
+            this.syncSliderFromNumberInput(input);
         }
 
         const values = this.collectNormalizedFormValues(input.name);
@@ -1093,6 +1178,10 @@ export class PropertyPanelCapabilityOwner {
 
     setOperator(operator) {
         this.handleSelectedNodeChanged(operator);
+    }
+
+    shouldRenderParameterSlider(parameter) {
+        return shouldRenderParameterSlider(parameter);
     }
 
     clear() {
@@ -1890,6 +1979,7 @@ export class PropertyPanelCapabilityOwner {
             const max = getParameterRangeValue(parameter, 'max', 'Max', 'maxValue', 'MaxValue');
             const step = parameter?.step ?? parameter?.Step ?? (controlType === 'int' || controlType === 'integer' ? 1 : 0.1);
             const hasRange = min !== null && max !== null;
+            const shouldRenderSlider = hasRange && this.shouldRenderParameterSlider(parameter);
             return `
                 <div class="number-input-wrapper">
                     <input type="number"
@@ -1901,9 +1991,10 @@ export class PropertyPanelCapabilityOwner {
                            class="form-input number-input"
                            data-type="${controlType}"
                            ${disabled}>
-                    ${hasRange ? `
+                    ${shouldRenderSlider ? `
                         <input type="range"
                                class="param-slider"
+                               name="${escapeAttribute(name)}"
                                min="${min}"
                                max="${max}"
                                step="${escapeAttribute(step)}"
