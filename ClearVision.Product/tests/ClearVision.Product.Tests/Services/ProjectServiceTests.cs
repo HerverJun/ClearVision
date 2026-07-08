@@ -501,6 +501,7 @@ public class ProjectServiceTests
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
         var project = new Project("demo");
+        project.UpdateFlow(new OperatorFlow("DbOnlyFlow"));
         storage.Seed(project.Id, SerializeFlow(new OperatorFlowDto { Name = "ExistingFlow" }), 0);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
@@ -523,6 +524,37 @@ public class ProjectServiceTests
         });
 
         DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("ExistingFlow");
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().NotBe("MainFlow");
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_WhenNameIsOmittedAndStoredFlowMissing_ShouldPreserveDatabaseFlowName()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        project.UpdateFlow(new OperatorFlow("DbOnlyFlow"));
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "ResultOutput",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.ResultOutput
+                }
+            ],
+            Connections = []
+        });
+
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("DbOnlyFlow");
         DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().NotBe("MainFlow");
     }
 

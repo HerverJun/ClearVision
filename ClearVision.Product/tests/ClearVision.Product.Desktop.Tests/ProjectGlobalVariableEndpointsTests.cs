@@ -481,7 +481,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
             CreateSchema(variableId, 1, manualWriteAllowed: true),
             storedFlowJson: SerializeFlow(new OperatorFlowDto { Name = "ExistingEndpointFlow" }),
-            flowStorage: flowStorage);
+            flowStorage: flowStorage,
+            databaseFlowName: "DbEndpointFlow");
 
         using var response = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/flow",
@@ -502,6 +503,37 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         DeserializeFlow(flowStorage.LastSavedFlowJson!).Name.Should().Be("ExistingEndpointFlow");
+    }
+
+    [Fact]
+    public async Task FlowPut_WhenNameIsOmittedAndStoredFlowMissing_ShouldPreserveDatabaseFlowName()
+    {
+        var variableId = Guid.NewGuid();
+        var flowStorage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            flowStorage: flowStorage,
+            databaseFlowName: "DbOnlyFlow");
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/flow",
+            new UpdateFlowRequest
+            {
+                ExpectedPersistenceRevision = 0,
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "ResultOutput",
+                        Type = OperatorType.ResultOutput
+                    }
+                ],
+                Connections = []
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        DeserializeFlow(flowStorage.LastSavedFlowJson!).Name.Should().Be("DbOnlyFlow");
     }
 
     [Fact]
@@ -972,10 +1004,16 @@ public sealed class ProjectGlobalVariableEndpointsTests
             IProjectVariableStateStore? stateStore = null,
             IProjectFlowStorage? flowStorage = null,
             IProjectAssetStorage? assetStorage = null,
-            UserRole role = UserRole.Admin)
+            UserRole role = UserRole.Admin,
+            string? databaseFlowName = null)
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
+            if (!string.IsNullOrWhiteSpace(databaseFlowName))
+            {
+                project.UpdateFlow(new OperatorFlow(databaseFlowName));
+            }
+
             project.UpdateGlobalVariables(schema);
             var repository = Substitute.For<IProjectRepository>();
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));

@@ -339,7 +339,7 @@ public class ProjectService
         // 2. 构造流程DTO
         var flowDto = new OperatorFlowDto
         {
-            Name = ResolveFlowName(request.Name, existingFlow?.Name),
+            Name = ResolveFlowName(request.Name, existingFlow?.Name, project.Flow?.Name),
             Operators = request.Operators,
             Connections = request.Connections
         };
@@ -356,16 +356,21 @@ public class ProjectService
         // await _projectRepository.UpdateAsync(project);
     }
 
-    private static string ResolveFlowName(string? requestedName, string? existingName)
+    private static string ResolveFlowName(string? requestedName, string? storedName, string? databaseName)
     {
         if (!string.IsNullOrWhiteSpace(requestedName))
         {
             return requestedName.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(existingName))
+        if (!string.IsNullOrWhiteSpace(storedName))
         {
-            return existingName.Trim();
+            return storedName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(databaseName))
+        {
+            return databaseName.Trim();
         }
 
         return "MainFlow";
