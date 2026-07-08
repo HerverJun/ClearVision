@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,13 @@ namespace ClearVision.Product.Tests.Operators;
 public class TcpCommunicationOperatorTests
 {
     private readonly TcpCommunicationOperator _operator;
+
+    public static TheoryData<string, object, string> NestedResultPayloads => new()
+    {
+        { "dictionary", new Dictionary<string, object> { ["Score"] = 96 }, "96" },
+        { "object", new ResultPayload { Score = 97 }, "97" },
+        { "json", "{\"Score\":98}", "98" }
+    };
 
     public TcpCommunicationOperatorTests()
     {
@@ -37,6 +45,16 @@ public class TcpCommunicationOperatorTests
     {
         var op = new Operator("test", OperatorType.TcpCommunication, 0, 0);
         _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Metadata_ShouldDefaultFailOnUnresolvedPayloadPlaceholderToTrue()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.TcpCommunication)!;
+
+        var parameter = metadata.Parameters.Single(p => p.Name == "FailOnUnresolvedPayloadPlaceholder");
+
+        parameter.DefaultValue.Should().Be(true);
     }
 
     [Fact]
@@ -117,13 +135,13 @@ public class TcpCommunicationOperatorTests
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "SN={Serial};CODE={Result.Code};OK={Result.Ok};RAW={Data};STATIC={SendData};MISS={Missing}", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "SN={Serial};CODE={Result.Code};OK={Result.Ok};RAW={Data};STATIC={SendData}", "string"));
         op.AddParameter(TestHelpers.CreateParameter("SendData", "fixed", "string"));
 
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
             ["Data"] = "raw",
-            ["Serial"] = "A001",
+            ["serial"] = "A001",
             ["Result"] = new Dictionary<string, object>
             {
                 ["Code"] = 12,
@@ -133,8 +151,149 @@ public class TcpCommunicationOperatorTests
 
         result.IsSuccess.Should().BeTrue();
         capturedRequest.Should().NotBeNull();
-        capturedRequest!.Payload.Should().Be("SN=A001;CODE=12;OK=True;RAW=raw;STATIC=fixed;MISS={Missing}");
-        result.OutputData!["RequestPayload"].Should().Be("SN=A001;CODE=12;OK=True;RAW=raw;STATIC=fixed;MISS={Missing}");
+        capturedRequest!.Payload.Should().Be("SN=A001;CODE=12;OK=True;RAW=raw;STATIC=fixed");
+        result.OutputData!["RequestPayload"].Should().Be("SN=A001;CODE=12;OK=True;RAW=raw;STATIC=fixed");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDefaultFailParameterAndMissingPlaceholder_ShouldFailBeforeSend()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "OK,{Missing}", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnUnresolvedPayloadPlaceholder", true, "bool"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("PayloadTemplate contains unresolved placeholders: Missing.");
+        await manager.DidNotReceive().SendAsync(Arg.Any<string>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(Arg.Any<TcpCommunicationProfile>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithOmittedFailParameterAndMissingPlaceholder_ShouldFailBeforeSend()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "OK,{Missing}", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("PayloadTemplate contains unresolved placeholders: Missing.");
+        await manager.DidNotReceive().SendAsync(Arg.Any<string>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(Arg.Any<TcpCommunicationProfile>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithExplicitFalseFailParameterAndMissingPlaceholder_ShouldPreserveAndSend()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "OK,{Missing}", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnUnresolvedPayloadPlaceholder", false, "bool"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Payload.Should().Be("OK,{Missing}");
+        result.OutputData!["RequestPayload"].Should().Be("OK,{Missing}");
+        await manager.Received(1).SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDataPlaceholder_ShouldResolveAndSendInputData()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "J={Data}", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Data"] = "NG"
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Payload.Should().Be("J=NG");
+        result.OutputData!["RequestPayload"].Should().Be("J=NG");
+    }
+
+    [Theory]
+    [MemberData(nameof(NestedResultPayloads))]
+    public async Task ExecuteAsync_WithNestedResultPlaceholder_ShouldResolveAndSend(string caseName, object resultInput, string expectedScore)
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "S={Result.Score}", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Result"] = resultInput
+        });
+
+        result.IsSuccess.Should().BeTrue($"{caseName}: {result.ErrorMessage}");
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Payload.Should().Be($"S={expectedScore}");
+        result.OutputData!["RequestPayload"].Should().Be($"S={expectedScore}");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSendDataPlaceholder_ShouldResolveAndSendStaticSendData()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("PayloadTemplate", "P={SendData}", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("SendData", "READY", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Payload.Should().Be("P=READY");
+        result.OutputData!["RequestPayload"].Should().Be("P=READY");
     }
 
     [Fact]
@@ -186,6 +345,11 @@ public class TcpCommunicationOperatorTests
         result.ErrorMessage.Should().Contain("Missing");
         await manager.DidNotReceive().SendAsync(Arg.Any<string>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
         await manager.DidNotReceive().SendTransientAsync(Arg.Any<TcpCommunicationProfile>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    private sealed class ResultPayload
+    {
+        public int Score { get; init; }
     }
 
     [Fact]

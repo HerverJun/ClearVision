@@ -54,7 +54,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("ResponseAccepted", "Response Accepted", PortDataType.Boolean)]
 [OutputPort("ResponseMatchError", "Response Match Error", PortDataType.String)]
 [OutputPort("ResponseMatchValue", "Response Match Value", PortDataType.String)]
-[OperatorParam("FailOnUnresolvedPayloadPlaceholder", "Fail On Unresolved Payload Placeholder", "bool", Description = "启用后，请求报文模板中存在未解析占位符时执行失败。", DefaultValue = false)]
+[OperatorParam("FailOnUnresolvedPayloadPlaceholder", "Fail On Unresolved Payload Placeholder", "bool", Description = "启用后，请求报文模板中存在未解析占位符时执行失败。", DefaultValue = true)]
 [OperatorParam("FailOnParseError", "Fail On Parse Error", "bool", Description = "启用后，响应解析失败时执行失败。", DefaultValue = false)]
 [OperatorParam("FailOnUnexpectedResponse", "Fail On Unexpected Response", "bool", Description = "启用后，响应未满足期望或命中拒绝条件时执行失败。", DefaultValue = false)]
 [OperatorParam("ResponseParseMode", "Response Parse Mode", "enum", Description = "选择响应解析方式：不解析、JSON路径、键值对、正则、分隔符或固定宽度。", DefaultValue = "None", Options = new[] { "None|None", "JsonPath|JSON path", "KeyValue|Key-value", "Regex|Regex", "Delimited|Delimited", "FixedWidth|Fixed width" })]
@@ -125,7 +125,7 @@ public class TcpCommunicationOperator : OperatorBase
         var timeout = GetIntParam(@operator, "Timeout", 5000, 100, 600000);
         var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
         var failOnParseError = GetBoolParam(@operator, "FailOnParseError", false);
-        var failOnUnresolvedPayloadPlaceholder = GetBoolParam(@operator, "FailOnUnresolvedPayloadPlaceholder", false);
+        var failOnUnresolvedPayloadPlaceholder = GetBoolParam(@operator, "FailOnUnresolvedPayloadPlaceholder", true);
         var failOnUnexpectedResponse = GetBoolParam(@operator, "FailOnUnexpectedResponse", false);
         var expectedResponse = DecodeIfEnabled(GetStringParam(@operator, "ExpectedResponse", string.Empty), decodeEscapeSequences);
         var rejectedResponse = DecodeIfEnabled(GetStringParam(@operator, "RejectedResponse", string.Empty), decodeEscapeSequences);
