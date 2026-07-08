@@ -343,15 +343,9 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             .ToList();
     }
 
-    private static bool HasUpstreamOperatorType(OperatorFlow flow, Guid targetNodeId, OperatorType type)
-    {
-        var relevantIds = CollectRelevantOperatorIds(flow, targetNodeId);
-        return flow.Operators.Any(item => relevantIds.Contains(item.Id) && item.Type == type);
-    }
-
     private static bool ShouldUseExternalInputImage(OperatorFlow flow, Guid targetNodeId)
     {
-        return !HasUpstreamOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition);
+        return ImageAcquisitionFlowAnalyzer.ShouldPassExternalInputImageToPreview(flow, targetNodeId);
     }
 
     private static bool PathExists(string path)

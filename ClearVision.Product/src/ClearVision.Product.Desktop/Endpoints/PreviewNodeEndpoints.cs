@@ -955,57 +955,11 @@ public static class PreviewNodeEndpoints
             : null;
     }
 
-    private static bool HasUpstreamOperatorType(
-        ClearVision.Product.Core.Entities.OperatorFlow flow,
-        Guid targetNodeId,
-        OperatorType type)
-    {
-        var visited = new HashSet<Guid>();
-        var stack = new Stack<Guid>();
-        stack.Push(targetNodeId);
-
-        while (stack.Count > 0)
-        {
-            var current = stack.Pop();
-            if (!visited.Add(current))
-            {
-                continue;
-            }
-
-            foreach (var connection in flow.Connections.Where(item => item.TargetOperatorId == current))
-            {
-                var sourceOperator = flow.Operators.FirstOrDefault(item => item.Id == connection.SourceOperatorId);
-                if (sourceOperator == null)
-                {
-                    continue;
-                }
-
-                if (sourceOperator.Type == type)
-                {
-                    return true;
-                }
-
-                stack.Push(sourceOperator.Id);
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsTargetOperatorType(
-        ClearVision.Product.Core.Entities.OperatorFlow flow,
-        Guid targetNodeId,
-        OperatorType type)
-    {
-        return flow.Operators.Any(item => item.Id == targetNodeId && item.Type == type);
-    }
-
     private static bool ShouldUseExternalInputImage(
         ClearVision.Product.Core.Entities.OperatorFlow flow,
         Guid targetNodeId)
     {
-        return !IsTargetOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition)
-            && !HasUpstreamOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition);
+        return ImageAcquisitionFlowAnalyzer.ShouldPassExternalInputImageToPreview(flow, targetNodeId);
     }
 
     private static string BuildMissingNodeOutputDetail(

@@ -140,6 +140,37 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithFileSourceAndNoFilePathOrRuntimeImage_ShouldExplainMissingRuntimeImage()
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("FilePath is required when SourceType is File and no runtime Image input was provided.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRuntimeImageAndExplicitMissingFilePath_ShouldNotOverrideFilePath()
+    {
+        using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var missingPath = Path.Combine(Path.GetTempPath(), $"missing-image-{Guid.NewGuid():N}.png");
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", missingPath));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = mat.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain(missingPath);
+        result.ErrorMessage.Should().NotContain("provided-image");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithRuntimeImageAndInvalidSourceType_ShouldReturnFailure()
     {
         using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));

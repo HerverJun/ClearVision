@@ -340,6 +340,193 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithFileImageAcquisitionTargetAndRuntimeImage_ShouldUseProvidedImage()
+    {
+        var project = new Project("preview-runtime-image-acquisition");
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var inputImage = CreateBinaryPreviewImageBytes();
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>())
+            ]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = acquisitionId,
+            InputImageBase64 = Convert.ToBase64String(inputImage),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    acquisitionId,
+                    "ImageAcquisition",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [acquisitionOutputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = string.Empty
+                    }))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        document.RootElement.GetProperty("outputImageBase64").GetString().Should().NotBeNullOrWhiteSpace();
+        document.RootElement.GetProperty("outputData").GetProperty("Source").GetString().Should().Be("provided-image");
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithDownstreamTargetAndRuntimeImageAcquisitionUpstream_ShouldUseProvidedImage()
+    {
+        var project = new Project("preview-runtime-image-downstream");
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var thresholdId = Guid.NewGuid();
+        var thresholdInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var thresholdOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var inputImage = CreateBinaryPreviewImageBytes();
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>()),
+                new ThresholdOperator(NullLogger<ThresholdOperator>.Instance)
+            ]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = thresholdId,
+            InputImageBase64 = Convert.ToBase64String(inputImage),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    acquisitionId,
+                    "ImageAcquisition",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [acquisitionOutputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = string.Empty
+                    }),
+                CreateOperatorDto(
+                    thresholdId,
+                    "Threshold",
+                    OperatorType.Thresholding,
+                    inputPorts: [thresholdInputPort],
+                    outputPorts: [thresholdOutputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["Threshold"] = 127.0,
+                        ["Type"] = "0",
+                        ["MaxValue"] = 255.0
+                    }),
+                CreateConnection(acquisitionId, acquisitionOutputPort.Id, thresholdId, thresholdInputPort.Id))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        document.RootElement.GetProperty("outputImageBase64").GetString().Should().NotBeNullOrWhiteSpace();
+        payload.Should().NotContain("FilePath is required");
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithExplicitMissingFilePathAndRuntimeImage_ShouldKeepFilePathFailure()
+    {
+        var project = new Project("preview-explicit-missing-file");
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var missingPath = Path.Combine(Path.GetTempPath(), $"missing-preview-{Guid.NewGuid():N}.png");
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>())
+            ]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = acquisitionId,
+            InputImageBase64 = Convert.ToBase64String(CreateBinaryPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    acquisitionId,
+                    "ImageAcquisition",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [acquisitionOutputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = missingPath
+                    }))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse(payload);
+        document.RootElement.GetProperty("errorMessage").GetString().Should().Contain(missingPath);
+        payload.Should().NotContain("provided-image");
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithFileImageAcquisitionTargetWithoutRuntimeImage_ShouldKeepClearMissingInputFailure()
+    {
+        var project = new Project("preview-missing-runtime-image");
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>())
+            ]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = acquisitionId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    acquisitionId,
+                    "ImageAcquisition",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [acquisitionOutputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = string.Empty
+                    }))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse(payload);
+        document.RootElement.GetProperty("errorMessage").GetString()
+            .Should().Contain("FilePath is required when SourceType is File and no runtime Image input was provided.");
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldReturnObservationEnvelopeForSuccessfulPreview()
     {
         var projectId = Guid.NewGuid();
@@ -1322,7 +1509,7 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
-    public async Task PreviewNode_ShouldNotInjectExternalImage_WhenTargetPathContainsImageAcquisition()
+    public async Task PreviewNode_ShouldInjectExternalImage_WhenTargetPathContainsFileImageAcquisitionWithoutFilePath()
     {
         var projectId = Guid.NewGuid();
         var acquisitionId = Guid.NewGuid();
@@ -1371,11 +1558,12 @@ public class PreviewNodeEndpointsTests
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-        capturedInput.Should().BeNull();
+        capturedInput.Should().NotBeNull();
+        capturedInput!["Image"].Should().BeEquivalentTo(new byte[] { 9, 9, 9 });
     }
 
     [Fact]
-    public async Task PreviewNode_ShouldNotInjectExternalImage_WhenTargetIsImageAcquisition()
+    public async Task PreviewNode_ShouldInjectExternalImage_WhenTargetIsFileImageAcquisitionWithoutFilePath()
     {
         var projectId = Guid.NewGuid();
         var targetNodeId = Guid.NewGuid();
@@ -1417,7 +1605,8 @@ public class PreviewNodeEndpointsTests
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-        capturedInput.Should().BeNull();
+        capturedInput.Should().NotBeNull();
+        capturedInput!["Image"].Should().BeEquivalentTo(new byte[] { 9, 9, 9 });
     }
 
     [Fact]

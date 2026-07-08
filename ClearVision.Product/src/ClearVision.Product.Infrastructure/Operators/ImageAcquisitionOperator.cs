@@ -107,7 +107,7 @@ public class ImageAcquisitionOperator : OperatorBase
         {
             if (!hasExplicitFilePath)
             {
-                return OperatorExecutionOutput.Failure("FilePath is required when SourceType is File.");
+                return OperatorExecutionOutput.Failure("FilePath is required when SourceType is File and no runtime Image input was provided.");
             }
 
             if (!File.Exists(filePath))

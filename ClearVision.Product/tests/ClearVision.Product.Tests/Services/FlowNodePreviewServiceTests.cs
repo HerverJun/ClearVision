@@ -13,7 +13,7 @@ namespace ClearVision.Product.Tests.Services;
 public class FlowNodePreviewServiceTests
 {
     [Fact]
-    public async Task PreviewWithMetricsAsync_ShouldNotInjectExternalImage_WhenImageAcquisitionExistsUpstream()
+    public async Task PreviewWithMetricsAsync_ShouldInjectExternalImage_WhenFileImageAcquisitionWithoutFilePathExistsUpstream()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
         Dictionary<string, object>? capturedInput = null;
@@ -54,11 +54,12 @@ public class FlowNodePreviewServiceTests
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
 
         result.Success.Should().BeTrue();
-        capturedInput.Should().BeNull();
+        capturedInput.Should().NotBeNull();
+        capturedInput!["Image"].Should().BeEquivalentTo(new byte[] { 9, 9, 9 });
     }
 
     [Fact]
-    public async Task PreviewWithMetricsAsync_ShouldNotReturnExternalImage_WhenTargetIsImageAcquisition()
+    public async Task PreviewWithMetricsAsync_ShouldInjectExternalImage_WhenTargetIsFileImageAcquisitionWithoutFilePath()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
         Dictionary<string, object>? capturedInput = null;
@@ -96,8 +97,60 @@ public class FlowNodePreviewServiceTests
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
 
         result.Success.Should().BeTrue();
+        capturedInput.Should().NotBeNull();
+        capturedInput!["Image"].Should().BeEquivalentTo(new byte[] { 9, 9, 9 });
+        result.InputImage.Should().Equal(new byte[] { 9, 9, 9 });
+    }
+
+    [Fact]
+    public async Task PreviewWithMetricsAsync_ShouldNotInjectExternalImage_WhenFileImageAcquisitionHasExplicitFilePath()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        Dictionary<string, object>? capturedInput = null;
+        var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", "C:\\missing\\image.png"));
+        var target = new Operator("Resize", OperatorType.ImageResize, 0, 0);
+        var flow = new OperatorFlow("preview-flow");
+        flow.AddOperator(acquisition);
+        flow.AddOperator(target);
+        flow.Connections.Add(new OperatorConnection(acquisition.Id, Guid.NewGuid(), target.Id, Guid.NewGuid()));
+
+        flowExecution.ExecuteFlowDebugAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedInput = callInfo.ArgAt<Dictionary<string, object>?>(2);
+                return Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = false,
+                    DebugSessionId = Guid.NewGuid(),
+                    DebugOperatorResults =
+                    [
+                        new OperatorDebugResult
+                        {
+                            OperatorId = acquisition.Id,
+                            OperatorName = acquisition.Name,
+                            IsSuccess = false,
+                            ErrorMessage = "图像文件不存在: C:\\missing\\image.png"
+                        }
+                    ]
+                });
+            });
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>());
+
+        var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
+
+        result.Success.Should().BeFalse();
         capturedInput.Should().BeNull();
-        result.InputImage.Should().BeNull();
+        result.ErrorMessage.Should().Contain("图像文件不存在");
     }
 
     [Fact]
