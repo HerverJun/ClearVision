@@ -230,6 +230,14 @@ function getStatusLabel(state, belongsToSelectedNode, nodeDeleted, stale = false
         };
     }
 
+    if (state?.status === 'auth-error') {
+        return {
+            kind: 'auth-error',
+            label: '登录状态无效',
+            message: state?.errorMessage || '登录状态无效，请重新登录。'
+        };
+    }
+
     if (state?.status === 'error') {
         return {
             kind: 'error',
@@ -344,6 +352,10 @@ function getPreviewImageEmptyMessage({
 
     if (statusInfo.kind === 'loading') {
         return '预览中...';
+    }
+
+    if (statusInfo.kind === 'auth-error') {
+        return statusInfo.message || '登录状态无效，请重新登录。';
     }
 
     if (statusInfo.kind === 'error') {
@@ -1117,6 +1129,15 @@ export class PreviewPanelCapabilityOwner {
                 <section class="preview-capability-section">
                     <h5>预览结果</h5>
                     <div class="preview-capability-empty">${escapeHtml(statusInfo.message || statusInfo.label)}</div>
+                </section>
+            `;
+        }
+
+        if (statusInfo.kind === 'auth-error') {
+            return `
+                <section class="preview-capability-section">
+                    <h5>预览结果</h5>
+                    <div class="preview-capability-empty auth-error">${escapeHtml(statusInfo.message || '登录状态无效，请重新登录。')}</div>
                 </section>
             `;
         }

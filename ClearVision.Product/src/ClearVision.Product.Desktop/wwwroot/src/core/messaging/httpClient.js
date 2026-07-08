@@ -602,13 +602,42 @@ class HttpClient {
             }
         }
 
-        return new HttpError(message, {
+        const error = new HttpError(message, {
             status: response.status,
             statusText: response.statusText,
             payload,
             rawBody,
             response
         });
+
+        if (response.status === 401) {
+            // Authentication failure — flag it so callers (e.g. the preview workbench) can present a
+            // "登录状态无效，请重新登录" prompt instead of surfacing a raw "Unauthorized" as an operator
+            // failure, and broadcast a decoupled signal so the auth layer can clear the local session
+            // and route the user to re-login. Dispatching an event (rather than importing auth.js)
+            // keeps httpClient free of an import cycle.
+            error.isAuthError = true;
+            this.notifyUnauthorized(error);
+        }
+
+        return error;
+    }
+
+    /**
+     * 广播全局未授权信号。认证层监听该事件以清理本地会话并引导用户重新登录。
+     * 使用事件而非直接依赖 auth 模块，避免 httpClient ↔ auth 的循环引用。
+     */
+    notifyUnauthorized(error) {
+        try {
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function'
+                && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('clearvision:auth-unauthorized', {
+                    detail: { status: 401, message: error?.message || 'Unauthorized' }
+                }));
+            }
+        } catch (dispatchError) {
+            console.warn('[HttpClient] 广播未授权事件失败:', dispatchError);
+        }
     }
 
     async extractErrorMessage(response) {

@@ -62,7 +62,7 @@ debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}.
 // ============================================
 // Auth session bootstrap
 // ============================================
-import { PermissionGuard, bootstrapAuthSession, logout } from './features/auth/auth.js';
+import { PermissionGuard, bootstrapAuthSession, installUnauthorizedHandler, logout } from './features/auth/auth.js';
 
 import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
@@ -2551,6 +2551,10 @@ async function initializeApp() {
 
     debugLogger.debug('[App] 初始化应用...');
     showLoadingScreen();
+
+    // 安装全局 401 处理：会话在运行期间失效时清理本地会话并引导用户重新登录，
+    // 而不是让各功能把 Unauthorized 当作普通错误反复弹出。
+    installUnauthorizedHandler();
 
     const authState = await bootstrapAuthSession();
     if (!authState.ok) {

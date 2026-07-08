@@ -410,8 +410,9 @@ export function installSystemTabs(SettingsView) {
                             <input type="number" class="cv-input" id="cfg-passwordMinLength" value="${security.passwordMinLength || 6}">
                         </div>
                         <div class="settings-fieldset" style="flex:1;">
-                            <label>会话自动超时 (分钟)</label>
-                            <input type="number" class="cv-input" id="cfg-sessionTimeoutMinutes" value="${security.sessionTimeoutMinutes || 30}">
+                            <label>会话自动超时 (分钟)<span style="color:#94a3b8; font-weight:normal;">（桌面端不适用）</span></label>
+                            <input type="number" class="cv-input" id="cfg-sessionTimeoutMinutes" value="${security.sessionTimeoutMinutes || 30}" disabled title="桌面端登录会话在软件运行期间保持有效，不再按时间自动掉登录；此项仅为历史配置兼容保留。">
+                            <span class="settings-field-hint">桌面端登录会话在软件运行期间保持有效，直到主动退出或软件关闭，不再按时间自动掉登录。</span>
                         </div>
                         <div class="settings-fieldset" style="flex:1;">
                             <label>登录失败锁定次数</label>

@@ -104,7 +104,12 @@ public class AuthService : IAuthService
             UserId = user.Id.ToString(),
             Username = user.Username,
             Role = user.Role.ToString(),
-            ExpiresAt = utcNow.Add(ResolveSessionTimeout())
+            // Desktop sessions never expire by elapsed time. They remain valid for the lifetime of
+            // the process and are invalidated only by explicit logout, server-side session clearing,
+            // or a security-relevant change (password change / user disabled), each enforced in
+            // GetSessionAsync. Security.SessionTimeoutMinutes is retained purely for config
+            // backward-compatibility and no longer drives session expiry.
+            ExpiresAt = null
         };
 
         var passwordFingerprint = ComputePasswordFingerprint(user.PasswordHash);
@@ -381,12 +386,6 @@ public class AuthService : IAuthService
                 _sessions.Remove(token);
             }
         }
-    }
-
-    private TimeSpan ResolveSessionTimeout()
-    {
-        var minutes = Math.Max(1, _configurationService.GetCurrent()?.Security?.SessionTimeoutMinutes ?? 30);
-        return TimeSpan.FromMinutes(minutes);
     }
 
     private int ResolvePasswordMinLength()

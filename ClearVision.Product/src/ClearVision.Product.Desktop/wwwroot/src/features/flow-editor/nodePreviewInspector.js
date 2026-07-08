@@ -936,6 +936,12 @@ export class NodePreviewInspector {
             return body;
         }
 
+        if (status === 'auth-error') {
+            // 登录态问题单独提示，不显示为算子预览失败。
+            body.appendChild(createElement('div', 'node-preview-inspector-state auth-error', this.state?.errorMessage || '登录状态无效，请重新登录。'));
+            return body;
+        }
+
         if (status === 'error') {
             body.appendChild(createElement('div', 'node-preview-inspector-state error', this.state?.errorMessage || '预览请求失败'));
             return body;
@@ -963,6 +969,9 @@ export class NodePreviewInspector {
         const status = String(this.state?.status || 'idle');
         if (status === 'loading') {
             return 'loading';
+        }
+        if (status === 'auth-error') {
+            return this.state?.errorMessage || '登录状态无效，请重新登录。';
         }
         if (status === 'error') {
             return `error: ${this.state?.errorMessage || 'unknown'}`;

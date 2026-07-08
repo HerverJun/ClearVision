@@ -649,6 +649,18 @@ function collectDiagnostics(state, observation, scene) {
     const outcomeErrorMessage = readDefined(outcome, 'errorMessage', 'ErrorMessage');
     const primaryError = stateErrorMessage || outcomeErrorMessage;
 
+    if (status === 'auth-error') {
+        // 认证失效是登录态问题，不是算子/后端故障：仅给出登录态提示，
+        // 不生成 backend/failed-operator 诊断，避免污染节点诊断。
+        pushUniqueDiagnostic(result, {
+            source: 'auth',
+            code: 'auth-error',
+            message: primaryError || '登录状态无效，请重新登录。',
+            pathHint: null
+        });
+        return result;
+    }
+
     if (primaryError) {
         const issue = classifyPreviewIssue(primaryError, status);
         pushUniqueDiagnostic(result, {

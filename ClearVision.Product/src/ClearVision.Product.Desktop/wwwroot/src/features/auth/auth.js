@@ -171,6 +171,42 @@ export function getAuthHeaders() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const SESSION_INVALID_NOTICE = '登录状态无效，请重新登录。';
+let unauthorizedHandlerInstalled = false;
+let unauthorizedHandling = false;
+
+/**
+ * 处理全局未授权（401）信号：清理本地会话，写入提示，并引导用户重新登录。
+ * 通过 guard 防止并发的多个 401 触发重复跳转，也避免在登录页上再次跳转造成循环。
+ */
+export function handleUnauthorized() {
+    if (unauthorizedHandling || isLoginPage()) {
+        return;
+    }
+
+    unauthorizedHandling = true;
+    resetAuthState();
+    writeLogoutNotice(SESSION_INVALID_NOTICE);
+    redirectToLogin();
+}
+
+/**
+ * 安装全局未授权监听器（幂等）。应在应用启动时调用一次。
+ */
+export function installUnauthorizedHandler() {
+    if (unauthorizedHandlerInstalled) {
+        return;
+    }
+
+    const authWindow = getAuthWindow();
+    if (typeof authWindow.addEventListener !== 'function') {
+        return;
+    }
+
+    authWindow.addEventListener('clearvision:auth-unauthorized', () => handleUnauthorized());
+    unauthorizedHandlerInstalled = true;
+}
+
 export const PermissionGuard = {
     canEdit() {
         return isEngineer();

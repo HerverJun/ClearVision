@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HttpClient } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js';
+import { HttpClient, HttpError } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js';
 
 function createStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -81,5 +81,70 @@ test('HttpClient DELETE rediscovers backend port and retries after WebView conne
   } finally {
     globalThis.window = originalWindow;
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('HttpClient flags 401 responses as auth errors and broadcasts the unauthorized signal', async () => {
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalCustomEvent = globalThis.CustomEvent;
+  const localStorage = createStorage();
+  const sessionStorage = createStorage({ cv_auth_token: 'expired-token' });
+  const dispatched = [];
+
+  class FakeCustomEvent {
+    constructor(type, init = {}) {
+      this.type = type;
+      this.detail = init.detail ?? null;
+    }
+  }
+  globalThis.CustomEvent = FakeCustomEvent;
+
+  globalThis.window = {
+    location: {
+      protocol: 'file:',
+      hostname: '',
+      port: '',
+      href: 'file:///C:/ClearVision/index.html'
+    },
+    localStorage,
+    sessionStorage,
+    dispatchEvent(event) {
+      dispatched.push(event);
+      return true;
+    }
+  };
+
+  globalThis.fetch = async (url, options = {}) => {
+    if (String(url) === 'http://localhost:5000/api/flows/preview-node' && options.method === 'POST') {
+      return new Response(JSON.stringify({ error: 'Unauthorized', message: '请先登录' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    return new Response('not found', { status: 404 });
+  };
+
+  try {
+    const client = new HttpClient();
+    let caught = null;
+    try {
+      await client.post('/flows/preview-node', { targetNodeId: 'node-1' });
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof HttpError, 'a 401 should surface as an HttpError');
+    assert.equal(caught.status, 401);
+    assert.equal(caught.isAuthError, true, '401 must be flagged as an auth error so previews do not render it as an operator failure');
+
+    const authEvents = dispatched.filter(event => event.type === 'clearvision:auth-unauthorized');
+    assert.equal(authEvents.length, 1, 'exactly one unauthorized signal should be broadcast');
+    assert.equal(authEvents[0].detail.status, 401);
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.CustomEvent = originalCustomEvent;
   }
 });

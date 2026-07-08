@@ -1185,4 +1185,48 @@ test.describe('Node Preview Inspector flag', () => {
     await page.locator('.node-preview-inspector-tab', { hasText: 'Summary' }).click();
     await expect(page.locator('.node-preview-inspector-panel.summary')).toBeVisible();
   });
+
+  test('preview 401 shows a re-login prompt instead of an operator failure', async ({ page }) => {
+    // Stub login.html with a controlled page that surfaces the logout notice from sessionStorage.
+    // This keeps the recovery deterministic (the real login.html would re-resume the seeded E2E
+    // token and loop) while still proving the user lands on a "登录状态无效，请重新登录" prompt.
+    await page.route('**/login.html', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>登录</title></head>
+<body><div id="session-notice" role="alert"></div>
+<script>
+  try {
+    var notice = sessionStorage.getItem('cv_logout_notice') || '';
+    document.getElementById('session-notice').textContent = notice;
+  } catch (e) {}
+</script></body></html>`,
+      });
+    });
+
+    // The preview request fails with an authentication error.
+    await page.route('**/api/flows/preview-node', async route => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Unauthorized', message: '请先登录' }),
+      });
+    });
+
+    await addAndSelectNode(page, {
+      type: 'PreviewImageNode',
+      title: 'Auth Failure Node',
+      outputs: [{ name: 'Image', type: 'Image' }],
+    });
+    await page.evaluate(() => (window as any).nodePreviewCoordinator.invalidateActivePreview({ immediate: true, force: true }));
+
+    // The global 401 handler clears the session and routes the user to re-login.
+    await page.waitForURL('**/login.html');
+    const notice = page.locator('#session-notice');
+    await expect(notice).toContainText('登录状态无效，请重新登录');
+    // The user must never see a raw "Unauthorized" nor an operator-failure framing.
+    await expect(notice).not.toContainText('Unauthorized');
+    await expect(notice).not.toContainText('预览失败');
+  });
 });

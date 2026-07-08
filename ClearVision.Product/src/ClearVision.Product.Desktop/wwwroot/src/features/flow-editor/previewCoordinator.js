@@ -6,6 +6,8 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { normalizeAcquisitionSourceType } from '../../shared/parameterDependencyRules.js';
 
 const DEFAULT_DEBOUNCE_MS = 500;
+// 预览请求遇到认证失效（401）时展示的登录态提示，区别于算子执行失败。
+const PREVIEW_SESSION_INVALID_MESSAGE = '登录状态无效，请重新登录。';
 const DEFAULT_PREVIEW_TIMEOUT_MS = 15000;
 const HIGH_COST_PREVIEW_TIMEOUT_MS = 30000;
 const MAX_PREVIEW_INPUT_BASE64_CHARS = 24 * 1024 * 1024;
@@ -439,6 +441,8 @@ function createPresenterState(state) {
             : '预览完成';
     } else if (state.status === 'canceled') {
         statusText = '预览已取消';
+    } else if (state.status === 'auth-error') {
+        statusText = state.errorMessage || '登录状态无效，请重新登录。';
     } else if (state.status === 'error') {
         statusText = `预览失败: ${state.errorMessage || '未知错误'}`;
     }
@@ -1552,6 +1556,24 @@ export class NodePreviewCoordinator {
                 }
 
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
+                    return;
+                }
+
+                // 认证失效（401）不是算子/后端故障：单独用 auth-error 状态呈现登录态提示，
+                // 且不写入 failedOperator 诊断，避免污染节点诊断、误导用户以为算子失效。
+                // 全局 401 处理器会同时清理会话并引导重新登录。
+                const isAuthError = error?.isAuthError === true || error?.status === 401 || error?.statusCode === 401;
+                if (isAuthError && !timedOut) {
+                    this.replacePreviewState(withClearedPreviewResources({
+                        status: 'auth-error',
+                        executionTimeMs: null,
+                        errorMessage: PREVIEW_SESSION_INVALID_MESSAGE,
+                        request,
+                        inputImageBase64: inputImageBase64 || null,
+                        outputImageBase64: null,
+                        outputData: null,
+                        previewCost
+                    }));
                     return;
                 }
 

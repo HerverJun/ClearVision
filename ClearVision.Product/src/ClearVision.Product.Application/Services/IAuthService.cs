@@ -60,9 +60,16 @@ public class UserSession
 
     public string Role { get; set; } = string.Empty;
 
-    public DateTime ExpiresAt { get; set; }
+    /// <summary>
+    /// Absolute expiry instant of the session, or <see langword="null"/> when the session never
+    /// expires by elapsed time. Desktop logins are non-expiring (<see langword="null"/>): the
+    /// session stays valid for the lifetime of the ClearVision process until the user logs out,
+    /// the server session is cleared, or a security-relevant change (password/user status) occurs.
+    /// A non-null value is still honoured for any caller that opts into a time-bounded session.
+    /// </summary>
+    public DateTime? ExpiresAt { get; set; }
 
     public bool IsExpired => IsExpiredAt(DateTime.UtcNow);
 
-    public bool IsExpiredAt(DateTime utcNow) => utcNow > ExpiresAt;
+    public bool IsExpiredAt(DateTime utcNow) => ExpiresAt.HasValue && utcNow > ExpiresAt.Value;
 }

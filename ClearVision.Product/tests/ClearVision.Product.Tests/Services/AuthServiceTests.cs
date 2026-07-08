@@ -16,8 +16,11 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task ValidateTokenAsync_ShouldRespectConfiguredSessionTimeout()
+    public async Task Session_ShouldRemainValid_RegardlessOfElapsedTime()
     {
+        // Desktop sessions never expire by elapsed time. Advancing the clock far past the legacy
+        // 30-minute timeout (and beyond a full day) must not invalidate an otherwise good session;
+        // it stays valid for the lifetime of the process until logout / security change.
         var now = new DateTime(2026, 3, 20, 10, 0, 0, DateTimeKind.Utc);
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
@@ -39,10 +42,17 @@ public class AuthServiceTests
         login.Token.Should().NotBeNullOrWhiteSpace();
         (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
 
-        service.UtcNowProvider = () => now.AddMinutes(2);
+        // Two hours later: still valid.
+        service.UtcNowProvider = () => now.AddHours(2);
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
 
-        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
-        (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+        // A full day later: still valid, and the session is still resolvable.
+        service.UtcNowProvider = () => now.AddHours(24);
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
+
+        var session = await service.GetSessionAsync(login.Token!);
+        session.Should().NotBeNull();
+        session!.ExpiresAt.Should().BeNull("desktop sessions do not carry a time-based expiry");
     }
 
     [Fact]
@@ -277,8 +287,11 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_ShouldRemoveExpiredSessions()
+    public async Task LoginAsync_ShouldNotRemovePriorSessionsByElapsedTime()
     {
+        // With time-based expiry removed, an earlier session must survive a later login even when
+        // the clock has advanced well past the legacy timeout. Sessions end only on explicit
+        // logout or a security-relevant change, never by elapsed time.
         var now = new DateTime(2026, 3, 20, 10, 0, 0, DateTimeKind.Utc);
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
@@ -302,8 +315,10 @@ public class AuthServiceTests
         var secondLogin = await service.LoginAsync("cleanup-user", "correct-password");
 
         secondLogin.Success.Should().BeTrue();
-        AuthService.GetInMemorySessionCountForTests().Should().Be(1);
-        (await service.ValidateTokenAsync(firstLogin.Token!)).Should().BeFalse();
+        // The first session is NOT purged by elapsed time — both remain valid.
+        AuthService.GetInMemorySessionCountForTests().Should().Be(2);
+        (await service.ValidateTokenAsync(firstLogin.Token!)).Should().BeTrue();
+        (await service.ValidateTokenAsync(secondLogin.Token!)).Should().BeTrue();
     }
 
     [Fact]
