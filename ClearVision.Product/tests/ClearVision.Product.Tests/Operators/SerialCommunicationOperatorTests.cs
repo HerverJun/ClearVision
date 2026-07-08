@@ -98,6 +98,67 @@ public class SerialCommunicationOperatorTests
             () => execution.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithWiredDataInput_ShouldSendUpstreamValueInsteadOfStaticSendData()
+    {
+        var fakeConnection = new FakeSerialPortConnection(Encoding.ASCII.GetBytes("OK"));
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(
+            ("SendData", "STATIC"),
+            ("Encoding", "ASCII"),
+            ("ResponseWaitMs", 1000));
+
+        var inputs = new Dictionary<string, object>
+        {
+            ["Data"] = "DYN-42"
+        };
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue();
+        // 上游连线到 "发送数据" 端口的动态值应覆盖参数面板中的静态内容。
+        Encoding.ASCII.GetString(fakeConnection.WrittenBytes.ToArray()).Should().Be("DYN-42");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithJudgmentValueInput_ShouldSendJudgmentValue()
+    {
+        var fakeConnection = new FakeSerialPortConnection(Encoding.ASCII.GetBytes("OK"));
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(
+            ("SendData", ""),
+            ("Encoding", "ASCII"),
+            ("ResponseWaitMs", 1000));
+
+        // 模拟 ResultJudgment 上游输出展平合并进 inputs 的键。
+        var inputs = new Dictionary<string, object>
+        {
+            ["JudgmentValue"] = "1"
+        };
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue();
+        Encoding.ASCII.GetString(fakeConnection.WrittenBytes.ToArray()).Should().Be("1");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutWiredData_ShouldFallBackToStaticSendData()
+    {
+        var fakeConnection = new FakeSerialPortConnection(Encoding.ASCII.GetBytes("OK"));
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(
+            ("SendData", "STATIC"),
+            ("Encoding", "ASCII"),
+            ("ResponseWaitMs", 1000));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue();
+        // 无上游连线时保持原有行为，回退静态 SendData。
+        Encoding.ASCII.GetString(fakeConnection.WrittenBytes.ToArray()).Should().Be("STATIC");
+    }
+
     private static SerialCommunicationOperator CreateWithConnection(FakeSerialPortConnection connection)
     {
         return new SerialCommunicationOperator(

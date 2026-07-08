@@ -67,7 +67,8 @@ public class SerialCommunicationOperator : OperatorBase
         var parityStr = GetStringParam(@operator, "Parity", "None");
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", 3000);
         var responseWaitMs = Math.Clamp(GetIntParam(@operator, "ResponseWaitMs", DefaultResponseWaitMs), 0, timeoutMs);
-        var sendData = GetStringParam(@operator, "SendData", "");
+        // 优先使用上游连线到 "发送数据" 端口的动态值，否则回退到参数面板中的静态内容。
+        var sendData = ResolveSendData(@operator, inputs);
         var encoding = GetStringParam(@operator, "Encoding", "UTF8");
 
         // 解析波特率
@@ -203,6 +204,36 @@ public class SerialCommunicationOperator : OperatorBase
             Logger.LogError(ex, "[SerialCommunication] 串口通信失败: {Port}", portName);
             return OperatorExecutionOutput.Failure($"串口通信失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 解析实际要发送的数据：优先读取上游连线（"Data" 端口，以及展平合并进 inputs 的常见结果键），
+    /// 无连线时回退到参数面板中的静态 <c>SendData</c>。这样视觉结果才能真正通过画布连线发往串口设备。
+    /// </summary>
+    private string ResolveSendData(Operator @operator, Dictionary<string, object>? inputs)
+    {
+        var staticValue = GetStringParam(@operator, "SendData", "");
+
+        if (inputs == null || inputs.Count == 0)
+        {
+            return staticValue;
+        }
+
+        // 优先级：显式 "Data" 端口 > 判断结果 > 通用 Value。与 PLC 算子的 ResolveWriteValue 保持一致。
+        foreach (var key in new[] { "Data", "JudgmentValue", "Value" })
+        {
+            if (inputs.TryGetValue(key, out var value) && value != null)
+            {
+                var stringValue = value.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(stringValue))
+                {
+                    Logger.LogDebug("[SerialCommunication] 使用上游动态发送数据: Key={Key}", key);
+                    return stringValue;
+                }
+            }
+        }
+
+        return staticValue;
     }
 
     private static async Task<int> WaitForAvailableBytesAsync(

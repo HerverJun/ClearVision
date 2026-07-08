@@ -84,11 +84,32 @@ public class ModbusCommunicationOperatorVirtualPlcTests
         await WaitForRegisterAsync(1, 0);
     }
 
+    [Fact]
+    public async Task WriteSingle_WithWiredDataInput_ShouldPersistUpstreamValue()
+    {
+        if (!ShouldRunVirtualPlcTests())
+        {
+            return;
+        }
+
+        // Data 输入端口连线的动态值应覆盖参数面板中的静态 WriteValue，实现"视觉结果驱动写入"。
+        var writeResponse = await ExecuteAsync(
+            "WriteSingle",
+            10,
+            writeValue: "1",
+            inputs: new Dictionary<string, object> { ["Data"] = "4321" });
+        writeResponse.Should().Be("Write succeeded: 4321");
+
+        var readResponse = await ExecuteAsync("ReadHolding", 10);
+        ParseRegisters(readResponse).Should().Equal(4321);
+    }
+
     private async Task<string> ExecuteAsync(
         string functionCode,
         int registerAddress,
         int registerCount = 1,
-        string writeValue = "")
+        string writeValue = "",
+        Dictionary<string, object>? inputs = null)
     {
         var op = new Operator("virtual-plc-modbus", OperatorType.ModbusCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Protocol", "TCP", "string"));
@@ -101,7 +122,7 @@ public class ModbusCommunicationOperatorVirtualPlcTests
         op.AddParameter(TestHelpers.CreateParameter("WriteValue", writeValue, "string"));
         op.AddParameter(TestHelpers.CreateParameter("TimeoutMs", 5000, "int"));
 
-        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+        var result = await _operator.ExecuteAsync(op, inputs ?? new Dictionary<string, object>());
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         var outputData = result.OutputData ?? throw new InvalidOperationException("Modbus operator returned no output data.");

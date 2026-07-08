@@ -61,7 +61,8 @@ public class ModbusCommunicationOperator : OperatorBase
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1, 1, 125);
         var functionCode = GetStringParam(@operator, "FunctionCode", "ReadHolding");
-        var writeValue = GetStringParam(@operator, "WriteValue", string.Empty);
+        // 写操作优先使用上游连线到 "Data" 端口的动态值，否则回退参数面板中的静态 WriteValue。
+        var writeValue = ResolveWriteValue(@operator, inputs);
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", DefaultOperationTimeoutMs, 100, 60000);
 
         if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
@@ -93,6 +94,35 @@ public class ModbusCommunicationOperator : OperatorBase
             ["FunctionCode"] = functionCode,
             ["SlaveId"] = slaveId
         });
+    }
+
+    /// <summary>
+    /// 解析写入寄存器的值：优先读取上游连线（"Data" 端口，以及展平合并进 inputs 的常见结果键），
+    /// 无连线时回退到参数面板中的静态 <c>WriteValue</c>。仅影响写功能码，读功能码不使用该值。
+    /// </summary>
+    private string ResolveWriteValue(Operator @operator, Dictionary<string, object>? inputs)
+    {
+        var staticValue = GetStringParam(@operator, "WriteValue", string.Empty);
+
+        if (inputs == null || inputs.Count == 0)
+        {
+            return staticValue;
+        }
+
+        foreach (var key in new[] { "Data", "JudgmentValue", "Value" })
+        {
+            if (inputs.TryGetValue(key, out var value) && value != null)
+            {
+                var stringValue = value.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(stringValue))
+                {
+                    Logger.LogDebug("Modbus using upstream dynamic write value: Key={Key}", key);
+                    return stringValue;
+                }
+            }
+        }
+
+        return staticValue;
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T14:45:14.7543995\u002B08:00",
+  "generatedAt": "2026-07-08T13:53:08.5202166\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -5356,6 +5356,21 @@
           "version": "1.0.0",
           "sourceHash": "993A2A46E8274FAEF41D6853544C0D365932F3EDD78F1A699932A7F6B9DBDB7B",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "8CA74BF88B4904F93E3D0BCF8471DCDEAA386DF4043C6C7828848CA475A62D1A",
+          "recordedAt": "2026-07-08T13:44:48.7501564\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "A02E1D91FE24ABCC2472219FE84784C768909601469429136ACC86DBAABBF1DE",
+          "recordedAt": "2026-07-08T13:51:33.9970116\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "8CA74BF88B4904F93E3D0BCF8471DCDEAA386DF4043C6C7828848CA475A62D1A",
+          "recordedAt": "2026-07-08T13:53:08.5202166\u002B08:00"
         }
       ]
     },
@@ -7673,6 +7688,16 @@
           "version": "1.0.1",
           "sourceHash": "29C919BC9CA26F24CA38C0931919DC69A3540CB3AA7EB93002897FA327B991C8",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "F238F5781AC84121B7FA585299ED4E6748583999383B512FB64DA632E27449C0",
+          "recordedAt": "2026-07-08T13:44:48.7501564\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "29C919BC9CA26F24CA38C0931919DC69A3540CB3AA7EB93002897FA327B991C8",
+          "recordedAt": "2026-07-08T13:51:33.9970116\u002B08:00"
         }
       ]
     },
@@ -7948,6 +7973,21 @@
           "version": "1.0.0",
           "sourceHash": "471682B39F52D3E26388498A9086E7B23DA3F7F2ED75C0E0432C9C7DDEDE6AAD",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "E8D5452533CECAC1311620E0F4EEC37F472CA514067C8CA7502547B78A98910F",
+          "recordedAt": "2026-07-08T13:44:48.7501564\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "077AD8F6531CB894D8ECD307D5FD32D1476B30DC62CFB8439D32205A0DE258E8",
+          "recordedAt": "2026-07-08T13:51:33.9970116\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "E8D5452533CECAC1311620E0F4EEC37F472CA514067C8CA7502547B78A98910F",
+          "recordedAt": "2026-07-08T13:53:08.5202166\u002B08:00"
         }
       ]
     },
