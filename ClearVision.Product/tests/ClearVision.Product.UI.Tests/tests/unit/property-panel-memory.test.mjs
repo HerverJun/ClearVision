@@ -199,6 +199,120 @@ function createNPointPanel(nPointCalibrationWorkbenchEnabled = undefined) {
   return panel;
 }
 
+function createParameterRenderPanel(param) {
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    currentOperator: {
+      id: 'property-node',
+      type: 'CaliperTool',
+      parameters: [param]
+    },
+    circleSearchV2ToolEnabled: false,
+    nPointCalibrationWorkbenchEnabled: false
+  });
+  return panel;
+}
+
+function renderEnhancedParameter(param) {
+  const panel = createParameterRenderPanel(param);
+  return panel.renderParameterEnhanced(param);
+}
+
+test('PropertyPanel renders ranged numeric parameters as number inputs without sliders by default', () => {
+  for (const param of [
+    { name: 'ExpectedCount', displayName: '期望数量', dataType: 'int', value: 3, min: 1, max: 12 },
+    { name: 'Angle', displayName: '角度', dataType: 'double', value: 45, min: -180, max: 180 },
+    { name: 'EdgeThreshold', displayName: '边缘阈值', dataType: 'float', value: 18.5, min: 0, max: 255 }
+  ]) {
+    const html = renderEnhancedParameter(param);
+
+    assert.match(html, /type="number"/);
+    assert.match(html, new RegExp(`name="${param.name}"`));
+    assert.match(html, new RegExp(`min="${param.min}"`));
+    assert.match(html, new RegExp(`max="${param.max}"`));
+    assert.doesNotMatch(html, /class="param-slider"/);
+  }
+});
+
+test('PropertyPanel renders a slider only when showSlider is explicitly true', () => {
+  const html = renderEnhancedParameter({
+    name: 'Gain',
+    dataType: 'double',
+    value: 0.4,
+    min: 0,
+    max: 1,
+    showSlider: true
+  });
+
+  assert.match(html, /type="number"/);
+  assert.match(html, /type="range"/);
+  assert.match(html, /class="param-slider"/);
+});
+
+test('PropertyPanel renders sliders for explicit uiControl control or editor metadata', () => {
+  for (const metadata of [
+    { uiControl: 'SLIDER' },
+    { Control: 'slider' },
+    { EDITOR: 'Slider' }
+  ]) {
+    const html = renderEnhancedParameter({
+      name: `Slider${Object.keys(metadata)[0]}`,
+      dataType: 'double',
+      value: 5,
+      min: 0,
+      max: 10,
+      ...metadata
+    });
+
+    assert.match(html, /class="param-slider"/);
+  }
+});
+
+test('PropertyPanel keeps the required marker separate from numeric slider rendering', () => {
+  const html = renderEnhancedParameter({
+    name: 'ExpectedCount',
+    displayName: '期望数量',
+    dataType: 'int',
+    value: 3,
+    min: 1,
+    max: 12,
+    isRequired: true
+  });
+
+  assert.match(html, /<span class="required">\*<\/span>/);
+  assert.doesNotMatch(html, /class="param-slider"/);
+});
+
+test('PropertyPanel applyChanges still validates syncs and notifies parameter changes', () => {
+  const calls = [];
+  const panel = Object.create(PropertyPanel.prototype);
+  Object.assign(panel, {
+    currentOperator: {
+      id: 'property-node',
+      type: 'CaliperTool',
+      parameters: []
+    },
+    validateCurrentOperator(options) {
+      calls.push(['validate', options]);
+      return true;
+    },
+    syncGlobalVariableTargetBindings() {
+      calls.push(['sync']);
+    },
+    _notifyValueChanged() {
+      calls.push(['notify']);
+    },
+    showToast(message, type) {
+      calls.push(['toast', message, type]);
+    }
+  });
+
+  assert.equal(panel.applyChanges(), true);
+  assert.deepEqual(calls.map(call => call[0]), ['validate', 'sync', 'notify', 'toast']);
+  assert.deepEqual(calls[0][1], { showToast: true, markFields: true });
+  assert.equal(calls.at(-1)[2], 'success');
+});
+
 test('PropertyPanel deduplicates concurrent cached image base64 loads', async () => {
   const calls = [];
   const deferred = createDeferred();

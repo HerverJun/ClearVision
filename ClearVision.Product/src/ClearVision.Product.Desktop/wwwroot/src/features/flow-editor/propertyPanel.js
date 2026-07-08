@@ -815,6 +815,24 @@ class PropertyPanel {
         return dataType;
     }
 
+    shouldRenderParameterSlider(param) {
+        if (!param || typeof param !== 'object') {
+            return false;
+        }
+
+        const metadata = new Map(
+            Object.entries(param).map(([key, value]) => [String(key).toLowerCase(), value])
+        );
+
+        if (metadata.get('showslider') === true) {
+            return true;
+        }
+
+        return ['uicontrol', 'control', 'editor'].some(key =>
+            String(metadata.get(key) ?? '').trim().toLowerCase() === 'slider'
+        );
+    }
+
     isPathLikeParameter(param) {
         const normalizedName = normalizeParameterName(param?.name || param?.Name);
         if (!normalizedName || normalizedName === 'ipaddress') {
@@ -1002,8 +1020,9 @@ class PropertyPanel {
             case 'int':
             case 'double':
             case 'float':
-                // 数值类型：输入框 + 滑块
+                // 数值类型：默认仅输入框，显式 slider 元数据才渲染滑块
                 const hasRange = min !== undefined && max !== undefined;
+                const shouldRenderSlider = hasRange && this.shouldRenderParameterSlider(param);
                 const stepValue = step || (dataType === 'int' ? 1 : 0.1);
                 
                 inputHtml = `
@@ -1018,15 +1037,14 @@ class PropertyPanel {
                                class="form-input number-input"
                                data-type="${dataType}"
                                ${readonly ? 'readonly aria-readonly="true"' : ''}>
-                        ${hasRange ? `
+                        ${shouldRenderSlider ? `
                             <input type="range" 
                                    class="param-slider"
                                    min="${min}" 
                                    max="${max}" 
                                    step="${stepValue}"
                                    value="${currentValue}"
-                                   ${readonly ? 'disabled aria-disabled="true"' : ''}
-                                   oninput="document.getElementById('param-${name}').value = this.value; document.getElementById('param-${name}').dispatchEvent(new Event('change'));">
+                                   ${readonly ? 'disabled aria-disabled="true"' : ''}>
                         ` : ''}
                     </div>
                 `;
@@ -1207,6 +1225,11 @@ class PropertyPanel {
         sliders.forEach(slider => {
             const targetInput = slider.parentElement.querySelector('input[type="number"]');
             if (targetInput) {
+                slider.addEventListener('input', () => {
+                    targetInput.value = slider.value;
+                    targetInput.dispatchEvent(new Event('change'));
+                });
+
                 // 输入框改变时更新滑块
                 targetInput.addEventListener('input', () => {
                     slider.value = targetInput.value;
