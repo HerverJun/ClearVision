@@ -1005,6 +1005,48 @@
     opacity: 0.5;
 }
 
+.form-group.invalid .cv-input,
+.cv-input[aria-invalid="true"] {
+    border-color: var(--cinnabar);
+    box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.08), var(--neon-cinnabar);
+}
+
+.cv-field-error {
+    color: var(--cinnabar);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+}
+
+.project-page-delete-message {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.project-page-delete-details {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 8px 12px;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.project-page-delete-details dt {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.project-page-delete-details dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
 /* ==========================================================================
    Tooltip - Minimal Hint
    ========================================================================== */

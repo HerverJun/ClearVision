@@ -1,4 +1,10 @@
 import projectManager from './projectManager.js';
+import {
+    closeModal as closeSharedModal,
+    createButton as createSharedButton,
+    createModal as createSharedModal,
+    showToast as showSharedToast
+} from '../../shared/components/uiComponents.js';
 
 export const PROJECT_PAGE_CAPABILITY_OWNER_ID = 'project-page-capability-v2';
 
@@ -77,7 +83,10 @@ export function createProjectPageCapabilityAdapter(options = {}) {
 export class ProjectPageCapabilityOwner {
     constructor(container, {
         adapter,
-        showToast = () => {}
+        showToast = showSharedToast,
+        createModal = createSharedModal,
+        closeModal = closeSharedModal,
+        createButton = createSharedButton
     } = {}) {
         this.container = resolveElement(container);
         if (!this.container) {
@@ -89,6 +98,9 @@ export class ProjectPageCapabilityOwner {
 
         this.adapter = adapter;
         this.showToast = typeof showToast === 'function' ? showToast : () => {};
+        this.createModal = typeof createModal === 'function' ? createModal : createSharedModal;
+        this.closeModal = typeof closeModal === 'function' ? closeModal : closeSharedModal;
+        this.createButton = typeof createButton === 'function' ? createButton : createSharedButton;
         this.projects = [];
         this.search = '';
         this.currentTab = 'all';
@@ -97,6 +109,7 @@ export class ProjectPageCapabilityOwner {
         this.errorMessage = '';
         this.disposed = false;
         this.refreshRequestId = 0;
+        this.modalSequence = 0;
 
         this.handleClick = this.handleClick.bind(this);
         this.handleInput = this.handleInput.bind(this);
@@ -205,21 +218,149 @@ export class ProjectPageCapabilityOwner {
         }
     }
 
-    async createProject() {
-        const name = globalThis.prompt?.('请输入工程名称')?.trim();
-        if (!name) {
+    createProject() {
+        if (this.disposed) {
             return null;
         }
 
-        try {
-            const project = await this.adapter.createProject(name, '');
-            this.showToast(`工程 "${project?.name || name}" 已创建`, 'success');
-            await this.refresh();
-            return project;
-        } catch (error) {
-            this.showToast(`创建失败: ${error.message}`, 'error');
-            return null;
-        }
+        const formId = `project-page-create-${++this.modalSequence}`;
+        const content = document.createElement('div');
+        content.className = 'new-project-form project-page-create-form';
+        content.dataset.projectCreateForm = '';
+
+        const nameGroup = document.createElement('div');
+        nameGroup.className = 'form-group';
+
+        const nameLabel = document.createElement('label');
+        nameLabel.setAttribute('for', `${formId}-name`);
+        nameLabel.textContent = '工程名称 ';
+
+        const requiredMark = document.createElement('span');
+        requiredMark.className = 'required';
+        requiredMark.textContent = '*';
+        nameLabel.appendChild(requiredMark);
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.id = `${formId}-name`;
+        nameInput.className = 'cv-input';
+        nameInput.placeholder = '请输入工程名称';
+        nameInput.dataset.projectNameInput = '';
+        nameInput.setAttribute('autocomplete', 'off');
+
+        const nameError = document.createElement('div');
+        nameError.className = 'cv-field-error';
+        nameError.dataset.projectNameError = '';
+        nameError.setAttribute('role', 'alert');
+        nameError.hidden = true;
+
+        nameGroup.appendChild(nameLabel);
+        nameGroup.appendChild(nameInput);
+        nameGroup.appendChild(nameError);
+
+        const descGroup = document.createElement('div');
+        descGroup.className = 'form-group';
+
+        const descLabel = document.createElement('label');
+        descLabel.setAttribute('for', `${formId}-desc`);
+        descLabel.textContent = '描述';
+
+        const descInput = document.createElement('input');
+        descInput.type = 'text';
+        descInput.id = `${formId}-desc`;
+        descInput.className = 'cv-input';
+        descInput.placeholder = '可选描述';
+        descInput.dataset.projectDescInput = '';
+        descInput.setAttribute('autocomplete', 'off');
+
+        descGroup.appendChild(descLabel);
+        descGroup.appendChild(descInput);
+
+        content.appendChild(nameGroup);
+        content.appendChild(descGroup);
+
+        let modalOverlay = null;
+        let createInFlight = false;
+
+        const clearNameError = () => {
+            nameError.textContent = '';
+            nameError.hidden = true;
+            nameGroup.classList?.remove('invalid');
+            nameInput.removeAttribute?.('aria-invalid');
+        };
+
+        const showNameError = () => {
+            nameError.textContent = '请输入工程名称';
+            nameError.hidden = false;
+            nameGroup.classList?.add('invalid');
+            nameInput.setAttribute('aria-invalid', 'true');
+            this.showToast('请输入工程名称', 'warning');
+            nameInput.focus?.();
+        };
+
+        nameInput.addEventListener('input', () => {
+            if (nameInput.value.trim()) {
+                clearNameError();
+            }
+        });
+
+        const btnCancel = this.createButton({
+            text: '取消',
+            type: 'secondary',
+            onClick: () => this.closeModal(modalOverlay)
+        });
+        btnCancel.dataset.projectModalAction = 'cancel';
+
+        const btnCreate = this.createButton({
+            text: '创建',
+            onClick: async () => {
+                if (createInFlight) {
+                    return;
+                }
+
+                const name = nameInput.value.trim();
+                const description = descInput.value.trim();
+                if (!name) {
+                    showNameError();
+                    return;
+                }
+
+                clearNameError();
+                createInFlight = true;
+                btnCreate.disabled = true;
+
+                try {
+                    const project = await this.adapter.createProject(name, description);
+                    this.showToast(`工程 "${project?.name || name}" 已创建`, 'success');
+                    this.closeModal(modalOverlay);
+                    await this.refresh();
+                } catch (error) {
+                    createInFlight = false;
+                    btnCreate.disabled = false;
+                    this.showToast(`创建失败: ${error?.message || error}`, 'error');
+                }
+            }
+        });
+        btnCreate.dataset.projectModalAction = 'create';
+
+        nameInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                btnCreate.click?.();
+            }
+        });
+
+        modalOverlay = this.createModal({
+            title: '新建工程',
+            content,
+            footer: [btnCancel, btnCreate],
+            width: '400px'
+        });
+        modalOverlay?.setAttribute?.('data-project-create-modal', '');
+        modalOverlay?.querySelector?.('.cv-modal')?.setAttribute?.('data-project-create-dialog', '');
+
+        setTimeout(() => nameInput.focus?.(), 0);
+        return modalOverlay;
     }
 
     async openProject(projectId) {
@@ -249,20 +390,89 @@ export class ProjectPageCapabilityOwner {
         }
     }
 
-    async deleteProject(projectId) {
-        if (!projectId || !globalThis.confirm?.('确定要删除该工程吗？')) {
-            return false;
+    deleteProject(projectId) {
+        if (!projectId || this.disposed) {
+            return null;
         }
 
-        try {
-            await this.adapter.deleteProject(projectId);
-            this.showToast('工程已删除', 'success');
-            await this.refresh();
-            return true;
-        } catch (error) {
-            this.showToast(`删除失败: ${error.message}`, 'error');
-            return false;
-        }
+        const project = this.projects.find(item => item?.id === projectId) || null;
+        const projectName = project?.name || '未命名工程';
+
+        const content = document.createElement('div');
+        content.className = 'cv-modal-form project-page-delete-confirm';
+        content.dataset.projectDeleteConfirm = '';
+
+        const message = document.createElement('p');
+        message.className = 'project-page-delete-message';
+        message.textContent = '确定要删除此工程吗？此操作无法撤销。';
+
+        const details = document.createElement('dl');
+        details.className = 'project-page-delete-details';
+
+        const nameTerm = document.createElement('dt');
+        nameTerm.textContent = '工程名称';
+        const nameValue = document.createElement('dd');
+        nameValue.dataset.projectDeleteName = '';
+        nameValue.textContent = projectName;
+
+        const idTerm = document.createElement('dt');
+        idTerm.textContent = '工程 ID';
+        const idValue = document.createElement('dd');
+        idValue.dataset.projectDeleteId = '';
+        idValue.textContent = projectId;
+
+        details.appendChild(nameTerm);
+        details.appendChild(nameValue);
+        details.appendChild(idTerm);
+        details.appendChild(idValue);
+        content.appendChild(message);
+        content.appendChild(details);
+
+        let modalOverlay = null;
+        let deleteInFlight = false;
+
+        const btnCancel = this.createButton({
+            text: '取消',
+            type: 'secondary',
+            onClick: () => this.closeModal(modalOverlay)
+        });
+        btnCancel.dataset.projectModalAction = 'cancel-delete';
+
+        const btnDelete = this.createButton({
+            text: '删除',
+            type: 'danger',
+            onClick: async () => {
+                if (deleteInFlight) {
+                    return;
+                }
+
+                deleteInFlight = true;
+                btnDelete.disabled = true;
+
+                try {
+                    await this.adapter.deleteProject(projectId);
+                    this.showToast(`工程 "${projectName}" 已删除`, 'success');
+                    this.closeModal(modalOverlay);
+                    await this.refresh();
+                } catch (error) {
+                    deleteInFlight = false;
+                    btnDelete.disabled = false;
+                    this.showToast(`删除失败: ${error?.message || error}`, 'error');
+                }
+            }
+        });
+        btnDelete.dataset.projectModalAction = 'confirm-delete';
+
+        modalOverlay = this.createModal({
+            title: '确认删除',
+            content,
+            footer: [btnCancel, btnDelete],
+            width: '420px'
+        });
+        modalOverlay?.setAttribute?.('data-project-delete-modal', '');
+        modalOverlay?.querySelector?.('.cv-modal')?.setAttribute?.('data-project-delete-dialog', '');
+
+        return modalOverlay;
     }
 
     render() {
