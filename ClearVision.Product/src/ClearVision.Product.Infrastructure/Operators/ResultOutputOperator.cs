@@ -185,10 +185,43 @@ public class ResultOutputOperator : OperatorBase
 
         if (format.Equals("Text", StringComparison.OrdinalIgnoreCase))
         {
-            return string.Join(Environment.NewLine, exportPayload.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+            return string.Join(Environment.NewLine, exportPayload.Select(kvp => $"{kvp.Key}: {FormatFlatValue(kvp.Value)}"));
         }
 
         return JsonSerializer.Serialize(exportPayload, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>
+    /// 将单个值渲染为 CSV/Text 单元格文本。标量按原样 <c>ToString</c>；
+    /// 结构化值（字典/集合，来自 <see cref="NormalizeForExport"/> 或上游结果对象）序列化为紧凑 JSON，
+    /// 避免直接 <c>ToString</c> 输出 .NET 类型名（如 "System.Collections.Generic.Dictionary`2[...]"）。
+    /// </summary>
+    private static string FormatFlatValue(object? value)
+    {
+        switch (value)
+        {
+            case null:
+                return string.Empty;
+            case string s:
+                return s;
+            case bool b:
+                return b ? "true" : "false";
+            default:
+                if (value is IFormattable formattable)
+                {
+                    return formattable.ToString(null, CultureInfo.InvariantCulture);
+                }
+
+                // 字典 / 集合 / 匿名对象等结构化值：序列化为紧凑 JSON 而不是类型名。
+                try
+                {
+                    return JsonSerializer.Serialize(value);
+                }
+                catch (NotSupportedException)
+                {
+                    return value.ToString() ?? string.Empty;
+                }
+        }
     }
 
     private static object? NormalizeForExport(object? value, int maxFormattedCollectionItems)
@@ -251,7 +284,7 @@ public class ResultOutputOperator : OperatorBase
         foreach (var (key, value) in exportPayload)
         {
             var escapedKey = EscapeCsv(key);
-            var escapedValue = EscapeCsv(value?.ToString() ?? string.Empty);
+            var escapedValue = EscapeCsv(FormatFlatValue(value));
             lines.Add($"{escapedKey},{escapedValue}");
         }
 

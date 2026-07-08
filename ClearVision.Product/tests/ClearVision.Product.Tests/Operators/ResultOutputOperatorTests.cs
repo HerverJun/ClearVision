@@ -222,6 +222,46 @@ public class ResultOutputOperatorTests
         document.RootElement.GetProperty("Data").GetProperty("NullableValue").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithStructuredResult_ShouldSerializeAsJsonInCsvNotDotNetTypeName()
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Format", "CSV", "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Result"] = new Dictionary<string, object>
+            {
+                ["measureValue"] = 12.5,
+                ["ok"] = true
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var output = result.OutputData!["Output"].Should().BeOfType<string>().Subject;
+        // 结构化字典应序列化为 JSON，而不是 .NET 类型名。
+        output.Should().NotContain("System.Collections");
+        output.Should().Contain("measureValue");
+        output.Should().Contain("12.5");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithStructuredData_ShouldSerializeAsJsonInTextNotDotNetTypeName()
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Format", "Text", "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Data"] = new List<object> { "A", "B", "C" }
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var output = result.OutputData!["Output"].Should().BeOfType<string>().Subject;
+        output.Should().NotContain("System.Collections");
+        output.Should().Contain("\"A\"");
+    }
+
     [Theory]
     [InlineData("CSV", "Result,")]
     [InlineData("Text", "Result: ")]
