@@ -81,9 +81,25 @@ test('Settings capability saves only the active tab through the existing setting
 
   assert.match(source, /SETTINGS_TABS/);
   assert.match(source, /saveCurrentTab/);
-  assert.match(source, /nextConfig\[tab\.configKey\] = parsed/);
+  assert.match(source, /saveScope:\s*tab\.configKey/);
+  assert.match(source, /\[tab\.configKey\]:\s*parsed/);
   assert.match(source, /settingsApiRef = settingsApi/);
   assert.doesNotMatch(source, /localStorage\.setItem|indexedDB/);
+});
+
+test('Legacy settings system tab saves scoped payloads and excludes retired no-op fields', () => {
+  const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/systemTabs.js');
+
+  assert.match(source, /saveScope:\s*'general'/);
+  assert.match(source, /saveScope:\s*'storage'/);
+  assert.match(source, /saveScope:\s*'users'/);
+  assert.doesNotMatch(source, /autoStart:\s*this\.container\?\.querySelector\('#cfg-autoStart'\)/);
+  assert.doesNotMatch(source, /minFreeSpaceGb:\s*this\.readFloatSetting\('#cfg-minFreeSpaceGb'/);
+  assert.doesNotMatch(source, /sessionTimeoutMinutes:\s*this\.readIntegerSetting\('#cfg-sessionTimeoutMinutes'/);
+  assert.match(source, /cfg-autoStart[\s\S]*暂未启用，需安装器支持/);
+  assert.match(source, /cfg-minFreeSpaceGb[\s\S]*暂未启用，仅保留兼容/);
+  assert.match(source, /id="cfg-sessionTimeoutMinutes"[\s\S]*disabled/);
+  assert.match(source, /桌面端不适用/);
 });
 
 test('Settings and AI capability gates fail closed behind explicit experimental window switches', () => {

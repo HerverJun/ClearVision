@@ -103,6 +103,67 @@ public class SettingsThemeEndpointTests
         await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
     }
 
+    [Fact]
+    public async Task UpdateSettings_WithGeneralScope_ShouldPreserveOtherSectionsAndRetiredAutoStart()
+    {
+        var initialConfig = CreateRichSettingsConfig();
+        await using var host = await SettingsThemeTestHost.CreateAsync(initialConfig);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings", new
+        {
+            saveScope = "general",
+            general = new
+            {
+                softwareTitle = "Updated Station",
+                theme = "light"
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
+            config.General.SoftwareTitle == "Updated Station" &&
+            config.General.Theme == GeneralConfig.ThemeLight &&
+            config.General.AutoStart == initialConfig.General.AutoStart &&
+            config.Communication.ActiveProtocol == initialConfig.Communication.ActiveProtocol &&
+            config.TcpCommunication.Profiles.Count == 1 &&
+            config.TcpCommunication.Profiles[0].Id == "robot" &&
+            config.Cameras.Count == 1 &&
+            config.Cameras[0].Id == "cam-001" &&
+            config.Runtime.RuntimePreviewPilot.Enabled == initialConfig.Runtime.RuntimePreviewPilot.Enabled &&
+            config.Security.SessionTimeoutMinutes == initialConfig.Security.SessionTimeoutMinutes &&
+            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
+            config.ActiveCameraId == initialConfig.ActiveCameraId));
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithMissingSections_ShouldNotClearExistingSections()
+    {
+        var initialConfig = CreateRichSettingsConfig();
+        await using var host = await SettingsThemeTestHost.CreateAsync(initialConfig);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings", new
+        {
+            saveScope = "storage",
+            storage = new
+            {
+                imageSavePath = @"E:\VisionData",
+                retentionDays = 90
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
+            config.Storage.ImageSavePath == @"E:\VisionData" &&
+            config.Storage.RetentionDays == 90 &&
+            config.Storage.SavePolicy == initialConfig.Storage.SavePolicy &&
+            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
+            config.General.SoftwareTitle == initialConfig.General.SoftwareTitle &&
+            config.Communication.ActiveProtocol == initialConfig.Communication.ActiveProtocol &&
+            config.TcpCommunication.Profiles.Count == 1 &&
+            config.Cameras.Count == 1 &&
+            config.Security.PasswordMinLength == initialConfig.Security.PasswordMinLength));
+    }
+
     private sealed class SettingsThemeTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -176,5 +237,76 @@ public class SettingsThemeEndpointTests
             return JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(source))
                 ?? new AppConfig();
         }
+    }
+
+    private static AppConfig CreateRichSettingsConfig()
+    {
+        var config = new AppConfig
+        {
+            General = new GeneralConfig
+            {
+                SoftwareTitle = "ClearVision",
+                Theme = GeneralConfig.ThemeDark,
+                AutoStart = true
+            },
+            Communication = new CommunicationConfig
+            {
+                ActiveProtocol = CommunicationConfig.ProtocolMc,
+                HeartbeatIntervalMs = 4321,
+                Mc = new PlcCommunicationProfile
+                {
+                    IpAddress = "10.0.0.8",
+                    Port = 5002,
+                    Mappings = new List<PlcAddressMapping>()
+                }
+            },
+            TcpCommunication = new TcpCommunicationConfig
+            {
+                Profiles =
+                [
+                    new TcpCommunicationProfile
+                    {
+                        Id = "robot",
+                        Name = "Robot",
+                        RemoteHost = "10.0.0.9",
+                        RemotePort = 9000
+                    }
+                ]
+            },
+            Storage = new StorageConfig
+            {
+                ImageSavePath = @"D:\VisionData\Images",
+                SavePolicy = "NgOnly",
+                RetentionDays = 45,
+                MinFreeSpaceGb = 9
+            },
+            Runtime = new RuntimeConfig
+            {
+                MissingMaterialTimeoutSeconds = 180,
+                RuntimePreviewPilot = new RuntimePreviewPilotConfig
+                {
+                    Enabled = true,
+                    AllowedModelIds = ["model-a"]
+                }
+            },
+            Security = new SecurityConfig
+            {
+                PasswordMinLength = 10,
+                SessionTimeoutMinutes = 999,
+                LoginFailureLockoutCount = 7
+            },
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-001",
+                    DisplayName = "Camera 1",
+                    SerialNumber = "SN001"
+                }
+            ],
+            ActiveCameraId = "cam-001"
+        };
+        config.Normalize();
+        return config;
     }
 }

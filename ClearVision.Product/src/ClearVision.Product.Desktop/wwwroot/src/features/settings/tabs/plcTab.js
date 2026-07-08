@@ -414,12 +414,6 @@ export function installPlcTab(SettingsView) {
                 this.plcSettingsLoaded = true;
                 this.plcDraftDirty = false;
                 this.plcProfileDrafts = {};
-                if (this.buildAppConfigForSave) {
-                    const appConfig = this.buildAppConfigForSave('communication');
-                    await settingsApi.saveSettings(appConfig);
-                    this.config = this.normalizeAppConfig(appConfig);
-                    this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
-                }
                 this.syncPlcMappingsFromActiveProfile();
                 this.refreshCommunicationPanel();
 

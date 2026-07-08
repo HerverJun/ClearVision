@@ -34,6 +34,11 @@ namespace ClearVision.Product.Desktop.Endpoints;
 /// </summary>
 public static class SettingsEndpoints
 {
+    private static readonly JsonSerializerOptions SettingsJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         // 获取当前配置
@@ -49,7 +54,7 @@ public static class SettingsEndpoints
         });
 
         // 更新配置
-        app.MapPut("/api/settings", async (AppConfig config, IConfigurationService configService, HttpContext context) =>
+        app.MapPut("/api/settings", async (JsonElement request, IConfigurationService configService, HttpContext context) =>
         {
             if (!IsAdmin(context))
             {
@@ -59,11 +64,10 @@ public static class SettingsEndpoints
             try
             {
                 var currentConfig = await configService.LoadAsync();
-                config.Cameras = NormalizeBindings(CloneBindings(currentConfig.Cameras));
-                config.ActiveCameraId = currentConfig.ActiveCameraId ?? string.Empty;
+                var config = MergeSettingsUpdate(currentConfig, request);
 
                 await configService.SaveAsync(config);
-                return Results.Ok(new { Message = "设置已保存" });
+                return Results.Ok(new { Message = "设置已保存", Config = config });
             }
             catch (Exception ex)
             {
@@ -1845,6 +1849,199 @@ public static class SettingsEndpoints
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         return app;
+    }
+
+    private static AppConfig MergeSettingsUpdate(AppConfig currentConfig, JsonElement request)
+    {
+        currentConfig ??= new AppConfig();
+        currentConfig.Normalize();
+        if (request.ValueKind != JsonValueKind.Object)
+        {
+            return currentConfig;
+        }
+
+        var incoming = JsonSerializer.Deserialize<AppConfig>(request.GetRawText(), SettingsJsonOptions) ?? new AppConfig();
+        incoming.Normalize();
+        var scope = TryGetJsonProperty(request, "saveScope", out var scopeElement)
+            ? scopeElement.GetString()
+            : null;
+
+        if (ShouldMergeSection(request, scope, "general") &&
+            TryGetJsonProperty(request, "general", out var generalElement) &&
+            generalElement.ValueKind == JsonValueKind.Object)
+        {
+            MergeGeneralConfig(currentConfig.General, incoming.General, generalElement);
+        }
+
+        if (ShouldMergeSection(request, scope, "storage") &&
+            TryGetJsonProperty(request, "storage", out var storageElement) &&
+            storageElement.ValueKind == JsonValueKind.Object)
+        {
+            MergeStorageConfig(currentConfig.Storage, incoming.Storage, storageElement);
+        }
+
+        if (ShouldMergeSection(request, scope, "runtime") &&
+            TryGetJsonProperty(request, "runtime", out var runtimeElement) &&
+            runtimeElement.ValueKind == JsonValueKind.Object)
+        {
+            MergeRuntimeConfig(currentConfig.Runtime, incoming.Runtime, runtimeElement);
+        }
+
+        if (ShouldMergeSection(request, scope, "security", "users") &&
+            TryGetJsonProperty(request, "security", out var securityElement) &&
+            securityElement.ValueKind == JsonValueKind.Object)
+        {
+            MergeSecurityConfig(currentConfig.Security, incoming.Security, securityElement);
+        }
+
+        if (ShouldMergeSection(request, scope, "communication", "plc") &&
+            TryGetJsonProperty(request, "communication", out _))
+        {
+            currentConfig.Communication = incoming.Communication;
+        }
+
+        if (ShouldMergeSection(request, scope, "tcpCommunication", "tcp") &&
+            TryGetJsonProperty(request, "tcpCommunication", out _))
+        {
+            currentConfig.TcpCommunication = incoming.TcpCommunication;
+        }
+
+        if (ShouldMergeSection(request, scope, "features") &&
+            TryGetJsonProperty(request, "features", out _))
+        {
+            currentConfig.Features = incoming.Features;
+        }
+
+        // Camera bindings are owned by /api/cameras/bindings; keep the existing protection for full settings PUT.
+        currentConfig.Cameras = NormalizeBindings(CloneBindings(currentConfig.Cameras));
+        currentConfig.ActiveCameraId = currentConfig.ActiveCameraId ?? string.Empty;
+        currentConfig.Normalize();
+        return currentConfig;
+    }
+
+    private static bool ShouldMergeSection(JsonElement request, string? scope, string propertyName, params string[] scopeAliases)
+    {
+        if (!string.IsNullOrWhiteSpace(scope))
+        {
+            return string.Equals(scope, propertyName, StringComparison.OrdinalIgnoreCase) ||
+                   scopeAliases.Any(alias => string.Equals(scope, alias, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return TryGetJsonProperty(request, propertyName, out _);
+    }
+
+    private static void MergeGeneralConfig(GeneralConfig target, GeneralConfig source, JsonElement section)
+    {
+        if (TryGetJsonProperty(section, "softwareTitle", out _))
+        {
+            target.SoftwareTitle = source.SoftwareTitle;
+        }
+
+        if (TryGetJsonProperty(section, "theme", out _))
+        {
+            target.Theme = source.Theme;
+        }
+
+        if (TryGetJsonProperty(section, "autoStart", out _))
+        {
+            target.AutoStart = source.AutoStart;
+        }
+    }
+
+    private static void MergeStorageConfig(StorageConfig target, StorageConfig source, JsonElement section)
+    {
+        if (TryGetJsonProperty(section, "imageSavePath", out _))
+        {
+            target.ImageSavePath = source.ImageSavePath;
+        }
+
+        if (TryGetJsonProperty(section, "savePolicy", out _))
+        {
+            target.SavePolicy = source.SavePolicy;
+        }
+
+        if (TryGetJsonProperty(section, "retentionDays", out _))
+        {
+            target.RetentionDays = source.RetentionDays;
+        }
+
+        if (TryGetJsonProperty(section, "minFreeSpaceGb", out _))
+        {
+            target.MinFreeSpaceGb = source.MinFreeSpaceGb;
+        }
+    }
+
+    private static void MergeRuntimeConfig(RuntimeConfig target, RuntimeConfig source, JsonElement section)
+    {
+        if (TryGetJsonProperty(section, "autoRun", out _))
+        {
+            target.AutoRun = source.AutoRun;
+        }
+
+        if (TryGetJsonProperty(section, "stopOnConsecutiveNg", out _))
+        {
+            target.StopOnConsecutiveNg = source.StopOnConsecutiveNg;
+        }
+
+        if (TryGetJsonProperty(section, "missingMaterialTimeoutSeconds", out _))
+        {
+            target.MissingMaterialTimeoutSeconds = source.MissingMaterialTimeoutSeconds;
+        }
+
+        if (TryGetJsonProperty(section, "applyProtectionRules", out _))
+        {
+            target.ApplyProtectionRules = source.ApplyProtectionRules;
+        }
+
+        if (TryGetJsonProperty(section, "runtimePreviewPilot", out _))
+        {
+            target.RuntimePreviewPilot = source.RuntimePreviewPilot;
+        }
+    }
+
+    private static void MergeSecurityConfig(SecurityConfig target, SecurityConfig source, JsonElement section)
+    {
+        if (TryGetJsonProperty(section, "passwordMinLength", out _))
+        {
+            target.PasswordMinLength = source.PasswordMinLength;
+        }
+
+        if (TryGetJsonProperty(section, "sessionTimeoutMinutes", out _))
+        {
+            target.SessionTimeoutMinutes = source.SessionTimeoutMinutes;
+        }
+
+        if (TryGetJsonProperty(section, "loginFailureLockoutCount", out _))
+        {
+            target.LoginFailureLockoutCount = source.LoginFailureLockoutCount;
+        }
+    }
+
+    private static bool TryGetJsonProperty(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            value = default;
+            return false;
+        }
+
+        if (element.TryGetProperty(propertyName, out value))
+        {
+            return true;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.NameEquals(propertyName) ||
+                property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);

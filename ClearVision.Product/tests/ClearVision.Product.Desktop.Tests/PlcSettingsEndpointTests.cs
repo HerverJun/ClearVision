@@ -160,6 +160,94 @@ public class PlcSettingsEndpointTests
     }
 
     [Fact]
+    public async Task PutPlcSettings_ShouldPreserveSystemCameraAndTcpSettings()
+    {
+        var initialConfig = new AppConfig
+        {
+            General = new GeneralConfig
+            {
+                SoftwareTitle = "Line A",
+                Theme = GeneralConfig.ThemeLight,
+                AutoStart = true
+            },
+            Storage = new StorageConfig
+            {
+                ImageSavePath = @"D:\VisionData",
+                RetentionDays = 45,
+                MinFreeSpaceGb = 11
+            },
+            TcpCommunication = new TcpCommunicationConfig
+            {
+                Profiles =
+                [
+                    new TcpCommunicationProfile
+                    {
+                        Id = "robot",
+                        Name = "Robot",
+                        RemoteHost = "10.0.0.7",
+                        RemotePort = 9000
+                    }
+                ]
+            },
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-main",
+                    DisplayName = "Main Camera",
+                    SerialNumber = "SN-MAIN"
+                }
+            ],
+            ActiveCameraId = "cam-main"
+        };
+        initialConfig.Normalize();
+        await using var host = await PlcSettingsTestHost.CreateAsync(initialConfig);
+        var payload = new
+        {
+            activeProtocol = "MC",
+            heartbeatIntervalMs = 1500,
+            s7 = new
+            {
+                ipAddress = "192.168.0.1",
+                port = 102,
+                cpuType = "S7-1200",
+                rack = 0,
+                slot = 1,
+                mappings = Array.Empty<object>()
+            },
+            mc = new
+            {
+                ipAddress = "192.168.3.10",
+                port = 5002,
+                mappings = Array.Empty<object>()
+            },
+            fins = new
+            {
+                ipAddress = "192.168.250.1",
+                port = 9600,
+                mappings = Array.Empty<object>()
+            }
+        };
+
+        using var response = await host.Client.PutAsync(
+            "/api/plc/settings",
+            new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
+            config.Communication.ActiveProtocol == CommunicationConfig.ProtocolMc &&
+            config.Communication.Mc.IpAddress == "192.168.3.10" &&
+            config.General.SoftwareTitle == initialConfig.General.SoftwareTitle &&
+            config.General.AutoStart == initialConfig.General.AutoStart &&
+            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
+            config.TcpCommunication.Profiles.Count == 1 &&
+            config.TcpCommunication.Profiles[0].Id == "robot" &&
+            config.Cameras.Count == 1 &&
+            config.Cameras[0].Id == "cam-main" &&
+            config.ActiveCameraId == "cam-main"));
+    }
+
+    [Fact]
     public async Task PutPlcMappings_ShouldRejectNonAdminUser()
     {
         await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig(), role: "Operator");

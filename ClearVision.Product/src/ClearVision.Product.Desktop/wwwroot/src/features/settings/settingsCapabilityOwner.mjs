@@ -217,8 +217,10 @@ export class SettingsCapabilityOwner {
             return false;
         }
 
-        const nextConfig = deepClone(this.config) || {};
-        nextConfig[tab.configKey] = parsed;
+        const nextConfig = {
+            saveScope: tab.configKey,
+            [tab.configKey]: parsed
+        };
         this.loading = true;
         this.errorMessage = '';
         this.statusMessage = `正在保存${tab.label}设置`;
@@ -226,7 +228,10 @@ export class SettingsCapabilityOwner {
 
         try {
             const saved = await this.adapter.saveSettings(nextConfig);
-            this.config = saved || nextConfig;
+            this.config = saved || {
+                ...(deepClone(this.config) || {}),
+                [tab.configKey]: parsed
+            };
             this.draftTextByTab.set(tab.id, this.stringifyTabConfig(tab));
             this.dirtyTabs.delete(tab.id);
             this.statusMessage = `${tab.label}设置已保存`;

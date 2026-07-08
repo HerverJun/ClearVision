@@ -113,6 +113,48 @@ public sealed class JsonConfigurationServiceTests
         }
     }
 
+    [Fact]
+    public async Task LoadAsync_ShouldKeepLegacyRetiredSettingsFieldsReadable()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "config.json"),
+                """
+                {
+                  "general": {
+                    "softwareTitle": "Legacy Station",
+                    "theme": "light",
+                    "autoStart": true
+                  },
+                  "storage": {
+                    "imageSavePath": "D:\\VisionData",
+                    "savePolicy": "NgOnly",
+                    "retentionDays": 30,
+                    "minFreeSpaceGb": 17
+                  },
+                  "security": {
+                    "passwordMinLength": 8,
+                    "sessionTimeoutMinutes": 777,
+                    "loginFailureLockoutCount": 6
+                  }
+                }
+                """);
+
+            var service = CreateService(root);
+            var config = await service.LoadAsync();
+
+            config.General.AutoStart.Should().BeTrue();
+            config.Storage.MinFreeSpaceGb.Should().Be(17);
+            config.Security.SessionTimeoutMinutes.Should().Be(777);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     private static JsonConfigurationService CreateService(string root)
     {
         return new JsonConfigurationService(

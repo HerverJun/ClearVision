@@ -2,7 +2,10 @@ import httpClient from '../../core/messaging/httpClient.js';
 
 const settingsApi = {
     loadSettings: () => httpClient.get('/settings'),
-    saveSettings: config => httpClient.put('/settings', config),
+    saveSettings: async config => {
+        const result = await httpClient.put('/settings', config);
+        return result?.config || result?.Config || result;
+    },
     resetSettings: () => httpClient.post('/settings/reset'),
     getDiskUsage: path => httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(path || '')}`),
     getDatabaseStatus: () => httpClient.get('/settings/database/status'),

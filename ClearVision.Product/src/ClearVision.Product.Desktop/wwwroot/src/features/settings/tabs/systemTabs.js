@@ -45,9 +45,10 @@ export function installSystemTabs(SettingsView) {
                             </div>
                             <div class="settings-fieldset" style="flex:1; display:flex; flex-direction:column; justify-content:flex-end;">
                                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:12px;">
-                                    <input type="checkbox" id="cfg-autoStart" ${general.autoStart ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--cinnabar);">
-                                    开机自动启动软件
+                                    <input type="checkbox" id="cfg-autoStart" ${general.autoStart ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--cinnabar);" disabled readonly aria-disabled="true" title="暂未启用：开机自启需要安装器支持，此项仅保留历史配置兼容。">
+                                    开机自动启动软件<span style="color:#94a3b8; font-weight:normal;">（暂未启用，需安装器支持）</span>
                                 </label>
+                                <span class="settings-field-hint">此项不会写入 Windows 启动项；旧配置值会继续兼容读取。</span>
                             </div>
                         </div>
                     </div>
@@ -152,10 +153,10 @@ export function installSystemTabs(SettingsView) {
                             <div class="settings-fieldset">
                                 <label>磁盘低空间预警 (GB)</label>
                                 <div class="input-with-suffix" style="position:relative; max-width: 200px;">
-                                    <input type="number" class="cv-input" id="cfg-minFreeSpaceGb" value="${storage.minFreeSpaceGb ?? 5}" style="padding-right:36px;">
+                                    <input type="number" class="cv-input" id="cfg-minFreeSpaceGb" value="${storage.minFreeSpaceGb ?? 5}" style="padding-right:36px;" disabled readonly aria-disabled="true" title="暂未启用：此阈值仅保留历史配置兼容，不参与保存校验。">
                                     <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">GB</span>
                                 </div>
-                                <span class="settings-field-hint">当磁盘剩余空间不足该值时，系统会报警并禁止生产启动。</span>
+                                <span class="settings-field-hint">暂未启用，仅保留兼容；当前仅显示实时磁盘容量，不会按该阈值阻止生产启动。</span>
                             </div>
                         </div>
                     </div>
@@ -964,8 +965,7 @@ export function installSystemTabs(SettingsView) {
 
             return {
                 softwareTitle,
-                theme,
-                autoStart: this.container?.querySelector('#cfg-autoStart')?.checked || false
+                theme
             };
         }
         ,
@@ -983,8 +983,7 @@ export function installSystemTabs(SettingsView) {
             return {
                 imageSavePath,
                 savePolicy,
-                retentionDays: this.readIntegerSetting('#cfg-retentionDays', '自动清理阈值', { min: 0, max: 3650 }),
-                minFreeSpaceGb: this.readFloatSetting('#cfg-minFreeSpaceGb', '磁盘低空间预警', { min: 0, max: 1024 })
+                retentionDays: this.readIntegerSetting('#cfg-retentionDays', '自动清理阈值', { min: 0, max: 3650 })
             };
         }
         ,
@@ -1000,30 +999,28 @@ export function installSystemTabs(SettingsView) {
         collectSecurityConfigForSave() {
             return {
                 passwordMinLength: this.readIntegerSetting('#cfg-passwordMinLength', '密码最小长度', { min: 6, max: 128 }),
-                sessionTimeoutMinutes: this.readIntegerSetting('#cfg-sessionTimeoutMinutes', '会话自动超时', { min: 1, max: 1440 }),
                 loginFailureLockoutCount: this.readIntegerSetting('#cfg-loginFailureLockoutCount', '登录失败锁定次数', { min: 1, max: 100 })
             };
         }
         ,
         buildAppConfigForSave(activeTabName) {
-            const nextConfig = this.normalizeAppConfig(this.config || this.getDefaultConfig());
-            nextConfig.communication = this.cloneCommunicationConfig(
-                this.savedCommunicationConfig || this.config?.communication || nextConfig.communication
-            );
-            nextConfig.cameras = Array.isArray(this.config?.cameras) ? [...this.config.cameras] : [];
-            nextConfig.activeCameraId = this.config?.activeCameraId || '';
-
             if (activeTabName === 'general') {
-                nextConfig.general = this.collectGeneralConfigForSave();
-            } else if (activeTabName === 'storage') {
-                nextConfig.storage = this.collectStorageConfigForSave();
-            } else if (activeTabName === 'runtime') {
-                nextConfig.runtime = this.collectRuntimeConfigForSave();
-            } else if (activeTabName === 'users') {
-                nextConfig.security = this.collectSecurityConfigForSave();
+                return { saveScope: 'general', general: this.collectGeneralConfigForSave() };
+            }
+            if (activeTabName === 'storage') {
+                return { saveScope: 'storage', storage: this.collectStorageConfigForSave() };
+            }
+            if (activeTabName === 'runtime') {
+                return { saveScope: 'runtime', runtime: this.collectRuntimeConfigForSave() };
+            }
+            if (activeTabName === 'users') {
+                return { saveScope: 'users', security: this.collectSecurityConfigForSave() };
+            }
+            if (activeTabName === 'cameras') {
+                return { saveScope: 'cameras' };
             }
 
-            return nextConfig;
+            return { saveScope: activeTabName };
         }
         ,
         async saveAppSettingsForTab(activeTabName) {
