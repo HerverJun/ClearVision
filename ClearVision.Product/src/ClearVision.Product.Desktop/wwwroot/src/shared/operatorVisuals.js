@@ -550,9 +550,24 @@ function cloneParameters(parameters) {
     return parameters.map(parameter => ({ ...parameter }));
 }
 
+// 解析 metadata 中的端口候选：明确给出的数组（哪怕为空 []）优先于另一种命名，
+// 只有两种命名都缺失时才返回 undefined，交给 clonePorts 走兼容 fallback。
+function resolvePortsCandidate(camelCandidate, pascalCandidate) {
+    if (Array.isArray(camelCandidate)) {
+        return camelCandidate;
+    }
+    if (Array.isArray(pascalCandidate)) {
+        return pascalCandidate;
+    }
+    return undefined;
+}
+
 function clonePorts(ports, fallbackName) {
-    if (!Array.isArray(ports) || ports.length === 0) {
-        return [{ name: fallbackName, type: 'Any' }];
+    // metadata 未声明该侧端口（undefined/null 或非数组）时，才使用兼容 fallback。
+    // metadata 明确给出数组（包含空数组 []）时必须原样保留，不得伪造端口，
+    // 否则 ImageAcquisition/RectangleRegion 等源头算子会凭空多出一个 Any 端口。
+    if (!Array.isArray(ports)) {
+        return [{ name: fallbackName, type: 'Any', dataType: 'Any' }];
     }
 
     return ports.map((port, index) => ({
@@ -582,7 +597,7 @@ export function buildOperatorNodeConfig(type, data = null) {
         color: data?.color || getOperatorColor(resolvedType, category),
         iconPath: data?.iconPath || data?.IconPath || getOperatorIconPath(resolvedType, category, iconName),
         parameters: cloneParameters(data?.parameters || data?.Parameters),
-        inputs: clonePorts(data?.inputPorts || data?.InputPorts, 'input'),
-        outputs: clonePorts(data?.outputPorts || data?.OutputPorts, 'output')
+        inputs: clonePorts(resolvePortsCandidate(data?.inputPorts, data?.InputPorts), 'input'),
+        outputs: clonePorts(resolvePortsCandidate(data?.outputPorts, data?.OutputPorts), 'output')
     };
 }

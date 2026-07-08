@@ -568,6 +568,87 @@ test('FlowCanvas persists disabled node state through serialize and deserialize'
   restored.destroy();
 });
 
+test('buildOperatorNodeConfig → addNode → serialize preserves explicit-empty input ports', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+  const { buildOperatorNodeConfig } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorVisuals.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+
+  // RectangleRegion：metadata 明确声明 inputPorts: []，是真正的无输入源头算子。
+  const config = buildOperatorNodeConfig('RectangleRegion', {
+    type: 'RectangleRegion',
+    displayName: '矩形区域',
+    inputPorts: [],
+    outputPorts: [{ name: 'Rectangle', displayName: '矩形', dataType: 'Rectangle' }]
+  });
+
+  // 画布节点：不得凭空多出输入端口。
+  const node = fc.addNode('RectangleRegion', 0, 0, config);
+  assert.equal(node.inputs.length, 0, '画布节点不得伪造输入端口');
+  assert.equal(node.outputs.length, 1);
+
+  // serialize 后 inputPorts 仍为空。
+  const serialized = fc.serialize();
+  assert.equal(serialized.operators.length, 1);
+  assert.equal(serialized.operators[0].inputPorts.length, 0, 'serialize 后 inputPorts 仍为空');
+  assert.equal(serialized.operators[0].outputPorts.length, 1);
+
+  // 反序列化回来仍为空，且不破坏旧流程兼容。
+  const restored = new FlowCanvas('canvas');
+  restored.deserialize(serialized);
+  const restoredNode = restored.nodes.get(node.id);
+  assert.equal(restoredNode.inputs.length, 0, '反序列化后 inputPorts 仍为空');
+  assert.equal(restoredNode.outputs.length, 1);
+
+  fc.destroy();
+  restored.destroy();
+});
+
+test('buildOperatorNodeConfig → addNode → serialize keeps ImageAcquisition real ports intact', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+  const { buildOperatorNodeConfig } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorVisuals.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+
+  // ImageAcquisition 的真实后端契约：2 个输入端口（Image/FilePath）+ 1 个图像输出端口。
+  const config = buildOperatorNodeConfig('ImageAcquisition', {
+    type: 'ImageAcquisition',
+    displayName: '图像采集',
+    inputPorts: [
+      { name: 'Image', displayName: 'Runtime supplied image', dataType: 'Image', isRequired: false },
+      { name: 'FilePath', displayName: '文件路径输入', dataType: 'String', isRequired: false }
+    ],
+    outputPorts: [{ name: 'Image', displayName: '图像', dataType: 'Image' }]
+  });
+
+  const node = fc.addNode('ImageAcquisition', 0, 0, config);
+  assert.equal(node.inputs.length, 2, 'ImageAcquisition 保留其真实声明的 2 个输入端口');
+  assert.deepEqual(node.inputs.map(p => p.name), ['Image', 'FilePath']);
+
+  const serialized = fc.serialize();
+  assert.equal(serialized.operators[0].inputPorts.length, 2, 'serialize 后保留 2 个输入端口');
+  assert.deepEqual(serialized.operators[0].inputPorts.map(p => p.name), ['Image', 'FilePath']);
+  assert.equal(serialized.operators[0].outputPorts.length, 1);
+
+  fc.destroy();
+});
+
 test('FlowCanvas handleMouseMove skips redraws when hover state does not change', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
