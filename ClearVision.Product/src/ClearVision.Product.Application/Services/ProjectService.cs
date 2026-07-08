@@ -324,33 +324,51 @@ public class ProjectService
     /// <summary>
     /// 更新工程流程
     /// </summary>
-    public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
+    public async Task<ProjectDto> UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
         // 1. 验证工程存在
         Project project;
+        OperatorFlowDto? existingFlow;
         await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
         {
             project = await _projectRepository.GetByIdAsync(id)
                 ?? throw new ProjectNotFoundException(id);
+            existingFlow = await LoadStoredFlowDtoAsync(id);
         }
 
         // 2. 构造流程DTO
         var flowDto = new OperatorFlowDto
         {
-            Name = "MainFlow", // 保持默认名称或从某处获取
+            Name = ResolveFlowName(request.Name, existingFlow?.Name),
             Operators = request.Operators,
             Connections = request.Connections
         };
-        await UpdateAsync(id, new UpdateProjectRequest
+        return await UpdateAsync(id, new UpdateProjectRequest
         {
             Name = project.Name,
             Description = project.Description,
+            ExpectedPersistenceRevision = request.ExpectedPersistenceRevision ?? project.PersistenceRevision,
             Flow = flowDto
         });
 
         // 4. 更新工程修改时间 (可选，但推荐)
         // project.LastModified = DateTime.UtcNow; // 如果 Project 有这个字段
         // await _projectRepository.UpdateAsync(project);
+    }
+
+    private static string ResolveFlowName(string? requestedName, string? existingName)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedName))
+        {
+            return requestedName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(existingName))
+        {
+            return existingName.Trim();
+        }
+
+        return "MainFlow";
     }
 
     /// <summary>

@@ -243,28 +243,47 @@ class ProjectManager {
         const globalVariablesChanged = this.haveGlobalVariablesChanged(globalVariables);
 
         try {
+            const expectedRevision = readPersistenceRevision(this.currentProject);
             const updatePayload = {
                 name: data.name,
                 description: data.description
             };
+            if (Number.isFinite(expectedRevision)) {
+                updatePayload.expectedPersistenceRevision = expectedRevision;
+            }
+
             if (globalVariablesChanged) {
                 updatePayload.globalVariables = globalVariables;
             }
 
             const saved = await httpClient.put(`/projects/${targetProjectId}`, updatePayload);
+            const savedProject = isProjectPayload(saved) ? saved : {};
+            let flowExpectedRevision = readPersistenceRevision(savedProject);
+            if (!Number.isFinite(flowExpectedRevision)) {
+                flowExpectedRevision = expectedRevision;
+            }
+
+            let savedFlow = null;
             if (flow) {
-                await httpClient.put(`/projects/${targetProjectId}/flow`, toUpdateFlowRequest(flow));
+                savedFlow = await httpClient.put(
+                    `/projects/${targetProjectId}/flow`,
+                    toUpdateFlowRequest(flow, flowExpectedRevision));
+                const flowRevision = readPersistenceRevision(savedFlow);
+                if (Number.isFinite(flowRevision)) {
+                    savedProject.persistenceRevision = flowRevision;
+                    savedProject.PersistenceRevision = flowRevision;
+                }
             }
 
             if (!this.currentProject || this.currentProject.id !== targetProjectId) {
                 return true;
             }
 
-            const savedProject = isProjectPayload(saved) ? saved : {};
+            const flowFromResponse = savedFlow?.flow || savedFlow?.Flow;
             Object.assign(this.currentProject, savedProject);
             this.currentProject.name = savedProject.name ?? savedProject.Name ?? data.name ?? this.currentProject.name;
             this.currentProject.description = savedProject.description ?? savedProject.Description ?? data.description ?? this.currentProject.description;
-            this.currentProject.flow = savedProject.flow || savedProject.Flow || flow || this.currentProject.flow;
+            this.currentProject.flow = flowFromResponse || savedProject.flow || savedProject.Flow || flow || this.currentProject.flow;
             const savedGlobalVariables = savedProject.globalVariables || savedProject.GlobalVariables || globalVariables || this.currentProject.globalVariables;
             if (savedGlobalVariables) {
                 this.currentProject.globalVariables = savedGlobalVariables;
@@ -524,11 +543,30 @@ class ProjectManager {
     }
 }
 
-function toUpdateFlowRequest(flow) {
-    return {
+function toUpdateFlowRequest(flow, expectedPersistenceRevision = null) {
+    const request = {
         operators: Array.isArray(flow?.operators) ? flow.operators : (flow?.Operators || []),
         connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || [])
     };
+    const name = flow?.name ?? flow?.Name;
+    if (typeof name === 'string' && name.trim()) {
+        request.name = name.trim();
+    }
+
+    if (expectedPersistenceRevision !== null && expectedPersistenceRevision !== undefined) {
+        const revision = Number(expectedPersistenceRevision);
+        if (Number.isFinite(revision)) {
+            request.expectedPersistenceRevision = revision;
+        }
+    }
+
+    return request;
+}
+
+function readPersistenceRevision(source) {
+    const value = source?.persistenceRevision ?? source?.PersistenceRevision;
+    const revision = Number(value);
+    return Number.isFinite(revision) ? revision : null;
 }
 
 function getGlobalVariablesSignature(globalVariables) {

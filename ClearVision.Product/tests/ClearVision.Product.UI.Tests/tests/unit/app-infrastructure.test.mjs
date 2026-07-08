@@ -518,6 +518,60 @@ test('project manager flow save omits unchanged global variables from aggregate 
   assert.deepEqual(puts[1].body, flow);
 });
 
+test('project manager sends persistence revision and flow name through legacy flow save', async (t) => {
+  const originalPut = httpClient.put;
+  const previousDocument = globalThis.document;
+  const project = {
+    id: 'project-revision-save',
+    name: 'Revision Save',
+    description: '',
+    persistenceRevision: 4,
+    flow: { name: 'ExistingFlow', operators: [], connections: [] },
+    globalVariables: { variables: [] }
+  };
+  const flow = { name: 'InspectionFlow', operators: [{ id: 'node-1' }], connections: [] };
+  const puts = [];
+
+  t.after(() => {
+    httpClient.put = originalPut;
+    projectManager.currentProject = null;
+    projectManager.savedGlobalVariablesSignature = '';
+    projectManager.forgetProjectFromCaches(project.id);
+    setCurrentProject(null);
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  });
+
+  globalThis.document = {
+    title: '',
+    getElementById() {
+      return null;
+    }
+  };
+  projectManager.currentProject = project;
+  projectManager.rememberGlobalVariableBaseline(project);
+  setCurrentProject(project);
+  httpClient.put = async (url, body) => {
+    puts.push({ url, body });
+    if (url.endsWith('/flow')) {
+      return { persistenceRevision: 6, flow };
+    }
+
+    return { id: project.id, name: project.name, description: project.description, persistenceRevision: 5 };
+  };
+
+  await projectManager.saveProject({ ...project, flow });
+
+  assert.equal(puts[0].body.expectedPersistenceRevision, 4);
+  assert.equal(puts[1].body.expectedPersistenceRevision, 5);
+  assert.equal(puts[1].body.name, 'InspectionFlow');
+  assert.deepEqual(puts[1].body.operators, flow.operators);
+  assert.equal(getCurrentProject().persistenceRevision, 6);
+});
+
 test('project manager includes changed global variables in aggregate save payload', async (t) => {
   const originalPut = httpClient.put;
   const previousDocument = globalThis.document;

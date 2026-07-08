@@ -231,14 +231,22 @@ public static class ApiEndpoints
             {
                 // 使用 ProjectService 处理更新，它现在使用文件存储
                 // 这种方式完全绕过了 EF Core 的复杂状态管理和 Table Splitting 问题
-                await service.UpdateFlowAsync(id, request);
+                var project = await service.UpdateFlowAsync(id, request);
 
-                return Results.Ok(new { Message = "流程已更新 (File Based)", OperatorCount = request.Operators.Count, ConnectionCount = request.Connections.Count });
+                return Results.Ok(new
+                {
+                    Message = "流程已更新 (File Based)",
+                    OperatorCount = request.Operators.Count,
+                    ConnectionCount = request.Connections.Count,
+                    ProjectId = project.Id,
+                    PersistenceRevision = project.PersistenceRevision,
+                    Flow = project.Flow
+                });
             }
             catch (Exception ex)
             {
                 // 日志已由全局异常中间件记录
-                return ToBadRequest(ex);
+                return ToProjectUpdateFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -899,7 +907,12 @@ public static class ApiEndpoints
         if (TryParseStableError(ex.Message, out var code, out var message))
         {
             return string.Equals(code, "PSV011", StringComparison.Ordinal)
-                ? Results.Conflict(new { Code = code, Error = message })
+                ? Results.Conflict(new
+                {
+                    Code = code,
+                    Error = "Project flow was updated by another save. Refresh and retry.",
+                    Detail = message
+                })
                 : Results.BadRequest(new { Code = code, Error = message });
         }
 

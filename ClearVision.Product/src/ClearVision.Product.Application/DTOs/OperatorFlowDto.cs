@@ -111,6 +111,10 @@ public class OperatorFlowDto
 /// </summary>
 public class UpdateFlowRequest
 {
+    public string? Name { get; set; }
+
+    public long? ExpectedPersistenceRevision { get; set; }
+
     public List<OperatorDto> Operators { get; set; } = new();
     public List<OperatorConnectionDto> Connections { get; set; } = new();
 }

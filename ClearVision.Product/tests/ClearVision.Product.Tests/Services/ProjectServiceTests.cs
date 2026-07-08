@@ -435,6 +435,233 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task UpdateFlowAsync_WhenExpectedPersistenceRevisionMatches_ShouldAdvanceRevisionAndPersistFlow()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        var saved = await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            Name = "InspectionFlow",
+            ExpectedPersistenceRevision = 0,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Threshold",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.Thresholding
+                }
+            ],
+            Connections = []
+        });
+
+        saved.PersistenceRevision.Should().Be(1);
+        project.PersistenceRevision.Should().Be(1);
+        storage.SaveCount.Should().Be(1);
+        storage.LastPersistenceRevision.Should().Be(1);
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("InspectionFlow");
+        await repository.Received(1).UpdateAsync(project);
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_WhenExpectedPersistenceRevisionIsStale_ShouldFailWithoutWriting()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        project.SetPersistenceRevision(2);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        var act = async () => await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            Name = "StaleFlow",
+            ExpectedPersistenceRevision = 1,
+            Operators = [],
+            Connections = []
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
+        project.PersistenceRevision.Should().Be(2);
+        storage.SaveCount.Should().Be(0);
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_WhenNameIsOmitted_ShouldPreserveStoredFlowName()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        storage.Seed(project.Id, SerializeFlow(new OperatorFlowDto { Name = "ExistingFlow" }), 0);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "ResultOutput",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.ResultOutput
+                }
+            ],
+            Connections = []
+        });
+
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("ExistingFlow");
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().NotBe("MainFlow");
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_WhenNameIsProvided_ShouldPersistRequestedFlowName()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        storage.Seed(project.Id, SerializeFlow(new OperatorFlowDto { Name = "ExistingFlow" }), 0);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            Name = "RequestedFlow",
+            ExpectedPersistenceRevision = 0,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "ResultOutput",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.ResultOutput
+                }
+            ],
+            Connections = []
+        });
+
+        DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("RequestedFlow");
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_ShouldPreserveFlowJsonContract()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sourceOperatorId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetPortId = Guid.NewGuid();
+        var parameterId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+
+        await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            Name = "ContractFlow",
+            ExpectedPersistenceRevision = 0,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = sourceOperatorId,
+                    Name = "Source",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.ResultOutput,
+                    IsEnabled = false,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = sourcePortId,
+                            Name = "SourcePort",
+                            Direction = ClearVision.Product.Core.Enums.PortDirection.Output,
+                            DataType = ClearVision.Product.Core.Enums.PortDataType.String
+                        }
+                    ],
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = parameterId,
+                            Name = "FilePath",
+                            DisplayName = "File Path",
+                            DataType = "string",
+                            Value = "D:/vision/output.txt",
+                            IsRequired = true
+                        }
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "Target",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.ResultOutput,
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = targetPortId,
+                            Name = "TargetPort",
+                            Direction = ClearVision.Product.Core.Enums.PortDirection.Input,
+                            DataType = ClearVision.Product.Core.Enums.PortDataType.String,
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = connectionId,
+                    SourceOperatorId = sourceOperatorId,
+                    SourcePortId = sourcePortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = targetPortId
+                }
+            ]
+        });
+
+        var savedFlow = DeserializeFlow(storage.LastSavedFlowJson!);
+        savedFlow.Name.Should().Be("ContractFlow");
+        savedFlow.Operators.Should().HaveCount(2);
+        var source = savedFlow.Operators.Single(op => op.Id == sourceOperatorId);
+        source.IsEnabled.Should().BeFalse();
+        source.OutputPorts.Should().ContainSingle(port => port.Id == sourcePortId)
+            .Which.Name.Should().Be("SourcePort");
+        var parameter = source.Parameters.Should().ContainSingle(param => param.Id == parameterId).Subject;
+        parameter.Value.Should().BeAssignableTo<JsonElement>()
+            .Which.GetString().Should().Be("D:/vision/output.txt");
+        var target = savedFlow.Operators.Single(op => op.Id == targetOperatorId);
+        target.InputPorts.Should().ContainSingle(port => port.Id == targetPortId)
+            .Which.Name.Should().Be("TargetPort");
+        savedFlow.Connections.Should().ContainSingle(connection =>
+            connection.Id == connectionId &&
+            connection.SourceOperatorId == sourceOperatorId &&
+            connection.SourcePortId == sourcePortId &&
+            connection.TargetOperatorId == targetOperatorId &&
+            connection.TargetPortId == targetPortId);
+    }
+
+    [Fact]
     public async Task UpdateGlobalVariablesAsync_WhenVariableIsRenamed_ShouldNormalizeStoredFlowVariableName()
     {
         var repository = Substitute.For<IProjectRepository>();
@@ -820,6 +1047,26 @@ public class ProjectServiceTests
             Connections = []
         };
     }
+
+    private static string SerializeFlow(OperatorFlowDto flow) =>
+        JsonSerializer.Serialize(flow, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        });
+
+    private static OperatorFlowDto DeserializeFlow(string flowJson) =>
+        JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        }) ?? throw new InvalidOperationException("Unable to deserialize test flow JSON.");
 
     private static JsonElement CreateCalibrationPayload()
     {

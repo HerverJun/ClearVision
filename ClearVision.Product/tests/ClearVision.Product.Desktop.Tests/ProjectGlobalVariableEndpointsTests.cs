@@ -409,6 +409,102 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task FlowPut_WhenExpectedRevisionMatches_ShouldPersistAndReturnNextRevision()
+    {
+        var variableId = Guid.NewGuid();
+        var flowStorage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            flowStorage: flowStorage);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/flow",
+            new UpdateFlowRequest
+            {
+                Name = "EndpointFlow",
+                ExpectedPersistenceRevision = 0,
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "ResultOutput",
+                        Type = OperatorType.ResultOutput
+                    }
+                ],
+                Connections = []
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("persistenceRevision").GetInt64().Should().Be(1);
+        host.Project.PersistenceRevision.Should().Be(1);
+        flowStorage.LastPersistenceRevision.Should().Be(1);
+        DeserializeFlow(flowStorage.LastSavedFlowJson!).Name.Should().Be("EndpointFlow");
+    }
+
+    [Fact]
+    public async Task FlowPut_WhenExpectedRevisionIsStale_ShouldReturnConflictWithoutWriting()
+    {
+        var variableId = Guid.NewGuid();
+        var flowStorage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            flowStorage: flowStorage);
+        host.Project.SetPersistenceRevision(2);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/flow",
+            new UpdateFlowRequest
+            {
+                Name = "StaleEndpointFlow",
+                ExpectedPersistenceRevision = 1,
+                Operators = [],
+                Connections = []
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PSV011");
+        body.GetProperty("error").GetString().Should().Contain("Refresh and retry");
+        body.GetProperty("detail").GetString().Should().Contain("Expected=1");
+        host.Project.PersistenceRevision.Should().Be(2);
+        flowStorage.SaveCount.Should().Be(0);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task FlowPut_WhenNameIsOmitted_ShouldPreserveExistingFlowName()
+    {
+        var variableId = Guid.NewGuid();
+        var flowStorage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            storedFlowJson: SerializeFlow(new OperatorFlowDto { Name = "ExistingEndpointFlow" }),
+            flowStorage: flowStorage);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/flow",
+            new UpdateFlowRequest
+            {
+                ExpectedPersistenceRevision = 0,
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "ResultOutput",
+                        Type = OperatorType.ResultOutput
+                    }
+                ],
+                Connections = []
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        DeserializeFlow(flowStorage.LastSavedFlowJson!).Name.Should().Be("ExistingEndpointFlow");
+    }
+
+    [Fact]
     public async Task ProjectDelete_ShouldRejectWhileProjectIsRunning()
     {
         var variableId = Guid.NewGuid();
@@ -761,7 +857,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             ProjectAssetJson.Options);
 
     private static string CreateResultOnlyFlowJson() =>
-        JsonSerializer.Serialize(
+        SerializeFlow(
             new OperatorFlowDto
             {
                 Id = Guid.NewGuid(),
@@ -777,15 +873,27 @@ public sealed class ProjectGlobalVariableEndpointsTests
                         Y = 0
                     }
                 ]
-            },
-            new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                Converters =
-                {
-                    new System.Text.Json.Serialization.JsonStringEnumConverter()
-                }
             });
+
+    private static string SerializeFlow(OperatorFlowDto flow) =>
+        JsonSerializer.Serialize(flow, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        });
+
+    private static OperatorFlowDto DeserializeFlow(string flowJson) =>
+        JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters =
+            {
+                new System.Text.Json.Serialization.JsonStringEnumConverter()
+            }
+        }) ?? throw new InvalidOperationException("Unable to deserialize test flow JSON.");
 
     private sealed class MutableProjectAssetStorage : IProjectAssetStorage
     {
