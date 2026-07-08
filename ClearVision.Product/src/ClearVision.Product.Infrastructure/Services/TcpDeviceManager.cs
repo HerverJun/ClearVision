@@ -15,6 +15,12 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
     private const int MaxFramesPerProfile = 300;
     private const int DefaultReadBufferSize = 4096;
 
+    // Raw/无定界响应的收敛间隔：某段数据到达后，若对端在该时间内没有继续发送，
+    // 就把已缓冲的数据视为一个完整帧返回，避免"只读一次"截断跨 TCP 分段的响应。
+    // 该值需大于现场典型的分段到达间隔（TCP 分片通常在个位数毫秒内送达），
+    // 同时保持足够小以免每次读取都引入过多尾部延迟。
+    private const int DefaultReadIdleGapMs = 100;
+
     private static readonly JsonSerializerOptions CloneJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -134,9 +140,12 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
         TcpDeviceSendRequest request,
         CancellationToken cancellationToken = default)
     {
+        // Transient 语义：连接仅服务这一次发送/接收，成功或失败后都必须释放，
+        // 不得在 _clients / 状态里残留可复用连接。需要复用连接的调用方应改走
+        // 持久化路径（ConnectAsync + SendAsync(profileId)），而不是让 Transient 悄悄持久化。
         profile ??= new TcpCommunicationProfile();
         profile.Normalize();
-        return await SendWithProfileAsync(profile, request, persistSession: true, cancellationToken);
+        return await SendWithProfileAsync(profile, request, persistSession: false, cancellationToken);
     }
 
     public async Task<TcpDeviceOperationResult> StartServerAsync(
@@ -446,7 +455,12 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
                     response = DecodeFrameText(profile, responseBytes);
                 }
 
-                return TcpDeviceSendResult.Ok("发送成功。", response, BuildClientStatus(profile, session));
+                // Transient 发送成功后不保留连接，返回的状态也必须体现"已释放"，
+                // 否则调用方会误以为存在可复用连接。
+                var successStatus = persistSession
+                    ? BuildClientStatus(profile, session)
+                    : BuildReleasedStatus(profile);
+                return TcpDeviceSendResult.Ok("发送成功。", response, successStatus);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -476,6 +490,9 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
             if (removeSessionAfterRelease || !persistSession)
             {
                 await RemoveClientSessionAsync(profile.Id);
+                // 释放后把存储的状态也收敛为"未连接"，确保后续 GetStatusAsync 不会
+                // 报告一个已不存在的可复用连接。
+                MarkReleasedStatus(profile.Id, profile.Mode);
             }
         }
     }
@@ -781,15 +798,95 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
                 await ReadExactAsync(stream, profile.FixedLength, cancellationToken),
             TcpCommunicationProfile.FrameModeLine =>
                 await ReadLineFrameAsync(stream, ResolveExpectedLineEnding(profile), cancellationToken),
-            _ => await ReadRawFrameAsync(stream, cancellationToken)
+            _ => await ReadRawFrameAsync(stream, endMarker: null, cancellationToken)
         };
     }
 
-    private static async Task<byte[]> ReadRawFrameAsync(NetworkStream stream, CancellationToken cancellationToken)
+    // Raw / 无定界响应的安全收敛读取。
+    // - 首个 ReadAsync 使用调用方的整体操作超时（cancellationToken）等待第一段数据；
+    // - 收到第一段后，通过 DataAvailable 轮询等待后续分段，直到出现超过 idle gap 的空闲、
+    //   达到 maxBytes、连接关闭，或命中可选的 end marker，从而避免"只读一次就判定完整响应"
+    //   导致的截断。
+    // 注意：这里刻意用 DataAvailable 轮询而非取消挂起的 ReadAsync —— 取消 NetworkStream 上
+    // 挂起的 socket 读取在部分平台会让 socket 进入不可用状态，会破坏需要保持的持久连接。
+    private static async Task<byte[]> ReadRawFrameAsync(
+        NetworkStream stream,
+        byte[]? endMarker,
+        CancellationToken cancellationToken)
     {
         var buffer = new byte[DefaultReadBufferSize];
-        var count = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        return count == 0 ? Array.Empty<byte>() : buffer.AsSpan(0, count).ToArray();
+
+        // 首段：阻塞等待，遵循整体超时。对端立即关闭时返回空帧（语义与旧实现一致）。
+        var first = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        if (first == 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var bytes = new List<byte>(DefaultReadBufferSize);
+        bytes.AddRange(buffer.AsSpan(0, first).ToArray());
+
+        while (bytes.Count < MaxFrameBytes)
+        {
+            if (HasEndMarker(bytes, endMarker))
+            {
+                break;
+            }
+
+            if (!await WaitForMoreDataAsync(stream, DefaultReadIdleGapMs, cancellationToken))
+            {
+                // idle gap 内没有更多数据到达：把已缓冲的内容视为一个完整帧。
+                break;
+            }
+
+            var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            if (read == 0)
+            {
+                // 对端在发送完毕后关闭连接：已缓冲的数据即为完整帧。
+                break;
+            }
+
+            bytes.AddRange(buffer.AsSpan(0, read).ToArray());
+        }
+
+        return bytes.ToArray();
+    }
+
+    // 在 idle gap 内轮询等待后续分段到达，不取消任何挂起的 socket 读取。
+    // 返回 true 表示有数据可读，false 表示在 idle gap 内保持空闲（视为响应收敛）。
+    private static async Task<bool> WaitForMoreDataAsync(
+        NetworkStream stream,
+        int idleGapMs,
+        CancellationToken cancellationToken)
+    {
+        const int pollIntervalMs = 5;
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(idleGapMs);
+        while (true)
+        {
+            try
+            {
+                if (stream.DataAvailable)
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                return false;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            await Task.Delay(pollIntervalMs, cancellationToken);
+        }
+    }
+
+    private static bool HasEndMarker(List<byte> bytes, byte[]? endMarker)
+    {
+        return endMarker is { Length: > 0 } && EndsWith(bytes, endMarker);
     }
 
     private static async Task<byte[]> ReadExactAsync(
@@ -820,7 +917,7 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
     {
         if (expectedEnding.Length == 0)
         {
-            return await ReadRawFrameAsync(stream, cancellationToken);
+            return await ReadRawFrameAsync(stream, endMarker: null, cancellationToken);
         }
 
         var bytes = new List<byte>();
@@ -945,6 +1042,24 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
         };
         _statuses[profile.Id] = status;
         return status;
+    }
+
+    // Transient 发送释放连接后对外呈现的状态：未连接、无端点，明确表示不存在可复用连接。
+    private TcpProfileStatus BuildReleasedStatus(TcpCommunicationProfile profile)
+    {
+        return MarkReleasedStatus(profile.Id, profile.Mode);
+    }
+
+    private TcpProfileStatus MarkReleasedStatus(string profileId, string mode)
+    {
+        return UpdateStatus(profileId, mode, current => current with
+        {
+            IsConnected = false,
+            IsListening = false,
+            ConnectedClients = 0,
+            LocalEndpoint = null,
+            RemoteEndpoint = null
+        });
     }
 
     private TcpProfileStatus BuildServerStatus(TcpCommunicationProfile profile, ServerSession session)

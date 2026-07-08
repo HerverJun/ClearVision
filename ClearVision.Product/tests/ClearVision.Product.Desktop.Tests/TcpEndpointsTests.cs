@@ -161,9 +161,79 @@ public class TcpEndpointsTests
         }
     }
 
+    [Fact]
+    public async Task PostTcpSend_WithSegmentedResponse_ShouldReturnFullResponse()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = RunSegmentedResponseServerAsync(listener, cts.Token);
+
+        var config = new AppConfig
+        {
+            TcpCommunication = new TcpCommunicationConfig
+            {
+                Profiles =
+                [
+                    new TcpCommunicationProfile
+                    {
+                        Id = "robot",
+                        Name = "Robot",
+                        Enabled = true,
+                        Mode = TcpCommunicationProfile.ModeClient,
+                        RemoteHost = "127.0.0.1",
+                        RemotePort = port,
+                        TimeoutMs = 2500
+                    }
+                ]
+            }
+        };
+        await using var host = await TcpEndpointTestHost.CreateAsync(config);
+
+        try
+        {
+            using var response = await host.Client.PostAsync(
+                "/api/tcp/profiles/robot/send",
+                JsonContent(new { payload = "PING", waitResponse = true, responseTimeoutMs = 2500 }));
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+            // 响应分两段 ("PO" + "NG") 到达，收敛后应得到完整 "PONG"。
+            document.RootElement.GetProperty("response").GetString().Should().Be("PONG");
+        }
+        finally
+        {
+            cts.Cancel();
+            listener.Stop();
+            await IgnoreServerTerminationAsync(serverTask);
+        }
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+    }
+
+    private static async Task RunSegmentedResponseServerAsync(TcpListener listener, CancellationToken cancellationToken)
+    {
+        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
+        await using var stream = client.GetStream();
+        var buffer = new byte[4];
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        Encoding.UTF8.GetString(buffer, 0, read).Should().Be("PING");
+
+        await stream.WriteAsync(Encoding.UTF8.GetBytes("PO"), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+
+        // 间隔小于 Raw 收敛的 idle gap，模拟真实 TCP 分段。
+        await Task.Delay(30, cancellationToken);
+
+        await stream.WriteAsync(Encoding.UTF8.GetBytes("NG"), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+
+        await Task.Delay(300, cancellationToken);
     }
 
     private static async Task RunSingleEchoServerAsync(TcpListener listener, CancellationToken cancellationToken)
