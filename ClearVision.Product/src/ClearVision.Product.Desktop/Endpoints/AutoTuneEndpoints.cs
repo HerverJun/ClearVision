@@ -159,6 +159,7 @@ public static class AutoTuneEndpoints
         group.MapPost("/flow-node/preview", async (
             FlowNodePreviewRequest request,
             IFlowNodePreviewService previewService,
+            IExecutionAdmissionService executionAdmissionService,
             ILogger<AutoTuneService> logger,
             CancellationToken ct) =>
         {
@@ -169,6 +170,19 @@ public static class AutoTuneEndpoints
                     request.FlowId, request.TargetNodeId);
 
                 var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
+                var admission = executionAdmissionService.ValidateFlowSideEffects(
+                    flow,
+                    ExecutionAdmissionSurface.NodePreview);
+                if (!admission.IsAllowed)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Code = admission.Code,
+                        Error = admission.Message,
+                        Violations = admission.Violations
+                    });
+                }
+
                 byte[]? inputImage = null;
                 if (!string.IsNullOrWhiteSpace(request.InputImageBase64) &&
                     !ImagePayloadDecoder.TryDecodeBytes(request.InputImageBase64, "InputImageBase64", out inputImage, out var decodeError, out var statusCode))

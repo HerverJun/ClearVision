@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   NodePreviewCoordinator,
+  getOperatorPreviewCostPolicy,
   previewObservationMatchesRequest
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
 import {
@@ -324,6 +325,139 @@ test('NodePreviewCoordinator keeps high-cost auto previews idle until manual req
     assert.equal(getExecuteCount(), 1);
   } finally {
     coordinator.destroy();
+  }
+});
+
+test('getOperatorPreviewCostPolicy restores auto preview for explicit light operator allowlist', () => {
+  const lightOperatorTypes = [
+    'BlobLabeling',
+    'BoxFilter',
+    'BoxNms',
+    'CaliperTool',
+    'DetectionSequenceJudge',
+    'DualModalVoting',
+    'EdgePairDefect',
+    'FrequencyFilter',
+    'GeometricTolerance',
+    'GlcmTexture',
+    'HistogramAnalysis',
+    'LineMeasurement',
+    'ParallelLineFind',
+    'PhaseClosure',
+    'QuadrilateralFind'
+  ];
+
+  for (const type of lightOperatorTypes) {
+    const policy = getOperatorPreviewCostPolicy(
+      { id: `${type}-node`, type, parameters: [] },
+      {
+        type,
+        category: 'AI feature tools',
+        tags: ['ai', 'feature', 'measurement'],
+        keywords: ['feature analysis']
+      });
+
+    assert.equal(policy.level, 'light', type);
+    assert.equal(policy.autoPreviewAllowed, true, type);
+  }
+});
+
+test('getOperatorPreviewCostPolicy keeps explicit high-cost operator types manual', () => {
+  const highCostOperatorTypes = [
+    'DeepLearning',
+    'OnnxInference',
+    'SemanticSegmentation',
+    'SurfaceDefectDetection',
+    'AnomalyDetection',
+    'OcrRecognition',
+    'TemplateMatching',
+    'TemplateMatch',
+    'ShapeMatching',
+    'PlanarMatching',
+    'AkazeFeatureMatch',
+    'OrbFeatureMatch',
+    'LocalDeformableMatching',
+    'PPFMatch',
+    'RansacPlaneSegmentation',
+    'PPFEstimation'
+  ];
+
+  for (const type of highCostOperatorTypes) {
+    const policy = getOperatorPreviewCostPolicy({ id: `${type}-node`, type, parameters: [] });
+
+    assert.equal(policy.level, 'high', type);
+    assert.equal(policy.autoPreviewAllowed, false, type);
+  }
+});
+
+test('getOperatorPreviewCostPolicy treats ImageAcquisition file and camera modes separately', () => {
+  const filePolicy = getOperatorPreviewCostPolicy({
+    id: 'file-acquisition',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'File' },
+      { name: 'FilePath', value: 'sample.png' }
+    ]
+  });
+
+  assert.equal(filePolicy.autoPreviewAllowed, true);
+
+  const cameraPolicy = getOperatorPreviewCostPolicy({
+    id: 'camera-acquisition',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'camera-1' }
+    ]
+  });
+
+  assert.equal(cameraPolicy.autoPreviewAllowed, false);
+  assert.equal(cameraPolicy.reason, '相机采集会访问真实设备，自动预览已暂停；请使用手动预览或运行流程。');
+});
+
+test('getOperatorPreviewCostPolicy does not infer high cost from generic ai or feature metadata substrings', () => {
+  const cases = [
+    {
+      node: { id: 'histogram-node', type: 'HistogramAnalysis', parameters: [] },
+      metadata: {
+        type: 'HistogramAnalysis',
+        category: 'basic analysis',
+        tags: ['ai', 'quality'],
+        keywords: ['feature summary']
+      }
+    },
+    {
+      node: { id: 'line-node', type: 'LineMeasurement', parameters: [] },
+      metadata: {
+        type: 'LineMeasurement',
+        category: 'geometry feature measurement',
+        tags: ['feature'],
+        keywords: ['straight line']
+      }
+    }
+  ];
+
+  for (const { node, metadata } of cases) {
+    const policy = getOperatorPreviewCostPolicy(node, metadata);
+
+    assert.equal(policy.autoPreviewAllowed, true, node.type);
+    assert.equal(policy.level, 'light', node.type);
+  }
+});
+
+test('getOperatorPreviewCostPolicy keeps explicit metadata tokens high cost', () => {
+  const explicitTokens = ['feature-matching', 'template-matching', 'onnx', 'deep-learning'];
+
+  for (const token of explicitTokens) {
+    const policy = getOperatorPreviewCostPolicy(
+      { id: `${token}-node`, type: 'CustomPreviewOperator', parameters: [] },
+      {
+        type: 'CustomPreviewOperator',
+        tags: [token]
+      });
+
+    assert.equal(policy.autoPreviewAllowed, false, token);
+    assert.equal(policy.level, 'high', token);
   }
 });
 

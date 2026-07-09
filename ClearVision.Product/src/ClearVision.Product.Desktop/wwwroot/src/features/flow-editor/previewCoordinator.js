@@ -20,32 +20,50 @@ const PREVIEW_OUTPUT_MAX_DEPTH = 3;
 const PREVIEW_OUTPUT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 const MISSING_PROJECT_PREVIEW_MESSAGE = '请先新建/保存/打开工程后再预览';
 const SIDE_EFFECT_BLOCKED_PREVIEW_MESSAGE = '预览已安全拦截副作用算子：该算子可能执行外部 I/O 或持久化动作。正式运行流程时才会执行外部动作。';
-const HIGH_COST_OPERATOR_TYPE_HINTS = [
+const HIGH_COST_OPERATOR_TYPES = new Set([
     'DeepLearning',
     'OnnxInference',
+    'SemanticSegmentation',
+    'SurfaceDefectDetection',
+    'AnomalyDetection',
     'OcrRecognition',
     'TemplateMatch',
     'TemplateMatching',
     'ShapeMatching',
     'PlanarMatching',
     'AkazeFeatureMatch',
-    'FeatureMatch',
-    'SemanticSegmentation',
-    'SurfaceDefectDetection',
-    'AnomalyDetection'
-];
-const HIGH_COST_TEXT_HINTS = [
-    'ai',
-    'deep learning',
+    'OrbFeatureMatch',
+    'LocalDeformableMatching',
+    'PPFMatch',
+    'RansacPlaneSegmentation',
+    'PPFEstimation'
+]);
+const LIGHT_AUTO_PREVIEW_OPERATOR_TYPES = new Set([
+    'BlobLabeling',
+    'BoxFilter',
+    'BoxNms',
+    'CaliperTool',
+    'DetectionSequenceJudge',
+    'DualModalVoting',
+    'EdgePairDefect',
+    'FrequencyFilter',
+    'GeometricTolerance',
+    'GlcmTexture',
+    'HistogramAnalysis',
+    'LineMeasurement',
+    'ParallelLineFind',
+    'PhaseClosure',
+    'QuadrilateralFind'
+]);
+const HIGH_COST_METADATA_TOKENS = new Set([
+    'ai-model',
     'onnx',
-    'ocr',
-    'yolo',
-    'template',
-    'matching',
-    'feature',
-    'segmentation',
-    'defect'
-];
+    'deep-learning',
+    'ocr-model',
+    'yolo-model',
+    'template-matching',
+    'feature-matching'
+]);
 const IMAGE_NODE_TYPE_FALLBACKS = new Set([
     'ImageAcquisition'
 ]);
@@ -319,26 +337,48 @@ function normalizeText(value) {
     return String(value ?? '').trim().toLowerCase();
 }
 
-function containsAnyHint(value, hints) {
-    const text = normalizeText(value);
-    return Boolean(text) && hints.some(hint => text.includes(normalizeText(hint)));
+function normalizeMetadataToken(value) {
+    return normalizeText(value)
+        .replace(/[_\s]+/g, '-')
+        .replace(/^-+|-+$/g, '');
 }
 
-function getMetadataText(metadata) {
+function collectMetadataTokenValues(value, tokens) {
+    if (value === null || value === undefined) {
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        value.forEach(item => collectMetadataTokenValues(item, tokens));
+        return;
+    }
+
+    const text = normalizeText(value);
+    if (!text) {
+        return;
+    }
+
+    tokens.add(normalizeMetadataToken(text));
+    text.split(/[;,|/]+/u)
+        .map(normalizeMetadataToken)
+        .filter(Boolean)
+        .forEach(token => tokens.add(token));
+}
+
+function getMetadataTokens(metadata) {
+    const tokens = new Set();
     const tags = metadata?.tags || metadata?.Tags || [];
     const keywords = metadata?.keywords || metadata?.Keywords || [];
-    return [
+    [
         metadata?.type,
         metadata?.Type,
-        metadata?.displayName,
-        metadata?.DisplayName,
-        metadata?.description,
-        metadata?.Description,
         metadata?.category,
         metadata?.Category,
-        ...(Array.isArray(tags) ? tags : []),
-        ...(Array.isArray(keywords) ? keywords : [])
-    ].join(' ');
+        tags,
+        keywords
+    ].forEach(value => collectMetadataTokenValues(value, tokens));
+
+    return tokens;
 }
 
 export function getOperatorPreviewCostPolicy(node, metadata = null) {
@@ -355,16 +395,24 @@ export function getOperatorPreviewCostPolicy(node, metadata = null) {
         return {
             level: 'high',
             autoPreviewAllowed: false,
-            reason: '相机采集会触发真实取帧，请点击“手动预览”执行。',
+            reason: '相机采集会访问真实设备，自动预览已暂停；请使用手动预览或运行流程。',
             timeoutMs: HIGH_COST_PREVIEW_TIMEOUT_MS
         };
     }
 
     const type = String(node.type || metadata?.type || metadata?.Type || '');
-    const normalizedType = normalizeText(type);
-    const metadataText = getMetadataText(metadata);
-    const isHighCost = HIGH_COST_OPERATOR_TYPE_HINTS.some(hint => normalizedType.includes(normalizeText(hint))) ||
-        containsAnyHint(metadataText || type, HIGH_COST_TEXT_HINTS);
+    if (LIGHT_AUTO_PREVIEW_OPERATOR_TYPES.has(type)) {
+        return {
+            level: 'light',
+            autoPreviewAllowed: true,
+            reason: null,
+            timeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
+        };
+    }
+
+    const metadataTokens = getMetadataTokens(metadata);
+    const isHighCost = HIGH_COST_OPERATOR_TYPES.has(type) ||
+        Array.from(metadataTokens).some(token => HIGH_COST_METADATA_TOKENS.has(token));
 
     if (isHighCost) {
         return {

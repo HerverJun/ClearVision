@@ -1465,6 +1465,288 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithTextSaveTarget_ShouldDryRunWithoutWritingFile()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var outputDir = Path.Combine(Path.GetTempPath(), $"ClearVision-TextSavePreview-{Guid.NewGuid():N}");
+        var outputPath = Path.Combine(outputDir, "preview.txt");
+        var sourceOutputPort = CreatePort("Text", PortDataType.String, PortDirection.Output);
+        var textSaveInputPort = CreatePort("Text", PortDataType.String, PortDirection.Input);
+        DebugOptions? capturedOptions = null;
+        OperatorFlow? capturedFlow = null;
+
+        try
+        {
+            await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(callInfo =>
+                    {
+                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedOptions = callInfo.ArgAt<DebugOptions>(1);
+
+                        return Task.FromResult(new FlowDebugExecutionResult
+                        {
+                            IsSuccess = true,
+                            DebugSessionId = debugSessionId,
+                            ExecutionTimeMs = 7,
+                            IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                            {
+                                [sourceNodeId] = new()
+                                {
+                                    ["Text"] = "dry-run text payload"
+                                }
+                            },
+                            DebugOperatorResults = new List<OperatorDebugResult>
+                            {
+                                new()
+                                {
+                                    OperatorId = sourceNodeId,
+                                    OperatorName = "StringFormat",
+                                    IsSuccess = true,
+                                    ExecutionOrder = 0,
+                                    ExecutionTimeMs = 7,
+                                    OutputSnapshot = new Dictionary<string, object>
+                                    {
+                                        ["Text"] = "dry-run text payload"
+                                    }
+                                }
+                            }
+                        });
+                    });
+            });
+
+            Directory.Exists(outputDir).Should().BeFalse();
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = projectId,
+                TargetNodeId = targetNodeId,
+                DebugSessionId = debugSessionId,
+                FlowData = CreateUpdateFlowRequest(
+                    CreateOperatorDto(
+                        sourceNodeId,
+                        "StringFormat",
+                        OperatorType.StringFormat,
+                        outputPorts: [sourceOutputPort]),
+                    CreateOperatorDto(
+                        targetNodeId,
+                        "TextSave",
+                        OperatorType.TextSave,
+                        inputPorts: [textSaveInputPort],
+                        parameters: new Dictionary<string, object>
+                        {
+                            ["FilePath"] = outputPath,
+                            ["Format"] = "Text",
+                            ["AppendMode"] = false,
+                            ["Encoding"] = "UTF8"
+                        }),
+                    CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, textSaveInputPort.Id))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+            document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+
+            var outputData = document.RootElement.GetProperty("outputData");
+            outputData.GetProperty("PreviewMode").GetString().Should().Be("TextSaveDryRun");
+            outputData.GetProperty("DryRun").GetBoolean().Should().BeTrue();
+            outputData.GetProperty("WillWriteToDisk").GetBoolean().Should().BeFalse();
+            outputData.GetProperty("Message").GetString().Should().Be("预览模式不会写入磁盘；点击运行流程后才会保存文本。");
+            outputData.GetProperty("FilePathTemplate").GetString().Should().Be(outputPath);
+            outputData.GetProperty("AppendMode").GetBoolean().Should().BeFalse();
+            outputData.GetProperty("ContentSummary").GetString().Should().Contain("dry-run text payload");
+
+            Directory.Exists(outputDir).Should().BeFalse("节点预览不能创建 TextSave 目录或写盘");
+            File.Exists(outputPath).Should().BeFalse("节点预览不能写入 TextSave 文件");
+            capturedOptions.Should().NotBeNull();
+            capturedOptions!.BreakAtOperatorId.Should().BeNull();
+            capturedFlow.Should().NotBeNull();
+            capturedFlow!.Operators.Select(op => op.Type).Should().NotContain(OperatorType.TextSave);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithResultOutputSaveToFileTrue_ShouldDryRunWithoutWritingFile()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var sourceOutputPort = CreatePort("Result", PortDataType.Any, PortDirection.Output);
+        var resultOutputInputPort = CreatePort("Result", PortDataType.Any, PortDirection.Input);
+        DebugOptions? capturedOptions = null;
+        OperatorFlow? capturedFlow = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(callInfo =>
+                {
+                    capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                    capturedOptions = callInfo.ArgAt<DebugOptions>(1);
+
+                    return Task.FromResult(new FlowDebugExecutionResult
+                    {
+                        IsSuccess = true,
+                        DebugSessionId = debugSessionId,
+                        ExecutionTimeMs = 5,
+                        IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                        {
+                            [sourceNodeId] = new()
+                            {
+                                ["Result"] = new Dictionary<string, object>
+                                {
+                                    ["Score"] = 0.93,
+                                    ["Status"] = "OK"
+                                }
+                            }
+                        },
+                        DebugOperatorResults = new List<OperatorDebugResult>
+                        {
+                            new()
+                            {
+                                OperatorId = sourceNodeId,
+                                OperatorName = "ResultJudgment",
+                                IsSuccess = true,
+                                ExecutionOrder = 0,
+                                ExecutionTimeMs = 5,
+                                OutputSnapshot = new Dictionary<string, object>
+                                {
+                                    ["Result"] = new Dictionary<string, object>
+                                    {
+                                        ["Score"] = 0.93,
+                                        ["Status"] = "OK"
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            DebugSessionId = debugSessionId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    sourceNodeId,
+                    "ResultJudgment",
+                    OperatorType.ResultJudgment,
+                    outputPorts: [sourceOutputPort]),
+                CreateOperatorDto(
+                    targetNodeId,
+                    "ResultOutput",
+                    OperatorType.ResultOutput,
+                    inputPorts: [resultOutputInputPort],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SaveToFile"] = true,
+                        ["Format"] = "JSON"
+                    }),
+                CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, resultOutputInputPort.Id))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("PreviewMode").GetString().Should().Be("ResultOutputDryRun");
+        outputData.GetProperty("DryRun").GetBoolean().Should().BeTrue();
+        outputData.GetProperty("SaveToFile").GetBoolean().Should().BeTrue();
+        outputData.GetProperty("WillWriteToDisk").GetBoolean().Should().BeFalse();
+        outputData.GetProperty("Message").GetString().Should().Be("预览模式不会写入磁盘；点击运行流程后才会保存结果文件。");
+        outputData.GetProperty("EstimatedFilePath").GetString().Should().NotBeNullOrWhiteSpace();
+        File.Exists(outputData.GetProperty("EstimatedFilePath").GetString()!).Should().BeFalse("ResultOutput 预览不能写入结果文件");
+
+        capturedOptions.Should().NotBeNull();
+        capturedOptions!.BreakAtOperatorId.Should().BeNull();
+        capturedFlow.Should().NotBeNull();
+        capturedFlow!.Operators.Select(op => op.Type).Should().NotContain(OperatorType.ResultOutput);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithResultOutputSaveToFileFalse_ShouldReturnStructuredPreview()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    DebugSessionId = Guid.NewGuid(),
+                    ExecutionTimeMs = 4,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Output"] = "OK",
+                            ["Result"] = new Dictionary<string, object>
+                            {
+                                ["Score"] = 0.91
+                            }
+                        }
+                    }
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    targetNodeId,
+                    "ResultOutput",
+                    OperatorType.ResultOutput,
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SaveToFile"] = false,
+                        ["Format"] = "JSON"
+                    }))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("Output").GetString().Should().Be("OK");
+        outputData.TryGetProperty("DryRun", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldPropagateRequestCancellationToFlowExecution()
     {
         var projectId = Guid.NewGuid();

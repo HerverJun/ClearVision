@@ -179,7 +179,7 @@ async function runPreviewCoordinatorChecks() {
   smokeAssert.equal(noProjectPreviewCalls, 0, 'missing project should not execute preview');
   smokeAssert.equal(noProjectCoordinator.getState().status, 'idle');
   smokeAssert.equal(noProjectCoordinator.getState().presenter.hasError, false);
-  smokeAssert.equal(noProjectCoordinator.getState().presenter.statusText, '等待预览');
+  smokeAssert.equal(noProjectCoordinator.getState().presenter.statusText, '请先新建/保存/打开工程后再预览');
   noProjectCoordinator.destroy();
 
   let abortPreviewCalls = 0;

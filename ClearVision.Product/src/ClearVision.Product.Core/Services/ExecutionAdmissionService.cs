@@ -67,6 +67,10 @@ public interface IExecutionAdmissionService
         ExecutionAdmissionSurface surface,
         CancellationToken cancellationToken = default);
 
+    ExecutionAdmissionResult ValidateFlowSideEffects(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface);
+
     ExecutionAdmissionResult ValidateOperator(
         Operator @operator,
         ExecutionAdmissionSurface surface);
@@ -152,7 +156,20 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             return projectAdmission;
         }
 
-        if (!HasExecutableFlow(flow))
+        return ValidateFlowSideEffects(flow, surface);
+    }
+
+    public ExecutionAdmissionResult ValidateFlowSideEffects(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface)
+    {
+        if (surface == ExecutionAdmissionSurface.LegacyWebMessageExecution)
+        {
+            return RejectLegacyWebMessage();
+        }
+
+        if (surface == ExecutionAdmissionSurface.StoredProjectExecution ||
+            !HasExecutableFlow(flow))
         {
             return ExecutionAdmissionResult.Allow();
         }

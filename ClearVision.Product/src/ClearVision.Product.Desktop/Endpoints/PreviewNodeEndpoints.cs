@@ -42,6 +42,10 @@ public static class PreviewNodeEndpoints
     private const string ImageSaveSafePreviewMode = "ImageSaveDryRun";
     private const string ImageSaveSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存图像。";
     private const string ImageSaveMissingInputMessage = "缺少输入图像，无法生成保存预览";
+    private const string TextSaveSafePreviewMode = "TextSaveDryRun";
+    private const string TextSaveSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存文本。";
+    private const string ResultOutputSafePreviewMode = "ResultOutputDryRun";
+    private const string ResultOutputSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存结果文件。";
 
     private static readonly string[] MetricsCountKeys =
     [
@@ -195,6 +199,26 @@ public static class PreviewNodeEndpoints
                         useArtifactReferences,
                         studioOptions.Value,
                         imageSavePreviewCancellation.Token,
+                        logger,
+                        ReleaseProjectAccessAsync);
+                }
+
+                if (IsTextualDryRunPreviewTarget(targetOperator))
+                {
+                    var fileOutputPreviewTimeoutMs = NormalizePreviewTimeoutMs(request.TimeoutMs);
+                    using var fileOutputPreviewCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+                    fileOutputPreviewCancellation.CancelAfter(TimeSpan.FromMilliseconds(fileOutputPreviewTimeoutMs));
+
+                    return await BuildTextualOutputSafePreviewAsync(
+                        request,
+                        flow,
+                        targetOperator!,
+                        flowService,
+                        executionAdmissionService,
+                        projectRepository,
+                        projectVariableSessions,
+                        studioOptions.Value,
+                        fileOutputPreviewCancellation.Token,
                         logger,
                         ReleaseProjectAccessAsync);
                 }
@@ -698,6 +722,490 @@ public static class PreviewNodeEndpoints
             logger));
     }
 
+    private static bool IsTextualDryRunPreviewTarget(
+        ClearVision.Product.Core.Entities.Operator? targetOperator)
+    {
+        if (targetOperator == null)
+        {
+            return false;
+        }
+
+        if (targetOperator.Type == OperatorType.TextSave)
+        {
+            return true;
+        }
+
+        return targetOperator.Type == OperatorType.ResultOutput &&
+            GetOperatorBoolParameter(targetOperator, "SaveToFile", false);
+    }
+
+    private static async Task<IResult> BuildTextualOutputSafePreviewAsync(
+        PreviewNodeRequest request,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        IFlowExecutionService flowService,
+        IExecutionAdmissionService executionAdmissionService,
+        IProjectRepository projectRepository,
+        ProjectVariableSessionRegistry projectVariableSessions,
+        StudioOptions studioOptions,
+        CancellationToken cancellationToken,
+        ILogger logger,
+        Func<Task> releaseProjectAccessAsync)
+    {
+        var dryRunFlow = BuildUpstreamDryRunFlow(flow, targetOperator.Id, $"{flow.Name}-{targetOperator.Type}Preview");
+        var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+            request.ProjectId,
+            dryRunFlow,
+            ExecutionAdmissionSurface.NodePreview,
+            cancellationToken);
+        if (!flowAdmission.IsAllowed)
+        {
+            await releaseProjectAccessAsync();
+            return ToAdmissionFailure(flowAdmission);
+        }
+
+        var externalInputImageBase64 = ShouldUseExternalInputImage(flow, targetOperator.Id)
+            ? request.InputImageBase64
+            : null;
+        Dictionary<string, object>? inputData = null;
+        if (!string.IsNullOrWhiteSpace(externalInputImageBase64))
+        {
+            if (!ImagePayloadDecoder.TryDecodeBytes(
+                    externalInputImageBase64,
+                    "InputImageBase64",
+                    out var imageData,
+                    out var decodeError,
+                    out var statusCode))
+            {
+                await releaseProjectAccessAsync();
+                return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
+            }
+
+            inputData = new Dictionary<string, object>
+            {
+                ["Image"] = imageData
+            };
+        }
+
+        var projectVariables = await CreatePreviewProjectVariableContextAsync(
+            request.ProjectId,
+            dryRunFlow,
+            projectRepository,
+            projectVariableSessions);
+
+        await releaseProjectAccessAsync();
+
+        FlowDebugExecutionResult result;
+        if (dryRunFlow.Operators.Count == 0)
+        {
+            result = new FlowDebugExecutionResult
+            {
+                DebugSessionId = request.DebugSessionId,
+                IsSuccess = true,
+                IntermediateResults = inputData == null
+                    ? new Dictionary<Guid, Dictionary<string, object>>()
+                    : new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [Guid.Empty] = inputData
+                    }
+            };
+        }
+        else
+        {
+            var debugOptions = new DebugOptions
+            {
+                DebugSessionId = request.DebugSessionId,
+                EnableIntermediateCache = true,
+                ImageFormat = request.ImageFormat ?? ".png"
+            };
+
+            result = projectVariables == null
+                ? await flowService.ExecuteFlowDebugAsync(
+                    dryRunFlow,
+                    debugOptions,
+                    inputData,
+                    cancellationToken)
+                : await flowService.ExecuteFlowDebugAsync(
+                    dryRunFlow,
+                    debugOptions,
+                    inputData,
+                    projectVariables,
+                    cancellationToken);
+        }
+
+        result.DebugSessionId = request.DebugSessionId;
+        var targetInputs = BuildTargetInputPreviewData(flow, targetOperator, result, inputData);
+        var upstreamMessage = !result.IsSuccess && !string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? result.ErrorMessage
+            : null;
+
+        return Results.Ok(BuildTextualOutputSafePreviewResponse(
+            request,
+            flow,
+            result,
+            targetOperator,
+            targetInputs,
+            upstreamMessage,
+            externalInputImageBase64,
+            studioOptions,
+            cancellationToken,
+            logger));
+    }
+
+    private static ClearVision.Product.Core.Entities.OperatorFlow BuildUpstreamDryRunFlow(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        Guid targetOperatorId,
+        string flowName)
+    {
+        var relevantIds = CollectRelevantOperatorIds(flow, targetOperatorId);
+        relevantIds.Remove(targetOperatorId);
+
+        var dryRunFlow = new ClearVision.Product.Core.Entities.OperatorFlow(flowName);
+        foreach (var op in flow.Operators.Where(op => relevantIds.Contains(op.Id)))
+        {
+            dryRunFlow.AddOperator(op);
+        }
+
+        foreach (var connection in flow.Connections.Where(connection =>
+                     relevantIds.Contains(connection.SourceOperatorId) &&
+                     relevantIds.Contains(connection.TargetOperatorId)))
+        {
+            dryRunFlow.AddConnection(connection);
+        }
+
+        return dryRunFlow;
+    }
+
+    private static Dictionary<string, object> BuildTargetInputPreviewData(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        FlowDebugExecutionResult result,
+        Dictionary<string, object>? initialInputData)
+    {
+        var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var incoming = flow.Connections
+            .Where(connection => connection.TargetOperatorId == targetOperator.Id)
+            .ToList();
+
+        if (incoming.Count == 0 && initialInputData != null)
+        {
+            foreach (var (key, value) in initialInputData)
+            {
+                inputs[key] = value;
+            }
+        }
+
+        foreach (var connection in incoming)
+        {
+            var sourceOperator = flow.Operators.FirstOrDefault(op => op.Id == connection.SourceOperatorId);
+            var sourcePort = sourceOperator?.OutputPorts.FirstOrDefault(port => port.Id == connection.SourcePortId);
+            var targetPort = targetOperator.InputPorts.FirstOrDefault(port => port.Id == connection.TargetPortId);
+            var sourceOutput = TryGetDebugOutput(result, connection.SourceOperatorId);
+            if (sourceOutput == null)
+            {
+                continue;
+            }
+
+            if (TryResolveDryRunSourceOutput(sourceOutput, sourcePort, out var data) && data != null)
+            {
+                if (targetPort != null)
+                {
+                    inputs[targetPort.Name] = data;
+                }
+
+                if (sourcePort != null && !inputs.ContainsKey(sourcePort.Name))
+                {
+                    inputs[sourcePort.Name] = data;
+                }
+            }
+
+            foreach (var (key, value) in sourceOutput)
+            {
+                if (!inputs.ContainsKey(key))
+                {
+                    inputs[key] = value;
+                }
+            }
+        }
+
+        return inputs;
+    }
+
+    private static Dictionary<string, object>? TryGetDebugOutput(
+        FlowDebugExecutionResult result,
+        Guid operatorId)
+    {
+        if (result.IntermediateResults.TryGetValue(operatorId, out var intermediate))
+        {
+            return intermediate;
+        }
+
+        return result.DebugOperatorResults
+            .FirstOrDefault(item => item.OperatorId == operatorId)
+            ?.OutputSnapshot;
+    }
+
+    private static bool TryResolveDryRunSourceOutput(
+        Dictionary<string, object> sourceOutput,
+        Port? sourcePort,
+        out object? data)
+    {
+        data = null;
+        if (sourcePort != null &&
+            TryReadDictionaryValue(sourceOutput, sourcePort.Name, out data))
+        {
+            return true;
+        }
+
+        if (sourcePort?.DataType == PortDataType.Image &&
+            TryReadDictionaryValue(sourceOutput, "Image", out data))
+        {
+            return true;
+        }
+
+        if (TryReadDictionaryValue(sourceOutput, "Output", out data))
+        {
+            return true;
+        }
+
+        if (sourceOutput.Count == 1)
+        {
+            data = sourceOutput.Values.FirstOrDefault();
+            return data != null;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadDictionaryValue(
+        Dictionary<string, object> values,
+        string key,
+        out object? value)
+    {
+        if (values.TryGetValue(key, out value))
+        {
+            return true;
+        }
+
+        var match = values.FirstOrDefault(item =>
+            string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+        value = string.IsNullOrEmpty(match.Key) ? null : match.Value;
+        return value != null;
+    }
+
+    private static PreviewNodeResponse BuildTextualOutputSafePreviewResponse(
+        PreviewNodeRequest request,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        FlowDebugExecutionResult result,
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        Dictionary<string, object> targetInputs,
+        string? upstreamMessage,
+        string? externalInputImageBase64,
+        StudioOptions studioOptions,
+        CancellationToken cancellationToken,
+        ILogger logger)
+    {
+        result.IsSuccess = true;
+        result.ErrorMessage = null;
+
+        var outputData = BuildTextualDryRunOutputData(targetOperator, targetInputs, upstreamMessage);
+        var sanitizedOutputData = BuildResponseOutputData(outputData);
+        var rawInputImageBytes = ResolveInputImageBytes(flow, targetOperator.Id, result, null, externalInputImageBase64);
+        var inputImageBytes = LimitPreviewImageBytes(
+            rawInputImageBytes,
+            sanitizedOutputData,
+            "输入图像",
+            logger);
+        var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+        var metricsInput = BuildMetricsOutputData(sanitizedOutputData);
+        var metrics = BuildPreviewMetrics(metricsInput.OutputData, null, null, metricsInput.Diagnostics);
+        var observation = BuildPreviewObservation(
+            request,
+            result,
+            outputData,
+            flow,
+            null,
+            studioOptions,
+            successOverride: true,
+            errorMessageOverride: null);
+
+        var response = new PreviewNodeResponse
+        {
+            Success = true,
+            ProjectId = request.ProjectId,
+            TargetNodeId = request.TargetNodeId,
+            DebugSessionId = request.DebugSessionId,
+            InputImageBase64 = inputImageBase64,
+            OutputData = sanitizedOutputData,
+            OutputImageBase64 = null,
+            ExecutionTimeMs = result.ExecutionTimeMs,
+            ErrorMessage = null,
+            FailedOperatorId = null,
+            FailedOperatorName = null,
+            FailedOperatorType = null,
+            Metrics = metrics,
+            ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
+            {
+                OperatorId = r.OperatorId,
+                OperatorName = r.OperatorName,
+                ExecutionOrder = r.ExecutionOrder,
+                ExecutionTimeMs = r.ExecutionTimeMs,
+                IsSuccess = r.IsSuccess
+            }).ToList(),
+            Observation = observation
+        };
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return response;
+    }
+
+    private static Dictionary<string, object> BuildTextualDryRunOutputData(
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        Dictionary<string, object> targetInputs,
+        string? upstreamMessage)
+    {
+        var fieldSummary = BuildPreviewFieldSummary(targetInputs);
+        var outputData = targetOperator.Type == OperatorType.TextSave
+            ? BuildTextSaveDryRunOutputData(targetOperator, fieldSummary)
+            : BuildResultOutputDryRunOutputData(targetOperator, fieldSummary);
+
+        if (!string.IsNullOrWhiteSpace(upstreamMessage))
+        {
+            outputData["UpstreamPreviewMessage"] = upstreamMessage;
+        }
+
+        return outputData;
+    }
+
+    private static Dictionary<string, object> BuildTextSaveDryRunOutputData(
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        PreviewFieldSummary fieldSummary)
+    {
+        var filePathTemplate = GetOperatorStringParameter(targetOperator, "FilePath", "output_{date}_{time}.txt");
+        var format = GetOperatorStringParameter(targetOperator, "Format", "Text");
+        var appendMode = GetOperatorBoolParameter(targetOperator, "AppendMode", true);
+        var encoding = GetOperatorStringParameter(targetOperator, "Encoding", "UTF8");
+        var estimatedFilePath = BuildTextSaveEstimatedFilePath(filePathTemplate);
+
+        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["FilePathTemplate"] = filePathTemplate,
+            ["TargetPath"] = estimatedFilePath,
+            ["EstimatedFilePath"] = estimatedFilePath,
+            ["Format"] = format,
+            ["AppendMode"] = appendMode,
+            ["WriteMode"] = appendMode ? "追加" : "覆盖",
+            ["Encoding"] = encoding,
+            ["ContentSummary"] = fieldSummary.ContentSummary,
+            ["Fields"] = fieldSummary.Fields,
+            ["FieldCount"] = fieldSummary.FieldCount,
+            ["DryRun"] = true,
+            ["WillWriteToDisk"] = false,
+            ["PreviewMode"] = TextSaveSafePreviewMode,
+            ["PreviewKind"] = "TextSaveSafePreview",
+            ["PreviewSafe"] = true,
+            ["Message"] = TextSaveSafePreviewMessage
+        };
+    }
+
+    private static Dictionary<string, object> BuildResultOutputDryRunOutputData(
+        ClearVision.Product.Core.Entities.Operator targetOperator,
+        PreviewFieldSummary fieldSummary)
+    {
+        var format = GetOperatorStringParameter(targetOperator, "Format", "JSON");
+        var estimatedFile = BuildResultOutputEstimatedFile(format);
+
+        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["SaveToFile"] = true,
+            ["Format"] = format,
+            ["Directory"] = estimatedFile.Directory,
+            ["EstimatedFileName"] = estimatedFile.FileName,
+            ["EstimatedFilePath"] = estimatedFile.FilePath,
+            ["ContentSummary"] = fieldSummary.ContentSummary,
+            ["Fields"] = fieldSummary.Fields,
+            ["FieldCount"] = fieldSummary.FieldCount,
+            ["DryRun"] = true,
+            ["WillWriteToDisk"] = false,
+            ["PreviewMode"] = ResultOutputSafePreviewMode,
+            ["PreviewKind"] = "ResultOutputSafePreview",
+            ["PreviewSafe"] = true,
+            ["Message"] = ResultOutputSafePreviewMessage
+        };
+    }
+
+    private static PreviewFieldSummary BuildPreviewFieldSummary(
+        Dictionary<string, object> targetInputs)
+    {
+        var sanitizedInputs = BuildResponseOutputData(targetInputs);
+        var fields = sanitizedInputs.Keys
+            .Where(key => !IsInternalPreviewImageKey(key))
+            .Take(MaxMetricsItems)
+            .ToList();
+
+        string contentSummary;
+        if (TryReadDictionaryValue(sanitizedInputs, "Text", out var textValue) &&
+            textValue != null &&
+            !string.IsNullOrWhiteSpace(textValue.ToString()))
+        {
+            contentSummary = ClipPreviewSummaryText(textValue.ToString()!);
+        }
+        else if (fields.Count > 0)
+        {
+            contentSummary = $"{fields.Count} 个字段：{string.Join("、", fields.Take(8))}";
+        }
+        else
+        {
+            contentSummary = "未检测到上游结构化输入";
+        }
+
+        return new PreviewFieldSummary(fields, fields.Count, contentSummary);
+    }
+
+    private static string ClipPreviewSummaryText(string text)
+    {
+        var normalized = text
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Trim();
+        return normalized.Length <= 160 ? normalized : normalized[..160] + "...";
+    }
+
+    private static string BuildTextSaveEstimatedFilePath(string template)
+    {
+        var now = DateTime.Now;
+        var resolved = (string.IsNullOrWhiteSpace(template) ? "output_{date}_{time}.txt" : template)
+            .Replace("{date}", now.ToString("yyyyMMdd", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase)
+            .Replace("{time}", now.ToString("HHmmss", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase);
+
+        try
+        {
+            return Path.GetFullPath(resolved);
+        }
+        catch
+        {
+            return resolved;
+        }
+    }
+
+    private static ResultOutputEstimatedFile BuildResultOutputEstimatedFile(string format)
+    {
+        var extension = format.ToUpperInvariant() switch
+        {
+            "CSV" => ".csv",
+            "TEXT" => ".txt",
+            _ => ".json"
+        };
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "ClearVision.Product",
+            "result-output",
+            DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture));
+        var fileName = $"result_preview_{DateTime.UtcNow:HHmmssfff}{extension}";
+
+        return new ResultOutputEstimatedFile(directory, fileName, Path.Combine(directory, fileName));
+    }
+
     private static ImageSavePreviewPlan? ResolveImageSavePreviewPlan(
         ClearVision.Product.Core.Entities.OperatorFlow flow,
         ClearVision.Product.Core.Entities.Operator targetOperator)
@@ -882,6 +1390,7 @@ public static class PreviewNodeEndpoints
             ["Format"] = previewInfo.Format,
             ["Quality"] = previewInfo.Quality,
             ["Message"] = message,
+            ["DryRun"] = true,
             ["WillWriteToDisk"] = false,
             ["PreviewMode"] = ImageSaveSafePreviewMode,
             ["PreviewKind"] = "ImageSaveSafePreview",
@@ -1088,6 +1597,27 @@ public static class PreviewNodeEndpoints
         return value?.ToString() ?? defaultValue;
     }
 
+    private static bool GetOperatorBoolParameter(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name,
+        bool defaultValue)
+    {
+        var value = @operator.Parameters
+            .FirstOrDefault(parameter => string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?.GetValue();
+
+        return value switch
+        {
+            bool boolValue => boolValue,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            JsonElement element when element.ValueKind == JsonValueKind.True => true,
+            JsonElement element when element.ValueKind == JsonValueKind.False => false,
+            JsonElement element when element.ValueKind == JsonValueKind.String &&
+                                     bool.TryParse(element.GetString(), out var jsonParsed) => jsonParsed,
+            _ => defaultValue
+        };
+    }
+
     private static int GetOperatorIntParameter(
         ClearVision.Product.Core.Entities.Operator @operator,
         string name,
@@ -1127,6 +1657,16 @@ public static class PreviewNodeEndpoints
         int Quality,
         string EstimatedFileName,
         string EstimatedFilePath);
+
+    private sealed record PreviewFieldSummary(
+        List<string> Fields,
+        int FieldCount,
+        string ContentSummary);
+
+    private sealed record ResultOutputEstimatedFile(
+        string Directory,
+        string FileName,
+        string FilePath);
 
     private static void AppendPreviewArtifactDiagnostics(
         Dictionary<string, object> outputData,

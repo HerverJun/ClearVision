@@ -5,6 +5,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
@@ -168,6 +169,116 @@ public class AutoTuneEndpointsTests
         document.RootElement.GetProperty("missingResources").GetArrayLength().Should().Be(2);
         document.RootElement.GetProperty("diagnosticCodes").EnumerateArray().Select(item => item.GetString()).Should()
             .Contain(new[] { "missing_model", "missing_labels" });
+    }
+
+    [Fact]
+    public async Task FlowNodePreview_ShouldRejectSideEffectTargetBeforePreviewService()
+    {
+        var targetNodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
+        {
+            FlowId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = CreateFlowData(targetNodeId, OperatorType.HttpRequest)
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("预览不会执行外部动作");
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FlowNodePreview_ShouldRejectUpstreamSideEffectBeforePreviewService()
+    {
+        var sideEffectNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetPortId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
+        {
+            FlowId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = new FlowDataDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "AutoTuneAdmissionFlow",
+                Operators =
+                [
+                    new CanvasOperatorDataDto
+                    {
+                        Id = sideEffectNodeId,
+                        Name = "TextSave",
+                        Type = "TextSave",
+                        OutputPorts =
+                        [
+                            new CanvasPortDataDto
+                            {
+                                Id = sourcePortId,
+                                Name = "FilePath",
+                                DataType = "String"
+                            }
+                        ],
+                        Parameters = new Dictionary<string, object>
+                        {
+                            ["FilePath"] = "should-not-write.txt"
+                        }
+                    },
+                    new CanvasOperatorDataDto
+                    {
+                        Id = targetNodeId,
+                        Name = "DetectionSequenceJudge",
+                        Type = "DetectionSequenceJudge",
+                        InputPorts =
+                        [
+                            new CanvasPortDataDto
+                            {
+                                Id = targetPortId,
+                                Name = "Data",
+                                DataType = "Any",
+                                IsRequired = false
+                            }
+                        ]
+                    }
+                ],
+                Connections =
+                [
+                    new FlowConnectionDto
+                    {
+                        Id = Guid.NewGuid(),
+                        SourceOperatorId = sideEffectNodeId,
+                        SourcePortId = sourcePortId,
+                        TargetOperatorId = targetNodeId,
+                        TargetPortId = targetPortId
+                    }
+                ]
+            }
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("TextSave");
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -384,6 +495,8 @@ public class AutoTuneEndpointsTests
             builder.Services.AddSingleton(previewService);
             builder.Services.AddSingleton(autoTuneService);
             builder.Services.AddSingleton(Substitute.For<IPreviewMetricsAnalyzer>());
+            var projectRepository = Substitute.For<IProjectRepository>();
+            builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services
                 .AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
@@ -413,6 +526,8 @@ public class AutoTuneEndpointsTests
             builder.Services.AddSingleton(previewService);
             builder.Services.AddSingleton(autoTuneService);
             builder.Services.AddSingleton(Substitute.For<IPreviewMetricsAnalyzer>());
+            var projectRepository = Substitute.For<IProjectRepository>();
+            builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services.AddSingleton(authService);
 
             var app = builder.Build();
