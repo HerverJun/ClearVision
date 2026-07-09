@@ -34,10 +34,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("GaussianKernelSize", "Gaussian Kernel Size", "int", DefaultValue = 5, Min = 3, Max = 15)]
 [OperatorParam("ApertureSize", "Sobel Aperture Size", "enum", DefaultValue = "3", Options = new[] { "3|3", "5|5", "7|7" })]
 [OperatorParam("L2Gradient", "L2 梯度", "bool", DefaultValue = false, Description = "使用 L2 范数计算梯度幅值，更精确但稍慢")]
-[OperatorParam("EdgeModelPath", "Edge Model Path", "file", DefaultValue = "")]
-[OperatorParam("EdgeModelId", "Edge Model Id", "string", DefaultValue = "")]
-[OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "")]
-[OperatorParam("EdgeBinarizationThreshold", "Edge Binarization Threshold", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0)]
+[OperatorParam("EdgeModelPath", "Edge Model Path", "file", DefaultValue = "", IsRequired = false)]
+[OperatorParam("EdgeModelId", "Edge Model Id", "string", DefaultValue = "", IsRequired = false)]
+[OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "", IsRequired = false)]
+[OperatorParam("EdgeBinarizationThreshold", "Edge Binarization Threshold", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0, IsRequired = false)]
 public class CannyEdgeOperator : OperatorBase
 {
     private static readonly string[] SupportedEdgeCatalogTypes = ["edge_detection", "edge", "onnx_edge"];
@@ -179,10 +179,22 @@ public class CannyEdgeOperator : OperatorBase
             return ValidationResult.Invalid("AutoThresholdStrategy must be MedianIntensity, GradientPercentile, RecallGuardPercentile or OtsuGradient.");
         }
 
-        var edgeThreshold = GetDoubleParam(@operator, "EdgeBinarizationThreshold", 0.5);
-        if (edgeThreshold is < 0 or > 1)
+        if (method.Equals("OnnxEdge", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("EdgeBinarizationThreshold must be between 0 and 1.");
+            var hasModelSource =
+                !string.IsNullOrWhiteSpace(GetStringParam(@operator, "EdgeModelPath", string.Empty)) ||
+                !string.IsNullOrWhiteSpace(GetStringParam(@operator, "EdgeModelId", string.Empty)) ||
+                !string.IsNullOrWhiteSpace(GetStringParam(@operator, "ModelCatalogPath", string.Empty));
+            if (!hasModelSource)
+            {
+                return ValidationResult.Invalid("OnnxEdge requires EdgeModelPath, EdgeModelId, or ModelCatalogPath.");
+            }
+
+            var edgeThreshold = GetDoubleParam(@operator, "EdgeBinarizationThreshold", 0.5);
+            if (edgeThreshold is < 0 or > 1)
+            {
+                return ValidationResult.Invalid("EdgeBinarizationThreshold must be between 0 and 1.");
+            }
         }
 
         return ValidationResult.Valid();

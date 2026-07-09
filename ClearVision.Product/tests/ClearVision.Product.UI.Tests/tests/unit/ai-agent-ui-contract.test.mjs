@@ -10285,6 +10285,66 @@ test('parameter rules cover DeepLearning model source and NMS dependencies', asy
   );
 });
 
+test('parameter rules cover EdgeDetection Canny and OnnxEdge model source dependencies', async () => {
+  const {
+    collectEffectiveRequiredParameterErrors,
+    getParameterEffectiveState,
+    shouldIncludePendingParameter
+  } = await loadParameterRules();
+  const cannyParameters = [
+    { name: 'Method', value: 'Canny' },
+    { name: 'EdgeModelPath', value: '', isRequired: true },
+    { name: 'EdgeModelId', value: '', isRequired: true },
+    { name: 'ModelCatalogPath', value: '', isRequired: true },
+    { name: 'EdgeBinarizationThreshold', value: 0.5, isRequired: true }
+  ];
+  const canny = {
+    type: 'EdgeDetection',
+    parameters: cannyParameters
+  };
+  const missingOnnxModel = {
+    type: 'EdgeDetection',
+    parameters: [
+      { name: 'Method', value: 'OnnxEdge' },
+      { name: 'EdgeModelPath', value: '', isRequired: false },
+      { name: 'EdgeModelId', value: '', isRequired: false },
+      { name: 'ModelCatalogPath', value: '', isRequired: false },
+      { name: 'EdgeBinarizationThreshold', value: 0.5, isRequired: false }
+    ]
+  };
+  const onnxModelById = {
+    type: 'EdgeDetection',
+    parameters: {
+      Method: 'OnnxEdge',
+      EdgeModelPath: '',
+      EdgeModelId: 'edge-catalog-model',
+      ModelCatalogPath: '',
+      EdgeBinarizationThreshold: 0.5
+    }
+  };
+
+  for (const name of ['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath', 'EdgeBinarizationThreshold']) {
+    const parameter = cannyParameters.find(item => item.name === name);
+    assert.equal(getParameterEffectiveState(canny, parameter).effectiveRequired, false, `${name} Canny required`);
+  }
+  assert.equal(getParameterEffectiveState(canny, 'EdgeModelPath').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(canny, 'EdgeModelPath'), false);
+
+  const missingErrors = collectEffectiveRequiredParameterErrors(missingOnnxModel, missingOnnxModel.parameters);
+  assert.equal(
+    missingErrors.some(error =>
+      error.kind === 'atLeastOneOf' &&
+      error.parameterNames.includes('EdgeModelPath') &&
+      error.message === 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'),
+    true
+  );
+  assert.deepEqual(
+    collectEffectiveRequiredParameterErrors(onnxModelById, missingOnnxModel.parameters),
+    []
+  );
+  assert.equal(getParameterEffectiveState(onnxModelById, 'EdgeModelPath').effectiveDisabled, true);
+});
+
 test('parameter rules cover ResultOutput channel file and PLC safety dependencies', async () => {
   const {
     collectEffectiveRequiredParameterErrors,

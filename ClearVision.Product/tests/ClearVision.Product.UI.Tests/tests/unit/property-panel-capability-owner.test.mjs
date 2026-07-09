@@ -68,6 +68,122 @@ function installFakeDocument() {
   };
 }
 
+function installValidationDocument(parameterNames) {
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document');
+  const previousDocument = globalThis.document;
+  const messages = [];
+  const groups = new Map();
+  const inputs = new Map();
+  const createClassList = () => {
+    const values = new Set();
+    return {
+      add(name) {
+        values.add(name);
+      },
+      remove(name) {
+        values.delete(name);
+      },
+      contains(name) {
+        return values.has(name);
+      },
+      toggle(name, enabled) {
+        if (enabled) {
+          values.add(name);
+        } else {
+          values.delete(name);
+        }
+      }
+    };
+  };
+
+  for (const name of parameterNames) {
+    const group = {
+      children: [],
+      classList: createClassList(),
+      appendChild(child) {
+        child.parentNode = group;
+        group.children.push(child);
+        messages.push(child);
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      }
+    };
+    const input = {
+      name,
+      attributes: {},
+      setAttribute(attributeName, value) {
+        this.attributes[attributeName] = String(value);
+      },
+      removeAttribute(attributeName) {
+        delete this.attributes[attributeName];
+      },
+      getAttribute(attributeName) {
+        return this.attributes[attributeName] ?? null;
+      },
+      closest(selector) {
+        return selector === '.form-group' ? group : null;
+      }
+    };
+    groups.set(name, group);
+    inputs.set(name, input);
+  }
+
+  globalThis.document = {
+    createElement(tagName) {
+      return {
+        tagName,
+        className: '',
+        dataset: {},
+        parentNode: null,
+        textContent: '',
+        remove() {
+          const messageIndex = messages.indexOf(this);
+          if (messageIndex >= 0) {
+            messages.splice(messageIndex, 1);
+          }
+          if (this.parentNode) {
+            this.parentNode.children = this.parentNode.children.filter(child => child !== this);
+          }
+        }
+      };
+    }
+  };
+
+  return {
+    container: {
+      querySelectorAll(selector) {
+        if (selector === '[data-property-parameter="true"]') {
+          return Array.from(inputs.values());
+        }
+        if (selector === '.form-group.invalid') {
+          return Array.from(groups.values()).filter(group => group.classList.contains('invalid'));
+        }
+        if (selector === '[data-property-parameter="true"][aria-invalid="true"]') {
+          return Array.from(inputs.values()).filter(input => input.getAttribute('aria-invalid') === 'true');
+        }
+        if (selector === '[data-validation-error="true"]') {
+          return [...messages];
+        }
+        return [];
+      }
+    },
+    groups,
+    inputs,
+    messages,
+    cleanup() {
+      if (hadDocument) {
+        globalThis.document = previousDocument;
+      } else {
+        delete globalThis.document;
+      }
+    }
+  };
+}
+
 function countSliderMarkup(html) {
   return (String(html).match(/class="param-slider"/g) || []).length;
 }
@@ -1107,6 +1223,68 @@ test('PropertyPanelCapabilityOwner does not clear disabled file paths during pas
   assert.equal(pickerButton.disabled, true);
   assert.equal(pickerButton['aria-disabled'], 'true');
   assert.match(fileRuleHint.textContent, /相机模式/);
+});
+
+test('PropertyPanelCapabilityOwner validates EdgeDetection model sources only for OnnxEdge', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const dom = installValidationDocument([
+    'Method',
+    'EdgeModelPath',
+    'EdgeModelId',
+    'ModelCatalogPath',
+    'EdgeBinarizationThreshold'
+  ]);
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  owner.container = dom.container;
+  const createOperator = method => ({
+    id: 'edge-detection-1',
+    type: 'EdgeDetection',
+    parameters: [
+      { name: 'Method', value: method, dataType: 'enum' },
+      { name: 'EdgeModelPath', displayName: '模型路径', value: '', dataType: 'file', isRequired: true },
+      { name: 'EdgeModelId', displayName: '模型 ID', value: '', dataType: 'string', isRequired: true },
+      { name: 'ModelCatalogPath', displayName: '模型目录', value: '', dataType: 'file', isRequired: true },
+      { name: 'EdgeBinarizationThreshold', displayName: '边缘二值化阈值', value: 0.5, dataType: 'double', isRequired: true }
+    ]
+  });
+
+  try {
+    owner.currentOperator = createOperator('Canny');
+    owner.validationErrors = owner.validateOperatorModel(owner.currentOperator);
+    owner.renderValidationErrors();
+
+    assert.deepEqual(owner.validationErrors, []);
+    assert.equal(dom.messages.length, 0);
+    assert.equal(dom.groups.get('EdgeModelPath').classList.contains('invalid'), false);
+    assert.equal(dom.inputs.get('EdgeModelPath').getAttribute('aria-invalid'), null);
+
+    owner.currentOperator = createOperator('OnnxEdge');
+    owner.validationErrors = owner.validateOperatorModel(owner.currentOperator);
+    owner.renderValidationErrors();
+
+    assert.equal(owner.validationErrors.length, 1);
+    assert.equal(owner.validationErrors[0].kind, 'atLeastOneOf');
+    assert.equal(owner.validationErrors[0].message, 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一');
+    for (const name of ['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']) {
+      assert.equal(dom.groups.get(name).classList.contains('invalid'), true, `${name} invalid group`);
+      assert.equal(dom.inputs.get(name).getAttribute('aria-invalid'), 'true', `${name} aria-invalid`);
+    }
+    assert.equal(dom.messages.length, 3);
+    assert.equal(dom.messages.every(message => message.textContent === owner.validationErrors[0].message), true);
+
+    owner.currentOperator = createOperator('Canny');
+    owner.validationErrors = owner.validateOperatorModel(owner.currentOperator);
+    owner.renderValidationErrors();
+
+    assert.deepEqual(owner.validationErrors, []);
+    assert.equal(dom.messages.length, 0);
+    for (const name of ['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']) {
+      assert.equal(dom.groups.get(name).classList.contains('invalid'), false, `${name} invalid group cleared`);
+      assert.equal(dom.inputs.get(name).getAttribute('aria-invalid'), null, `${name} aria-invalid cleared`);
+    }
+  } finally {
+    dom.cleanup();
+  }
 });
 
 test('PropertyPanelCapabilityOwner clears stale selection when full apply target node is missing', async () => {

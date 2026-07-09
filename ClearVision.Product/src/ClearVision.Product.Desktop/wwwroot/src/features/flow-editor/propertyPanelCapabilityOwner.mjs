@@ -359,6 +359,16 @@ function buildValidationErrorMessage(error, operator, parameters = [], values = 
         }
     }
 
+    if (
+        operatorType === 'EdgeDetection' &&
+        error?.kind === 'atLeastOneOf' &&
+        normalizedNames.includes('edgemodelpath') &&
+        normalizedNames.includes('edgemodelid') &&
+        normalizedNames.includes('modelcatalogpath')
+    ) {
+        return 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一';
+    }
+
     if (error?.kind === 'required') {
         const label = getParameterLabelByName(parameters, error.name);
         return `${label} 必填`;

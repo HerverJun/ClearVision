@@ -132,6 +132,27 @@ public class OperatorMetadataMigrationTests
     }
 
     [Fact]
+    public void EdgeDetectionModelParameters_ShouldNotBeMetadataRequired()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.EdgeDetection);
+        var optionalParameterNames = new[]
+        {
+            "EdgeModelPath",
+            "EdgeModelId",
+            "ModelCatalogPath",
+            "EdgeBinarizationThreshold"
+        };
+
+        metadata.Should().NotBeNull();
+        metadata!.Parameters
+            .Where(parameter => optionalParameterNames.Contains(parameter.Name))
+            .Should()
+            .HaveCount(optionalParameterNames.Length)
+            .And
+            .OnlyContain(parameter => !parameter.IsRequired);
+    }
+
+    [Fact]
     public void MetadataCatalog_ShouldLocalizeVmStyleCommunicationAndVariableLabels()
     {
         var metadataByType = new OperatorFactory()

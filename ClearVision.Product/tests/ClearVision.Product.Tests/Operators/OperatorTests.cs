@@ -483,6 +483,62 @@ public class CannyEdgeOperatorTests
     }
 
     [Fact]
+    public void ValidateParameters_WithCannyAndEmptyModelSources_ShouldReturnValid()
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(TestHelpers.CreateParameter("Method", "Canny", "enum"));
+        AddEdgeModelParameters(op);
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeTrue(result.Errors.FirstOrDefault());
+    }
+
+    [Fact]
+    public void ValidateParameters_WithOnnxEdgeAndEmptyModelSources_ShouldReturnInvalid()
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(TestHelpers.CreateParameter("Method", "OnnxEdge", "enum"));
+        AddEdgeModelParameters(op);
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain("OnnxEdge requires EdgeModelPath, EdgeModelId, or ModelCatalogPath.");
+    }
+
+    [Theory]
+    [InlineData("EdgeModelPath", "C:\\drafts\\edge.onnx")]
+    [InlineData("EdgeModelId", "edge-catalog-model")]
+    [InlineData("ModelCatalogPath", "C:\\drafts\\model_catalog.json")]
+    public void ValidateParameters_WithOnnxEdgeAndAnyModelSource_ShouldReturnValid(
+        string parameterName,
+        string parameterValue)
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(TestHelpers.CreateParameter("Method", "OnnxEdge", "enum"));
+        AddEdgeModelParameters(op, parameterName, parameterValue);
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeTrue(result.Errors.FirstOrDefault());
+    }
+
+    [Fact]
+    public void ValidateParameters_WithOnnxEdgeAndInvalidBinarizationThreshold_ShouldReturnInvalid()
+    {
+        var op = CreateTestOperator();
+        op.AddParameter(TestHelpers.CreateParameter("Method", "OnnxEdge", "enum"));
+        AddEdgeModelParameters(op, "EdgeModelId", "edge-catalog-model");
+        op.AddParameter(TestHelpers.CreateParameter("EdgeBinarizationThreshold", 1.1, "double"));
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain("EdgeBinarizationThreshold must be between 0 and 1.");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithValidImage_ShouldOutputEdgesAsBytes()
     {
         var op = CreateTestOperator();
@@ -520,6 +576,20 @@ public class CannyEdgeOperatorTests
     private static Operator CreateTestOperator()
     {
         return new Operator("CannyEdge", OperatorType.EdgeDetection, 0, 0);
+    }
+
+    private static void AddEdgeModelParameters(
+        Operator op,
+        string nonEmptyParameterName = "",
+        string nonEmptyValue = "")
+    {
+        foreach (var name in new[] { "EdgeModelPath", "EdgeModelId", "ModelCatalogPath" })
+        {
+            var value = string.Equals(name, nonEmptyParameterName, StringComparison.OrdinalIgnoreCase)
+                ? nonEmptyValue
+                : string.Empty;
+            op.AddParameter(TestHelpers.CreateParameter(name, value, "string"));
+        }
     }
 }
 

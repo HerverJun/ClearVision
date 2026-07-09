@@ -123,6 +123,51 @@ export const OPERATOR_PARAMETER_RULES = Object.freeze({
             })
         })
     }),
+    EdgeDetection: Object.freeze({
+        parameters: Object.freeze({
+            EdgeModelPath: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
+                    Object.freeze({ parameter: 'EdgeModelId', notEmpty: true }),
+                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
+                ]),
+                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
+                mutuallyExclusiveGroup: 'edge-model-source',
+                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
+            }),
+            EdgeModelId: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
+                    Object.freeze({ parameter: 'EdgeModelPath', notEmpty: true }),
+                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
+                ]),
+                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
+                mutuallyExclusiveGroup: 'edge-model-source',
+                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
+            }),
+            ModelCatalogPath: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
+                    Object.freeze({ parameter: 'EdgeModelPath', notEmpty: true }),
+                    Object.freeze({ parameter: 'EdgeModelId', notEmpty: true })
+                ]),
+                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
+                mutuallyExclusiveGroup: 'edge-model-source',
+                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
+            }),
+            EdgeBinarizationThreshold: Object.freeze({
+                required: false,
+                disabledWhen: Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
+                disabledReason: 'Canny 模式不使用 ONNX 边缘二值化阈值。'
+            })
+        })
+    }),
     DeepLearning: Object.freeze({
         parameters: Object.freeze({
             ModelPath: Object.freeze({
