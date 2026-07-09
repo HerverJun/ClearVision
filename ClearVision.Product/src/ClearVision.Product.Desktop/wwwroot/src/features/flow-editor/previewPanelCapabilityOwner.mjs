@@ -230,6 +230,14 @@ function getStatusLabel(state, belongsToSelectedNode, nodeDeleted, stale = false
         };
     }
 
+    if (state?.status === 'blocked') {
+        return {
+            kind: 'blocked',
+            label: '安全拦截',
+            message: state?.errorMessage || '预览已安全拦截，正式运行流程时才会执行外部动作。'
+        };
+    }
+
     if (state?.status === 'auth-error') {
         return {
             kind: 'auth-error',
@@ -356,6 +364,10 @@ function getPreviewImageEmptyMessage({
 
     if (statusInfo.kind === 'auth-error') {
         return statusInfo.message || '登录状态无效，请重新登录。';
+    }
+
+    if (statusInfo.kind === 'blocked') {
+        return statusInfo.message || '预览已安全拦截，正式运行流程时才会执行外部动作。';
     }
 
     if (statusInfo.kind === 'error') {
@@ -1138,6 +1150,15 @@ export class PreviewPanelCapabilityOwner {
                 <section class="preview-capability-section">
                     <h5>预览结果</h5>
                     <div class="preview-capability-empty auth-error">${escapeHtml(statusInfo.message || '登录状态无效，请重新登录。')}</div>
+                </section>
+            `;
+        }
+
+        if (statusInfo.kind === 'blocked') {
+            return `
+                <section class="preview-capability-section">
+                    <h5>预览结果</h5>
+                    <div class="preview-capability-empty warning">${escapeHtml(statusInfo.message || '预览已安全拦截，正式运行流程时才会执行外部动作。')}</div>
                 </section>
             `;
         }

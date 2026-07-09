@@ -4,6 +4,7 @@
 // 作者：架构修复方案 v2
 
 using System.Collections;
+using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
@@ -38,6 +39,9 @@ public static class PreviewNodeEndpoints
     private const int MaxPreviewImageBytes = 8 * 1024 * 1024;
     private const int MaxMetricsItems = 64;
     private const int MaxMetricsStringChars = 1024;
+    private const string ImageSaveSafePreviewMode = "ImageSaveDryRun";
+    private const string ImageSaveSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存图像。";
+    private const string ImageSaveMissingInputMessage = "缺少输入图像，无法生成保存预览";
 
     private static readonly string[] MetricsCountKeys =
     [
@@ -91,6 +95,15 @@ public static class PreviewNodeEndpoints
             ILogger<object> logger) =>
         {
             ProjectAccessLease? projectAccess = null;
+            async Task ReleaseProjectAccessAsync()
+            {
+                if (projectAccess != null)
+                {
+                    await projectAccess.DisposeAsync();
+                    projectAccess = null;
+                }
+            }
+
             try
             {
                 logger.LogInformation(
@@ -163,6 +176,29 @@ public static class PreviewNodeEndpoints
                     }
                 }
 
+                var targetOperator = flow.Operators.FirstOrDefault(o => o.Id == request.TargetNodeId);
+                if (targetOperator?.Type == OperatorType.ImageSave)
+                {
+                    var imageSavePreviewTimeoutMs = NormalizePreviewTimeoutMs(request.TimeoutMs);
+                    using var imageSavePreviewCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+                    imageSavePreviewCancellation.CancelAfter(TimeSpan.FromMilliseconds(imageSavePreviewTimeoutMs));
+
+                    return await BuildImageSaveSafePreviewAsync(
+                        request,
+                        flow,
+                        flowService,
+                        executionAdmissionService,
+                        projectRepository,
+                        projectVariableSessions,
+                        artifactMaterializer,
+                        artifactOwner,
+                        useArtifactReferences,
+                        studioOptions.Value,
+                        imageSavePreviewCancellation.Token,
+                        logger,
+                        ReleaseProjectAccessAsync);
+                }
+
                 // 构建调试选项
                 var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
                     request.ProjectId,
@@ -210,8 +246,7 @@ public static class PreviewNodeEndpoints
                     projectVariableSessions);
                 if (projectAccess != null)
                 {
-                    await projectAccess.DisposeAsync();
-                    projectAccess = null;
+                    await ReleaseProjectAccessAsync();
                 }
 
                 // 执行调试流程（自动执行上游子图到目标节点）
@@ -381,7 +416,7 @@ public static class PreviewNodeEndpoints
             {
                 if (projectAccess != null)
                 {
-                    await projectAccess.DisposeAsync();
+                    await ReleaseProjectAccessAsync();
                 }
             }
         });
@@ -516,6 +551,582 @@ public static class PreviewNodeEndpoints
             request.DebugSessionId,
             request.ClientRequestSequence,
             request.FlowRevision);
+
+    private static async Task<IResult> BuildImageSaveSafePreviewAsync(
+        PreviewNodeRequest request,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        IFlowExecutionService flowService,
+        IExecutionAdmissionService executionAdmissionService,
+        IProjectRepository projectRepository,
+        ProjectVariableSessionRegistry projectVariableSessions,
+        PreviewArtifactMaterializer artifactMaterializer,
+        PreviewArtifactOwnerScope artifactOwner,
+        bool useArtifactReferences,
+        StudioOptions studioOptions,
+        CancellationToken cancellationToken,
+        ILogger logger,
+        Func<Task> releaseProjectAccessAsync)
+    {
+        var targetOperator = flow.Operators.FirstOrDefault(o => o.Id == request.TargetNodeId);
+        if (targetOperator == null)
+        {
+            await releaseProjectAccessAsync();
+            return Results.Problem(
+                detail: "无法找到图像保存节点",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var previewInfo = ResolveImageSavePreviewInfo(targetOperator);
+        var plan = ResolveImageSavePreviewPlan(flow, targetOperator);
+        if (plan == null)
+        {
+            await releaseProjectAccessAsync();
+            var missingInputResult = new FlowDebugExecutionResult
+            {
+                DebugSessionId = request.DebugSessionId,
+                IsSuccess = true
+            };
+            return Results.Ok(BuildImageSaveSafePreviewResponse(
+                request,
+                flow,
+                missingInputResult,
+                null,
+                previewInfo,
+                ImageSaveMissingInputMessage,
+                null,
+                artifactMaterializer,
+                artifactOwner,
+                useArtifactReferences,
+                studioOptions,
+                cancellationToken,
+                logger));
+        }
+
+        var dryRunFlow = BuildImageSaveDryRunFlow(flow, plan.SourceOperator.Id);
+        var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+            request.ProjectId,
+            dryRunFlow,
+            ExecutionAdmissionSurface.NodePreview,
+            cancellationToken);
+        if (!flowAdmission.IsAllowed)
+        {
+            await releaseProjectAccessAsync();
+            return ToAdmissionFailure(flowAdmission);
+        }
+
+        Dictionary<string, object>? inputData = null;
+        var externalInputImageBase64 = ShouldUseExternalInputImage(dryRunFlow, plan.SourceOperator.Id)
+            ? request.InputImageBase64
+            : null;
+        if (!string.IsNullOrWhiteSpace(externalInputImageBase64))
+        {
+            if (!ImagePayloadDecoder.TryDecodeBytes(
+                    externalInputImageBase64,
+                    "InputImageBase64",
+                    out var imageData,
+                    out var decodeError,
+                    out var statusCode))
+            {
+                await releaseProjectAccessAsync();
+                return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
+            }
+
+            inputData = new Dictionary<string, object>
+            {
+                ["Image"] = imageData
+            };
+        }
+
+        var projectVariables = await CreatePreviewProjectVariableContextAsync(
+            request.ProjectId,
+            dryRunFlow,
+            projectRepository,
+            projectVariableSessions);
+
+        await releaseProjectAccessAsync();
+
+        var debugOptions = new DebugOptions
+        {
+            DebugSessionId = request.DebugSessionId,
+            EnableIntermediateCache = true,
+            BreakAtOperatorId = plan.SourceOperator.Id,
+            ImageFormat = request.ImageFormat ?? ".png"
+        };
+
+        var result = projectVariables == null
+            ? await flowService.ExecuteFlowDebugAsync(
+                dryRunFlow,
+                debugOptions,
+                inputData,
+                cancellationToken)
+            : await flowService.ExecuteFlowDebugAsync(
+                dryRunFlow,
+                debugOptions,
+                inputData,
+                projectVariables,
+                cancellationToken);
+
+        result.DebugSessionId = request.DebugSessionId;
+
+        if (!result.IntermediateResults.TryGetValue(plan.SourceOperator.Id, out var sourceOutput))
+        {
+            sourceOutput = flowService.GetDebugIntermediateResult(request.DebugSessionId, plan.SourceOperator.Id);
+        }
+
+        var sourceDebugResult = result.DebugOperatorResults.FirstOrDefault(item => item.OperatorId == plan.SourceOperator.Id);
+        var inputImageBytes = ResolveImageSavePreviewInputImageBytes(plan, sourceOutput, sourceDebugResult);
+        var upstreamMessage = !result.IsSuccess && !string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? result.ErrorMessage
+            : null;
+        var message = inputImageBytes == null
+            ? ImageSaveMissingInputMessage
+            : ImageSaveSafePreviewMessage;
+
+        return Results.Ok(BuildImageSaveSafePreviewResponse(
+            request,
+            flow,
+            result,
+            inputImageBytes,
+            previewInfo,
+            message,
+            upstreamMessage,
+            artifactMaterializer,
+            artifactOwner,
+            useArtifactReferences,
+            studioOptions,
+            cancellationToken,
+            logger));
+    }
+
+    private static ImageSavePreviewPlan? ResolveImageSavePreviewPlan(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        ClearVision.Product.Core.Entities.Operator targetOperator)
+    {
+        var targetInputPorts = targetOperator.InputPorts.ToDictionary(port => port.Id);
+        var incoming = flow.Connections
+            .Where(connection => connection.TargetOperatorId == targetOperator.Id)
+            .ToList();
+
+        var inputConnection = incoming.FirstOrDefault(connection =>
+                targetInputPorts.TryGetValue(connection.TargetPortId, out var port) &&
+                port.Name.Equals("Image", StringComparison.OrdinalIgnoreCase) &&
+                port.DataType == PortDataType.Image)
+            ?? incoming.FirstOrDefault(connection =>
+                targetInputPorts.TryGetValue(connection.TargetPortId, out var port) &&
+                port.DataType == PortDataType.Image)
+            ?? incoming.FirstOrDefault();
+
+        if (inputConnection == null)
+        {
+            return null;
+        }
+
+        var sourceOperator = flow.Operators.FirstOrDefault(op => op.Id == inputConnection.SourceOperatorId);
+        if (sourceOperator == null)
+        {
+            return null;
+        }
+
+        var sourcePort = sourceOperator.OutputPorts.FirstOrDefault(port => port.Id == inputConnection.SourcePortId);
+        return new ImageSavePreviewPlan(inputConnection, sourceOperator, sourcePort);
+    }
+
+    private static ClearVision.Product.Core.Entities.OperatorFlow BuildImageSaveDryRunFlow(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        Guid sourceOperatorId)
+    {
+        var relevantIds = CollectRelevantOperatorIds(flow, sourceOperatorId);
+        var dryRunFlow = new ClearVision.Product.Core.Entities.OperatorFlow($"{flow.Name}-ImageSavePreview");
+
+        foreach (var op in flow.Operators.Where(op => relevantIds.Contains(op.Id)))
+        {
+            dryRunFlow.AddOperator(op);
+        }
+
+        foreach (var connection in flow.Connections.Where(connection =>
+                     relevantIds.Contains(connection.SourceOperatorId) &&
+                     relevantIds.Contains(connection.TargetOperatorId)))
+        {
+            dryRunFlow.AddConnection(connection);
+        }
+
+        return dryRunFlow;
+    }
+
+    private static byte[]? ResolveImageSavePreviewInputImageBytes(
+        ImageSavePreviewPlan plan,
+        Dictionary<string, object>? sourceOutput,
+        OperatorDebugResult? sourceDebugResult)
+    {
+        var sourcePortName = plan.SourcePort?.Name;
+        return TryGetImageBytesByKey(sourceOutput, sourcePortName)
+            ?? TryGetImageBytesByKey(sourceDebugResult?.OutputSnapshot, sourcePortName)
+            ?? TryGetOutputImageBytes(sourceOutput)
+            ?? TryGetOutputImageBytes(sourceDebugResult?.OutputSnapshot);
+    }
+
+    private static PreviewNodeResponse BuildImageSaveSafePreviewResponse(
+        PreviewNodeRequest request,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        FlowDebugExecutionResult result,
+        byte[]? rawInputImageBytes,
+        ImageSavePreviewInfo previewInfo,
+        string message,
+        string? upstreamMessage,
+        PreviewArtifactMaterializer artifactMaterializer,
+        PreviewArtifactOwnerScope artifactOwner,
+        bool useArtifactReferences,
+        StudioOptions studioOptions,
+        CancellationToken cancellationToken,
+        ILogger logger)
+    {
+        result.IsSuccess = true;
+        result.ErrorMessage = null;
+
+        var outputData = BuildImageSavePreviewOutputData(previewInfo, rawInputImageBytes != null, message, upstreamMessage);
+        var outputDataForObservation = outputData;
+        var sanitizedOutputData = new Dictionary<string, object>(outputData, StringComparer.OrdinalIgnoreCase);
+        byte[]? outputImageBytes = rawInputImageBytes;
+        string? inputImageBase64 = null;
+        string? outputImageBase64 = null;
+        List<PreviewArtifactReferenceV1>? artifacts = null;
+        PreviewArtifactMaterializationResult? materialization = null;
+
+        try
+        {
+            if (useArtifactReferences)
+            {
+                materialization = artifactMaterializer.MaterializePreview(
+                    artifactOwner,
+                    outputData,
+                    rawInputImageBytes,
+                    rawInputImageBytes,
+                    cancellationToken);
+                artifacts = materialization.Artifacts.Count > 0 ? materialization.Artifacts : null;
+                outputDataForObservation = materialization.OutputData;
+                sanitizedOutputData = BuildResponseOutputData(materialization.OutputData);
+                AppendPreviewArtifactDiagnostics(sanitizedOutputData, materialization.Diagnostics);
+            }
+            else
+            {
+                outputImageBytes = LimitPreviewImageBytes(
+                    rawInputImageBytes,
+                    sanitizedOutputData,
+                    "预览图像",
+                    logger);
+                inputImageBase64 = outputImageBytes != null ? Convert.ToBase64String(outputImageBytes) : null;
+                outputImageBase64 = inputImageBase64;
+            }
+
+            var metricsInput = BuildMetricsOutputData(sanitizedOutputData);
+            var metrics = BuildPreviewMetrics(metricsInput.OutputData, outputImageBytes, null, metricsInput.Diagnostics);
+            var observation = BuildPreviewObservation(
+                request,
+                result,
+                outputDataForObservation,
+                flow,
+                null,
+                studioOptions,
+                successOverride: true,
+                errorMessageOverride: null);
+
+            var response = new PreviewNodeResponse
+            {
+                Success = true,
+                ProjectId = request.ProjectId,
+                TargetNodeId = request.TargetNodeId,
+                DebugSessionId = request.DebugSessionId,
+                InputImageBase64 = inputImageBase64,
+                OutputData = sanitizedOutputData,
+                OutputImageBase64 = outputImageBase64,
+                ExecutionTimeMs = result.ExecutionTimeMs,
+                ErrorMessage = null,
+                FailedOperatorId = null,
+                FailedOperatorName = null,
+                FailedOperatorType = null,
+                Metrics = metrics,
+                Artifacts = artifacts,
+                ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
+                {
+                    OperatorId = r.OperatorId,
+                    OperatorName = r.OperatorName,
+                    ExecutionOrder = r.ExecutionOrder,
+                    ExecutionTimeMs = r.ExecutionTimeMs,
+                    IsSuccess = r.IsSuccess
+                }).ToList(),
+                Observation = observation
+            };
+
+            cancellationToken.ThrowIfCancellationRequested();
+            materialization?.Commit();
+            return response;
+        }
+        finally
+        {
+            materialization?.Dispose();
+        }
+    }
+
+    private static Dictionary<string, object> BuildImageSavePreviewOutputData(
+        ImageSavePreviewInfo previewInfo,
+        bool hasInputImage,
+        string message,
+        string? upstreamMessage)
+    {
+        var outputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Directory"] = previewInfo.Directory,
+            ["FileNameTemplate"] = previewInfo.FileNameTemplate,
+            ["EstimatedFileName"] = previewInfo.EstimatedFileName,
+            ["EstimatedFilePath"] = previewInfo.EstimatedFilePath,
+            ["Format"] = previewInfo.Format,
+            ["Quality"] = previewInfo.Quality,
+            ["Message"] = message,
+            ["WillWriteToDisk"] = false,
+            ["PreviewMode"] = ImageSaveSafePreviewMode,
+            ["PreviewKind"] = "ImageSaveSafePreview",
+            ["PreviewBlocked"] = false,
+            ["PreviewSafe"] = true
+        };
+
+        if (!hasInputImage)
+        {
+            outputData["_previewWarning"] = ImageSaveMissingInputMessage;
+        }
+
+        if (!string.IsNullOrWhiteSpace(upstreamMessage))
+        {
+            outputData["UpstreamPreviewMessage"] = upstreamMessage;
+        }
+
+        return outputData;
+    }
+
+    private static ImageSavePreviewInfo ResolveImageSavePreviewInfo(
+        ClearVision.Product.Core.Entities.Operator @operator)
+    {
+        var directory = ResolveImageSaveDirectory(@operator);
+        var fileNameTemplate = ResolveImageSaveFileNameTemplate(@operator);
+        var format = ResolveImageSaveFormat(@operator, fileNameTemplate);
+        var quality = ResolveImageSaveQuality(@operator);
+        var estimatedFileName = BuildImageSaveEstimatedFileName(fileNameTemplate, format);
+        var estimatedFilePath = string.IsNullOrWhiteSpace(directory)
+            ? estimatedFileName
+            : Path.Combine(directory, estimatedFileName);
+
+        return new ImageSavePreviewInfo(
+            directory,
+            fileNameTemplate,
+            format,
+            quality,
+            estimatedFileName,
+            estimatedFilePath);
+    }
+
+    private static string ResolveImageSaveDirectory(ClearVision.Product.Core.Entities.Operator @operator)
+    {
+        var directory = GetOperatorStringParameter(@operator, "Directory", string.Empty);
+        var legacyDirectory = GetOperatorStringParameter(@operator, "FolderPath", string.Empty);
+
+        if (IsOperatorParameterExplicitlyConfigured(@operator, "Directory"))
+        {
+            return directory;
+        }
+
+        return !string.IsNullOrWhiteSpace(legacyDirectory)
+            ? legacyDirectory
+            : directory;
+    }
+
+    private static string ResolveImageSaveFileNameTemplate(ClearVision.Product.Core.Entities.Operator @operator)
+    {
+        var hasTemplate = HasOperatorParameter(@operator, "FileNameTemplate");
+        var hasLegacyTemplate = HasOperatorParameter(@operator, "FileName");
+        var template = hasTemplate
+            ? GetOperatorStringParameter(@operator, "FileNameTemplate", string.Empty)
+            : string.Empty;
+        var legacyTemplate = hasLegacyTemplate
+            ? GetOperatorStringParameter(@operator, "FileName", string.Empty)
+            : string.Empty;
+
+        if (IsOperatorParameterExplicitlyConfigured(@operator, "FileNameTemplate"))
+        {
+            return template;
+        }
+
+        if (!string.IsNullOrWhiteSpace(legacyTemplate))
+        {
+            return legacyTemplate;
+        }
+
+        if (!string.IsNullOrWhiteSpace(template))
+        {
+            return template;
+        }
+
+        return "image_{timestamp}.png";
+    }
+
+    private static string ResolveImageSaveFormat(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string fileNameTemplate)
+    {
+        var explicitFormat = GetOperatorStringParameter(@operator, "Format", string.Empty);
+        if (!string.IsNullOrWhiteSpace(explicitFormat))
+        {
+            return explicitFormat.Trim().TrimStart('.').ToLowerInvariant();
+        }
+
+        var metadataTemplateExplicit = IsOperatorParameterExplicitlyConfigured(@operator, "FileNameTemplate");
+        var metadataTemplate = HasOperatorParameter(@operator, "FileNameTemplate")
+            ? GetOperatorStringParameter(@operator, "FileNameTemplate", string.Empty)
+            : string.Empty;
+        var legacyTemplate = HasOperatorParameter(@operator, "FileName")
+            ? GetOperatorStringParameter(@operator, "FileName", string.Empty)
+            : string.Empty;
+
+        var metadataExtension = Path.GetExtension(metadataTemplate);
+        if (metadataTemplateExplicit)
+        {
+            if (!string.IsNullOrWhiteSpace(metadataExtension))
+            {
+                return metadataExtension.TrimStart('.').ToLowerInvariant();
+            }
+
+            var resolvedExtension = Path.GetExtension(fileNameTemplate);
+            if (!string.IsNullOrWhiteSpace(resolvedExtension))
+            {
+                return resolvedExtension.TrimStart('.').ToLowerInvariant();
+            }
+
+            return "png";
+        }
+
+        var legacyExtension = Path.GetExtension(legacyTemplate);
+        if (!string.IsNullOrWhiteSpace(legacyExtension))
+        {
+            return legacyExtension.TrimStart('.').ToLowerInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadataExtension))
+        {
+            return metadataExtension.TrimStart('.').ToLowerInvariant();
+        }
+
+        return "png";
+    }
+
+    private static int ResolveImageSaveQuality(ClearVision.Product.Core.Entities.Operator @operator)
+    {
+        var metadataQuality = GetOperatorIntParameter(@operator, "Quality", 90, 1, 100);
+        var legacyQuality = GetOperatorIntParameter(@operator, "JpegQuality", metadataQuality, 1, 100);
+
+        if (IsOperatorParameterExplicitlyConfigured(@operator, "Quality"))
+        {
+            return metadataQuality;
+        }
+
+        return HasOperatorParameter(@operator, "JpegQuality")
+            ? legacyQuality
+            : metadataQuality;
+    }
+
+    private static string BuildImageSaveEstimatedFileName(string template, string format)
+    {
+        var now = DateTime.Now;
+        var guidToken = "preview";
+        var fileName = (string.IsNullOrWhiteSpace(template) ? "image_{timestamp}.png" : template)
+            .Replace("{timestamp}", now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{date}", now.ToString("yyyyMMdd", CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{time}", now.ToString("HHmmss", CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{year}", now.Year.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{month}", now.Month.ToString("D2", CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{day}", now.Day.ToString("D2", CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{Guid}", guidToken, StringComparison.Ordinal)
+            .Replace("{guid}", guidToken, StringComparison.Ordinal);
+
+        var extension = format.ToLowerInvariant() switch
+        {
+            "jpg" or "jpeg" => ".jpg",
+            "bmp" => ".bmp",
+            _ => ".png"
+        };
+
+        return fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+            ? fileName
+            : Path.ChangeExtension(fileName, extension);
+    }
+
+    private static bool HasOperatorParameter(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name)
+    {
+        return @operator.Parameters.Any(parameter =>
+            string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsOperatorParameterExplicitlyConfigured(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name)
+    {
+        var parameter = @operator.Parameters.FirstOrDefault(item =>
+            string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        return parameter != null &&
+            !string.Equals(parameter.ValueJson, parameter.DefaultValueJson, StringComparison.Ordinal);
+    }
+
+    private static string GetOperatorStringParameter(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name,
+        string defaultValue)
+    {
+        var value = @operator.Parameters
+            .FirstOrDefault(parameter => string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?.GetValue();
+
+        return value?.ToString() ?? defaultValue;
+    }
+
+    private static int GetOperatorIntParameter(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name,
+        int defaultValue,
+        int min,
+        int max)
+    {
+        var value = @operator.Parameters
+            .FirstOrDefault(parameter => string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?.GetValue();
+
+        var parsed = value switch
+        {
+            int intValue => intValue,
+            long longValue => (int)longValue,
+            double doubleValue => (int)doubleValue,
+            decimal decimalValue => (int)decimalValue,
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var textValue) => textValue,
+            JsonElement element when element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var jsonValue) => jsonValue,
+            JsonElement element when element.ValueKind == JsonValueKind.String &&
+                                     int.TryParse(element.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var jsonTextValue) => jsonTextValue,
+            _ => defaultValue
+        };
+
+        return Math.Clamp(parsed, min, max);
+    }
+
+    private sealed record ImageSavePreviewPlan(
+        OperatorConnection InputConnection,
+        ClearVision.Product.Core.Entities.Operator SourceOperator,
+        Port? SourcePort);
+
+    private sealed record ImageSavePreviewInfo(
+        string Directory,
+        string FileNameTemplate,
+        string Format,
+        int Quality,
+        string EstimatedFileName,
+        string EstimatedFilePath);
 
     private static void AppendPreviewArtifactDiagnostics(
         Dictionary<string, object> outputData,
@@ -920,9 +1531,31 @@ public static class PreviewNodeEndpoints
                string.Equals(key, "OriginalImage", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static byte[]? TryGetOutputImageBytes(Dictionary<string, object> nodeOutput)
+    private static byte[]? TryGetOutputImageBytes(Dictionary<string, object>? nodeOutput)
     {
-        if (!nodeOutput.TryGetValue("Image", out var imageValue) || imageValue == null)
+        return TryGetImageBytesByKey(nodeOutput, "Image");
+    }
+
+    private static byte[]? TryGetImageBytesByKey(Dictionary<string, object>? nodeOutput, string? key)
+    {
+        if (nodeOutput == null || string.IsNullOrWhiteSpace(key))
+        {
+            return null;
+        }
+
+        if (!nodeOutput.TryGetValue(key, out var imageValue))
+        {
+            var match = nodeOutput.FirstOrDefault(pair =>
+                string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase));
+            imageValue = string.IsNullOrEmpty(match.Key) ? null : match.Value;
+        }
+
+        return TryConvertPreviewImageValueToBytes(imageValue);
+    }
+
+    private static byte[]? TryConvertPreviewImageValueToBytes(object? imageValue)
+    {
+        if (imageValue == null)
         {
             return null;
         }

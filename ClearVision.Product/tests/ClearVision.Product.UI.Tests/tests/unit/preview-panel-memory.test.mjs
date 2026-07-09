@@ -1377,6 +1377,74 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   assert.equal(harness.container.innerHTML, '');
 });
 
+test('PreviewPanelCapabilityOwner renders ImageSave safe preview as completed summary', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState({
+      nodeType: 'ImageSave',
+      title: '图像保存',
+      inputImageBase64: 'INPUT_IMAGE',
+      outputImageBase64: 'INPUT_IMAGE',
+      outputData: {
+        Directory: 'D:\\CV\\Preview',
+        FileNameTemplate: 'edge_{timestamp}.jpg',
+        EstimatedFileName: 'edge_20260709_120000.jpg',
+        Format: 'jpg',
+        Quality: 88,
+        Message: '预览模式不会写入磁盘；点击运行流程后才会保存图像。',
+        WillWriteToDisk: false,
+        PreviewMode: 'ImageSaveDryRun',
+        PreviewBlocked: false
+      },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: 'data:image/png;base64,INPUT_IMAGE',
+        outputImageSrc: 'data:image/png;base64,INPUT_IMAGE'
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /预览完成/);
+  assert.match(harness.container.innerHTML, /保存目录/);
+  assert.match(harness.container.innerHTML, /命名规则/);
+  assert.match(harness.container.innerHTML, /预计文件名/);
+  assert.match(harness.container.innerHTML, /预览模式不会写入磁盘；点击运行流程后才会保存图像。/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览失败/);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner renders side-effect preview block as warning state', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState(),
+    status: 'blocked',
+    errorMessage: '节点预览已安全拦截副作用算子“TcpCommunication”：预览不会执行外部动作，正式运行流程时才会执行。',
+    outputData: null,
+    outputImageBase64: null,
+    presenter: {
+      statusText: '预览已安全拦截',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  assert.match(harness.container.innerHTML, /安全拦截/);
+  assert.match(harness.container.innerHTML, /正式运行流程时才会执行/);
+  assert.match(harness.container.innerHTML, /preview-capability-empty warning/);
+  assert.doesNotMatch(harness.container.innerHTML, /预览失败/);
+
+  owner.dispose();
+});
+
 test('PreviewPanelCapabilityOwner restores manual preview controls when request throws', () => {
   const toasts = [];
   const harness = createPreviewCapabilityHarness({

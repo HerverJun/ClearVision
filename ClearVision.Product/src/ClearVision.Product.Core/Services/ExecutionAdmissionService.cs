@@ -223,7 +223,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         {
             return CreateViolation(
                 @operator,
-                $"{@operator.Type} can perform external I/O or persistent side effects.");
+                $"{@operator.Type} 可能执行外部 I/O 或持久化动作。");
         }
 
         if (@operator.Type == OperatorType.ResultOutput &&
@@ -232,7 +232,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         {
             return CreateViolation(
                 @operator,
-                "ResultOutput with SaveToFile=true writes local files.",
+                "ResultOutput 启用 SaveToFile=true 时会写入本地文件。",
                 "SaveToFile");
         }
 
@@ -244,7 +244,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             {
                 return CreateViolation(
                     @operator,
-                    "ImageAcquisition with SourceType=Camera can access local camera hardware.",
+                    "ImageAcquisition 使用相机采集源时会访问本机相机硬件。",
                     "SourceType");
             }
 
@@ -253,7 +253,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             {
                 return CreateViolation(
                     @operator,
-                    "ImageAcquisition with FilePath can read local files.",
+                    "ImageAcquisition 配置 FilePath 时会读取本地文件。",
                     "FilePath");
             }
         }
@@ -283,13 +283,13 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         var first = violations[0];
         var surfaceName = surface switch
         {
-            ExecutionAdmissionSurface.OperatorPreview => "operator preview",
-            ExecutionAdmissionSurface.NodePreview => "node preview",
-            ExecutionAdmissionSurface.RealtimeInlineExecution => "realtime inline execution",
-            _ => "inline execution"
+            ExecutionAdmissionSurface.OperatorPreview => "算子预览",
+            ExecutionAdmissionSurface.NodePreview => "节点预览",
+            ExecutionAdmissionSurface.RealtimeInlineExecution => "实时内联执行",
+            _ => "内联执行"
         };
 
-        return $"{surfaceName} blocked side-effect operator '{first.OperatorName}' ({first.OperatorType}): {first.Reason}";
+        return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会执行外部动作，正式运行流程时才会执行。";
     }
 
     private static bool TryReadBoolParameter(Operator @operator, string name, out bool value)

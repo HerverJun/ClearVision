@@ -1282,6 +1282,189 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithImageSaveTarget_ShouldDryRunWithoutWritingFile()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var outputDir = Path.Combine(Path.GetTempPath(), $"ClearVision-ImageSavePreview-{Guid.NewGuid():N}");
+        var sourceOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var imageSaveInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var imageBytes = CreateBinaryPreviewImageBytes();
+        DebugOptions? capturedOptions = null;
+        OperatorFlow? capturedFlow = null;
+
+        try
+        {
+            await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(callInfo =>
+                    {
+                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedOptions = callInfo.ArgAt<DebugOptions>(1);
+
+                        return Task.FromResult(new FlowDebugExecutionResult
+                        {
+                            IsSuccess = true,
+                            DebugSessionId = debugSessionId,
+                            ExecutionTimeMs = 9,
+                            IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                            {
+                                [sourceNodeId] = new()
+                                {
+                                    ["Image"] = imageBytes
+                                }
+                            },
+                            DebugOperatorResults = new List<OperatorDebugResult>
+                            {
+                                new()
+                                {
+                                    OperatorId = sourceNodeId,
+                                    OperatorName = "EdgePreparation",
+                                    IsSuccess = true,
+                                    ExecutionOrder = 0,
+                                    ExecutionTimeMs = 9,
+                                    OutputSnapshot = new Dictionary<string, object>
+                                    {
+                                        ["Image"] = imageBytes
+                                    }
+                                }
+                            }
+                        });
+                    });
+            });
+
+            Directory.Exists(outputDir).Should().BeFalse();
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = projectId,
+                TargetNodeId = targetNodeId,
+                DebugSessionId = debugSessionId,
+                FlowData = CreateUpdateFlowRequest(
+                    CreateOperatorDto(
+                        sourceNodeId,
+                        "EdgePreparation",
+                        OperatorType.Thresholding,
+                        outputPorts: [sourceOutputPort]),
+                    CreateOperatorDto(
+                        targetNodeId,
+                        "ImageSave",
+                        OperatorType.ImageSave,
+                        inputPorts: [imageSaveInputPort],
+                        parameters: new Dictionary<string, object>
+                        {
+                            ["Directory"] = outputDir,
+                            ["FileNameTemplate"] = "edge_{timestamp}_{Guid}.jpg",
+                            ["Quality"] = 88
+                        }),
+                    CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, imageSaveInputPort.Id))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+            document.RootElement.GetProperty("inputImageBase64").GetString().Should().Be(Convert.ToBase64String(imageBytes));
+            document.RootElement.GetProperty("outputImageBase64").GetString().Should().Be(Convert.ToBase64String(imageBytes));
+
+            var outputData = document.RootElement.GetProperty("outputData");
+            outputData.GetProperty("PreviewMode").GetString().Should().Be("ImageSaveDryRun");
+            outputData.GetProperty("PreviewBlocked").GetBoolean().Should().BeFalse();
+            outputData.GetProperty("WillWriteToDisk").GetBoolean().Should().BeFalse();
+            outputData.GetProperty("Message").GetString().Should().Be("预览模式不会写入磁盘；点击运行流程后才会保存图像。");
+            outputData.GetProperty("Directory").GetString().Should().Be(outputDir);
+            outputData.GetProperty("FileNameTemplate").GetString().Should().Be("edge_{timestamp}_{Guid}.jpg");
+            outputData.GetProperty("Format").GetString().Should().Be("jpg");
+            outputData.GetProperty("Quality").GetInt32().Should().Be(88);
+            outputData.GetProperty("EstimatedFileName").GetString().Should().EndWith(".jpg");
+
+            Directory.Exists(outputDir).Should().BeFalse("节点预览不能创建 ImageSave 目录或写盘");
+            capturedOptions.Should().NotBeNull();
+            capturedOptions!.BreakAtOperatorId.Should().Be(sourceNodeId);
+            capturedFlow.Should().NotBeNull();
+            capturedFlow!.Operators.Select(op => op.Type).Should().NotContain(OperatorType.ImageSave);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithImageSaveTargetAndNoInputImage_ShouldReturnMissingInputPreviewMessage()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var outputDir = Path.Combine(Path.GetTempPath(), $"ClearVision-ImageSavePreviewMissing-{Guid.NewGuid():N}");
+        var imageSaveInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        IFlowExecutionService? flowExecution = null;
+
+        try
+        {
+            await using var host = await PreviewNodeTestHost.CreateAsync(configuredFlowExecution =>
+            {
+                flowExecution = configuredFlowExecution;
+            });
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = projectId,
+                TargetNodeId = targetNodeId,
+                FlowData = CreateUpdateFlowRequest(
+                    CreateOperatorDto(
+                        targetNodeId,
+                        "ImageSave",
+                        OperatorType.ImageSave,
+                        inputPorts: [imageSaveInputPort],
+                        parameters: new Dictionary<string, object>
+                        {
+                            ["Directory"] = outputDir,
+                            ["FileNameTemplate"] = "missing_{timestamp}.png",
+                            ["Quality"] = 90
+                        }))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+            document.RootElement.GetProperty("errorMessage").ValueKind.Should().Be(JsonValueKind.Null);
+            document.RootElement.GetProperty("inputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+            document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+
+            var outputData = document.RootElement.GetProperty("outputData");
+            outputData.GetProperty("Message").GetString().Should().Be("缺少输入图像，无法生成保存预览");
+            outputData.GetProperty("_previewWarning").GetString().Should().Be("缺少输入图像，无法生成保存预览");
+            outputData.GetProperty("PreviewBlocked").GetBoolean().Should().BeFalse();
+            payload.Should().NotContain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+            Directory.Exists(outputDir).Should().BeFalse("缺输入图像的 ImageSave 预览也不能创建目录");
+
+            await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldPropagateRequestCancellationToFlowExecution()
     {
         var projectId = Guid.NewGuid();

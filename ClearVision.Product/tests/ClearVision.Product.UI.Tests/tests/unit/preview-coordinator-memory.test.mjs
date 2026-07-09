@@ -976,6 +976,33 @@ test('NodePreviewCoordinator retains accepted observation and reads current arti
   }
 });
 
+test('NodePreviewCoordinator maps side-effect admission rejection to blocked preview state', async () => {
+  const sideEffectError = new Error('node preview blocked side-effect operator');
+  sideEffectError.status = 400;
+  sideEffectError.payload = {
+    code: 'ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED',
+    error: '节点预览已安全拦截副作用算子“TcpCommunication”：预览不会执行外部动作，正式运行流程时才会执行。'
+  };
+
+  const { coordinator, node } = createCoordinator({
+    previewExecutor: async () => {
+      throw sideEffectError;
+    }
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    coordinator.invalidateActivePreview({ immediate: true, force: true });
+
+    await waitFor(() => assert.equal(coordinator.getState().status, 'blocked'));
+    assert.match(coordinator.getState().errorMessage, /节点预览已安全拦截副作用算子/);
+    assert.doesNotMatch(coordinator.getState().errorMessage, /blocked side-effect/);
+    assert.equal(coordinator.getState().outputImageBase64, null);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
 test('NodePreviewCoordinator maps expired artifact reads without polluting preview state', async () => {
   const artifactClient = {
     async getPreviewArtifactBlob() {

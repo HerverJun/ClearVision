@@ -19,6 +19,7 @@ const PREVIEW_OUTPUT_STRING_LIMIT = 512;
 const PREVIEW_OUTPUT_MAX_DEPTH = 3;
 const PREVIEW_OUTPUT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 const MISSING_PROJECT_PREVIEW_MESSAGE = '请先新建/保存/打开工程后再预览';
+const SIDE_EFFECT_BLOCKED_PREVIEW_MESSAGE = '预览已安全拦截副作用算子：该算子可能执行外部 I/O 或持久化动作。正式运行流程时才会执行外部动作。';
 const HIGH_COST_OPERATOR_TYPE_HINTS = [
     'DeepLearning',
     'OnnxInference',
@@ -439,6 +440,8 @@ function createPresenterState(state) {
         statusText = typeof state.executionTimeMs === 'number'
             ? `预览完成 (${state.executionTimeMs} ms)`
             : '预览完成';
+    } else if (state.status === 'blocked') {
+        statusText = state.errorMessage || '预览已安全拦截';
     } else if (state.status === 'canceled') {
         statusText = '预览已取消';
     } else if (state.status === 'auth-error') {
@@ -461,8 +464,38 @@ function createPresenterState(state) {
         canOpenImage: Boolean(state.outputImageBase64),
         isLoading: state.status === 'loading',
         hasError: state.status === 'error',
+        isBlocked: state.status === 'blocked',
         errorMessage: state.errorMessage
     };
+}
+
+function isSideEffectAdmissionBlockedError(error) {
+    const payload = error?.payload || null;
+    const code = String(payload?.code || payload?.Code || '').trim();
+    if (/SIDE_EFFECT_BLOCKED/i.test(code)) {
+        return true;
+    }
+
+    const message = String(error?.message || payload?.error || payload?.Error || '').trim();
+    return /side-effect|副作用|外部 I\/O|持久化/.test(message) && /blocked|拦截|阻断/.test(message);
+}
+
+function normalizeSideEffectBlockedMessage(error) {
+    const payload = error?.payload || null;
+    const candidate = String(
+        payload?.error ||
+        payload?.Error ||
+        payload?.message ||
+        payload?.Message ||
+        error?.message ||
+        ''
+    ).trim();
+
+    if (candidate && !/blocked side-effect|external I\/O|persistent side effects/i.test(candidate)) {
+        return candidate;
+    }
+
+    return SIDE_EFFECT_BLOCKED_PREVIEW_MESSAGE;
 }
 
 function getParameterValue(parameters, ...names) {
@@ -1577,12 +1610,15 @@ export class NodePreviewCoordinator {
                     return;
                 }
 
+                const sideEffectBlocked = !timedOut && isSideEffectAdmissionBlockedError(error);
                 this.replacePreviewState(withClearedPreviewResources({
-                    status: 'error',
+                    status: sideEffectBlocked ? 'blocked' : 'error',
                     executionTimeMs: null,
                     errorMessage: timedOut
                         ? `预览超时（${Math.round(effectiveTimeoutMs / 1000)} 秒），已取消本次请求。`
-                        : (error?.message || '预览请求失败'),
+                        : (sideEffectBlocked
+                            ? normalizeSideEffectBlockedMessage(error)
+                            : (error?.message || '预览请求失败')),
                     request,
                     inputImageBase64: inputImageBase64 || null,
                     outputImageBase64: null,

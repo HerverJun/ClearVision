@@ -851,6 +851,11 @@
     color: #b45309;
 }
 
+.preview-capability-empty.warning,
+.preview-capability-empty.blocked {
+    color: #b45309;
+}
+
 .preview-capability-empty.stale {
     color: #b45309;
 }
