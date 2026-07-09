@@ -42,8 +42,11 @@ public static class PreviewNodeEndpoints
     private const string ImageSaveSafePreviewMode = "ImageSaveDryRun";
     private const string ImageSaveSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存图像。";
     private const string ImageSaveMissingInputMessage = "缺少输入图像，无法生成保存预览";
+    private const string ImageSaveUpstreamMissingMessage = "预览模式未写入磁盘；但上游未产出图像，请先检查上游节点。";
     private const string TextSaveSafePreviewMode = "TextSaveDryRun";
     private const string TextSaveSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存文本。";
+    private const string TextSaveMissingInputMessage = "缺少输入文本，无法生成文本保存预览";
+    private const string TextSaveMissingContentSummary = "缺少输入文本";
     private const string ResultOutputSafePreviewMode = "ResultOutputDryRun";
     private const string ResultOutputSafePreviewMessage = "预览模式不会写入磁盘；点击运行流程后才会保存结果文件。";
 
@@ -706,11 +709,12 @@ public static class PreviewNodeEndpoints
 
         var sourceDebugResult = result.DebugOperatorResults.FirstOrDefault(item => item.OperatorId == plan.SourceOperator.Id);
         var inputImageBytes = ResolveImageSavePreviewInputImageBytes(plan, sourceOutput, sourceDebugResult);
-        var upstreamMessage = !result.IsSuccess && !string.IsNullOrWhiteSpace(result.ErrorMessage)
+        var upstreamFailed = !result.IsSuccess;
+        var upstreamMessage = upstreamFailed && !string.IsNullOrWhiteSpace(result.ErrorMessage)
             ? result.ErrorMessage
             : null;
-        var message = inputImageBytes == null
-            ? ImageSaveMissingInputMessage
+        var message = upstreamFailed || inputImageBytes == null
+            ? ImageSaveUpstreamMissingMessage
             : ImageSaveSafePreviewMessage;
 
         return Results.Ok(BuildImageSaveSafePreviewResponse(
@@ -1115,8 +1119,11 @@ public static class PreviewNodeEndpoints
         var appendMode = GetOperatorBoolParameter(targetOperator, "AppendMode", true);
         var encoding = GetOperatorStringParameter(targetOperator, "Encoding", "UTF8");
         var estimatedFilePath = BuildTextSaveEstimatedFilePath(filePathTemplate);
+        var hasText = fieldSummary.HasText;
+        var message = hasText ? TextSaveSafePreviewMessage : TextSaveMissingInputMessage;
+        var contentSummary = hasText ? fieldSummary.ContentSummary : TextSaveMissingContentSummary;
 
-        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        var outputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
             ["FilePathTemplate"] = filePathTemplate,
             ["TargetPath"] = estimatedFilePath,
@@ -1125,7 +1132,7 @@ public static class PreviewNodeEndpoints
             ["AppendMode"] = appendMode,
             ["WriteMode"] = appendMode ? "追加" : "覆盖",
             ["Encoding"] = encoding,
-            ["ContentSummary"] = fieldSummary.ContentSummary,
+            ["ContentSummary"] = contentSummary,
             ["Fields"] = fieldSummary.Fields,
             ["FieldCount"] = fieldSummary.FieldCount,
             ["DryRun"] = true,
@@ -1133,8 +1140,16 @@ public static class PreviewNodeEndpoints
             ["PreviewMode"] = TextSaveSafePreviewMode,
             ["PreviewKind"] = "TextSaveSafePreview",
             ["PreviewSafe"] = true,
-            ["Message"] = TextSaveSafePreviewMessage
+            ["Message"] = message
         };
+
+        // 缺少可用文本输入时，明确告知无法生成文本保存预览。
+        if (!hasText)
+        {
+            outputData["_previewWarning"] = TextSaveMissingInputMessage;
+        }
+
+        return outputData;
     }
 
     private static Dictionary<string, object> BuildResultOutputDryRunOutputData(
@@ -1173,11 +1188,13 @@ public static class PreviewNodeEndpoints
             .ToList();
 
         string contentSummary;
+        var hasText = false;
         if (TryReadDictionaryValue(sanitizedInputs, "Text", out var textValue) &&
             textValue != null &&
             !string.IsNullOrWhiteSpace(textValue.ToString()))
         {
             contentSummary = ClipPreviewSummaryText(textValue.ToString()!);
+            hasText = true;
         }
         else if (fields.Count > 0)
         {
@@ -1188,7 +1205,7 @@ public static class PreviewNodeEndpoints
             contentSummary = "未检测到上游结构化输入";
         }
 
-        return new PreviewFieldSummary(fields, fields.Count, contentSummary);
+        return new PreviewFieldSummary(fields, fields.Count, contentSummary, hasText);
     }
 
     private static string ClipPreviewSummaryText(string text)
@@ -1320,7 +1337,7 @@ public static class PreviewNodeEndpoints
         result.IsSuccess = true;
         result.ErrorMessage = null;
 
-        var outputData = BuildImageSavePreviewOutputData(previewInfo, rawInputImageBytes != null, message, upstreamMessage);
+        var outputData = BuildImageSavePreviewOutputData(previewInfo, message, upstreamMessage);
         var outputDataForObservation = outputData;
         var sanitizedOutputData = new Dictionary<string, object>(outputData, StringComparer.OrdinalIgnoreCase);
         byte[]? outputImageBytes = rawInputImageBytes;
@@ -1406,7 +1423,6 @@ public static class PreviewNodeEndpoints
 
     private static Dictionary<string, object> BuildImageSavePreviewOutputData(
         ImageSavePreviewInfo previewInfo,
-        bool hasInputImage,
         string message,
         string? upstreamMessage)
     {
@@ -1427,9 +1443,10 @@ public static class PreviewNodeEndpoints
             ["PreviewSafe"] = true
         };
 
-        if (!hasInputImage)
+        // 只有正常“可写入”提示不算告警；缺图/上游失败时把同一句写入 _previewWarning。
+        if (!string.Equals(message, ImageSaveSafePreviewMessage, StringComparison.Ordinal))
         {
-            outputData["_previewWarning"] = ImageSaveMissingInputMessage;
+            outputData["_previewWarning"] = message;
         }
 
         if (!string.IsNullOrWhiteSpace(upstreamMessage))
@@ -1690,7 +1707,8 @@ public static class PreviewNodeEndpoints
     private sealed record PreviewFieldSummary(
         List<string> Fields,
         int FieldCount,
-        string ContentSummary);
+        string ContentSummary,
+        bool HasText);
 
     private sealed record ResultOutputEstimatedFile(
         string Directory,

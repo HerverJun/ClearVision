@@ -1465,6 +1465,98 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithImageSaveTargetAndUpstreamFailure_ShouldReturnUpstreamMissingImagePreviewMessage()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var outputDir = Path.Combine(Path.GetTempPath(), $"ClearVision-ImageSavePreviewUpstreamFail-{Guid.NewGuid():N}");
+        var sourceOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var imageSaveInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+
+        try
+        {
+            await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(callInfo => Task.FromResult(new FlowDebugExecutionResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "上游阈值算子执行失败",
+                        DebugSessionId = debugSessionId,
+                        ExecutionTimeMs = 4,
+                        IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>(),
+                        DebugOperatorResults = new List<OperatorDebugResult>
+                        {
+                            new()
+                            {
+                                OperatorId = sourceNodeId,
+                                OperatorName = "EdgePreparation",
+                                IsSuccess = false,
+                                ExecutionOrder = 0,
+                                ExecutionTimeMs = 4
+                            }
+                        }
+                    }));
+            });
+
+            Directory.Exists(outputDir).Should().BeFalse();
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = projectId,
+                TargetNodeId = targetNodeId,
+                DebugSessionId = debugSessionId,
+                FlowData = CreateUpdateFlowRequest(
+                    CreateOperatorDto(
+                        sourceNodeId,
+                        "EdgePreparation",
+                        OperatorType.Thresholding,
+                        outputPorts: [sourceOutputPort]),
+                    CreateOperatorDto(
+                        targetNodeId,
+                        "ImageSave",
+                        OperatorType.ImageSave,
+                        inputPorts: [imageSaveInputPort],
+                        parameters: new Dictionary<string, object>
+                        {
+                            ["Directory"] = outputDir,
+                            ["FileNameTemplate"] = "edge_{timestamp}.png",
+                            ["Quality"] = 90
+                        }),
+                    CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, imageSaveInputPort.Id))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+
+            var outputData = document.RootElement.GetProperty("outputData");
+            outputData.GetProperty("Message").GetString().Should().Be("预览模式未写入磁盘；但上游未产出图像，请先检查上游节点。");
+            outputData.GetProperty("_previewWarning").GetString().Should().Be("预览模式未写入磁盘；但上游未产出图像，请先检查上游节点。");
+            outputData.GetProperty("UpstreamPreviewMessage").GetString().Should().Be("上游阈值算子执行失败");
+            outputData.GetProperty("PreviewMode").GetString().Should().Be("ImageSaveDryRun");
+            outputData.GetProperty("PreviewSafe").GetBoolean().Should().BeTrue();
+            outputData.GetProperty("WillWriteToDisk").GetBoolean().Should().BeFalse();
+
+            Directory.Exists(outputDir).Should().BeFalse("上游失败的 ImageSave 预览不能创建目录或写盘");
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PreviewNode_WithTextSaveTarget_ShouldDryRunWithoutWritingFile()
     {
         var projectId = Guid.NewGuid();
@@ -1572,6 +1664,104 @@ public class PreviewNodeEndpointsTests
             capturedOptions!.BreakAtOperatorId.Should().BeNull();
             capturedFlow.Should().NotBeNull();
             capturedFlow!.Operators.Select(op => op.Type).Should().NotContain(OperatorType.TextSave);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithTextSaveTargetAndNoInputText_ShouldReturnMissingTextPreviewMessage()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var outputDir = Path.Combine(Path.GetTempPath(), $"ClearVision-TextSavePreviewNoText-{Guid.NewGuid():N}");
+        var outputPath = Path.Combine(outputDir, "preview.txt");
+        var sourceOutputPort = CreatePort("Text", PortDataType.String, PortDirection.Output);
+        var textSaveInputPort = CreatePort("Text", PortDataType.String, PortDirection.Input);
+
+        try
+        {
+            await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(_ => Task.FromResult(new FlowDebugExecutionResult
+                    {
+                        IsSuccess = true,
+                        DebugSessionId = debugSessionId,
+                        ExecutionTimeMs = 6,
+                        IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                        {
+                            [sourceNodeId] = new()
+                        },
+                        DebugOperatorResults = new List<OperatorDebugResult>
+                        {
+                            new()
+                            {
+                                OperatorId = sourceNodeId,
+                                OperatorName = "StringFormat",
+                                IsSuccess = true,
+                                ExecutionOrder = 0,
+                                ExecutionTimeMs = 6,
+                                OutputSnapshot = new Dictionary<string, object>()
+                            }
+                        }
+                    }));
+            });
+
+            Directory.Exists(outputDir).Should().BeFalse();
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = projectId,
+                TargetNodeId = targetNodeId,
+                DebugSessionId = debugSessionId,
+                FlowData = CreateUpdateFlowRequest(
+                    CreateOperatorDto(
+                        sourceNodeId,
+                        "StringFormat",
+                        OperatorType.StringFormat,
+                        outputPorts: [sourceOutputPort]),
+                    CreateOperatorDto(
+                        targetNodeId,
+                        "TextSave",
+                        OperatorType.TextSave,
+                        inputPorts: [textSaveInputPort],
+                        parameters: new Dictionary<string, object>
+                        {
+                            ["FilePath"] = outputPath,
+                            ["Format"] = "Text",
+                            ["AppendMode"] = false,
+                            ["Encoding"] = "UTF8"
+                        }),
+                    CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, textSaveInputPort.Id))
+            });
+
+            var payload = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+
+            var outputData = document.RootElement.GetProperty("outputData");
+            outputData.GetProperty("PreviewMode").GetString().Should().Be("TextSaveDryRun");
+            outputData.GetProperty("WillWriteToDisk").GetBoolean().Should().BeFalse();
+            outputData.GetProperty("PreviewSafe").GetBoolean().Should().BeTrue();
+            outputData.GetProperty("Message").GetString().Should().Be("缺少输入文本，无法生成文本保存预览");
+            outputData.GetProperty("_previewWarning").GetString().Should().Be("缺少输入文本，无法生成文本保存预览");
+            outputData.GetProperty("ContentSummary").GetString().Should().Be("缺少输入文本");
+
+            Directory.Exists(outputDir).Should().BeFalse("缺输入文本的 TextSave 预览不能创建目录");
+            File.Exists(outputPath).Should().BeFalse("缺输入文本的 TextSave 预览不能写入文件");
         }
         finally
         {
