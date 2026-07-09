@@ -1547,6 +1547,13 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
 
+        public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+            string sessionId,
+            string runId,
+            string kind,
+            string? clientMutationId = null) =>
+            _inner.TryBeginAgentRun(sessionId, runId, kind, clientMutationId);
+
         public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
         {
             if (_throw)
@@ -1622,6 +1629,13 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             string sessionId,
             VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+            string sessionId,
+            string runId,
+            string kind,
+            string? clientMutationId = null) =>
+            _inner.TryBeginAgentRun(sessionId, runId, kind, clientMutationId);
 
         public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
         {

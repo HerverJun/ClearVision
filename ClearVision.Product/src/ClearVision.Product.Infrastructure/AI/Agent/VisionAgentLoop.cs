@@ -321,12 +321,9 @@ public sealed class VisionAgentLoop
                 cancellationToken);
 
             messages.Add(new VisionAgentLoopMessage("assistant", completion));
-            messages.Add(new VisionAgentLoopMessage("user", JsonSerializer.Serialize(new
-            {
-                kind = "tool_result",
-                round = round + 1,
-                toolResults = roundResults
-            }, JsonOptions)));
+            messages.Add(new VisionAgentLoopMessage(
+                "user",
+                VisionAgentContentSafety.ToolResultMessageJson(round + 1, roundResults)));
             AppendLoopEvent(
                 request.EmitPublicEvents,
                 request.ToolContext.AgentRunId,

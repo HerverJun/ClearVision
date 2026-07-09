@@ -329,6 +329,7 @@ public static class AgentRunEndpoints
             ownerHash);
         VisionAgentWorkspaceSnapshot? workspaceSnapshot = null;
         var persistenceStatus = conversationService.GetLastPersistenceStatus();
+        var buildAssociationPrepared = false;
         if (request.BuildFromPlan != null)
         {
             var associationResult = buildRunService.PrepareBuildAssociation(
@@ -382,13 +383,71 @@ public static class AgentRunEndpoints
                     persistenceStatus
                 }, statusCode: statusCode));
             }
+
+            buildAssociationPrepared = true;
+        }
+        else
+        {
+            var beginResult = conversationService.TryBeginAgentRun(
+                sessionId,
+                createResult.RunId,
+                VisionAgentRunKindResolver.Build,
+                $"agent-run-begin:{createResult.RunId}");
+            workspaceSnapshot = beginResult.Snapshot;
+            persistenceStatus = beginResult.PersistenceStatus;
+            if (!beginResult.Success)
+            {
+                var failureCode = beginResult.Conflict
+                    ? beginResult.ErrorCode
+                    : "session_persistence_failed";
+                var statusCode = beginResult.Conflict
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status503ServiceUnavailable;
+                var publicMessage = string.IsNullOrWhiteSpace(beginResult.PublicMessage)
+                    ? "The same conversation already has an Agent run in progress."
+                    : beginResult.PublicMessage;
+                streamService.Fail(
+                    createResult.RunId,
+                    publicMessage,
+                    "Wait for the current Agent run to finish, then retry this request.",
+                    new
+                    {
+                        runKind = VisionAgentRunKindResolver.Build,
+                        projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Skip,
+                        associationCommitted = false,
+                        associationWorkspaceRevision = (long?)null,
+                        status = AiFlowGenerationResult.CompletionStatusFailed,
+                        sessionId,
+                        failureCode,
+                        publicMessage,
+                        workspaceSnapshot,
+                        persistenceStatus,
+                        metadataOnly = true
+                    });
+
+                var failedReplay = streamService.Replay(createResult.RunId);
+                return Task.FromResult<IResult>(Results.Json(new
+                {
+                    errorCode = failureCode,
+                    publicMessage,
+                    runId = createResult.RunId,
+                    sessionId,
+                    brief = createResult.Brief,
+                    events = failedReplay?.Events ?? createResult.Events,
+                    workspaceSnapshot,
+                    persistenceStatus,
+                    metadataOnly = true
+                }, statusCode: statusCode));
+            }
+
+            buildAssociationPrepared = true;
         }
         _ = Task.Run(async () =>
         {
             await RunGenerateFlowAsync(
                 createResult.RunId,
                 request,
-                request.BuildFromPlan != null,
+                buildAssociationPrepared,
                 scopeFactory,
                 loggerFactory.CreateLogger("AgentRunGenerateFlow"));
         });

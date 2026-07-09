@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -232,6 +233,11 @@ public interface IConversationalFlowService
     VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
         string sessionId,
         VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+        string sessionId,
+        string runId,
+        string kind,
+        string? clientMutationId = null);
     VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request);
     ConversationPersistenceStatus GetLastPersistenceStatus();
     bool DeleteSession(string sessionId);
@@ -665,6 +671,114 @@ public class ConversationalFlowService : IConversationalFlowService
             .ToWorkspaceMutationResult();
     }
 
+    public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+        string sessionId,
+        string runId,
+        string kind,
+        string? clientMutationId = null)
+    {
+        var normalizedSessionId = NormalizeSessionId(sessionId);
+        var normalizedRunId = runId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedRunId))
+        {
+            return new VisionAgentWorkspaceSnapshotMutationResult
+            {
+                Success = false,
+                ErrorCode = "agent_run_invalid_request",
+                PublicMessage = "Agent run id is required.",
+                PersistenceStatus = ClonePersistenceStatus(_lastPersistenceStatus)
+            };
+        }
+
+        var normalizedKind = string.IsNullOrWhiteSpace(kind)
+            ? "agent_run"
+            : kind.Trim();
+        var normalizedMutationId = string.IsNullOrWhiteSpace(clientMutationId)
+            ? $"agent-run-begin:{normalizedRunId}"
+            : clientMutationId.Trim();
+        var payloadFingerprint = ComputeJsonFingerprint(new
+        {
+            SessionId = normalizedSessionId,
+            RunId = normalizedRunId,
+            Kind = normalizedKind
+        });
+
+        lock (_persistLock)
+        {
+            var current = GetCurrentSessionSnapshot(normalizedSessionId);
+            NormalizeSession(current);
+
+            var receipt = current.MutationReceipts.FirstOrDefault(item =>
+                string.Equals(item.MutationId, normalizedMutationId, StringComparison.OrdinalIgnoreCase));
+            if (receipt != null)
+            {
+                if (!string.Equals(receipt.PayloadFingerprint, payloadFingerprint, StringComparison.Ordinal))
+                {
+                    return SessionMutationCommitResult.Conflicted(
+                            "workspace_mutation_id_conflict",
+                            "This agent run begin request conflicts with an already processed mutation id.",
+                            current.WorkspaceSnapshot,
+                            _lastPersistenceStatus)
+                        .ToWorkspaceMutationResult();
+                }
+
+                return SessionMutationCommitResult.Succeeded(
+                        current,
+                        current.WorkspaceSnapshot,
+                        _lastPersistenceStatus,
+                        idempotentReplay: true)
+                    .ToWorkspaceMutationResult();
+            }
+
+            if (IsSameAgentRunInProgress(current.WorkspaceSnapshot, normalizedRunId))
+            {
+                return SessionMutationCommitResult.Succeeded(
+                        current,
+                        current.WorkspaceSnapshot,
+                        _lastPersistenceStatus,
+                        idempotentReplay: true)
+                    .ToWorkspaceMutationResult();
+            }
+
+            if (HasRunningAgentRun(current.WorkspaceSnapshot))
+            {
+                return SessionMutationCommitResult.Conflicted(
+                        "agent_run_already_running",
+                        "The same conversation already has an Agent run in progress.",
+                        current.WorkspaceSnapshot,
+                        _lastPersistenceStatus)
+                    .ToWorkspaceMutationResult();
+            }
+
+            var candidate = CloneSession(current);
+            ApplyWorkspaceUpdateLocked(candidate, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "building",
+                BuildRunId = normalizedRunId,
+                BuildRunStatus = AgentRunEventStatuses.Running
+            });
+            NormalizeSession(candidate);
+            AddMutationReceipt(candidate, normalizedMutationId, payloadFingerprint);
+
+            var persistence = PersistSessionsSnapshotUnderLock(BuildPersistedSnapshotWithCandidate(candidate));
+            if (!persistence.PrimaryStoreSaved)
+            {
+                return SessionMutationCommitResult.Failed(
+                        current.WorkspaceSnapshot,
+                        persistence)
+                    .ToWorkspaceMutationResult();
+            }
+
+            _sessions[normalizedSessionId] = candidate;
+            return SessionMutationCommitResult.Succeeded(
+                    candidate,
+                    candidate.WorkspaceSnapshot,
+                    persistence,
+                    idempotentReplay: false)
+                .ToWorkspaceMutationResult();
+        }
+    }
+
     public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -900,6 +1014,42 @@ public class ConversationalFlowService : IConversationalFlowService
         string.IsNullOrWhiteSpace(sessionId)
             ? Guid.NewGuid().ToString("N")
             : sessionId.Trim();
+
+    private static bool HasRunningAgentRun(VisionAgentWorkspaceSnapshot? snapshot)
+    {
+        if (snapshot == null)
+        {
+            return false;
+        }
+
+        if (IsActiveRunStatus(snapshot.PlanRunStatus) || IsActiveRunStatus(snapshot.BuildRunStatus))
+        {
+            return true;
+        }
+
+        return IsActiveLifecycleState(snapshot.LifecycleState);
+    }
+
+    private static bool IsSameAgentRunInProgress(VisionAgentWorkspaceSnapshot? snapshot, string runId)
+    {
+        return snapshot != null &&
+               !string.IsNullOrWhiteSpace(runId) &&
+               string.Equals(snapshot.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+               (IsActiveRunStatus(snapshot.BuildRunStatus) ||
+                IsActiveLifecycleState(snapshot.LifecycleState));
+    }
+
+    private static bool IsActiveRunStatus(string? status)
+    {
+        return string.Equals(status, AgentRunEventStatuses.Running, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(status, AgentRunEventStatuses.Pending, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsActiveLifecycleState(string? lifecycleState)
+    {
+        return string.Equals(lifecycleState, "planning", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(lifecycleState, "building", StringComparison.OrdinalIgnoreCase);
+    }
 
     private ConversationSession GetCurrentSessionSnapshot(string sessionId)
     {

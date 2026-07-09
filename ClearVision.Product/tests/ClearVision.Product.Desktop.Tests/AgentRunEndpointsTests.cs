@@ -1221,6 +1221,61 @@ public sealed class AgentRunEndpointsTests
         await host.WaitForTerminalAsync(runId);
     }
 
+    [Fact(DisplayName = "POST AgentRun ad-hoc should reject same-session running build before background start")]
+    public async Task CreateRun_AdHocSameSessionRunning_ShouldReturnConflictAndNotStartSecondBuild()
+    {
+        var firstBuildEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstBuild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            firstBuildEntered.TrySetResult();
+            await releaseFirstBuild.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        });
+        var sessionId = "session-adhoc-running-conflict";
+
+        using var firstResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Detect scratches first",
+            SessionId = sessionId,
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = null
+        });
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var firstDocument = JsonDocument.Parse(await firstResponse.Content.ReadAsStringAsync());
+        var firstRunId = firstDocument.RootElement.GetProperty("runId").GetString()!;
+        firstDocument.RootElement.GetProperty("workspaceSnapshot").GetProperty("buildRunStatus").GetString()
+            .Should().Be(AgentRunEventStatuses.Running);
+        await firstBuildEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        using var secondResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Detect scratches second",
+            SessionId = sessionId,
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = null
+        });
+
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var secondDocument = JsonDocument.Parse(await secondResponse.Content.ReadAsStringAsync());
+        var root = secondDocument.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("agent_run_already_running");
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        root.GetProperty("workspaceSnapshot").GetProperty("buildRunId").GetString().Should().Be(firstRunId);
+        root.GetProperty("workspaceSnapshot").GetProperty("buildRunStatus").GetString()
+            .Should().Be(AgentRunEventStatuses.Running);
+        var secondRunId = root.GetProperty("runId").GetString()!;
+        host.StreamService.Replay(secondRunId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        host.Generation.BuildCallCount.Should().Be(1);
+
+        releaseFirstBuild.SetResult();
+        await host.WaitForTerminalAsync(firstRunId);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.BuildRunStatus
+            .Should().Be(AgentRunEventStatuses.Completed);
+    }
+
     [Fact(DisplayName = "POST AgentRun BuildFromPlan with old blocked Plan and confirmed answers completes through orchestrator")]
     public async Task CreateRun_BuildFromPlanWithOldBlockedPlanAndConfirmedAnswers_ShouldCompleteThroughOrchestrator()
     {
@@ -2630,6 +2685,8 @@ public sealed class AgentRunEndpointsTests
 
         public BuildCommand? LastCommand { get; private set; }
 
+        public int BuildCallCount { get; private set; }
+
         public CancellationToken LastCancellationToken { get; private set; }
 
         public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -2649,6 +2706,7 @@ public sealed class AgentRunEndpointsTests
             BuildCommand command,
             CancellationToken cancellationToken)
         {
+            BuildCallCount++;
             LastCommand = command;
             LastRequest = command.Request;
             LastCancellationToken = cancellationToken;
