@@ -240,7 +240,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         {
             return CreateViolation(
                 @operator,
-                $"{@operator.Type} 可能执行外部 I/O 或持久化动作。");
+                $"{@operator.Type} 可能访问外部设备、网络服务或执行文件系统写入。");
         }
 
         if (@operator.Type == OperatorType.ResultOutput &&
@@ -306,7 +306,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             _ => "内联执行"
         };
 
-        return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会执行外部动作，正式运行流程时才会执行。";
+        return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会访问外部设备、网络服务或执行文件系统写入，正式运行流程时才会执行。";
     }
 
     private static bool TryReadBoolParameter(Operator @operator, string name, out bool value)

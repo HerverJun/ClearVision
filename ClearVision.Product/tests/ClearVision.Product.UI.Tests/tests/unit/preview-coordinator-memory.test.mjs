@@ -413,6 +413,18 @@ test('getOperatorPreviewCostPolicy treats ImageAcquisition file and camera modes
 
   assert.equal(cameraPolicy.autoPreviewAllowed, false);
   assert.equal(cameraPolicy.reason, '相机采集会访问真实设备，自动预览已暂停；请使用手动预览或运行流程。');
+
+  const unconfiguredCameraPolicy = getOperatorPreviewCostPolicy({
+    id: 'unconfigured-camera-acquisition',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: '' }
+    ]
+  });
+
+  assert.equal(unconfiguredCameraPolicy.autoPreviewAllowed, false);
+  assert.equal(unconfiguredCameraPolicy.reason, '相机采集会访问真实设备，自动预览已暂停；请使用手动预览或运行流程。');
 });
 
 test('getOperatorPreviewCostPolicy does not infer high cost from generic ai or feature metadata substrings', () => {

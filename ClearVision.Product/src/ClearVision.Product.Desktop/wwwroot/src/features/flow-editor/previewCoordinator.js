@@ -19,7 +19,7 @@ const PREVIEW_OUTPUT_STRING_LIMIT = 512;
 const PREVIEW_OUTPUT_MAX_DEPTH = 3;
 const PREVIEW_OUTPUT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 const MISSING_PROJECT_PREVIEW_MESSAGE = '请先新建/保存/打开工程后再预览';
-const SIDE_EFFECT_BLOCKED_PREVIEW_MESSAGE = '预览已安全拦截副作用算子：该算子可能执行外部 I/O 或持久化动作。正式运行流程时才会执行外部动作。';
+const SIDE_EFFECT_BLOCKED_PREVIEW_MESSAGE = '预览已安全拦截副作用算子：该算子可能访问外部设备、网络服务或执行文件系统写入。正式运行流程时才会执行这些动作。';
 const HIGH_COST_OPERATOR_TYPES = new Set([
     'DeepLearning',
     'OnnxInference',
@@ -391,7 +391,7 @@ export function getOperatorPreviewCostPolicy(node, metadata = null) {
         };
     }
 
-    if (isLiveCameraAcquisitionNode(node)) {
+    if (isCameraAcquisitionSourceNode(node)) {
         return {
             level: 'high',
             autoPreviewAllowed: false,
@@ -570,13 +570,17 @@ function getCameraAcquisitionBindingValue(node) {
     return cameraId || cameraBindingId;
 }
 
-function isLiveCameraAcquisitionNode(node) {
+function isCameraAcquisitionSourceNode(node) {
     if (node?.type !== 'ImageAcquisition') {
         return false;
     }
 
     const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
-    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera' &&
+    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera';
+}
+
+function isLiveCameraAcquisitionNode(node) {
+    return isCameraAcquisitionSourceNode(node) &&
         Boolean(getCameraAcquisitionBindingValue(node));
 }
 
@@ -1407,10 +1411,11 @@ export class NodePreviewCoordinator {
             const metadata = this.getOperatorMetadata(activeNode.type);
             const previewCost = getOperatorPreviewCostPolicy(activeNode, metadata);
             if (trigger === 'auto' && !previewCost.autoPreviewAllowed) {
+                const prerequisiteError = validatePreviewPrerequisites(activeNode, null);
                 this.replacePreviewState(withClearedPreviewResources({
                     status: 'idle',
                     executionTimeMs: null,
-                    errorMessage: previewCost.reason,
+                    errorMessage: prerequisiteError || previewCost.reason,
                     inputImageBase64: null,
                     outputImageBase64: null,
                     outputData: null,

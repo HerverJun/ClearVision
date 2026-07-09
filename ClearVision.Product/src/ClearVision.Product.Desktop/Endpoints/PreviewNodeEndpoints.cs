@@ -145,10 +145,12 @@ public static class PreviewNodeEndpoints
                 // 从数据库加载流程，或直接使用前端传来的流程数据
                 ClearVision.Product.Core.Entities.OperatorFlow? flow;
 
-                if (request.FlowData?.Operators?.Count > 0)
+                var hasInlineFlowData = false;
+                if (request.FlowData is { Operators.Count: > 0 } inlineFlowData)
                 {
                     // 使用前端传来的流程数据
-                    flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId, "PreviewFlow");
+                    hasInlineFlowData = true;
+                    flow = FlowEntityMapper.ToPreviewEntity(inlineFlowData, request.TargetNodeId, "PreviewFlow");
                 }
                 else
                 {
@@ -221,6 +223,11 @@ public static class PreviewNodeEndpoints
                         fileOutputPreviewCancellation.Token,
                         logger,
                         ReleaseProjectAccessAsync);
+                }
+
+                if (!hasInlineFlowData && targetOperator != null)
+                {
+                    flow = BuildTargetPreviewFlow(flow, targetOperator.Id, $"{flow.Name}-NodePreview");
                 }
 
                 // 构建调试选项
@@ -874,6 +881,28 @@ public static class PreviewNodeEndpoints
         }
 
         return dryRunFlow;
+    }
+
+    private static ClearVision.Product.Core.Entities.OperatorFlow BuildTargetPreviewFlow(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        Guid targetOperatorId,
+        string flowName)
+    {
+        var relevantIds = CollectRelevantOperatorIds(flow, targetOperatorId);
+        var previewFlow = new ClearVision.Product.Core.Entities.OperatorFlow(flowName);
+        foreach (var op in flow.Operators.Where(op => relevantIds.Contains(op.Id)))
+        {
+            previewFlow.AddOperator(op);
+        }
+
+        foreach (var connection in flow.Connections.Where(connection =>
+                     relevantIds.Contains(connection.SourceOperatorId) &&
+                     relevantIds.Contains(connection.TargetOperatorId)))
+        {
+            previewFlow.AddConnection(connection);
+        }
+
+        return previewFlow;
     }
 
     private static Dictionary<string, object> BuildTargetInputPreviewData(

@@ -1856,6 +1856,164 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithStoredFlow_ShouldPruneUnrelatedSideEffectBranchBeforeAdmissionAndExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var sourceNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var httpNodeId = Guid.NewGuid();
+        var textSaveNodeId = Guid.NewGuid();
+        var sourceOutputPort = CreatePort("Result", PortDataType.Any, PortDirection.Output);
+        var targetInputPort = CreatePort("Result", PortDataType.Any, PortDirection.Input);
+        var httpOutputPort = CreatePort("Response", PortDataType.String, PortDirection.Output);
+        var textSaveInputPort = CreatePort("Text", PortDataType.String, PortDirection.Input);
+        OperatorFlow? capturedFlow = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            configureFlowExecution: flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(callInfo =>
+                    {
+                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        return Task.FromResult(new FlowDebugExecutionResult
+                        {
+                            IsSuccess = true,
+                            DebugSessionId = Guid.NewGuid(),
+                            ExecutionTimeMs = 6,
+                            IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                            {
+                                [targetNodeId] = new()
+                                {
+                                    ["Output"] = "OK"
+                                }
+                            }
+                        });
+                    });
+            },
+            configureProjectRepository: projectRepository =>
+            {
+                projectRepository.GetWithFlowAsync(projectId).Returns(new Project("preview-stored-flow"));
+            },
+            configureFlowStorage: flowStorage =>
+            {
+                flowStorage.LoadFlowJsonAsync(projectId).Returns(CreateStoredFlowJsonWithConnections(
+                    [
+                        CreateOperatorDto(
+                            sourceNodeId,
+                            "StringFormat",
+                            OperatorType.StringFormat,
+                            outputPorts: [sourceOutputPort]),
+                        CreateOperatorDto(
+                            targetNodeId,
+                            "ResultJudgment",
+                            OperatorType.ResultJudgment,
+                            inputPorts: [targetInputPort]),
+                        CreateOperatorDto(
+                            httpNodeId,
+                            "HttpRequest",
+                            OperatorType.HttpRequest,
+                            outputPorts: [httpOutputPort]),
+                        CreateOperatorDto(
+                            textSaveNodeId,
+                            "TextSave",
+                            OperatorType.TextSave,
+                            inputPorts: [textSaveInputPort],
+                            parameters: new Dictionary<string, object>
+                            {
+                                ["FilePath"] = "unrelated-branch.txt"
+                            })
+                    ],
+                    [
+                        CreateConnection(sourceNodeId, sourceOutputPort.Id, targetNodeId, targetInputPort.Id),
+                        CreateConnection(httpNodeId, httpOutputPort.Id, textSaveNodeId, textSaveInputPort.Id)
+                    ]));
+            });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        capturedFlow.Should().NotBeNull();
+        capturedFlow!.Operators.Select(item => item.Id).Should().BeEquivalentTo(new[] { sourceNodeId, targetNodeId });
+        capturedFlow.Operators.Select(item => item.Type).Should().NotContain(OperatorType.HttpRequest);
+        capturedFlow.Operators.Select(item => item.Type).Should().NotContain(OperatorType.TextSave);
+        capturedFlow.Connections.Should().ContainSingle(connection =>
+            connection.SourceOperatorId == sourceNodeId &&
+            connection.TargetOperatorId == targetNodeId);
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithStoredFlowUpstreamSideEffect_ShouldRejectBeforeDebugExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var httpNodeId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var httpOutputPort = CreatePort("Response", PortDataType.String, PortDirection.Output);
+        var targetInputPort = CreatePort("Result", PortDataType.Any, PortDirection.Input);
+        IFlowExecutionService? flowExecution = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            configureFlowExecution: configuredFlowExecution =>
+            {
+                flowExecution = configuredFlowExecution;
+                configuredFlowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
+            },
+            configureProjectRepository: projectRepository =>
+            {
+                projectRepository.GetWithFlowAsync(projectId).Returns(new Project("preview-stored-side-effect-flow"));
+            },
+            configureFlowStorage: flowStorage =>
+            {
+                flowStorage.LoadFlowJsonAsync(projectId).Returns(CreateStoredFlowJsonWithConnections(
+                    [
+                        CreateOperatorDto(
+                            httpNodeId,
+                            "HttpRequest",
+                            OperatorType.HttpRequest,
+                            outputPorts: [httpOutputPort]),
+                        CreateOperatorDto(
+                            targetNodeId,
+                            "ResultJudgment",
+                            OperatorType.ResultJudgment,
+                            inputPorts: [targetInputPort])
+                    ],
+                    [
+                        CreateConnection(httpNodeId, httpOutputPort.Id, targetNodeId, targetInputPort.Id)
+                    ]));
+            });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("外部设备、网络服务或执行文件系统写入");
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<DebugOptions>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PreviewNode_ReturnsMinimalFeedbackMetrics()
     {
         var projectId = Guid.NewGuid();
@@ -2872,6 +3030,25 @@ public class PreviewNodeEndpointsTests
             Name = "StoredPreviewFlow",
             Operators = operators.ToList(),
             Connections = new List<OperatorConnectionDto>()
+        };
+
+        return JsonSerializer.Serialize(flowDto, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        });
+    }
+
+    private static string CreateStoredFlowJsonWithConnections(
+        IEnumerable<OperatorDto> operators,
+        IEnumerable<OperatorConnectionDto> connections)
+    {
+        var flowDto = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "StoredPreviewFlow",
+            Operators = operators.ToList(),
+            Connections = connections.ToList()
         };
 
         return JsonSerializer.Serialize(flowDto, new JsonSerializerOptions
