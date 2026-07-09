@@ -821,12 +821,14 @@ export class PreviewPanelCapabilityOwner {
 
         if (action === 'image-fit') {
             this.previewImageMode = 'fit';
+            this.resetPixelProbeStatus();
             this.render();
             return;
         }
 
         if (action === 'image-original') {
             this.previewImageMode = 'original';
+            this.resetPixelProbeStatus();
             this.render();
             return;
         }

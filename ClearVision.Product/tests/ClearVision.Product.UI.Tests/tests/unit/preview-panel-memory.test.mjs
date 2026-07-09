@@ -14,6 +14,9 @@ import {
   createPreviewPanelCapabilityAdapter
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs';
 import {
+  PIXEL_PROBE_DEFAULT_MESSAGE
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/imagePixelProbe.mjs';
+import {
   MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
   STALE_PREVIEW_MESSAGE,
   buildOperatorResultViewModel,
@@ -1979,6 +1982,80 @@ test('PreviewPanelCapabilityOwner shows image operations and routes open image t
 
   owner.handleClick(previewActionEvent('open-image', { imageSource }));
   assert.deepEqual(harness.calls.openImages, [imageSource]);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner resets pixel probe status and cache on image mode switches', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const imageSource = 'data:image/png;base64,TEST_IMAGE';
+  let resetCalls = 0;
+  let probeCalls = 0;
+  const image = {};
+  const stage = {
+    querySelector(selector) {
+      return selector === 'img' ? image : null;
+    }
+  };
+  const pointerEvent = {
+    clientX: 24,
+    clientY: 12,
+    target: {
+      closest(selector) {
+        return selector === '.preview-capability-image-stage' ? stage : null;
+      }
+    }
+  };
+
+  harness.emitPreview({
+    ...successState({
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: imageSource
+      }
+    })
+  });
+  owner.pixelProbe = {
+    reset() {
+      resetCalls += 1;
+    },
+    probePoint(point, imageElement) {
+      probeCalls += 1;
+      assert.equal(point.clientX, 24);
+      assert.equal(point.clientY, 12);
+      assert.equal(imageElement, image);
+      return {
+        kind: 'pixel',
+        message: `X: ${probeCalls}  Y: 2  RGB: 1,2,3  Image: 4x5  Zoom: 100%`
+      };
+    }
+  };
+
+  owner.handlePixelProbePointerMove(pointerEvent);
+  assert.equal(owner.pixelProbeStatusKind, 'pixel');
+  assert.match(owner.pixelProbeStatusText, /X: 1  Y: 2/);
+
+  owner.handleClick(previewActionEvent('image-original'));
+  assert.equal(owner.previewImageMode, 'original');
+  assert.equal(resetCalls, 1);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(owner.pixelProbeStatusText, PIXEL_PROBE_DEFAULT_MESSAGE);
+  assert.doesNotMatch(harness.container.innerHTML, /X: 1  Y: 2/);
+
+  owner.handlePixelProbePointerMove(pointerEvent);
+  assert.equal(owner.pixelProbeStatusKind, 'pixel');
+  assert.match(owner.pixelProbeStatusText, /X: 2  Y: 2/);
+
+  owner.handleClick(previewActionEvent('image-fit'));
+  assert.equal(owner.previewImageMode, 'fit');
+  assert.equal(resetCalls, 2);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(owner.pixelProbeStatusText, PIXEL_PROBE_DEFAULT_MESSAGE);
+  assert.doesNotMatch(harness.container.innerHTML, /X: 2  Y: 2/);
 
   owner.dispose();
 });
