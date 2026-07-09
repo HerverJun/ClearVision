@@ -6,6 +6,30 @@ import { bootAuthenticatedApp } from './authHelper';
 const applyEvidenceDir = path.resolve(process.cwd(), 'test-results', 'agent-apply-visible');
 const workbenchEvidenceDir = path.resolve(process.cwd(), 'test-results', 'agent-workbench-default');
 
+async function expectCtaHitTarget(page: Page, selector: string): Promise<void> {
+  const locator = page.locator(selector);
+  await expect(locator).toBeVisible();
+  await expect(locator).toBeEnabled();
+  await locator.scrollIntoViewIfNeeded();
+  const state = await locator.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    const style = window.getComputedStyle(element);
+    return {
+      disabled: (element as HTMLButtonElement).disabled,
+      pointerEvents: style.pointerEvents,
+      hitSelf: hit === element || element.contains(hit),
+      hitTag: hit?.tagName || '',
+      hitText: hit?.textContent || '',
+    };
+  });
+  expect(state.disabled).toBe(false);
+  expect(state.pointerEvents).toBe('auto');
+  expect(state.hitSelf, `${selector} center hit ${state.hitTag}: ${state.hitText}`).toBe(true);
+}
+
 const applyReadyFlow = {
   operators: [
     {
@@ -1648,6 +1672,44 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-agent-workspace-overview')).toContainText('还需补充 2 项信息');
   await page.screenshot({
     path: path.join(workbenchEvidenceDir, 'default-plan-1920x1080-no-raw-semantic.png'),
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-before-cta-clicks.png'),
+    fullPage: true,
+  });
+
+  await expectCtaHitTarget(page, '#ai-plan-focus-confirmation');
+  await page.locator('#ai-plan-focus-confirmation').click();
+  await expect(page.locator('.ai-plan-more-details')).toHaveJSProperty('open', true);
+  await expect(page.locator('#ai-input')).toBeFocused();
+  await expect(page.locator('.ai-plan-cta-feedback', {
+    hasText: '当前没有可展开的关键问题，请在右侧输入框补充信息。',
+  })).toBeVisible();
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-supplement-click.png'),
+    fullPage: true,
+  });
+
+  await expectCtaHitTarget(page, '#ai-plan-use-recommended-defaults');
+  await page.locator('#ai-plan-use-recommended-defaults').click();
+  await expect(page.locator('.ai-plan-cta-feedback', {
+    hasText: '仍需先确认 2 项构建前信息。',
+  })).toBeVisible();
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-recommended-click.png'),
+    fullPage: true,
+  });
+
+  await expectCtaHitTarget(page, '#ai-plan-view-draft');
+  await page.locator('#ai-plan-view-draft').click();
+  await expect(page.locator('.ai-plan-cta-feedback', {
+    hasText: '开始构建后会生成可查看的流程草稿。',
+  })).toBeVisible();
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-view-draft-click.png'),
     fullPage: true,
   });
 

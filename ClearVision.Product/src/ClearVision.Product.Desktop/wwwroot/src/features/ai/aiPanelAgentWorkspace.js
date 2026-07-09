@@ -5308,6 +5308,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <button type="button" class="ai-plan-user-action" id="ai-plan-use-recommended-defaults">使用推荐默认值继续</button>
                     <button type="button" class="ai-plan-user-action" id="ai-plan-view-draft">查看草稿</button>
                 </div>
+                <div class="ai-plan-cta-feedback" id="ai-plan-cta-feedback" role="status" aria-live="polite" hidden></div>
                 <div class="ai-plan-missing-grid">
                     ${missingCards.map(item => `
                         <article class="ai-plan-missing-card ${item.missing ? 'is-missing' : 'is-ready'}">
@@ -5322,6 +5323,94 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
         `;
+    },
+
+    _setPlanCtaFeedback(message, tone = 'info', root = null) {
+        const text = String(message || '').trim();
+        this._setResultStatusNote?.(text, tone);
+        const workspace = root || this.container?.querySelector?.('#ai-plan-workspace') || null;
+        const feedback = workspace?.querySelector?.('#ai-plan-cta-feedback') ||
+            this.container?.querySelector?.('#ai-plan-cta-feedback');
+        if (!feedback || !text) return;
+
+        feedback.hidden = false;
+        feedback.textContent = text;
+        feedback.className = `ai-plan-cta-feedback is-${tone || 'info'}`;
+    },
+
+    _handlePlanSupplementInfoClick(plan = this.pendingVisionPlan, root = null) {
+        const workspace = root || this.container?.querySelector?.('#ai-plan-workspace') || null;
+        const details = workspace?.querySelector?.('.ai-plan-more-details');
+        if (details) {
+            details.open = true;
+        }
+
+        const firstQuestion = workspace?.querySelector?.('.ai-plan-question');
+        if (firstQuestion) {
+            firstQuestion.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+            const focusTarget = firstQuestion.querySelector?.('button, input, textarea, select') || firstQuestion;
+            focusTarget?.focus?.({ preventScroll: true });
+            this._setPlanCtaFeedback('已展开更多方案细节，请补充第一个关键问题。', 'info', workspace);
+            return true;
+        }
+
+        const input = this.container?.querySelector?.('#ai-input');
+        input?.focus?.();
+        const message = plan
+            ? '当前没有可展开的关键问题，请在右侧输入框补充信息。'
+            : '请先输入检测需求，我会先整理规划方案。';
+        this._setPlanCtaFeedback(message, 'info', workspace);
+        return false;
+    },
+
+    async _handlePlanUseRecommendedDefaultsClick(plan = this.pendingVisionPlan) {
+        if (!plan) {
+            this._setPlanCtaFeedback('请先完成规划，再使用推荐默认值继续。', 'warning');
+            return false;
+        }
+
+        const actionState = this._getPlanBuildActionState(plan);
+        if (actionState.canStart === true) {
+            this._setPlanCtaFeedback('当前方案已满足构建条件，正在进入构建。', 'info');
+            return await this._startBuildFromCurrentPlan();
+        }
+
+        const changed = this._acceptRecommendedPlanAnswers?.(plan) === true;
+        const nextActionState = this._getPlanBuildActionState(plan);
+        if (nextActionState.canStart === true) {
+            this._setPlanCtaFeedback('已使用推荐默认值，正在进入构建。', 'info');
+            return await this._startBuildFromCurrentPlan();
+        }
+
+        const missingSummary = nextActionState.missingSummary || this._buildPlanMissingSummary?.(plan);
+        const mustConfirmCount = Math.max(Number(missingSummary?.mustConfirmCount) || 0, 0);
+        let feedbackMessage = '';
+        let feedbackTone = 'info';
+        if (mustConfirmCount > 0) {
+            feedbackMessage = `仍需先确认 ${mustConfirmCount} 项构建前信息。`;
+            feedbackTone = 'warning';
+        } else {
+            feedbackMessage = changed ? '已使用推荐默认值，正在校验构建条件。' : '当前推荐默认值不足以继续，请补充确认信息。';
+            feedbackTone = changed ? 'info' : 'warning';
+        }
+
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(plan);
+        this._renderBuildWorkspaceFromAgentRun?.();
+        this._updatePlanBuildActionState?.();
+        this._setPlanCtaFeedback(feedbackMessage, feedbackTone);
+        return false;
+    },
+
+    _handlePlanViewDraftClick() {
+        if (this._canViewBuildWorkspace?.()) {
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD);
+            this._setPlanCtaFeedback('已切换到构建草稿视图。', 'info');
+            return true;
+        }
+
+        this._setPlanCtaFeedback('开始构建后会生成可查看的流程草稿。', 'info');
+        return false;
     },
 
     _renderPlanWorkspace(plan = this.pendingVisionPlan) {
@@ -5523,23 +5612,12 @@ export const aiPanelAgentWorkspaceMixin = {
             this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'retry' });
             this._renderPlanWorkspace(this.pendingVisionPlan);
         });
-        el.querySelector('#ai-plan-focus-confirmation')?.addEventListener('click', () => {
-            const details = el.querySelector('.ai-plan-more-details');
-            if (details) details.open = true;
-            const firstQuestion = el.querySelector('.ai-plan-question');
-            firstQuestion?.scrollIntoView?.({ block: 'nearest' });
-            this._setResultStatusNote?.('请在确认问题区补充缺失信息。', 'info');
-        });
-        el.querySelector('#ai-plan-use-recommended-defaults')?.addEventListener('click', () => {
-            this._startBuildFromCurrentPlan({ acceptedRecommended: true });
-        });
-        el.querySelector('#ai-plan-view-draft')?.addEventListener('click', () => {
-            if (this._canViewBuildWorkspace?.()) {
-                this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD);
-                return;
-            }
-            this._setResultStatusNote?.('开始构建后会生成可查看的流程草稿。', 'info');
-        });
+        el.querySelector('#ai-plan-focus-confirmation')?.addEventListener('click', () =>
+            this._handlePlanSupplementInfoClick(plan, el));
+        el.querySelector('#ai-plan-use-recommended-defaults')?.addEventListener('click', () =>
+            this._handlePlanUseRecommendedDefaultsClick(plan));
+        el.querySelector('#ai-plan-view-draft')?.addEventListener('click', () =>
+            this._handlePlanViewDraftClick());
         this._renderPlanConfirmationGuidance?.(plan, userSummary);
         this._updatePlanBuildActionState();
     },

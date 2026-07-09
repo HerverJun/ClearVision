@@ -96,11 +96,13 @@ class FakeClassList {
   }
 }
 
-function createFakeElement() {
+function createFakeElement(tagName = 'div') {
   let text = '';
   let html = '';
   let className = '';
+  let id = '';
   const children = [];
+  const listeners = new Map();
   const escapeHtml = value => String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -121,11 +123,72 @@ function createFakeElement() {
     }
     return null;
   };
+  const hasId = (element, selector) => String(element.id || '') === String(selector || '').replace(/^#/, '');
+  const findById = (element, selector) => {
+    for (const child of element.children || []) {
+      if (hasId(child, selector)) {
+        return child;
+      }
+      const nested = findById(child, selector);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  };
+  const matchesSelector = (element, selector) => {
+    const normalized = String(selector || '').trim();
+    if (!normalized) return false;
+    if (normalized.startsWith('#')) return hasId(element, normalized);
+    if (normalized.startsWith('.')) return hasClass(element, normalized);
+    if (/^\[[^\]]+\]$/.test(normalized)) {
+      const attr = normalized.slice(1, -1).split('=')[0].trim();
+      return element.getAttribute?.(attr) !== undefined;
+    }
+    const tagClass = normalized.match(/^([a-z][\w-]*)\.([\w-]+)$/i);
+    if (tagClass) {
+      return String(element.tagName || '').toLowerCase() === tagClass[1].toLowerCase() &&
+        hasClass(element, `.${tagClass[2]}`);
+    }
+    return String(element.tagName || '').toLowerCase() === normalized.toLowerCase();
+  };
+  const parseAttributes = (element, rawAttributes = '') => {
+    for (const attr of String(rawAttributes || '').matchAll(/([:\w-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+      const name = attr[1];
+      const value = attr[2] ?? attr[3] ?? attr[4] ?? '';
+      if (!name || name === String(element.tagName || '').toLowerCase()) continue;
+      element.setAttribute(name, value);
+      if (name === 'id') element.id = value;
+      if (name === 'class') element.className = value;
+      if (name === 'disabled') element.disabled = true;
+      if (name === 'open') element.open = true;
+      if (name === 'hidden') element.hidden = true;
+    }
+  };
+  const emitEvent = (element, type, event = {}) => {
+    const handlers = listeners.get(type) || [];
+    const eventObject = {
+      ...event,
+      type,
+      target: event.target || element,
+      currentTarget: element,
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    return handlers.map(handler => handler.call(element, eventObject));
+  };
 
   const element = {
+    tagName: String(tagName || 'div').toUpperCase(),
     hidden: false,
     disabled: false,
     checked: false,
+    open: false,
+    focused: false,
+    scrollIntoViewCalled: false,
+    lastScrollIntoViewOptions: null,
     value: '',
     get innerHTML() {
       if (!html && !text && children.length > 0) {
@@ -137,9 +200,11 @@ function createFakeElement() {
       html = String(value ?? '');
       text = '';
       children.splice(0, children.length);
-      for (const match of html.matchAll(/class="([^"]+)"/g)) {
-        const child = createFakeElement();
-        child.className = match[1];
+      for (const match of html.matchAll(/<([a-z][\w:-]*)([^>]*)>/gi)) {
+        const rawTag = match[1];
+        if (!rawTag || rawTag.startsWith('/')) continue;
+        const child = createFakeElement(rawTag);
+        parseAttributes(child, match[2]);
         children.push(child);
       }
     },
@@ -152,7 +217,19 @@ function createFakeElement() {
     },
     get outerHTML() {
       const cls = className ? ` class="${escapeHtml(className)}"` : '';
-      return `<div${cls}>${this.innerHTML}</div>`;
+      const idAttr = id ? ` id="${escapeHtml(id)}"` : '';
+      return `<${String(this.tagName || 'div').toLowerCase()}${idAttr}${cls}>${this.innerHTML}</${String(this.tagName || 'div').toLowerCase()}>`;
+    },
+    get id() {
+      return id;
+    },
+    set id(value) {
+      id = String(value ?? '');
+      if (id) {
+        this.attributes.set('id', id);
+      } else {
+        this.attributes.delete('id');
+      }
     },
     get className() {
       return className;
@@ -168,15 +245,65 @@ function createFakeElement() {
     style: {},
     attributes: new Map(),
     setAttribute(name, value) {
-      this.attributes.set(name, String(value));
+      const attrName = String(name || '');
+      const attrValue = String(value ?? '');
+      this.attributes.set(attrName, attrValue);
+      if (attrName === 'id') {
+        id = attrValue;
+      } else if (attrName === 'class') {
+        this.className = attrValue;
+      } else if (attrName === 'disabled') {
+        this.disabled = true;
+      } else if (attrName === 'open') {
+        this.open = true;
+      } else if (attrName === 'hidden') {
+        this.hidden = true;
+      } else if (attrName.startsWith('data-')) {
+        const key = attrName.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+        this.dataset[key] = attrValue;
+      }
     },
     removeAttribute(name) {
-      this.attributes.delete(name);
+      const attrName = String(name || '');
+      this.attributes.delete(attrName);
+      if (attrName === 'id') id = '';
+      if (attrName === 'disabled') this.disabled = false;
+      if (attrName === 'open') this.open = false;
+      if (attrName === 'hidden') this.hidden = false;
     },
     getAttribute(name) {
-      return this.attributes.get(name);
+      return this.attributes.get(String(name || ''));
     },
-    addEventListener() {},
+    addEventListener(type, handler) {
+      const key = String(type || '');
+      if (!key || typeof handler !== 'function') return;
+      const handlers = listeners.get(key) || [];
+      handlers.push(handler);
+      listeners.set(key, handlers);
+    },
+    removeEventListener(type, handler) {
+      const key = String(type || '');
+      const handlers = listeners.get(key) || [];
+      listeners.set(key, handlers.filter(item => item !== handler));
+    },
+    dispatchEvent(event) {
+      const type = String(event?.type || '');
+      if (!type) return true;
+      emitEvent(this, type, event);
+      return event?.defaultPrevented !== true;
+    },
+    click() {
+      const results = emitEvent(this, 'click');
+      const pending = results.filter(result => result && typeof result.then === 'function');
+      return pending.length ? Promise.allSettled(pending) : undefined;
+    },
+    focus() {
+      this.focused = true;
+    },
+    scrollIntoView(options) {
+      this.scrollIntoViewCalled = true;
+      this.lastScrollIntoViewOptions = options || null;
+    },
     appendChild(child) {
       children.push(child);
       child.parentNode = this;
@@ -188,16 +315,27 @@ function createFakeElement() {
       return children.includes(child) || children.some(item => item.contains?.(child));
     },
     querySelector(selector) {
-      if (String(selector || '').startsWith('.')) {
-        return findByClass(this, selector);
+      const selectors = String(selector || '').split(',').map(item => item.trim()).filter(Boolean);
+      for (const item of selectors) {
+        if (item.startsWith('#')) {
+          const found = findById(this, item);
+          if (found) return found;
+        } else if (item.startsWith('.')) {
+          const found = findByClass(this, item);
+          if (found) return found;
+        } else {
+          const found = this.querySelectorAll(item)[0] || null;
+          if (found) return found;
+        }
       }
       return null;
     },
     querySelectorAll(selector) {
       const results = [];
+      const selectors = String(selector || '').split(',').map(item => item.trim()).filter(Boolean);
       const visit = node => {
         for (const child of node.children || []) {
-          if (String(selector || '').startsWith('.') && hasClass(child, selector)) {
+          if (selectors.some(item => matchesSelector(child, item))) {
             results.push(child);
           }
           visit(child);
@@ -214,7 +352,6 @@ function createFakeElement() {
 function createFakeButton() {
   const button = createFakeElement();
   button.disabled = false;
-  button.click = () => {};
   return button;
 }
 
@@ -2606,6 +2743,251 @@ test('Plan workspace missing fields render user-facing missing information count
   assert.match(turn.card.innerHTML, /总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项/);
   assert.match(turn.card.innerHTML, /图像来源/);
   assert.match(turn.card.innerHTML, /判定标准/);
+});
+
+test('Plan workspace supplement CTA expands details and scrolls to first key question', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'image_source',
+        field: 'image_source',
+        title: '图像来源是什么？',
+        why: '构建前需要确认输入来源。',
+        defaultValue: 'camera_pending',
+        defaultAssumption: '先保留相机待绑定。',
+        impact: '未确认前不能构建。',
+        options: [
+          {
+            value: 'camera_pending',
+            label: '稍后绑定相机',
+            recommended: true,
+            description: '保持待补。',
+            impact: '仍需确认。'
+          }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { field: 'image_source', questionId: 'image_source', blocksBuild: true, category: 'hard_requirement' }
+      ],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: ['image_source'],
+      primaryMessage: '需要确认图像来源。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: '需要确认图像来源。'
+    }
+  });
+
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  const button = planWorkspace.querySelector('#ai-plan-focus-confirmation');
+  assert.ok(button);
+  assert.equal(button.disabled, false);
+  await button.click();
+
+  const details = planWorkspace.querySelector('.ai-plan-more-details');
+  const question = planWorkspace.querySelector('.ai-plan-question');
+  assert.equal(details.open, true);
+  assert.equal(question.scrollIntoViewCalled, true);
+  assert.equal(question.focused, true);
+  assert.match(panel.lastResultStatusNote.text, /已展开更多方案细节/);
+  assert.equal(panel.lastResultStatusNote.tone, 'info');
+});
+
+test('Plan workspace supplement CTA focuses chat input when no key questions exist', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  const input = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': input,
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { field: 'image_source', blocksBuild: true, category: 'hard_requirement' }
+      ],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: ['image_source'],
+      primaryMessage: '需要确认图像来源。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: '需要确认图像来源。'
+    }
+  });
+
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  await planWorkspace.querySelector('#ai-plan-focus-confirmation').click();
+
+  assert.equal(planWorkspace.querySelector('.ai-plan-more-details').open, true);
+  assert.equal(input.focused, true);
+  assert.match(panel.lastResultStatusNote.text, /右侧输入框补充信息/);
+  assert.equal(panel.lastResultStatusNote.tone, 'info');
+});
+
+test('Plan workspace recommended defaults CTA reports blocked count instead of staying silent', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { field: 'image_source', blocksBuild: true, category: 'hard_requirement' },
+        { field: 'acceptance_criteria', blocksBuild: true, category: 'hard_requirement' }
+      ],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: ['image_source', 'acceptance_criteria'],
+      primaryMessage: '需要补充图像来源和判定标准。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['image_source', 'acceptance_criteria'],
+      blockingReasons: ['image_source_missing', 'acceptance_criteria_missing'],
+      publicReason: '需要补充图像来源和判定标准。'
+    }
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
+  panel._dispatchGenerateRequest = () => {
+    throw new Error('Build should not dispatch while hard blockers remain');
+  };
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  const button = planWorkspace.querySelector('#ai-plan-use-recommended-defaults');
+  assert.ok(button);
+  assert.equal(button.disabled, false);
+  await button.click();
+
+  assert.match(panel.lastResultStatusNote.text, /仍需先确认 2 项构建前信息/);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+});
+
+test('Plan workspace recommended defaults CTA starts Build when plan is already buildable', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: true,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: '构建条件已满足。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: true,
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: '需求足够明确，可以进入构建。'
+    }
+  }), '检测产品表面');
+  let started = false;
+  panel._startBuildFromCurrentPlan = async () => {
+    started = true;
+    return true;
+  };
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  await planWorkspace.querySelector('#ai-plan-use-recommended-defaults').click();
+
+  assert.equal(started, true);
+  assert.match(panel.lastResultStatusNote.text, /正在进入构建/);
+  assert.equal(panel.lastResultStatusNote.tone, 'info');
+});
+
+test('Plan workspace view draft CTA switches to draft view or explains no draft exists', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: []
+  }), '检测产品表面');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  await planWorkspace.querySelector('#ai-plan-view-draft').click();
+  assert.match(panel.lastResultStatusNote.text, /开始构建后会生成可查看的流程草稿/);
+  assert.equal(panel.lastResultStatusNote.tone, 'info');
+
+  let switchedTo = '';
+  panel.currentResult = { buildResult: { flow: { operators: [] } } };
+  panel._setWorkspaceViewMode = mode => {
+    switchedTo = mode;
+    panel.workspaceViewMode = mode;
+  };
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  await planWorkspace.querySelector('#ai-plan-view-draft').click();
+
+  assert.equal(switchedTo, 'build');
+  assert.match(panel.lastResultStatusNote.text, /已切换到构建草稿视图/);
+  assert.equal(panel.lastResultStatusNote.tone, 'info');
 });
 
 test('casual Intent Router result replies without opening Plan', async () => {
