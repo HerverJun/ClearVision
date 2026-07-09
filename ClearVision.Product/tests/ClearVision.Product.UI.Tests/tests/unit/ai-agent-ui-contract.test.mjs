@@ -2430,9 +2430,11 @@ test('Plan workspace shows rule fallback as recoverable confirmation state', asy
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
   const actionState = panel._getPlanBuildActionState(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /已启用规则兜底，需补充信息/);
-  assert.match(planWorkspace.innerHTML, /还差 1 项信息/);
-  assert.match(actionState.statusText, /还差 1 项信息/);
+  assert.match(planWorkspace.innerHTML, /已形成初步方案/);
+  assert.match(planWorkspace.innerHTML, /已启用规则兜底。还需补充 1 项信息，暂不能构建。/);
+  assert.match(planWorkspace.innerHTML, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
+  assert.match(actionState.statusText, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
+  assert.equal(actionState.label, '还需补充 1 项信息');
   assert.match(planWorkspace.innerHTML, /id="ai-btn-start-build">开始构建/);
   assert.doesNotMatch(planWorkspace.innerHTML, /Plan 失败|规划失败|语义抽取失败/);
 
@@ -2529,6 +2531,11 @@ test('Plan workspace hides raw semantic diagnostics until diagnostics details', 
   assert.match(visibleHtml, /推荐流程/);
   assert.match(visibleHtml, /还需要确认的信息/);
   assert.match(visibleHtml, /下一步动作/);
+  assert.ok(visibleHtml.indexOf('我理解的需求') < visibleHtml.indexOf('还需要确认的信息'));
+  assert.ok(visibleHtml.indexOf('还需要确认的信息') < visibleHtml.indexOf('推荐流程'));
+  assert.ok(visibleHtml.indexOf('推荐流程') < visibleHtml.indexOf('下一步动作'));
+  assert.doesNotMatch(visibleHtml, /ai-workspace-section-title">推荐默认值|ai-workspace-section-title">风险|ai-workspace-section-title">可执行计划|ai-workspace-section-title">验收标准/);
+  assert.match(planWorkspace.innerHTML, /更多方案细节/);
   assert.match(planWorkspace.innerHTML, /诊断详情 \/ 原始事件 \/ Agent Trace/);
   assert.match(planWorkspace.innerHTML, /semantic\.taskType/);
   assert.match(planWorkspace.innerHTML, /semantic\.failureCode/);
@@ -2588,13 +2595,15 @@ test('Plan workspace missing fields render user-facing missing information count
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /还差 2 项信息/);
+  assert.match(planWorkspace.innerHTML, /还需补充 2 项信息/);
+  assert.match(planWorkspace.innerHTML, /总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项/);
   assert.match(planWorkspace.innerHTML, /图像来源/);
   assert.match(planWorkspace.innerHTML, /检测目标\/判定标准/);
   assert.match(planWorkspace.innerHTML, /补充信息/);
   assert.match(planWorkspace.innerHTML, /使用推荐默认值继续/);
   assert.match(planWorkspace.innerHTML, /查看草稿/);
-  assert.match(turn.card.innerHTML, /还需要你确认 2 项信息/);
+  assert.match(turn.card.innerHTML, /还需补充 2 项信息/);
+  assert.match(turn.card.innerHTML, /总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项/);
   assert.match(turn.card.innerHTML, /图像来源/);
   assert.match(turn.card.innerHTML, /判定标准/);
 });
@@ -2926,8 +2935,9 @@ test('Plan Mode captures vague inspection request without starting Build', async
     scenarioKey: 'scratch'
   });
   assert.equal(panel.pendingVisionPlan.goal, 'metal scratch inspection workflow');
-  assert.match(overview.innerHTML, /高/);
-  assert.match(overview.innerHTML, /规则兜底/);
+  assert.match(overview.innerHTML, /已形成初步方案/);
+  assert.match(overview.innerHTML, /还需补充 6 项信息/);
+  assert.match(overview.innerHTML, /暂不能构建/);
   assert.match(plan.innerHTML, /关键问题/);
   assert.match(plan.innerHTML, /规则兜底/);
   assert.match(plan.innerHTML, /模型规划失败/);
@@ -2942,8 +2952,8 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(plan.innerHTML, /开始构建/);
   assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
   assert.match(plan.innerHTML, /资源补齐会在开始构建后出现/);
-  assert.match(overview.innerHTML, /Plan 规划/);
-  assert.match(overview.innerHTML, /Build 审计/);
+  assert.match(overview.innerHTML, /初步方案/);
+  assert.match(overview.innerHTML, /构建草稿/);
   assert.match(overview.innerHTML, /Applied 复核/);
   assert.doesNotMatch(plan.innerHTML, /资源审计任务|人工确认模型资源|人工选择模板资源|仅记录 PLC 元数据/);
   assert.doesNotMatch(plan.innerHTML, /Clarifying Questions|Accept Recommended and Build|Plan Mode/);
@@ -5128,7 +5138,9 @@ test('Backend Plan without explicit canBuild is not executable by default', asyn
   assert.equal(plan.executable, false);
   assert.equal(plan.requirementMaturity.maturity, 'ambiguous');
   assert.deepEqual(plan.requirementMaturity.missingFields, ['inspection_object', 'task_type']);
-  assert.match(overview.innerHTML, /可构建：否/);
+  assert.match(overview.innerHTML, /已形成初步方案/);
+  assert.match(overview.innerHTML, /还需补充 6 项信息/);
+  assert.match(overview.innerHTML, /暂不能构建/);
   assert.equal(inlineBuildButton.disabled, true);
   assert.equal(inlineBuildButton.getAttribute('aria-disabled'), 'true');
   assert.ok(planActionButtons.every(button => button.disabled));
@@ -5161,7 +5173,8 @@ test('Backend Plan with canBuild true but missing RequirementMaturity remains no
 
   assert.equal(plan.executable, false);
   assert.equal(plan.requirementMaturity.canBuild, false);
-  assert.match(overview.innerHTML, /可构建：否/);
+  assert.match(overview.innerHTML, /已形成初步方案/);
+  assert.match(overview.innerHTML, /暂不能构建/);
   assert.equal(inlineBuildButton.disabled, true);
   assert.ok(planActionButtons.every(button => button.disabled));
 });
@@ -5201,8 +5214,9 @@ test('Backend Plan can be plannable while Build remains disabled', async () => {
 
   assert.equal(plan.canPlan, true);
   assert.equal(plan.executable, false);
-  assert.match(overview.innerHTML, /可规划：是/);
-  assert.match(overview.innerHTML, /可构建：否/);
+  assert.match(overview.innerHTML, /已形成初步方案/);
+  assert.match(overview.innerHTML, /还需补充 5 项信息/);
+  assert.match(overview.innerHTML, /暂不能构建/);
   assert.equal(inlineBuildButton.disabled, true);
 });
 
@@ -5598,8 +5612,9 @@ test('Plan resource pending drives strict and draft CTA without deployment-ready
   const action = panel._getPlanBuildActionState(draftPlan);
   assert.equal(action.canStart, true);
   assert.equal(action.label, '按当前方案生成可编辑草稿');
-  assert.match(planWorkspace.innerHTML, /可编辑草稿模式/);
-  assert.match(planWorkspace.innerHTML, /后补资源/);
+  assert.match(planWorkspace.innerHTML, /构建前确认/);
+  assert.match(planWorkspace.innerHTML, /先生成可编辑草稿/);
+  assert.match(planWorkspace.innerHTML, /可构建后补齐 2 项/);
   assert.match(optionMarkup(planWorkspace.innerHTML, 'station_camera'), /资源待后补/);
   assert.doesNotMatch(planWorkspace.innerHTML, /部署就绪/);
 
@@ -5621,8 +5636,8 @@ test('Plan resource pending drives strict and draft CTA without deployment-ready
 
   const blocked = panel._getPlanBuildActionState(strictPlan);
   assert.equal(blocked.canStart, false);
-  assert.equal(blocked.label, '仍需补齐资源 1 项');
-  assert.match(planWorkspace.innerHTML, /严格确认模式/);
+  assert.equal(blocked.label, '还需补充 5 项信息');
+  assert.match(planWorkspace.innerHTML, /构建前确认/);
   assert.match(buildStatus.textContent, /资源仍待绑定/);
 });
 
@@ -5820,7 +5835,7 @@ test('Plan main CTA ignores model NextAction and uses canonical readiness', asyn
 
   assert.match(planWorkspace.innerHTML, /模型 NextAction/);
   assert.match(planWorkspace.innerHTML, /Deploy now from model advice/);
-  assert.equal(panel._getPlanBuildActionState(plan).label, '还差 2 项信息');
+  assert.equal(panel._getPlanBuildActionState(plan).label, '还需补充 2 项信息');
   assert.notEqual(mainButton.textContent, 'Deploy now from model advice');
 });
 
@@ -5972,7 +5987,7 @@ test('Plan with pending image source and acquisition route can start editable dr
   assert.equal(captured.buildFromPlan.planId, plan.planId);
   assert.equal(captured.buildFromPlan.planHash, plan.planHash);
   assert.equal(buildStatus.textContent, '可编辑草稿可先生成；当前不代表可部署。');
-  assert.match(planWorkspace.innerHTML, /按当前方案生成可编辑草稿|可编辑草稿模式/);
+  assert.match(planWorkspace.innerHTML, /先生成可编辑草稿/);
   assert.doesNotMatch(planWorkspace.innerHTML, /按推荐方案开始构建/);
 });
 
@@ -6282,7 +6297,8 @@ test('Backend Plan with explicit canBuild true and actionable maturity enables B
   panel._renderPlanWorkspace(plan);
 
   assert.equal(plan.executable, true);
-  assert.match(overview.innerHTML, /可构建：是/);
+  assert.match(overview.innerHTML, /方案已就绪/);
+  assert.match(overview.innerHTML, /可以构建/);
   assert.equal(inlineBuildButton.disabled, false);
   assert.ok(planActionButtons.every(button => !button.disabled));
 });

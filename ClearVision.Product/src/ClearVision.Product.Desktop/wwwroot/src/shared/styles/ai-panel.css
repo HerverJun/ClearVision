@@ -5335,6 +5335,12 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     border-color: var(--ai-accent-strong);
 }
 
+.ai-plan-action.is-primary:disabled {
+    color: var(--ai-warning);
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.32);
+}
+
 .ai-agent-workspace-overview {
     padding: 10px 12px 0;
 }
@@ -5349,6 +5355,16 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     border-radius: 8px;
     background: var(--ai-surface-panel);
     box-shadow: inset 3px 0 0 var(--ai-accent), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ai-agent-overview-card.is-warning {
+    border-color: rgba(251, 191, 36, 0.32);
+    box-shadow: inset 3px 0 0 var(--ai-warning), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ai-agent-overview-card.is-success {
+    border-color: rgba(34, 197, 94, 0.32);
+    box-shadow: inset 3px 0 0 var(--ai-success), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .ai-agent-stage-strip {
@@ -5389,6 +5405,18 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     color: #ffffff;
     border-color: var(--ai-accent-strong);
     background: var(--ai-accent-strong);
+}
+
+.ai-agent-overview-card.is-warning .ai-agent-stage-strip button.is-selected {
+    color: var(--ai-warning);
+    border-color: rgba(251, 191, 36, 0.38);
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.ai-agent-overview-card.is-success .ai-agent-stage-strip button.is-selected {
+    color: var(--ai-success);
+    border-color: rgba(34, 197, 94, 0.36);
+    background: rgba(34, 197, 94, 0.1);
 }
 
 .ai-agent-stage-strip button.is-active:not(.is-selected),
@@ -5727,10 +5755,17 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     line-height: 1.35;
 }
 
-.ai-plan-user-status span {
+.ai-plan-user-status span,
+.ai-plan-user-status small {
     color: var(--ai-text-muted);
     font-size: 12px;
     line-height: 1.45;
+}
+
+.ai-plan-user-status small {
+    color: var(--ai-warning);
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .ai-plan-user-status.is-warning {
@@ -5798,6 +5833,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 .ai-plan-user-action {
@@ -5817,6 +5853,17 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-plan-user-action:hover {
     border-color: var(--ai-accent-strong);
     color: #fff;
+}
+
+.ai-plan-user-action.is-primary {
+    border-color: rgba(251, 191, 36, 0.46);
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--ai-warning);
+}
+
+.ai-plan-user-action.is-primary:hover {
+    border-color: rgba(251, 191, 36, 0.68);
+    color: var(--ai-warning);
 }
 
 .ai-plan-confirmation-guidance {
@@ -5866,16 +5913,41 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     gap: 8px;
 }
 
+.ai-plan-confirm-mode {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--ai-border);
+}
+
+.ai-plan-confirm-mode > div:first-child {
+    display: grid;
+    gap: 3px;
+}
+
+.ai-plan-confirm-mode strong {
+    color: var(--ai-text-main);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.ai-plan-confirm-mode span,
+.ai-plan-confirm-mode small {
+    color: var(--ai-text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
 .ai-plan-mode-toggle {
     display: inline-grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
-    width: min(100%, 28rem);
-    margin-top: 8px;
+    width: min(100%, 24rem);
     padding: 3px;
     border: 1px solid var(--ai-border);
     border-radius: 8px;
-    background: var(--ai-surface-pane);
+    background: var(--ai-surface-panel);
 }
 
 .ai-plan-mode-toggle button {
@@ -5895,8 +5967,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 
 .ai-plan-mode-toggle button.is-active {
-    background: var(--ai-accent-strong);
-    color: #ffffff;
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--ai-warning);
 }
 
 .ai-plan-mode-help,
@@ -5932,6 +6004,22 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     color: var(--ai-text-muted);
     font-size: 12px;
     line-height: 1.55;
+}
+
+.ai-plan-more-details > summary,
+.ai-plan-diagnostics > summary {
+    cursor: pointer;
+}
+
+.ai-plan-more-details-body {
+    display: grid;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.ai-plan-more-details-body > section {
+    display: grid;
+    gap: 8px;
 }
 
 .ai-plan-route strong {
@@ -6104,10 +6192,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    position: sticky;
-    bottom: 0;
     padding: 10px 0 0;
-    background: linear-gradient(180deg, transparent, var(--ai-surface-page) 35%);
+    border-top: 1px solid var(--ai-border);
 }
 
 .ai-plan-action-status {

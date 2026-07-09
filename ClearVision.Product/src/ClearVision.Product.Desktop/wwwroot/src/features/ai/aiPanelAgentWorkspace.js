@@ -3365,6 +3365,91 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _buildPlanMissingSummary(plan, missingFields = null) {
+        if (!plan) {
+            return {
+                totalCount: 0,
+                mustConfirmCount: 0,
+                fillLaterCount: 0,
+                missingFields: [],
+                summaryText: '总计 0 项；构建前必须确认 0 项；可构建后补齐 0 项'
+            };
+        }
+
+        const preview = this._getCurrentCanonicalPreview?.(plan);
+        const readiness = preview?.buildReadiness || plan?.buildReadiness || {};
+        const readinessStats = this._getPlanReadinessStats({ ...plan, buildReadiness: readiness });
+        const stats = {
+            ...readinessStats,
+            pendingConfirmationCount: Number(preview?.pendingConfirmationCount) || readinessStats.pendingConfirmationCount,
+            resourcePendingCount: Number(preview?.resourcePendingCount) || readinessStats.resourcePendingCount,
+            hardBlockerCount: Number(preview?.hardBlockerCount) || 0
+        };
+        const fields = Array.isArray(missingFields)
+            ? missingFields
+            : this._collectPlanMissingInformation(plan).missingFields;
+        const normalizedFields = [...new Set(this._toArray(fields)
+            .map(field => this._inferPlanQuestionField?.(field) || String(field || '').trim().toLowerCase())
+            .filter(Boolean))];
+        const blockers = this._toArray(readiness.blockers);
+        const resourceFields = new Set(blockers
+            .filter(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING)
+            .map(blocker => this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) || String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase())
+            .filter(Boolean));
+        const hardFields = new Set(blockers
+            .filter(blocker => blocker?.blocksBuild === true && blocker?.category !== PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING)
+            .map(blocker => this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) || String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase())
+            .filter(Boolean));
+        const mode = this._normalizeRequirementMode?.(this.requirementMode || plan.requirementMode || 'strict') || 'strict';
+        const maturity = plan.requirementMaturity || {};
+        const semantic = plan.semanticExtraction || {};
+        this._toArray(readiness.remainingFields)
+            .map(field => this._inferPlanQuestionField?.(field) || String(field || '').trim().toLowerCase())
+            .filter(Boolean)
+            .forEach(field => {
+                if (this._isPlanBuildBlockingField?.(field, mode, maturity, {
+                    plan,
+                    semanticExtraction: semantic,
+                    route: plan?.route
+                })) {
+                    hardFields.add(field);
+                }
+            });
+
+        const canBuildNow = readiness.canBuild === true || plan.executable === true;
+        let mustConfirmCount = Math.max(
+            hardFields.size,
+            Number(stats.hardBlockerCount) || 0,
+            canBuildNow
+                ? 0
+                : Math.max((Number(stats.pendingConfirmationCount) || 0) - (Number(stats.resourcePendingCount) || 0), 0)
+        );
+        let fillLaterCount = Math.max(resourceFields.size, Number(stats.resourcePendingCount) || 0);
+        let totalCount = Math.max(
+            normalizedFields.length,
+            mustConfirmCount + fillLaterCount,
+            Number(stats.pendingConfirmationCount) || 0,
+            Number(stats.blockingCount) || 0
+        );
+        if (totalCount > mustConfirmCount + fillLaterCount) {
+            fillLaterCount = totalCount - mustConfirmCount;
+        } else {
+            totalCount = mustConfirmCount + fillLaterCount;
+        }
+        mustConfirmCount = Math.max(mustConfirmCount, 0);
+        fillLaterCount = Math.max(fillLaterCount, 0);
+        totalCount = Math.max(totalCount, 0);
+
+        return {
+            totalCount,
+            mustConfirmCount,
+            fillLaterCount,
+            missingFields: normalizedFields,
+            stats,
+            summaryText: `总计 ${totalCount} 项；构建前必须确认 ${mustConfirmCount} 项；可构建后补齐 ${fillLaterCount} 项`
+        };
+    },
+
     _hasOnlyDraftableResourceBlockers(plan) {
         const mode = this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
         if (mode !== 'draft') return false;
@@ -3447,29 +3532,25 @@ export const aiPanelAgentWorkspaceMixin = {
             };
         }
 
+        const missingSummary = this._buildPlanMissingSummary(plan);
         const deferredCount = this._toArray(preview.deferredQuestionIds).length;
-        const resourceOnly = stats.resourcePendingCount > 0 &&
-            stats.pendingConfirmationCount === 0 &&
-            stats.hardBlockerCount === 0;
-        const hardCount = stats.hardBlockerCount || stats.pendingConfirmationCount || stats.blockingCount || 1;
         const blockedReason = this._getPlanBuildBlockedReason(plan);
-        const userMissingCount = this._buildPlanUserSummary?.(plan)?.missingCount || hardCount;
-        const userBlockedText = resourceOnly
-            ? `仍需补齐资源 ${stats.resourcePendingCount} 项`
-            : `还差 ${Math.max(userMissingCount, 1)} 项信息`;
+        const userBlockedText = missingSummary.totalCount > 0
+            ? `还需补充 ${missingSummary.totalCount} 项信息`
+            : '暂不能构建';
+        const statusText = `${missingSummary.summaryText}。${blockedReason || '暂不能构建。'}`;
 
         return {
             canBuild: false,
             canAcceptRecommended: false,
             canStart: false,
             acceptedRecommended: false,
-            label: mode === 'draft'
-                ? userBlockedText
-                : userBlockedText,
+            label: userBlockedText,
             statusText: mode === 'strict' && deferredCount > 0
-                ? '已暂缓确认。严格模式下仍会阻断构建。'
-                : `${userBlockedText}：${blockedReason}`,
-            stats
+                ? `${missingSummary.summaryText}。当前选择要求构建前确认，暂缓项仍会阻止构建。`
+                : statusText,
+            stats,
+            missingSummary
         };
     },
 
@@ -4735,27 +4816,55 @@ export const aiPanelAgentWorkspaceMixin = {
         const executable = phase === AgentWorkspaceModes.BUILD
             ? activeEvents.length > 0
             : Boolean(plan?.executable);
-        const canPlan = phase === AgentWorkspaceModes.BUILD
-            ? true
-            : Boolean(plan?.canPlan || plan?.requirementMaturity?.canPlan);
         const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : (planRunEvents.length ? '事件驱动' : '未设置')));
+        const userSummary = plan ? this._buildPlanUserSummary?.(plan) : null;
+        const missingSummary = userSummary?.missingSummary || this._buildPlanMissingSummary?.(plan);
+        const missingTotal = Number(missingSummary?.totalCount) || 0;
+        const overviewTone = terminal?.eventType === 'run.failed'
+            ? 'danger'
+            : phase === AgentWorkspaceModes.PLAN && plan && !executable && missingTotal > 0
+                ? 'warning'
+                : executable
+                    ? 'success'
+                    : 'neutral';
+        const overviewKicker = phase === AgentWorkspaceModes.PLAN && plan
+            ? (executable ? '方案已就绪' : '已形成初步方案')
+            : mode;
+        const overviewDetail = phase === AgentWorkspaceModes.PLAN && plan
+            ? (missingTotal > 0 ? `还需补充 ${missingTotal} 项信息` : '信息已满足构建条件')
+            : nextAction;
+        const overviewState = phase === AgentWorkspaceModes.PLAN && plan
+            ? (executable ? '可以构建' : '暂不能构建')
+            : (terminal?.eventType === 'run.failed' ? '构建失败' : mode);
+        const planOverviewMetrics = plan
+            ? `
+                <span><small>总计</small><b>${this._escapeHtml(String(missingSummary?.totalCount || 0))} 项</b></span>
+                <span><small>构建前确认</small><b>${this._escapeHtml(String(missingSummary?.mustConfirmCount || 0))} 项</b></span>
+                <span><small>可后补</small><b>${this._escapeHtml(String(missingSummary?.fillLaterCount || 0))} 项</b></span>
+                <span><small>状态</small><b>${this._escapeHtml(executable ? '可以构建' : '暂不能构建')}</b></span>
+            `
+            : `<span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
+               <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>
+               <span><small>总计</small><b>0 项</b></span>
+               <span><small>状态</small><b>等待规划</b></span>`;
 
         el.innerHTML = `
-            <section class="ai-agent-overview-card is-${this._escapeHtml(phase)}">
+            <section class="ai-agent-overview-card is-${this._escapeHtml(phase)} is-${this._escapeHtml(overviewTone)}">
                 <div class="ai-agent-overview-main">
-                    <span class="ai-agent-overview-kicker">${this._escapeHtml(mode)}</span>
+                    <span class="ai-agent-overview-kicker">${this._escapeHtml(overviewKicker)}</span>
                     <strong>${this._escapeHtml(goal)}</strong>
-                    <span>${this._escapeHtml(nextAction)}</span>
-                    <em>可规划：${canPlan ? '是' : '否'} · 可构建：${executable ? '是' : '否'}</em>
+                    <span>${this._escapeHtml(overviewDetail)}</span>
+                    <em>${this._escapeHtml(overviewState)}</em>
                 </div>
                 <div class="ai-agent-overview-metrics">
                     ${showBuildExecutionPath
                         ? `<span><small>当前模式</small><b>${this._escapeHtml(executionPath.modeLabel || mode)}</b></span>
                            <span><small>VisionAgentLoop</small><b>${this._escapeHtml(executionPath.enteredLabel)}</b></span>`
-                        : `<span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
-                           <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>`}
-                    <span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
-                    <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planRunEvents.length || planEvents.length))}</b></span>
+                        : planOverviewMetrics}
+                    ${showBuildExecutionPath
+                        ? `<span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
+                           <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planRunEvents.length || planEvents.length))}</b></span>`
+                        : ''}
                 </div>
                 ${executionPath.reasonLabel ? `<div class="ai-build-note"><strong>路径原因</strong>${this._escapeHtml(executionPath.reasonLabel)}</div>` : ''}
                 <div class="ai-agent-stage-strip" role="tablist" aria-label="Vision Agent 工作台视图">
@@ -4773,7 +4882,7 @@ export const aiPanelAgentWorkspaceMixin = {
                                 aria-selected="${key === viewMode ? 'true' : 'false'}"
                                 ${disabled ? 'disabled aria-disabled="true"' : ''}
                                 class="${key === phase ? 'is-active' : ''} ${key === viewMode ? 'is-selected' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
-                                <span>${key === AgentWorkspaceModes.PLAN ? 'Plan 规划' : 'Build 审计'}</span>
+                                <span>${key === AgentWorkspaceModes.PLAN ? '初步方案' : '构建草稿'}</span>
                                 <small>${this._escapeHtml(statusLabel)}</small>
                             </button>
                         `;
@@ -4952,6 +5061,13 @@ export const aiPanelAgentWorkspaceMixin = {
                 missingCards: [],
                 missingFields: [],
                 missingCount: 0,
+                missingSummary: {
+                    totalCount: 0,
+                    mustConfirmCount: 0,
+                    fillLaterCount: 0,
+                    missingFields: [],
+                    summaryText: '总计 0 项；构建前必须确认 0 项；可构建后补齐 0 项'
+                },
                 nextActions: ['描述检测目标、图像来源和判定标准。']
             };
         }
@@ -4959,36 +5075,43 @@ export const aiPanelAgentWorkspaceMixin = {
         const semantic = plan.semanticExtraction || {};
         const routeOperators = this._toArray(plan.route?.operators);
         const missingInfo = this._collectPlanMissingInformation(plan);
-        const missingCount = missingInfo.missingFields.length;
+        const missingSummary = this._buildPlanMissingSummary(plan, missingInfo.missingFields);
+        const missingCount = missingSummary.totalCount;
         const hasSemanticFallback = this._hasSemanticRuleFallback(plan);
         const semanticFailureCode = String(semantic.failureCode || '').trim().toLowerCase();
         const hasSemanticFailure = semanticFailureCode.startsWith('semantic_') || hasSemanticFallback;
         const canBuild = plan.executable === true;
-        const status = hasSemanticFallback && hasSemanticFailure
+        const status = canBuild && missingCount > 0
             ? {
                 tone: 'warning',
-                title: '已启用规则兜底，需补充信息',
-                detail: missingCount > 0
-                    ? `还差 ${missingCount} 项信息后再构建。`
-                    : '可先复核规则兜底草案，再决定是否构建。'
+                title: '已形成初步方案',
+                detail: `可以先生成可编辑草稿；仍有 ${missingCount} 项信息可在构建后补齐。`
             }
-            : missingCount > 0
+            : hasSemanticFallback && hasSemanticFailure
                 ? {
-                    tone: 'warning',
-                    title: `还差 ${missingCount} 项信息`,
-                    detail: '补齐关键输入后，Build 才会进入构建链路。'
+                tone: 'warning',
+                title: '已形成初步方案',
+                detail: missingCount > 0
+                    ? `已启用规则兜底。还需补充 ${missingCount} 项信息，暂不能构建。`
+                    : '可先复核规则兜底草案，再决定是否构建。'
                 }
-                : canBuild
+                : missingCount > 0
                     ? {
-                        tone: 'success',
-                        title: '信息已足够，可以构建',
-                        detail: '请复核推荐流程后开始构建。'
-                    }
-                    : {
                         tone: 'warning',
-                        title: '需要先确认信息',
-                        detail: this._getPlanBuildBlockedReason?.(plan) || '当前计划还不能开始构建。'
-                    };
+                        title: '已形成初步方案',
+                        detail: `还需补充 ${missingCount} 项信息，暂不能构建。`
+                    }
+                    : canBuild
+                        ? {
+                            tone: 'success',
+                            title: '信息已足够，可以构建',
+                            detail: '请复核推荐流程后开始构建。'
+                        }
+                        : {
+                            tone: 'warning',
+                            title: '需要先确认信息',
+                            detail: this._getPlanBuildBlockedReason?.(plan) || '当前计划还不能开始构建。'
+                        };
 
         const conditions = [
             semantic.okCondition ? `OK：${semantic.okCondition}` : '',
@@ -5022,6 +5145,7 @@ export const aiPanelAgentWorkspaceMixin = {
             missingCards: missingInfo.cards,
             missingFields: missingInfo.missingFields,
             missingCount,
+            missingSummary,
             nextActions
         };
     },
@@ -5166,11 +5290,10 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _renderRequirementMaturityPanel(plan) {
-        const maturity = plan?.requirementMaturity || null;
-        const trace = plan?.decisionTrace || null;
-        if (!maturity && !trace) return '';
+        if (!plan) return '';
         const summary = this._buildPlanUserSummary(plan);
         const missingCards = summary.missingCards || [];
+        const missingSummary = summary.missingSummary || this._buildPlanMissingSummary(plan, summary.missingFields);
 
         return `
             <section class="ai-workspace-section ai-plan-user-summary ${summary.status.tone === 'success' ? 'is-ready' : 'is-warning'}">
@@ -5178,6 +5301,12 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-user-status is-${this._escapeHtml(summary.status.tone)}">
                     <strong>${this._escapeHtml(summary.status.title)}</strong>
                     <span>${this._escapeHtml(summary.status.detail)}</span>
+                    <small>${this._escapeHtml(missingSummary.summaryText)}</small>
+                </div>
+                <div class="ai-plan-user-cta">
+                    <button type="button" class="ai-plan-user-action is-primary" id="ai-plan-focus-confirmation">补充信息</button>
+                    <button type="button" class="ai-plan-user-action" id="ai-plan-use-recommended-defaults">使用推荐默认值继续</button>
+                    <button type="button" class="ai-plan-user-action" id="ai-plan-view-draft">查看草稿</button>
                 </div>
                 <div class="ai-plan-missing-grid">
                     ${missingCards.map(item => `
@@ -5190,11 +5319,6 @@ export const aiPanelAgentWorkspaceMixin = {
                             <small>${this._escapeHtml(item.detail)}</small>
                         </article>
                     `).join('')}
-                </div>
-                <div class="ai-plan-user-cta">
-                    <button type="button" class="ai-plan-user-action" id="ai-plan-focus-confirmation">补充信息</button>
-                    <button type="button" class="ai-plan-user-action" id="ai-plan-use-recommended-defaults">使用推荐默认值继续</button>
-                    <button type="button" class="ai-plan-user-action" id="ai-plan-view-draft">查看草稿</button>
                 </div>
             </section>
         `;
@@ -5237,15 +5361,16 @@ export const aiPanelAgentWorkspaceMixin = {
 
         const userSummary = this._buildPlanUserSummary(plan);
         const maturityPanel = this._renderRequirementMaturityPanel(plan);
+        const missingSummary = userSummary.missingSummary || this._buildPlanMissingSummary(plan, userSummary.missingFields);
         const routeOperators = this._toArray(plan.route?.operators);
         const routeChain = routeOperators.length
             ? `<div class="ai-plan-chain">${routeOperators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`
             : '<div class="ai-plan-maturity-empty">需求成熟度不足时不会提前选择算子链。</div>';
         const plannerFailureDiagnostics = this._renderPlannerFailureDiagnostics(plan);
-        const modeLabel = (this._normalizeRequirementMode?.(plan.requirementMode || this.requirementMode || 'strict') || 'strict') === 'draft'
-            ? '可编辑草稿模式'
-            : '严格确认模式';
-        const readinessStats = this._getPlanReadinessStats(plan);
+        const requirementMode = this._normalizeRequirementMode?.(plan.requirementMode || this.requirementMode || 'strict') || 'strict';
+        const confirmationModeLabel = requirementMode === 'draft'
+            ? '先生成可编辑草稿'
+            : '确认完整后构建';
         const actionState = this._getPlanBuildActionState(plan);
         const isPlanReadOnly = this._isPlanSnapshotReadOnly?.() === true;
         const currentPreview = this._getCurrentCanonicalPreview?.(plan);
@@ -5255,15 +5380,15 @@ export const aiPanelAgentWorkspaceMixin = {
         const previewFailed = (plan.previewState || this.previewState) === 'failed';
         const modeToggle = `
             <div class="ai-plan-mode-toggle" role="group" aria-label="构建确认模式">
-                <button type="button" data-requirement-mode="strict" class="${this.requirementMode === 'strict' ? 'is-active' : ''}" aria-pressed="${this.requirementMode === 'strict' ? 'true' : 'false'}">严格确认后构建</button>
+                <button type="button" data-requirement-mode="strict" class="${this.requirementMode === 'strict' ? 'is-active' : ''}" aria-pressed="${this.requirementMode === 'strict' ? 'true' : 'false'}">确认完整后构建</button>
                 <button type="button" data-requirement-mode="draft" class="${this.requirementMode === 'draft' ? 'is-active' : ''}" aria-pressed="${this.requirementMode === 'draft' ? 'true' : 'false'}">先生成可编辑草稿</button>
             </div>
             <div class="ai-plan-mode-help" id="ai-requirement-mode-tip">${this.requirementMode === 'draft'
-                ? 'Draft：允许后端判定为可后补的决策或资源暂缓，先生成可编辑草稿，不代表可部署。'
-                : 'Strict：关键决策及当前模式要求的资源确认后才可构建。'}</div>
+                ? '允许后端判定为可后补的决策或资源暂缓，先生成可编辑草稿，不代表可部署。'
+                : '关键决策及当前模式要求的资源确认后才可构建。'}</div>
         `;
         const ctaAssist = hasDeferredStrictBlock
-            ? `<div class="ai-plan-cta-assist">已暂缓确认。严格模式下仍会阻断构建。<button type="button" id="ai-btn-switch-draft-from-defer">切换为可编辑草稿模式</button></div>`
+            ? `<div class="ai-plan-cta-assist">当前选择要求构建前确认，暂缓项仍会阻止构建。<button type="button" id="ai-btn-switch-draft-from-defer">切换为可编辑草稿</button></div>`
             : previewFailed
                 ? `<div class="ai-plan-cta-assist">构建条件校验失败，请重试<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
                 : '';
@@ -5271,16 +5396,6 @@ export const aiPanelAgentWorkspaceMixin = {
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">我理解的需求</div>
                 <div class="ai-workspace-list">${userSummary.understoodItems.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
-            </section>
-            <section class="ai-workspace-section ai-plan-build-summary ${plan.executable ? 'is-ready' : 'is-blocked'}">
-                <div class="ai-workspace-section-title">${this._escapeHtml(modeLabel)}</div>
-                <div class="ai-requirement-maturity-grid">
-                    <div class="ai-build-compact-row"><b>阻断项</b><span>${this._escapeHtml(String(readinessStats.blockingCount))}</span></div>
-                    <div class="ai-build-compact-row"><b>待确认</b><span>${this._escapeHtml(String(readinessStats.pendingConfirmationCount))}</span></div>
-                    <div class="ai-build-compact-row"><b>后补资源</b><span>${this._escapeHtml(String(readinessStats.resourcePendingCount))}</span></div>
-                </div>
-                ${isPlanReadOnly ? modeToggle.replaceAll('<button type="button" data-requirement-mode=', '<button type="button" disabled data-requirement-mode=') : modeToggle}
-                ${plan.buildReadiness?.primaryMessage ? `<div class="ai-build-note">${this._escapeHtml(plan.buildReadiness.primaryMessage)}</div>` : ''}
             </section>
             ${maturityPanel}
             <section class="ai-workspace-section">
@@ -5296,6 +5411,49 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-workspace-list">
                     ${userSummary.nextActions.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}
                 </div>
+                <div class="ai-plan-confirm-mode">
+                    <div>
+                        <strong>构建前确认</strong>
+                        <span>${this._escapeHtml(confirmationModeLabel)} · ${this._escapeHtml(missingSummary.summaryText)}</span>
+                    </div>
+                    ${isPlanReadOnly ? modeToggle.replaceAll('<button type="button" data-requirement-mode=', '<button type="button" disabled data-requirement-mode=') : modeToggle}
+                    ${plan.buildReadiness?.primaryMessage ? `<small>${this._escapeHtml(plan.buildReadiness.primaryMessage)}</small>` : ''}
+                </div>
+            </section>
+            <section class="ai-workspace-section">
+                <details class="ai-plan-more-details">
+                    <summary class="ai-workspace-section-title">更多方案细节</summary>
+                    <div class="ai-plan-more-details-body">
+                        <section>
+                            <div class="ai-workspace-section-title">关键问题</div>
+                            <div class="ai-plan-question-list">
+                                ${plan.questions
+                                    .map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
+                            </div>
+                            <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
+                        </section>
+                        <section class="ai-workspace-grid-2">
+                            <div>
+                                <div class="ai-workspace-section-title">推荐默认值</div>
+                                <ul>${plan.assumptions.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
+                            </div>
+                            <div>
+                                <div class="ai-workspace-section-title">风险</div>
+                                <ul>${plan.risks.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
+                            </div>
+                        </section>
+                        <section class="ai-workspace-grid-2">
+                            <div>
+                                <div class="ai-workspace-section-title">可执行计划</div>
+                                <ol>${plan.steps.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
+                            </div>
+                            <div>
+                                <div class="ai-workspace-section-title">验收标准</div>
+                                <ol>${plan.acceptanceCriteria.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
+                            </div>
+                        </section>
+                    </div>
+                </details>
             </section>
             <section class="ai-workspace-section">
                 <details class="ai-plan-diagnostics">
@@ -5317,34 +5475,6 @@ export const aiPanelAgentWorkspaceMixin = {
                     ${this._renderPlanRawDiagnostics(plan)}
                 </div>
                 </details>
-            </section>
-            <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">关键问题</div>
-                <div class="ai-plan-question-list">
-                    ${plan.questions
-                        .map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
-                </div>
-                <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
-            </section>
-            <section class="ai-workspace-section ai-workspace-grid-2">
-                <div>
-                    <div class="ai-workspace-section-title">推荐默认值</div>
-                    <ul>${plan.assumptions.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
-                </div>
-                <div>
-                    <div class="ai-workspace-section-title">风险</div>
-                    <ul>${plan.risks.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
-                </div>
-            </section>
-            <section class="ai-workspace-section ai-workspace-grid-2">
-                <div>
-                    <div class="ai-workspace-section-title">可执行计划</div>
-                    <ol>${plan.steps.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
-                </div>
-                <div>
-                    <div class="ai-workspace-section-title">验收标准</div>
-                    <ol>${plan.acceptanceCriteria.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
-                </div>
             </section>
             <div class="ai-plan-actions">
                 ${ctaAssist}
@@ -5394,6 +5524,8 @@ export const aiPanelAgentWorkspaceMixin = {
             this._renderPlanWorkspace(this.pendingVisionPlan);
         });
         el.querySelector('#ai-plan-focus-confirmation')?.addEventListener('click', () => {
+            const details = el.querySelector('.ai-plan-more-details');
+            if (details) details.open = true;
             const firstQuestion = el.querySelector('.ai-plan-question');
             firstQuestion?.scrollIntoView?.({ block: 'nearest' });
             this._setResultStatusNote?.('请在确认问题区补充缺失信息。', 'info');
@@ -5490,9 +5622,10 @@ export const aiPanelAgentWorkspaceMixin = {
             card.appendChild(guidance);
         }
         guidance.hidden = false;
+        const missingSummary = data.missingSummary || this._buildPlanMissingSummary?.(plan, data.missingFields);
         guidance.innerHTML = `
-            <div class="ai-plan-confirmation-guidance-title">还需要你确认 ${this._escapeHtml(String(data.missingCount))} 项信息</div>
-            <div class="ai-plan-confirmation-guidance-copy">${this._escapeHtml(data.status?.detail || '补充信息后再开始构建。')}</div>
+            <div class="ai-plan-confirmation-guidance-title">还需补充 ${this._escapeHtml(String(missingSummary?.totalCount || data.missingCount))} 项信息</div>
+            <div class="ai-plan-confirmation-guidance-copy">${this._escapeHtml(missingSummary?.summaryText || data.status?.detail || '补充信息后再开始构建。')}。暂不能构建。</div>
             <div class="ai-plan-confirmation-guidance-tags">
                 ${(data.missingFields || []).slice(0, 5).map(field => `<span>${this._escapeHtml(this._formatRequirementFieldLabel(field))}</span>`).join('')}
             </div>

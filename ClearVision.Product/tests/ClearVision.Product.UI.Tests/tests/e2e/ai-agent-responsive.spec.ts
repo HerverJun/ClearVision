@@ -1468,7 +1468,7 @@ test('AI panel posts Build through AgentRun even when WebView2 is available', as
 });
 
 test('AI agent workbench default Plan view hides raw semantic trace until diagnostics expand', async ({ page }) => {
-  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 820 });
   await mockShellApis(page);
   await bootAuthenticatedApp(page);
 
@@ -1572,7 +1572,14 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-plan-workspace')).toContainText('推荐流程');
   await expect(page.locator('#ai-plan-workspace')).toContainText('还需要确认的信息');
   await expect(page.locator('#ai-plan-workspace')).toContainText('下一步动作');
-  await expect(page.getByText('已启用规则兜底，需补充信息')).toBeVisible();
+  await expect(page.locator('#ai-agent-workspace-overview')).toContainText('已形成初步方案');
+  await expect(page.locator('#ai-agent-workspace-overview')).toContainText('还需补充 2 项信息');
+  await expect(page.locator('#ai-agent-workspace-overview')).toContainText('暂不能构建');
+  await expect(page.locator('#ai-agent-workspace-overview')).not.toContainText('可构建：否');
+  await expect(page.locator('.ai-agent-overview-card')).toHaveClass(/is-warning/);
+  await expect(page.locator('.ai-agent-overview-card')).not.toHaveClass(/is-danger/);
+  await expect(page.getByText('已启用规则兜底。还需补充 2 项信息，暂不能构建。')).toBeVisible();
+  await expect(page.locator('#ai-plan-workspace')).toContainText('总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项');
   const visibleRawSnippets = await page.evaluate(() => {
     const root = document.querySelector('#ai-plan-workspace');
     const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];
@@ -1602,10 +1609,45 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
     });
   });
   expect(visibleRawSnippets).toEqual([]);
+  const visibleDetailTitles = await page.evaluate(() => {
+    const root = document.querySelector('#ai-plan-workspace');
+    const titles = ['推荐默认值', '风险', '可执行计划', '验收标准'];
+    if (!root) return titles;
+    const isTextVisible = (node: Text) => {
+      const parent = node.parentElement;
+      const closedDetails = parent?.closest('details:not([open])');
+      if (closedDetails && !parent?.closest('summary')) {
+        return false;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const visible = Array.from(range.getClientRects()).some(rect => rect.width > 0 && rect.height > 0);
+      range.detach();
+      return visible;
+    };
+    return titles.filter(title => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let current = walker.nextNode() as Text | null;
+      while (current) {
+        if ((current.nodeValue || '').trim() === title && isTextVisible(current)) {
+          return true;
+        }
+        current = walker.nextNode() as Text | null;
+      }
+      return false;
+    });
+  });
+  expect(visibleDetailTitles).toEqual([]);
 
   await mkdir(workbenchEvidenceDir, { recursive: true });
   await page.screenshot({
-    path: path.join(workbenchEvidenceDir, 'default-plan-no-raw-semantic.png'),
+    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-no-raw-semantic.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page.locator('#ai-agent-workspace-overview')).toContainText('还需补充 2 项信息');
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-1920x1080-no-raw-semantic.png'),
     fullPage: true,
   });
 
