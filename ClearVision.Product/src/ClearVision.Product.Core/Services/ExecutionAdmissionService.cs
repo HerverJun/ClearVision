@@ -5,14 +5,40 @@ using ClearVision.Product.Core.Interfaces;
 
 namespace ClearVision.Product.Core.Services;
 
+/// <summary>
+/// 执行准入 surface：明确区分“正式运行”（允许流程声明的真实 I/O）与
+/// “预览/调参/AI dry-run”（除已实现的 safe dry-run 外，禁止真实外部 I/O）。
+/// </summary>
+/// <remarks>
+/// 正式运行 surface（<see cref="StoredProjectExecution"/> / <see cref="StudioInspectionRun"/> /
+/// <see cref="StationRuntimeExecution"/>）只做“项目存在、项目激活”等非 I/O 安全校验，
+/// 不再拦截 ImageAcquisition/ImageSave/TextSave/ResultOutput/TCP/PLC/HTTP/MQTT/DatabaseWrite/标定等副作用算子。
+/// 预览 surface（<see cref="NodePreview"/> / <see cref="OperatorPreview"/> / <see cref="AutoTunePreview"/>）
+/// 继续阻断真实外部 I/O；节点预览层已单独实现 ImageSave/TextSave/ResultOutput 的 safe dry-run。
+/// <see cref="LegacyWebMessageExecution"/> 恒定禁用。
+/// </remarks>
 public enum ExecutionAdmissionSurface
 {
+    /// <summary>已授权的正式项目执行：使用项目已存储的流程运行，允许流程声明的真实 I/O。</summary>
     StoredProjectExecution = 0,
-    InlineOfficialExecution = 1,
-    RealtimeInlineExecution = 2,
+
+    /// <summary>Studio 检测页单次/连续“运行流程”，使用画布内联流程运行，允许流程声明的真实 I/O。</summary>
+    StudioInspectionRun = 1,
+
+    /// <summary>Station 现场正式运行（含内联流程），允许流程声明的真实 I/O。</summary>
+    StationRuntimeExecution = 2,
+
+    /// <summary>流程编辑器节点预览：禁止真实外部 I/O（写盘算子走 safe dry-run；File 图源允许读图）。</summary>
     NodePreview = 3,
+
+    /// <summary>单算子预览/调参：禁止真实外部 I/O。</summary>
     OperatorPreview = 4,
-    LegacyWebMessageExecution = 5
+
+    /// <summary>旧 WebMessage 执行命令：恒定禁用。</summary>
+    LegacyWebMessageExecution = 5,
+
+    /// <summary>AutoTune 线序预览与指标分析：禁止真实外部 I/O（File 图源允许读图，与节点预览一致）。</summary>
+    AutoTunePreview = 6
 }
 
 public sealed record ExecutionAdmissionViolation(
@@ -110,6 +136,22 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         _projectRepository = projectRepository;
     }
 
+    /// <summary>
+    /// 正式运行 surface：允许流程声明的真实 I/O，仅保留非 I/O 安全校验（项目存在/激活等）。
+    /// </summary>
+    public static bool IsOfficialExecutionSurface(ExecutionAdmissionSurface surface) =>
+        surface is ExecutionAdmissionSurface.StoredProjectExecution
+            or ExecutionAdmissionSurface.StudioInspectionRun
+            or ExecutionAdmissionSurface.StationRuntimeExecution;
+
+    /// <summary>
+    /// 预览 surface 中是否允许 ImageAcquisition 以 File 模式读取本地图像。
+    /// 节点预览与 AutoTune 线序预览需要读取样张生成预览图；单算子预览只接受显式输入图，故禁止。
+    /// </summary>
+    private static bool AllowsFileImageAcquisitionRead(ExecutionAdmissionSurface surface) =>
+        surface is ExecutionAdmissionSurface.NodePreview
+            or ExecutionAdmissionSurface.AutoTunePreview;
+
     public async Task<ExecutionAdmissionResult> ValidateProjectAsync(
         Guid projectId,
         ExecutionAdmissionSurface surface,
@@ -151,8 +193,9 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         }
 
         var projectAdmission = await ValidateProjectAsync(projectId, surface, cancellationToken);
-        if (!projectAdmission.IsAllowed || surface == ExecutionAdmissionSurface.StoredProjectExecution)
+        if (!projectAdmission.IsAllowed || IsOfficialExecutionSurface(surface))
         {
+            // 正式运行 surface：项目校验通过即放行，允许流程声明的真实 I/O。
             return projectAdmission;
         }
 
@@ -168,9 +211,10 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             return RejectLegacyWebMessage();
         }
 
-        if (surface == ExecutionAdmissionSurface.StoredProjectExecution ||
+        if (IsOfficialExecutionSurface(surface) ||
             !HasExecutableFlow(flow))
         {
+            // 正式运行 surface 不拦截副作用算子；空流程无副作用可查。
             return ExecutionAdmissionResult.Allow();
         }
 
@@ -198,7 +242,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             return RejectLegacyWebMessage();
         }
 
-        if (surface == ExecutionAdmissionSurface.StoredProjectExecution)
+        if (IsOfficialExecutionSurface(surface))
         {
             return ExecutionAdmissionResult.Allow();
         }
@@ -231,8 +275,9 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         Operator @operator,
         ExecutionAdmissionSurface surface)
     {
-        if (surface == ExecutionAdmissionSurface.StoredProjectExecution)
+        if (IsOfficialExecutionSurface(surface))
         {
+            // 正式运行 surface：允许流程声明的真实 I/O，不产生副作用违规。
             return null;
         }
 
@@ -266,8 +311,9 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             }
 
             if (!string.IsNullOrWhiteSpace(filePath) &&
-                surface != ExecutionAdmissionSurface.NodePreview)
+                !AllowsFileImageAcquisitionRead(surface))
             {
+                // 节点预览 / AutoTune 线序预览允许读本地样张生成预览图；单算子预览等其它预览 surface 仍拦截。
                 return CreateViolation(
                     @operator,
                     "ImageAcquisition 配置 FilePath 时会读取本地文件。",
@@ -289,21 +335,22 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         {
             ExecutionAdmissionSurface.OperatorPreview => "ADMISSION_OPERATOR_PREVIEW_SIDE_EFFECT_BLOCKED",
             ExecutionAdmissionSurface.NodePreview => "ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED",
-            ExecutionAdmissionSurface.RealtimeInlineExecution => "ADMISSION_REALTIME_INLINE_SIDE_EFFECT_BLOCKED",
-            _ => "ADMISSION_INLINE_SIDE_EFFECT_BLOCKED"
+            ExecutionAdmissionSurface.AutoTunePreview => "ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED",
+            _ => "ADMISSION_PREVIEW_SIDE_EFFECT_BLOCKED"
         };
 
     private static string BuildBlockedMessage(
         ExecutionAdmissionSurface surface,
         IReadOnlyList<ExecutionAdmissionViolation> violations)
     {
+        // 仅预览 surface 会走到这里；正式运行 surface 已在上游放行，不会套用“预览”文案。
         var first = violations[0];
         var surfaceName = surface switch
         {
             ExecutionAdmissionSurface.OperatorPreview => "算子预览",
             ExecutionAdmissionSurface.NodePreview => "节点预览",
-            ExecutionAdmissionSurface.RealtimeInlineExecution => "实时内联执行",
-            _ => "内联执行"
+            ExecutionAdmissionSurface.AutoTunePreview => "线序预览",
+            _ => "预览"
         };
 
         return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会访问外部设备、网络服务或执行文件系统写入，正式运行流程时才会执行。";

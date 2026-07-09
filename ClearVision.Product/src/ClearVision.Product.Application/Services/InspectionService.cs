@@ -347,10 +347,12 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
+        // 检测页“运行流程”（连续/实时）属于正式运行：允许流程声明的真实 I/O，
+        // 仅保留项目存在/激活等非 I/O 安全校验（运行中防并发由 Coordinator 负责）。
         var inlineAdmission = await _executionAdmissionService.ValidateFlowAsync(
             projectId,
             flow,
-            ExecutionAdmissionSurface.RealtimeInlineExecution,
+            ExecutionAdmissionSurface.StudioInspectionRun,
             cancellationToken);
         ThrowIfAdmissionRejected(inlineAdmission);
 
@@ -709,7 +711,7 @@ public class InspectionService : IInspectionService
             projectId,
             flow,
             HasExecutableFlow(flow)
-                ? ExecutionAdmissionSurface.InlineOfficialExecution
+                ? ExecutionAdmissionSurface.StudioInspectionRun
                 : ExecutionAdmissionSurface.StoredProjectExecution,
             cancellationToken);
 
@@ -857,7 +859,7 @@ public class InspectionService : IInspectionService
                 projectId,
                 flow,
                 HasExecutableFlow(flow)
-                    ? ExecutionAdmissionSurface.InlineOfficialExecution
+                    ? ExecutionAdmissionSurface.StudioInspectionRun
                     : ExecutionAdmissionSurface.StoredProjectExecution,
                 cancellationToken);
             if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))

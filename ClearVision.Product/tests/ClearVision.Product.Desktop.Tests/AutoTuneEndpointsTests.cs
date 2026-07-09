@@ -189,7 +189,7 @@ public class AutoTuneEndpointsTests
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
         payload.Should().Contain("外部设备、网络服务或执行文件系统写入");
         await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
             Arg.Any<OperatorFlow>(),
@@ -272,7 +272,7 @@ public class AutoTuneEndpointsTests
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
         payload.Should().Contain("TextSave");
         await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
             Arg.Any<OperatorFlow>(),

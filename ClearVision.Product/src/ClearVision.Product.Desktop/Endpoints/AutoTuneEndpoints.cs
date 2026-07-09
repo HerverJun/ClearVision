@@ -170,9 +170,10 @@ public static class AutoTuneEndpoints
                     request.FlowId, request.TargetNodeId);
 
                 var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
+                // 线序预览属于预览 surface：禁止真实外部 I/O（File 图源读图仍允许，与节点预览一致）。
                 var admission = executionAdmissionService.ValidateFlowSideEffects(
                     flow,
-                    ExecutionAdmissionSurface.NodePreview);
+                    ExecutionAdmissionSurface.AutoTunePreview);
                 if (!admission.IsAllowed)
                 {
                     return Results.BadRequest(new

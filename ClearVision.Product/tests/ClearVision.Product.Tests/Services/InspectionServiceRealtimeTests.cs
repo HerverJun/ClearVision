@@ -108,26 +108,30 @@ public class InspectionServiceRealtimeTests
     }
 
     [Fact]
-    public async Task StartRealtimeInspectionFlowAsync_WithInlineSideEffectFlow_ShouldRejectWithoutRuntimeSession()
+    public async Task StartRealtimeInspectionFlowAsync_WithInlineSideEffectFlow_ShouldStartOfficiallyWithoutAdmissionBlock()
     {
+        // 检测页“连续运行”属于正式运行：内联 TextSave 写盘算子放行，正常注册会话并启动 Worker。
         var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
         var worker = Substitute.For<IInspectionWorker>();
+        worker.TryStartRunAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<string?>())
+            .Returns(Task.FromResult(true));
         var service = CreateService(coordinator, worker);
         var projectId = Guid.NewGuid();
 
-        var act = async () => await service.StartRealtimeInspectionFlowAsync(
+        await service.StartRealtimeInspectionFlowAsync(
             projectId,
             CreateSideEffectFlow(OperatorType.TextSave),
             cameraId: null,
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("ADMISSION_REALTIME_INLINE_SIDE_EFFECT_BLOCKED:*TextSave*");
-        coordinator.GetState(projectId).Should().BeNull();
-        await worker.DidNotReceiveWithAnyArgs().TryStartRunAsync(
+        await worker.Received(1).TryStartRunAsync(
+            projectId,
             Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Any<OperatorFlow>(),
+            Arg.Is<OperatorFlow>(flow => flow.Operators.Any(op => op.Type == OperatorType.TextSave)),
             Arg.Any<string?>());
     }
 
