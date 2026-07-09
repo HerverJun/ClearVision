@@ -43,11 +43,11 @@ const PLAN_PUBLIC_EVENT_DEFINITIONS = {
     },
     'semantic.failed': {
         channel: 'semantic',
-        kind: 'failure',
+        kind: 'warning',
         phase: 'semantic_extraction',
-        title: '语义抽取失败',
-        summary: '语义抽取模型不可用，当前为规则降级解析。',
-        status: 'failed',
+        title: '已启用规则兜底，需补充信息',
+        summary: '语义模型暂不可用，当前已切换为规则兜底解析。',
+        status: 'warning',
         visibility: 'persistent'
     },
     'semantic.fallback.used': {
@@ -409,19 +409,24 @@ export const aiPanelLiveEventsMixin = {
         if (!definition) return null;
 
         const payload = this._asObject?.(evt.payload) || {};
-        const status = this._normalizePublicLiveStatus(definition.status || evt.status);
+        const safeDiagnostics = this._collectPublicLiveDiagnostics(evt);
+        const publicPresentation = this._resolvePublicLiveUserPresentation?.(evt, definition, safeDiagnostics) || {};
+        const status = this._normalizePublicLiveStatus(publicPresentation.status || definition.status || evt.status);
         const fallbackSummary = planDefinition && (evt.eventType === 'plan.model.failed' || evt.eventType === 'plan.model.timeout')
             ? definition.summary
             : '';
-        const title = this._sanitizePublicLiveEventText(definition.title || evt.title || evt.stage || evt.eventType, 96);
+        const title = this._sanitizePublicLiveEventText(publicPresentation.title || definition.title || evt.title || evt.stage || evt.eventType, 96);
         const eventSummary = definition.useEventSummary === false
             ? ''
             : (evt.summary || this._payloadString?.(payload, 'summary') || '');
-        const summary = this._sanitizePublicLiveEventText(eventSummary || fallbackSummary || definition.summary || '', 220);
-        const safeDiagnostics = this._collectPublicLiveDiagnostics(evt);
+        const summary = this._sanitizePublicLiveEventText(
+            publicPresentation.summary || eventSummary || fallbackSummary || definition.summary || '',
+            220
+        );
+        const kind = publicPresentation.kind || definition.kind;
         const visibility = this._resolvePublicLiveVisibility(definition.visibility, {
             status,
-            kind: definition.kind,
+            kind,
             eventType: evt.eventType,
             safeDiagnostics
         });
@@ -433,7 +438,7 @@ export const aiPanelLiveEventsMixin = {
             requestId: this.activePlanRunRequestId || this.activeGenerateRequestId || '',
             sequence: evt.sequence,
             channel: definition.channel || 'build',
-            kind: definition.kind || 'status',
+            kind: kind || 'status',
             phase: definition.phase || evt.stage || 'run',
             title,
             summary,
@@ -447,6 +452,33 @@ export const aiPanelLiveEventsMixin = {
             redactionPass: true,
             safeDiagnostics
         };
+    },
+
+    _resolvePublicLiveUserPresentation(evt, definition, safeDiagnostics = {}) {
+        const eventType = String(evt?.eventType || '').trim();
+        const failureCode = String(
+            safeDiagnostics.plannerFailureCode ||
+            safeDiagnostics.failureReason ||
+            safeDiagnostics.sanitizedErrorKind ||
+            ''
+        ).trim().toLowerCase();
+        const fallbackReason = String(safeDiagnostics.fallbackReason || '').trim().toLowerCase();
+        const hasRuleFallback = Boolean(fallbackReason) ||
+            eventType === 'semantic.fallback.used' ||
+            String(safeDiagnostics.semanticSource || '').trim().toLowerCase() === 'rule_fallback';
+        const isSemanticFallbackFailure = eventType === 'semantic.failed' ||
+            (failureCode.startsWith('semantic_') && hasRuleFallback);
+
+        if (isSemanticFallbackFailure) {
+            return {
+                kind: 'warning',
+                status: 'warning',
+                title: '已启用规则兜底，需补充信息',
+                summary: '语义模型暂不可用，当前已切换为规则兜底解析。'
+            };
+        }
+
+        return definition || {};
     },
 
     _routePublicLiveEvent(publicEvent) {

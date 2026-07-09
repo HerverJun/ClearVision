@@ -2374,6 +2374,231 @@ test('Intent Router semanticExtraction is passed to PlanRun and rendered from Pl
   assert.match(planWorkspace.innerHTML, /camera/);
 });
 
+test('Plan workspace shows rule fallback as recoverable confirmation state', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canPlan: true,
+    canBuild: false,
+    clarificationQuestions: [],
+    planSource: 'rule_fallback',
+    fallbackReason: 'semantic_model_request_failed',
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { field: 'image_source', blocksBuild: true, category: 'hard_requirement' }
+      ],
+      resolvedFields: ['inspection_object'],
+      remainingFields: ['image_source'],
+      primaryMessage: '需要确认图像来源。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['metal surface'],
+      taskSignals: ['scratch'],
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: '规则兜底可继续，但图像来源还未确认。'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'rule_fallback',
+      taskType: 'surface_defect',
+      inspectionObject: 'metal surface',
+      okCondition: 'no scratch is OK',
+      ngCondition: 'scratch is NG',
+      imageSource: 'unknown',
+      missingFields: ['image_source'],
+      failureCode: 'semantic_model_request_failed',
+      sanitizedErrorMessage: 'semantic service unavailable',
+      metadataOnly: true
+    }
+  });
+
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, 'detect metal scratches');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  const actionState = panel._getPlanBuildActionState(panel.pendingVisionPlan);
+
+  assert.match(planWorkspace.innerHTML, /已启用规则兜底，需补充信息/);
+  assert.match(planWorkspace.innerHTML, /还差 1 项信息/);
+  assert.match(actionState.statusText, /还差 1 项信息/);
+  assert.match(planWorkspace.innerHTML, /id="ai-btn-start-build">开始构建/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /Plan 失败|规划失败|语义抽取失败/);
+
+  panel.activePlanRunId = 'semantic_fallback_run';
+  const publicEvent = panel._normalizePublicLiveEvent({
+    runId: 'semantic_fallback_run',
+    sequence: 1,
+    eventType: 'semantic.failed',
+    stage: 'semantic_extraction',
+    status: 'failed',
+    payload: {
+      metadata: {
+        semanticSource: 'rule_fallback',
+        failureCode: 'semantic_model_request_failed'
+      },
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  }, { source: 'plan-run' });
+
+  assert.equal(publicEvent.status, 'warning');
+  assert.equal(publicEvent.kind, 'warning');
+  assert.match(publicEvent.title, /已启用规则兜底/);
+});
+
+test('Plan workspace hides raw semantic diagnostics until diagnostics details', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canPlan: true,
+    canBuild: false,
+    clarificationQuestions: [],
+    planSource: 'rule_fallback',
+    fallbackReason: 'semantic_json_parse_failed',
+    publicEvents: [
+      {
+        stage: 'semantic_fallback_used',
+        status: 'warning',
+        title: 'semantic fallback',
+        summary: 'semantic fallback used',
+        metadata: {
+          failureCode: 'semantic_json_parse_failed',
+          taskType: 'surface_defect',
+          metadataOnly: true
+        },
+        metadataOnly: true
+      }
+    ],
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['raw-object-signal'],
+      taskSignals: ['raw-task-signal'],
+      missingFields: ['image_source'],
+      blockingReasons: [],
+      publicReason: 'need image source'
+    },
+    decisionTrace: {
+      taskType: 'surface_defect',
+      objectSignalsHit: ['raw-object-signal'],
+      fallbackReason: 'semantic_json_parse_failed',
+      metadataOnly: true
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'rule_fallback',
+      taskType: 'surface_defect',
+      inspectionObject: 'product surface',
+      okCondition: 'clean is OK',
+      ngCondition: 'scratch is NG',
+      imageSource: 'unknown',
+      missingFields: ['image_source'],
+      failureCode: 'semantic_json_parse_failed',
+      metadataOnly: true
+    }
+  });
+
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, 'detect scratches');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  const visibleHtml = planWorkspace.innerHTML.replace(/<details[\s\S]*<\/details>/g, '');
+  assert.doesNotMatch(visibleHtml, /semantic\.taskType|semantic\.failureCode|failureCode|objectSignals|metadataOnly|Agent Trace|Trace/);
+  assert.match(visibleHtml, /我理解的需求/);
+  assert.match(visibleHtml, /推荐流程/);
+  assert.match(visibleHtml, /还需要确认的信息/);
+  assert.match(visibleHtml, /下一步动作/);
+  assert.match(planWorkspace.innerHTML, /诊断详情 \/ 原始事件 \/ Agent Trace/);
+  assert.match(planWorkspace.innerHTML, /semantic\.taskType/);
+  assert.match(planWorkspace.innerHTML, /semantic\.failureCode/);
+  assert.match(planWorkspace.innerHTML, /objectSignals/);
+  assert.match(planWorkspace.innerHTML, /metadataOnly/);
+  assert.match(planWorkspace.innerHTML, /Agent Trace/);
+});
+
+test('Plan workspace missing fields render user-facing missing information count and chat guidance', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  const turn = attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    canPlan: true,
+    canBuild: false,
+    clarificationQuestions: [],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { field: 'image_source', blocksBuild: true, category: 'hard_requirement' },
+        { field: 'acceptance_criteria', blocksBuild: true, category: 'hard_requirement' }
+      ],
+      resolvedFields: ['inspection_object'],
+      remainingFields: ['image_source', 'acceptance_criteria'],
+      primaryMessage: '需要补充图像来源和判定标准。',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: [],
+      taskSignals: [],
+      missingFields: ['image_source', 'acceptance_criteria'],
+      blockingReasons: [],
+      publicReason: '缺少图像来源和判定标准。'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model',
+      taskType: 'surface_defect',
+      inspectionObject: '产品表面',
+      imageSource: 'unknown',
+      missingFields: ['image_source', 'acceptance_criteria'],
+      metadataOnly: true
+    }
+  });
+
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+
+  assert.match(planWorkspace.innerHTML, /还差 2 项信息/);
+  assert.match(planWorkspace.innerHTML, /图像来源/);
+  assert.match(planWorkspace.innerHTML, /检测目标\/判定标准/);
+  assert.match(planWorkspace.innerHTML, /补充信息/);
+  assert.match(planWorkspace.innerHTML, /使用推荐默认值继续/);
+  assert.match(planWorkspace.innerHTML, /查看草稿/);
+  assert.match(turn.card.innerHTML, /还需要你确认 2 项信息/);
+  assert.match(turn.card.innerHTML, /图像来源/);
+  assert.match(turn.card.innerHTML, /判定标准/);
+});
+
 test('casual Intent Router result replies without opening Plan', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -2722,9 +2947,10 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(overview.innerHTML, /Applied 复核/);
   assert.doesNotMatch(plan.innerHTML, /资源审计任务|人工确认模型资源|人工选择模板资源|仅记录 PLC 元数据/);
   assert.doesNotMatch(plan.innerHTML, /Clarifying Questions|Accept Recommended and Build|Plan Mode/);
+  const visiblePlanHtml = plan.innerHTML.replace(/<details[\s\S]*<\/details>/g, '');
   assert.doesNotMatch([
     overview.innerHTML,
-    plan.innerHTML
+    visiblePlanHtml
   ].join('\n'), /Accept recommended defaults|rule_fallback|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
 });
@@ -5594,7 +5820,7 @@ test('Plan main CTA ignores model NextAction and uses canonical readiness', asyn
 
   assert.match(planWorkspace.innerHTML, /模型 NextAction/);
   assert.match(planWorkspace.innerHTML, /Deploy now from model advice/);
-  assert.equal(panel._getPlanBuildActionState(plan).label, '仍需人工确认 1 项');
+  assert.equal(panel._getPlanBuildActionState(plan).label, '还差 2 项信息');
   assert.notEqual(mainButton.textContent, 'Deploy now from model advice');
 });
 

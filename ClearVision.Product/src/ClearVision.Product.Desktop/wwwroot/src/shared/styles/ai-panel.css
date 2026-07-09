@@ -5696,6 +5696,170 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     border-color: rgba(34, 197, 94, 0.35);
 }
 
+.ai-plan-user-summary,
+.ai-plan-build-summary {
+    border-color: rgba(59, 130, 246, 0.35);
+}
+
+.ai-plan-user-summary.is-warning,
+.ai-plan-build-summary.is-blocked {
+    border-color: rgba(183, 121, 31, 0.42);
+}
+
+.ai-plan-user-summary.is-ready,
+.ai-plan-build-summary.is-ready {
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.ai-plan-user-status {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--ai-border);
+    border-radius: 8px;
+    background: var(--ai-surface-panel);
+}
+
+.ai-plan-user-status strong {
+    color: var(--ai-text-main);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.ai-plan-user-status span {
+    color: var(--ai-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.ai-plan-user-status.is-warning {
+    border-color: rgba(183, 121, 31, 0.45);
+}
+
+.ai-plan-user-status.is-success {
+    border-color: rgba(34, 197, 94, 0.38);
+}
+
+.ai-plan-missing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ai-plan-missing-card {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid var(--ai-border);
+    border-radius: 8px;
+    background: var(--ai-surface-panel);
+}
+
+.ai-plan-missing-card.is-missing {
+    border-color: rgba(183, 121, 31, 0.45);
+}
+
+.ai-plan-missing-card.is-ready {
+    border-color: rgba(34, 197, 94, 0.28);
+}
+
+.ai-plan-missing-card div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ai-plan-missing-card strong {
+    min-width: 0;
+    color: var(--ai-text-main);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.ai-plan-missing-card span,
+.ai-plan-missing-card small,
+.ai-plan-missing-card p {
+    color: var(--ai-text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.ai-plan-missing-card p {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.ai-plan-user-cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.ai-plan-user-action {
+    min-height: 30px;
+    border: 1px solid var(--ai-border);
+    border-radius: 6px;
+    background: var(--ai-surface-panel);
+    color: var(--ai-text-main);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 6px 10px;
+}
+
+.ai-plan-user-action:hover {
+    border-color: var(--ai-accent-strong);
+    color: #fff;
+}
+
+.ai-plan-confirmation-guidance {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid rgba(183, 121, 31, 0.42);
+    border-radius: 8px;
+    background: var(--ai-surface-panel);
+}
+
+.ai-plan-confirmation-guidance[hidden] {
+    display: none;
+}
+
+.ai-plan-confirmation-guidance-title {
+    color: var(--ai-text-main);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.ai-plan-confirmation-guidance-copy {
+    color: var(--ai-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.ai-plan-confirmation-guidance-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ai-plan-confirmation-guidance-tags span {
+    padding: 4px 8px;
+    border: 1px solid rgba(183, 121, 31, 0.42);
+    border-radius: 999px;
+    color: #f8d38a;
+    font-size: 11px;
+}
+
 .ai-requirement-maturity-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5791,6 +5955,60 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     background: var(--ai-surface-panel);
     color: var(--ai-text-main);
     font-size: 11px;
+}
+
+.ai-plan-raw-diagnostics {
+    display: grid;
+    gap: 10px;
+}
+
+.ai-plan-raw-diagnostics > strong,
+.ai-plan-raw-diagnostic-block > span {
+    color: var(--ai-text-main);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ai-plan-raw-diagnostic-rows {
+    display: grid;
+    gap: 5px;
+}
+
+.ai-plan-raw-diagnostic-rows div {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+}
+
+.ai-plan-raw-diagnostic-rows span {
+    color: var(--ai-text-muted);
+    font-size: 11px;
+}
+
+.ai-plan-raw-diagnostic-rows code,
+.ai-plan-raw-diagnostic-block pre {
+    color: var(--ai-text-main);
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.ai-plan-raw-diagnostic-block {
+    display: grid;
+    gap: 6px;
+}
+
+.ai-plan-raw-diagnostic-block pre {
+    max-height: 220px;
+    margin: 0;
+    overflow: auto;
+    padding: 8px;
+    border: 1px solid var(--ai-border);
+    border-radius: 6px;
+    background: var(--ai-surface-panel);
+    white-space: pre-wrap;
 }
 
 .ai-plan-question {
@@ -6050,7 +6268,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 @media (max-width: 1180px) {
     .ai-agent-overview-card,
-    .ai-workspace-grid-2 {
+    .ai-workspace-grid-2,
+    .ai-plan-missing-grid {
         grid-template-columns: 1fr;
     }
 
@@ -6064,12 +6283,14 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     .ai-plan-question-options,
     .ai-clarification-plan-grid,
     .ai-agent-overview-metrics,
-    .ai-build-metric-row {
+    .ai-build-metric-row,
+    .ai-plan-raw-diagnostic-rows div {
         grid-template-columns: 1fr;
     }
 
     .ai-clarification-plan-header,
-    .ai-clarification-plan-actions {
+    .ai-clarification-plan-actions,
+    .ai-plan-user-cta {
         align-items: stretch;
         flex-direction: column;
     }

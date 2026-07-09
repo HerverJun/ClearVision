@@ -3453,6 +3453,10 @@ export const aiPanelAgentWorkspaceMixin = {
             stats.hardBlockerCount === 0;
         const hardCount = stats.hardBlockerCount || stats.pendingConfirmationCount || stats.blockingCount || 1;
         const blockedReason = this._getPlanBuildBlockedReason(plan);
+        const userMissingCount = this._buildPlanUserSummary?.(plan)?.missingCount || hardCount;
+        const userBlockedText = resourceOnly
+            ? `仍需补齐资源 ${stats.resourcePendingCount} 项`
+            : `还差 ${Math.max(userMissingCount, 1)} 项信息`;
 
         return {
             canBuild: false,
@@ -3460,13 +3464,11 @@ export const aiPanelAgentWorkspaceMixin = {
             canStart: false,
             acceptedRecommended: false,
             label: mode === 'draft'
-                ? `仍需确认基础需求 ${hardCount} 项`
-                : resourceOnly
-                    ? `仍需补齐资源 ${stats.resourcePendingCount} 项`
-                    : `仍需人工确认 ${Math.max(stats.pendingConfirmationCount, hardCount)} 项`,
+                ? userBlockedText
+                : userBlockedText,
             statusText: mode === 'strict' && deferredCount > 0
                 ? '已暂缓确认。严格模式下仍会阻断构建。'
-                : blockedReason,
+                : `${userBlockedText}：${blockedReason}`,
             stats
         };
     },
@@ -4942,56 +4944,258 @@ export const aiPanelAgentWorkspaceMixin = {
         }
     },
 
+    _buildPlanUserSummary(plan) {
+        if (!plan) {
+            return {
+                status: { tone: 'neutral', title: '等待需求描述', detail: '请输入检测目标后开始规划。' },
+                understoodItems: [],
+                missingCards: [],
+                missingFields: [],
+                missingCount: 0,
+                nextActions: ['描述检测目标、图像来源和判定标准。']
+            };
+        }
+
+        const semantic = plan.semanticExtraction || {};
+        const routeOperators = this._toArray(plan.route?.operators);
+        const missingInfo = this._collectPlanMissingInformation(plan);
+        const missingCount = missingInfo.missingFields.length;
+        const hasSemanticFallback = this._hasSemanticRuleFallback(plan);
+        const semanticFailureCode = String(semantic.failureCode || '').trim().toLowerCase();
+        const hasSemanticFailure = semanticFailureCode.startsWith('semantic_') || hasSemanticFallback;
+        const canBuild = plan.executable === true;
+        const status = hasSemanticFallback && hasSemanticFailure
+            ? {
+                tone: 'warning',
+                title: '已启用规则兜底，需补充信息',
+                detail: missingCount > 0
+                    ? `还差 ${missingCount} 项信息后再构建。`
+                    : '可先复核规则兜底草案，再决定是否构建。'
+            }
+            : missingCount > 0
+                ? {
+                    tone: 'warning',
+                    title: `还差 ${missingCount} 项信息`,
+                    detail: '补齐关键输入后，Build 才会进入构建链路。'
+                }
+                : canBuild
+                    ? {
+                        tone: 'success',
+                        title: '信息已足够，可以构建',
+                        detail: '请复核推荐流程后开始构建。'
+                    }
+                    : {
+                        tone: 'warning',
+                        title: '需要先确认信息',
+                        detail: this._getPlanBuildBlockedReason?.(plan) || '当前计划还不能开始构建。'
+                    };
+
+        const conditions = [
+            semantic.okCondition ? `OK：${semantic.okCondition}` : '',
+            semantic.ngCondition ? `NG：${semantic.ngCondition}` : ''
+        ].filter(Boolean).join('；');
+        const understoodItems = [
+            plan.goal ? `目标：${plan.goal}` : '',
+            semantic.inspectionObject ? `检测目标：${semantic.inspectionObject}` : '',
+            semantic.targetAttribute ? `关注属性：${semantic.targetAttribute}` : '',
+            conditions ? `判定标准：${conditions}` : '',
+            semantic.imageSource ? `图像来源：${semantic.imageSource}` : ''
+        ].filter(Boolean);
+        if (!understoodItems.length) {
+            understoodItems.push(...this._toArray(plan.understanding).slice(0, 4));
+        }
+
+        const nextActions = missingCount > 0
+            ? [
+                '补充缺失信息，或选择推荐默认值继续生成可编辑草稿。',
+                '确认后再开始 Build；部署和运行预览仍按权限门禁执行。'
+            ]
+            : [
+                plan.nextAction || '复核推荐流程后开始构建。',
+                routeOperators.length ? 'Build 会生成可编辑流程草稿，资源缺口会继续保留为待补项。' : ''
+            ].filter(Boolean);
+
+        return {
+            status,
+            understoodItems: understoodItems.slice(0, 6),
+            routeOperators,
+            missingCards: missingInfo.cards,
+            missingFields: missingInfo.missingFields,
+            missingCount,
+            nextActions
+        };
+    },
+
+    _collectPlanMissingInformation(plan) {
+        const semantic = plan?.semanticExtraction || {};
+        const maturity = plan?.requirementMaturity || {};
+        const preview = this._getCurrentCanonicalPreview?.(plan);
+        const readiness = preview?.buildReadiness || plan?.buildReadiness || {};
+        const fields = new Set();
+        const addField = value => {
+            const normalized = this._inferPlanQuestionField?.(value) || String(value || '').trim().toLowerCase();
+            if (normalized) fields.add(normalized);
+        };
+
+        [
+            ...this._toArray(maturity.missingFields),
+            ...this._toArray(semantic.missingFields),
+            ...this._toArray(plan?.remainingPlanFields),
+            ...this._toArray(readiness.remainingFields)
+        ].forEach(addField);
+
+        this._toArray(readiness.blockers).forEach(blocker => {
+            addField(blocker?.field || blocker?.Field || blocker?.questionId || blocker?.QuestionId);
+        });
+        this._toArray(plan?.blockingReasons).forEach(reason => addField(this._normalizePlanBlockingField?.(reason) || reason));
+        this._toArray(plan?.questions).forEach(question => {
+            const field = this._inferPlanQuestionFieldForQuestion?.(question, plan) ||
+                this._fallbackPlanQuestionField?.(question, question?.id) ||
+                question?.field ||
+                question?.id;
+            const answer = this._normalizePlanAnswer?.(this._getPlanAnswerForQuestion?.(question), question);
+            if (!answer && this._isPlanBuildBlockingField?.(field, this.requirementMode || 'strict', maturity, {
+                plan,
+                semanticExtraction: semantic,
+                route: plan?.route
+            })) {
+                addField(field);
+            }
+        });
+
+        if (!semantic.imageSource || String(semantic.imageSource).trim().toLowerCase() === 'unknown') {
+            addField(PLAN_ANSWER_FIELDS.IMAGE_SOURCE);
+        }
+        if (!semantic.inspectionObject && !plan?.goal) {
+            addField(PLAN_ANSWER_FIELDS.INSPECTION_OBJECT);
+        }
+        if (!semantic.okCondition && !semantic.ngCondition) {
+            addField(PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA);
+        }
+
+        const missingFields = Array.from(fields).filter(Boolean);
+        const hasAny = (...names) => names.some(name => fields.has(name));
+        const formatMissing = (...names) => names
+            .filter(name => fields.has(name))
+            .map(field => this._formatRequirementFieldLabel(field))
+            .filter(Boolean)
+            .join('、');
+        const card = ({ id, title, value, missing, detail }) => ({
+            id,
+            title,
+            value: value || '',
+            missing: Boolean(missing),
+            detail: detail || (missing ? '待补充' : '已明确')
+        });
+        const templateSelection = plan?.templateSelection || {};
+        const templateValue = [
+            templateSelection.templateName || templateSelection.TemplateName,
+            templateSelection.templateId || templateSelection.TemplateId,
+            templateSelection.mode || templateSelection.Mode
+        ].filter(Boolean).join(' / ');
+
+        const cards = [
+            card({
+                id: 'image_source',
+                title: '图像来源',
+                value: semantic.imageSource && String(semantic.imageSource).trim().toLowerCase() !== 'unknown'
+                    ? semantic.imageSource
+                    : '',
+                missing: hasAny(PLAN_ANSWER_FIELDS.IMAGE_SOURCE),
+                detail: hasAny(PLAN_ANSWER_FIELDS.IMAGE_SOURCE)
+                    ? '请确认来自相机、样张、当前画布还是历史结果。'
+                    : '已记录图像输入来源。'
+            }),
+            card({
+                id: 'decision_rule',
+                title: '检测目标/判定标准',
+                value: [
+                    semantic.inspectionObject ? `目标：${semantic.inspectionObject}` : '',
+                    semantic.okCondition ? `OK：${semantic.okCondition}` : '',
+                    semantic.ngCondition ? `NG：${semantic.ngCondition}` : ''
+                ].filter(Boolean).join('；'),
+                missing: hasAny(
+                    PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+                    PLAN_ANSWER_FIELDS.TASK_TYPE,
+                    PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+                    PLAN_ANSWER_FIELDS.DEFECT_TYPE,
+                    PLAN_ANSWER_FIELDS.TARGET_ATTRIBUTE
+                ),
+                detail: hasAny(
+                    PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+                    PLAN_ANSWER_FIELDS.TASK_TYPE,
+                    PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+                    PLAN_ANSWER_FIELDS.DEFECT_TYPE,
+                    PLAN_ANSWER_FIELDS.TARGET_ATTRIBUTE
+                )
+                    ? `还差：${formatMissing(
+                        PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+                        PLAN_ANSWER_FIELDS.TASK_TYPE,
+                        PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+                        PLAN_ANSWER_FIELDS.DEFECT_TYPE,
+                        PLAN_ANSWER_FIELDS.TARGET_ATTRIBUTE
+                    ) || '检测目标或判定标准'}`
+                    : '目标和 OK/NG 标准已记录。'
+            }),
+            card({
+                id: 'template_selection',
+                title: '当前流程/模板选择',
+                value: templateValue,
+                missing: hasAny(PLAN_ANSWER_FIELDS.TEMPLATE_STRATEGY, PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY),
+                detail: hasAny(PLAN_ANSWER_FIELDS.TEMPLATE_STRATEGY, PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY)
+                    ? `还差：${formatMissing(PLAN_ANSWER_FIELDS.TEMPLATE_STRATEGY, PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY) || '流程或算法策略'}`
+                    : (templateValue ? '已记录模板选择。' : '未指定模板，将使用推荐流程草稿。')
+            })
+        ];
+
+        return { cards, missingFields };
+    },
+
+    _hasSemanticRuleFallback(plan) {
+        const semantic = plan?.semanticExtraction || {};
+        if (String(semantic.source || '').trim().toLowerCase() === 'rule_fallback') return true;
+        if (String(plan?.planSource || '').trim().toLowerCase() === 'rule_fallback') return true;
+        if (String(plan?.rawFallbackReason || '').trim().toLowerCase().includes('semantic_')) return true;
+        return this._toArray(plan?.publicEvents).some(evt => {
+            const stage = String(evt?.stage || evt?.eventType || '').trim().toLowerCase();
+            const summary = String(evt?.summary || '').trim().toLowerCase();
+            return stage.includes('semantic_fallback') ||
+                stage.includes('rule_fallback') ||
+                summary.includes('semantic') && summary.includes('fallback');
+        });
+    },
+
     _renderRequirementMaturityPanel(plan) {
         const maturity = plan?.requirementMaturity || null;
         const trace = plan?.decisionTrace || null;
         if (!maturity && !trace) return '';
-        const canPlan = plan?.canPlan === true || maturity?.canPlan === true || trace?.canPlan === true;
-        const canBuild = plan?.executable === true;
-        const missingFields = this._toArray(maturity?.missingFields)
-            .map(field => this._formatRequirementFieldLabel(field))
-            .filter(Boolean);
-        const blockingReasons = this._toArray(maturity?.blockingReasons)
-            .map(reason => this._localizeDisplayText(reason))
-            .filter(Boolean);
-        const unresolvedStrategyBlockers = this._getUnresolvedStrategyBlockers({
-            blockingReasons: plan?.blockingReasons,
-            questions: plan?.questions
-        });
-        const taskSignals = this._toArray(maturity?.taskSignals).slice(0, 8);
-        const objectSignals = this._toArray(maturity?.objectSignals).slice(0, 8);
-        const fallbackReason = trace?.fallbackReason || plan?.fallbackReason || '';
-        const renderChips = (items, emptyText) => items.length
-            ? `<div class="ai-plan-chain">${items.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>`
-            : `<div class="ai-plan-maturity-empty">${this._escapeHtml(emptyText)}</div>`;
+        const summary = this._buildPlanUserSummary(plan);
+        const missingCards = summary.missingCards || [];
 
         return `
-            <section class="ai-workspace-section ai-requirement-maturity ${canBuild ? 'is-ready' : 'is-blocked'}">
-                <div class="ai-workspace-section-title">需求成熟度</div>
-                <div class="ai-requirement-maturity-grid">
-                    <div class="ai-build-compact-row">
-                        <b>成熟度</b>
-                        <span>${this._escapeHtml(this._formatRequirementMaturityLabel(maturity?.maturity || trace?.maturityLevel))}</span>
-                    </div>
-                    <div class="ai-build-compact-row">
-                        <b>任务类型</b>
-                        <span>${this._escapeHtml(this._formatRequirementTaskTypeLabel(maturity?.taskType || trace?.taskType))}</span>
-                    </div>
-                    <div class="ai-build-compact-row">
-                        <b>Plan</b>
-                        <span>${canPlan ? '允许' : '阻断'}</span>
-                    </div>
-                    <div class="ai-build-compact-row">
-                        <b>Build</b>
-                        <span>${canBuild ? '允许' : '阻断'}</span>
-                    </div>
+            <section class="ai-workspace-section ai-plan-user-summary ${summary.status.tone === 'success' ? 'is-ready' : 'is-warning'}">
+                <div class="ai-workspace-section-title">还需要确认的信息</div>
+                <div class="ai-plan-user-status is-${this._escapeHtml(summary.status.tone)}">
+                    <strong>${this._escapeHtml(summary.status.title)}</strong>
+                    <span>${this._escapeHtml(summary.status.detail)}</span>
                 </div>
-                ${unresolvedStrategyBlockers.length ? `<div class="ai-build-note"><strong>需确认策略</strong>${renderChips(unresolvedStrategyBlockers, '无')}</div>` : ''}
-                ${maturity?.publicReason ? `<div class="ai-build-note"><strong>判断原因</strong>${this._escapeHtml(maturity.publicReason)}</div>` : ''}
-                ${missingFields.length ? `<div class="ai-build-note"><strong>缺失字段</strong>${renderChips(missingFields, '无')}</div>` : ''}
-                ${blockingReasons.length ? `<div class="ai-build-note"><strong>阻断原因</strong>${renderChips(blockingReasons, '无')}</div>` : ''}
-                ${(objectSignals.length || taskSignals.length) ? `<div class="ai-build-note"><strong>命中信号</strong>${renderChips([...objectSignals, ...taskSignals], '无')}</div>` : ''}
-                ${fallbackReason ? `<div class="ai-build-note"><strong>Trace</strong>${this._escapeHtml(this._localizeDisplayText(fallbackReason))}</div>` : ''}
+                <div class="ai-plan-missing-grid">
+                    ${missingCards.map(item => `
+                        <article class="ai-plan-missing-card ${item.missing ? 'is-missing' : 'is-ready'}">
+                            <div>
+                                <strong>${this._escapeHtml(item.title)}</strong>
+                                <span>${this._escapeHtml(item.missing ? '待确认' : '已记录')}</span>
+                            </div>
+                            ${item.value ? `<p>${this._escapeHtml(item.value)}</p>` : ''}
+                            <small>${this._escapeHtml(item.detail)}</small>
+                        </article>
+                    `).join('')}
+                </div>
+                <div class="ai-plan-user-cta">
+                    <button type="button" class="ai-plan-user-action" id="ai-plan-focus-confirmation">补充信息</button>
+                    <button type="button" class="ai-plan-user-action" id="ai-plan-use-recommended-defaults">使用推荐默认值继续</button>
+                    <button type="button" class="ai-plan-user-action" id="ai-plan-view-draft">查看草稿</button>
+                </div>
             </section>
         `;
     },
@@ -5026,11 +5230,12 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-plan-empty-copy">资源补齐会在开始构建后出现；Plan 阶段只显示目标、关键问题、推荐默认值和规划诊断。</div>
                 </div>
             `;
+            this._renderPlanConfirmationGuidance?.(null, null);
             this._updatePlanBuildActionState();
             return;
         }
 
-        const semanticPanel = this._renderSemanticExtractionPanel(plan);
+        const userSummary = this._buildPlanUserSummary(plan);
         const maturityPanel = this._renderRequirementMaturityPanel(plan);
         const routeOperators = this._toArray(plan.route?.operators);
         const routeChain = routeOperators.length
@@ -5064,10 +5269,10 @@ export const aiPanelAgentWorkspaceMixin = {
                 : '';
         el.innerHTML = `
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">需求理解</div>
-                <div class="ai-workspace-list">${plan.understanding.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
+                <div class="ai-workspace-section-title">我理解的需求</div>
+                <div class="ai-workspace-list">${userSummary.understoodItems.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
             </section>
-            <section class="ai-workspace-section ai-requirement-maturity ${plan.executable ? 'is-ready' : 'is-blocked'}">
+            <section class="ai-workspace-section ai-plan-build-summary ${plan.executable ? 'is-ready' : 'is-blocked'}">
                 <div class="ai-workspace-section-title">${this._escapeHtml(modeLabel)}</div>
                 <div class="ai-requirement-maturity-grid">
                     <div class="ai-build-compact-row"><b>阻断项</b><span>${this._escapeHtml(String(readinessStats.blockingCount))}</span></div>
@@ -5077,10 +5282,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 ${isPlanReadOnly ? modeToggle.replaceAll('<button type="button" data-requirement-mode=', '<button type="button" disabled data-requirement-mode=') : modeToggle}
                 ${plan.buildReadiness?.primaryMessage ? `<div class="ai-build-note">${this._escapeHtml(plan.buildReadiness.primaryMessage)}</div>` : ''}
             </section>
-            ${semanticPanel}
             ${maturityPanel}
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">推荐方案</div>
+                <div class="ai-workspace-section-title">推荐流程</div>
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
@@ -5088,8 +5292,14 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <section class="ai-workspace-section">
+                <div class="ai-workspace-section-title">下一步动作</div>
+                <div class="ai-workspace-list">
+                    ${userSummary.nextActions.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}
+                </div>
+            </section>
+            <section class="ai-workspace-section">
                 <details class="ai-plan-diagnostics">
-                <summary class="ai-workspace-section-title">规划诊断</summary>
+                <summary class="ai-workspace-section-title">规划诊断（诊断详情 / 原始事件 / Agent Trace）</summary>
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
@@ -5104,6 +5314,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         const event = this._formatPlanEvent(evt);
                         return `<div><b>${this._escapeHtml(event.stageLabel)}</b> ${this._escapeHtml(event.statusLabel)} - ${this._escapeHtml(event.summary)}</div>`;
                     }).join('')}</div>` : ''}
+                    ${this._renderPlanRawDiagnostics(plan)}
                 </div>
                 </details>
             </section>
@@ -5182,7 +5393,111 @@ export const aiPanelAgentWorkspaceMixin = {
             this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'retry' });
             this._renderPlanWorkspace(this.pendingVisionPlan);
         });
+        el.querySelector('#ai-plan-focus-confirmation')?.addEventListener('click', () => {
+            const firstQuestion = el.querySelector('.ai-plan-question');
+            firstQuestion?.scrollIntoView?.({ block: 'nearest' });
+            this._setResultStatusNote?.('请在确认问题区补充缺失信息。', 'info');
+        });
+        el.querySelector('#ai-plan-use-recommended-defaults')?.addEventListener('click', () => {
+            this._startBuildFromCurrentPlan({ acceptedRecommended: true });
+        });
+        el.querySelector('#ai-plan-view-draft')?.addEventListener('click', () => {
+            if (this._canViewBuildWorkspace?.()) {
+                this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD);
+                return;
+            }
+            this._setResultStatusNote?.('开始构建后会生成可查看的流程草稿。', 'info');
+        });
+        this._renderPlanConfirmationGuidance?.(plan, userSummary);
         this._updatePlanBuildActionState();
+    },
+
+    _renderPlanRawDiagnostics(plan) {
+        const semantic = plan?.semanticExtraction || plan?.rawPlanSnapshot?.semanticExtraction || plan?.rawPlanSnapshot?.SemanticExtraction || null;
+        const maturity = plan?.requirementMaturity || plan?.rawPlanSnapshot?.requirementMaturity || plan?.rawPlanSnapshot?.RequirementMaturity || null;
+        const trace = plan?.decisionTrace || plan?.rawPlanSnapshot?.decisionTrace || plan?.rawPlanSnapshot?.DecisionTrace || null;
+        const rawEvents = plan?.rawPlanSnapshot?.publicEvents || plan?.rawPlanSnapshot?.PublicEvents || plan?.publicEvents || [];
+        const workspaceSnapshot = plan?.workspaceSnapshot || plan?.WorkspaceSnapshot || plan?.rawPlanSnapshot?.workspaceSnapshot || plan?.rawPlanSnapshot?.WorkspaceSnapshot || null;
+        const rows = [
+            semantic ? ['semantic.source', semantic.source || semantic.Source || ''] : null,
+            semantic ? ['semantic.taskType', semantic.taskType || semantic.TaskType || ''] : null,
+            semantic ? ['semantic.failureCode', semantic.failureCode || semantic.FailureCode || ''] : null,
+            semantic ? ['semantic.metadataOnly', semantic.metadataOnly ?? semantic.MetadataOnly ?? ''] : null,
+            maturity ? ['taskType', maturity.taskType || maturity.TaskType || ''] : null,
+            maturity ? ['objectSignals', this._toArray(maturity.objectSignals || maturity.ObjectSignals).join('、')] : null,
+            trace ? ['Trace', trace.fallbackReason || trace.FallbackReason || trace.stage || trace.Stage || ''] : null
+        ].filter(item => item && String(item[1] ?? '').trim());
+        const renderRows = rows.length
+            ? `<div class="ai-plan-raw-diagnostic-rows">${rows.map(([label, value]) => `
+                <div><span>${this._escapeHtml(label)}</span><code>${this._escapeHtml(this._sanitizePlanDiagnosticText(value, 220))}</code></div>
+            `).join('')}</div>`
+            : '<div class="ai-plan-maturity-empty">当前没有 semantic/taskType/objectSignals/failureCode 诊断字段。</div>';
+        const blocks = [
+            semantic ? ['原始 semantic', semantic] : null,
+            maturity ? ['需求成熟度原始字段', maturity] : null,
+            trace ? ['Agent Trace', trace] : null,
+            rawEvents?.length ? ['原始事件', rawEvents] : null,
+            workspaceSnapshot ? ['workspaceSnapshot', workspaceSnapshot] : null
+        ].filter(Boolean);
+
+        return `
+            <div class="ai-plan-raw-diagnostics">
+                <strong>原始诊断字段</strong>
+                ${renderRows}
+                ${blocks.map(([title, value]) => `
+                    <div class="ai-plan-raw-diagnostic-block">
+                        <span>${this._escapeHtml(title)}</span>
+                        <pre>${this._escapeHtml(this._stringifyPlanDiagnosticValue(value))}</pre>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    _stringifyPlanDiagnosticValue(value) {
+        const seen = new WeakSet();
+        const sanitize = raw => {
+            if (typeof raw !== 'string') return raw;
+            return this._sanitizePlanDiagnosticText(raw, 500);
+        };
+        try {
+            return JSON.stringify(value, (key, raw) => {
+                if (raw && typeof raw === 'object') {
+                    if (seen.has(raw)) return '[Circular]';
+                    seen.add(raw);
+                }
+                if (typeof raw === 'string') return sanitize(raw);
+                return raw;
+            }, 2).slice(0, 8000);
+        } catch {
+            return this._sanitizePlanDiagnosticText(String(value ?? ''), 8000);
+        }
+    },
+
+    _renderPlanConfirmationGuidance(plan, summary = null) {
+        const turn = this.activeAssistantTurn;
+        const card = turn?.card;
+        if (!card?.appendChild || typeof document === 'undefined') return;
+        let guidance = card.querySelector?.('.ai-plan-confirmation-guidance');
+        const data = summary || this._buildPlanUserSummary?.(plan);
+        if (!plan || !data || Number(data.missingCount || 0) <= 0) {
+            if (guidance) guidance.hidden = true;
+            return;
+        }
+        if (!guidance) {
+            guidance = document.createElement('div');
+            guidance.className = 'ai-plan-confirmation-guidance';
+            card.appendChild(guidance);
+        }
+        guidance.hidden = false;
+        guidance.innerHTML = `
+            <div class="ai-plan-confirmation-guidance-title">还需要你确认 ${this._escapeHtml(String(data.missingCount))} 项信息</div>
+            <div class="ai-plan-confirmation-guidance-copy">${this._escapeHtml(data.status?.detail || '补充信息后再开始构建。')}</div>
+            <div class="ai-plan-confirmation-guidance-tags">
+                ${(data.missingFields || []).slice(0, 5).map(field => `<span>${this._escapeHtml(this._formatRequirementFieldLabel(field))}</span>`).join('')}
+            </div>
+        `;
+        this._scrollToBottom?.();
     },
 
     _renderSemanticExtractionPanel(plan) {

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { bootAuthenticatedApp } from './authHelper';
 
 const applyEvidenceDir = path.resolve(process.cwd(), 'test-results', 'agent-apply-visible');
+const workbenchEvidenceDir = path.resolve(process.cwd(), 'test-results', 'agent-workbench-default');
 
 const applyReadyFlow = {
   operators: [
@@ -1464,6 +1465,154 @@ test('AI panel posts Build through AgentRun even when WebView2 is available', as
   expect(Object.prototype.hasOwnProperty.call(agentRunPayloads[0], 'sessionId')).toBe(true);
   const webMessages = await page.evaluate(() => (window as any).__cvWebViewMessages || []);
   expect(webMessages.some((message: any) => message.messageType === 'GenerateFlow')).toBe(false);
+});
+
+test('AI agent workbench default Plan view hides raw semantic trace until diagnostics expand', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await mockShellApis(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-plan-workspace')));
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    const plan = panel._normalizeBackendPlanResult({
+      planId: 'plan_default_semantic_hidden',
+      planHash: 'sha256:default-semantic-hidden',
+      originalUserPrompt: '检测产品表面划痕',
+      goal: '检测产品表面划痕',
+      intent: 'surface_defect',
+      confidence: 'high',
+      requirementMode: 'strict',
+      planSource: 'rule_fallback',
+      fallbackReason: 'semantic_model_request_failed',
+      requirementUnderstanding: ['目标是表面划痕检测。'],
+      recommendedRoute: {
+        routeId: 'surface_defect_default',
+        title: '表面缺陷检测流程',
+        summary: '采集图像后检测划痕并输出 OK/NG。',
+        operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultOutput'],
+      },
+      clarificationQuestions: [],
+      recommendedDefaults: [],
+      risks: [],
+      acceptanceCriteria: ['确认图像来源和 OK/NG 判定。'],
+      executablePlan: ['补齐图像来源后构建流程草稿。'],
+      canPlan: true,
+      canBuild: false,
+      buildReadiness: {
+        canBuild: false,
+        blockers: [
+          { field: 'image_source', blocksBuild: true, category: 'hard_requirement' },
+          { field: 'acceptance_criteria', blocksBuild: true, category: 'hard_requirement' },
+        ],
+        resolvedFields: ['inspection_object', 'task_type'],
+        remainingFields: ['image_source', 'acceptance_criteria'],
+        primaryMessage: '需要补充图像来源和判定标准。',
+        contractVersion: 'v2',
+      },
+      requirementMaturity: {
+        maturity: 'ambiguous',
+        taskType: 'surface_defect',
+        canPlan: true,
+        canBuild: false,
+        objectSignals: ['product surface'],
+        taskSignals: ['scratch'],
+        missingFields: ['image_source', 'acceptance_criteria'],
+        blockingReasons: ['image_source_missing', 'acceptance_criteria_missing'],
+        publicReason: '规则兜底可继续，但还需要确认输入和判定标准。',
+        metadataOnly: true,
+      },
+      decisionTrace: {
+        taskType: 'surface_defect',
+        objectSignalsHit: ['product surface'],
+        fallbackReason: 'semantic_model_request_failed',
+        metadataOnly: true,
+      },
+      semanticExtraction: {
+        isVisionRequest: true,
+        source: 'rule_fallback',
+        taskType: 'surface_defect',
+        inspectionObject: '产品表面',
+        okCondition: '',
+        ngCondition: '',
+        imageSource: 'unknown',
+        missingFields: ['image_source', 'acceptance_criteria'],
+        failureCode: 'semantic_model_request_failed',
+        sanitizedErrorMessage: 'semantic service unavailable',
+        metadataOnly: true,
+      },
+      publicEvents: [
+        {
+          stage: 'semantic_fallback_used',
+          status: 'warning',
+          title: 'semantic fallback',
+          summary: 'semantic fallback used',
+          metadata: {
+            failureCode: 'semantic_model_request_failed',
+            taskType: 'surface_defect',
+            metadataOnly: true,
+          },
+          metadataOnly: true,
+        },
+      ],
+      metadataOnly: true,
+    }, '检测产品表面划痕');
+    panel.pendingVisionPlan = plan;
+    panel.agentWorkspaceMode = 'plan';
+    panel.workspaceViewMode = 'plan';
+    panel._renderAgentWorkspaceOverview();
+    panel._renderPlanWorkspace(plan);
+  });
+
+  await expect(page.locator('#ai-plan-workspace')).toContainText('我理解的需求');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('推荐流程');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('还需要确认的信息');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('下一步动作');
+  await expect(page.getByText('已启用规则兜底，需补充信息')).toBeVisible();
+  const visibleRawSnippets = await page.evaluate(() => {
+    const root = document.querySelector('#ai-plan-workspace');
+    const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];
+    if (!root) return snippets;
+    const isTextVisible = (node: Text) => {
+      const parent = node.parentElement;
+      const closedDetails = parent?.closest('details:not([open])');
+      if (closedDetails && !parent?.closest('summary')) {
+        return false;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const visible = Array.from(range.getClientRects()).some(rect => rect.width > 0 && rect.height > 0);
+      range.detach();
+      return visible;
+    };
+    return snippets.filter(snippet => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let current = walker.nextNode() as Text | null;
+      while (current) {
+        if ((current.nodeValue || '').includes(snippet) && isTextVisible(current)) {
+          return true;
+        }
+        current = walker.nextNode() as Text | null;
+      }
+      return false;
+    });
+  });
+  expect(visibleRawSnippets).toEqual([]);
+
+  await mkdir(workbenchEvidenceDir, { recursive: true });
+  await page.screenshot({
+    path: path.join(workbenchEvidenceDir, 'default-plan-no-raw-semantic.png'),
+    fullPage: true,
+  });
+
+  await page.locator('summary', { hasText: '规划诊断' }).click();
+  await expect(page.locator('.ai-plan-raw-diagnostic-rows span', { hasText: 'semantic.taskType' })).toBeVisible();
+  await expect(page.locator('.ai-plan-raw-diagnostic-rows span', { hasText: 'semantic.failureCode' })).toBeVisible();
+  await expect(page.locator('.ai-plan-raw-diagnostic-block > span', { hasText: 'Agent Trace' })).toBeVisible();
 });
 
 test('AI agent Plan to Build exposes visible Apply button and applies through real click path', async ({ page }) => {
