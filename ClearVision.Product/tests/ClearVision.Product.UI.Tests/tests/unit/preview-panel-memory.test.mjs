@@ -2060,6 +2060,371 @@ test('PreviewPanelCapabilityOwner resets pixel probe status and cache on image m
   owner.dispose();
 });
 
+test('PreviewPanelCapabilityOwner locks a clicked image point and clears the crosshair', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const imageSource = 'data:image/png;base64,TEST_IMAGE';
+  const crosshair = {
+    hidden: true,
+    style: {},
+    attributes: new Map(),
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+      if (name === 'hidden') {
+        this.hidden = true;
+      }
+    },
+    removeAttribute(name) {
+      this.attributes.delete(name);
+      if (name === 'hidden') {
+        this.hidden = false;
+      }
+    }
+  };
+  const image = {
+    naturalWidth: 100,
+    naturalHeight: 50,
+    complete: true,
+    currentSrc: imageSource,
+    src: imageSource,
+    getAttribute(name) {
+      return name === 'src' ? imageSource : null;
+    },
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 200, height: 100, right: 210, bottom: 120 };
+    }
+  };
+  const stage = {
+    scrollLeft: 0,
+    scrollTop: 0,
+    focus() {},
+    setPointerCapture() {},
+    releasePointerCapture() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 260, height: 160, right: 260, bottom: 160 };
+    },
+    querySelector(selector) {
+      return selector === 'img' ? image : null;
+    }
+  };
+  harness.container.querySelector = selector => {
+    if (selector === '.preview-capability-image-stage') {
+      return stage;
+    }
+    if (selector === '[data-role="pixel-probe-crosshair"]') {
+      return crosshair;
+    }
+    return null;
+  };
+  owner.pixelProbe = {
+    reset() {},
+    mapPoint(point) {
+      return {
+        inside: true,
+        x: Math.floor((point.clientX - 10) / 2),
+        y: Math.floor((point.clientY - 20) / 2),
+        width: 100,
+        height: 50,
+        scale: 2,
+        scaleX: 2,
+        scaleY: 2
+      };
+    },
+    probePoint(point) {
+      return {
+        kind: 'pixel',
+        message: `X: ${point.clientX}  Y: ${point.clientY}  RGB: 1,2,3`
+      };
+    },
+    createLockedPoint(mapped) {
+      return {
+        kind: 'locked',
+        message: `已锁定 X: ${mapped.x}  Y: ${mapped.y}  RGB: 1,2,3`,
+        mapped,
+        rgba: [1, 2, 3, 255]
+      };
+    }
+  };
+  const eventAt = (clientX, clientY) => ({
+    button: 0,
+    pointerId: 1,
+    clientX,
+    clientY,
+    target: {
+      closest(selector) {
+        return selector === '.preview-capability-image-stage' ? stage : null;
+      }
+    },
+    preventDefault() {}
+  });
+
+  harness.emitPreview({
+    ...successState({
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: imageSource
+      }
+    })
+  });
+
+  owner.handlePixelProbePointerMove(eventAt(30, 40));
+  assert.equal(owner.pixelProbeStatusKind, 'pixel');
+  assert.match(owner.pixelProbeStatusText, /X: 30  Y: 40/);
+
+  owner.handlePixelProbePointerDown(eventAt(110, 70));
+  owner.handlePixelProbePointerUp(eventAt(110, 70));
+  assert.equal(owner.pixelProbeStatusKind, 'locked');
+  assert.match(owner.pixelProbeStatusText, /已锁定 X: 50  Y: 25/);
+  assert.equal(owner.pixelProbeLockedPoint.mapped.x, 50);
+  assert.equal(crosshair.hidden, false);
+  assert.equal(crosshair.style.left, '111px');
+  assert.equal(crosshair.style.top, '71px');
+
+  owner.handlePixelProbePointerMove({
+    target: {
+      closest() {
+        return null;
+      }
+    }
+  });
+  assert.equal(owner.pixelProbeStatusKind, 'locked');
+  assert.match(owner.pixelProbeStatusText, /已锁定 X: 50  Y: 25/);
+
+  image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 50, right: 100, bottom: 50 });
+  owner.handleClick(previewActionEvent('image-original'));
+  assert.equal(owner.previewImageMode, 'original');
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(owner.pixelProbeLockedPoint.mapped.x, 50);
+  assert.equal(crosshair.style.left, '50.5px');
+  assert.equal(crosshair.style.top, '25.5px');
+
+  owner.handleClick(previewActionEvent('clear-pixel-lock'));
+  assert.equal(owner.pixelProbeLockedPoint, null);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(crosshair.hidden, true);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner drags and clears an image ROI overlay', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const imageSource = 'data:image/png;base64,TEST_IMAGE';
+  const roiBox = {
+    hidden: true,
+    style: {},
+    attributes: new Map(),
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+      if (name === 'hidden') {
+        this.hidden = true;
+      }
+    },
+    removeAttribute(name) {
+      this.attributes.delete(name);
+      if (name === 'hidden') {
+        this.hidden = false;
+      }
+    }
+  };
+  const image = {
+    naturalWidth: 100,
+    naturalHeight: 50,
+    complete: true,
+    currentSrc: imageSource,
+    src: imageSource,
+    getAttribute(name) {
+      return name === 'src' ? imageSource : null;
+    },
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 200, height: 100, right: 210, bottom: 120 };
+    }
+  };
+  const stage = {
+    scrollLeft: 0,
+    scrollTop: 0,
+    focus() {},
+    setPointerCapture() {},
+    releasePointerCapture() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 260, height: 160, right: 260, bottom: 160 };
+    },
+    querySelector(selector) {
+      return selector === 'img' ? image : null;
+    }
+  };
+  harness.container.querySelector = selector => {
+    if (selector === '.preview-capability-image-stage') {
+      return stage;
+    }
+    if (selector === '[data-role="pixel-probe-roi"]') {
+      return roiBox;
+    }
+    return null;
+  };
+  owner.pixelProbe = {
+    reset() {},
+    mapPoint(point) {
+      return {
+        inside: true,
+        x: Math.floor((point.clientX - 10) / 2),
+        y: Math.floor((point.clientY - 20) / 2),
+        width: 100,
+        height: 50,
+        scale: 2,
+        scaleX: 2,
+        scaleY: 2
+      };
+    },
+    probePoint() {
+      return {
+        kind: 'pixel',
+        message: 'X: 0  Y: 0'
+      };
+    },
+    createLockedPoint(mapped) {
+      return {
+        kind: 'locked',
+        message: `已锁定 X: ${mapped.x}  Y: ${mapped.y}`,
+        mapped
+      };
+    },
+    createRoiSelection(roi) {
+      return {
+        kind: 'roi',
+        message: `ROI x:${roi.x} y:${roi.y} w:${roi.width} h:${roi.height}  像素:${roi.width * roi.height}  灰度 mean:1 min:0 max:2  世界: 未配置标定/暂无世界坐标`,
+        roi,
+        stats: {
+          ok: true,
+          count: roi.width * roi.height
+        }
+      };
+    }
+  };
+  const eventAt = (clientX, clientY) => ({
+    button: 0,
+    pointerId: 2,
+    clientX,
+    clientY,
+    target: {
+      closest(selector) {
+        return selector === '.preview-capability-image-stage' ? stage : null;
+      }
+    },
+    preventDefault() {}
+  });
+
+  harness.emitPreview({
+    ...successState({
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: imageSource
+      }
+    })
+  });
+
+  owner.handlePixelProbePointerDown(eventAt(10, 20));
+  owner.handlePixelProbePointerMove(eventAt(22, 32));
+  assert.deepEqual(owner.pixelProbeRoiDraft, { x: 0, y: 0, width: 7, height: 7 });
+  assert.equal(roiBox.hidden, false);
+  assert.equal(roiBox.style.left, '10px');
+  assert.equal(roiBox.style.top, '20px');
+  assert.equal(roiBox.style.width, '14px');
+  assert.equal(roiBox.style.height, '14px');
+
+  owner.handlePixelProbePointerUp(eventAt(22, 32));
+  assert.equal(owner.pixelProbeStatusKind, 'roi');
+  assert.match(owner.pixelProbeStatusText, /ROI x:0 y:0 w:7 h:7/);
+  assert.match(owner.pixelProbeStatusText, /未配置标定\/暂无世界坐标/);
+  assert.deepEqual(owner.pixelProbeRoiSelection.roi, { x: 0, y: 0, width: 7, height: 7 });
+
+  image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 50, right: 100, bottom: 50 });
+  owner.handleClick(previewActionEvent('image-original'));
+  assert.equal(owner.previewImageMode, 'original');
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.deepEqual(owner.pixelProbeRoiSelection.roi, { x: 0, y: 0, width: 7, height: 7 });
+  assert.equal(roiBox.style.left, '0px');
+  assert.equal(roiBox.style.top, '0px');
+  assert.equal(roiBox.style.width, '7px');
+  assert.equal(roiBox.style.height, '7px');
+
+  owner.handleClick(previewActionEvent('clear-pixel-roi'));
+  assert.equal(owner.pixelProbeRoiSelection, null);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(roiBox.hidden, true);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner clears pixel probe selections with Escape', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  let prevented = false;
+
+  owner.pixelProbeLockedPoint = { kind: 'locked', message: '已锁定 X: 1  Y: 2' };
+  owner.pixelProbeRoiSelection = {
+    kind: 'roi',
+    message: 'ROI x:0 y:0 w:1 h:1',
+    roi: { x: 0, y: 0, width: 1, height: 1 }
+  };
+  owner.handlePixelProbeKeyDown({
+    key: 'Escape',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(owner.pixelProbeLockedPoint, null);
+  assert.equal(owner.pixelProbeRoiSelection, null);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner clears locked pixel state when preview identity changes', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  owner.pixelProbeLockedPoint = {
+    mapped: { x: 1, y: 2, width: 10, height: 10 }
+  };
+  owner.pixelProbeRoiSelection = {
+    roi: { x: 0, y: 0, width: 5, height: 5 }
+  };
+  owner.pixelProbeStatusKind = 'locked';
+  owner.pixelProbeStatusText = '已锁定 X: 1  Y: 2';
+
+  harness.emitPreview({
+    ...successState({
+      activeNodeId: 'node-1',
+      identity: identity({ clientRequestSequence: 8 }),
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: 'data:image/png;base64,NEW_IMAGE'
+      }
+    })
+  });
+
+  assert.equal(owner.pixelProbeLockedPoint, null);
+  assert.equal(owner.pixelProbeRoiSelection, null);
+  assert.equal(owner.pixelProbeStatusKind, 'default');
+  assert.equal(owner.pixelProbeStatusText, PIXEL_PROBE_DEFAULT_MESSAGE);
+
+  owner.dispose();
+});
+
 test('PreviewPanelCapabilityOwner marks old preview results stale when input image hash changes', () => {
   const harness = createPreviewCapabilityHarness({
     inputImageBase64: 'new-input-image'

@@ -7,7 +7,10 @@ import {
 } from './previewCoordinator.js';
 import {
     ImagePixelProbe,
-    PIXEL_PROBE_DEFAULT_MESSAGE
+    PIXEL_PROBE_DEFAULT_MESSAGE,
+    createImageRoiFromPoints,
+    mapImagePixelToStagePoint,
+    mapImageRoiToStageRect
 } from './imagePixelProbe.mjs';
 import {
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
@@ -23,6 +26,7 @@ import {
 } from './operatorResultViewModel.mjs';
 
 export const PREVIEW_PANEL_CAPABILITY_OWNER_ID = 'preview-panel-capability-v2';
+const PIXEL_PROBE_ROI_DRAG_THRESHOLD_PX = 4;
 
 // Preview request and artifact-read route: PreviewPanelCapabilityOwner -> PreviewPanelCapabilityAdapter -> NodePreviewCoordinator.
 
@@ -624,6 +628,10 @@ export class PreviewPanelCapabilityOwner {
         this.pixelProbeStatusText = PIXEL_PROBE_DEFAULT_MESSAGE;
         this.pixelProbeStatusKind = 'default';
         this.pixelProbeImageKey = this.buildPixelProbeImageKey(this.previewState);
+        this.pixelProbeLockedPoint = null;
+        this.pixelProbeRoiSelection = null;
+        this.pixelProbeRoiDraft = null;
+        this.pixelProbePointerDown = null;
         this.disposed = false;
         this.unsubscribes = [];
         this.artifactReadAbort = null;
@@ -634,13 +642,26 @@ export class PreviewPanelCapabilityOwner {
         this.handleClick = this.handleClick.bind(this);
         this.handleChange = this.handleChange.bind(this);
         this.handlePixelProbePointerMove = this.handlePixelProbePointerMove.bind(this);
+        this.handlePixelProbePointerDown = this.handlePixelProbePointerDown.bind(this);
+        this.handlePixelProbePointerUp = this.handlePixelProbePointerUp.bind(this);
+        this.handlePixelProbePointerCancel = this.handlePixelProbePointerCancel.bind(this);
         this.handlePixelProbePointerLeave = this.handlePixelProbePointerLeave.bind(this);
+        this.handlePixelProbeKeyDown = this.handlePixelProbeKeyDown.bind(this);
+        this.handlePreviewImageLoad = this.handlePreviewImageLoad.bind(this);
 
         this.container.dataset.previewPanelOwner = PREVIEW_PANEL_CAPABILITY_OWNER_ID;
         this.container.addEventListener('click', this.handleClick);
         this.container.addEventListener('change', this.handleChange);
         this.container.addEventListener('pointermove', this.handlePixelProbePointerMove);
+        this.container.addEventListener('pointerdown', this.handlePixelProbePointerDown);
+        this.container.addEventListener('pointerup', this.handlePixelProbePointerUp);
+        this.container.addEventListener('pointercancel', this.handlePixelProbePointerCancel);
         this.container.addEventListener('pointerleave', this.handlePixelProbePointerLeave);
+        this.container.addEventListener('keydown', this.handlePixelProbeKeyDown);
+        this.container.addEventListener('load', this.handlePreviewImageLoad, true);
+        if (typeof document !== 'undefined' && document?.addEventListener) {
+            document.addEventListener('keydown', this.handlePixelProbeKeyDown);
+        }
 
         this.unsubscribes.push(
             this.previewAdapter.subscribePreviewState(state => this.handlePreviewStateChanged(state)),
@@ -739,11 +760,22 @@ export class PreviewPanelCapabilityOwner {
         ].join('|');
     }
 
-    resetPixelProbeStatus() {
+    resetPixelProbeStatus(options = {}) {
+        const clearSelections = options.clearSelections !== false;
         this.pixelProbe?.reset?.();
+        if (clearSelections) {
+            this.pixelProbeLockedPoint = null;
+            this.pixelProbeRoiSelection = null;
+            this.pixelProbeRoiDraft = null;
+            this.pixelProbePointerDown = null;
+        } else {
+            this.pixelProbeRoiDraft = null;
+            this.pixelProbePointerDown = null;
+        }
         this.pixelProbeStatusText = PIXEL_PROBE_DEFAULT_MESSAGE;
         this.pixelProbeStatusKind = 'default';
         this.syncPixelProbeStatusElement();
+        this.syncPixelProbeOverlayElements();
     }
 
     syncPixelProbeStatusElement() {
@@ -763,6 +795,167 @@ export class PreviewPanelCapabilityOwner {
         this.syncPixelProbeStatusElement();
     }
 
+    getPixelProbeStageFromEvent(event) {
+        return event?.target?.closest?.('.preview-capability-image-stage') || null;
+    }
+
+    getPixelProbeImage(stage = null) {
+        const host = stage || this.container.querySelector?.('.preview-capability-image-stage') || null;
+        return host?.querySelector?.('img') || null;
+    }
+
+    mapPixelProbeEvent(event, stage = null, options = {}) {
+        const image = this.getPixelProbeImage(stage);
+        if (!image) {
+            return {
+                image: null,
+                mapped: {
+                    inside: false,
+                    reason: 'missing-image'
+                }
+            };
+        }
+
+        return {
+            image,
+            mapped: this.pixelProbe.mapPoint({
+                clientX: event?.clientX,
+                clientY: event?.clientY
+            }, image, options)
+        };
+    }
+
+    syncPixelProbeOverlayElements() {
+        const stage = this.container.querySelector?.('.preview-capability-image-stage') || null;
+        const image = this.getPixelProbeImage(stage);
+        const crosshair = this.container.querySelector?.('[data-role="pixel-probe-crosshair"]') || null;
+        const roiBox = this.container.querySelector?.('[data-role="pixel-probe-roi"]') || null;
+        if (!crosshair && !roiBox) {
+            return;
+        }
+
+        if (crosshair && (!stage || !image || !this.pixelProbeLockedPoint?.mapped)) {
+            crosshair.hidden = true;
+            crosshair.setAttribute?.('hidden', '');
+        } else if (crosshair) {
+            const mapped = this.pixelProbeLockedPoint.mapped;
+            const point = mapImagePixelToStagePoint({
+                x: mapped.x,
+                y: mapped.y,
+                naturalWidth: mapped.width,
+                naturalHeight: mapped.height,
+                imageElement: image,
+                stageElement: stage
+            });
+            if (!point) {
+                crosshair.hidden = true;
+                crosshair.setAttribute?.('hidden', '');
+            } else {
+                crosshair.hidden = false;
+                crosshair.removeAttribute?.('hidden');
+                crosshair.style.left = `${point.left}px`;
+                crosshair.style.top = `${point.top}px`;
+            }
+        }
+
+        const roi = this.pixelProbeRoiDraft || this.pixelProbeRoiSelection?.roi || null;
+        if (roiBox && (!stage || !image || !roi)) {
+            roiBox.hidden = true;
+            roiBox.setAttribute?.('hidden', '');
+        } else if (roiBox) {
+            const rect = mapImageRoiToStageRect({
+                roi,
+                imageElement: image,
+                stageElement: stage
+            });
+            if (!rect) {
+                roiBox.hidden = true;
+                roiBox.setAttribute?.('hidden', '');
+            } else {
+                roiBox.hidden = false;
+                roiBox.removeAttribute?.('hidden');
+                roiBox.style.left = `${rect.left}px`;
+                roiBox.style.top = `${rect.top}px`;
+                roiBox.style.width = `${rect.width}px`;
+                roiBox.style.height = `${rect.height}px`;
+            }
+        }
+    }
+
+    schedulePixelProbeOverlaySync() {
+        const sync = () => this.syncPixelProbeOverlayElements();
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(sync);
+            return;
+        }
+
+        sync();
+    }
+
+    handlePreviewImageLoad(event) {
+        if (event?.target?.tagName?.toLowerCase?.() === 'img') {
+            this.syncPixelProbeOverlayElements();
+        }
+    }
+
+    setLockedPixelProbePoint(mapped, image) {
+        const result = this.pixelProbe.createLockedPoint(mapped, image, this.previewState);
+        if (result?.kind !== 'locked') {
+            this.updatePixelProbeStatus(result);
+            return;
+        }
+
+        this.pixelProbeLockedPoint = result;
+        this.updatePixelProbeStatus(result);
+        this.syncPixelProbeOverlayElements();
+    }
+
+    clearLockedPixelProbePoint() {
+        this.pixelProbeLockedPoint = null;
+        this.pixelProbePointerDown = null;
+        this.updatePixelProbeStatus({
+            kind: this.pixelProbeRoiSelection?.kind || 'default',
+            message: this.pixelProbeRoiSelection?.message || PIXEL_PROBE_DEFAULT_MESSAGE
+        });
+        this.syncPixelProbeOverlayElements();
+    }
+
+    setPixelProbeRoiSelection(roi, image) {
+        const result = this.pixelProbe.createRoiSelection(roi, image, this.previewState);
+        if (result?.kind !== 'roi') {
+            this.updatePixelProbeStatus(result);
+            return;
+        }
+
+        this.pixelProbeRoiSelection = result;
+        this.pixelProbeRoiDraft = null;
+        this.updatePixelProbeStatus(result);
+        this.syncPixelProbeOverlayElements();
+    }
+
+    clearPixelProbeRoiSelection() {
+        this.pixelProbeRoiSelection = null;
+        this.pixelProbeRoiDraft = null;
+        this.pixelProbePointerDown = null;
+        this.updatePixelProbeStatus({
+            kind: this.pixelProbeLockedPoint?.kind || 'default',
+            message: this.pixelProbeLockedPoint?.message || PIXEL_PROBE_DEFAULT_MESSAGE
+        });
+        this.syncPixelProbeOverlayElements();
+    }
+
+    clearPixelProbeSelections() {
+        this.pixelProbeLockedPoint = null;
+        this.pixelProbeRoiSelection = null;
+        this.pixelProbeRoiDraft = null;
+        this.pixelProbePointerDown = null;
+        this.updatePixelProbeStatus({
+            kind: 'default',
+            message: PIXEL_PROBE_DEFAULT_MESSAGE
+        });
+        this.syncPixelProbeOverlayElements();
+    }
+
     handlePixelProbePointerMove(event) {
         if (this.disposed) {
             return;
@@ -770,6 +963,10 @@ export class PreviewPanelCapabilityOwner {
 
         const stage = event.target?.closest?.('.preview-capability-image-stage') || null;
         if (!stage) {
+            if (this.pixelProbeLockedPoint || this.pixelProbeRoiSelection) {
+                this.syncPixelProbeOverlayElements();
+                return;
+            }
             if (this.pixelProbeStatusKind !== 'default') {
                 this.updatePixelProbeStatus({
                     kind: 'default',
@@ -779,7 +976,35 @@ export class PreviewPanelCapabilityOwner {
             return;
         }
 
+        if (this.pixelProbePointerDown) {
+            const pointerDown = this.pixelProbePointerDown;
+            if (pointerDown.pointerId === undefined ||
+                event.pointerId === undefined ||
+                pointerDown.pointerId === event.pointerId) {
+                const { mapped } = this.mapPixelProbeEvent(event, pointerDown.stage, { clampToImage: true });
+                const deltaX = Number(event.clientX) - pointerDown.startClientX;
+                const deltaY = Number(event.clientY) - pointerDown.startClientY;
+                const distance = Math.hypot(deltaX, deltaY);
+                if (mapped?.inside && (pointerDown.dragging || distance >= PIXEL_PROBE_ROI_DRAG_THRESHOLD_PX)) {
+                    pointerDown.dragging = true;
+                    this.pixelProbeRoiDraft = createImageRoiFromPoints(
+                        pointerDown.mapped,
+                        mapped,
+                        pointerDown.mapped.width,
+                        pointerDown.mapped.height
+                    );
+                    this.syncPixelProbeOverlayElements();
+                }
+            }
+            return;
+        }
+
         const image = stage.querySelector?.('img') || null;
+        if (this.pixelProbeLockedPoint || this.pixelProbeRoiSelection) {
+            this.syncPixelProbeOverlayElements();
+            return;
+        }
+
         const result = this.pixelProbe.probePoint({
             clientX: event.clientX,
             clientY: event.clientY
@@ -787,12 +1012,111 @@ export class PreviewPanelCapabilityOwner {
         this.updatePixelProbeStatus(result);
     }
 
+    handlePixelProbePointerDown(event) {
+        if (this.disposed || event?.button > 0) {
+            return;
+        }
+
+        const stage = this.getPixelProbeStageFromEvent(event);
+        if (!stage) {
+            return;
+        }
+
+        const { image, mapped } = this.mapPixelProbeEvent(event, stage);
+        if (!image || !mapped?.inside) {
+            return;
+        }
+
+        event.preventDefault?.();
+        stage.focus?.({ preventScroll: true });
+        stage.setPointerCapture?.(event.pointerId);
+        this.pixelProbePointerDown = {
+            pointerId: event.pointerId,
+            startClientX: Number(event.clientX),
+            startClientY: Number(event.clientY),
+            mapped,
+            image,
+            stage,
+            dragging: false
+        };
+    }
+
+    handlePixelProbePointerUp(event) {
+        if (this.disposed || !this.pixelProbePointerDown) {
+            return;
+        }
+
+        const pointerDown = this.pixelProbePointerDown;
+        if (pointerDown.pointerId !== undefined &&
+            event.pointerId !== undefined &&
+            pointerDown.pointerId !== event.pointerId) {
+            return;
+        }
+
+        pointerDown.stage?.releasePointerCapture?.(event.pointerId);
+        this.pixelProbePointerDown = null;
+        const deltaX = Number(event.clientX) - pointerDown.startClientX;
+        const deltaY = Number(event.clientY) - pointerDown.startClientY;
+        const distance = Math.hypot(deltaX, deltaY);
+        const shouldCreateRoi = pointerDown.dragging || distance >= PIXEL_PROBE_ROI_DRAG_THRESHOLD_PX;
+        const { image, mapped } = this.mapPixelProbeEvent(event, pointerDown.stage, {
+            clampToImage: shouldCreateRoi
+        });
+        if (!image || !mapped?.inside) {
+            this.pixelProbeRoiDraft = null;
+            this.syncPixelProbeOverlayElements();
+            return;
+        }
+
+        if (shouldCreateRoi) {
+            const roi = createImageRoiFromPoints(
+                pointerDown.mapped,
+                mapped,
+                pointerDown.mapped.width,
+                pointerDown.mapped.height
+            );
+            this.pixelProbeRoiDraft = null;
+            if (roi) {
+                this.setPixelProbeRoiSelection(roi, image);
+            } else {
+                this.syncPixelProbeOverlayElements();
+            }
+            return;
+        }
+
+        this.setLockedPixelProbePoint(mapped, image);
+    }
+
+    handlePixelProbePointerCancel(event) {
+        const pointerDown = this.pixelProbePointerDown;
+        if (pointerDown?.stage && event?.pointerId !== undefined) {
+            pointerDown.stage.releasePointerCapture?.(event.pointerId);
+        }
+        this.pixelProbePointerDown = null;
+        this.pixelProbeRoiDraft = null;
+        this.syncPixelProbeOverlayElements();
+    }
+
     handlePixelProbePointerLeave() {
-        if (!this.disposed) {
+        if (!this.disposed && !this.pixelProbeLockedPoint && !this.pixelProbeRoiSelection) {
             this.updatePixelProbeStatus({
                 kind: 'default',
                 message: PIXEL_PROBE_DEFAULT_MESSAGE
             });
+        }
+    }
+
+    handlePixelProbeKeyDown(event) {
+        if (this.disposed || event?.key !== 'Escape') {
+            return;
+        }
+
+        if (this.pixelProbeLockedPoint ||
+            this.pixelProbeRoiSelection ||
+            this.pixelProbeRoiDraft ||
+            this.pixelProbePointerDown) {
+            event.preventDefault?.();
+            this.clearPixelProbeSelections();
         }
     }
 
@@ -821,14 +1145,28 @@ export class PreviewPanelCapabilityOwner {
 
         if (action === 'image-fit') {
             this.previewImageMode = 'fit';
-            this.resetPixelProbeStatus();
+            this.resetPixelProbeStatus({ clearSelections: false });
             this.render();
+            this.schedulePixelProbeOverlaySync();
             return;
         }
 
         if (action === 'image-original') {
             this.previewImageMode = 'original';
-            this.resetPixelProbeStatus();
+            this.resetPixelProbeStatus({ clearSelections: false });
+            this.render();
+            this.schedulePixelProbeOverlaySync();
+            return;
+        }
+
+        if (action === 'clear-pixel-lock') {
+            this.clearLockedPixelProbePoint();
+            this.render();
+            return;
+        }
+
+        if (action === 'clear-pixel-roi') {
+            this.clearPixelProbeRoiSelection();
             this.render();
             return;
         }
@@ -1034,6 +1372,7 @@ export class PreviewPanelCapabilityOwner {
                 </div>
             </section>
         `;
+        this.schedulePixelProbeOverlaySync();
     }
 
     renderCurrentParameterSummary() {
@@ -1081,6 +1420,8 @@ export class PreviewPanelCapabilityOwner {
             : '';
         const imageFitPressed = this.previewImageMode === 'fit';
         const imageOriginalPressed = this.previewImageMode === 'original';
+        const clearLockDisabled = !hasImage || !this.pixelProbeLockedPoint;
+        const clearRoiDisabled = !hasImage || !this.pixelProbeRoiSelection;
 
         return `
             <section class="preview-capability-media preview-capability-media-single">
@@ -1090,13 +1431,17 @@ export class PreviewPanelCapabilityOwner {
                         <div class="preview-capability-image-actions">
                             <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-fit" aria-pressed="${imageFitPressed ? 'true' : 'false'}" ${renderButtonDisabledAttributes(!hasImage)}>适应窗口</button>
                             <button type="button" class="btn btn-secondary btn-sm" data-preview-action="image-original" aria-pressed="${imageOriginalPressed ? 'true' : 'false'}" ${renderButtonDisabledAttributes(!hasImage)}>原始大小</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="clear-pixel-lock" ${renderButtonDisabledAttributes(clearLockDisabled)}>清除锁定</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-preview-action="clear-pixel-roi" ${renderButtonDisabledAttributes(clearRoiDisabled)}>清除 ROI</button>
                             <button type="button" class="btn btn-secondary btn-sm" data-preview-action="open-image" data-image-source="${escapeAttribute(outputImageSrc || '')}" ${renderButtonDisabledAttributes(!hasImage)}>打开大图</button>
                         </div>
                     </div>
-                    <div class="preview-capability-image-stage">
+                    <div class="preview-capability-image-stage" tabindex="${hasImage ? '0' : '-1'}">
                         ${hasImage
                             ? `<img src="${escapeAttribute(outputImageSrc)}" alt="当前算子输出图像预览">`
                             : `<div class="preview-capability-placeholder">${escapeHtml(emptyMessage)}</div>`}
+                        ${hasImage ? '<div class="preview-capability-probe-crosshair" data-role="pixel-probe-crosshair" hidden aria-hidden="true"></div>' : ''}
+                        ${hasImage ? '<div class="preview-capability-roi-box" data-role="pixel-probe-roi" hidden aria-hidden="true"></div>' : ''}
                         ${hasImage ? staleBadge : ''}
                     </div>
                     <div class="preview-capability-pixel-probe-status" data-role="pixel-probe-status" data-probe-state="${escapeAttribute(this.pixelProbeStatusKind)}">${escapeHtml(this.pixelProbeStatusText)}</div>
@@ -1632,7 +1977,15 @@ export class PreviewPanelCapabilityOwner {
         this.container.removeEventListener('click', this.handleClick);
         this.container.removeEventListener('change', this.handleChange);
         this.container.removeEventListener('pointermove', this.handlePixelProbePointerMove);
+        this.container.removeEventListener('pointerdown', this.handlePixelProbePointerDown);
+        this.container.removeEventListener('pointerup', this.handlePixelProbePointerUp);
+        this.container.removeEventListener('pointercancel', this.handlePixelProbePointerCancel);
         this.container.removeEventListener('pointerleave', this.handlePixelProbePointerLeave);
+        this.container.removeEventListener('keydown', this.handlePixelProbeKeyDown);
+        this.container.removeEventListener('load', this.handlePreviewImageLoad, true);
+        if (typeof document !== 'undefined' && document?.removeEventListener) {
+            document.removeEventListener('keydown', this.handlePixelProbeKeyDown);
+        }
         delete this.container.dataset.previewPanelOwner;
         this.container.innerHTML = '';
         this.currentOperator = null;
