@@ -6,6 +6,10 @@ import {
     buildPreviewInputImageHash
 } from './previewCoordinator.js';
 import {
+    ImagePixelProbe,
+    PIXEL_PROBE_DEFAULT_MESSAGE
+} from './imagePixelProbe.mjs';
+import {
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES,
     buildOperatorResultViewModel,
@@ -616,6 +620,10 @@ export class PreviewPanelCapabilityOwner {
         this.manualPreviewRequestToken = 0;
         this.previewImageMode = 'fit';
         this.previewImageSource = this.previewState?.presenter?.outputImageSrc || null;
+        this.pixelProbe = new ImagePixelProbe();
+        this.pixelProbeStatusText = PIXEL_PROBE_DEFAULT_MESSAGE;
+        this.pixelProbeStatusKind = 'default';
+        this.pixelProbeImageKey = this.buildPixelProbeImageKey(this.previewState);
         this.disposed = false;
         this.unsubscribes = [];
         this.artifactReadAbort = null;
@@ -625,10 +633,14 @@ export class PreviewPanelCapabilityOwner {
 
         this.handleClick = this.handleClick.bind(this);
         this.handleChange = this.handleChange.bind(this);
+        this.handlePixelProbePointerMove = this.handlePixelProbePointerMove.bind(this);
+        this.handlePixelProbePointerLeave = this.handlePixelProbePointerLeave.bind(this);
 
         this.container.dataset.previewPanelOwner = PREVIEW_PANEL_CAPABILITY_OWNER_ID;
         this.container.addEventListener('click', this.handleClick);
         this.container.addEventListener('change', this.handleChange);
+        this.container.addEventListener('pointermove', this.handlePixelProbePointerMove);
+        this.container.addEventListener('pointerleave', this.handlePixelProbePointerLeave);
 
         this.unsubscribes.push(
             this.previewAdapter.subscribePreviewState(state => this.handlePreviewStateChanged(state)),
@@ -654,6 +666,7 @@ export class PreviewPanelCapabilityOwner {
         this.manualPreviewRequestToken += 1;
         this.cancelArtifactRead();
         this.artifactReadState.clear();
+        this.resetPixelProbeStatus();
 
         if (!this.currentNodeId) {
             this.previewAdapter.clearActiveNode();
@@ -679,6 +692,7 @@ export class PreviewPanelCapabilityOwner {
             this.currentConnection = null;
             this.manualPreviewPending = false;
             this.manualPreviewRequestToken += 1;
+            this.resetPixelProbeStatus();
             this.previewAdapter.clearActiveNode();
             this.render();
             return;
@@ -708,8 +722,78 @@ export class PreviewPanelCapabilityOwner {
             this.previewImageSource = nextImageSource;
             this.previewImageMode = 'fit';
         }
+        const nextPixelProbeImageKey = this.buildPixelProbeImageKey(this.previewState);
+        if (nextPixelProbeImageKey !== this.pixelProbeImageKey) {
+            this.pixelProbeImageKey = nextPixelProbeImageKey;
+            this.resetPixelProbeStatus();
+        }
         this.resetArtifactReadsIfIdentityChanged();
         this.render();
+    }
+
+    buildPixelProbeImageKey(state) {
+        return [
+            state?.activeNodeId || '',
+            getStateIdentitySignature(state),
+            state?.presenter?.outputImageSrc || ''
+        ].join('|');
+    }
+
+    resetPixelProbeStatus() {
+        this.pixelProbe?.reset?.();
+        this.pixelProbeStatusText = PIXEL_PROBE_DEFAULT_MESSAGE;
+        this.pixelProbeStatusKind = 'default';
+        this.syncPixelProbeStatusElement();
+    }
+
+    syncPixelProbeStatusElement() {
+        const element = this.container.querySelector?.('[data-role="pixel-probe-status"]');
+        if (!element) {
+            return;
+        }
+
+        element.textContent = this.pixelProbeStatusText || PIXEL_PROBE_DEFAULT_MESSAGE;
+        element.dataset.probeState = this.pixelProbeStatusKind || 'default';
+        element.setAttribute?.('data-probe-state', this.pixelProbeStatusKind || 'default');
+    }
+
+    updatePixelProbeStatus(result) {
+        this.pixelProbeStatusText = result?.message || PIXEL_PROBE_DEFAULT_MESSAGE;
+        this.pixelProbeStatusKind = result?.kind || 'default';
+        this.syncPixelProbeStatusElement();
+    }
+
+    handlePixelProbePointerMove(event) {
+        if (this.disposed) {
+            return;
+        }
+
+        const stage = event.target?.closest?.('.preview-capability-image-stage') || null;
+        if (!stage) {
+            if (this.pixelProbeStatusKind !== 'default') {
+                this.updatePixelProbeStatus({
+                    kind: 'default',
+                    message: PIXEL_PROBE_DEFAULT_MESSAGE
+                });
+            }
+            return;
+        }
+
+        const image = stage.querySelector?.('img') || null;
+        const result = this.pixelProbe.probePoint({
+            clientX: event.clientX,
+            clientY: event.clientY
+        }, image);
+        this.updatePixelProbeStatus(result);
+    }
+
+    handlePixelProbePointerLeave() {
+        if (!this.disposed) {
+            this.updatePixelProbeStatus({
+                kind: 'default',
+                message: PIXEL_PROBE_DEFAULT_MESSAGE
+            });
+        }
     }
 
     handleClick(event) {
@@ -1013,6 +1097,7 @@ export class PreviewPanelCapabilityOwner {
                             : `<div class="preview-capability-placeholder">${escapeHtml(emptyMessage)}</div>`}
                         ${hasImage ? staleBadge : ''}
                     </div>
+                    <div class="preview-capability-pixel-probe-status" data-role="pixel-probe-status" data-probe-state="${escapeAttribute(this.pixelProbeStatusKind)}">${escapeHtml(this.pixelProbeStatusText)}</div>
                 </div>
             </section>
         `;
@@ -1541,8 +1626,11 @@ export class PreviewPanelCapabilityOwner {
         });
         this.unsubscribes = [];
         this.artifactReadState.clear();
+        this.pixelProbe?.reset?.();
         this.container.removeEventListener('click', this.handleClick);
         this.container.removeEventListener('change', this.handleChange);
+        this.container.removeEventListener('pointermove', this.handlePixelProbePointerMove);
+        this.container.removeEventListener('pointerleave', this.handlePixelProbePointerLeave);
         delete this.container.dataset.previewPanelOwner;
         this.container.innerHTML = '';
         this.currentOperator = null;

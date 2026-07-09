@@ -776,6 +776,30 @@
     background: var(--ink-deep);
 }
 
+.preview-capability-pixel-probe-status {
+    min-height: 24px;
+    padding: 4px 7px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.78);
+    color: var(--template-text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.45;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-capability-pixel-probe-status[data-probe-state="pixel"] {
+    color: var(--template-text);
+}
+
+.preview-capability-pixel-probe-status[data-probe-state="outside"],
+.preview-capability-pixel-probe-status[data-probe-state="loading"],
+.preview-capability-pixel-probe-status[data-probe-state="unavailable"] {
+    color: #fbbf24;
+}
+
 .preview-capability-image[data-image-mode="fit"] img {
     display: block;
     width: 100%;

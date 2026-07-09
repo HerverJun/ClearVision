@@ -47,6 +47,8 @@ const project = {
 };
 
 const user = {
+  id: 'layout-admin',
+  userId: 'layout-admin',
   username: 'admin',
   displayName: 'Layout QA',
   role: 'Admin'
@@ -454,8 +456,111 @@ async function selectLibraryOperator(page) {
 async function waitForOutputImage(page) {
   await page.waitForFunction(() => {
     const image = document.querySelector('#preview-panel .preview-capability-main-image img');
-    return image?.getAttribute('src')?.startsWith('data:image/');
+    return image?.getAttribute('src')?.startsWith('data:image/') &&
+      image.complete &&
+      image.naturalWidth > 0 &&
+      image.naturalHeight > 0;
   }, null, { timeout: 10000 });
+}
+
+async function readPixelProbeStatus(page) {
+  return ((await page.locator('#preview-panel [data-role="pixel-probe-status"]').first().textContent()) || '').trim();
+}
+
+async function waitForPixelProbeStatus(page, predicate, description) {
+  let lastText = '';
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    lastText = await readPixelProbeStatus(page);
+    if (predicate(lastText)) {
+      return lastText;
+    }
+    await page.waitForTimeout(50);
+  }
+
+  throw new Error(`${description}: last pixel probe status was "${lastText}"`);
+}
+
+function parsePixelProbeCoordinates(text) {
+  const x = Number.parseInt(text.match(/\bX:\s*(\d+)/)?.[1] || '', 10);
+  const y = Number.parseInt(text.match(/\bY:\s*(\d+)/)?.[1] || '', 10);
+  const zoom = Number.parseInt(text.match(/缩放:\s*(\d+)%/)?.[1] || '', 10);
+  return { x, y, zoom };
+}
+
+async function assertPixelProbeInteractions(page, scenarioName) {
+  const status = page.locator('#preview-panel [data-role="pixel-probe-status"]').first();
+  await status.waitFor({ state: 'visible', timeout: 5000 });
+
+  const initial = await readPixelProbeStatus(page);
+  if (!initial.includes('移动鼠标查看像素坐标和值')) {
+    throw new Error(`${scenarioName}: pixel probe did not start with the default hint: "${initial}"`);
+  }
+
+  const stage = page.locator('#preview-panel .preview-capability-image-stage').first();
+  const fitBox = await stage.boundingBox();
+  if (!fitBox) {
+    throw new Error(`${scenarioName}: output image stage is missing`);
+  }
+
+  await page.mouse.move(fitBox.x + (fitBox.width / 2), fitBox.y + (fitBox.height / 2));
+  const fitText = await waitForPixelProbeStatus(
+    page,
+    text => /\bX:\s*\d+/.test(text) &&
+      /\bY:\s*\d+/.test(text) &&
+      (/RGB:\s*\d+,\d+,\d+/.test(text) || /灰度:\s*\d+/.test(text)) &&
+      /图像:\s*640x240/.test(text) &&
+      /缩放:\s*\d+%/.test(text),
+    `${scenarioName}: fit center pixel probe status did not show coordinates and pixel value`
+  );
+  const fitCoordinates = parsePixelProbeCoordinates(fitText);
+  if (fitCoordinates.x < 250 || fitCoordinates.x > 390 || fitCoordinates.y < 80 || fitCoordinates.y > 160) {
+    throw new Error(`${scenarioName}: fit center coordinates are not near image center: "${fitText}"`);
+  }
+
+  await page.mouse.move(fitBox.x + 5, fitBox.y + 5);
+  await waitForPixelProbeStatus(
+    page,
+    text => text.includes('光标不在图像内'),
+    `${scenarioName}: fit letterbox status did not report outside-image cursor`
+  );
+
+  await page.mouse.move(5, 5);
+  await waitForPixelProbeStatus(
+    page,
+    text => text.includes('移动鼠标查看像素坐标和值'),
+    `${scenarioName}: pixel probe did not reset after leaving the image`
+  );
+
+  await page.locator('#preview-panel [data-preview-action="image-original"]').click();
+  await page.waitForFunction(() => {
+    return document.querySelector('#preview-panel .preview-capability-main-image')?.dataset.imageMode === 'original';
+  }, null, { timeout: 5000 });
+
+  const originalBox = await stage.boundingBox();
+  if (!originalBox) {
+    throw new Error(`${scenarioName}: output image stage is missing after original-size toggle`);
+  }
+  await page.mouse.move(originalBox.x + 16, originalBox.y + 16);
+  const originalText = await waitForPixelProbeStatus(
+    page,
+    text => /\bX:\s*\d+/.test(text) && /\bY:\s*\d+/.test(text) && /缩放:\s*100%/.test(text),
+    `${scenarioName}: original-size pixel probe status did not show 100% coordinates`
+  );
+  const originalCoordinates = parsePixelProbeCoordinates(originalText);
+  if (originalCoordinates.x < 0 || originalCoordinates.x > 32 || originalCoordinates.y < 0 || originalCoordinates.y > 32) {
+    throw new Error(`${scenarioName}: original-size coordinates are not near image top-left: "${originalText}"`);
+  }
+
+  await page.locator('#preview-panel [data-preview-action="image-fit"]').click();
+  await page.waitForFunction(() => {
+    return document.querySelector('#preview-panel .preview-capability-main-image')?.dataset.imageMode === 'fit';
+  }, null, { timeout: 5000 });
+  await page.mouse.move(5, 5);
+  await waitForPixelProbeStatus(
+    page,
+    text => text.includes('移动鼠标查看像素坐标和值'),
+    `${scenarioName}: pixel probe did not reset after restoring fit mode`
+  );
 }
 
 async function setTheme(page, theme) {
@@ -512,6 +617,8 @@ async function collectLayoutMetrics(page) {
       })(),
       previewText: document.querySelector('#preview-panel')?.textContent?.trim() || '',
       previewImageSrc: document.querySelector('#preview-panel .preview-capability-main-image img')?.getAttribute('src') || '',
+      pixelProbeStatus: rect('#preview-panel [data-role="pixel-probe-status"]'),
+      pixelProbeText: document.querySelector('#preview-panel [data-role="pixel-probe-status"]')?.textContent?.trim() || '',
       panelTitles: [
         document.querySelector('.inspector-pane .panel-title')?.textContent?.trim(),
         document.querySelector('.preview-workbench-pane .panel-title')?.textContent?.trim()
@@ -555,6 +662,12 @@ function assertLayoutMetrics(metrics, scenarioName, options = {}) {
     }
   } else if (metrics.previewHostHidden) {
     throw new Error(`${scenarioName}: preview host is unexpectedly hidden`);
+  }
+  if (!options.expectPreviewHidden && (!metrics.pixelProbeStatus || metrics.pixelProbeStatus.height < 18)) {
+    throw new Error(`${scenarioName}: pixel probe status bar is missing or too short`);
+  }
+  if (!options.expectPreviewHidden && !metrics.pixelProbeText) {
+    throw new Error(`${scenarioName}: pixel probe status text is empty`);
   }
 
   if (options.expectedPreviewText && !metrics.previewText.includes(options.expectedPreviewText)) {
@@ -685,6 +798,7 @@ async function main() {
       color: '#0ea5e9'
     });
     await waitForOutputImage(page);
+    await assertPixelProbeInteractions(page, '03-image-acquisition-single-preview-dark');
     await capture(
       page,
       '03-image-acquisition-single-preview-dark',

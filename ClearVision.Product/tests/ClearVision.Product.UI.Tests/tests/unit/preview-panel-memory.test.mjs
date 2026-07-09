@@ -1958,6 +1958,8 @@ test('PreviewPanelCapabilityOwner shows image operations and routes open image t
   assert.match(harness.container.innerHTML, /适应窗口/);
   assert.match(harness.container.innerHTML, /原始大小/);
   assert.match(harness.container.innerHTML, /打开大图/);
+  assert.match(harness.container.innerHTML, /data-role="pixel-probe-status"/);
+  assert.match(harness.container.innerHTML, /移动鼠标查看像素坐标和值/);
   assert.match(harness.container.innerHTML, /data-image-mode="fit"/);
   assert.match(harness.container.innerHTML, /data-preview-action="image-fit" aria-pressed="true"/);
   assert.match(harness.container.innerHTML, /data-preview-action="image-original" aria-pressed="false"/);
