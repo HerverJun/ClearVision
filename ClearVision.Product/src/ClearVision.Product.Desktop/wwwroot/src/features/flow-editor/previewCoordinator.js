@@ -1331,7 +1331,15 @@ export class NodePreviewCoordinator {
                 title: node.title || metadata?.displayName || node.type,
                 canvasEligibility: getCanvasPreviewEligibility(node, metadata),
                 previewCost,
-                ...(scopeChanged ? this.buildReleasedArtifactStatePatch() : {}),
+                ...(scopeChanged ? withClearedPreviewResources({
+                    ...this.buildReleasedArtifactStatePatch(),
+                    status: 'idle',
+                    executionTimeMs: null,
+                    errorMessage: null,
+                    inputImageBase64: null,
+                    outputImageBase64: null,
+                    outputData: null
+                }) : {}),
                 staleScopeKey: scopeChanged ? nextScopeKey : undefined
             });
         }
@@ -1375,6 +1383,17 @@ export class NodePreviewCoordinator {
             this.setActiveNode(null);
             return Promise.resolve({ status: 'cleared' });
         }
+
+        // A new snapshot, node revision, or manual refresh must never leave an older
+        // image or summary visible while the next preview is queued or executing.
+        this.replacePreviewState(withClearedPreviewResources({
+            status: 'loading',
+            executionTimeMs: null,
+            errorMessage: null,
+            inputImageBase64: null,
+            outputImageBase64: null,
+            outputData: null
+        }));
 
         try {
             const scheduledProjectId = this.getProjectId();
@@ -1528,6 +1547,8 @@ export class NodePreviewCoordinator {
                 executionTimeMs: null,
                 request,
                 inputImageBase64: inputImageBase64 || null,
+                outputImageBase64: null,
+                outputData: null,
                 previewCost
             }));
 

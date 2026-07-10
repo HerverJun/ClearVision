@@ -1634,6 +1634,17 @@ html[data-theme="light"] .operator-preview-region-guidance strong {
     color: #94a3b8;
 }
 
+.blob-preview-semantics {
+    margin: 8px 12px 12px;
+    padding: 8px 10px;
+    border-left: 3px solid #16a34a;
+    border-radius: 4px;
+    background: color-mix(in srgb, #dcfce7 72%, var(--template-surface));
+    color: var(--template-text);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 /* Node Preview Inspector -------------------------------------------------- */
 .node-preview-inspector-root {
     position: absolute;

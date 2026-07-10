@@ -443,6 +443,114 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_BlobAnalysis_ShouldPersistMaxAreaAndReturnOnlyFilteredBlobsInArtifactPreview()
+    {
+        var project = new Project("preview-blob-analysis");
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var blobId = Guid.NewGuid();
+        var blobInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var blobImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var blobListOutput = CreatePort("Blobs", PortDataType.BlobList, PortDirection.Output);
+        var blobCountOutput = CreatePort("BlobCount", PortDataType.Integer, PortDirection.Output);
+        var blobExecutor = new CountingOperatorExecutor(
+            new BlobDetectionOperator(NullLogger<BlobDetectionOperator>.Instance));
+        var acquisition = CreateOperatorDto(
+            acquisitionId,
+            "ImageAcquisition",
+            OperatorType.ImageAcquisition,
+            outputPorts: [acquisitionOutput],
+            parameters: new Dictionary<string, object>
+            {
+                ["SourceType"] = "File",
+                ["FilePath"] = string.Empty
+            });
+        var blob = CreateOperatorDto(
+            blobId,
+            "BlobAnalysis",
+            OperatorType.BlobAnalysis,
+            inputPorts: [blobInput],
+            outputPorts: [blobImageOutput, blobListOutput, blobCountOutput],
+            parameters: new Dictionary<string, object>
+            {
+                ["MinArea"] = 0,
+                ["MaxArea"] = 200,
+                ["FeatureFilter"] = string.Empty
+            });
+        var flowData = CreateUpdateFlowRequest(
+            acquisition,
+            blob,
+            CreateConnection(acquisitionId, acquisitionOutput.Id, blobId, blobInput.Id));
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>()),
+                blobExecutor
+            ]);
+
+        var request = new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = blobId,
+            DebugSessionId = Guid.NewGuid(),
+            ClientRequestSequence = 1,
+            FlowRevision = 1,
+            ArtifactMode = "references",
+            InputImageBase64 = Convert.ToBase64String(CreateTwoAreaBlobPreviewImageBytes()),
+            FlowData = flowData
+        };
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", request);
+        var payload = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("BlobCount").GetInt32().Should().Be(1);
+        outputData.TryGetProperty("Blobs", out var blobs).Should().BeTrue();
+        (blobs.ValueKind is JsonValueKind.Array or JsonValueKind.Object).Should().BeTrue(
+            "the filtered Blob result remains available to the bounded preview transport");
+        document.RootElement.GetProperty("observation").GetProperty("summary").EnumerateArray()
+            .Should().Contain(item =>
+                item.GetProperty("key").GetString() == "BlobCount" &&
+                item.GetProperty("displayValue").GetString() == "1");
+
+        blobExecutor.LastExecutedOperator.Should().NotBeNull();
+        ReadIntValue(blobExecutor.LastExecutedOperator!.Parameters.Single(parameter => parameter.Name == "MaxArea").GetValue())
+            .Should().Be(200);
+
+        var outputArtifactId = document.RootElement.GetProperty("artifacts").EnumerateArray()
+            .Single(artifact => artifact.GetProperty("role").GetString() == "outputImage")
+            .GetProperty("artifactId").GetString()!;
+        using var artifactResponse = await host.Client.GetAsync($"/api/preview-artifacts/{outputArtifactId}");
+        artifactResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var previewImage = Cv2.ImDecode(await artifactResponse.Content.ReadAsByteArrayAsync(), ImreadModes.Color);
+        CountGreenPixels(previewImage, new OpenCvSharp.Rect(6, 6, 20, 20)).Should().BeGreaterThan(0,
+            "the retained Blob is marked in the preview image");
+        CountGreenPixels(previewImage, new OpenCvSharp.Rect(55, 5, 40, 30)).Should().Be(0,
+            "the filtered-out large Blob remains in the source background without a pass marker");
+
+        blob.Parameters.Single(parameter => parameter.Name == "MaxArea").Value = 1000;
+        request.DebugSessionId = Guid.NewGuid();
+        request.ClientRequestSequence = 2;
+        request.FlowRevision = 2;
+        using var secondResponse = await host.Client.PostAsJsonAsync("/api/flows/preview-node", request);
+        var secondPayload = await secondResponse.Content.ReadAsStringAsync();
+
+        secondResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, secondPayload);
+        using var secondDocument = JsonDocument.Parse(secondPayload);
+        secondDocument.RootElement.GetProperty("outputData").GetProperty("BlobCount").GetInt32().Should().Be(2);
+        secondDocument.RootElement.GetProperty("outputData").TryGetProperty("Blobs", out _).Should().BeTrue();
+        ReadIntValue(blobExecutor.LastExecutedOperator!.Parameters.Single(parameter => parameter.Name == "MaxArea").GetValue())
+            .Should().Be(1000);
+    }
+
+    [Fact]
     public async Task PreviewNode_WithExplicitMissingFilePathAndRuntimeImage_ShouldKeepFilePathFailure()
     {
         var project = new Project("preview-explicit-missing-file");
@@ -3065,6 +3173,22 @@ public class PreviewNodeEndpointsTests
         return image.ToBytes(".png");
     }
 
+    private static byte[] CreateTwoAreaBlobPreviewImageBytes()
+    {
+        using var image = new Mat(100, 120, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(image, new OpenCvSharp.Rect(10, 10, 10, 10), Scalar.White, -1);
+        Cv2.Rectangle(image, new OpenCvSharp.Rect(60, 10, 30, 20), Scalar.White, -1);
+        return image.ToBytes(".png");
+    }
+
+    private static int CountGreenPixels(Mat image, OpenCvSharp.Rect region)
+    {
+        using var roi = new Mat(image, region);
+        using var greenMask = new Mat();
+        Cv2.InRange(roi, new Scalar(0, 180, 0), new Scalar(80, 255, 80), greenMask);
+        return Cv2.CountNonZero(greenMask);
+    }
+
     private static async Task<FlowDebugExecutionResult> CompleteWhenCanceledAsync(
         Guid targetNodeId,
         CancellationToken cancellationToken,
@@ -3409,6 +3533,7 @@ public class PreviewNodeEndpointsTests
         public OperatorType OperatorType => _inner.OperatorType;
 
         public int ExecuteCount { get; private set; }
+        public Operator? LastExecutedOperator { get; private set; }
 
         public Task<OperatorExecutionOutput> ExecuteAsync(
             Operator @operator,
@@ -3416,6 +3541,7 @@ public class PreviewNodeEndpointsTests
             CancellationToken cancellationToken = default)
         {
             ExecuteCount++;
+            LastExecutedOperator = @operator;
             return _inner.ExecuteAsync(@operator, inputs, cancellationToken);
         }
 

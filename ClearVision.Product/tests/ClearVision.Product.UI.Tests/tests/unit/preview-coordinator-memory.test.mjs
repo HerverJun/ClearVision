@@ -39,7 +39,9 @@ function createCoordinator(options = {}) {
   let executeCount = 0;
   const coordinator = new NodePreviewCoordinator({
     getProjectId: () => typeof options.projectId === 'function' ? options.projectId() : (options.projectId ?? 'project-1'),
-    getFlowRevision: () => options.flowRevision ?? 1,
+    getFlowRevision: () => typeof options.flowRevision === 'function'
+      ? options.flowRevision()
+      : (options.flowRevision ?? 1),
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
@@ -871,8 +873,8 @@ test('NodePreviewCoordinator releases same-node method artifacts before debounce
     assert.deepEqual(revokedUrls.sort(), ['blob:method-scope-1', 'blob:method-scope-2']);
     assert.deepEqual(deletedArtifactIds.sort(), ['input-artifact-caliper', 'output-artifact-caliper']);
     assert.equal(coordinator.cache.size, 0);
-    assert.equal(coordinator.getState().status, 'success');
-    assert.deepEqual(coordinator.getState().outputData, { score: 1 });
+    assert.equal(coordinator.getState().status, 'loading');
+    assert.equal(coordinator.getState().outputData, null);
     assert.equal(coordinator.getState().outputImageBase64, null);
     assert.deepEqual(coordinator.getState().previewArtifactIds, []);
   } finally {
@@ -1118,6 +1120,50 @@ test('NodePreviewCoordinator retains accepted observation and reads current arti
     );
   } finally {
     globalThis.URL.createObjectURL = originalCreateObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator clears old image and summary before a changed parameter snapshot or flow revision resolves', async () => {
+  let flowRevision = 1;
+  const node = {
+    id: 'blob-node',
+    type: 'BlobAnalysis',
+    parameters: [{ name: 'MaxArea', value: 1000 }],
+    outputs: [{ type: 'image' }]
+  };
+  const { coordinator } = createCoordinator({
+    node,
+    flowRevision: () => flowRevision,
+    previewResponse: (executeCount, executorOptions, nodeId) => ({
+      ...buildObservationResponse(nodeId, executorOptions),
+      outputImageBase64: `OUTPUT_IMAGE_${executeCount}`,
+      outputData: { BlobCount: executeCount }
+    })
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    assert.equal(coordinator.getState().outputImageBase64, 'OUTPUT_IMAGE_1');
+    assert.deepEqual(coordinator.getState().outputData, { BlobCount: 1 });
+
+    node.parameters[0].value = 150;
+    flowRevision = 2;
+    const refreshed = coordinator.invalidateActivePreview({ immediate: false });
+
+    assert.equal(coordinator.getState().status, 'loading');
+    assert.equal(coordinator.getState().outputImageBase64, null);
+    assert.equal(coordinator.getState().outputData, null);
+    assert.equal(coordinator.getState().presenter.outputImageSrc, null);
+    assert.equal(coordinator.getState().presenter.summaryItems.length, 0);
+
+    await refreshed;
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+    assert.equal(coordinator.getState().request.flowRevision, 2);
+    assert.equal(coordinator.getState().outputImageBase64, 'OUTPUT_IMAGE_2');
+    assert.deepEqual(coordinator.getState().outputData, { BlobCount: 2 });
+  } finally {
     coordinator.destroy();
   }
 });

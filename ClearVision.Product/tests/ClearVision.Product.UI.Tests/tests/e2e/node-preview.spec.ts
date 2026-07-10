@@ -5,6 +5,7 @@ const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
 const MATCHING_512_IMAGE_SOURCE =
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#111827"/><text x="16" y="32">matching-real-image-512</text></svg>')}`;
+const BLOB_PREVIEW_IMAGE_BASE64 = PNG_BASE64;
 
 async function stubOperatorLibrary(page) {
   await page.route('**/api/operators/types', async route => {
@@ -369,6 +370,93 @@ test.describe('Node Preview Overlay', () => {
       overlayAfter &&
       (Math.abs(overlayBefore.x - overlayAfter.x) > 1 || Math.abs(overlayBefore.y - overlayAfter.y) > 1);
     expect(moved).toBeTruthy();
+  });
+
+  test('BlobAnalysis parameter preview shows filtered count, optional FeatureFilter, semantics, and clear expression errors', async ({ page }) => {
+    const previewRequests: any[] = [];
+    await page.route('**/api/flows/preview-node', async route => {
+      const request = route.request().postDataJSON();
+      previewRequests.push(request);
+      const operators = request.flowData?.operators || request.FlowData?.Operators || [];
+      const blob = operators.find((operator: any) => operator.id === (request.targetNodeId || request.TargetNodeId));
+      const parameters = blob?.parameters || blob?.Parameters || [];
+      const getParameter = (name: string) => parameters.find((parameter: any) =>
+        String(parameter.name || parameter.Name).toLowerCase() === name.toLowerCase())?.value;
+      const maxArea = Number(getParameter('MaxArea') ?? 100000);
+      const featureFilter = String(getParameter('FeatureFilter') ?? '');
+
+      if (featureFilter === 'Area >') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            errorMessage: 'FeatureFilter 表达式无效：缺少右侧操作数。支持字段：Area、Circularity；示例：Area >= 100。',
+          }),
+        });
+        return;
+      }
+
+      const blobCount = maxArea <= 200 ? 1 : 2;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          outputImageBase64: BLOB_PREVIEW_IMAGE_BASE64,
+          outputData: {
+            BlobCount: blobCount,
+            Blobs: Array.from({ length: blobCount }, (_, index) => ({ Id: index + 1 })),
+          },
+          executionTimeMs: 12,
+        }),
+      });
+    });
+
+    await expect(page.locator('#flow-canvas')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Boolean((window as any).flowCanvas))).toBe(true);
+
+    const blobNodeId = await addAndSelectNode(page, {
+      type: 'BlobAnalysis',
+      title: 'Blob 分析',
+      parameters: [
+        { name: 'MinArea', displayName: '最小面积', dataType: 'int', value: 0, defaultValue: 0 },
+        { name: 'MaxArea', displayName: '最大面积', dataType: 'int', value: 1000, defaultValue: 1000 },
+        {
+          name: 'FeatureFilter',
+          displayName: '特征过滤表达式',
+          dataType: 'string',
+          value: '',
+          defaultValue: '',
+          isRequired: false,
+          description: '可选。支持 Area、Circularity、CenterX；示例：Area >= 100 && Circularity >= 0.8。留空不过滤。',
+        },
+      ],
+      outputs: [{ name: 'Image', type: 'Image' }, { name: 'BlobCount', type: 'Integer' }],
+    });
+
+    const featureFilterLabel = page.locator('label[for="param-FeatureFilter"]');
+    await expect(featureFilterLabel).toHaveCount(1);
+    await expect(featureFilterLabel).toContainText('特征过滤表达式');
+    await expect(featureFilterLabel).not.toContainText('*');
+    await expect(page.locator('.form-group', { has: page.locator('#param-FeatureFilter') })).toContainText('可选。支持 Area、Circularity、CenterX');
+
+    await expect(page.locator('#preview-output-list')).toContainText('Blob数量（过滤后）');
+    await expect(page.locator('#preview-output-list')).toContainText('2');
+    await expect(page.locator('#blob-preview-semantics')).toContainText('底图保留原始目标，未标记不表示通过');
+    await expect(page.locator('.node-preview-card')).toContainText('BlobCount 为过滤后数量');
+
+    await page.locator('#param-MaxArea').fill('200');
+    await page.locator('#param-MaxArea').blur();
+    await expect.poll(() => previewRequests.length).toBeGreaterThan(1);
+    await expect(page.locator('#preview-output-list')).toContainText('1');
+    const lastParameters = previewRequests.at(-1).flowData.operators
+      .find((operator: any) => operator.id === blobNodeId)?.parameters;
+    expect(lastParameters.find((parameter: any) => parameter.name === 'MaxArea').value).toBe(200);
+
+    await page.locator('#param-FeatureFilter').fill('Area >');
+    await page.locator('#param-FeatureFilter').blur();
+    await expect(page.locator('#preview-status-text')).toContainText('FeatureFilter 表达式无效');
   });
 
   test('double click on ForEach still enters subgraph', async ({ page }) => {

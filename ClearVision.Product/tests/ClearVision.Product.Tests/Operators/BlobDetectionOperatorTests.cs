@@ -1,5 +1,7 @@
+using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -91,12 +93,86 @@ public class BlobDetectionOperatorTests
         features.Should().NotBeSameAs(blobs);
         features.Should().AllSatisfy(item =>
         {
+            item.Should().ContainKeys("Id", "Area", "Circularity", "CenterX");
             item.Should().ContainKey("BlobId");
             item.Should().ContainKey("Features");
             item["Features"].Should().BeOfType<Dictionary<string, object>>();
         });
+        features[0].Should().NotBeSameAs(blobs[0]);
+        Convert.ToInt32(features[0]["Id"]).Should().Be(Convert.ToInt32(blobs[0]["Id"]));
+        Convert.ToInt32(features[0]["BlobId"]).Should().Be(Convert.ToInt32(blobs[0]["Id"]));
+
+        var nestedFeatures = features[0]["Features"].Should().BeOfType<Dictionary<string, object>>().Subject;
+        foreach (var field in new[] { "Area", "Circularity", "CenterX" })
+        {
+            Convert.ToDouble(features[0][field]).Should().Be(Convert.ToDouble(nestedFeatures[field]));
+        }
+
         blobs.Should().OnlyContain(item =>
             item.ContainsKey("Id") && item.ContainsKey("Area") && item.ContainsKey("Width") && item.ContainsKey("Height"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDetailedFeatures_ShouldExposeLegacyPathsToJsonExtractor()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("OutputDetailedFeatures", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 10, "int"));
+
+        using var image = TestHelpers.CreateShapeTestImage();
+        var blobResult = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        blobResult.IsSuccess.Should().BeTrue(blobResult.ErrorMessage);
+        var features = blobResult.OutputData!["BlobFeatures"]
+            .Should().BeOfType<List<Dictionary<string, object>>>().Subject;
+        features.Should().NotBeEmpty();
+
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["BlobFeatures"] = features
+        });
+        var extractor = new JsonExtractorOperator(Substitute.For<ILogger<JsonExtractorOperator>>());
+
+        foreach (var field in new[] { "Area", "Circularity", "CenterX" })
+        {
+            var extractOp = new Operator($"extract-{field}", OperatorType.JsonExtractor, 0, 0);
+            extractOp.AddParameter(TestHelpers.CreateParameter("JsonPath", $"$.BlobFeatures[0].{field}", "string"));
+            extractOp.AddParameter(TestHelpers.CreateParameter("OutputType", "Double", "string"));
+
+            var extracted = await extractor.ExecuteAsync(extractOp, new Dictionary<string, object> { ["Json"] = json });
+
+            extracted.IsSuccess.Should().BeTrue(extracted.ErrorMessage);
+            Convert.ToDouble(extracted.OutputData!["Value"])
+                .Should().Be(Convert.ToDouble(features[0][field]), because: $"the legacy path for {field} must remain readable");
+        }
+
+        var nestedOp = new Operator("extract-nested-area", OperatorType.JsonExtractor, 0, 0);
+        nestedOp.AddParameter(TestHelpers.CreateParameter("JsonPath", "$.BlobFeatures[0].Features.Area", "string"));
+        nestedOp.AddParameter(TestHelpers.CreateParameter("OutputType", "Double", "string"));
+        var nestedExtracted = await extractor.ExecuteAsync(nestedOp, new Dictionary<string, object> { ["Json"] = json });
+
+        nestedExtracted.IsSuccess.Should().BeTrue(nestedExtracted.ErrorMessage);
+        Convert.ToDouble(nestedExtracted.OutputData!["Value"])
+            .Should().Be(Convert.ToDouble(features[0]["Area"]));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDetailedFeaturesDisabled_ShouldAlwaysReturnEmptyFeatureList()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("OutputDetailedFeatures", false, "bool"));
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var image = TestHelpers.CreateShapeTestImage();
+            var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            result.OutputData.Should().ContainKey("BlobFeatures");
+            result.OutputData!["BlobFeatures"]
+                .Should().BeOfType<List<Dictionary<string, object>>>()
+                .Which.Should().BeEmpty();
+        }
     }
 
     [Fact]
@@ -104,6 +180,139 @@ public class BlobDetectionOperatorTests
     {
         var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
         _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldKeepOnlyBlobWithinMaxArea_AndCountOnlyFilteredBlobs()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 200, "int"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(1);
+        var blobs = result.OutputData["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>().Subject;
+        blobs.Should().ContainSingle();
+        Convert.ToInt32(blobs[0]["Area"]).Should().Be(100);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldKeepBlobWhenMaxAreaEqualsItsArea()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 100, "int"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(1);
+        Convert.ToInt32(((List<Dictionary<string, object>>)result.OutputData["Blobs"])[0]["Area"]).Should().Be(100);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldKeepBlobWhenMinAreaEqualsItsArea()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 100, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(2);
+        ((List<Dictionary<string, object>>)result.OutputData["Blobs"])
+            .Select(blob => Convert.ToInt32(blob["Area"]))
+            .Should().Contain(100);
+    }
+
+    [Theory]
+    [InlineData(100, 100)]
+    [InlineData(101, 100)]
+    public void ValidateParameters_ShouldKeepExistingStrictMinAreaLessThanMaxAreaContract(int minArea, int maxArea)
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", minArea, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", maxArea, "int"));
+
+        var validation = _operator.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_ShouldTreatEmptyAsNoFilter_AndApplyValidExpressions()
+    {
+        var emptyFilter = new Operator("empty", OperatorType.BlobAnalysis, 0, 0);
+        emptyFilter.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        emptyFilter.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        emptyFilter.AddParameter(TestHelpers.CreateParameter("FeatureFilter", string.Empty, "string"));
+        OperatorExecutionOutput emptyResult;
+        using (var image = CreateTwoAreaBlobImage())
+        {
+            emptyResult = await _operator.ExecuteAsync(emptyFilter, TestHelpers.CreateImageInputs(image));
+        }
+
+        emptyResult.IsSuccess.Should().BeTrue(emptyResult.ErrorMessage);
+        Convert.ToInt32(emptyResult.OutputData!["BlobCount"]).Should().Be(2);
+
+        var passingFilter = new Operator("passing", OperatorType.BlobAnalysis, 0, 0);
+        passingFilter.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        passingFilter.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        passingFilter.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >= 100", "string"));
+        OperatorExecutionOutput passingResult;
+        using (var image = CreateTwoAreaBlobImage())
+        {
+            passingResult = await _operator.ExecuteAsync(passingFilter, TestHelpers.CreateImageInputs(image));
+        }
+
+        passingResult.IsSuccess.Should().BeTrue(passingResult.ErrorMessage);
+        Convert.ToInt32(passingResult.OutputData!["BlobCount"]).Should().Be(2);
+
+        var rejectingFilter = new Operator("rejecting", OperatorType.BlobAnalysis, 0, 0);
+        rejectingFilter.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        rejectingFilter.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        rejectingFilter.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area > 1000", "string"));
+        OperatorExecutionOutput rejectingResult;
+        using (var image = CreateTwoAreaBlobImage())
+        {
+            rejectingResult = await _operator.ExecuteAsync(rejectingFilter, TestHelpers.CreateImageInputs(image));
+        }
+
+        rejectingResult.IsSuccess.Should().BeTrue(rejectingResult.ErrorMessage);
+        Convert.ToInt32(rejectingResult.OutputData!["BlobCount"]).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_ShouldReturnClearFailureForInvalidExpression()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >", "string"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("FeatureFilter 表达式无效");
+        result.ErrorMessage.Should().Contain("Area >= 100");
+    }
+
+    [Fact]
+    public void Metadata_FeatureFilter_ShouldBeOptionalAndDocumentSupportedFields()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.BlobAnalysis)!;
+        var featureFilter = metadata.Parameters.Single(parameter => parameter.Name == "FeatureFilter");
+
+        featureFilter.DisplayName.Should().Be("特征过滤表达式");
+        featureFilter.IsRequired.Should().BeFalse();
+        featureFilter.Description.Should().ContainAll("Area", "Circularity", "CenterX", "HoleCount", "Area >= 100");
     }
 
     [Fact]
@@ -261,5 +470,13 @@ public class BlobDetectionOperatorTests
         outputImage.Width.Should().Be(80);
         outputImage.Height.Should().Be(80);
         outputImage.Channels.Should().Be(3);
+    }
+
+    private static ImageWrapper CreateTwoAreaBlobImage()
+    {
+        var image = new Mat(100, 120, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(image, new Rect(10, 10, 10, 10), Scalar.White, -1);
+        Cv2.Rectangle(image, new Rect(60, 10, 30, 20), Scalar.White, -1);
+        return new ImageWrapper(image);
     }
 }

@@ -74,6 +74,9 @@ export class NodePreviewOverlay {
                 </div>
             `).join('')
             : '<div class="node-preview-summary-empty">暂无输出摘要</div>';
+        const blobSemantics = this.state?.nodeType === 'BlobAnalysis' && this.state?.status === 'success'
+            ? `<div class="blob-preview-semantics" role="note"><strong>BlobCount 为过滤后数量。</strong>绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。</div>`
+            : '';
 
         this.root.classList.remove('hidden');
         this.root.innerHTML = `
@@ -97,6 +100,7 @@ export class NodePreviewOverlay {
                         : `<div class="node-preview-media-placeholder">${presenter.isLoading ? '预览生成中...' : (presenter.hasError ? '预览失败' : '暂无图像输出')}</div>`}
                 </div>
                 <div class="node-preview-summary">${summaryItems}</div>
+                ${blobSemantics}
             </div>
         `;
 

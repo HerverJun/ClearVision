@@ -22,13 +22,13 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "特征提取",
     IconName = "blob",
     Keywords = new[] { "连通域", "缺陷区域", "斑点", "面积提取", "缺陷分析", "Blob", "Connected components" },
-    Version = "1.2.0"
+    Version = "1.2.1"
 )]
 [InputPort("Image", "二值图像", PortDataType.Image, IsRequired = true, Description = "用于连通域分析的二值图或可自动阈值化的灰度图。")]
 [InputPort("SourceImage", "参考图像", PortDataType.Image, IsRequired = false, Description = "可选，仅作为标注结果的参考底图，不替代主 Image 输入。")]
 [OutputPort("Image", "标记图像", PortDataType.Image, Description = "绘制 Blob 边界与中心点的可视化图像。")]
 [OutputPort("Blobs", "Blob结果列表", PortDataType.BlobList, Description = "兼容旧流程端口名的 Blob 结果字典列表，包含边界框、中心、面积及常用度量；不是 Contour 或 Region。")]
-[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "开启“输出详细特征”后填充的 Blob 特征表；不是轮廓或像素区域。")]
+[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，并提供 Features 嵌套别名。不是轮廓或像素区域。")]
 [OutputPort("BlobCount", "Blob数量", PortDataType.Integer, Description = "通过面积、形状与可选特征过滤后的 Blob 数量。")]
 [OperatorParam("MinArea", "最小面积", "int", DefaultValue = 100, Min = 0)]
 [OperatorParam("MaxArea", "最大面积", "int", DefaultValue = 100000, Min = 0)]
@@ -39,7 +39,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("MinRectangularity", "最小矩形度", "double", DefaultValue = 0.0, Min = 0.0, Max = 1.0)]
 [OperatorParam("MinEccentricity", "最小离心率", "double", DefaultValue = 0.0, Min = 0.0, Max = 1.0)]
 [OperatorParam("OutputDetailedFeatures", "输出详细特征", "bool", DefaultValue = false)]
-[OperatorParam("FeatureFilter", "Feature Filter", "string", DefaultValue = "")]
+[OperatorParam("FeatureFilter", "特征过滤表达式", "string", DefaultValue = "", IsRequired = false, Description = "可选。支持 Area、ContourArea、Perimeter、Circularity、Convexity、Rectangularity、Eccentricity、EulerNumber、MeanGray、GrayDeviation、Width、Height、X、Y、CenterX、CenterY、InertiaRatio、ConvexHullArea、HoleCount；示例：Area >= 100 && Circularity >= 0.8。留空不过滤。")]
 [OperatorParam("EnableColorFilter", "启用颜色过滤", "bool", DefaultValue = false, Description = "启用HSV颜色范围预过滤")]
 [OperatorParam("HueLow", "色相下限", "int", DefaultValue = 0, Min = 0, Max = 180)]
 [OperatorParam("HueHigh", "色相上限", "int", DefaultValue = 180, Min = 0, Max = 180)]
@@ -431,22 +431,28 @@ public class BlobDetectionOperator : OperatorBase
 
                 if (outputDetailedFeatures)
                 {
-                    blobFeatures.Add(new Dictionary<string, object>
+                    var legacyCompatibleFeature = new Dictionary<string, object>(blobInfo, StringComparer.OrdinalIgnoreCase)
                     {
-                        { "BlobId", blobId },
-                        { "Features", featureValues.ToDictionary(pair => pair.Key, pair => (object)pair.Value, StringComparer.OrdinalIgnoreCase) }
-                    });
+                        ["BlobId"] = blobId,
+                        ["Features"] = featureValues.ToDictionary(
+                            pair => pair.Key,
+                            pair => (object)pair.Value,
+                            StringComparer.OrdinalIgnoreCase)
+                    };
+
+                    blobFeatures.Add(legacyCompatibleFeature);
                 }
 
                 var offsetContour = contour.Select(p => new Point(p.X + rect.X, p.Y + rect.Y)).ToArray();
                 Cv2.DrawContours(resultImage, new[] { offsetContour }, -1, new Scalar(0, 255, 0), 2);
-                Cv2.Circle(resultImage, (int)Math.Round(centerX), (int)Math.Round(centerY), 3, new Scalar(0, 0, 255), -1);
+                Cv2.Circle(resultImage, (int)Math.Round(centerX), (int)Math.Round(centerY), 3, new Scalar(0, 255, 0), -1);
             }
 
             if (!string.IsNullOrWhiteSpace(filterError))
             {
                 resultImage.Dispose();
-                return Task.FromResult(OperatorExecutionOutput.Failure($"FeatureFilter invalid: {filterError}"));
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"FeatureFilter 表达式无效：{filterError}。支持字段：Area、Circularity、Convexity、Rectangularity、Eccentricity、MeanGray、Width、Height、CenterX、CenterY 等；示例：Area >= 100 && Circularity >= 0.8。"));
             }
 
             var additionalData = new Dictionary<string, object>

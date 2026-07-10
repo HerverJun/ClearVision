@@ -119,6 +119,7 @@ test('buildPreviewSummaryItems skips image-like payloads and uses Chinese field 
 
 test('preview result formatter localizes labels, diagnostics, and internal type names', () => {
   assert.equal(getPreviewResultLabel('inputImage'), '输入图像');
+  assert.equal(getPreviewResultLabel('BlobCount'), 'Blob数量（过滤后）');
   assert.equal(getPreviewResultLabel('$["spatialContext"]'), '空间上下文');
   assert.equal(getPreviewTypeLabel('System.Text.Json.JsonElement'), 'JSON 对象');
   assert.equal(

@@ -106,7 +106,8 @@ const FRIENDLY_FIELD_LABELS = new Map([
     ['defects', '缺陷列表'],
     ['count', '数量'],
     ['objectcount', '对象数量'],
-    ['detectioncount', '检测数量']
+    ['detectioncount', '检测数量'],
+    ['blobcount', 'Blob数量（过滤后）']
 ]);
 const INTERNAL_TYPE_LABELS = new Map([
     ['system.int32', '整数'],

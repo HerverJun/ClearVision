@@ -1,6 +1,7 @@
 import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
 import {
     formatPreviewOutputValue,
+    getPreviewResultLabel,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
 import {
@@ -146,6 +147,7 @@ export class PreviewPanel {
                     <div class="operator-preview-meta">
                         <div class="operator-preview-status" id="preview-status-text">等待预览</div>
                         <div class="operator-preview-outputs" id="preview-output-list">暂无输出摘要</div>
+                        <div class="blob-preview-semantics" id="blob-preview-semantics" role="note" hidden></div>
                         <div class="operator-preview-diagnostics" id="preview-diagnostics-panel"></div>
                     </div>
 
@@ -300,6 +302,7 @@ export class PreviewPanel {
         this._setStatus(resultViewModel?.stale ? '结果已过期，请重新预览' : presenter.statusText);
         this._setOutputImage(presenter.outputImageSrc || null);
         this._renderOutputs(this.state.status === 'loading' ? null : this.state.outputData);
+        this._setBlobPreviewSemantics(operator, this.state.status);
         this._renderOperatorResultPanel(resultViewModel);
     }
 
@@ -308,6 +311,19 @@ export class PreviewPanel {
         if (statusElement) {
             statusElement.textContent = text;
         }
+    }
+
+    _setBlobPreviewSemantics(operator, status) {
+        const container = this.container?.querySelector('#blob-preview-semantics');
+        if (!container) {
+            return;
+        }
+
+        const isBlobPreview = operator?.type === 'BlobAnalysis' && status === 'success';
+        container.hidden = !isBlobPreview;
+        container.textContent = isBlobPreview
+            ? 'BlobCount 为过滤后数量。绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。'
+            : '';
     }
 
     _getRegionInputGuidance(operator = this.getOperator()) {
@@ -414,7 +430,7 @@ export class PreviewPanel {
 
             return `
                 <div class="operator-preview-output-item" data-output-kind="${formattedValue.kind}">
-                    <span class="key">${escapeHtml(key)}</span>
+                    <span class="key">${escapeHtml(getPreviewResultLabel(key))}</span>
                     <span class="value"${titleAttribute}>${escapeHtml(formattedValue.text)}</span>
                 </div>
             `;
