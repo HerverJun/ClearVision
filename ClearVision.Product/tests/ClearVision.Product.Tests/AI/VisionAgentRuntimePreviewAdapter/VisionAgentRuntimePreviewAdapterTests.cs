@@ -534,7 +534,7 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         payload.GetProperty("missingResources").EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .Should()
-            .Contain(["CameraBindingId", "Template"]);
+            .Contain(["CameraId", "Template"]);
         payload.GetProperty("previewReady").GetBoolean().Should().BeTrue();
     }
 
@@ -779,7 +779,11 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "<pending-camera-binding>" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "<pending-camera-binding>"
+                }),
                 Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" })
             },
             connections = new object[]

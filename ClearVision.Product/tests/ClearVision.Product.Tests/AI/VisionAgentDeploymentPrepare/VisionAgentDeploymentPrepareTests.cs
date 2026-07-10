@@ -28,7 +28,7 @@ public sealed class VisionAgentDeploymentPrepareTests
         payload.GetProperty("pendingActions").GetArrayLength().Should().BeGreaterThan(0);
     }
 
-    [Fact(DisplayName = "runtime_package_precheck should block deployment for missing CameraBindingId ModelPath and Template")]
+    [Fact(DisplayName = "runtime_package_precheck should block deployment for missing CameraId ModelPath and Template")]
     public async Task Precheck_ShouldBlockDeploymentForMissingVisionResources()
     {
         var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
@@ -45,16 +45,16 @@ public sealed class VisionAgentDeploymentPrepareTests
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
 
-        missingParameters.Should().Contain("CameraBindingId");
+        missingParameters.Should().Contain("CameraId");
         missingParameters.Should().Contain("ModelPath");
         missingParameters.Should().Contain("Template");
         Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
     }
 
-    [Fact(DisplayName = "runtime_package_precheck should report PLC parameters and output channel as missing deployment resources")]
-    public async Task Precheck_ShouldReportPlcAndOutputResources()
+    [Fact(DisplayName = "runtime_package_precheck should report PLC metadata without inventing an output channel resource")]
+    public async Task Precheck_ShouldReportPlcResourceWithoutSyntheticOutputChannel()
     {
-        var flow = PlcAndOutputMissingFlow();
+        var flow = PlcResourceFlow();
         var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
             new VisionAgentToolContext(),
             Args(
@@ -70,7 +70,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .ToList();
 
         missingKinds.Should().Contain("plc_address");
-        missingKinds.Should().Contain("output_channel");
+        missingKinds.Should().NotContain("output_channel");
         Json(result.Data).GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
     }
 
@@ -94,8 +94,8 @@ public sealed class VisionAgentDeploymentPrepareTests
         missingParameters.Should().NotContain("ModelPath");
     }
 
-    [Fact(DisplayName = "runtime_package_precheck should use parameter rule center for output channel aliases")]
-    public async Task Precheck_ShouldUseParameterRuleCenterForOutputChannelAliases()
+    [Fact(DisplayName = "runtime_package_precheck should reject synthetic ResultOutput channel metadata")]
+    public async Task Precheck_ShouldRejectSyntheticResultOutputChannelMetadata()
     {
         var flow = OutputAliasFlow();
         var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
@@ -112,13 +112,9 @@ public sealed class VisionAgentDeploymentPrepareTests
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
 
-        missingParameters.Should().NotContain("Channel");
+        missingParameters.Should().NotContain(["Channel", "OutputChannel", "OutputChannelId"]);
+        Codes(Json(result.Data), "blockingIssues").Should().Contain("unknown_parameter");
         Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
-        Json(result.Data).GetProperty("missingResources")
-            .EnumerateArray()
-            .Select(item => item.GetProperty("parameterName").GetString())
-            .Should()
-            .Contain(["CameraBindingId", "TemplatePath", "OutputChannelId"]);
     }
 
     [Fact(DisplayName = "runtime_package_precheck should keep deployment blocked when resource values lack manual confirmation")]
@@ -140,7 +136,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
-        missingParameters.Should().Contain(["CameraBindingId", "TemplatePath", "Channel"]);
+        missingParameters.Should().Contain(["CameraId", "TemplatePath"]);
         payload.GetProperty("manualConfirmationRequired").GetBoolean().Should().BeTrue();
     }
 
@@ -176,12 +172,12 @@ public sealed class VisionAgentDeploymentPrepareTests
             CancellationToken.None);
 
         var payload = Json(result.Data);
-        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeTrue(payload.ToString());
         payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
         payload.GetProperty("deployed").GetBoolean().Should().BeFalse();
         payload.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
         payload.GetProperty("stationTouched").GetBoolean().Should().BeFalse();
-        payload.GetProperty("manualConfirmationCount").GetInt32().Should().Be(3);
+        payload.GetProperty("manualConfirmationCount").GetInt32().Should().Be(2);
     }
 
     [Fact(DisplayName = "runtime_package_precheck should block deployment but allow draft when dryrun is missing")]
@@ -217,7 +213,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .Should()
-            .Contain(["CameraBindingId", "TemplatePath", "Channel"]);
+            .Contain(["CameraId", "TemplatePath"]);
         Codes(payload, "warnings").Should().Contain("target_station_missing");
         Codes(payload, "blockingIssues").Should().NotContain("target_station_missing");
     }
@@ -437,10 +433,10 @@ public sealed class VisionAgentDeploymentPrepareTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition"),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera" }),
                 Operator("op_detect", "DeepLearning"),
                 Operator("op_match", "TemplateMatching"),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "result_bus" })
+                Operator("op_out", "ResultOutput")
             },
             connections = new object[]
             {
@@ -451,13 +447,17 @@ public sealed class VisionAgentDeploymentPrepareTests
         };
     }
 
-    private static object PlcAndOutputMissingFlow()
+    private static object PlcResourceFlow()
     {
         return new
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam_1"
+                }),
                 Operator("op_plc", "PlcResultOutput"),
                 Operator("op_out", "ResultOutput")
             },
@@ -475,10 +475,14 @@ public sealed class VisionAgentDeploymentPrepareTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam_1"
+                }),
                 Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplateId"] = "template_catalog_item" }),
                 Operator("op_detect", "DeepLearning", new Dictionary<string, string> { ["ModelId"] = "model_catalog_item" }),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "result_bus" })
+                Operator("op_out", "ResultOutput")
             },
             connections = new object[]
             {
@@ -495,7 +499,11 @@ public sealed class VisionAgentDeploymentPrepareTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam_1"
+                }),
                 Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" }),
                 Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["OutputChannelId"] = "result_bus" })
             },
@@ -513,7 +521,11 @@ public sealed class VisionAgentDeploymentPrepareTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam_1"
+                }),
                 Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" })
             },
             connections = new object[]
@@ -529,10 +541,14 @@ public sealed class VisionAgentDeploymentPrepareTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam_1"
+                }),
                 Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" }),
                 Operator("op_judge", "ResultJudgment"),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "result_bus" })
+                Operator("op_out", "ResultOutput")
             },
             connections = new object[]
             {
@@ -548,8 +564,7 @@ public sealed class VisionAgentDeploymentPrepareTests
         return
         [
             ManualConfirmation("camera_binding", "op_cam", "CameraBindingId"),
-            ManualConfirmation("template_artifact", "op_match", "TemplatePath"),
-            ManualConfirmation("output_channel", "op_out", "Channel")
+            ManualConfirmation("template_artifact", "op_match", "TemplatePath")
         ];
     }
 
