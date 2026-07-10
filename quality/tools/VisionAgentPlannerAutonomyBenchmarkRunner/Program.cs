@@ -690,7 +690,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 "VA-PL-008",
                 "planner_autonomy",
                 "parameter_completion_review",
-                "Review pending parameters after the user supplied camera binding, template id, model id, and output channel.",
+                "Review pending parameters after the user supplied camera binding, template id, and model id.",
                 ValidTemplateAndModelFlow(),
                 ["apply_parameter_completion", "review_effective_rules", "validate_flow", "dryrun_flow", "precheck_deployment"],
                 ReviewMissingResourceSteps(finalAction: "parameterCompletionReviewed"),
@@ -1138,10 +1138,6 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 AddManualConfirmation(confirmations, seen, op, "template_artifact", "TemplatePath", "TemplateId", "Template");
             }
 
-            if (IsOperatorType(op, "ResultOutput"))
-            {
-                AddManualConfirmation(confirmations, seen, op, "output_channel", "OutputChannelId", "OutputChannel", "Channel");
-            }
         }
 
         return confirmations;
@@ -1508,7 +1504,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
         };
     }
 
-    private static PlannerFlow ValidWireFlow(string outputChannelId = "qa-wire")
+    private static PlannerFlow ValidWireFlow()
     {
         return Flow(
             [
@@ -1516,7 +1512,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_roi", "RoiManager", ("Shape", "Rectangle"), ("Operation", "Crop"), ("X", "0"), ("Y", "0"), ("Width", "320"), ("Height", "160")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-wire-sequence-model")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", outputChannelId))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_roi", "Image"),
@@ -1563,7 +1559,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
                 Op("op_match", "TemplateMatching", templateParams.ToArray()),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", minScore ?? "0.82")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-template"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
@@ -1579,7 +1575,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
                 Op("op_match", "TemplateMatching"),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-template"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
@@ -1595,7 +1591,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning"),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
@@ -1612,7 +1608,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-model-catalog-item")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
@@ -1630,7 +1626,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_match", "TemplateMatching", ("TemplateId", "mock-template-combo")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-combo-model")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", "0.8")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-combo"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
@@ -1650,7 +1646,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_circle_b", "CircleMeasurement", ("Method", "HoughCircle"), ("MinRadius", "10"), ("MaxRadius", "200")),
                 Op("op_distance", "Measurement", ("MeasureType", "PointToPoint")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "Range"), ("ExpectValueMin", "0"), ("ExpectValueMax", "1000")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-hole"))
+                Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_circle_a", "Image"),
