@@ -880,6 +880,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     expect(firstText).toMatch(/RGB:\s*\d+,\d+,\d+|灰度:\s*\d+/);
     expect(firstText).toContain('图像: 64x48');
     expect(firstText).toMatch(/缩放:\s*\d+%/);
+    expect(await status.evaluate(element => getComputedStyle(element).color)).toBe('rgb(248, 250, 252)');
 
     await page.evaluate(() => {
       (window as any).__pixelProbeStage = document.querySelector('#preview-panel .preview-capability-image-stage');

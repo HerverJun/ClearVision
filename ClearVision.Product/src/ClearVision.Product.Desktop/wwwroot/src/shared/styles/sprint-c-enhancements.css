@@ -826,7 +826,7 @@ html[data-theme="light"] .operator-preview-region-guidance strong {
 }
 
 .preview-capability-pixel-probe-status[data-probe-state="pixel"] {
-    color: var(--template-text);
+    color: #f8fafc;
 }
 
 .preview-capability-pixel-probe-status[data-probe-state="locked"] {

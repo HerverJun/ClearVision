@@ -2914,6 +2914,7 @@ test('PreviewPanelCapabilityOwner clears previous artifact loading state when an
 test('Preview Panel capability source and app composition keep legacy resources behind active owner flag', () => {
   const appSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
   const ownerSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs');
+  const styleSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/styles/sprint-c-enhancements.css');
   const propertyPanelSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
   const indexSource = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/index.html');
 
@@ -2941,6 +2942,7 @@ test('Preview Panel capability source and app composition keep legacy resources 
   assert.match(ownerSource, /requestPreview/);
   assert.match(ownerSource, /readArtifactForCurrentState/);
   assert.match(ownerSource, /buildOperatorResultViewModel/);
+  assert.match(styleSource, /\.preview-capability-pixel-probe-status\[data-probe-state="pixel"\]\s*\{\s*color:\s*#f8fafc;/);
   assert.match(ownerSource, /预览工作台/);
   assert.match(ownerSource, /请选择一个算子/);
   assert.match(ownerSource, /当前算子/);
