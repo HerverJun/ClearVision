@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.Operators;
@@ -50,7 +51,7 @@ public class TextSaveOperator : OperatorBase
         var addTimestamp = GetBoolParam(@operator, "AddTimestamp", true);
         var encodingName = GetStringParam(@operator, "Encoding", "UTF8");
 
-        if (string.IsNullOrWhiteSpace(filePathTemplate))
+        if (OperatorParameterValueSemantics.IsMissing(filePathTemplate))
         {
             return OperatorExecutionOutput.Failure("FilePath is required.");
         }
@@ -93,7 +94,7 @@ public class TextSaveOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var filePath = GetStringParam(@operator, "FilePath", string.Empty);
-        if (string.IsNullOrWhiteSpace(filePath))
+        if (OperatorParameterValueSemantics.IsMissing(filePath))
         {
             return ValidationResult.Invalid("FilePath cannot be empty.");
         }

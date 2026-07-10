@@ -62,6 +62,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
 
         MergeValidationSummary(arguments, contractValidation, blockingIssues, warnings, missingResources);
         AddDeploymentResourceChecks(flow, warnings, missingResources);
+        AddDeploymentConstraintChecks(flow, blockingIssues);
         var manualConfirmationCount = AddManualConfirmationChecks(flow, arguments, warnings, missingResources);
         CheckDryRun(arguments, blockingIssues, warnings);
         CheckReplay(arguments, blockingIssues);
@@ -154,6 +155,43 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         }
     }
 
+    private static void AddDeploymentConstraintChecks(
+        VisionAgentFlowDraft flow,
+        List<PrecheckIssue> blockingIssues)
+    {
+        foreach (var issue in VisionAgentParameterRuleCenter.CollectConstraintViolations(flow))
+        {
+            var violation = issue.Violation;
+            if ((violation.Code is "required" or "at-least-one") &&
+                !string.IsNullOrWhiteSpace(violation.ResourceKind))
+            {
+                continue;
+            }
+
+            var code = violation.Code switch
+            {
+                "at-least-one" => "missing_conditional_parameter_group",
+                "mutually-exclusive" => "mutually_exclusive_parameters",
+                _ => "missing_conditional_parameter"
+            };
+            if (blockingIssues.Any(existing =>
+                    string.Equals(existing.Code, code, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(existing.TempId, issue.TempId, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            var parameterNames = string.Join(", ", violation.ParameterNames);
+            var message = violation.Code switch
+            {
+                "at-least-one" => $"{issue.OperatorType} requires at least one of {parameterNames} before deployment.",
+                "mutually-exclusive" => $"{issue.OperatorType} parameters {parameterNames} cannot be configured together.",
+                _ => $"{issue.OperatorType}.{parameterNames} is required for the active parameter mode."
+            };
+            blockingIssues.Add(new PrecheckIssue(code, message, issue.TempId, issue.OperatorType));
+        }
+    }
+
     private static int AddManualConfirmationChecks(
         VisionAgentFlowDraft flow,
         JsonElement arguments,
@@ -192,15 +230,51 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         VisionAgentFlowDraft flow)
     {
         var resources = new List<DeploymentResourceRequirement>();
+        var contractCatalog = new VisionAgentOperatorContractCatalog();
         foreach (var op in flow.Operators)
         {
-            if (IsOperatorType(op, "ImageAcquisition") && !IsFileSource(ReadParameter(op, "SourceType")))
+            if (contractCatalog.TryGet(op.OperatorType, out var contract) &&
+                contract.ParameterConstraints is { Count: > 0 } constraints)
             {
-                AddIfConfigured(resources, op, "camera_binding", ["CameraBindingId", "CameraId"]);
+                var metadata = new OperatorMetadata
+                {
+                    Parameters = contract.Parameters.Select(parameter => new ParameterDefinition
+                    {
+                        Name = parameter.Name,
+                        IsRequired = parameter.IsRequired,
+                        DefaultValue = parameter.DefaultValue
+                    }).ToList(),
+                    ParameterConstraints = constraints.ToList()
+                };
+                var values = op.Parameters.ToDictionary(
+                    pair => pair.Key,
+                    pair => (object?)pair.Value,
+                    StringComparer.Ordinal);
+                var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(metadata, values);
+                foreach (var state in OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
+                             .Where(item =>
+                                 !item.EffectiveDisabled &&
+                                 string.IsNullOrWhiteSpace(item.Constraint.AliasFor) &&
+                                 RequiresManualConfirmation(item.Constraint.ResourceKind)))
+                {
+                    if (!canonicalization.ExplicitValues.TryGetValue(state.Constraint.Parameter, out var value) ||
+                        OperatorParameterValueSemantics.IsMissing(value) ||
+                        IsInactiveResourceSwitch(value))
+                    {
+                        continue;
+                    }
+
+                    resources.Add(new DeploymentResourceRequirement(
+                        state.Constraint.ResourceKind!,
+                        state.Constraint.Parameter,
+                        op.TempId,
+                        op.OperatorType));
+                }
+
+                continue;
             }
 
-            if (IsOperatorType(op, "DeepLearning") ||
-                IsOperatorType(op, "OnnxInference") ||
+            if (IsOperatorType(op, "OnnxInference") ||
                 IsOperatorType(op, "SemanticSegmentation") ||
                 IsOperatorType(op, "AnomalyDetection"))
             {
@@ -227,6 +301,25 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             .GroupBy(item => $"{item.ResourceKind}|{item.TempId}|{item.ParameterName}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList();
+    }
+
+    private static bool RequiresManualConfirmation(string? resourceKind)
+    {
+        return resourceKind is
+            "camera_binding" or
+            "model_resource" or
+            "output_file" or
+            "plc_endpoint" or
+            "plc_address" or
+            "tcp_profile" or
+            "network_endpoint";
+    }
+
+    private static bool IsInactiveResourceSwitch(object? value)
+    {
+        return value is bool boolean
+            ? !boolean
+            : bool.TryParse(value?.ToString(), out var parsed) && !parsed;
     }
 
     private static void AddIfConfigured(

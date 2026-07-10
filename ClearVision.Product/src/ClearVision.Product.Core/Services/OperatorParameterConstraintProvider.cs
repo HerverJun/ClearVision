@@ -57,7 +57,11 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
                 [OperatorType.DeepLearning] = DeepLearningConstraints(),
                 [OperatorType.EdgeDetection] = EdgeDetectionConstraints(),
                 [OperatorType.ResultOutput] = ResultOutputConstraints(),
-                [OperatorType.BlobAnalysis] = BlobAnalysisConstraints()
+                [OperatorType.BlobAnalysis] = BlobAnalysisConstraints(),
+                [OperatorType.ImageSave] = ImageSaveConstraints(),
+                [OperatorType.TextSave] = TextSaveConstraints(),
+                [OperatorType.MitsubishiMcCommunication] = MitsubishiMcCommunicationConstraints(),
+                [OperatorType.TcpCommunication] = TcpCommunicationConstraints()
             });
 
     public IReadOnlyList<OperatorParameterConstraint> GetConstraints(OperatorType operatorType)
@@ -217,6 +221,306 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
         ];
     }
 
+    private static IReadOnlyList<OperatorParameterConstraint> ImageSaveConstraints()
+    {
+        return
+        [
+            Constraint(
+                "Directory",
+                OperatorParameterRequiredPolicies.Required,
+                resourceKind: "output_file",
+                reasonCode: "IMAGE_SAVE_DIRECTORY_REQUIRED"),
+            Constraint(
+                "FileNameTemplate",
+                OperatorParameterRequiredPolicies.Required,
+                reasonCode: "IMAGE_SAVE_FILE_NAME_REQUIRED"),
+            Constraint("Quality", reasonCode: "IMAGE_SAVE_QUALITY"),
+            Constraint(
+                "FolderPath",
+                OperatorParameterRequiredPolicies.Optional,
+                aliasFor: "Directory",
+                deprecated: true,
+                resourceKind: "output_file",
+                reasonCode: "IMAGE_SAVE_DIRECTORY_LEGACY_ALIAS"),
+            Constraint(
+                "FileName",
+                OperatorParameterRequiredPolicies.Optional,
+                aliasFor: "FileNameTemplate",
+                deprecated: true,
+                reasonCode: "IMAGE_SAVE_FILE_NAME_LEGACY_ALIAS"),
+            Constraint(
+                "JpegQuality",
+                OperatorParameterRequiredPolicies.Optional,
+                aliasFor: "Quality",
+                deprecated: true,
+                reasonCode: "IMAGE_SAVE_QUALITY_LEGACY_ALIAS")
+        ];
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraint> TextSaveConstraints()
+    {
+        return
+        [
+            Constraint(
+                "FilePath",
+                OperatorParameterRequiredPolicies.Required,
+                resourceKind: "output_file",
+                reasonCode: "TEXT_SAVE_FILE_PATH_REQUIRED")
+        ];
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraint> MitsubishiMcCommunicationConstraints()
+    {
+        var operatorEndpointRequired = All(Equals("UseGlobalFallback", false));
+        var readOperation = All(Equals("Operation", "Read"));
+        var writeOperation = All(Equals("Operation", "Write"));
+        var pollingOperation = All(
+            Equals("Operation", "Read"),
+            Equals("PollingMode", "WaitForValue"));
+
+        return
+        [
+            Constraint(
+                "IpAddress",
+                requiredWhen: operatorEndpointRequired,
+                resourceKind: "plc_endpoint",
+                reasonCode: "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK"),
+            Constraint(
+                "Port",
+                requiredWhen: operatorEndpointRequired,
+                reasonCode: "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK"),
+            Constraint(
+                "Address",
+                OperatorParameterRequiredPolicies.Required,
+                resourceKind: "plc_address",
+                reasonCode: "MITSUBISHI_PLC_ADDRESS_REQUIRED"),
+            Constraint(
+                "Length",
+                enabledWhen: readOperation,
+                reasonCode: "MITSUBISHI_READ_LENGTH_ONLY_FOR_READ"),
+            Constraint(
+                "WriteValue",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: writeOperation,
+                reasonCode: "MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE"),
+            Constraint(
+                "PollingMode",
+                enabledWhen: readOperation,
+                reasonCode: "MITSUBISHI_POLLING_ONLY_FOR_READ"),
+            Constraint(
+                "PollingCondition",
+                enabledWhen: pollingOperation,
+                reasonCode: "MITSUBISHI_POLLING_CONDITION_ONLY_WHEN_WAITING"),
+            Constraint(
+                "PollingValue",
+                enabledWhen: pollingOperation,
+                reasonCode: "MITSUBISHI_POLLING_VALUE_ONLY_WHEN_WAITING"),
+            Constraint(
+                "PollingTimeout",
+                enabledWhen: pollingOperation,
+                reasonCode: "MITSUBISHI_POLLING_TIMEOUT_ONLY_WHEN_WAITING"),
+            Constraint(
+                "PollingInterval",
+                enabledWhen: pollingOperation,
+                reasonCode: "MITSUBISHI_POLLING_INTERVAL_ONLY_WHEN_WAITING")
+        ];
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraint> TcpCommunicationConstraints()
+    {
+        var profileRequired = Any(
+            Equals("UseGlobalProfile", true),
+            Equals("Mode", "Server"));
+        var legacyClient = All(
+            Empty("ProfileId"),
+            Equals("UseGlobalProfile", false),
+            Equals("Mode", "Client"));
+        var waitResponse = All(Equals("WaitResponse", true));
+        var parseEnabled = All(
+            Equals("WaitResponse", true),
+            NotEquals("ResponseParseMode", "None"));
+        var regexParse = All(
+            Equals("WaitResponse", true),
+            Equals("ResponseParseMode", "Regex"));
+        var keyValueParse = All(
+            Equals("WaitResponse", true),
+            Equals("ResponseParseMode", "KeyValue"));
+        var delimitedParse = All(
+            Equals("WaitResponse", true),
+            Equals("ResponseParseMode", "Delimited"));
+        var fixedWidthParse = All(
+            Equals("WaitResponse", true),
+            Equals("ResponseParseMode", "FixedWidth"));
+        var delimitedOrFixedWidth = When(
+            all: [Equals("WaitResponse", true)],
+            any:
+            [
+                Equals("ResponseParseMode", "Delimited"),
+                Equals("ResponseParseMode", "FixedWidth")
+            ]);
+        return
+        [
+            Constraint(
+                "ProfileId",
+                OperatorParameterRequiredPolicies.Optional,
+                requiredWhen: profileRequired,
+                resourceKind: "tcp_profile",
+                reasonCode: "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE"),
+            Constraint(
+                "Mode",
+                disabledWhen: All(NotEmpty("ProfileId")),
+                reasonCode: "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED"),
+            Constraint(
+                "IpAddress",
+                requiredWhen: legacyClient,
+                enabledWhen: legacyClient,
+                resourceKind: "network_endpoint",
+                reasonCode: "TCP_LEGACY_CLIENT_HOST_REQUIRED"),
+            Constraint(
+                "Port",
+                requiredWhen: legacyClient,
+                enabledWhen: legacyClient,
+                reasonCode: "TCP_LEGACY_CLIENT_PORT_REQUIRED"),
+            Constraint(
+                "Timeout",
+                enabledWhen: legacyClient,
+                reasonCode: "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE"),
+            Constraint(
+                "Encoding",
+                enabledWhen: legacyClient,
+                reasonCode: "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE"),
+            Constraint(
+                "UseFixedSendData",
+                disabledWhen: All(NotEmpty("PayloadTemplate")),
+                reasonCode: "TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION"),
+            Constraint(
+                "ResponseTimeoutMs",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING"),
+            Constraint(
+                "FailOnParseError",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING"),
+            Constraint(
+                "FailOnUnexpectedResponse",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseParseMode",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_PARSE_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseFieldName",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: parseEnabled,
+                reasonCode: "TCP_RESPONSE_FIELD_ONLY_WHEN_PARSING"),
+            Constraint(
+                "ResponseFieldNames",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: delimitedOrFixedWidth,
+                reasonCode: "TCP_RESPONSE_FIELD_NAMES_ONLY_FOR_POSITIONAL_PARSE"),
+            Constraint(
+                "RequiredResponseFields",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseFieldWidths",
+                requiredWhen: fixedWidthParse,
+                enabledWhen: fixedWidthParse,
+                reasonCode: "TCP_FIXED_WIDTHS_REQUIRED_FOR_FIXED_WIDTH_PARSE"),
+            Constraint(
+                "ResponseRegexPattern",
+                requiredWhen: regexParse,
+                enabledWhen: regexParse,
+                reasonCode: "TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE"),
+            Constraint(
+                "ResponseRegexIgnoreCase",
+                enabledWhen: regexParse,
+                reasonCode: "TCP_REGEX_OPTIONS_ONLY_FOR_REGEX_PARSE"),
+            Constraint(
+                "ResponseKeyValuePairDelimiter",
+                requiredWhen: keyValueParse,
+                enabledWhen: keyValueParse,
+                atLeastOneGroup: "tcp-key-value-pair-delimiters",
+                reasonCode: "TCP_KEY_VALUE_PAIR_DELIMITER_ONLY_FOR_KEY_VALUE_PARSE"),
+            Constraint(
+                "ResponseKeyValuePairDelimiters",
+                requiredWhen: keyValueParse,
+                enabledWhen: keyValueParse,
+                atLeastOneGroup: "tcp-key-value-pair-delimiters",
+                reasonCode: "TCP_KEY_VALUE_PAIR_DELIMITERS_ONLY_FOR_KEY_VALUE_PARSE"),
+            Constraint(
+                "ResponseKeyValueSeparator",
+                requiredWhen: keyValueParse,
+                enabledWhen: keyValueParse,
+                atLeastOneGroup: "tcp-key-value-separators",
+                reasonCode: "TCP_KEY_VALUE_SEPARATOR_ONLY_FOR_KEY_VALUE_PARSE"),
+            Constraint(
+                "ResponseKeyValueSeparators",
+                requiredWhen: keyValueParse,
+                enabledWhen: keyValueParse,
+                atLeastOneGroup: "tcp-key-value-separators",
+                reasonCode: "TCP_KEY_VALUE_SEPARATORS_ONLY_FOR_KEY_VALUE_PARSE"),
+            Constraint(
+                "ResponseDelimiter",
+                requiredWhen: delimitedParse,
+                enabledWhen: delimitedParse,
+                atLeastOneGroup: "tcp-response-delimiters",
+                reasonCode: "TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE"),
+            Constraint(
+                "ResponseDelimiters",
+                requiredWhen: delimitedParse,
+                enabledWhen: delimitedParse,
+                atLeastOneGroup: "tcp-response-delimiters",
+                reasonCode: "TCP_DELIMITERS_ONLY_FOR_DELIMITED_PARSE"),
+            Constraint(
+                "ResponseIndex",
+                enabledWhen: delimitedOrFixedWidth,
+                reasonCode: "TCP_RESPONSE_INDEX_ONLY_FOR_POSITIONAL_PARSE"),
+            Constraint(
+                "TrimResponseBeforeParse",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseStartMarker",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseEndMarker",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"),
+            Constraint(
+                "FailOnMissingResponseFrame",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ExpectedResponse",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING"),
+            Constraint(
+                "RejectedResponse",
+                OperatorParameterRequiredPolicies.Optional,
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseMatchMode",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseMatchIgnoreCase",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"),
+            Constraint(
+                "ResponseMatchSource",
+                enabledWhen: waitResponse,
+                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING")
+        ];
+    }
+
     private static OperatorParameterConstraint Constraint(
         string parameter,
         string requiredPolicy = OperatorParameterRequiredPolicies.Metadata,
@@ -261,6 +565,11 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
 
     private static OperatorParameterConditionSet Any(params OperatorParameterCondition[] conditions) =>
         new(Any: conditions);
+
+    private static OperatorParameterConditionSet When(
+        IReadOnlyList<OperatorParameterCondition>? all = null,
+        IReadOnlyList<OperatorParameterCondition>? any = null) =>
+        new(All: all, Any: any);
 }
 
 public sealed record OperatorParameterConstraintState(

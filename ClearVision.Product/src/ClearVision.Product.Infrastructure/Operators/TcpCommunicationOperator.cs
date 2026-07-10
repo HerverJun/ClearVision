@@ -12,6 +12,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -111,13 +112,13 @@ public class TcpCommunicationOperator : OperatorBase
         inputs ??= new Dictionary<string, object>();
         inputs.TryGetValue("Data", out var inputData);
 
-        var mode = GetStringParam(@operator, "Mode", "Client");
-        var profileId = GetStringParam(@operator, "ProfileId", string.Empty).Trim();
+        var mode = NormalizePendingString(GetStringParam(@operator, "Mode", "Client"));
+        var profileId = NormalizePendingString(GetStringParam(@operator, "ProfileId", string.Empty)).Trim();
         var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
         var ipAddress = GetStringParam(@operator, "IpAddress", "127.0.0.1");
         var port = GetIntParam(@operator, "Port", 8080, 1, 65535);
-        var sendData = GetStringParam(@operator, "SendData", string.Empty);
-        var payloadTemplate = GetStringParam(@operator, "PayloadTemplate", string.Empty);
+        var sendData = NormalizePendingString(GetStringParam(@operator, "SendData", string.Empty));
+        var payloadTemplate = NormalizePendingString(GetStringParam(@operator, "PayloadTemplate", string.Empty));
         var useFixedSendData = GetBoolParam(@operator, "UseFixedSendData", false);
         var decodeEscapeSequences = GetBoolParam(@operator, "DecodeEscapeSequences", false);
         var waitResponse = GetBoolParam(@operator, "WaitResponse", true);
@@ -127,16 +128,22 @@ public class TcpCommunicationOperator : OperatorBase
         var failOnParseError = GetBoolParam(@operator, "FailOnParseError", false);
         var failOnUnresolvedPayloadPlaceholder = GetBoolParam(@operator, "FailOnUnresolvedPayloadPlaceholder", true);
         var failOnUnexpectedResponse = GetBoolParam(@operator, "FailOnUnexpectedResponse", false);
-        var expectedResponse = DecodeIfEnabled(GetStringParam(@operator, "ExpectedResponse", string.Empty), decodeEscapeSequences);
-        var rejectedResponse = DecodeIfEnabled(GetStringParam(@operator, "RejectedResponse", string.Empty), decodeEscapeSequences);
-        var responseMatchMode = NormalizeResponseMatchMode(GetStringParam(@operator, "ResponseMatchMode", "Contains"));
-        var responseMatchSource = NormalizeResponseMatchSource(GetStringParam(@operator, "ResponseMatchSource", "Response"));
+        var expectedResponse = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "ExpectedResponse", string.Empty)), decodeEscapeSequences);
+        var rejectedResponse = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "RejectedResponse", string.Empty)), decodeEscapeSequences);
+        var responseMatchMode = NormalizeResponseMatchMode(NormalizePendingString(GetStringParam(@operator, "ResponseMatchMode", "Contains")));
+        var responseMatchSource = NormalizeResponseMatchSource(NormalizePendingString(GetStringParam(@operator, "ResponseMatchSource", "Response")));
         var responseMatchIgnoreCase = GetBoolParam(@operator, "ResponseMatchIgnoreCase", false);
         var responseRegexIgnoreCase = GetBoolParam(@operator, "ResponseRegexIgnoreCase", false);
         var trimResponseBeforeParse = GetBoolParam(@operator, "TrimResponseBeforeParse", false);
-        var responseStartMarker = DecodeIfEnabled(GetStringParam(@operator, "ResponseStartMarker", string.Empty), decodeEscapeSequences);
-        var responseEndMarker = DecodeIfEnabled(GetStringParam(@operator, "ResponseEndMarker", string.Empty), decodeEscapeSequences);
+        var responseStartMarker = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "ResponseStartMarker", string.Empty)), decodeEscapeSequences);
+        var responseEndMarker = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "ResponseEndMarker", string.Empty)), decodeEscapeSequences);
         var failOnMissingResponseFrame = GetBoolParam(@operator, "FailOnMissingResponseFrame", false);
+        var validation = ValidateParameters(@operator);
+        if (!validation.IsValid)
+        {
+            return OperatorExecutionOutput.Failure(string.Join("; ", validation.Errors));
+        }
+
         if (!TryResolvePayload(inputs, inputData, sendData, payloadTemplate, useFixedSendData, failOnUnresolvedPayloadPlaceholder, decodeEscapeSequences, out var payload, out var payloadError))
         {
             return OperatorExecutionOutput.Failure(payloadError);
@@ -149,7 +156,7 @@ public class TcpCommunicationOperator : OperatorBase
                 profileId,
                 new TcpDeviceSendRequest(
                     payload,
-                    IsHexEncoding(encoding),
+                    false,
                     waitResponse,
                     responseTimeoutMs),
                 cancellationToken);
@@ -197,12 +204,14 @@ public class TcpCommunicationOperator : OperatorBase
             return OperatorExecutionOutput.Failure(result.Message);
         }
 
-        var responseNormalization = NormalizeResponse(
-            result.Response,
-            trimResponseBeforeParse,
-            responseStartMarker,
-            responseEndMarker,
-            failOnMissingResponseFrame);
+        var responseNormalization = waitResponse
+            ? NormalizeResponse(
+                result.Response,
+                trimResponseBeforeParse,
+                responseStartMarker,
+                responseEndMarker,
+                failOnMissingResponseFrame)
+            : ResponseNormalizationResult.Ok(result.Response, false);
         if (!responseNormalization.Success)
         {
             return new OperatorExecutionOutput
@@ -230,16 +239,22 @@ public class TcpCommunicationOperator : OperatorBase
             };
         }
 
-        var parseResult = ParseResponse(@operator, responseNormalization.Response);
-        var responseJudgment = EvaluateResponseJudgment(
-            result.Response,
-            responseNormalization.Response,
-            parseResult,
-            expectedResponse,
-            rejectedResponse,
-            responseMatchMode,
-            responseMatchSource,
-            responseMatchIgnoreCase);
+        var parseResult = waitResponse
+            ? ParseResponse(@operator, responseNormalization.Response)
+            : ResponseParseResult.Ok(
+                responseNormalization.Response,
+                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase));
+        var responseJudgment = waitResponse
+            ? EvaluateResponseJudgment(
+                result.Response,
+                responseNormalization.Response,
+                parseResult,
+                expectedResponse,
+                rejectedResponse,
+                responseMatchMode,
+                responseMatchSource,
+                responseMatchIgnoreCase)
+            : ResponseJudgment.Ok(responseNormalization.Response);
         var outputData = new Dictionary<string, object>
         {
             { "RequestPayload", payload },
@@ -272,7 +287,7 @@ public class TcpCommunicationOperator : OperatorBase
             { "Port", port }
         };
 
-        if (failOnParseError && !parseResult.Success)
+        if (waitResponse && failOnParseError && !parseResult.Success)
         {
             return new OperatorExecutionOutput
             {
@@ -284,7 +299,7 @@ public class TcpCommunicationOperator : OperatorBase
             };
         }
 
-        if (failOnUnexpectedResponse && !responseJudgment.Accepted)
+        if (waitResponse && failOnUnexpectedResponse && !responseJudgment.Accepted)
         {
             return new OperatorExecutionOutput
             {
@@ -301,17 +316,21 @@ public class TcpCommunicationOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var profileId = GetStringParam(@operator, "ProfileId", string.Empty).Trim();
+        var profileId = NormalizePendingString(GetStringParam(@operator, "ProfileId", string.Empty)).Trim();
         var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
-        var host = GetStringParam(@operator, "IpAddress", "127.0.0.1");
+        var host = NormalizePendingString(GetStringParam(@operator, "IpAddress", "127.0.0.1"));
         var port = GetIntParam(@operator, "Port", 8080);
         var timeout = GetIntParam(@operator, "Timeout", 5000);
         var responseTimeoutMs = GetIntParam(@operator, "ResponseTimeoutMs", 5000);
-        var mode = GetStringParam(@operator, "Mode", "Client");
+        var mode = NormalizePendingString(GetStringParam(@operator, "Mode", "Client"));
         var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
-        var responseParseMode = NormalizeResponseParseMode(GetStringParam(@operator, "ResponseParseMode", "None"));
-        var responseMatchMode = NormalizeResponseMatchMode(GetStringParam(@operator, "ResponseMatchMode", "Contains"));
-        var responseMatchSource = NormalizeResponseMatchSource(GetStringParam(@operator, "ResponseMatchSource", "Response"));
+        var waitResponse = GetBoolParam(@operator, "WaitResponse", true);
+        var responseParseMode = NormalizeResponseParseMode(
+            NormalizePendingString(GetStringParam(@operator, "ResponseParseMode", "None")));
+        var responseMatchMode = NormalizeResponseMatchMode(
+            NormalizePendingString(GetStringParam(@operator, "ResponseMatchMode", "Contains")));
+        var responseMatchSource = NormalizeResponseMatchSource(
+            NormalizePendingString(GetStringParam(@operator, "ResponseMatchSource", "Response")));
         var decodeEscapeSequences = GetBoolParam(@operator, "DecodeEscapeSequences", false);
 
         if (useGlobalProfile && string.IsNullOrWhiteSpace(profileId))
@@ -319,7 +338,8 @@ public class TcpCommunicationOperator : OperatorBase
             return ValidationResult.Invalid("启用全局 Profile 时必须配置 ProfileId。");
         }
 
-        if (mode != TcpCommunicationProfile.ModeClient && mode != TcpCommunicationProfile.ModeServer)
+        if (string.IsNullOrWhiteSpace(profileId) &&
+            mode != TcpCommunicationProfile.ModeClient && mode != TcpCommunicationProfile.ModeServer)
         {
             return ValidationResult.Invalid("模式必须是 Client 或 Server");
         }
@@ -329,9 +349,12 @@ public class TcpCommunicationOperator : OperatorBase
             return ValidationResult.Invalid("Server 监听请在全局 TCP 通讯页启动。");
         }
 
-        if (string.IsNullOrWhiteSpace(profileId))
+        if (string.IsNullOrWhiteSpace(profileId) &&
+            mode == TcpCommunicationProfile.ModeClient &&
+            !useGlobalProfile)
         {
-            if (@operator.Parameters.Any(p => p.Name == "IpAddress") && string.IsNullOrWhiteSpace(host))
+            if (@operator.Parameters.Any(p => p.Name == "IpAddress") &&
+                OperatorParameterValueSemantics.IsMissing(host))
             {
                 return ValidationResult.Invalid("主机地址不能为空");
             }
@@ -342,43 +365,53 @@ public class TcpCommunicationOperator : OperatorBase
             }
         }
 
-        if (timeout is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
+        if (string.IsNullOrWhiteSpace(profileId) &&
+            mode == TcpCommunicationProfile.ModeClient &&
+            !useGlobalProfile &&
+            timeout is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
         {
             return ValidationResult.Invalid($"超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
         }
 
-        if (responseTimeoutMs is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
+        if (waitResponse &&
+            responseTimeoutMs is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
         {
             return ValidationResult.Invalid($"响应超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
         }
 
-        if (encoding is not (
-            TcpCommunicationProfile.EncodingUtf8 or
-            TcpCommunicationProfile.EncodingAscii or
-            TcpCommunicationProfile.EncodingGbk or
-            TcpCommunicationProfile.EncodingHex))
+        if (string.IsNullOrWhiteSpace(profileId) &&
+            mode == TcpCommunicationProfile.ModeClient &&
+            !useGlobalProfile &&
+            encoding is not (
+                TcpCommunicationProfile.EncodingUtf8 or
+                TcpCommunicationProfile.EncodingAscii or
+                TcpCommunicationProfile.EncodingGbk or
+                TcpCommunicationProfile.EncodingHex))
         {
             return ValidationResult.Invalid("编码必须是 UTF8、ASCII、GBK 或 HEX");
         }
 
-        if (responseParseMode is not ("none" or "jsonpath" or "keyvalue" or "regex" or "delimited" or "fixedwidth"))
+        if (waitResponse &&
+            responseParseMode is not ("none" or "jsonpath" or "keyvalue" or "regex" or "delimited" or "fixedwidth"))
         {
             return ValidationResult.Invalid("ResponseParseMode must be None, JsonPath, KeyValue, Regex, Delimited or FixedWidth.");
         }
 
-        if (responseMatchMode is not ("contains" or "equals" or "startswith" or "endswith" or "regex"))
+        if (waitResponse &&
+            responseMatchMode is not ("contains" or "equals" or "startswith" or "endswith" or "regex"))
         {
             return ValidationResult.Invalid("ResponseMatchMode must be Contains, Equals, StartsWith, EndsWith or Regex.");
         }
 
-        if (responseMatchSource is not ("response" or "normalizedresponse" or "parsedvalue"))
+        if (waitResponse &&
+            responseMatchSource is not ("response" or "normalizedresponse" or "parsedvalue"))
         {
             return ValidationResult.Invalid("ResponseMatchSource must be Response, NormalizedResponse or ParsedValue.");
         }
 
-        if (responseParseMode == "regex")
+        if (waitResponse && responseParseMode == "regex")
         {
-            var pattern = GetStringParam(@operator, "ResponseRegexPattern", string.Empty);
+            var pattern = NormalizePendingString(GetStringParam(@operator, "ResponseRegexPattern", string.Empty));
             var regexOptions = GetBoolParam(@operator, "ResponseRegexIgnoreCase", false)
                 ? RegexOptions.IgnoreCase
                 : RegexOptions.None;
@@ -397,38 +430,41 @@ public class TcpCommunicationOperator : OperatorBase
             }
         }
 
-        if (responseParseMode == "keyvalue" &&
+        if (waitResponse && responseParseMode == "keyvalue" &&
             (BuildDelimiterOptions(
-                 GetStringParam(@operator, "ResponseKeyValuePairDelimiter", ";"),
-                 GetStringParam(@operator, "ResponseKeyValuePairDelimiters", string.Empty),
+                 NormalizePendingString(GetStringParam(@operator, "ResponseKeyValuePairDelimiter", ";")),
+                 NormalizePendingString(GetStringParam(@operator, "ResponseKeyValuePairDelimiters", string.Empty)),
                  decodeEscapeSequences).Length == 0 ||
              BuildDelimiterOptions(
-                 GetStringParam(@operator, "ResponseKeyValueSeparator", "="),
-                 GetStringParam(@operator, "ResponseKeyValueSeparators", string.Empty),
+                 NormalizePendingString(GetStringParam(@operator, "ResponseKeyValueSeparator", "=")),
+                 NormalizePendingString(GetStringParam(@operator, "ResponseKeyValueSeparators", string.Empty)),
                  decodeEscapeSequences).Length == 0))
         {
             return ValidationResult.Invalid("KeyValue response parsing requires non-empty pair and key/value delimiters.");
         }
 
-        if (responseParseMode == "delimited" &&
+        if (waitResponse && responseParseMode == "delimited" &&
             BuildDelimiterOptions(
-                GetStringParam(@operator, "ResponseDelimiter", ","),
-                GetStringParam(@operator, "ResponseDelimiters", string.Empty),
+                NormalizePendingString(GetStringParam(@operator, "ResponseDelimiter", ",")),
+                NormalizePendingString(GetStringParam(@operator, "ResponseDelimiters", string.Empty)),
                 decodeEscapeSequences).Length == 0)
         {
             return ValidationResult.Invalid("Delimited response parsing requires a non-empty delimiter.");
         }
 
-        if (responseParseMode == "fixedwidth" &&
-            !TryParseFixedWidths(GetStringParam(@operator, "ResponseFieldWidths", string.Empty), out _, out var widthsError))
+        if (waitResponse && responseParseMode == "fixedwidth" &&
+            !TryParseFixedWidths(
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldWidths", string.Empty)),
+                out _,
+                out var widthsError))
         {
             return ValidationResult.Invalid(widthsError);
         }
 
-        if (responseMatchMode == "regex")
+        if (waitResponse && responseMatchMode == "regex")
         {
-            var expectedResponse = DecodeIfEnabled(GetStringParam(@operator, "ExpectedResponse", string.Empty), decodeEscapeSequences);
-            var rejectedResponse = DecodeIfEnabled(GetStringParam(@operator, "RejectedResponse", string.Empty), decodeEscapeSequences);
+            var expectedResponse = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "ExpectedResponse", string.Empty)), decodeEscapeSequences);
+            var rejectedResponse = DecodeIfEnabled(NormalizePendingString(GetStringParam(@operator, "RejectedResponse", string.Empty)), decodeEscapeSequences);
             if (!TryValidateOptionalRegex(expectedResponse, "ExpectedResponse", out var expectedRegexError))
             {
                 return ValidationResult.Invalid(expectedRegexError);
@@ -443,10 +479,15 @@ public class TcpCommunicationOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
+    private static string NormalizePendingString(string? value)
+    {
+        return OperatorParameterValueSemantics.IsMissing(value) ? string.Empty : value!;
+    }
+
     private ResponseParseResult ParseResponse(Operator @operator, string response)
     {
-        var parseMode = NormalizeResponseParseMode(GetStringParam(@operator, "ResponseParseMode", "None"));
-        var requiredFields = SplitFieldNames(GetStringParam(@operator, "RequiredResponseFields", string.Empty));
+        var parseMode = NormalizeResponseParseMode(NormalizePendingString(GetStringParam(@operator, "ResponseParseMode", "None")));
+        var requiredFields = SplitFieldNames(NormalizePendingString(GetStringParam(@operator, "RequiredResponseFields", string.Empty)));
         var decodeEscapeSequences = GetBoolParam(@operator, "DecodeEscapeSequences", false);
         if (parseMode == "none")
         {
@@ -464,37 +505,37 @@ public class TcpCommunicationOperator : OperatorBase
         {
             "jsonpath" => ParseJsonResponse(
                 response,
-                GetStringParam(@operator, "ResponseFieldName", string.Empty)),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldName", string.Empty))),
             "keyvalue" => ParseKeyValueResponse(
                 response,
-                GetStringParam(@operator, "ResponseFieldName", string.Empty),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldName", string.Empty)),
                 BuildDelimiterOptions(
-                    GetStringParam(@operator, "ResponseKeyValuePairDelimiter", ";"),
-                    GetStringParam(@operator, "ResponseKeyValuePairDelimiters", string.Empty),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseKeyValuePairDelimiter", ";")),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseKeyValuePairDelimiters", string.Empty)),
                     decodeEscapeSequences),
                 BuildDelimiterOptions(
-                    GetStringParam(@operator, "ResponseKeyValueSeparator", "="),
-                    GetStringParam(@operator, "ResponseKeyValueSeparators", string.Empty),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseKeyValueSeparator", "=")),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseKeyValueSeparators", string.Empty)),
                     decodeEscapeSequences)),
             "regex" => ParseRegexResponse(
                 response,
-                GetStringParam(@operator, "ResponseFieldName", string.Empty),
-                GetStringParam(@operator, "ResponseRegexPattern", string.Empty),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldName", string.Empty)),
+                NormalizePendingString(GetStringParam(@operator, "ResponseRegexPattern", string.Empty)),
                 GetBoolParam(@operator, "ResponseRegexIgnoreCase", false)),
             "delimited" => ParseDelimitedResponse(
                 response,
-                GetStringParam(@operator, "ResponseFieldName", string.Empty),
-                GetStringParam(@operator, "ResponseFieldNames", string.Empty),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldName", string.Empty)),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldNames", string.Empty)),
                 BuildDelimiterOptions(
-                    GetStringParam(@operator, "ResponseDelimiter", ","),
-                    GetStringParam(@operator, "ResponseDelimiters", string.Empty),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseDelimiter", ",")),
+                    NormalizePendingString(GetStringParam(@operator, "ResponseDelimiters", string.Empty)),
                     decodeEscapeSequences),
                 GetIntParam(@operator, "ResponseIndex", 0, 0, 4096)),
             "fixedwidth" => ParseFixedWidthResponse(
                 response,
-                GetStringParam(@operator, "ResponseFieldName", string.Empty),
-                GetStringParam(@operator, "ResponseFieldNames", string.Empty),
-                GetStringParam(@operator, "ResponseFieldWidths", string.Empty),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldName", string.Empty)),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldNames", string.Empty)),
+                NormalizePendingString(GetStringParam(@operator, "ResponseFieldWidths", string.Empty)),
                 GetIntParam(@operator, "ResponseIndex", 0, 0, 4096)),
             _ => ResponseParseResult.Fail($"Unsupported response parse mode '{parseMode}'.")
         };

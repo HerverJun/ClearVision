@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.Operators;
@@ -67,6 +68,23 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
         var pollingTimeout = GetIntParam(@operator, "PollingTimeout", 30000, 100, 300000);
         var pollingInterval = GetIntParam(@operator, "PollingInterval", 50, 10, 5000);
         var writeValue = ResolveWriteValue(@operator, inputs);
+
+        if (OperatorParameterValueSemantics.IsMissing(address))
+        {
+            return CreateFailureOutput("Address cannot be empty.");
+        }
+
+        if (!operation.Equals("Read", StringComparison.OrdinalIgnoreCase) &&
+            !operation.Equals("Write", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateFailureOutput("Operation must be Read or Write.");
+        }
+
+        if (operation.Equals("Write", StringComparison.OrdinalIgnoreCase) &&
+            OperatorParameterValueSemantics.IsMissing(writeValue))
+        {
+            return CreateFailureOutput("WriteValue cannot be empty.");
+        }
 
         var logIp = string.IsNullOrWhiteSpace(operatorIpAddress) ? "(unset)" : operatorIpAddress;
         var logPort = operatorPort;
@@ -193,20 +211,31 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             return ValidationResult.Invalid(ex.Message);
         }
 
-        if (string.IsNullOrWhiteSpace(address))
+        if (OperatorParameterValueSemantics.IsMissing(address))
         {
             return ValidationResult.Invalid("Address cannot be empty.");
         }
 
-        if (length < 1 || length > 999)
+        var operation = GetStringParam(@operator, "Operation", "Read");
+        if (!operation.Equals("Read", StringComparison.OrdinalIgnoreCase) &&
+            !operation.Equals("Write", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("Operation must be Read or Write.");
+        }
+
+        if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase) &&
+            (length < 1 || length > 999))
         {
             return ValidationResult.Invalid("Length must be within [1, 999].");
         }
 
-        var validPollingModes = new[] { "None", "WaitForValue" };
-        if (!validPollingModes.Contains(pollingMode, StringComparer.OrdinalIgnoreCase))
+        if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid($"PollingMode must be one of: {string.Join(", ", validPollingModes)}.");
+            var validPollingModes = new[] { "None", "WaitForValue" };
+            if (!validPollingModes.Contains(pollingMode, StringComparer.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Invalid($"PollingMode must be one of: {string.Join(", ", validPollingModes)}.");
+            }
         }
 
         return ValidationResult.Valid();

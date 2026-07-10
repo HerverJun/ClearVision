@@ -174,6 +174,45 @@ internal static class VisionAgentFlowDraftValidator
             AddMissingResource(missingResources, resource);
         }
 
+        foreach (var issue in VisionAgentParameterRuleCenter.CollectConstraintViolations(
+                     canonicalFlow,
+                     contractCatalog))
+        {
+            var violation = issue.Violation;
+            if ((violation.Code is "required" or "at-least-one") &&
+                !string.IsNullOrWhiteSpace(violation.ResourceKind))
+            {
+                continue;
+            }
+
+            var parameterNames = string.Join(", ", violation.ParameterNames);
+            var code = violation.Code switch
+            {
+                "at-least-one" => "missing_conditional_parameter_group",
+                "mutually-exclusive" => "mutually_exclusive_parameters",
+                _ => "missing_conditional_parameter"
+            };
+            var message = violation.Code switch
+            {
+                "at-least-one" => $"{issue.OperatorType} requires at least one of {parameterNames}.",
+                "mutually-exclusive" => $"{issue.OperatorType} parameters {parameterNames} cannot be configured together.",
+                _ => $"{issue.OperatorType}.{parameterNames} is required for the active parameter mode."
+            };
+            blockingIssues.Add(new VisionAgentFlowIssue(
+                code,
+                message,
+                issue.TempId,
+                issue.OperatorType));
+            if (violation.Code is "required" or "at-least-one")
+            {
+                pendingParameters.Add(new VisionAgentPendingParameter(
+                    issue.TempId,
+                    issue.OperatorType,
+                    violation.ParameterNames[0],
+                    code));
+            }
+        }
+
         foreach (var missingResource in missingResources)
         {
             warnings.Add(new VisionAgentFlowIssue(

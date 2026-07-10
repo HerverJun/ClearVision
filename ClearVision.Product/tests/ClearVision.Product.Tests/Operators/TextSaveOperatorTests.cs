@@ -66,6 +66,25 @@ public class TextSaveOperatorTests
     }
 
     [Fact]
+    public async Task PendingFilePath_ShouldFailValidationAndExecuteWithoutWriting()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "FilePath", "<pending-output-file>" },
+            { "Format", "Text" },
+            { "AppendMode", false },
+            { "AddTimestamp", false }
+        });
+
+        Assert.False(sut.ValidateParameters(op).IsValid);
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Text"] = "must-not-write" });
+
+        Assert.False(result.IsSuccess);
+        Assert.False(File.Exists(Path.GetFullPath("<pending-output-file>")));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ConcurrentAppend_ShouldNotLoseLines()
     {
         var sut = CreateSut();

@@ -94,6 +94,42 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void MitsubishiMcCommunicationOperator_WriteValidation_ShouldIgnoreDisabledReadAndPollingValues()
+    {
+        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var @operator = CreateOperator(
+            "MC Write Validation",
+            OperatorType.MitsubishiMcCommunication,
+            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
+            ("Port", 5002, "int"),
+            ("Address", "D100", "string"),
+            ("Operation", "Write", "string"),
+            ("Length", 0, "int"),
+            ("PollingMode", "<pending-polling-mode>", "string"),
+            ("WriteValue", "1", "string"));
+
+        sut.ValidateParameters(@operator).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MitsubishiMcCommunicationOperator_PendingEndpoint_ShouldFailBeforeConnection()
+    {
+        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var @operator = CreateOperator(
+            "MC Pending Endpoint",
+            OperatorType.MitsubishiMcCommunication,
+            ("IpAddress", "<pending-plc-endpoint>", "string"),
+            ("Port", 5002, "int"),
+            ("Address", "D100", "string"),
+            ("Operation", "Read", "string"));
+
+        sut.ValidateParameters(@operator).IsValid.Should().BeFalse();
+        var result = await sut.ExecuteAsync(@operator);
+
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task MitsubishiMcCommunicationOperator_ReadAsync_WaitForValue_ShouldPollUntilMatched()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);

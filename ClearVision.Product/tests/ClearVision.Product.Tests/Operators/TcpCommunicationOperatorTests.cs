@@ -81,6 +81,117 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
+    public async Task PendingGlobalProfile_ShouldFailBeforeAnyNetworkCall()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-pending-profile", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("UseGlobalProfile", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "<pending-tcp-profile>", "string"));
+
+        sut.ValidateParameters(op).IsValid.Should().BeFalse();
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeFalse();
+        await manager.DidNotReceive().SendAsync(
+            Arg.Any<string>(),
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(
+            Arg.Any<TcpCommunicationProfile>(),
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProfileMode_ShouldIgnoreDisabledLegacyModeTimeoutAndEncoding()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-profile-stale", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Mode", "<pending-mode>", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Timeout", 1, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("Encoding", "INVALID", "string"));
+
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.IsHex.Should().BeFalse();
+        await manager.Received(1).SendAsync(
+            "robot-main",
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(
+            Arg.Any<TcpCommunicationProfile>(),
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WaitResponseFalse_ShouldIgnoreAllStaleResponseRules()
+    {
+        var manager = Substitute.For<ITcpDeviceManager>();
+        TcpDeviceSendRequest? capturedRequest = null;
+        manager
+            .SendAsync(
+                "robot-main",
+                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("sent", string.Empty)));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-no-response", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("WaitResponse", false, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseTimeoutMs", 1, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "Regex", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseRegexPattern", string.Empty, "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnParseError", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseStartMarker", "BEGIN", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnMissingResponseFrame", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("ExpectedResponse", "ACK", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnUnexpectedResponse", true, "bool"));
+
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.WaitResponse.Should().BeFalse();
+        result.OutputData!["ResponseAccepted"].Should().Be(true);
+        result.OutputData["ParseSuccess"].Should().Be(true);
+    }
+
+    [Fact]
+    public void ValidateParameters_KeyValueDelimiterAlternatives_ShouldMatchAtLeastOneContract()
+    {
+        var valid = new Operator("tcp-key-value-valid", OperatorType.TcpCommunication, 0, 0);
+        valid.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
+        valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiter", string.Empty, "string"));
+        valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiters", ",", "string"));
+        valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValueSeparator", string.Empty, "string"));
+        valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValueSeparators", ":", "string"));
+        _operator.ValidateParameters(valid).IsValid.Should().BeTrue();
+
+        var invalid = new Operator("tcp-key-value-invalid", OperatorType.TcpCommunication, 0, 0);
+        invalid.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
+        invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiter", string.Empty, "string"));
+        invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiters", string.Empty, "string"));
+        invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValueSeparator", string.Empty, "string"));
+        invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValueSeparators", string.Empty, "string"));
+        _operator.ValidateParameters(invalid).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithUnsupportedInlineServerMode_ShouldReturnFailure()
     {
         var op = new Operator("test", OperatorType.TcpCommunication, 0, 0);

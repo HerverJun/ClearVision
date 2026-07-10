@@ -27,6 +27,7 @@ public sealed class ExecutionAdmissionServiceTests
         OperatorType.TcpCommunication,
         OperatorType.ModbusCommunication,
         OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
         OperatorType.CameraCalibration
     ];
 

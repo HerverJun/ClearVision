@@ -11,7 +11,7 @@ public sealed class OperatorParameterConstraintProviderTests
     private readonly OperatorFactory _factory = new();
 
     [Fact]
-    public void Provider_ShouldExposeOnlyTheFiveMigratedOperators()
+    public void Provider_ShouldExposeTheFirstAndSecondMigratedBatchesOnly()
     {
         var provider = OperatorParameterConstraintProvider.Instance;
 
@@ -20,7 +20,13 @@ public sealed class OperatorParameterConstraintProviderTests
         provider.GetConstraints(OperatorType.EdgeDetection).Should().NotBeEmpty();
         provider.GetConstraints(OperatorType.ResultOutput).Should().NotBeEmpty();
         provider.GetConstraints(OperatorType.BlobAnalysis).Should().NotBeEmpty();
+        provider.GetConstraints(OperatorType.ImageSave).Should().NotBeEmpty();
+        provider.GetConstraints(OperatorType.TextSave).Should().NotBeEmpty();
+        provider.GetConstraints(OperatorType.MitsubishiMcCommunication).Should().NotBeEmpty();
+        provider.GetConstraints(OperatorType.TcpCommunication).Should().NotBeEmpty();
         provider.GetConstraints(OperatorType.TemplateMatching).Should().BeEmpty();
+        provider.GetConstraints(OperatorType.HttpRequest).Should().BeEmpty();
+        provider.GetConstraints(OperatorType.MqttPublish).Should().BeEmpty();
 
         typeof(OperatorParameterConstraint).GetProperties().Select(property => property.Name).Should().Contain(
         [
@@ -286,6 +292,204 @@ public sealed class OperatorParameterConstraintProviderTests
             metadata,
             new Dictionary<string, object?> { ["EnableColorFilter"] = true });
         enabledStates["HueLow"].EffectiveDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ImageSave_ShouldCanonicalizeLegacyAliasesAndPreferExplicitCanonicalValues()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.ImageSave)!;
+        var legacy = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["FolderPath"] = "legacy-output",
+                ["FileName"] = "legacy.jpg",
+                ["JpegQuality"] = 81
+            });
+
+        legacy.ExplicitValues["Directory"].Should().Be("legacy-output");
+        legacy.ExplicitValues["FileNameTemplate"].Should().Be("legacy.jpg");
+        legacy.ExplicitValues["Quality"].Should().Be(81);
+
+        var conflict = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["Directory"] = "canonical-output",
+                ["FolderPath"] = "legacy-output"
+            });
+        conflict.EffectiveValues["Directory"].Should().Be("canonical-output");
+        conflict.Diagnostics.Should().ContainSingle(item =>
+            item.Code == "canonical-overrides-alias" && item.AliasParameter == "FolderPath");
+    }
+
+    [Fact]
+    public void FileOutputOperators_ShouldExposeRequiredOutputResourceFacts()
+    {
+        var imageSave = _factory.GetMetadata(OperatorType.ImageSave)!;
+        OperatorParameterConstraintEvaluator.Validate(
+                imageSave,
+                new Dictionary<string, object?>
+                {
+                    ["Directory"] = "",
+                    ["FileNameTemplate"] = ""
+                })
+            .SelectMany(item => item.ParameterNames)
+            .Should().BeEquivalentTo(["Directory", "FileNameTemplate"]);
+
+        var textSave = _factory.GetMetadata(OperatorType.TextSave)!;
+        OperatorParameterConstraintEvaluator.Validate(
+                textSave,
+                new Dictionary<string, object?> { ["FilePath"] = "<pending-output-file>" })
+            .Should().ContainSingle(item =>
+                item.Code == "required" &&
+                item.ParameterNames.SequenceEqual(new[] { "FilePath" }) &&
+                item.ResourceKind == "output_file");
+    }
+
+    [Fact]
+    public void MitsubishiMc_ShouldDisableReadAndPollingValuesOutsideTheirActiveModes()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.MitsubishiMcCommunication)!;
+        var writeStates = States(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["Operation"] = "Write",
+                ["PollingMode"] = "WaitForValue",
+                ["Length"] = 99,
+                ["PollingValue"] = "stale"
+            });
+        writeStates["Length"].EffectiveDisabled.Should().BeTrue();
+        writeStates["PollingMode"].EffectiveDisabled.Should().BeTrue();
+        writeStates["PollingValue"].EffectiveDisabled.Should().BeTrue();
+        writeStates["WriteValue"].EffectiveDisabled.Should().BeFalse();
+
+        var pollingStates = States(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["Operation"] = "Read",
+                ["PollingMode"] = "WaitForValue"
+            });
+        pollingStates["PollingCondition"].EffectiveDisabled.Should().BeFalse();
+        pollingStates["PollingTimeout"].EffectiveDisabled.Should().BeFalse();
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["UseGlobalFallback"] = false,
+                    ["IpAddress"] = "192.168.3.39",
+                    ["Port"] = 5002,
+                    ["Address"] = "D100",
+                    ["Operation"] = "Write",
+                    ["WriteValue"] = ""
+                })
+            .Should().BeEmpty("WriteValue may be supplied by the Data input at execution time");
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["UseGlobalFallback"] = false,
+                    ["IpAddress"] = "",
+                    ["Port"] = "",
+                    ["Address"] = ""
+                })
+            .SelectMany(item => item.ParameterNames)
+            .Should().BeEquivalentTo(["IpAddress", "Port", "Address"]);
+    }
+
+    [Fact]
+    public void TcpCommunication_ShouldProjectProfileResponseAndParseModeFacts()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.TcpCommunication)!;
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["UseGlobalProfile"] = true,
+                    ["ProfileId"] = ""
+                })
+            .Should().ContainSingle(item =>
+                item.ParameterNames.SequenceEqual(new[] { "ProfileId" }) &&
+                item.ResourceKind == "tcp_profile");
+
+        var profileStates = States(
+            metadata,
+            new Dictionary<string, object?> { ["ProfileId"] = "robot-profile" });
+        profileStates["Mode"].EffectiveDisabled.Should().BeTrue();
+        profileStates["IpAddress"].EffectiveDisabled.Should().BeTrue();
+        profileStates["Port"].EffectiveDisabled.Should().BeTrue();
+        profileStates["Timeout"].EffectiveDisabled.Should().BeTrue();
+
+        var noResponseStates = States(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["WaitResponse"] = false,
+                ["ResponseParseMode"] = "Regex",
+                ["ResponseRegexPattern"] = "<pending-regex>"
+            });
+        noResponseStates["ResponseTimeoutMs"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["ResponseParseMode"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["ResponseRegexPattern"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["FailOnParseError"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["FailOnUnexpectedResponse"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["RequiredResponseFields"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["ResponseStartMarker"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["ExpectedResponse"].EffectiveDisabled.Should().BeTrue();
+        noResponseStates["ResponseMatchMode"].EffectiveDisabled.Should().BeTrue();
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["WaitResponse"] = false,
+                    ["ResponseParseMode"] = "Regex",
+                    ["ResponseRegexPattern"] = "<pending-regex>"
+                })
+            .Should().BeEmpty();
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["WaitResponse"] = true,
+                    ["ResponseParseMode"] = "Regex",
+                    ["ResponseRegexPattern"] = ""
+                })
+            .Should().ContainSingle(item => item.ParameterNames.SequenceEqual(new[] { "ResponseRegexPattern" }));
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["WaitResponse"] = true,
+                    ["ResponseParseMode"] = "KeyValue",
+                    ["ResponseKeyValuePairDelimiter"] = "",
+                    ["ResponseKeyValuePairDelimiters"] = "",
+                    ["ResponseKeyValueSeparator"] = "",
+                    ["ResponseKeyValueSeparators"] = ""
+                })
+            .Should().Contain(items =>
+                items.Code == "at-least-one" &&
+                items.ParameterNames.Contains("ResponseKeyValuePairDelimiter") &&
+                items.ParameterNames.Contains("ResponseKeyValuePairDelimiters"));
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["WaitResponse"] = true,
+                    ["ResponseParseMode"] = "KeyValue",
+                    ["ResponseKeyValuePairDelimiter"] = "",
+                    ["ResponseKeyValuePairDelimiters"] = ",",
+                    ["ResponseKeyValueSeparator"] = "",
+                    ["ResponseKeyValueSeparators"] = ":"
+                })
+            .Should().BeEmpty();
     }
 
     [Fact]

@@ -9,6 +9,7 @@ using ClearVision.PlcComm.Interfaces;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -530,10 +531,10 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         var globalProfile = global.GetProfile(normalizedProtocol);
         var normalizedIp = (ipAddress ?? string.Empty).Trim();
         var requestedPort = port ?? 0;
-        var hasOperatorIp = !string.IsNullOrWhiteSpace(normalizedIp);
+        var hasOperatorIp = !OperatorParameterValueSemantics.IsMissing(normalizedIp);
         var hasOperatorPort = requestedPort > 0;
         var globalIp = (globalProfile.IpAddress ?? string.Empty).Trim();
-        var hasGlobalIp = !string.IsNullOrWhiteSpace(globalIp);
+        var hasGlobalIp = !OperatorParameterValueSemantics.IsMissing(globalIp);
         var hasGlobalPort = globalProfile.Port > 0 && globalProfile.Port <= 65535;
 
         if (hasOperatorPort && (requestedPort < 1 || requestedPort > 65535))

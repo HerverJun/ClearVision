@@ -13,14 +13,18 @@ public sealed class VisionAgentParameterRuleParityTests
     {
         var spec = LoadSpec();
 
-        spec.SchemaVersion.Should().Be("2026-07-10.vision-agent-parameter-rule-parity.v2");
+        spec.SchemaVersion.Should().Be("2026-07-10.vision-agent-parameter-rule-parity.v3");
         spec.Cases.Select(item => item.OperatorType).Should().Contain([
             "ImageAcquisition",
             "TemplateMatching",
             "DeepLearning",
             "EdgeDetection",
             "ResultOutput",
-            "BlobAnalysis"]);
+            "BlobAnalysis",
+            "ImageSave",
+            "TextSave",
+            "MitsubishiMcCommunication",
+            "TcpCommunication"]);
         spec.Cases.Should().Contain(item => item.CaseId == "image_camera_requires_camera_id_or_binding");
         spec.Cases.Should().Contain(item => item.CaseId == "result_output_only_uses_real_save_to_file_parameter");
         spec.Cases
@@ -39,7 +43,11 @@ public sealed class VisionAgentParameterRuleParityTests
             "DeepLearning",
             "EdgeDetection",
             "ResultOutput",
-            "BlobAnalysis"
+            "BlobAnalysis",
+            "ImageSave",
+            "TextSave",
+            "MitsubishiMcCommunication",
+            "TcpCommunication"
         };
 
         spec.OperatorConstraints.Keys.Should().BeEquivalentTo(migratedOperators);
@@ -199,6 +207,59 @@ public sealed class VisionAgentParameterRuleParityTests
         MissingParameters(precheck).Contains("CameraId").Should().Be(expectedMissing);
     }
 
+    [Theory(DisplayName = "Agent and precheck should block only active TCP parse requirements")]
+    [InlineData("tcp_regex_parse_requires_pattern", true)]
+    [InlineData("tcp_no_response_ignores_stale_regex_values", false)]
+    public async Task AgentAndPrecheck_ShouldShareTcpActiveModeSemantics(string caseId, bool expectedBlocked)
+    {
+        var testCase = LoadSpec().Cases.Single(item => item.CaseId == caseId);
+        var validation = await ValidateAsync(testCase);
+        HasIssue(validation, "blockingIssues", "missing_conditional_parameter").Should().Be(expectedBlocked);
+
+        var precheckResult = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", BuildFlow(testCase)),
+                ("validationSummary", validation),
+                ("dryRunSummary", new
+                {
+                    dryRunSucceeded = true,
+                    warnings = Array.Empty<object>(),
+                    blockingIssues = Array.Empty<object>()
+                }),
+                ("manualResourceConfirmations", ManualConfirmationsFor(testCase))),
+            CancellationToken.None);
+        var precheck = Json(precheckResult.Data);
+
+        HasIssue(precheck, "blockingIssues", "missing_conditional_parameter").Should().Be(expectedBlocked);
+    }
+
+    [Fact(DisplayName = "Agent and precheck should share TCP delimiter at-least-one groups")]
+    public async Task AgentAndPrecheck_ShouldShareTcpDelimiterGroupSemantics()
+    {
+        var testCase = LoadSpec().Cases.Single(item =>
+            item.CaseId == "tcp_key_value_requires_delimiter_groups");
+        var validation = await ValidateAsync(testCase);
+        HasIssue(validation, "blockingIssues", "missing_conditional_parameter_group").Should().BeTrue();
+
+        var precheckResult = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", BuildFlow(testCase)),
+                ("validationSummary", validation),
+                ("dryRunSummary", new
+                {
+                    dryRunSucceeded = true,
+                    warnings = Array.Empty<object>(),
+                    blockingIssues = Array.Empty<object>()
+                }),
+                ("manualResourceConfirmations", ManualConfirmationsFor(testCase))),
+            CancellationToken.None);
+        var precheck = Json(precheckResult.Data);
+
+        HasIssue(precheck, "blockingIssues", "missing_conditional_parameter_group").Should().BeTrue();
+    }
+
     [Fact(DisplayName = "executable benchmark source guard should exclude real hardware process and network APIs")]
     public void ExecutableBenchmark_SourceGuard_ShouldExcludeRuntimeHardwareProcessAndNetworkApis()
     {
@@ -301,6 +362,13 @@ public sealed class VisionAgentParameterRuleParityTests
         return element.TryGetProperty(propertyName, out _);
     }
 
+    private static bool HasIssue(JsonElement payload, string propertyName, string code)
+    {
+        return payload.GetProperty(propertyName)
+            .EnumerateArray()
+            .Any(item => item.GetProperty("code").GetString() == code);
+    }
+
     private static object BuildFlow(ParameterRuleParityCase testCase)
     {
         return new
@@ -322,8 +390,21 @@ public sealed class VisionAgentParameterRuleParityTests
     {
         var confirmations = new List<object>();
         AddIfConfigured(confirmations, testCase, "camera_binding", "CameraId", "CameraBindingId");
-        AddIfConfigured(confirmations, testCase, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+        AddIfConfigured(
+            confirmations,
+            testCase,
+            "model_resource",
+            "ModelPath",
+            "ModelId",
+            "EdgeModelPath",
+            "EdgeModelId",
+            "ModelCatalogPath");
         AddIfConfigured(confirmations, testCase, "template_artifact", "Template", "TemplateId", "TemplatePath");
+        AddIfConfigured(confirmations, testCase, "output_file", "Directory", "FolderPath", "FilePath");
+        AddIfConfigured(confirmations, testCase, "plc_endpoint", "IpAddress");
+        AddIfConfigured(confirmations, testCase, "plc_address", "Address");
+        AddIfConfigured(confirmations, testCase, "tcp_profile", "ProfileId");
+        AddIfConfigured(confirmations, testCase, "network_endpoint", "IpAddress");
         return confirmations.ToArray();
     }
 

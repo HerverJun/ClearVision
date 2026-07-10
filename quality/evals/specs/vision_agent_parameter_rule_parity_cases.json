@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2026-07-10.vision-agent-parameter-rule-parity.v2",
+  "schemaVersion": "2026-07-10.vision-agent-parameter-rule-parity.v3",
   "operatorConstraints": {
     "ImageAcquisition": [
       {
@@ -12,12 +12,20 @@
         "requiredPolicy": "optional",
         "requiredWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "Camera"
+            }
           ]
         },
         "resourceKind": "image_file",
@@ -28,12 +36,20 @@
         "requiredPolicy": "optional",
         "requiredWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "Camera"
+            }
           ]
         },
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "atLeastOneGroup": "image-camera-source",
@@ -45,12 +61,20 @@
         "requiredPolicy": "optional",
         "requiredWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "Camera"
+            }
           ]
         },
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "atLeastOneGroup": "image-camera-source",
@@ -62,7 +86,11 @@
         "parameter": "ExposureTime",
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
@@ -71,7 +99,11 @@
         "parameter": "Gain",
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
@@ -80,7 +112,11 @@
         "parameter": "TriggerMode",
         "disabledWhen": {
           "all": [
-            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+            {
+              "parameter": "SourceType",
+              "comparison": "equals",
+              "value": "File"
+            }
           ]
         },
         "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
@@ -122,8 +158,14 @@
         "requiredPolicy": "optional",
         "disabledWhen": {
           "any": [
-            { "parameter": "ModelId", "comparison": "empty" },
-            { "parameter": "ModelPath", "comparison": "not-empty" }
+            {
+              "parameter": "ModelId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "ModelPath",
+              "comparison": "not-empty"
+            }
           ]
         },
         "resourceKind": "model_catalog",
@@ -139,7 +181,11 @@
         "parameter": "GpuDeviceId",
         "disabledWhen": {
           "all": [
-            { "parameter": "UseGpu", "comparison": "equals", "value": false }
+            {
+              "parameter": "UseGpu",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU"
@@ -148,7 +194,11 @@
         "parameter": "EnableInternalNms",
         "disabledWhen": {
           "all": [
-            { "parameter": "OutputFormat", "comparison": "equals", "value": "EndToEndNms" }
+            {
+              "parameter": "OutputFormat",
+              "comparison": "equals",
+              "value": "EndToEndNms"
+            }
           ]
         },
         "reasonCode": "DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS"
@@ -157,14 +207,30 @@
         "parameter": "NmsIouThreshold",
         "requiredWhen": {
           "all": [
-            { "parameter": "OutputFormat", "comparison": "equals", "value": "RawYolo" },
-            { "parameter": "EnableInternalNms", "comparison": "equals", "value": true }
+            {
+              "parameter": "OutputFormat",
+              "comparison": "equals",
+              "value": "RawYolo"
+            },
+            {
+              "parameter": "EnableInternalNms",
+              "comparison": "equals",
+              "value": true
+            }
           ]
         },
         "disabledWhen": {
           "any": [
-            { "parameter": "OutputFormat", "comparison": "equals", "value": "EndToEndNms" },
-            { "parameter": "EnableInternalNms", "comparison": "equals", "value": false }
+            {
+              "parameter": "OutputFormat",
+              "comparison": "equals",
+              "value": "EndToEndNms"
+            },
+            {
+              "parameter": "EnableInternalNms",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS"
@@ -176,12 +242,20 @@
         "requiredPolicy": "optional",
         "requiredWhen": {
           "all": [
-            { "parameter": "Method", "comparison": "equals", "value": "OnnxEdge" }
+            {
+              "parameter": "Method",
+              "comparison": "equals",
+              "value": "OnnxEdge"
+            }
           ]
         },
         "disabledWhen": {
           "all": [
-            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+            {
+              "parameter": "Method",
+              "comparison": "not-equals",
+              "value": "OnnxEdge"
+            }
           ]
         },
         "atLeastOneGroup": "edge-model-source",
@@ -194,12 +268,20 @@
         "requiredPolicy": "optional",
         "requiredWhen": {
           "all": [
-            { "parameter": "Method", "comparison": "equals", "value": "OnnxEdge" }
+            {
+              "parameter": "Method",
+              "comparison": "equals",
+              "value": "OnnxEdge"
+            }
           ]
         },
         "disabledWhen": {
           "all": [
-            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+            {
+              "parameter": "Method",
+              "comparison": "not-equals",
+              "value": "OnnxEdge"
+            }
           ]
         },
         "atLeastOneGroup": "edge-model-source",
@@ -212,9 +294,19 @@
         "requiredPolicy": "optional",
         "disabledWhen": {
           "any": [
-            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" },
-            { "parameter": "EdgeModelId", "comparison": "empty" },
-            { "parameter": "EdgeModelPath", "comparison": "not-empty" }
+            {
+              "parameter": "Method",
+              "comparison": "not-equals",
+              "value": "OnnxEdge"
+            },
+            {
+              "parameter": "EdgeModelId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "EdgeModelPath",
+              "comparison": "not-empty"
+            }
           ]
         },
         "resourceKind": "model_catalog",
@@ -225,7 +317,11 @@
         "requiredPolicy": "optional",
         "disabledWhen": {
           "all": [
-            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+            {
+              "parameter": "Method",
+              "comparison": "not-equals",
+              "value": "OnnxEdge"
+            }
           ]
         },
         "reasonCode": "EDGE_BINARIZATION_ONLY_FOR_ONNX"
@@ -248,7 +344,11 @@
         "parameter": "HueLow",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
@@ -257,7 +357,11 @@
         "parameter": "HueHigh",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
@@ -266,7 +370,11 @@
         "parameter": "SatLow",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
@@ -275,7 +383,11 @@
         "parameter": "SatHigh",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
@@ -284,7 +396,11 @@
         "parameter": "ValLow",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
@@ -293,10 +409,997 @@
         "parameter": "ValHigh",
         "disabledWhen": {
           "all": [
-            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+            {
+              "parameter": "EnableColorFilter",
+              "comparison": "equals",
+              "value": false
+            }
           ]
         },
         "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      }
+    ],
+    "ImageSave": [
+      {
+        "parameter": "Directory",
+        "requiredPolicy": "required",
+        "deprecated": false,
+        "resourceKind": "output_file",
+        "reasonCode": "IMAGE_SAVE_DIRECTORY_REQUIRED"
+      },
+      {
+        "parameter": "FileNameTemplate",
+        "requiredPolicy": "required",
+        "deprecated": false,
+        "reasonCode": "IMAGE_SAVE_FILE_NAME_REQUIRED"
+      },
+      {
+        "parameter": "Quality",
+        "requiredPolicy": "metadata",
+        "deprecated": false,
+        "reasonCode": "IMAGE_SAVE_QUALITY"
+      },
+      {
+        "parameter": "FolderPath",
+        "requiredPolicy": "optional",
+        "aliasFor": "Directory",
+        "deprecated": true,
+        "resourceKind": "output_file",
+        "reasonCode": "IMAGE_SAVE_DIRECTORY_LEGACY_ALIAS"
+      },
+      {
+        "parameter": "FileName",
+        "requiredPolicy": "optional",
+        "aliasFor": "FileNameTemplate",
+        "deprecated": true,
+        "reasonCode": "IMAGE_SAVE_FILE_NAME_LEGACY_ALIAS"
+      },
+      {
+        "parameter": "JpegQuality",
+        "requiredPolicy": "optional",
+        "aliasFor": "Quality",
+        "deprecated": true,
+        "reasonCode": "IMAGE_SAVE_QUALITY_LEGACY_ALIAS"
+      }
+    ],
+    "TextSave": [
+      {
+        "parameter": "FilePath",
+        "requiredPolicy": "required",
+        "deprecated": false,
+        "resourceKind": "output_file",
+        "reasonCode": "TEXT_SAVE_FILE_PATH_REQUIRED"
+      }
+    ],
+    "MitsubishiMcCommunication": [
+      {
+        "parameter": "IpAddress",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseGlobalFallback",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "deprecated": false,
+        "resourceKind": "plc_endpoint",
+        "reasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK"
+      },
+      {
+        "parameter": "Port",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseGlobalFallback",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK"
+      },
+      {
+        "parameter": "Address",
+        "requiredPolicy": "required",
+        "deprecated": false,
+        "resourceKind": "plc_address",
+        "reasonCode": "MITSUBISHI_PLC_ADDRESS_REQUIRED"
+      },
+      {
+        "parameter": "Length",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_READ_LENGTH_ONLY_FOR_READ"
+      },
+      {
+        "parameter": "WriteValue",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Write"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE"
+      },
+      {
+        "parameter": "PollingMode",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_POLLING_ONLY_FOR_READ"
+      },
+      {
+        "parameter": "PollingCondition",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            },
+            {
+              "parameter": "PollingMode",
+              "comparison": "equals",
+              "value": "WaitForValue"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_POLLING_CONDITION_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "PollingValue",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            },
+            {
+              "parameter": "PollingMode",
+              "comparison": "equals",
+              "value": "WaitForValue"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_POLLING_VALUE_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "PollingTimeout",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            },
+            {
+              "parameter": "PollingMode",
+              "comparison": "equals",
+              "value": "WaitForValue"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_POLLING_TIMEOUT_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "PollingInterval",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "Operation",
+              "comparison": "equals",
+              "value": "Read"
+            },
+            {
+              "parameter": "PollingMode",
+              "comparison": "equals",
+              "value": "WaitForValue"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_POLLING_INTERVAL_ONLY_WHEN_WAITING"
+      }
+    ],
+    "TcpCommunication": [
+      {
+        "parameter": "ProfileId",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "any": [
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Server"
+            }
+          ]
+        },
+        "deprecated": false,
+        "resourceKind": "tcp_profile",
+        "reasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE"
+      },
+      {
+        "parameter": "Mode",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "not-empty"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED"
+      },
+      {
+        "parameter": "IpAddress",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "deprecated": false,
+        "resourceKind": "network_endpoint",
+        "reasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED"
+      },
+      {
+        "parameter": "Port",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_LEGACY_CLIENT_PORT_REQUIRED"
+      },
+      {
+        "parameter": "Timeout",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE"
+      },
+      {
+        "parameter": "Encoding",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "ProfileId",
+              "comparison": "empty"
+            },
+            {
+              "parameter": "UseGlobalProfile",
+              "comparison": "equals",
+              "value": false
+            },
+            {
+              "parameter": "Mode",
+              "comparison": "equals",
+              "value": "Client"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE"
+      },
+      {
+        "parameter": "UseFixedSendData",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "PayloadTemplate",
+              "comparison": "not-empty"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION"
+      },
+      {
+        "parameter": "ResponseTimeoutMs",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "FailOnParseError",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "FailOnUnexpectedResponse",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseParseMode",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_PARSE_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseFieldName",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "not-equals",
+              "value": "None"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FIELD_ONLY_WHEN_PARSING"
+      },
+      {
+        "parameter": "ResponseFieldNames",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ],
+          "any": [
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "FixedWidth"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FIELD_NAMES_ONLY_FOR_POSITIONAL_PARSE"
+      },
+      {
+        "parameter": "RequiredResponseFields",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseFieldWidths",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "FixedWidth"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "FixedWidth"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_FIXED_WIDTHS_REQUIRED_FOR_FIXED_WIDTH_PARSE"
+      },
+      {
+        "parameter": "ResponseRegexPattern",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Regex"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Regex"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE"
+      },
+      {
+        "parameter": "ResponseRegexIgnoreCase",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Regex"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_REGEX_OPTIONS_ONLY_FOR_REGEX_PARSE"
+      },
+      {
+        "parameter": "ResponseKeyValuePairDelimiter",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-key-value-pair-delimiters",
+        "deprecated": false,
+        "reasonCode": "TCP_KEY_VALUE_PAIR_DELIMITER_ONLY_FOR_KEY_VALUE_PARSE"
+      },
+      {
+        "parameter": "ResponseKeyValuePairDelimiters",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-key-value-pair-delimiters",
+        "deprecated": false,
+        "reasonCode": "TCP_KEY_VALUE_PAIR_DELIMITERS_ONLY_FOR_KEY_VALUE_PARSE"
+      },
+      {
+        "parameter": "ResponseKeyValueSeparator",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-key-value-separators",
+        "deprecated": false,
+        "reasonCode": "TCP_KEY_VALUE_SEPARATOR_ONLY_FOR_KEY_VALUE_PARSE"
+      },
+      {
+        "parameter": "ResponseKeyValueSeparators",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "KeyValue"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-key-value-separators",
+        "deprecated": false,
+        "reasonCode": "TCP_KEY_VALUE_SEPARATORS_ONLY_FOR_KEY_VALUE_PARSE"
+      },
+      {
+        "parameter": "ResponseDelimiter",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-response-delimiters",
+        "deprecated": false,
+        "reasonCode": "TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE"
+      },
+      {
+        "parameter": "ResponseDelimiters",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            }
+          ]
+        },
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            }
+          ]
+        },
+        "atLeastOneGroup": "tcp-response-delimiters",
+        "deprecated": false,
+        "reasonCode": "TCP_DELIMITERS_ONLY_FOR_DELIMITED_PARSE"
+      },
+      {
+        "parameter": "ResponseIndex",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ],
+          "any": [
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "Delimited"
+            },
+            {
+              "parameter": "ResponseParseMode",
+              "comparison": "equals",
+              "value": "FixedWidth"
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_INDEX_ONLY_FOR_POSITIONAL_PARSE"
+      },
+      {
+        "parameter": "TrimResponseBeforeParse",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseStartMarker",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseEndMarker",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "FailOnMissingResponseFrame",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ExpectedResponse",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "RejectedResponse",
+        "requiredPolicy": "optional",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseMatchMode",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseMatchIgnoreCase",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"
+      },
+      {
+        "parameter": "ResponseMatchSource",
+        "requiredPolicy": "metadata",
+        "enabledWhen": {
+          "all": [
+            {
+              "parameter": "WaitResponse",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "deprecated": false,
+        "reasonCode": "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"
       }
     ]
   },
@@ -309,12 +1412,25 @@
         "FilePath": "mock://unused/image-source"
       },
       "uiStates": {
-        "FilePath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "CameraId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "CameraBindingId": { "effectiveRequired": true, "effectiveDisabled": false }
+        "FilePath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "CameraId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "CameraBindingId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
       },
-      "flowValidationMissingParameters": ["CameraId"],
-      "deploymentPrecheckMissingParameters": ["CameraId"]
+      "flowValidationMissingParameters": [
+        "CameraId"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "CameraId"
+      ]
     },
     {
       "caseId": "image_file_requires_file_path",
@@ -323,23 +1439,46 @@
         "SourceType": "File"
       },
       "uiStates": {
-        "FilePath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "CameraId": { "effectiveRequired": false, "effectiveDisabled": true },
-        "CameraBindingId": { "effectiveRequired": false, "effectiveDisabled": true }
+        "FilePath": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "CameraId": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "CameraBindingId": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
       },
-      "flowValidationMissingParameters": ["FilePath"],
-      "deploymentPrecheckMissingParameters": ["FilePath"]
+      "flowValidationMissingParameters": [
+        "FilePath"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "FilePath"
+      ]
     },
     {
       "caseId": "template_matching_requires_runtime_template_input",
       "operatorType": "TemplateMatching",
       "parameters": {},
       "uiStates": {
-        "TemplatePath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "TemplateId": { "effectiveRequired": true, "effectiveDisabled": false }
+        "TemplatePath": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "TemplateId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
       },
-      "flowValidationMissingParameters": ["Template"],
-      "deploymentPrecheckMissingParameters": ["Template"]
+      "flowValidationMissingParameters": [
+        "Template"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "Template"
+      ]
     },
     {
       "caseId": "template_matching_legacy_metadata_accepts_template_id",
@@ -348,8 +1487,14 @@
         "TemplateId": "mock-template-catalog-item"
       },
       "uiStates": {
-        "TemplatePath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "TemplateId": { "effectiveRequired": true, "effectiveDisabled": false }
+        "TemplatePath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "TemplateId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -359,12 +1504,25 @@
       "operatorType": "DeepLearning",
       "parameters": {},
       "uiStates": {
-        "ModelPath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true }
+        "ModelPath": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ModelId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ModelCatalogPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
       },
-      "flowValidationMissingParameters": ["ModelPath"],
-      "deploymentPrecheckMissingParameters": ["ModelPath"]
+      "flowValidationMissingParameters": [
+        "ModelPath"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "ModelPath"
+      ]
     },
     {
       "caseId": "deep_learning_accepts_model_id_and_enables_catalog",
@@ -373,9 +1531,18 @@
         "ModelId": "mock-model-catalog-item"
       },
       "uiStates": {
-        "ModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": false }
+        "ModelPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ModelId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ModelCatalogPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -387,10 +1554,22 @@
         "Method": "Canny"
       },
       "uiStates": {
-        "EdgeModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "EdgeModelId": { "effectiveRequired": false, "effectiveDisabled": true },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "EdgeBinarizationThreshold": { "effectiveRequired": false, "effectiveDisabled": true }
+        "EdgeModelPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "EdgeModelId": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ModelCatalogPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "EdgeBinarizationThreshold": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -402,13 +1581,29 @@
         "Method": "OnnxEdge"
       },
       "uiStates": {
-        "EdgeModelPath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "EdgeModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "EdgeBinarizationThreshold": { "effectiveRequired": false, "effectiveDisabled": false }
+        "EdgeModelPath": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "EdgeModelId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ModelCatalogPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "EdgeBinarizationThreshold": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
       },
-      "flowValidationMissingParameters": ["EdgeModelPath"],
-      "deploymentPrecheckMissingParameters": ["EdgeModelPath"]
+      "flowValidationMissingParameters": [
+        "EdgeModelPath"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "EdgeModelPath"
+      ]
     },
     {
       "caseId": "edge_detection_onnx_accepts_model_id",
@@ -419,9 +1614,18 @@
         "ModelCatalogPath": "models/catalog.json"
       },
       "uiStates": {
-        "EdgeModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "EdgeModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": false }
+        "EdgeModelPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "EdgeModelId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ModelCatalogPath": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -433,7 +1637,10 @@
         "SaveToFile": false
       },
       "uiStates": {
-        "SaveToFile": { "effectiveRequired": false, "effectiveDisabled": false }
+        "SaveToFile": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -445,13 +1652,34 @@
         "EnableColorFilter": false
       },
       "uiStates": {
-        "FeatureFilter": { "effectiveRequired": false, "effectiveDisabled": false },
-        "HueLow": { "effectiveRequired": false, "effectiveDisabled": true },
-        "HueHigh": { "effectiveRequired": false, "effectiveDisabled": true },
-        "SatLow": { "effectiveRequired": false, "effectiveDisabled": true },
-        "SatHigh": { "effectiveRequired": false, "effectiveDisabled": true },
-        "ValLow": { "effectiveRequired": false, "effectiveDisabled": true },
-        "ValHigh": { "effectiveRequired": false, "effectiveDisabled": true }
+        "FeatureFilter": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "HueLow": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "HueHigh": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "SatLow": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "SatHigh": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ValLow": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ValHigh": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
@@ -463,9 +1691,379 @@
         "EnableColorFilter": true
       },
       "uiStates": {
-        "FeatureFilter": { "effectiveRequired": false, "effectiveDisabled": false },
-        "HueLow": { "effectiveRequired": false, "effectiveDisabled": false },
-        "ValHigh": { "effectiveRequired": false, "effectiveDisabled": false }
+        "FeatureFilter": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "HueLow": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "ValHigh": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "image_save_legacy_aliases_canonicalize",
+      "operatorType": "ImageSave",
+      "parameters": {
+        "FolderPath": "C:/audit/output",
+        "FileName": "legacy_{timestamp}.jpg",
+        "JpegQuality": 81
+      },
+      "uiStates": {
+        "Directory": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "FileNameTemplate": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "Quality": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "text_save_pending_path_is_missing",
+      "operatorType": "TextSave",
+      "parameters": {
+        "FilePath": "<pending-output-file>"
+      },
+      "uiStates": {
+        "FilePath": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [
+        "FilePath"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "FilePath"
+      ]
+    },
+    {
+      "caseId": "mitsubishi_write_disables_read_and_polling_values",
+      "operatorType": "MitsubishiMcCommunication",
+      "parameters": {
+        "UseGlobalFallback": false,
+        "IpAddress": "192.168.3.39",
+        "Port": 5002,
+        "Address": "D100",
+        "Operation": "Write",
+        "Length": 99,
+        "PollingMode": "WaitForValue",
+        "PollingValue": "<pending-polling-value>",
+        "WriteValue": "1"
+      },
+      "uiStates": {
+        "IpAddress": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "Port": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "Address": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "Length": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "PollingMode": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "PollingValue": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "WriteValue": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "mitsubishi_wait_for_value_enables_polling_fields",
+      "operatorType": "MitsubishiMcCommunication",
+      "parameters": {
+        "UseGlobalFallback": false,
+        "IpAddress": "192.168.3.39",
+        "Port": 5002,
+        "Address": "D100",
+        "Operation": "Read",
+        "PollingMode": "WaitForValue"
+      },
+      "uiStates": {
+        "Length": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "WriteValue": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "PollingCondition": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "PollingValue": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "PollingTimeout": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "PollingInterval": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "tcp_global_profile_requires_profile_id",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "UseGlobalProfile": true,
+        "ProfileId": "",
+        "Mode": "Client"
+      },
+      "uiStates": {
+        "ProfileId": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "IpAddress": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "Port": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "Timeout": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
+      },
+      "flowValidationMissingParameters": [
+        "ProfileId"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "ProfileId"
+      ]
+    },
+    {
+      "caseId": "tcp_profile_disables_legacy_endpoint",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "ProfileId": "robot-profile",
+        "UseGlobalProfile": false,
+        "Mode": "Client",
+        "IpAddress": "127.0.0.1",
+        "Port": 8080
+      },
+      "uiStates": {
+        "ProfileId": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "Mode": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "IpAddress": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "Port": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "Timeout": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "Encoding": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "tcp_no_response_ignores_stale_regex_values",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "WaitResponse": false,
+        "ResponseParseMode": "Regex",
+        "ResponseRegexPattern": "<pending-regex>",
+        "FailOnParseError": true,
+        "FailOnUnexpectedResponse": true,
+        "RequiredResponseFields": "<pending-required-fields>",
+        "ResponseStartMarker": "<pending-start-marker>",
+        "ExpectedResponse": "<pending-expected-response>",
+        "ResponseMatchMode": "Regex"
+      },
+      "uiStates": {
+        "ResponseTimeoutMs": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseParseMode": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseRegexPattern": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseRegexIgnoreCase": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "FailOnParseError": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "FailOnUnexpectedResponse": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "RequiredResponseFields": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseStartMarker": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ExpectedResponse": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseMatchMode": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "tcp_regex_parse_requires_pattern",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "WaitResponse": true,
+        "ResponseParseMode": "Regex",
+        "ResponseRegexPattern": ""
+      },
+      "uiStates": {
+        "ResponseParseMode": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "ResponseRegexPattern": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ResponseRegexIgnoreCase": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "ResponseDelimiter": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseFieldWidths": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "tcp_delimited_mode_ignores_stale_fixed_width_values",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "WaitResponse": true,
+        "ResponseParseMode": "Delimited",
+        "ResponseDelimiter": ",",
+        "ResponseFieldWidths": "<pending-widths>"
+      },
+      "uiStates": {
+        "ResponseFieldNames": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "ResponseDelimiter": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ResponseIndex": {
+          "effectiveRequired": false,
+          "effectiveDisabled": false
+        },
+        "ResponseFieldWidths": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ResponseRegexPattern": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "tcp_key_value_requires_delimiter_groups",
+      "operatorType": "TcpCommunication",
+      "parameters": {
+        "WaitResponse": true,
+        "ResponseParseMode": "KeyValue",
+        "ResponseKeyValuePairDelimiter": "",
+        "ResponseKeyValuePairDelimiters": "",
+        "ResponseKeyValueSeparator": "",
+        "ResponseKeyValueSeparators": ""
+      },
+      "uiStates": {
+        "ResponseKeyValuePairDelimiter": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ResponseKeyValuePairDelimiters": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ResponseKeyValueSeparator": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "ResponseKeyValueSeparators": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []

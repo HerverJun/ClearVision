@@ -18,9 +18,22 @@ internal static class VisionAgentParameterRuleCenter
         contractCatalog ??= new VisionAgentOperatorContractCatalog();
         var missingResources = new List<VisionAgentMissingResource>();
 
+        foreach (var issue in CollectConstraintViolations(flow, contractCatalog)
+                     .Where(item =>
+                         (item.Violation.Code is "required" or "at-least-one") &&
+                         !string.IsNullOrWhiteSpace(item.Violation.ResourceKind)))
+        {
+            AddMissingResource(
+                missingResources,
+                issue.Violation.ResourceKind!,
+                issue.Violation.ParameterNames[0],
+                issue.TempId,
+                issue.OperatorType,
+                $"{issue.OperatorType}.{string.Join("/", issue.Violation.ParameterNames)} requires engineer-supplied {issue.Violation.ResourceKind} metadata.");
+        }
+
         foreach (var op in flow.Operators)
         {
-            AddProviderResources(op, contractCatalog, missingResources);
             AddLegacyDeepLearningResources(op, missingResources);
             AddTemplateMatchingResources(op, missingResources);
             AddPlcResources(op, missingResources);
@@ -34,47 +47,50 @@ internal static class VisionAgentParameterRuleCenter
         return missingResources;
     }
 
-    private static void AddProviderResources(
-        VisionAgentFlowOperator op,
-        IVisionAgentOperatorContractCatalog contractCatalog,
-        List<VisionAgentMissingResource> missingResources)
+    public static IReadOnlyList<VisionAgentParameterConstraintIssue> CollectConstraintViolations(
+        VisionAgentFlowDraft flow,
+        IVisionAgentOperatorContractCatalog? contractCatalog = null)
     {
-        if (!contractCatalog.TryGet(op.OperatorType, out var contract) ||
-            contract.ParameterConstraints is not { Count: > 0 } constraints)
+        contractCatalog ??= new VisionAgentOperatorContractCatalog();
+        var issues = new List<VisionAgentParameterConstraintIssue>();
+        foreach (var op in flow.Operators)
         {
-            return;
-        }
-
-        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var pair in op.Parameters)
-        {
-            values[pair.Key] = pair.Value;
-        }
-
-        var metadata = new OperatorMetadata
-        {
-            Parameters = contract.Parameters.Select(parameter => new ParameterDefinition
+            if (!contractCatalog.TryGet(op.OperatorType, out var contract) ||
+                contract.ParameterConstraints is not { Count: > 0 } constraints)
             {
-                Name = parameter.Name,
-                IsRequired = parameter.IsRequired,
-                DefaultValue = parameter.DefaultValue
-            }).ToList(),
-            ParameterConstraints = constraints.ToList()
-        };
+                continue;
+            }
 
-        foreach (var violation in OperatorParameterConstraintEvaluator.Validate(metadata, values)
-                     .Where(item =>
-                         item.Code is "required" or "at-least-one" &&
-                         !string.IsNullOrWhiteSpace(item.ResourceKind)))
-        {
-            AddMissingResource(
-                missingResources,
-                violation.ResourceKind!,
-                violation.ParameterNames[0],
-                op.TempId,
-                op.OperatorType,
-                $"{op.OperatorType}.{string.Join("/", violation.ParameterNames)} requires engineer-supplied {violation.ResourceKind} metadata.");
+            var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var pair in op.Parameters)
+            {
+                values[pair.Key] = pair.Value;
+            }
+
+            var metadata = new OperatorMetadata
+            {
+                Parameters = contract.Parameters.Select(parameter => new ParameterDefinition
+                {
+                    Name = parameter.Name,
+                    IsRequired = parameter.IsRequired,
+                    DefaultValue = parameter.DefaultValue
+                }).ToList(),
+                ParameterConstraints = constraints.ToList()
+            };
+
+            issues.AddRange(OperatorParameterConstraintEvaluator.Validate(metadata, values)
+                .Select(violation => new VisionAgentParameterConstraintIssue(
+                    op.TempId,
+                    op.OperatorType,
+                    violation)));
         }
+
+        return issues
+            .GroupBy(item =>
+                $"{item.TempId}|{item.Violation.Code}|{string.Join('|', item.Violation.ParameterNames)}",
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
     }
 
     private static void AddLegacyDeepLearningResources(
@@ -196,3 +212,8 @@ internal static class VisionAgentParameterRuleCenter
                OperatorParameterConstraintEvaluator.IsMissing(value);
     }
 }
+
+internal sealed record VisionAgentParameterConstraintIssue(
+    string TempId,
+    string OperatorType,
+    OperatorParameterConstraintViolation Violation);
