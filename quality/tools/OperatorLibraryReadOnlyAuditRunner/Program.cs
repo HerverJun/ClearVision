@@ -27,10 +27,11 @@ try
         $"Operator audit: canonical={artifacts.Summary.CanonicalOperatorCount}, " +
         $"aliases={artifacts.Summary.LegacyAliasCount}, " +
         $"confirmed={artifacts.Summary.ConfirmedCount}, " +
+        $"new-confirmed={artifacts.Summary.NewConfirmedCount}, " +
         $"candidate={artifacts.Summary.CandidateCount}, " +
         $"not-reproduced={artifacts.Summary.NotReproducedCount}");
 
-    if (!options.ReportOnly && artifacts.Summary.ConfirmedCount > 0)
+    if (artifacts.Summary.NewConfirmedCount > 0)
     {
         return 1;
     }

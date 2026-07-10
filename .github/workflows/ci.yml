@@ -108,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           & "./scripts/audit-operator-library-readonly.ps1" `
-            -BaselineSha "$env:CV_DIFF_BASE" `
+            -SourceCommitSha "${{ github.sha }}" `
             -ReportOnly
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -125,16 +125,17 @@ jobs:
 
           $report = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
           $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-          if ($report.schemaVersion -ne "2026-07-10.operator-audit.v2" -or
+          if ($report.schemaVersion -ne "2026-07-10.operator-audit.v3" -or
               $report.auditMode -ne "read-only" -or
-              [string]::IsNullOrWhiteSpace([string]$report.sourceCommitSha) -or
+              $report.sourceCommitSha -ne "${{ github.sha }}" -or
               $summary.schemaValid -ne $true) {
             throw "Operator audit schema validation failed."
           }
-          Write-Host ("Operator audit report-only counts: canonical={0}, aliases={1}, confirmed={2}, candidate={3}, not-reproduced={4}" -f `
+          Write-Host ("Operator audit report-only counts: canonical={0}, aliases={1}, confirmed={2}, new-confirmed={3}, candidate={4}, not-reproduced={5}" -f `
             $summary.canonicalOperatorCount,
             $summary.legacyAliasCount,
             $summary.confirmedCount,
+            $summary.newConfirmedCount,
             $summary.candidateCount,
             $summary.notReproducedCount)
 

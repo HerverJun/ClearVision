@@ -71,18 +71,155 @@ public sealed class OperatorLibraryReadOnlyAuditTests
             !string.IsNullOrWhiteSpace(item.SuggestedAction));
     }
 
-    [Fact(DisplayName = "Audit report schema and manual review evidence are complete")]
-    public void AuditReport_SchemaAndManualReviewAreComplete()
+    [Fact(DisplayName = "Audit report schema and review baseline evidence are complete")]
+    public void AuditReport_SchemaAndReviewBaselineAreComplete()
     {
         var artifacts = AuditEngine.Generate(new AuditOptions(FindRepoRoot(), "audit-test-sha", ReportOnly: true));
 
         AuditSchemaValidator.Validate(artifacts.Report).Should().BeEmpty();
-        artifacts.Report.ManualReviewSamples.Should().HaveCountGreaterOrEqualTo(15);
-        artifacts.Report.ManualReviewSamples.Select(item => item.Category).Distinct().Should().HaveCountGreaterOrEqualTo(6);
+        artifacts.Report.ReviewEntries.Should().HaveCountGreaterOrEqualTo(15);
+        artifacts.Summary.Review.ReviewedCount.Should().BeGreaterOrEqualTo(15);
+        artifacts.Summary.Review.Categories.Should().HaveCountGreaterOrEqualTo(6);
         artifacts.Report.Findings.Should().OnlyContain(item => AuditSchema.Classifications.Contains(item.Classification));
         artifacts.Json.Should().NotContain("generatedAtUtc");
         artifacts.Json.Should().NotContain("generatedAt");
         artifacts.Summary.SchemaValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_InternalFeatureDictionary_ShouldNotProduceFinding()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source("""
+                var featureValues = new Dictionary<string, object> { ["Area"] = 10 };
+                var output = new Dictionary<string, object> { ["Result"] = featureValues.Count };
+                return OperatorExecutionOutput.Success(output);
+                """),
+            "Synthetic",
+            ["Result"]);
+
+        findings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_ParameterMapping_ShouldNotProduceFinding()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source("""
+                var parameterMap = new Dictionary<string, object> { ["Threshold"] = 10 };
+                return OperatorExecutionOutput.Success(new Dictionary<string, object> { ["Result"] = 1 });
+                """),
+            "Synthetic",
+            ["Result"]);
+
+        findings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_SuccessAdditionalData_ShouldProduceUndeclaredCandidate()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source("""
+                var additionalData = new Dictionary<string, object> { ["Undeclared"] = 1 };
+                return OperatorExecutionOutput.Success(additionalData);
+                """),
+            "Synthetic",
+            []);
+
+        findings.Should().ContainSingle(item =>
+            item.Code == "RUNTIME_OUTPUT_UNDOCUMENTED" && item.Field == "Undeclared");
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_HelperSuccessPath_ShouldBeRecognized()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source(
+                "return OperatorExecutionOutput.Success(CreateOutputs());",
+                """
+                private static Dictionary<string, object> CreateOutputs()
+                {
+                    return new Dictionary<string, object> { ["HelperKey"] = 1 };
+                }
+                """),
+            "Synthetic",
+            []);
+
+        findings.Should().ContainSingle(item => item.Field == "HelperKey");
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_DynamicSuccessKey_ShouldRemainLowConfidenceCandidate()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source("""
+                var key = DateTime.UtcNow.Ticks.ToString();
+                var output = new Dictionary<string, object>();
+                output[key] = 1;
+                return OperatorExecutionOutput.Success(output);
+                """),
+            "Synthetic",
+            []);
+
+        findings.Should().ContainSingle(item => item.Code == "RUNTIME_OUTPUT_DYNAMIC_UNPROVEN");
+    }
+
+    [Fact]
+    public void CandidateOutputFlow_DuplicateIdentity_ShouldBeDeduplicated()
+    {
+        var findings = AuditCandidateProbe.AnalyzeOutputFindings(
+            Source("""
+                var output = new Dictionary<string, object> { ["Duplicate"] = 1 };
+                output["Duplicate"] = 2;
+                return OperatorExecutionOutput.Success(output);
+                """),
+            "Synthetic",
+            []);
+
+        findings.Should().ContainSingle(item =>
+            item.Code == "RUNTIME_OUTPUT_UNDOCUMENTED" && item.Field == "Duplicate");
+    }
+
+    [Fact]
+    public void ConfirmedGate_ShouldOnlyFailNewConfirmedIdentities()
+    {
+        var baseline = new[]
+        {
+            new ConfirmedFindingBaselineEntry("KNOWN", "OperatorA", "FieldA", "intentional", "intentional-difference")
+        };
+        var findings = new[]
+        {
+            Finding("KNOWN", "confirmed", "OperatorA", "FieldA"),
+            Finding("NEW", "confirmed", "OperatorB", "FieldB"),
+            Finding("CANDIDATE", "candidate", "OperatorC", "FieldC")
+        };
+
+        var result = ConfirmedFindingGate.Evaluate(findings, baseline);
+
+        result.NewConfirmedFindings.Should().ContainSingle(item => item.Code == "NEW");
+    }
+
+    [Fact]
+    public void ConfirmedGate_ResolvedBaselineAndCandidates_ShouldPass()
+    {
+        var baseline = new[]
+        {
+            new ConfirmedFindingBaselineEntry("RESOLVED", "OperatorA", "FieldA", "intentional", "intentional-difference")
+        };
+
+        var result = ConfirmedFindingGate.Evaluate(
+            [Finding("CANDIDATE", "candidate", "OperatorB", "FieldB")],
+            baseline);
+
+        result.NewConfirmedFindings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ConfirmedGate_MalformedBaseline_ShouldFail()
+    {
+        var action = () => AuditBaselineStore.ParseConfirmedBaseline("[{\"code\":\"BROKEN\"}]", "test baseline");
+
+        action.Should().Throw<InvalidDataException>();
     }
 
     [Fact(DisplayName = "Audit JSON Markdown and summary are deterministic across consecutive runs")]
@@ -99,6 +236,41 @@ public sealed class OperatorLibraryReadOnlyAuditTests
     private static string Hash(string content)
     {
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+    }
+
+    private static string Source(string body, string helper = "")
+    {
+        return $$"""
+            using System;
+            using System.Collections.Generic;
+            public static class OperatorExecutionOutput
+            {
+                public static object Success(object data) => data;
+            }
+            public sealed class SyntheticOperator
+            {
+                public object Run()
+                {
+                    {{body}}
+                }
+
+                {{helper}}
+            }
+            """;
+    }
+
+    private static AuditFinding Finding(string code, string classification, string @operator, string field)
+    {
+        return new AuditFinding(
+            code,
+            "warning",
+            "high",
+            classification,
+            @operator,
+            field,
+            ["test"],
+            "impact",
+            "action");
     }
 
     private static string FindRepoRoot()

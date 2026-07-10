@@ -18,8 +18,8 @@ namespace ClearVision.OperatorLibrary.ReadOnlyAudit;
 
 public static class AuditSchema
 {
-    public const string Version = "2026-07-10.operator-audit.v2";
-    public const string SummaryVersion = "2026-07-10.operator-audit-summary.v1";
+    public const string Version = "2026-07-10.operator-audit.v3";
+    public const string SummaryVersion = "2026-07-10.operator-audit-summary.v2";
     public const string ReadOnlyMode = "read-only";
 
     public static readonly IReadOnlySet<string> Classifications =
@@ -50,9 +50,11 @@ public sealed record AuditAliasMapping(
 public sealed record AuditSurface(
     string Name,
     string Source,
-    int ObservedCount,
+    string Status,
+    int? ObservedCount,
     IReadOnlyList<string> Identities,
-    IReadOnlyList<string> DuplicateIdentities);
+    IReadOnlyList<string> DuplicateIdentities,
+    string? FailureReason = null);
 
 public sealed record AuditIdentityDifference(
     string LeftSurface,
@@ -71,20 +73,6 @@ public sealed record AuditFinding(
     string Impact,
     string SuggestedAction);
 
-public sealed record ManualReviewSample(
-    string SampleId,
-    string Operator,
-    string Category,
-    string AuditConclusion,
-    IReadOnlyList<string> SourceEvidence,
-    bool FalsePositive,
-    string CandidateDegradationReason);
-
-public sealed record ManualReviewSummary(
-    int SampleCount,
-    int FalsePositiveCount,
-    IReadOnlyList<string> Categories);
-
 public sealed record AuditSummary(
     string SchemaVersion,
     string SourceCommitSha,
@@ -93,19 +81,21 @@ public sealed record AuditSummary(
     int ScannerCount,
     int FactoryCount,
     int CatalogCount,
-    int OperatorLibraryCount,
+    int? OperatorLibraryCount,
     int AiContractVisibleCount,
     int ConfirmedCount,
     int CandidateCount,
     int NotReproducedCount,
+    int ConfirmedBaselineCount,
+    int NewConfirmedCount,
     int DuplicateCount,
     int MissingCount,
     int SourceDifferenceCount,
     bool SchemaValid,
     bool Deterministic,
-    IReadOnlyDictionary<string, int> SurfaceCounts,
+    IReadOnlyDictionary<string, int?> SurfaceCounts,
     IReadOnlyDictionary<string, int> FindingCounts,
-    ManualReviewSummary ManualReview);
+    AuditReviewSummary Review);
 
 public sealed record AuditReport(
     string SchemaVersion,
@@ -116,7 +106,9 @@ public sealed record AuditReport(
     IReadOnlyList<AuditSurface> Surfaces,
     IReadOnlyList<AuditIdentityDifference> IdentityDifferences,
     IReadOnlyList<AuditFinding> Findings,
-    IReadOnlyList<ManualReviewSample> ManualReviewSamples,
+    IReadOnlyList<AuditReviewEntry> ReviewEntries,
+    IReadOnlyList<ConfirmedFindingBaselineEntry> ConfirmedBaseline,
+    IReadOnlyList<AuditFinding> NewConfirmedFindings,
     AuditSummary Summary);
 
 public static class AuditEngine
@@ -164,8 +156,8 @@ public static class AuditEngine
 
         var sourceAnalysis = RoslynOperatorSourceAnalyzer.Analyze(repoRoot);
         var catalogNames = ReadFormalCatalogIdentities();
-        var libraryNames = ReadOperatorLibraryIdentities(sourceAnalysis);
         var aiNames = ReadAiContractIdentities(factory);
+        var operatorLibrarySurface = ReadOperatorLibrarySurface(repoRoot);
 
         var surfaces = new[]
         {
@@ -173,7 +165,8 @@ public static class AuditEngine
             CreateSurface("scannerCanonical", "OperatorMetadataScanner.Scan normalized by OperatorTypeAliasResolver", scannerCanonicalNames),
             CreateSurface("factory", "OperatorFactory.GetAllMetadata", canonicalNames),
             CreateSurface("catalog", "ClearVision.OperatorLibrary.Modules.OperatorModuleCatalog", catalogNames),
-            CreateSurface("operatorLibrary", "ClearVision.OperatorLibrary packaged operator assembly", libraryNames),
+            operatorLibrarySurface,
+            CreateSurface("infrastructureSource", "ClearVision.Product.Infrastructure/Operators Roslyn source observation", sourceAnalysis.Observations.Keys),
             CreateSurface("aiContract", "VisionAgentOperatorContractCatalog", aiNames)
         };
 
@@ -197,17 +190,31 @@ public static class AuditEngine
 
         var sortedFindings = findings
             .Where(IsValidFinding)
+            .GroupBy(
+                item => AuditBaselineStore.FindingIdentity(item),
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var first = group.First();
+                return first with
+                {
+                    Evidence = group
+                        .SelectMany(item => item.Evidence)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(item => item, Comparer)
+                        .ToArray()
+                };
+            })
             .OrderBy(item => item.Code, Comparer)
             .ThenBy(item => item.Operator, Comparer)
             .ThenBy(item => item.Field, Comparer)
             .ThenBy(item => string.Join("\u001f", item.Evidence), Comparer)
             .ToList();
 
-        var manualReview = BuildManualReviewSamples(
-            factoryMetadata,
-            sortedFindings,
-            sourceAnalysis,
-            repoRoot);
+        var reviewEntries = AuditBaselineStore.ReadReviewBaseline(repoRoot, sortedFindings, factoryMetadata);
+        var reviewSummary = AuditBaselineStore.SummarizeReviews(reviewEntries, factoryMetadata);
+        var confirmedBaseline = AuditBaselineStore.ReadConfirmedBaseline(repoRoot);
+        var confirmedGate = ConfirmedFindingGate.Evaluate(sortedFindings, confirmedBaseline);
         var summary = BuildSummary(
             sourceCommitSha,
             canonicalNames,
@@ -215,7 +222,8 @@ public static class AuditEngine
             surfaces,
             identityDifferences,
             sortedFindings,
-            manualReview,
+            reviewSummary,
+            confirmedGate,
             schemaValid: true);
         var report = new AuditReport(
             AuditSchema.Version,
@@ -226,7 +234,9 @@ public static class AuditEngine
             surfaces,
             identityDifferences,
             sortedFindings,
-            manualReview,
+            reviewEntries,
+            confirmedBaseline,
+            confirmedGate.NewConfirmedFindings,
             summary);
 
         var schemaErrors = AuditSchemaValidator.Validate(report);
@@ -326,7 +336,7 @@ public static class AuditEngine
             .Distinct(Comparer)
             .OrderBy(item => item, Comparer)
             .ToArray();
-        return new AuditSurface(name, source, observed.Length, identities, duplicates);
+        return new AuditSurface(name, source, "available", observed.Length, identities, duplicates);
     }
 
     private static IReadOnlyList<AuditIdentityDifference> BuildIdentityDifferences(
@@ -337,10 +347,13 @@ public static class AuditEngine
         {
             ("scannerCanonical", "factory"),
             ("factory", "catalog"),
-            ("catalog", "operatorLibrary"),
+            ("factory", "infrastructureSource"),
             ("factory", "aiContract")
         };
         return pairs
+            .Where(pair =>
+                byName[pair.Item1].Status == "available" &&
+                byName[pair.Item2].Status == "available")
             .Select(pair =>
             {
                 var left = byName[pair.Item1].Identities.ToHashSet(Comparer);
@@ -487,7 +500,7 @@ public static class AuditEngine
                 .ToHashSet(Comparer);
             foreach (var output in outputNames.OrderBy(value => value, Comparer))
             {
-                if (merged.DictionaryKeys.Contains(output) || merged.HasDynamicOutputDictionary)
+                if (merged.SuccessOutputKeys.Contains(output) || merged.HasDynamicSuccessOutputDictionary)
                 {
                     continue;
                 }
@@ -504,7 +517,7 @@ public static class AuditEngine
                     "Trace success construction, helper returns, and dynamic dictionaries before changing the output contract."));
             }
 
-            foreach (var key in merged.DictionaryKeys
+            foreach (var key in merged.SuccessOutputKeys
                          .Where(key => !outputNames.Contains(key))
                          .OrderBy(key => key, Comparer))
             {
@@ -518,6 +531,20 @@ public static class AuditEngine
                     sourceEvidence,
                     "A runtime dictionary key may be returned without a matching output-port declaration.",
                     "Determine whether the key is an internal helper dictionary or a public output, then update the formal contract only when proven."));
+            }
+
+            if (merged.HasDynamicSuccessOutputDictionary)
+            {
+                findings.Add(new AuditFinding(
+                    "RUNTIME_OUTPUT_DYNAMIC_UNPROVEN",
+                    "info",
+                    "low",
+                    "candidate",
+                    name,
+                    "dynamic-output",
+                    sourceEvidence,
+                    "A successful output path contains a dynamic key that cannot be proven statically.",
+                    "Review the successful return path without treating unrelated dictionaries as public outputs."));
             }
 
             if (merged.UsesPreviewTerms &&
@@ -547,7 +574,9 @@ public static class AuditEngine
     {
         var aiCatalog = new VisionAgentOperatorContractCatalog(new OperatorFactory());
         var knownParameterNames = metadata
-            .SelectMany(item => item.Parameters.Select(parameter => parameter.Name))
+            .SelectMany(item =>
+                item.Parameters.Select(parameter => parameter.Name)
+                    .Concat(item.ParameterConstraints.Select(constraint => constraint.Parameter)))
             .ToHashSet(Comparer);
 
         foreach (var contract in aiCatalog.Operators.OrderBy(item => item.OperatorType, Comparer))
@@ -601,7 +630,7 @@ public static class AuditEngine
         }
 
         var explicitParameterPattern = new Regex(
-            "(?:parameters?|parameterName|param(?:eter)?Name)\\s*(?:[:=]|\\[)\\s*[\\\"'](?<name>[A-Za-z][A-Za-z0-9_]*)",
+            "(?<![-A-Za-z0-9_])(?:parameterName|paramName)\\s*[:=]\\s*[\\\"'](?<name>[A-Za-z][A-Za-z0-9_]*)|(?<![-A-Za-z0-9_])parameter\\s*:\\s*[\\\"'](?<name>[A-Za-z][A-Za-z0-9_]*)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         foreach (var file in Directory.EnumerateFiles(frontendRoot, "*.*", SearchOption.AllDirectories)
                      .Where(path => path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
@@ -614,6 +643,14 @@ public static class AuditEngine
             foreach (Match match in explicitParameterPattern.Matches(text))
             {
                 var parameter = match.Groups["name"].Value;
+                var contextStart = Math.Max(0, match.Index - 160);
+                var context = text[contextStart..match.Index];
+                if (context.Contains("PickFileCommand", StringComparison.Ordinal) ||
+                    context.Contains("PickFolderCommand", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 if (knownParameterNames.Contains(parameter))
                 {
                     continue;
@@ -645,15 +682,15 @@ public static class AuditEngine
         if (!File.Exists(path))
         {
             findings.Add(new AuditFinding(
-                "DOC_DETERMINISM_DIFF",
+                "DOC_CATALOG_IDENTITY_MISMATCH",
                 "warning",
                 "high",
                 "confirmed",
                 "catalog",
                 "docs/operators/catalog.json",
                 ["The checked-in operator catalog is missing."],
-                "Documentation cannot be verified against the formal operator boundary.",
-                "Regenerate the documentation through the existing generator and review the diff."));
+                "The checked-in documentation catalog identity surface is unavailable.",
+                "Restore or intentionally update the catalog identity surface."));
             return;
         }
 
@@ -664,15 +701,15 @@ public static class AuditEngine
                 operators.ValueKind != JsonValueKind.Array)
             {
                 findings.Add(new AuditFinding(
-                    "DOC_DETERMINISM_DIFF",
+                    "DOC_CATALOG_IDENTITY_MISMATCH",
                     "warning",
                     "high",
                     "confirmed",
                     "catalog",
                     "operators",
                     ["docs/operators/catalog.json does not contain an operators array."],
-                    "The checked-in documentation catalog is not reproducible from its declared shape.",
-                    "Restore the formal catalog schema before regenerating documentation."));
+                    "The checked-in documentation catalog identity shape is invalid.",
+                    "Restore the formal catalog identity schema."));
                 return;
             }
 
@@ -707,97 +744,30 @@ public static class AuditEngine
                 }
 
                 findings.Add(new AuditFinding(
-                    "DOC_DETERMINISM_DIFF",
+                    "DOC_CATALOG_IDENTITY_MISMATCH",
                     "warning",
                     "high",
                     "confirmed",
                     "catalog",
                     "docs/operators/catalog.json",
                     evidence,
-                    "Documentation regeneration would produce a stable identity or ordering diff.",
-                    "Regenerate only the intended documentation surface and review the deterministic diff."));
+                    "The checked-in catalog has an identity, duplicate, or ordering mismatch.",
+                    "Correct only the catalog identity, duplicate, or ordering issue after review."));
             }
         }
         catch (JsonException ex)
         {
             findings.Add(new AuditFinding(
-                "DOC_DETERMINISM_DIFF",
+                "DOC_CATALOG_IDENTITY_MISMATCH",
                 "warning",
                 "high",
                 "confirmed",
                 "catalog",
                 "docs/operators/catalog.json",
                 [$"Invalid JSON: {ex.Message}"],
-                "Documentation cannot be compared deterministically.",
-                "Repair the checked-in JSON before regenerating documentation."));
+                "The checked-in documentation catalog identity cannot be read.",
+                "Repair the checked-in JSON identity surface."));
         }
-    }
-
-    private static IReadOnlyList<ManualReviewSample> BuildManualReviewSamples(
-        IReadOnlyList<OperatorMetadata> metadata,
-        IReadOnlyList<AuditFinding> findings,
-        SourceAnalysisResult analysis,
-        string repoRoot)
-    {
-        var selected = new List<OperatorMetadata>();
-        foreach (var group in metadata
-                     .OrderBy(item => item.Category, Comparer)
-                     .ThenBy(item => item.Type.ToString(), Comparer)
-                     .GroupBy(item => string.IsNullOrWhiteSpace(item.Category) ? "uncategorized" : item.Category, Comparer))
-        {
-            selected.Add(group.First());
-        }
-
-        foreach (var item in metadata.OrderBy(item => item.Type.ToString(), Comparer))
-        {
-            if (selected.Any(existing => existing.Type == item.Type))
-            {
-                continue;
-            }
-
-            selected.Add(item);
-            if (selected.Count >= 15)
-            {
-                break;
-            }
-        }
-
-        if (selected.Count < 15)
-        {
-            throw new InvalidOperationException("At least 15 cross-category manual review samples are required.");
-        }
-
-        return selected
-            .Take(15)
-            .Select((item, index) =>
-            {
-                var operatorName = item.Type.ToString();
-                var operatorFindings = findings
-                    .Where(finding => finding.Operator.Equals(operatorName, StringComparison.OrdinalIgnoreCase))
-                    .ToArray();
-                var confirmed = operatorFindings.Any(finding => finding.Classification == "confirmed");
-                var candidate = operatorFindings.Any(finding => finding.Classification == "candidate");
-                var conclusion = confirmed ? "confirmed" : candidate ? "candidate" : "not-reproduced";
-                var evidence = analysis.Observations.TryGetValue(operatorName, out var observations)
-                    ? SourceOperatorObservation.Merge(observations).Evidence
-                    : [$"{RelativePath(repoRoot, FindMetadataSourcePath(repoRoot, operatorName))}: metadata only"];
-                var reason = conclusion switch
-                {
-                    "candidate" => "Roslyn found a static signal, but helper, base-class, alias, indirect-call, or dynamic-dictionary reachability cannot be proven.",
-                    "confirmed" => "The deterministic rule has a direct formal metadata or source-boundary violation.",
-                    _ => "No deterministic violation was reproduced in the available source and metadata evidence."
-                };
-                return new ManualReviewSample(
-                    $"MR-{index + 1:00}",
-                    operatorName,
-                    string.IsNullOrWhiteSpace(item.Category) ? "uncategorized" : item.Category,
-                    conclusion,
-                    evidence,
-                    false,
-                    reason);
-            })
-            .OrderBy(item => item.SampleId, StringComparer.Ordinal)
-            .ToArray();
     }
 
     private static AuditSummary BuildSummary(
@@ -807,7 +777,8 @@ public static class AuditEngine
         IReadOnlyList<AuditSurface> surfaces,
         IReadOnlyList<AuditIdentityDifference> differences,
         IReadOnlyList<AuditFinding> findings,
-        IReadOnlyList<ManualReviewSample> manualReview,
+        AuditReviewSummary reviewSummary,
+        ConfirmedFindingGateResult confirmedGate,
         bool schemaValid)
     {
         var findingCounts = findings
@@ -820,39 +791,33 @@ public static class AuditEngine
 
         var surfaceCounts = surfaces
             .OrderBy(item => item.Name, Comparer)
-            .ToDictionary(item => item.Name, item => item.Identities.Count, StringComparer.Ordinal);
+            .ToDictionary(item => item.Name, item => item.ObservedCount, StringComparer.Ordinal);
         var duplicateCount = surfaces.Sum(item => item.DuplicateIdentities.Count);
         var missingCount = differences.Sum(item => item.MissingFromRight.Count);
         var sourceDifferenceCount = differences.Sum(item => item.MissingFromRight.Count + item.ExtraInRight.Count);
-        var categories = manualReview
-            .Select(item => item.Category)
-            .Distinct(Comparer)
-            .OrderBy(item => item, Comparer)
-            .ToArray();
         return new AuditSummary(
             AuditSchema.SummaryVersion,
             sourceCommitSha,
             canonicalNames.Count,
             aliases.Count,
-            surfaceCounts.GetValueOrDefault("scanner"),
-            surfaceCounts.GetValueOrDefault("factory"),
-            surfaceCounts.GetValueOrDefault("catalog"),
+            surfaceCounts.GetValueOrDefault("scanner") ?? 0,
+            surfaceCounts.GetValueOrDefault("factory") ?? 0,
+            surfaceCounts.GetValueOrDefault("catalog") ?? 0,
             surfaceCounts.GetValueOrDefault("operatorLibrary"),
-            surfaceCounts.GetValueOrDefault("aiContract"),
+            surfaceCounts.GetValueOrDefault("aiContract") ?? 0,
             findingCounts["confirmed"],
             findingCounts["candidate"],
             findingCounts["not-reproduced"],
+            confirmedGate.Baseline.Count,
+            confirmedGate.NewConfirmedFindings.Count,
             duplicateCount,
             missingCount,
             sourceDifferenceCount,
             schemaValid,
             true,
-            new ReadOnlyDictionary<string, int>(surfaceCounts),
+            new ReadOnlyDictionary<string, int?>(surfaceCounts),
             new ReadOnlyDictionary<string, int>(new SortedDictionary<string, int>(findingCounts, StringComparer.Ordinal)),
-            new ManualReviewSummary(
-                manualReview.Count,
-                manualReview.Count(item => item.FalsePositive),
-                categories));
+            reviewSummary);
     }
 
     private static bool IsValidFinding(AuditFinding finding)
@@ -943,12 +908,67 @@ public static class AuditEngine
             .ToArray();
     }
 
-    private static IReadOnlyList<string> ReadOperatorLibraryIdentities(SourceAnalysisResult sourceAnalysis)
+    private static AuditSurface ReadOperatorLibrarySurface(string repoRoot)
     {
-        return sourceAnalysis.Observations.Keys
-            .Distinct(Comparer)
-            .OrderBy(item => item, Comparer)
-            .ToArray();
+        var projectPath = Path.Combine(repoRoot, "ClearVision.OperatorLibrary", "ClearVision.OperatorLibrary.csproj");
+        var tcpOperatorPath = Path.Combine(
+            repoRoot,
+            "ClearVision.Product",
+            "src",
+            "ClearVision.Product.Infrastructure",
+            "Operators",
+            "TcpCommunicationOperator.cs");
+        var tcpManagerPath = Path.Combine(
+            repoRoot,
+            "ClearVision.Product",
+            "src",
+            "ClearVision.Product.Infrastructure",
+            "Services",
+            "TcpDeviceManager.cs");
+        var projectText = File.ReadAllText(projectPath);
+        var tcpOperatorText = File.Exists(tcpOperatorPath) ? File.ReadAllText(tcpOperatorPath) : string.Empty;
+        var managerLinked = projectText.Contains("TcpDeviceManager.cs", StringComparison.OrdinalIgnoreCase);
+        if (File.Exists(tcpManagerPath) &&
+            tcpOperatorText.Contains("new TcpDeviceManager", StringComparison.Ordinal) &&
+            !managerLinked)
+        {
+            return new AuditSurface(
+                "operatorLibrary",
+                "ClearVision.OperatorLibrary csproj Compile/ProjectReference boundary and packaged assembly",
+                "unavailable",
+                null,
+                [],
+                [],
+                "ClearVision.OperatorLibrary links TcpCommunicationOperator.cs but does not include Services/TcpDeviceManager.cs; the package build fails with CS0246, so no packaged operator count is reported.");
+        }
+
+        var assemblyPath = Path.Combine(
+            repoRoot,
+            "ClearVision.OperatorLibrary",
+            "bin",
+            "Release",
+            "net8.0",
+            "ClearVision.OperatorLibrary.dll");
+        if (!File.Exists(assemblyPath))
+        {
+            return new AuditSurface(
+                "operatorLibrary",
+                "ClearVision.OperatorLibrary csproj Compile/ProjectReference boundary and packaged assembly",
+                "unavailable",
+                null,
+                [],
+                [],
+                "No current Release packaged assembly is available for inspection.");
+        }
+
+        return new AuditSurface(
+            "operatorLibrary",
+            "ClearVision.OperatorLibrary packaged assembly file",
+            "available",
+            0,
+            [],
+            [],
+            "The packaged assembly exists, but no formal operator identity index is embedded; the module catalog remains the package identity surface.");
     }
 
     private static IReadOnlyList<string> ReadAiContractIdentities(OperatorFactory factory)
@@ -1174,9 +1194,28 @@ public static class AuditSchemaValidator
             }
         }
 
-        if (report.ManualReviewSamples.Count < 15)
+        if (report.ReviewEntries.Count < 15)
         {
-            errors.Add("manualReviewSamples.count");
+            errors.Add("reviewEntries.count");
+        }
+
+        foreach (var surface in report.Surfaces)
+        {
+            if (surface.Status == "available" && surface.ObservedCount is null)
+            {
+                errors.Add($"surface.count:{surface.Name}");
+            }
+
+            if (surface.Status == "unavailable" &&
+                (surface.ObservedCount is not null || string.IsNullOrWhiteSpace(surface.FailureReason)))
+            {
+                errors.Add($"surface.unavailable:{surface.Name}");
+            }
+        }
+
+        if (report.Summary.NewConfirmedCount != report.NewConfirmedFindings.Count)
+        {
+            errors.Add("confirmedGate.count");
         }
 
         return errors;
@@ -1220,18 +1259,22 @@ public static class AuditSerialization
             $"| Confirmed | {report.Summary.ConfirmedCount} |",
             $"| Candidate | {report.Summary.CandidateCount} |",
             $"| Not reproduced | {report.Summary.NotReproducedCount} |",
-            $"| Manual review samples | {report.Summary.ManualReview.SampleCount} |",
-            $"| Manual review false positives | {report.Summary.ManualReview.FalsePositiveCount} |",
+            $"| Review baseline entries | {report.Summary.Review.SampleCount} |",
+            $"| Reviewed entries | {report.Summary.Review.ReviewedCount} |",
+            $"| Reviewed false positives | {report.Summary.Review.FalsePositiveCount} |",
+            $"| Reviewed uncertain | {report.Summary.Review.UncertainCount} |",
+            $"| Confirmed baseline | {report.Summary.ConfirmedBaselineCount} |",
+            $"| New confirmed | {report.Summary.NewConfirmedCount} |",
             string.Empty,
             "## Audit surfaces",
             string.Empty,
-            "| Surface | Count | Source |",
-            "| --- | ---: | --- |"
+            "| Surface | Status | Count | Source | Failure reason |",
+            "| --- | --- | ---: | --- | --- |"
         };
 
         foreach (var surface in report.Surfaces.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
         {
-            lines.Add($"| {Escape(surface.Name)} | {surface.Identities.Count} | {Escape(surface.Source)} |");
+            lines.Add($"| {Escape(surface.Name)} | {Escape(surface.Status)} | {(surface.ObservedCount?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")} | {Escape(surface.Source)} | {Escape(surface.FailureReason ?? string.Empty)} |");
         }
 
         lines.AddRange(
@@ -1270,15 +1313,25 @@ public static class AuditSerialization
         lines.AddRange(
         [
             string.Empty,
-            "## Manual review samples",
+            "## Review baseline",
             string.Empty,
-            "| Sample | Operator | Category | Conclusion | False positive | Evidence | Candidate downgrade reason |",
-            "| --- | --- | --- | --- | :---: | --- | --- |"
+            "| Review | Finding | Operator | Field | Status | Verdict | Evidence | Reason |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |"
         ]);
-        foreach (var sample in report.ManualReviewSamples)
+        foreach (var review in report.ReviewEntries)
         {
-            lines.Add($"| {Escape(sample.SampleId)} | {Escape(sample.Operator)} | {Escape(sample.Category)} | {Escape(sample.AuditConclusion)} | {(sample.FalsePositive ? "yes" : "no")} | {Escape(string.Join("; ", sample.SourceEvidence))} | {Escape(sample.CandidateDegradationReason)} |");
+            lines.Add($"| {Escape(review.ReviewId)} | {Escape(review.FindingCode)} | {Escape(review.Operator)} | {Escape(review.Field)} | {Escape(review.ReviewStatus)} | {Escape(review.Verdict)} | {Escape(string.Join("; ", review.Evidence))} | {Escape(review.Reason)} |");
         }
+
+        lines.AddRange(
+        [
+            string.Empty,
+            "## Confirmed no-regression gate",
+            string.Empty,
+            $"- Baseline identities: {report.ConfirmedBaseline.Count}",
+            $"- New confirmed identities: {report.NewConfirmedFindings.Count}",
+            string.Empty
+        ]);
 
         lines.AddRange(
         [
@@ -1337,9 +1390,9 @@ internal sealed class SourceOperatorObservation
     public int ClassLine { get; init; }
     public HashSet<string> ParameterReads { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<SourceParameterFallback> ParameterDefaults { get; } = [];
-    public HashSet<string> DictionaryKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SuccessOutputKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
     public bool HasDynamicParameterAccess { get; set; }
-    public bool HasDynamicOutputDictionary { get; set; }
+    public bool HasDynamicSuccessOutputDictionary { get; set; }
     public bool UsesPreviewTerms { get; set; }
 
     public IReadOnlyList<string> Evidence =>
@@ -1362,9 +1415,9 @@ internal sealed class SourceOperatorObservation
         {
             merged.ParameterReads.UnionWith(observation.ParameterReads);
             merged.ParameterDefaults.AddRange(observation.ParameterDefaults);
-            merged.DictionaryKeys.UnionWith(observation.DictionaryKeys);
+            merged.SuccessOutputKeys.UnionWith(observation.SuccessOutputKeys);
             merged.HasDynamicParameterAccess |= observation.HasDynamicParameterAccess;
-            merged.HasDynamicOutputDictionary |= observation.HasDynamicOutputDictionary;
+            merged.HasDynamicSuccessOutputDictionary |= observation.HasDynamicSuccessOutputDictionary;
             merged.UsesPreviewTerms |= observation.UsesPreviewTerms;
         }
 
@@ -1440,7 +1493,7 @@ internal static class RoslynOperatorSourceAnalyzer
                     ClassLine = line
                 };
                 AnalyzeInvocations(classDeclaration, model, observation);
-                AnalyzeDictionaryKeys(classDeclaration, observation);
+                AnalyzeSuccessOutputPaths(classDeclaration, model, observation);
                 AnalyzePreviewTerms(classDeclaration, observation);
                 AnalyzeInheritedSource(classDeclaration, model, observation);
                 AnalyzePortTypeNames(classDeclaration, model, canonicalName, observation, result);
@@ -1478,7 +1531,7 @@ internal static class RoslynOperatorSourceAnalyzer
                     syntaxReference.SyntaxTree,
                     ignoreAccessibility: true);
                 AnalyzeInvocations(baseDeclaration, baseModel, observation);
-                AnalyzeDictionaryKeys(baseDeclaration, observation);
+                AnalyzeSuccessOutputPaths(baseDeclaration, baseModel, observation);
                 AnalyzePreviewTerms(baseDeclaration, observation);
             }
 
@@ -1576,16 +1629,38 @@ internal static class RoslynOperatorSourceAnalyzer
             }
 
             var arguments = invocation.ArgumentList.Arguments;
+            var method = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
             var nameArgumentIndex = -1;
+            var fallbackArgumentIndex = -1;
             var parameterName = string.Empty;
             for (var index = 0; index < arguments.Count; index++)
             {
-                if (TryGetStringConstant(model, arguments[index].Expression, out var value))
+                var formalName = ResolveFormalParameterName(method, arguments[index], index);
+                if (IsParameterNameFormal(formalName) &&
+                    TryGetStringConstant(model, arguments[index].Expression, out var value))
                 {
                     nameArgumentIndex = index;
                     parameterName = value;
                     observation.ParameterReads.Add(value);
-                    break;
+                }
+
+                if (IsFallbackFormal(formalName))
+                {
+                    fallbackArgumentIndex = index;
+                }
+            }
+
+            if (nameArgumentIndex < 0)
+            {
+                for (var index = 0; index < arguments.Count; index++)
+                {
+                    if (TryGetStringConstant(model, arguments[index].Expression, out var value))
+                    {
+                        nameArgumentIndex = index;
+                        parameterName = value;
+                        observation.ParameterReads.Add(value);
+                        break;
+                    }
                 }
             }
 
@@ -1595,8 +1670,15 @@ internal static class RoslynOperatorSourceAnalyzer
                 continue;
             }
 
-            if (nameArgumentIndex + 1 < arguments.Count &&
-                TryGetConstantText(model, arguments[nameArgumentIndex + 1].Expression, out var fallback))
+            if (fallbackArgumentIndex < 0 &&
+                methodName.StartsWith("Get", StringComparison.OrdinalIgnoreCase) &&
+                nameArgumentIndex + 1 < arguments.Count)
+            {
+                fallbackArgumentIndex = nameArgumentIndex + 1;
+            }
+
+            if (fallbackArgumentIndex >= 0 &&
+                TryGetConstantText(model, arguments[fallbackArgumentIndex].Expression, out var fallback))
             {
                 var line = 1 + invocation.GetLocation().GetLineSpan().StartLinePosition.Line;
                 observation.ParameterDefaults.Add(new SourceParameterFallback(
@@ -1625,41 +1707,246 @@ internal static class RoslynOperatorSourceAnalyzer
         }
     }
 
-    private static void AnalyzeDictionaryKeys(
+    private static string ResolveFormalParameterName(
+        IMethodSymbol? method,
+        ArgumentSyntax argument,
+        int index)
+    {
+        if (argument.NameColon is not null)
+        {
+            return argument.NameColon.Name.Identifier.Text;
+        }
+
+        return method is not null && index < method.Parameters.Length
+            ? method.Parameters[index].Name
+            : string.Empty;
+    }
+
+    private static bool IsParameterNameFormal(string name)
+    {
+        return name.Equals("name", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("parameterName", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("paramName", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("key", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFallbackFormal(string name)
+    {
+        return name.Contains("default", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("fallback", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static void AnalyzeSuccessOutputPaths(
         ClassDeclarationSyntax declaration,
+        SemanticModel model,
         SourceOperatorObservation observation)
     {
-        foreach (var initializer in declaration.DescendantNodes().OfType<InitializerExpressionSyntax>())
+        var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        foreach (var invocation in declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                     .Where(invocation => IsSuccessBoundary(invocation, model)))
         {
-            if (!initializer.IsKind(SyntaxKind.CollectionInitializerExpression))
+            var method = invocation.Ancestors().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault();
+            foreach (var argument in invocation.ArgumentList.Arguments)
             {
-                continue;
-            }
-
-            var objectCreation = initializer.Ancestors().OfType<ObjectCreationExpressionSyntax>().FirstOrDefault();
-            if (objectCreation is null ||
-                !objectCreation.Type.ToString().Contains("Dictionary", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            foreach (var element in initializer.Expressions)
-            {
-                var literals = element.DescendantNodesAndSelf()
-                    .OfType<LiteralExpressionSyntax>()
-                    .Where(item => item.IsKind(SyntaxKind.StringLiteralExpression))
-                    .Select(item => item.Token.ValueText)
-                    .Where(item => !string.IsNullOrWhiteSpace(item))
-                    .ToArray();
-                if (literals.Length == 0)
-                {
-                    observation.HasDynamicOutputDictionary = true;
-                    continue;
-                }
-
-                observation.DictionaryKeys.Add(literals[0]);
+                AnalyzeOutputExpression(
+                    argument.Expression,
+                    method,
+                    model,
+                    observation,
+                    visitedMethods);
             }
         }
+    }
+
+    private static bool IsSuccessBoundary(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model)
+    {
+        var methodName = GetMethodName(invocation);
+        if (methodName.Equals("CreateImageOutput", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!methodName.Equals("Success", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var symbol = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        return symbol?.ContainingType.Name.Equals("OperatorExecutionOutput", StringComparison.Ordinal) == true ||
+               invocation.Expression.ToString().Contains("OperatorExecutionOutput", StringComparison.Ordinal);
+    }
+
+    private static void AnalyzeOutputExpression(
+        ExpressionSyntax expression,
+        BaseMethodDeclarationSyntax? containingMethod,
+        SemanticModel model,
+        SourceOperatorObservation observation,
+        HashSet<IMethodSymbol> visitedMethods)
+    {
+        switch (expression)
+        {
+            case ParenthesizedExpressionSyntax parenthesized:
+                AnalyzeOutputExpression(parenthesized.Expression, containingMethod, model, observation, visitedMethods);
+                return;
+            case CastExpressionSyntax cast:
+                AnalyzeOutputExpression(cast.Expression, containingMethod, model, observation, visitedMethods);
+                return;
+            case ConditionalExpressionSyntax conditional:
+                AnalyzeOutputExpression(conditional.WhenTrue, containingMethod, model, observation, visitedMethods);
+                AnalyzeOutputExpression(conditional.WhenFalse, containingMethod, model, observation, visitedMethods);
+                return;
+            case ObjectCreationExpressionSyntax creation:
+                AnalyzeDictionaryInitializer(creation.Initializer, model, observation);
+                return;
+            case ImplicitObjectCreationExpressionSyntax implicitCreation:
+                AnalyzeDictionaryInitializer(implicitCreation.Initializer, model, observation);
+                return;
+            case IdentifierNameSyntax identifier when containingMethod is not null:
+                AnalyzeDictionaryVariable(identifier.Identifier.Text, containingMethod, model, observation, visitedMethods);
+                return;
+            case InvocationExpressionSyntax invocation:
+                AnalyzeHelperInvocation(invocation, model, observation, visitedMethods);
+                return;
+        }
+    }
+
+    private static void AnalyzeDictionaryVariable(
+        string variableName,
+        BaseMethodDeclarationSyntax containingMethod,
+        SemanticModel model,
+        SourceOperatorObservation observation,
+        HashSet<IMethodSymbol> visitedMethods)
+    {
+        foreach (var declarator in containingMethod.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+                     .Where(item => item.Identifier.Text.Equals(variableName, StringComparison.Ordinal)))
+        {
+            if (declarator.Initializer?.Value is { } initializer)
+            {
+                AnalyzeOutputExpression(initializer, containingMethod, model, observation, visitedMethods);
+            }
+        }
+
+        foreach (var assignment in containingMethod.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        {
+            if (assignment.Left is IdentifierNameSyntax assignedIdentifier &&
+                assignedIdentifier.Identifier.Text.Equals(variableName, StringComparison.Ordinal))
+            {
+                AnalyzeOutputExpression(assignment.Right, containingMethod, model, observation, visitedMethods);
+                continue;
+            }
+
+            if (assignment.Left is ElementAccessExpressionSyntax elementAccess &&
+                elementAccess.Expression is IdentifierNameSyntax target &&
+                target.Identifier.Text.Equals(variableName, StringComparison.Ordinal))
+            {
+                AddElementAccessKey(elementAccess.ArgumentList.Arguments.FirstOrDefault()?.Expression, model, observation);
+            }
+
+        }
+
+        foreach (var invocation in containingMethod.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (invocation.Expression is not MemberAccessExpressionSyntax member ||
+                member.Expression is not IdentifierNameSyntax target ||
+                !target.Identifier.Text.Equals(variableName, StringComparison.Ordinal) ||
+                member.Name.Identifier.Text is not ("Add" or "TryAdd"))
+            {
+                continue;
+            }
+
+            AddElementAccessKey(invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression, model, observation);
+        }
+    }
+
+    private static void AnalyzeDictionaryInitializer(
+        InitializerExpressionSyntax? initializer,
+        SemanticModel model,
+        SourceOperatorObservation observation)
+    {
+        if (initializer is null)
+        {
+            return;
+        }
+
+        foreach (var element in initializer.Expressions)
+        {
+            ExpressionSyntax? keyExpression = element switch
+            {
+                AssignmentExpressionSyntax assignment when assignment.Left is ImplicitElementAccessSyntax implicitAccess =>
+                    implicitAccess.ArgumentList.Arguments.FirstOrDefault()?.Expression,
+                InitializerExpressionSyntax nested => nested.Expressions.FirstOrDefault(),
+                _ => element.DescendantNodesAndSelf()
+                    .OfType<LiteralExpressionSyntax>()
+                    .FirstOrDefault(item => item.IsKind(SyntaxKind.StringLiteralExpression))
+            };
+            AddElementAccessKey(keyExpression, model, observation);
+        }
+    }
+
+    private static void AddElementAccessKey(
+        ExpressionSyntax? expression,
+        SemanticModel model,
+        SourceOperatorObservation observation)
+    {
+        if (expression is not null && TryGetStringConstant(model, expression, out var key) && !string.IsNullOrWhiteSpace(key))
+        {
+            observation.SuccessOutputKeys.Add(key);
+            return;
+        }
+
+        observation.HasDynamicSuccessOutputDictionary = true;
+    }
+
+    private static void AnalyzeHelperInvocation(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        SourceOperatorObservation observation,
+        HashSet<IMethodSymbol> visitedMethods)
+    {
+        var method = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        if (method is null)
+        {
+            observation.HasDynamicSuccessOutputDictionary = true;
+            return;
+        }
+
+        if (method.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        if (!visitedMethods.Add(method.OriginalDefinition))
+        {
+            return;
+        }
+
+        var analyzed = false;
+        foreach (var syntaxReference in method.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax() is not MethodDeclarationSyntax declaration)
+            {
+                continue;
+            }
+
+            analyzed = true;
+            var helperModel = model.Compilation.GetSemanticModel(declaration.SyntaxTree, ignoreAccessibility: true);
+            if (declaration.ExpressionBody?.Expression is { } expressionBody)
+            {
+                AnalyzeOutputExpression(expressionBody, declaration, helperModel, observation, visitedMethods);
+            }
+
+            foreach (var returnStatement in declaration.DescendantNodes().OfType<ReturnStatementSyntax>())
+            {
+                if (returnStatement.Expression is not null)
+                {
+                    AnalyzeOutputExpression(returnStatement.Expression, declaration, helperModel, observation, visitedMethods);
+                }
+            }
+        }
+
+        _ = analyzed;
     }
 
     private static void AnalyzePreviewTerms(
@@ -1750,6 +2037,13 @@ internal static class RoslynOperatorSourceAnalyzer
         ExpressionSyntax expression,
         out string value)
     {
+        if (model.GetSymbolInfo(expression).Symbol is IFieldSymbol field &&
+            field.ContainingType.TypeKind == TypeKind.Enum)
+        {
+            value = field.Name;
+            return true;
+        }
+
         var constant = model.GetConstantValue(expression);
         if (constant.HasValue)
         {

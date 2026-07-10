@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$BaselineSha,
+    [string]$SourceCommitSha,
     [switch]$ReportOnly,
     [string]$JsonOutputPath,
     [string]$MarkdownOutputPath,
@@ -37,8 +37,8 @@ $runnerProject = Join-Path $repoRoot "quality/tools/OperatorLibraryReadOnlyAudit
 $runnerArguments = @(
     "--repo-root", $repoRoot
 )
-if (-not [string]::IsNullOrWhiteSpace($BaselineSha)) {
-    $runnerArguments += @("--source-commit-sha", $BaselineSha)
+if (-not [string]::IsNullOrWhiteSpace($SourceCommitSha)) {
+    $runnerArguments += @("--source-commit-sha", $SourceCommitSha)
 }
 if ($ReportOnly) {
     $runnerArguments += "--report-only"

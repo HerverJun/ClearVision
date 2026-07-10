@@ -1,0 +1,16 @@
+[
+  {
+    "code": "DOC_CATALOG_IDENTITY_MISMATCH",
+    "operator": "catalog",
+    "field": "docs/operators/catalog.json",
+    "reason": "Isolated OperatorDocGenerator regeneration produces 158 identities and would reintroduce BinaryImageToRegion and RectangleRegion. This round intentionally restores the governed documentation surface to dc542913 and reports only catalog identity/duplicate/order semantics.",
+    "status": "intentional-difference"
+  },
+  {
+    "code": "SURFACE_IDENTITY_MISMATCH",
+    "operator": "FrameChangeTrigger",
+    "field": "factory->catalog",
+    "reason": "FrameChangeTrigger is explicitly listed in OperatorModuleCatalog.InternalOnlyTypes and is intentionally excluded from the package-public module catalog.",
+    "status": "intentional-difference"
+  }
+]

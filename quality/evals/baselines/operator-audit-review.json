@@ -1,0 +1,197 @@
+[
+  {
+    "reviewId": "OAR-001",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "ForEach",
+    "field": "FailFast",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ForEachOperator.cs:98 uses a false GetBoolParam fallback.",
+      "Formal OperatorParam metadata declares FailFast default=true."
+    ],
+    "reason": "A directly constructed operator that omits FailFast can execute with a different value than factory-created metadata defaults."
+  },
+  {
+    "reviewId": "OAR-002",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "HttpRequest",
+    "field": "Url",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/HttpRequestOperator.cs:236 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Url default=http://localhost:5000/api."
+    ],
+    "reason": "The direct runtime fallback and formal authoring default are different observable values."
+  },
+  {
+    "reviewId": "OAR-003",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "ImageSave",
+    "field": "Directory",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageSaveOperator.cs:260 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Directory default=C:\\ClearVision\\NG_Images."
+    ],
+    "reason": "Missing metadata can redirect the save path away from the formal default."
+  },
+  {
+    "reviewId": "OAR-004",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "ImageSave",
+    "field": "FileNameTemplate",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageSaveOperator.cs:281 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares FileNameTemplate default=NG_{yyyyMMdd_HHmmss}_{Guid}.jpg."
+    ],
+    "reason": "The runtime fallback does not preserve the formal file naming contract when the parameter is absent."
+  },
+  {
+    "reviewId": "OAR-005",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "MitsubishiMcCommunication",
+    "field": "Port",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MitsubishiMcCommunicationOperator.cs:181 uses GetIntParam fallback=0.",
+      "Formal OperatorParam metadata declares Port default=5002."
+    ],
+    "reason": "An omitted port resolves to a different network endpoint than the formal metadata contract."
+  },
+  {
+    "reviewId": "OAR-006",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "MqttPublish",
+    "field": "Broker",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs:146 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Broker default=localhost."
+    ],
+    "reason": "The communication target differs when Broker is absent."
+  },
+  {
+    "reviewId": "OAR-007",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "MqttPublish",
+    "field": "Topic",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs:147 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Topic default=cv/results."
+    ],
+    "reason": "The publish destination differs when Topic is absent."
+  },
+  {
+    "reviewId": "OAR-008",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "OmronFinsCommunication",
+    "field": "Address",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OmronFinsCommunicationOperator.cs:147 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Address default=DM100."
+    ],
+    "reason": "The PLC memory address differs when the parameter is omitted."
+  },
+  {
+    "reviewId": "OAR-009",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "PointSetTool",
+    "field": "FilterMaxX",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PointSetToolOperator.cs:61 uses double.MaxValue as the fallback.",
+      "Formal OperatorParam metadata declares FilterMaxX default=1000000000."
+    ],
+    "reason": "The effective filtering boundary differs for directly constructed operators."
+  },
+  {
+    "reviewId": "OAR-010",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "PolarUnwrap",
+    "field": "OuterRadius",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PolarUnwrapOperator.cs:113 uses GetIntParam fallback=1.",
+      "Formal OperatorParam metadata declares OuterRadius default=100."
+    ],
+    "reason": "The unwrap geometry changes materially when OuterRadius is absent."
+  },
+  {
+    "reviewId": "OAR-011",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "PyramidShapeMatch",
+    "field": "AngleRange",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/PyramidShapeMatchOperator.cs:354 uses GetIntParam fallback=0.",
+      "Formal OperatorParam metadata declares AngleRange default=180."
+    ],
+    "reason": "The fallback disables the formal angular search range."
+  },
+  {
+    "reviewId": "OAR-012",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "StringFormat",
+    "field": "Template",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/StringFormatOperator.cs:55 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares Template default=Result is {0} and {1}."
+    ],
+    "reason": "The formatted output contract differs when Template is absent."
+  },
+  {
+    "reviewId": "OAR-013",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "VariableIncrement",
+    "field": "ResetThreshold",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/VariableIncrementOperator.cs:54 uses GetIntParam fallback=0.",
+      "Formal OperatorParam metadata declares ResetThreshold default=100."
+    ],
+    "reason": "The state reset behavior differs for an omitted parameter."
+  },
+  {
+    "reviewId": "OAR-014",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "VariableWrite",
+    "field": "StaticValue",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/VariableWriteOperator.cs:611 uses an empty GetStringParam fallback.",
+      "Formal OperatorParam metadata declares StaticValue default=0."
+    ],
+    "reason": "The written value differs when StaticValue is omitted."
+  },
+  {
+    "reviewId": "OAR-015",
+    "findingCode": "GET_PARAM_DEFAULT_MISMATCH",
+    "operator": "WidthMeasurement",
+    "field": "SampleCount",
+    "reviewStatus": "reviewed",
+    "verdict": "true-positive",
+    "evidence": [
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/WidthMeasurementOperator.cs:357 uses ReadIntParameter fallback=0.",
+      "Formal OperatorParam metadata declares SampleCount default=24."
+    ],
+    "reason": "The measurement sampling behavior differs when the parameter is absent."
+  }
+]
