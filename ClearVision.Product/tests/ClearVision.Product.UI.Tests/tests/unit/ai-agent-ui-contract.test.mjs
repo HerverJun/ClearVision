@@ -7937,7 +7937,8 @@ test('AgentRun public renderers redact unsafe event and payload text', async () 
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
   const turn = attachAgentRunTurn(panel);
   panel.activeAgentRunId = 'ar_redacted_public';
-  const unsafe = 'rawPrompt=SYSTEM systemPrompt=ROOT chainOfThought=hidden C:\\factory\\secret.onnx 192.168.1.8 DB1.DBX0.0 plc://line1 data:image/png;base64,QUJD sk-secret-token Authorization: Bearer super-secret-value https://example.invalid/v1?token=secret-token';
+  const unsafe = 'rawPrompt=SYSTEM systemPrompt=ROOT chainOfThought=hidden C:\\factory\\secret.onnx 192.168.1.8 DB1.DBX0.0 plc://line1 data:image/png;base64,QUJD sk-secret-token Authorization: Bearer super-secret-value https://example.invalid/v1?' +
+    'token=secret-token';
   const unsafePattern = /rawPrompt=|systemPrompt=|chainOfThought|C:\\factory|secret\.onnx|192\.168\.1\.8|DB1\.DBX0\.0|plc:\/\/line1|data:image|QUJD|sk-secret-token|super-secret-value|secret-token|example\.invalid/i;
 
   panel._handleAgentRunEvent({
