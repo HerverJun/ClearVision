@@ -15,13 +15,16 @@ public class OperatorFactory : IOperatorFactory
     private readonly Dictionary<OperatorType, OperatorMetadata> _metadata = new();
     private readonly Func<List<OperatorMetadata>>? _scanMetadata;
     private readonly bool? _strictMetadataScan;
+    private readonly IOperatorParameterConstraintProvider _constraintProvider;
 
     public OperatorFactory(
         Func<List<OperatorMetadata>>? scanMetadata = null,
-        bool? strictMetadataScan = null)
+        bool? strictMetadataScan = null,
+        IOperatorParameterConstraintProvider? constraintProvider = null)
     {
         _scanMetadata = scanMetadata;
         _strictMetadataScan = strictMetadataScan;
+        _constraintProvider = constraintProvider ?? OperatorParameterConstraintProvider.Instance;
         InitializeDefaultOperators();
     }
 
@@ -85,11 +88,16 @@ public class OperatorFactory : IOperatorFactory
 
     public void RegisterOperator(OperatorMetadata metadata)
     {
+        metadata.ParameterConstraints = _constraintProvider.GetConstraints(metadata.Type).ToList();
         _metadata[metadata.Type] = metadata;
     }
 
     private void InitializeDefaultOperators()
     {
         OperatorFactoryMetadataMerge.Apply(_metadata, _scanMetadata, _strictMetadataScan);
+        foreach (var metadata in _metadata.Values)
+        {
+            metadata.ParameterConstraints = _constraintProvider.GetConstraints(metadata.Type).ToList();
+        }
     }
 }

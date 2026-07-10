@@ -94,7 +94,8 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
             metadata.Description,
             metadata.InputPorts.Select(ToPort).ToList(),
             outputPorts,
-            metadata.Parameters.Select(ToParameter).ToList());
+            metadata.Parameters.Select(ToParameter).ToList(),
+            metadata.ParameterConstraints);
     }
 
     private static void AddPortIfMissing(
@@ -238,7 +239,8 @@ internal sealed record VisionAgentOperatorContract(
     string Description,
     IReadOnlyList<VisionAgentPortContract> InputPorts,
     IReadOnlyList<VisionAgentPortContract> OutputPorts,
-    IReadOnlyList<VisionAgentParameterContract> Parameters);
+    IReadOnlyList<VisionAgentParameterContract> Parameters,
+    IReadOnlyList<OperatorParameterConstraint>? ParameterConstraints = null);
 
 internal sealed record VisionAgentPortContract(
     string Name,

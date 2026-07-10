@@ -388,7 +388,41 @@ public class AiFlowValidator : IAiFlowValidator
             op.Parameters ??= new Dictionary<string, string>();
             ApplyIntelligentDefaults(op, metadata, result, operatorField);
 
-            foreach (var requiredParam in metadata.Parameters.Where(p => p.IsRequired))
+            var constraintValues = op.Parameters.ToDictionary(
+                pair => pair.Key,
+                pair => (object?)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var violation in OperatorParameterConstraintEvaluator.Validate(metadata, constraintValues))
+            {
+                var fieldNames = string.Join(", ", violation.ParameterNames);
+                var code = violation.Code switch
+                {
+                    "at-least-one" => "missing_conditional_parameter_group",
+                    "mutually-exclusive" => "mutually_exclusive_parameters",
+                    _ => "missing_conditional_parameter"
+                };
+                var message = violation.Code switch
+                {
+                    "at-least-one" => $"算子 {op.TempId}({metadata.DisplayName}) 需要在 {fieldNames} 中至少配置一项",
+                    "mutually-exclusive" => $"算子 {op.TempId}({metadata.DisplayName}) 的参数 {fieldNames} 不能同时配置",
+                    _ => $"算子 {op.TempId}({metadata.DisplayName}) 缺少条件必填参数 {fieldNames}"
+                };
+                result.AddWarning(
+                    message,
+                    code: code,
+                    category: "parameter",
+                    relatedFields: violation.ParameterNames
+                        .Select(name => $"{operatorField}.parameters.{name}")
+                        .ToArray(),
+                    operatorId: op.TempId,
+                    parameterName: violation.ParameterNames[0],
+                    repairHint: $"请根据当前参数模式补齐或收敛 {fieldNames}。");
+            }
+
+            foreach (var requiredParam in metadata.Parameters.Where(p =>
+                         p.IsRequired &&
+                         metadata.ParameterConstraints.All(constraint =>
+                             !constraint.Parameter.Equals(p.Name, StringComparison.OrdinalIgnoreCase))))
             {
                 if (!op.Parameters.ContainsKey(requiredParam.Name))
                 {
@@ -411,6 +445,12 @@ public class AiFlowValidator : IAiFlowValidator
                 var paramDef = metadata.Parameters.FirstOrDefault(p => p.Name == paramName);
                 if (paramDef == null)
                 {
+                    if (metadata.ParameterConstraints.Any(constraint =>
+                            constraint.Parameter.Equals(paramName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
                     // 参数不存在，仅作为警告
                     result.AddWarning(
                         $"算子 {op.TempId}({metadata.DisplayName}) 生成了未知的参数 '{paramName}'",

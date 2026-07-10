@@ -108,6 +108,11 @@ public class OperatorMetadata
     /// 参数定义
     /// </summary>
     public List<ParameterDefinition> Parameters { get; set; } = new();
+
+    /// <summary>
+    /// 正式 metadata 无法表达的条件、分组、别名和资源约束。
+    /// </summary>
+    public List<OperatorParameterConstraint> ParameterConstraints { get; set; } = new();
 }
 
 /// <summary>

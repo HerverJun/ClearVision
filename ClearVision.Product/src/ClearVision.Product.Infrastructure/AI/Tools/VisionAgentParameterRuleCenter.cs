@@ -1,3 +1,5 @@
+using ClearVision.Product.Core.Services;
+
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 internal enum VisionAgentParameterRuleScope
@@ -10,16 +12,17 @@ internal static class VisionAgentParameterRuleCenter
 {
     public static IReadOnlyList<VisionAgentMissingResource> CollectMissingResources(
         VisionAgentFlowDraft flow,
-        VisionAgentParameterRuleScope scope)
+        VisionAgentParameterRuleScope scope,
+        IVisionAgentOperatorContractCatalog? contractCatalog = null)
     {
+        contractCatalog ??= new VisionAgentOperatorContractCatalog();
         var missingResources = new List<VisionAgentMissingResource>();
 
         foreach (var op in flow.Operators)
         {
-            AddImageAcquisitionResources(op, missingResources);
-            AddDeepLearningResources(op, missingResources);
+            AddProviderResources(op, contractCatalog, missingResources);
+            AddLegacyDeepLearningResources(op, missingResources);
             AddTemplateMatchingResources(op, missingResources);
-            AddResultOutputResources(op, missingResources);
             AddPlcResources(op, missingResources);
 
             if (scope == VisionAgentParameterRuleScope.DeploymentPrecheck)
@@ -31,43 +34,62 @@ internal static class VisionAgentParameterRuleCenter
         return missingResources;
     }
 
-    private static void AddImageAcquisitionResources(
+    private static void AddProviderResources(
         VisionAgentFlowOperator op,
+        IVisionAgentOperatorContractCatalog contractCatalog,
         List<VisionAgentMissingResource> missingResources)
     {
-        if (!IsOperatorType(op, "ImageAcquisition"))
+        if (!contractCatalog.TryGet(op.OperatorType, out var contract) ||
+            contract.ParameterConstraints is not { Count: > 0 } constraints)
         {
             return;
         }
 
-        var sourceType = GetParameter(op.Parameters, "SourceType");
-        if (IsFileSource(sourceType))
+        var values = contract.Parameters
+            .Where(parameter => parameter.DefaultValue is not null)
+            .ToDictionary(
+                parameter => parameter.Name,
+                parameter => parameter.DefaultValue,
+                StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in op.Parameters)
         {
-            AddMissingAtLeastOne(
-                op,
+            values[pair.Key] = pair.Value;
+        }
+
+        var metadata = new OperatorMetadata
+        {
+            Parameters = contract.Parameters.Select(parameter => new ParameterDefinition
+            {
+                Name = parameter.Name,
+                IsRequired = parameter.IsRequired,
+                DefaultValue = parameter.DefaultValue
+            }).ToList(),
+            ParameterConstraints = constraints.ToList()
+        };
+
+        foreach (var violation in OperatorParameterConstraintEvaluator.Validate(metadata, values)
+                     .Where(item =>
+                         item.Code is "required" or "at-least-one" &&
+                         !string.IsNullOrWhiteSpace(item.ResourceKind)))
+        {
+            AddMissingResource(
                 missingResources,
-                "camera_binding",
-                ["FilePath"],
-                "ImageAcquisition.FilePath is not configured for file source.");
-            return;
+                violation.ResourceKind!,
+                violation.ParameterNames[0],
+                op.TempId,
+                op.OperatorType,
+                $"{op.OperatorType}.{string.Join("/", violation.ParameterNames)} requires engineer-supplied {violation.ResourceKind} metadata.");
         }
-
-        AddMissingAtLeastOne(
-            op,
-            missingResources,
-            "camera_binding",
-            ["CameraBindingId", "CameraId"],
-            "ImageAcquisition.CameraBindingId is not configured.");
     }
 
-    private static void AddDeepLearningResources(
+    private static void AddLegacyDeepLearningResources(
         VisionAgentFlowOperator op,
         List<VisionAgentMissingResource> missingResources)
     {
-        if (!IsOperatorType(op, "DeepLearning") &&
-            !IsOperatorType(op, "OnnxInference") &&
-            !IsOperatorType(op, "SemanticSegmentation") &&
-            !IsOperatorType(op, "AnomalyDetection"))
+        if (IsOperatorType(op, "DeepLearning") ||
+            (!IsOperatorType(op, "OnnxInference") &&
+             !IsOperatorType(op, "SemanticSegmentation") &&
+             !IsOperatorType(op, "AnomalyDetection")))
         {
             return;
         }
@@ -97,44 +119,6 @@ internal static class VisionAgentParameterRuleCenter
             "TemplateMatching.Template input or TemplateId is not configured.");
     }
 
-    private static void AddResultOutputResources(
-        VisionAgentFlowOperator op,
-        List<VisionAgentMissingResource> missingResources)
-    {
-        if (!IsOperatorType(op, "ResultOutput"))
-        {
-            return;
-        }
-
-        AddMissingAtLeastOne(
-            op,
-            missingResources,
-            "output_channel",
-            ["OutputChannelId", "OutputChannel", "Channel"],
-            "ResultOutput output channel metadata is not configured.");
-
-        var channel = GetFirstPresentParameter(op.Parameters, "OutputChannel", "OutputChannelId", "Channel");
-        if (string.Equals(channel, "file", StringComparison.OrdinalIgnoreCase))
-        {
-            AddMissingAtLeastOne(
-                op,
-                missingResources,
-                "output_file",
-                ["FilePath", "OutputPath"],
-                "ResultOutput.FilePath is not configured for file output.");
-        }
-
-        if (string.Equals(channel, "plc", StringComparison.OrdinalIgnoreCase))
-        {
-            AddMissingAtLeastOne(
-                op,
-                missingResources,
-                "plc_address",
-                ["PlcAddress", "PLCParameters"],
-                "ResultOutput.PlcAddress is not configured for PLC output.");
-        }
-    }
-
     private static void AddPlcResources(
         VisionAgentFlowOperator op,
         List<VisionAgentMissingResource> missingResources)
@@ -156,8 +140,8 @@ internal static class VisionAgentParameterRuleCenter
         VisionAgentFlowOperator op,
         List<VisionAgentMissingResource> missingResources)
     {
-        // Reserved for future static deployment precheck-only rules. Runtime
-        // resources stay metadata-only; no package, Station, PLC, or adapter is touched here.
+        _ = op;
+        _ = missingResources;
     }
 
     private static void AddMissingAtLeastOne(
@@ -204,52 +188,16 @@ internal static class VisionAgentParameterRuleCenter
             message));
     }
 
-    private static string? GetFirstPresentParameter(
-        IReadOnlyDictionary<string, string?> parameters,
-        params string[] parameterNames)
-    {
-        foreach (var parameterName in parameterNames)
-        {
-            var value = GetParameter(parameters, parameterName);
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private static string? GetParameter(
-        IReadOnlyDictionary<string, string?> parameters,
-        string parameterName)
-    {
-        return parameters.TryGetValue(parameterName, out var value) ? value : null;
-    }
-
     private static bool IsOperatorType(VisionAgentFlowOperator op, string operatorType)
     {
         return string.Equals(op.OperatorType, operatorType, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsFileSource(string? sourceType)
-    {
-        return string.Equals(sourceType, "file", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(sourceType, "image", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(sourceType, "path", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsMissingParameter(
         IReadOnlyDictionary<string, string?> parameters,
         string parameterName)
     {
-        if (!parameters.TryGetValue(parameterName, out var value) ||
-            string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+        return !parameters.TryGetValue(parameterName, out var value) ||
+               OperatorParameterConstraintEvaluator.IsMissing(value);
     }
 }

@@ -37,6 +37,7 @@ public static class VisionRuntimeServiceCollectionExtensions
     {
         services.AddScoped<IFlowExecutionService, FlowExecutionService>();
         services.AddScoped<IExecutionAdmissionService, ExecutionAdmissionService>();
+        services.AddSingleton<IOperatorParameterConstraintProvider, OperatorParameterConstraintProvider>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
         services.AddSingleton<ParameterRecommender>();
         services.AddSingleton<ITcpDeviceManager>(sp => new TcpDeviceManager(

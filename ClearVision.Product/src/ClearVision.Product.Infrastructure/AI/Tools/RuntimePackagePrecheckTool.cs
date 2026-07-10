@@ -215,16 +215,6 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                 AddIfConfigured(resources, op, "measurement_parameter", ["Scale", "PixelScale", "CalibrationScale"]);
             }
 
-            if (IsOperatorType(op, "ResultOutput"))
-            {
-                AddIfConfigured(resources, op, "output_channel", ["OutputChannelId", "OutputChannel", "Channel"]);
-                var outputMode = ReadFirstConfiguredParameter(op, "OutputChannel", "OutputChannelId", "Channel");
-                if (string.Equals(outputMode, "plc", StringComparison.OrdinalIgnoreCase))
-                {
-                    AddIfConfigured(resources, op, "plc_address", ["PlcAddress", "PLCParameters"]);
-                }
-            }
-
             if (op.OperatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase))
             {
                 AddIfConfigured(resources, op, "plc_address", ["PlcAddress", "PLCParameters"]);
@@ -343,22 +333,6 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         string parameterName)
     {
         return op.Parameters.TryGetValue(parameterName, out var value) ? value : null;
-    }
-
-    private static string? ReadFirstConfiguredParameter(
-        VisionAgentFlowOperator op,
-        params string[] parameterNames)
-    {
-        foreach (var parameterName in parameterNames)
-        {
-            var value = ReadParameter(op, parameterName);
-            if (!IsMissingParameterValue(value))
-            {
-                return value;
-            }
-        }
-
-        return null;
     }
 
     private static bool IsOperatorType(VisionAgentFlowOperator op, string operatorType)

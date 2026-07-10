@@ -167,7 +167,8 @@ internal static class VisionAgentFlowDraftValidator
 
         foreach (var resource in VisionAgentParameterRuleCenter.CollectMissingResources(
                      canonicalFlow,
-                     VisionAgentParameterRuleScope.FlowValidation))
+                     VisionAgentParameterRuleScope.FlowValidation,
+                     contractCatalog))
         {
             AddMissingResource(missingResources, resource);
         }
@@ -345,7 +346,7 @@ internal static class VisionAgentFlowDraftValidator
         foreach (var parameterName in op.Parameters.Keys)
         {
             if (!knownParameters.ContainsKey(parameterName) &&
-                !IsRecognizedMetadataParameter(op.OperatorType, parameterName))
+                !IsRecognizedMetadataParameter(op.OperatorType, parameterName, contract))
             {
                 blockingIssues.Add(new VisionAgentFlowIssue(
                     "unknown_parameter",
@@ -363,7 +364,7 @@ internal static class VisionAgentFlowDraftValidator
                 continue;
             }
 
-            if (IsRuleCenterManagedMetadata(op.OperatorType, parameter.Name))
+            if (IsRuleCenterManagedMetadata(op.OperatorType, parameter.Name, contract))
             {
                 continue;
             }
@@ -423,7 +424,7 @@ internal static class VisionAgentFlowDraftValidator
                 continue;
             }
 
-            if (IsRuleCenterManagedMetadata(op.OperatorType, input.Name))
+            if (IsRuleCenterManagedMetadata(op.OperatorType, input.Name, contract))
             {
                 continue;
             }
@@ -513,29 +514,33 @@ internal static class VisionAgentFlowDraftValidator
 
     private static bool IsRecognizedMetadataParameter(
         string operatorType,
-        string parameterName)
+        string parameterName,
+        VisionAgentOperatorContract contract)
     {
-        return GetMetadataParameterGroup(operatorType, parameterName).Count > 0;
+        return contract.ParameterConstraints?.Any(constraint =>
+                   constraint.Parameter.Equals(parameterName, StringComparison.OrdinalIgnoreCase)) == true ||
+               GetLegacyMetadataParameterGroup(operatorType, parameterName).Count > 0;
     }
 
     private static bool IsRuleCenterManagedMetadata(
         string operatorType,
-        string parameterName)
+        string parameterName,
+        VisionAgentOperatorContract contract)
     {
-        return GetMetadataParameterGroup(operatorType, parameterName).Count > 0;
+        return contract.ParameterConstraints?.Any(constraint =>
+                   constraint.Parameter.Equals(parameterName, StringComparison.OrdinalIgnoreCase) &&
+                   (!string.IsNullOrWhiteSpace(constraint.ResourceKind) ||
+                    !string.IsNullOrWhiteSpace(constraint.AtLeastOneGroup) ||
+                    !string.IsNullOrWhiteSpace(constraint.AliasFor))) == true ||
+               GetLegacyMetadataParameterGroup(operatorType, parameterName).Count > 0;
     }
 
-    private static IReadOnlyList<string> GetMetadataParameterGroup(
+    private static IReadOnlyList<string> GetLegacyMetadataParameterGroup(
         string operatorType,
         string parameterName)
     {
-        if (IsOperatorType(operatorType, "ImageAcquisition") &&
-            IsAny(parameterName, "CameraBindingId", "CameraId"))
-        {
-            return ["CameraBindingId", "CameraId"];
-        }
-
-        if (IsDeepLearningOperator(operatorType) &&
+        if (!IsOperatorType(operatorType, "DeepLearning") &&
+            IsDeepLearningOperator(operatorType) &&
             IsAny(parameterName, "ModelPath", "ModelId", "ModelCatalogPath"))
         {
             return ["ModelPath", "ModelId", "ModelCatalogPath"];
@@ -547,20 +552,7 @@ internal static class VisionAgentFlowDraftValidator
             return ["TemplatePath", "TemplateId", "Template"];
         }
 
-        if (IsOperatorType(operatorType, "ResultOutput") &&
-            IsAny(parameterName, "OutputChannelId", "OutputChannel", "Channel"))
-        {
-            return ["OutputChannelId", "OutputChannel", "Channel"];
-        }
-
-        if (IsOperatorType(operatorType, "ResultOutput") &&
-            IsAny(parameterName, "FilePath", "OutputPath"))
-        {
-            return ["FilePath", "OutputPath"];
-        }
-
-        if ((IsOperatorType(operatorType, "ResultOutput") ||
-             operatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase)) &&
+        if (operatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase) &&
             IsAny(parameterName, "PlcAddress", "PLCParameters"))
         {
             return ["PlcAddress", "PLCParameters"];
