@@ -661,12 +661,9 @@ Step 3: 参数配置策略
 | --------------------- | ----------------------------------------- |
 | `Image` 输入        | 通常是已经分割过、接近前景/背景清晰的图像 |
 | `SourceImage` 输入  | 可选原图，用于灰度统计和结果绘制          |
-| `Blobs` 输出        | `BlobList` 常用结果列表，不是轮廓或区域   |
-| `BlobFeatures` 输出 | `BlobFeatureList` 详细特征列表；关闭时为空列表 |
+| `Blobs` 输出        | blob 特征列表                             |
+| `BlobFeatures` 输出 | 打开详细特征后得到更完整的特征集          |
 | `BlobCount` 输出    | 过滤后的 blob 数量                        |
-
-旧流程可继续读取 `BlobFeatures[0].Area`、`Circularity`、`CenterX`；
-`BlobFeatures[0].Features.Area` 是数值一致的附加别名，不要求旧流程迁移路径。
 
 ### 10.2 关键参数怎么调
 

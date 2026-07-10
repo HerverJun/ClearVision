@@ -6,7 +6,7 @@
 | 类名 (Class) | `BlobDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.BlobAnalysis` |
 | 分类 (Category) | 特征提取 |
-| 版本 (Version) | `1.2.1` |
+| 版本 (Version) | `1.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
@@ -50,7 +50,7 @@
 | `MinRectangularity` | 最小矩形度 | `double` | 0 | [0, 1] | Yes | - |
 | `MinEccentricity` | 最小离心率 | `double` | 0 | [0, 1] | Yes | - |
 | `OutputDetailedFeatures` | 输出详细特征 | `bool` | false | - | Yes | - |
-| `FeatureFilter` | 特征过滤表达式 | `string` | "" | - | No | 可选。支持 Area、ContourArea、Perimeter、Circularity、Convexity、Rectangularity、Eccentricity、EulerNumber、MeanGray、GrayDeviation、Width、Height、X、Y、CenterX、CenterY、InertiaRatio、ConvexHullArea、HoleCount；示例：`Area >= 100 && Circularity >= 0.8`。留空不过滤。 |
+| `FeatureFilter` | Feature Filter | `string` | "" | - | Yes | - |
 | `EnableColorFilter` | 启用颜色过滤 | `bool` | false | - | Yes | 启用HSV颜色范围预过滤 |
 | `HueLow` | 色相下限 | `int` | 0 | [0, 180] | Yes | - |
 | `HueHigh` | 色相上限 | `int` | 180 | [0, 180] | Yes | - |
@@ -63,22 +63,16 @@
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 二值图像 | `Image` | Yes | 用于连通域分析的二值图或可自动阈值化的灰度图。 |
-| `SourceImage` | 参考图像 | `Image` | No | 可选，仅作为标注结果的参考底图，不替代主 Image 输入。 |
+| `Image` | 图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `SourceImage` | Source Image | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Image` | 标记图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `Blobs` | Blob结果列表 | `BlobList` | 常用 Blob 结果字典列表；不是 Contour 或 Region。 |
-| `BlobFeatures` | Blob详细特征 | `BlobFeatureList` | 独立的详细特征列表；关闭详细特征时稳定输出空列表。 |
+| `Blobs` | Blob数据 | `Contour` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `BlobFeatures` | Blob特征 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `BlobCount` | Blob数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-
-### BlobFeatures 兼容字段 / Compatibility Fields
-- 旧流程路径继续有效：`BlobFeatures[0].Area`、`BlobFeatures[0].Circularity`、`BlobFeatures[0].CenterX`。
-- 新的嵌套别名也可读取：`BlobFeatures[0].Features.Area`；其数值与顶层 `Area` 一致。
-- `Blobs` 与 `BlobFeatures` 是不同列表、不同条目实例，端口类型分别为 `BlobList` 与 `BlobFeatureList`。
-- `OutputDetailedFeatures=false` 时仍包含 `BlobFeatures` 输出键，其值固定为空列表。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |

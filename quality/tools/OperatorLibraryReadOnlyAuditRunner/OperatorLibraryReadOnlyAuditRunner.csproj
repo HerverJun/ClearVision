@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <Deterministic>true</Deterministic>
+    <RootNamespace>ClearVision.OperatorLibrary.ReadOnlyAudit</RootNamespace>
+  </PropertyGroup>
+
+  <Import Project="..\..\..\ClearVision.Product\Directory.Packages.props" />
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.5.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\ClearVision.Product\src\ClearVision.Product.Core\ClearVision.Product.Core.csproj" />
+    <ProjectReference Include="..\..\..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\ClearVision.OperatorLibrary\src\ClearVision.OperatorLibrary.Modules\OperatorModuleCatalog.cs"
+             Link="FormalCatalog\OperatorModuleCatalog.cs" />
+  </ItemGroup>
+</Project>

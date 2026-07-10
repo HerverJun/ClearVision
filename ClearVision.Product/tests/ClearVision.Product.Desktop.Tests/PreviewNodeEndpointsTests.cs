@@ -551,6 +551,130 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_StoredProjectFlowRoundTrip_ShouldPreserveBlobParametersAndFilterResult()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        Project? persistedProject = null;
+        repository.AddAsync(Arg.Any<Project>())
+            .Returns(callInfo =>
+            {
+                persistedProject = callInfo.Arg<Project>();
+                return Task.FromResult(persistedProject);
+            });
+        repository.GetByIdAsync(Arg.Any<Guid>())
+            .Returns(_ => Task.FromResult(persistedProject));
+        repository.GetByIdFreshAsync(Arg.Any<Guid>())
+            .Returns(_ => Task.FromResult(persistedProject));
+        repository.GetByIdForUpdateAsync(Arg.Any<Guid>())
+            .Returns(_ => Task.FromResult(persistedProject));
+
+        var flowRoot = Path.Combine(Path.GetTempPath(), $"ClearVision.BlobRoundTrip.{Guid.NewGuid():N}");
+        var flowStorage = new JsonFileProjectFlowStorage(flowRoot);
+        try
+        {
+            var acquisitionId = Guid.NewGuid();
+            var blobId = Guid.NewGuid();
+            var acquisitionOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+            var blobInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+            var blobImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+            var blobListOutput = CreatePort("Blobs", PortDataType.BlobList, PortDirection.Output);
+            var blobCountOutput = CreatePort("BlobCount", PortDataType.Integer, PortDirection.Output);
+            var acquisition = CreateOperatorDto(
+                acquisitionId,
+                "ImageAcquisition",
+                OperatorType.ImageAcquisition,
+                outputPorts: [acquisitionOutput],
+                parameters: new Dictionary<string, object>
+                {
+                    ["SourceType"] = "File",
+                    ["FilePath"] = string.Empty
+                });
+            var blob = CreateOperatorDto(
+                blobId,
+                "BlobAnalysis",
+                OperatorType.BlobAnalysis,
+                inputPorts: [blobInput],
+                outputPorts: [blobImageOutput, blobListOutput, blobCountOutput],
+                parameters: new Dictionary<string, object>
+                {
+                    ["MinArea"] = 0,
+                    ["MaxArea"] = 200,
+                    ["FeatureFilter"] = string.Empty
+                });
+            var flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "BlobRoundTripFlow",
+                Operators = [acquisition, blob],
+                Connections =
+                [
+                    CreateConnection(acquisitionId, acquisitionOutput.Id, blobId, blobInput.Id)
+                ]
+            };
+
+            var projectService = new ProjectService(repository, flowStorage, new OperatorFactory());
+            var created = await projectService.CreateAsync(new CreateProjectRequest
+            {
+                Name = "Blob Round Trip Project",
+                Flow = flow
+            });
+            var loaded = await projectService.GetByIdAsync(created.Id);
+
+            loaded.Should().NotBeNull();
+            var loadedBlob = loaded!.Flow!.Operators.Single(op => op.Id == blobId);
+            loadedBlob.Parameters.Single(parameter => parameter.Name == "MaxArea").Value
+                .Should().BeOfType<JsonElement>().Which.GetInt32().Should().Be(200);
+            loadedBlob.Parameters.Single(parameter => parameter.Name == "FeatureFilter").Value
+                .Should().BeOfType<JsonElement>().Which.GetString().Should().BeEmpty();
+
+            var blobExecutor = new CountingOperatorExecutor(
+                new BlobDetectionOperator(NullLogger<BlobDetectionOperator>.Instance));
+            await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+                persistedProject!,
+                new ProjectVariableSessionRegistry(),
+                [
+                    new ImageAcquisitionOperator(
+                        NullLogger<ImageAcquisitionOperator>.Instance,
+                        Substitute.For<ICameraManager>()),
+                    blobExecutor
+                ],
+                projectRepository: repository,
+                flowStorage: flowStorage);
+
+            using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+            {
+                ProjectId = created.Id,
+                TargetNodeId = blobId,
+                DebugSessionId = Guid.NewGuid(),
+                ClientRequestSequence = 1,
+                FlowRevision = 1,
+                ArtifactMode = "references",
+                InputImageBase64 = Convert.ToBase64String(CreateTwoAreaBlobPreviewImageBytes())
+            });
+            var payload = await response.Content.ReadAsStringAsync();
+
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+            using var document = JsonDocument.Parse(payload);
+            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+            document.RootElement.GetProperty("outputData").GetProperty("BlobCount").GetInt32().Should().Be(1);
+            blobExecutor.LastExecutedOperator.Should().NotBeNull();
+            ReadIntValue(blobExecutor.LastExecutedOperator!.Parameters.Single(parameter => parameter.Name == "MaxArea").GetValue())
+                .Should().Be(200);
+            blobExecutor.LastExecutedOperator.Parameters.Single(parameter => parameter.Name == "FeatureFilter").GetValue()
+                .Should().NotBeNull();
+            ReadStringValue(blobExecutor.LastExecutedOperator.Parameters.Single(parameter => parameter.Name == "FeatureFilter").GetValue())
+                .Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(flowRoot))
+            {
+                Directory.Delete(flowRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PreviewNode_WithExplicitMissingFilePathAndRuntimeImage_ShouldKeepFilePathFailure()
     {
         var project = new Project("preview-explicit-missing-file");
@@ -3165,6 +3289,16 @@ public class PreviewNodeEndpointsTests
         };
     }
 
+    private static string ReadStringValue(object? value)
+    {
+        return value switch
+        {
+            string stringValue => stringValue,
+            JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.String => jsonElement.GetString() ?? string.Empty,
+            _ => Convert.ToString(value) ?? string.Empty
+        };
+    }
+
     private static byte[] CreateBinaryPreviewImageBytes()
     {
         using var image = new Mat(2, 2, MatType.CV_8UC1, Scalar.All(0));
@@ -3479,7 +3613,9 @@ public class PreviewNodeEndpointsTests
             Project project,
             ProjectVariableSessionRegistry registry,
             IEnumerable<IOperatorExecutor> executors,
-            ProjectVariableExecutionContextAccessor? accessor = null)
+            ProjectVariableExecutionContextAccessor? accessor = null,
+            IProjectRepository? projectRepository = null,
+            IProjectFlowStorage? flowStorage = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -3488,15 +3624,16 @@ public class PreviewNodeEndpointsTests
 
             builder.WebHost.UseTestServer();
             accessor ??= new ProjectVariableExecutionContextAccessor();
+            projectRepository ??= Substitute.For<IProjectRepository>();
+            flowStorage ??= Substitute.For<IProjectFlowStorage>();
             var flowExecution = new FlowExecutionService(
                 executors,
                 NullLogger<FlowExecutionService>.Instance,
                 new VariableContext(),
                 accessor);
-            var projectRepository = Substitute.For<IProjectRepository>();
             projectRepository.GetByIdAsync(project.Id).Returns(project);
             projectRepository.GetByIdFreshAsync(project.Id).Returns(project);
-            var flowStorage = Substitute.For<IProjectFlowStorage>();
+            projectRepository.GetWithFlowAsync(project.Id).Returns(project);
 
             builder.Services.AddSingleton<IFlowExecutionService>(flowExecution);
             builder.Services.AddSingleton(projectRepository);

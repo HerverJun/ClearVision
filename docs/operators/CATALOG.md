@@ -1,7 +1,7 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-10 18:58:57 +08:00`
-> 算子总数 / Total Operators: **158**
+> 生成时间 / Generated At: `2026-07-10 11:21:26 +08:00`
+> 算子总数 / Total Operators: **156**
 
 ## 分类统计 / Category Summary
 | 分类 (Category) | 数量 (Count) | 占比 (Ratio) |
@@ -16,36 +16,34 @@
 | Flow Control | 1 | 0.6% |
 | Frequency | 3 | 1.9% |
 | Morphology | 5 | 3.2% |
-| Region | 4 | 2.5% |
+| Region | 4 | 2.6% |
 | Texture | 2 | 1.3% |
-| 几何 | 1 | 0.6% |
 | 匹配定位 | 8 | 5.1% |
-| 区域处理 | 1 | 0.6% |
-| 变量 | 4 | 2.5% |
-| 图像处理 | 4 | 2.5% |
-| 定位 | 7 | 4.4% |
+| 变量 | 4 | 2.6% |
+| 图像处理 | 4 | 2.6% |
+| 定位 | 7 | 4.5% |
 | 拆分组合 | 2 | 1.3% |
-| 数据处理 | 10 | 6.3% |
-| 标定 | 12 | 7.6% |
-| 检测 | 18 | 11.4% |
+| 数据处理 | 10 | 6.4% |
+| 标定 | 12 | 7.7% |
+| 检测 | 18 | 11.5% |
 | 流程控制 | 5 | 3.2% |
-| 特征提取 | 4 | 2.5% |
+| 特征提取 | 4 | 2.6% |
 | 识别 | 2 | 1.3% |
 | 辅助 | 3 | 1.9% |
 | 输出 | 2 | 1.3% |
 | 通信 | 5 | 3.2% |
-| 通用 | 4 | 2.5% |
+| 通用 | 4 | 2.6% |
 | 逻辑工具 | 6 | 3.8% |
 | 采集 | 1 | 0.6% |
-| 预处理 | 23 | 14.6% |
+| 预处理 | 23 | 14.7% |
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.3**
+- 平均分 / Average: **95.5**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
-| B | 5 |
+| B | 3 |
 
 ## 分类索引 / Grouped Index
 
@@ -111,30 +109,25 @@
 ### Morphology (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology closing | [RegionClosing](./RegionClosing.md) |
-| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 90 (A) | `1.0.2` | Region morphology dilation | [RegionDilation](./RegionDilation.md) |
-| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 90 (A) | `1.0.2` | Region morphology erosion | [RegionErosion](./RegionErosion.md) |
-| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology opening | [RegionOpening](./RegionOpening.md) |
-| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 90 (A) | `1.0.2` | Zhang-Suen thinning | [RegionSkeleton](./RegionSkeleton.md) |
+| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology closing | [RegionClosing](./RegionClosing.md) |
+| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology dilation | [RegionDilation](./RegionDilation.md) |
+| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology erosion | [RegionErosion](./RegionErosion.md) |
+| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology opening | [RegionOpening](./RegionOpening.md) |
+| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 90 (A) | `1.0.1` | Zhang-Suen thinning | [RegionSkeleton](./RegionSkeleton.md) |
 
 ### Region (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 85 (A) | `1.0.2` | Bounded run-length complement | [RegionComplement](./RegionComplement.md) |
-| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length row subtraction | [RegionDifference](./RegionDifference.md) |
-| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length row intersection | [RegionIntersection](./RegionIntersection.md) |
-| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length region union | [RegionUnion](./RegionUnion.md) |
+| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 85 (A) | `1.0.1` | Bounded run-length complement | [RegionComplement](./RegionComplement.md) |
+| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row subtraction | [RegionDifference](./RegionDifference.md) |
+| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row intersection | [RegionIntersection](./RegionIntersection.md) |
+| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length region union | [RegionUnion](./RegionUnion.md) |
 
 ### Texture (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.GlcmTexture` | GLCM Texture Features | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
 | `OperatorType.LawsTextureFilter` | Laws Texture Filter | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./LawsTextureFilter.md) |
-
-### 几何 (1)
-| 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
-|------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RectangleRegion` | 矩形区域 | 0 | 1 | 4 | 84 (B) | `1.0.0` | 当前元数据描述为：Outputs a rectangular geometry va… | [RectangleRegion](./RectangleRegion.md) |
 
 ### 匹配定位 (8)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -148,18 +141,13 @@
 | `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 2 | 2 | 13 | 100 (A) | `1.2.0` | 当前元数据描述为：Rotation-scale template matching … | [ShapeMatching](./ShapeMatching.md) |
 | `OperatorType.TemplateMatching` | 模板匹配 | 3 | 13 | 20 | 96 (A) | `1.2.0` | 当前元数据描述为：Classic template matching with op… | [TemplateMatching](./TemplateMatching.md) |
 
-### 区域处理 (1)
-| 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
-|------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.BinaryImageToRegion` | 二值图转区域 | 1 | 3 | 3 | 76 (B) | `1.1.0` | 该算子用于将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区… | [BinaryImageToRegion](./BinaryImageToRegion.md) |
-
 ### 变量 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 96 (A) | `1.0.0` | 该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置… | [CycleCounter](./CycleCounter.md) |
 | `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 7 | 100 (A) | `1.0.0` | 该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析… | [VariableIncrement](./VariableIncrement.md) |
-| `OperatorType.VariableRead` | 变量读取 | 0 | 12 | 10 | 100 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./VariableRead.md) |
-| `OperatorType.VariableWrite` | 变量写入 | 1 | 11 | 12 | 90 (A) | `1.0.0` | 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析… | [VariableWrite](./VariableWrite.md) |
+| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 7 | 100 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./VariableRead.md) |
+| `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 8 | 90 (A) | `1.0.0` | 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析… | [VariableWrite](./VariableWrite.md) |
 
 ### 图像处理 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -211,7 +199,7 @@
 | `OperatorType.HandEyeCalibration` | Hand-Eye Calibration | 2 | 7 | 4 | 100 (A) | `1.0.0` | OpenCV Hand-Eye Calibration | [HandEyeCalibration](./HandEyeCalibration.md) |
 | `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 3 | 8 | 1 | 100 (A) | `1.0.1` | Hand-Eye Consistency Validation | [HandEyeCalibrationValidator](./HandEyeCalibrationValidator.md) |
 | `OperatorType.NPointCalibration` | N Point Calibration | 1 | 9 | 10 | 100 (A) | `1.0.0` | 当前元数据描述为：Builds robust affine or homograph… | [NPointCalibration](./NPointCalibration.md) |
-| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 3 | 3 | 11 | 100 (A) | `1.0.1` | 当前元数据描述为：Transforms coordinates via Calibr… | [PixelToWorldTransform](./PixelToWorldTransform.md) |
+| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 3 | 3 | 9 | 100 (A) | `1.0.1` | 当前元数据描述为：Transforms coordinates via Calibr… | [PixelToWorldTransform](./PixelToWorldTransform.md) |
 | `OperatorType.StereoCalibration` | Stereo Calibration | 2 | 6 | 11 | 100 (A) | `1.0.0` | 当前元数据描述为：Calibrates stereo camera pair and… | [StereoCalibration](./StereoCalibration.md) |
 | `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 1 | 3 | 3 | 100 (A) | `1.0.0` | 当前元数据描述为：Fits robust 2D rigid or similarit… | [TranslationRotationCalibration](./TranslationRotationCalibration.md) |
 | `OperatorType.Undistort` | Undistort | 2 | 1 | 0 | 91 (A) | `1.0.0` | 当前元数据描述为：Correct lens distortion using cal… | [Undistort](./Undistort.md) |
@@ -242,7 +230,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 89 (A) | `1.0.0` | 该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数… | [Comparator](./Comparator.md) |
-| `OperatorType.ConditionalBranch` | 条件分支 | 2 | 5 | 12 | 100 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./ConditionalBranch.md) |
+| `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 100 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./ConditionalBranch.md) |
 | `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 94 (A) | `1.0.0` | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | [Delay](./Delay.md) |
 | `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配… | [TryCatch](./TryCatch.md) |
@@ -250,7 +238,7 @@
 ### 特征提取 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.BlobAnalysis` | Blob分析 | 2 | 4 | 17 | 100 (A) | `1.2.1` | 该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [BlobAnalysis](./BlobAnalysis.md) |
+| `OperatorType.BlobAnalysis` | Blob分析 | 2 | 4 | 17 | 100 (A) | `1.1.0` | 该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [BlobAnalysis](./BlobAnalysis.md) |
 | `OperatorType.ContourDetection` | 轮廓检测 | 1 | 3 | 11 | 94 (A) | `1.0.0` | 该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输… | [ContourDetection](./ContourDetection.md) |
 | `OperatorType.EdgeDetection` | Edge Detection | 1 | 2 | 14 | 100 (A) | `1.0.0` | 当前元数据描述为：Detects edges with Canny and opti… | [EdgeDetection](./EdgeDetection.md) |
 | `OperatorType.SubpixelEdgeDetection` | Subpixel Edge Detection | 1 | 2 | 5 | 94 (A) | `1.0.0` | 当前元数据描述为：Non-industrial reference subpixel… | [SubpixelEdgeDetection](./SubpixelEdgeDetection.md) |
@@ -279,9 +267,9 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.HttpRequest` | HTTP 请求 | 2 | 3 | 6 | 100 (A) | `1.0.0` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./HttpRequest.md) |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 1 | 2 | 13 | 98 (A) | `1.0.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./OmronFinsCommunication.md) |
-| `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 9 | 100 (A) | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./SerialCommunication.md) |
+| `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./SerialCommunication.md) |
 | `OperatorType.SiemensS7Communication` | 西门子S7通信 | 1 | 2 | 15 | 98 (A) | `1.0.0` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./SiemensS7Communication.md) |
-| `OperatorType.TcpCommunication` | TCP通信 | 1 | 12 | 39 | 100 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./TcpCommunication.md) |
+| `OperatorType.TcpCommunication` | TCP通信 | 1 | 2 | 6 | 100 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./TcpCommunication.md) |
 
 ### 通用 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -328,7 +316,7 @@
 | `OperatorType.MeanFilter` | 均值滤波 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 当前元数据描述为：Applies mean (box blur) filtering… | [MeanFilter](./MeanFilter.md) |
 | `OperatorType.MedianBlur` | 中值滤波 | 1 | 1 | 1 | 94 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
 | `OperatorType.MorphologicalOperation` | Morphological Operation | 1 | 1 | 7 | 94 (A) | `1.0.0` | 当前元数据描述为：Erode, Dilate, Open, Close, Gradi… | [MorphologicalOperation](./MorphologicalOperation.md) |
-| `OperatorType.Morphology` | 形态学（旧版） | 1 | 1 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Legacy image morphology node. Use… | [Morphology](./Morphology.md) |
+| `OperatorType.Morphology` | Morphology (Legacy) | 1 | 1 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Legacy image morphology node. Use… | [Morphology](./Morphology.md) |
 | `OperatorType.PerspectiveTransform` | 透视变换 | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./PerspectiveTransform.md) |
 | `OperatorType.ShadingCorrection` | 光照校正 | 2 | 1 | 3 | 96 (A) | `1.0.0` | 当前元数据描述为：Corrects uneven illumination by b… | [ShadingCorrection](./ShadingCorrection.md) |
 | `OperatorType.Thresholding` | Threshold | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Global thresholding with optional… | [Thresholding](./Thresholding.md) |

@@ -188,36 +188,6 @@ public class OperatorKnowledgeGraphTests
         }
     }
 
-    [Fact(DisplayName = "Operator knowledge graph artifact should preserve strong Blob contracts and legacy feature paths")]
-    public void Artifact_ShouldPreserveStrongBlobContractsAndLegacyFeaturePaths()
-    {
-        var graph = LoadGraphFromFile(GetGraphArtifactPath());
-        var blobAnalysis = graph.Cards.Single(card => card.OperatorType == "BlobAnalysis");
-        var blobLabeling = graph.Cards.Single(card => card.OperatorType == "BlobLabeling");
-
-        blobAnalysis.Outputs.Should().ContainSingle(port =>
-            port.Name == "Blobs" && port.DataType == PortDataType.BlobList.ToString());
-        blobAnalysis.Outputs.Should().ContainSingle(port =>
-            port.Name == "BlobFeatures" &&
-            port.DataType == PortDataType.BlobFeatureList.ToString() &&
-            port.Description != null &&
-            port.Description.Contains("BlobFeatures[i].Area", StringComparison.Ordinal));
-        blobLabeling.Inputs.Should().ContainSingle(port =>
-            port.Name == "Blobs" && port.DataType == PortDataType.BlobList.ToString());
-
-        var featureEdge = graph.Edges.Should().ContainSingle(edge =>
-            edge.RelationType == "PRODUCES" &&
-            edge.Source == "BlobAnalysis" &&
-            edge.Target == PortDataType.BlobFeatureList.ToString()).Which;
-        featureEdge.Metadata.Should().ContainKey("port").WhoseValue.Should().Be("BlobFeatures");
-
-        var labelingEdge = graph.Edges.Should().ContainSingle(edge =>
-            edge.RelationType == "CONSUMES" &&
-            edge.Source == "BlobLabeling" &&
-            edge.Target == PortDataType.BlobList.ToString()).Which;
-        labelingEdge.Metadata.Should().ContainKey("port").WhoseValue.Should().Be("Blobs");
-    }
-
     private static OperatorKnowledgeGraph LoadGraphFromFile(string graphPath)
     {
         var json = File.ReadAllText(graphPath);

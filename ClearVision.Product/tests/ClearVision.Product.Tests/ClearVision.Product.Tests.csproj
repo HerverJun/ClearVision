@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\ClearVision.Product.Runtime.Abstractions\ClearVision.Product.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\ClearVision.Product.Runtime\ClearVision.Product.Runtime.csproj" />
+    <ProjectReference Include="..\..\..\quality\tools\OperatorLibraryReadOnlyAuditRunner\OperatorLibraryReadOnlyAuditRunner.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -776,7 +776,7 @@ test('PreviewPanel renders one output image surface and keeps output summary vis
   assert.equal(container.querySelector('#preview-output-image').getAttribute('src'), 'output-image-src');
   assert.equal(container.querySelector('#preview-output-placeholder').style.display, 'none');
   assert.equal(container.querySelector('#btn-preview-open-output').disabled, false);
-  assert.match(container.querySelector('#preview-output-list').innerHTML, /分数/);
+  assert.match(container.querySelector('#preview-output-list').innerHTML, /Score/);
   assert.doesNotMatch(container.querySelector('#preview-output-list').innerHTML, /SHOULD_BE_SKIPPED/);
   assert.equal(coordinator.listenerCount(), 1);
 

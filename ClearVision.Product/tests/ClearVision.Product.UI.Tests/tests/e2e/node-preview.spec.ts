@@ -205,7 +205,7 @@ test.describe('Node Preview Overlay', () => {
     await expect(page.locator('.node-preview-card')).toBeVisible();
     await expect(page.locator('.node-preview-card img')).toBeVisible();
     await expect(page.locator('#preview-status-text')).toContainText('预览完成');
-    await expect(page.locator('#preview-output-list')).toContainText('分数');
+    await expect(page.locator('#preview-output-list')).toContainText('Score');
     await expect(page.locator('#preview-output-list')).not.toContainText('OriginalImage');
     await expect(page.locator('#preview-output-list')).not.toContainText('hidden-clean-image');
   });
@@ -290,7 +290,7 @@ test.describe('Node Preview Overlay', () => {
 
     await page.waitForTimeout(700);
     await expect(page.locator('.node-preview-card')).toHaveCount(0);
-    await expect(page.locator('#preview-output-list')).toContainText('结果');
+    await expect(page.locator('#preview-output-list')).toContainText('Result');
   });
 
   test('parameter change triggers one debounced preview and panning does not trigger extra preview', async ({ page }) => {

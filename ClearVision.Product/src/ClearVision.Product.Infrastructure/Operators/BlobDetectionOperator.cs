@@ -2,9 +2,7 @@
 // Blob检测算子 - 检测图像中的连通区域
 // 作者：蘅芜君
 
-using System.Data;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -28,7 +26,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("SourceImage", "参考图像", PortDataType.Image, IsRequired = false, Description = "可选，仅作为标注结果的参考底图，不替代主 Image 输入。")]
 [OutputPort("Image", "标记图像", PortDataType.Image, Description = "绘制 Blob 边界与中心点的可视化图像。")]
 [OutputPort("Blobs", "Blob结果列表", PortDataType.BlobList, Description = "兼容旧流程端口名的 Blob 结果字典列表，包含边界框、中心、面积及常用度量；不是 Contour 或 Region。")]
-[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，兼容路径示例为 BlobFeatures[i].Area、BlobFeatures[i].Circularity、BlobFeatures[i].CenterX，并提供 Features 嵌套别名。不是轮廓或像素区域。")]
+[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，并提供 Features 嵌套别名。不是轮廓或像素区域。")]
 [OutputPort("BlobCount", "Blob数量", PortDataType.Integer, Description = "通过面积、形状与可选特征过滤后的 Blob 数量。")]
 [OperatorParam("MinArea", "最小面积", "int", DefaultValue = 100, Min = 0)]
 [OperatorParam("MaxArea", "最大面积", "int", DefaultValue = 100000, Min = 0)]
@@ -189,12 +187,19 @@ public class BlobDetectionOperator : OperatorBase
         var valHigh = GetIntParam(@operator, "ValHigh", 255, 0, 255);
 
         var src = imageWrapper.GetMat();
-        if (src.Empty())
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid"));
-        }
+            if (src.Empty())
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid"));
+            }
 
-        Mat sourceMat = sourceWrapper?.GetMat() ?? src;
+            CompiledFeatureFilter? compiledFeatureFilter = null;
+            if (!string.IsNullOrWhiteSpace(featureFilter) &&
+                !TryCompileFeatureFilter(featureFilter, out compiledFeatureFilter, out var compileError))
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(FormatFeatureFilterError(compileError)));
+            }
+
+            Mat sourceMat = sourceWrapper?.GetMat() ?? src;
         if (sourceMat.Empty())
         {
             sourceMat = src;
@@ -388,9 +393,9 @@ public class BlobDetectionOperator : OperatorBase
                     ["HoleCount"] = holeCount
                 };
 
-                if (!string.IsNullOrWhiteSpace(featureFilter))
+                if (compiledFeatureFilter != null)
                 {
-                    if (!TryEvaluateFeatureFilter(featureFilter, featureValues, out var passed, out var errorMessage))
+                    if (!compiledFeatureFilter.TryEvaluate(featureValues, out var passed, out var errorMessage))
                     {
                         filterError = errorMessage;
                         break;
@@ -452,7 +457,7 @@ public class BlobDetectionOperator : OperatorBase
             {
                 resultImage.Dispose();
                 return Task.FromResult(OperatorExecutionOutput.Failure(
-                    $"FeatureFilter 表达式无效：{filterError}。支持字段：Area、Circularity、Convexity、Rectangularity、Eccentricity、MeanGray、Width、Height、CenterX、CenterY 等；示例：Area >= 100 && Circularity >= 0.8。"));
+                    FormatFeatureFilterError(filterError)));
             }
 
             var additionalData = new Dictionary<string, object>
@@ -622,79 +627,624 @@ public class BlobDetectionOperator : OperatorBase
         }
     }
 
-    private static bool TryEvaluateFeatureFilter(
+    private static readonly IReadOnlySet<string> FeatureFilterFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "Area",
+        "ContourArea",
+        "Perimeter",
+        "Circularity",
+        "Convexity",
+        "Rectangularity",
+        "Eccentricity",
+        "EulerNumber",
+        "MeanGray",
+        "GrayDeviation",
+        "Width",
+        "Height",
+        "X",
+        "Y",
+        "CenterX",
+        "CenterY",
+        "InertiaRatio",
+        "ConvexHullArea",
+        "HoleCount"
+    };
+
+    private static bool TryCompileFeatureFilter(
         string filter,
-        IReadOnlyDictionary<string, double> values,
-        out bool passed,
+        out CompiledFeatureFilter? compiled,
         out string? errorMessage)
     {
-        passed = true;
+        compiled = null;
         errorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(filter))
-        {
-            return true;
-        }
-
-        var normalized = NormalizeFilter(filter);
-        var expression = ReplaceFeatureTokens(normalized, values);
 
         try
         {
-            using var table = new DataTable();
-            var result = table.Compute(expression, null);
-
-            if (result is bool booleanResult)
-            {
-                passed = booleanResult;
-                return true;
-            }
-
-            if (result is IConvertible)
-            {
-                var numeric = Convert.ToDouble(result, CultureInfo.InvariantCulture);
-                passed = Math.Abs(numeric) > 1e-12;
-                return true;
-            }
-
-            passed = false;
+            var parser = new FeatureFilterParser(filter, FeatureFilterFields);
+            compiled = new CompiledFeatureFilter(parser.Parse());
             return true;
         }
-        catch (Exception ex)
+        catch (FeatureFilterParseException ex)
         {
             errorMessage = ex.Message;
-            passed = false;
             return false;
         }
     }
 
-    private static string NormalizeFilter(string filter)
+    private static string FormatFeatureFilterError(string? errorMessage)
     {
-        var normalized = filter.Trim();
-        normalized = normalized.Replace("&&", " AND ", StringComparison.Ordinal);
-        normalized = normalized.Replace("||", " OR ", StringComparison.Ordinal);
-        normalized = Regex.Replace(normalized, "==", "=", RegexOptions.CultureInvariant);
-        normalized = Regex.Replace(normalized, "!=", "<>", RegexOptions.CultureInvariant);
-        normalized = Regex.Replace(normalized, @"\bAND\b", "AND", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        normalized = Regex.Replace(normalized, @"\bOR\b", "OR", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        normalized = Regex.Replace(normalized, @"\bNOT\b", "NOT", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        return normalized;
+        return $"FeatureFilter 表达式无效：{errorMessage ?? "未知错误"}。支持字段：Area、Circularity、Convexity、Rectangularity、Eccentricity、MeanGray、Width、Height、CenterX、CenterY 等；示例：Area >= 100 && Circularity >= 0.8。";
     }
 
-    private static string ReplaceFeatureTokens(string expression, IReadOnlyDictionary<string, double> values)
+    private sealed class CompiledFeatureFilter
     {
-        var result = expression;
-        foreach (var (key, value) in values)
+        private readonly FeatureFilterNode _root;
+
+        public CompiledFeatureFilter(FeatureFilterNode root)
         {
-            var pattern = $@"\b{Regex.Escape(key)}\b";
-            result = Regex.Replace(
-                result,
-                pattern,
-                value.ToString(CultureInfo.InvariantCulture),
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            _root = root;
         }
 
-        return result;
+        public bool TryEvaluate(
+            IReadOnlyDictionary<string, double> values,
+            out bool passed,
+            out string? errorMessage)
+        {
+            try
+            {
+                var result = _root.Evaluate(values);
+                passed = Math.Abs(result) > 1e-12;
+                errorMessage = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                passed = false;
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+    }
+
+    private abstract class FeatureFilterNode
+    {
+        public abstract double Evaluate(IReadOnlyDictionary<string, double> values);
+
+        protected static double EnsureFinite(double value)
+        {
+            if (!double.IsFinite(value))
+            {
+                throw new InvalidOperationException("计算结果不是有限数");
+            }
+
+            return value;
+        }
+
+        protected static bool IsTrue(double value) => Math.Abs(value) > 1e-12;
+    }
+
+    private sealed class FeatureFilterLiteralNode : FeatureFilterNode
+    {
+        private readonly double _value;
+
+        public FeatureFilterLiteralNode(double value)
+        {
+            _value = value;
+        }
+
+        public override double Evaluate(IReadOnlyDictionary<string, double> values) => _value;
+    }
+
+    private sealed class FeatureFilterFieldNode : FeatureFilterNode
+    {
+        private readonly string _name;
+
+        public FeatureFilterFieldNode(string name)
+        {
+            _name = name;
+        }
+
+        public override double Evaluate(IReadOnlyDictionary<string, double> values)
+        {
+            if (!values.TryGetValue(_name, out var value))
+            {
+                throw new InvalidOperationException($"运行时缺少 FeatureFilter 字段：{_name}");
+            }
+
+            return value;
+        }
+    }
+
+    private sealed class FeatureFilterUnaryNode : FeatureFilterNode
+    {
+        private readonly FeatureFilterUnaryOperator _operator;
+        private readonly FeatureFilterNode _operand;
+
+        public FeatureFilterUnaryNode(FeatureFilterUnaryOperator @operator, FeatureFilterNode operand)
+        {
+            _operator = @operator;
+            _operand = operand;
+        }
+
+        public override double Evaluate(IReadOnlyDictionary<string, double> values)
+        {
+            var operand = _operand.Evaluate(values);
+            return _operator switch
+            {
+                FeatureFilterUnaryOperator.Plus => operand,
+                FeatureFilterUnaryOperator.Minus => EnsureFinite(-operand),
+                FeatureFilterUnaryOperator.Not => IsTrue(operand) ? 0 : 1,
+                _ => throw new InvalidOperationException("未知的一元运算符")
+            };
+        }
+    }
+
+    private sealed class FeatureFilterBinaryNode : FeatureFilterNode
+    {
+        private readonly FeatureFilterBinaryOperator _operator;
+        private readonly FeatureFilterNode _left;
+        private readonly FeatureFilterNode _right;
+
+        public FeatureFilterBinaryNode(
+            FeatureFilterBinaryOperator @operator,
+            FeatureFilterNode left,
+            FeatureFilterNode right)
+        {
+            _operator = @operator;
+            _left = left;
+            _right = right;
+        }
+
+        public override double Evaluate(IReadOnlyDictionary<string, double> values)
+        {
+            var left = _left.Evaluate(values);
+            if (_operator == FeatureFilterBinaryOperator.And)
+            {
+                return IsTrue(left) && IsTrue(_right.Evaluate(values)) ? 1 : 0;
+            }
+
+            if (_operator == FeatureFilterBinaryOperator.Or)
+            {
+                return IsTrue(left) || IsTrue(_right.Evaluate(values)) ? 1 : 0;
+            }
+
+            var right = _right.Evaluate(values);
+            return _operator switch
+            {
+                FeatureFilterBinaryOperator.Add => EnsureFinite(left + right),
+                FeatureFilterBinaryOperator.Subtract => EnsureFinite(left - right),
+                FeatureFilterBinaryOperator.Multiply => EnsureFinite(left * right),
+                FeatureFilterBinaryOperator.Divide => right == 0
+                    ? throw new InvalidOperationException("FeatureFilter 不允许除以零")
+                    : EnsureFinite(left / right),
+                FeatureFilterBinaryOperator.Modulo => right == 0
+                    ? throw new InvalidOperationException("FeatureFilter 不允许对零取模")
+                    : EnsureFinite(left % right),
+                FeatureFilterBinaryOperator.Equal => NearlyEqual(left, right) ? 1 : 0,
+                FeatureFilterBinaryOperator.NotEqual => NearlyEqual(left, right) ? 0 : 1,
+                FeatureFilterBinaryOperator.Less => left < right ? 1 : 0,
+                FeatureFilterBinaryOperator.LessOrEqual => left <= right ? 1 : 0,
+                FeatureFilterBinaryOperator.Greater => left > right ? 1 : 0,
+                FeatureFilterBinaryOperator.GreaterOrEqual => left >= right ? 1 : 0,
+                _ => throw new InvalidOperationException("未知的二元运算符")
+            };
+        }
+
+        private static bool NearlyEqual(double left, double right)
+        {
+            return Math.Abs(left - right) <= 1e-12;
+        }
+    }
+
+    private enum FeatureFilterUnaryOperator
+    {
+        Plus,
+        Minus,
+        Not
+    }
+
+    private enum FeatureFilterBinaryOperator
+    {
+        And,
+        Or,
+        Add,
+        Subtract,
+        Multiply,
+        Divide,
+        Modulo,
+        Equal,
+        NotEqual,
+        Less,
+        LessOrEqual,
+        Greater,
+        GreaterOrEqual
+    }
+
+    private sealed class FeatureFilterParser
+    {
+        private readonly FeatureFilterLexer _lexer;
+        private readonly IReadOnlySet<string> _allowedFields;
+        private FeatureFilterToken _current;
+
+        public FeatureFilterParser(string expression, IReadOnlySet<string> allowedFields)
+        {
+            _lexer = new FeatureFilterLexer(expression);
+            _allowedFields = allowedFields;
+            _current = _lexer.Next();
+        }
+
+        public FeatureFilterNode Parse()
+        {
+            var expression = ParseOr();
+            if (_current.Kind != FeatureFilterTokenKind.End)
+            {
+                throw Error($"表达式包含无法识别的内容“{_current.Text}”");
+            }
+
+            return expression;
+        }
+
+        private FeatureFilterNode ParseOr()
+        {
+            var left = ParseAnd();
+            while (Match(FeatureFilterTokenKind.Or))
+            {
+                left = new FeatureFilterBinaryNode(FeatureFilterBinaryOperator.Or, left, ParseAnd());
+            }
+
+            return left;
+        }
+
+        private FeatureFilterNode ParseAnd()
+        {
+            var left = ParseComparison();
+            while (Match(FeatureFilterTokenKind.And))
+            {
+                left = new FeatureFilterBinaryNode(FeatureFilterBinaryOperator.And, left, ParseComparison());
+            }
+
+            return left;
+        }
+
+        private FeatureFilterNode ParseComparison()
+        {
+            var left = ParseAdditive();
+            if (!TryReadComparisonOperator(out var @operator))
+            {
+                return left;
+            }
+
+            var right = ParseAdditive();
+            if (IsComparisonOperator(_current.Kind))
+            {
+                throw Error("FeatureFilter 每个表达式只允许一个比较运算符");
+            }
+
+            return new FeatureFilterBinaryNode(@operator, left, right);
+        }
+
+        private FeatureFilterNode ParseAdditive()
+        {
+            var left = ParseMultiplicative();
+            while (_current.Kind is FeatureFilterTokenKind.Plus or FeatureFilterTokenKind.Minus)
+            {
+                var @operator = _current.Kind == FeatureFilterTokenKind.Plus
+                    ? FeatureFilterBinaryOperator.Add
+                    : FeatureFilterBinaryOperator.Subtract;
+                Advance();
+                left = new FeatureFilterBinaryNode(@operator, left, ParseMultiplicative());
+            }
+
+            return left;
+        }
+
+        private FeatureFilterNode ParseMultiplicative()
+        {
+            var left = ParseUnary();
+            while (_current.Kind is FeatureFilterTokenKind.Star or FeatureFilterTokenKind.Slash or FeatureFilterTokenKind.Percent)
+            {
+                var @operator = _current.Kind switch
+                {
+                    FeatureFilterTokenKind.Star => FeatureFilterBinaryOperator.Multiply,
+                    FeatureFilterTokenKind.Slash => FeatureFilterBinaryOperator.Divide,
+                    _ => FeatureFilterBinaryOperator.Modulo
+                };
+                Advance();
+                left = new FeatureFilterBinaryNode(@operator, left, ParseUnary());
+            }
+
+            return left;
+        }
+
+        private FeatureFilterNode ParseUnary()
+        {
+            if (_current.Kind is FeatureFilterTokenKind.Plus or FeatureFilterTokenKind.Minus or FeatureFilterTokenKind.Not)
+            {
+                var @operator = _current.Kind switch
+                {
+                    FeatureFilterTokenKind.Plus => FeatureFilterUnaryOperator.Plus,
+                    FeatureFilterTokenKind.Minus => FeatureFilterUnaryOperator.Minus,
+                    _ => FeatureFilterUnaryOperator.Not
+                };
+                Advance();
+                return new FeatureFilterUnaryNode(@operator, ParseUnary());
+            }
+
+            return ParsePrimary();
+        }
+
+        private FeatureFilterNode ParsePrimary()
+        {
+            var token = _current;
+            switch (token.Kind)
+            {
+                case FeatureFilterTokenKind.Number:
+                    Advance();
+                    return new FeatureFilterLiteralNode(token.Number);
+                case FeatureFilterTokenKind.True:
+                    Advance();
+                    return new FeatureFilterLiteralNode(1);
+                case FeatureFilterTokenKind.False:
+                    Advance();
+                    return new FeatureFilterLiteralNode(0);
+                case FeatureFilterTokenKind.Identifier:
+                    Advance();
+                    if (!_allowedFields.Contains(token.Text))
+                    {
+                        throw Error($"未知 FeatureFilter 字段“{token.Text}”");
+                    }
+
+                    return new FeatureFilterFieldNode(token.Text);
+                case FeatureFilterTokenKind.LeftParen:
+                    Advance();
+                    var nested = ParseOr();
+                    Expect(FeatureFilterTokenKind.RightParen, "缺少右括号“)”");
+                    return nested;
+                case FeatureFilterTokenKind.End:
+                    throw Error("表达式意外结束");
+                default:
+                    throw Error($"此处需要字段、数字或括号，实际为“{token.Text}”");
+            }
+        }
+
+        private bool TryReadComparisonOperator(out FeatureFilterBinaryOperator @operator)
+        {
+            @operator = default;
+            @operator = _current.Kind switch
+            {
+                FeatureFilterTokenKind.Equal => FeatureFilterBinaryOperator.Equal,
+                FeatureFilterTokenKind.NotEqual => FeatureFilterBinaryOperator.NotEqual,
+                FeatureFilterTokenKind.Less => FeatureFilterBinaryOperator.Less,
+                FeatureFilterTokenKind.LessOrEqual => FeatureFilterBinaryOperator.LessOrEqual,
+                FeatureFilterTokenKind.Greater => FeatureFilterBinaryOperator.Greater,
+                FeatureFilterTokenKind.GreaterOrEqual => FeatureFilterBinaryOperator.GreaterOrEqual,
+                _ => default
+            };
+
+            if (!IsComparisonOperator(_current.Kind))
+            {
+                return false;
+            }
+
+            Advance();
+            return true;
+        }
+
+        private static bool IsComparisonOperator(FeatureFilterTokenKind kind)
+        {
+            return kind is FeatureFilterTokenKind.Equal or
+                FeatureFilterTokenKind.NotEqual or
+                FeatureFilterTokenKind.Less or
+                FeatureFilterTokenKind.LessOrEqual or
+                FeatureFilterTokenKind.Greater or
+                FeatureFilterTokenKind.GreaterOrEqual;
+        }
+
+        private bool Match(FeatureFilterTokenKind kind)
+        {
+            if (_current.Kind != kind)
+            {
+                return false;
+            }
+
+            Advance();
+            return true;
+        }
+
+        private void Expect(FeatureFilterTokenKind kind, string message)
+        {
+            if (!Match(kind))
+            {
+                throw Error(message);
+            }
+        }
+
+        private void Advance()
+        {
+            _current = _lexer.Next();
+        }
+
+        private FeatureFilterParseException Error(string message)
+        {
+            return new FeatureFilterParseException($"{message}（位置 {_current.Position}）");
+        }
+    }
+
+    private sealed class FeatureFilterLexer
+    {
+        private readonly string _expression;
+        private int _position;
+
+        public FeatureFilterLexer(string expression)
+        {
+            _expression = expression;
+        }
+
+        public FeatureFilterToken Next()
+        {
+            SkipWhitespace();
+            if (_position >= _expression.Length)
+            {
+                return new FeatureFilterToken(FeatureFilterTokenKind.End, string.Empty, 0, _position);
+            }
+
+            var start = _position;
+            var current = _expression[_position];
+            if (char.IsDigit(current) || (current == '.' && _position + 1 < _expression.Length && char.IsDigit(_expression[_position + 1])))
+            {
+                return ReadNumber(start);
+            }
+
+            if (char.IsLetter(current) || current == '_')
+            {
+                return ReadIdentifier(start);
+            }
+
+            _position++;
+            return current switch
+            {
+                '(' => new FeatureFilterToken(FeatureFilterTokenKind.LeftParen, "(", 0, start),
+                ')' => new FeatureFilterToken(FeatureFilterTokenKind.RightParen, ")", 0, start),
+                '+' => new FeatureFilterToken(FeatureFilterTokenKind.Plus, "+", 0, start),
+                '-' => new FeatureFilterToken(FeatureFilterTokenKind.Minus, "-", 0, start),
+                '*' => new FeatureFilterToken(FeatureFilterTokenKind.Star, "*", 0, start),
+                '/' => new FeatureFilterToken(FeatureFilterTokenKind.Slash, "/", 0, start),
+                '%' => new FeatureFilterToken(FeatureFilterTokenKind.Percent, "%", 0, start),
+                '&' when ConsumeIf('&') => new FeatureFilterToken(FeatureFilterTokenKind.And, "&&", 0, start),
+                '|' when ConsumeIf('|') => new FeatureFilterToken(FeatureFilterTokenKind.Or, "||", 0, start),
+                '=' when ConsumeIf('=') => new FeatureFilterToken(FeatureFilterTokenKind.Equal, "==", 0, start),
+                '=' => new FeatureFilterToken(FeatureFilterTokenKind.Equal, "=", 0, start),
+                '!' when ConsumeIf('=') => new FeatureFilterToken(FeatureFilterTokenKind.NotEqual, "!=", 0, start),
+                '!' => new FeatureFilterToken(FeatureFilterTokenKind.Not, "!", 0, start),
+                '<' when ConsumeIf('=') => new FeatureFilterToken(FeatureFilterTokenKind.LessOrEqual, "<=", 0, start),
+                '<' when ConsumeIf('>') => new FeatureFilterToken(FeatureFilterTokenKind.NotEqual, "<>", 0, start),
+                '<' => new FeatureFilterToken(FeatureFilterTokenKind.Less, "<", 0, start),
+                '>' when ConsumeIf('=') => new FeatureFilterToken(FeatureFilterTokenKind.GreaterOrEqual, ">=", 0, start),
+                '>' => new FeatureFilterToken(FeatureFilterTokenKind.Greater, ">", 0, start),
+                '&' => throw Error("单独的“&”无效，请使用“&&”"),
+                '|' => throw Error("单独的“|”无效，请使用“||”"),
+                _ => throw Error($"无法识别字符“{current}”")
+            };
+        }
+
+        private FeatureFilterToken ReadNumber(int start)
+        {
+            while (_position < _expression.Length && (char.IsDigit(_expression[_position]) || _expression[_position] == '.'))
+            {
+                _position++;
+            }
+
+            if (_position < _expression.Length && (_expression[_position] == 'e' || _expression[_position] == 'E'))
+            {
+                _position++;
+                if (_position < _expression.Length && (_expression[_position] == '+' || _expression[_position] == '-'))
+                {
+                    _position++;
+                }
+
+                var exponentStart = _position;
+                while (_position < _expression.Length && char.IsDigit(_expression[_position]))
+                {
+                    _position++;
+                }
+
+                if (exponentStart == _position)
+                {
+                    throw Error("科学计数法缺少指数数字");
+                }
+            }
+
+            var text = _expression[start.._position];
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
+            {
+                throw Error($"数字“{text}”无效");
+            }
+
+            return new FeatureFilterToken(FeatureFilterTokenKind.Number, text, number, start);
+        }
+
+        private FeatureFilterToken ReadIdentifier(int start)
+        {
+            _position++;
+            while (_position < _expression.Length && (char.IsLetterOrDigit(_expression[_position]) || _expression[_position] == '_'))
+            {
+                _position++;
+            }
+
+            var text = _expression[start.._position];
+            var kind = text.ToUpperInvariant() switch
+            {
+                "AND" => FeatureFilterTokenKind.And,
+                "OR" => FeatureFilterTokenKind.Or,
+                "NOT" => FeatureFilterTokenKind.Not,
+                "TRUE" => FeatureFilterTokenKind.True,
+                "FALSE" => FeatureFilterTokenKind.False,
+                _ => FeatureFilterTokenKind.Identifier
+            };
+            return new FeatureFilterToken(kind, text, 0, start);
+        }
+
+        private bool ConsumeIf(char expected)
+        {
+            if (_position >= _expression.Length || _expression[_position] != expected)
+            {
+                return false;
+            }
+
+            _position++;
+            return true;
+        }
+
+        private void SkipWhitespace()
+        {
+            while (_position < _expression.Length && char.IsWhiteSpace(_expression[_position]))
+            {
+                _position++;
+            }
+        }
+
+        private FeatureFilterParseException Error(string message)
+        {
+            return new FeatureFilterParseException($"{message}（位置 {_position}）");
+        }
+    }
+
+    private readonly record struct FeatureFilterToken(
+        FeatureFilterTokenKind Kind,
+        string Text,
+        double Number,
+        int Position);
+
+    private enum FeatureFilterTokenKind
+    {
+        End,
+        Number,
+        Identifier,
+        True,
+        False,
+        LeftParen,
+        RightParen,
+        Plus,
+        Minus,
+        Star,
+        Slash,
+        Percent,
+        And,
+        Or,
+        Not,
+        Equal,
+        NotEqual,
+        Less,
+        LessOrEqual,
+        Greater,
+        GreaterOrEqual
+    }
+
+    private sealed class FeatureFilterParseException : Exception
+    {
+        public FeatureFilterParseException(string message) : base(message)
+        {
+        }
     }
 
     /// <summary>

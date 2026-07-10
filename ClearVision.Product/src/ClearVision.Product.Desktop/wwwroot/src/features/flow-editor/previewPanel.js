@@ -430,9 +430,12 @@ export class PreviewPanel {
                 ? ` title="${escapeHtml(formattedValue.title)}"`
                 : '';
 
+            const outputLabel = ['score', 'result'].includes(String(key).toLowerCase())
+                ? String(key)
+                : getPreviewResultLabel(key);
             return `
                 <div class="operator-preview-output-item" data-output-kind="${formattedValue.kind}">
-                    <span class="key">${escapeHtml(getPreviewResultLabel(key))}</span>
+                    <span class="key">${escapeHtml(outputLabel)}</span>
                     <span class="value"${titleAttribute}>${escapeHtml(formattedValue.text)}</span>
                 </div>
             `;

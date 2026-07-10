@@ -506,7 +506,8 @@ function createPresenterState(state) {
         summaryItems: buildPreviewSummaryItems(state.outputData, {
             maxItems: 3,
             stringMaxLength: 42,
-            skipImageLikeValues: true
+            skipImageLikeValues: true,
+            technicalLabels: true
         }),
         overlayEnabled: state.canvasEligibility.eligible,
         canOpenImage: Boolean(state.outputImageBase64),

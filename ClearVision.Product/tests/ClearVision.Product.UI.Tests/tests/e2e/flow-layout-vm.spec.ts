@@ -740,7 +740,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench.locator('.preview-capability-main-image img')).toBeVisible();
     await expect(workbench).toContainText('端口与耗时');
     await expect(workbench).toContainText('运行耗时');
-    await expect(workbench).toContainText('分数');
+    await expect(workbench).toContainText('Score');
     await expect(workbench).toContainText('Width');
     await expect(workbench.locator('[data-preview-action="image-fit"]')).toContainText('适应窗口');
     await expect(workbench.locator('[data-preview-action="image-original"]')).toContainText('原始大小');
@@ -1164,7 +1164,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await addNodeFromFlyout(page);
     const workbench = page.locator('.preview-workbench-pane');
     await expect(workbench).toContainText('预览完成');
-    await expect(workbench).toContainText('分数');
+    await expect(workbench).toContainText('Score');
 
     await page.evaluate(() => {
       const flowCanvas = (window as any).flowCanvas;

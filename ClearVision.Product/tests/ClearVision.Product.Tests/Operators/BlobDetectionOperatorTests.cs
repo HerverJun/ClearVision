@@ -305,6 +305,82 @@ public class BlobDetectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FeatureFilter_InvalidSyntax_ShouldFailForBlankImage()
+    {
+        var op = new Operator("blank-invalid", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >", "string"));
+
+        using var image = new Mat(100, 100, MatType.CV_8UC1, Scalar.Black);
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(image)));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("表达式意外结束");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_InvalidSyntax_ShouldFailWhenMaxAreaExcludesAllBlobs()
+    {
+        var op = new Operator("excluded-invalid", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 50, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >", "string"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("表达式意外结束");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_UnknownField_ShouldFailForBlankImage()
+    {
+        var op = new Operator("blank-unknown-field", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "UnknownField > 1", "string"));
+
+        using var image = new Mat(100, 100, MatType.CV_8UC1, Scalar.Black);
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(image)));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("未知 FeatureFilter 字段");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_ValidExpression_ShouldSucceedWithZeroBlobs()
+    {
+        var op = new Operator("blank-valid", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >= 1 && Width > 0", "string"));
+
+        using var image = new Mat(100, 100, MatType.CV_8UC1, Scalar.Black);
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(image)));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureFilter_ValidExpression_ShouldKeepNormalBlobResults()
+    {
+        var op = new Operator("normal-valid", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 1000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("FeatureFilter", "Area >= 100 && Width > 0", "string"));
+
+        using var image = CreateTwoAreaBlobImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(2);
+        result.OutputData["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>().Which.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void Metadata_FeatureFilter_ShouldBeOptionalAndDocumentSupportedFields()
     {
         var metadata = new OperatorFactory().GetMetadata(OperatorType.BlobAnalysis)!;

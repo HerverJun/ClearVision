@@ -451,8 +451,12 @@ export function buildPreviewSummaryItems(outputs, options = {}) {
         }
 
         const formattedValue = formatPreviewOutputValue(key, value, { stringMaxLength });
+        const normalizedKey = normalizeOutputKey(key);
+        const label = options.technicalLabels && (normalizedKey === 'score' || normalizedKey === 'result')
+            ? String(key)
+            : getPreviewResultLabel(key);
         items.push({
-            key: getPreviewResultLabel(key),
+            key: label,
             rawKey: key,
             value: formattedValue.text,
             title: formattedValue.title,

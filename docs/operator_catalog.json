@@ -1032,7 +1032,7 @@
       "displayName": "Blob分析",
       "description": "连通区域分析",
       "category": "特征提取",
-      "version": "1.2.1",
+      "version": "1.1.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -1042,13 +1042,13 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "二值图像",
+          "displayName": "图像",
           "dataType": "Image",
           "isRequired": true
         },
         {
           "name": "SourceImage",
-          "displayName": "参考图像",
+          "displayName": "Source Image",
           "dataType": "Image",
           "isRequired": false
         }
@@ -1062,14 +1062,14 @@
         },
         {
           "name": "Blobs",
-          "displayName": "Blob结果列表",
-          "dataType": "BlobList",
+          "displayName": "Blob数据",
+          "dataType": "Contour",
           "isRequired": null
         },
         {
           "name": "BlobFeatures",
-          "displayName": "Blob详细特征",
-          "dataType": "BlobFeatureList",
+          "displayName": "Blob特征",
+          "dataType": "Any",
           "isRequired": null
         },
         {
@@ -17360,8 +17360,8 @@
         },
         {
           "name": "Blobs",
-          "displayName": "Blob结果列表",
-          "dataType": "BlobList",
+          "displayName": "Blobs",
+          "dataType": "Contour",
           "isRequired": false
         }
       ],

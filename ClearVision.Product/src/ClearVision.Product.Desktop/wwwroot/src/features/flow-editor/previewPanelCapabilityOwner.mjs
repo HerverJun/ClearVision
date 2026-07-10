@@ -1627,7 +1627,8 @@ export class PreviewPanelCapabilityOwner {
             const summaryItems = buildPreviewSummaryItems(this.previewState.outputData, {
                 maxItems: 8,
                 stringMaxLength: 64,
-                skipImageLikeValues: true
+                skipImageLikeValues: true,
+                technicalLabels: true
             });
             return `
                 <section class="preview-capability-section" data-preview-section="summary" data-stale="true">
@@ -1696,7 +1697,8 @@ export class PreviewPanelCapabilityOwner {
         const summaryItems = buildPreviewSummaryItems(this.previewState.outputData, {
             maxItems: 8,
             stringMaxLength: 64,
-            skipImageLikeValues: true
+            skipImageLikeValues: true,
+            technicalLabels: true
         });
         const blobSemantics = this.currentOperator?.type === 'BlobAnalysis' && statusInfo.kind === 'success'
             ? `<div class="blob-preview-semantics preview-capability-blob-semantics" role="note">${escapeHtml(BLOB_PREVIEW_SEMANTICS_MESSAGE)}</div>`
