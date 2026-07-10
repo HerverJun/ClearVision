@@ -6,6 +6,12 @@ import {
     buildPreviewInputImageHash
 } from './previewCoordinator.js';
 import {
+    formatPortTypeForMessage
+} from '../../core/canvas/portTypeCompatibility.mjs';
+import {
+    buildRegionInputGuidance
+} from './regionInputGuidance.mjs';
+import {
     ImagePixelProbe,
     PIXEL_PROBE_DEFAULT_MESSAGE,
     createImageRoiFromPoints,
@@ -27,6 +33,7 @@ import {
 
 export const PREVIEW_PANEL_CAPABILITY_OWNER_ID = 'preview-panel-capability-v2';
 const PIXEL_PROBE_ROI_DRAG_THRESHOLD_PX = 4;
+export { buildRegionInputGuidance } from './regionInputGuidance.mjs';
 
 // Preview request and artifact-read route: PreviewPanelCapabilityOwner -> PreviewPanelCapabilityAdapter -> NodePreviewCoordinator.
 
@@ -825,6 +832,13 @@ export class PreviewPanelCapabilityOwner {
         };
     }
 
+    hasInputConnection(nodeId, portIndex) {
+        const canvas = this.flowCanvasAdapter?.raw || this.flowCanvasAdapter?.canvas || null;
+        const connections = Array.isArray(canvas?.connections) ? canvas.connections : [];
+        return connections.some(connection =>
+            connection?.target === nodeId && Number(connection?.targetPort) === Number(portIndex));
+    }
+
     syncPixelProbeOverlayElements() {
         const stage = this.container.querySelector?.('.preview-capability-image-stage') || null;
         const image = this.getPixelProbeImage(stage);
@@ -1288,6 +1302,17 @@ export class PreviewPanelCapabilityOwner {
         this.cancelArtifactRead();
     }
 
+    getRegionInputGuidance() {
+        const candidate = buildRegionInputGuidance(this.currentOperator);
+        if (!candidate || !this.currentNodeId) {
+            return candidate;
+        }
+
+        return this.previewAdapter.hasInputConnection?.(this.currentNodeId, candidate.portIndex)
+            ? null
+            : candidate;
+    }
+
     buildResultViewModel(liveNode = null) {
         return buildOperatorResultViewModel(this.currentOperator, this.previewState, {
             liveNode,
@@ -1321,9 +1346,17 @@ export class PreviewPanelCapabilityOwner {
             this.previewState?.status === 'idle' &&
             Boolean(this.previewState?.errorMessage);
         const isStale = belongsToSelectedNode && resultModel?.stale === true && !hasCurrentIdleMessage;
-        const statusInfo = getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted, isStale);
+        const regionInputGuidance = this.getRegionInputGuidance();
+        const statusInfo = regionInputGuidance
+            ? {
+                kind: 'missing-region',
+                label: '缺少 Region',
+                message: regionInputGuidance.summary,
+                emptyMessage: regionInputGuidance.summary
+            }
+            : getStatusLabel(this.previewState, belongsToSelectedNode, this.nodeDeleted, isStale);
         const isLoadingForCurrentNode = this.isPreviewLoadingForCurrentNode(resultModel);
-        const manualPreviewDisabled = !selectedNodeId || isLoadingForCurrentNode || this.manualPreviewPending;
+        const manualPreviewDisabled = !selectedNodeId || isLoadingForCurrentNode || this.manualPreviewPending || Boolean(regionInputGuidance);
         const manualPreviewLabel = isLoadingForCurrentNode || this.manualPreviewPending ? '预览中...' : '手动预览';
         const cancelPreviewDisabled = !(isLoadingForCurrentNode || this.manualPreviewPending);
         const title = this.currentConnection
@@ -1337,7 +1370,7 @@ export class PreviewPanelCapabilityOwner {
         const currentHeading = this.currentConnection ? '当前连线' : '当前算子';
         const currentMessage = this.currentConnection
             ? '连线用于传递端口数据，不产生独立预览。请选择算子节点查看输出图像与模块结果。'
-            : statusInfo.message;
+            : (regionInputGuidance?.summary || statusInfo.message);
 
         this.container.innerHTML = `
             <section class="preview-capability-owner" data-owner="${PREVIEW_PANEL_CAPABILITY_OWNER_ID}" data-status="${escapeAttribute(statusInfo.kind)}" aria-label="预览面板">
@@ -1356,7 +1389,7 @@ export class PreviewPanelCapabilityOwner {
                     </div>
                 </header>
                 <div class="preview-capability-scroll" data-low-height-scroll="true">
-                    ${this.renderPreviewMedia(belongsToSelectedNode, statusInfo, resultModel, liveNode)}
+                    ${this.renderPreviewMedia(belongsToSelectedNode, statusInfo, resultModel, liveNode, regionInputGuidance)}
                     <section class="preview-capability-current">
                         <div class="preview-capability-current-heading">
                             <span>${escapeHtml(currentHeading)}</span>
@@ -1366,6 +1399,7 @@ export class PreviewPanelCapabilityOwner {
                         <p class="preview-capability-message">${escapeHtml(currentMessage)}</p>
                         ${this.renderCurrentParameterSummary()}
                     </section>
+                    ${this.renderRegionInputGuidance(regionInputGuidance)}
                     ${this.renderPreviewSummary(belongsToSelectedNode, statusInfo)}
                     ${this.renderModuleResult(belongsToSelectedNode, resultModel)}
                     ${this.renderPortsAndTiming(belongsToSelectedNode)}
@@ -1401,12 +1435,27 @@ export class PreviewPanelCapabilityOwner {
         return items ? `<div class="preview-capability-parameter-summary">${items}</div>` : '';
     }
 
-    renderPreviewMedia(belongsToSelectedNode, statusInfo, model, liveNode) {
+    renderRegionInputGuidance(guidance) {
+        if (!guidance) {
+            return '';
+        }
+
+        return `
+            <section class="preview-capability-region-guidance" data-guidance="${escapeAttribute(guidance.code)}" role="alert">
+                <h5>${escapeHtml(guidance.title)}</h5>
+                <ul>
+                    ${guidance.lines.map(line => `<li>${escapeHtml(line)}</li>`).join('')}
+                </ul>
+            </section>
+        `;
+    }
+
+    renderPreviewMedia(belongsToSelectedNode, statusInfo, model, liveNode, regionInputGuidance = null) {
         const presenter = belongsToSelectedNode ? (this.previewState?.presenter || {}) : {};
         const outputImageSrc = presenter.outputImageSrc || null;
         const hasImage = Boolean(outputImageSrc);
         const hasImageOutput = hasImageOutputPort(this.currentOperator, liveNode);
-        const emptyMessage = getPreviewImageEmptyMessage({
+        const emptyMessage = regionInputGuidance?.summary || getPreviewImageEmptyMessage({
             nodeDeleted: this.nodeDeleted,
             currentConnection: this.currentConnection,
             currentNodeId: this.currentNodeId,
@@ -1470,7 +1519,7 @@ export class PreviewPanelCapabilityOwner {
         const renderPort = (port, index, fallback) => {
             const name = port?.displayName || port?.DisplayName || port?.name || port?.Name || `${fallback} ${index + 1}`;
             const type = port?.dataType || port?.DataType || port?.type || port?.Type || 'Any';
-            return `${name} (${type})`;
+            return `${name} (${formatPortTypeForMessage(type)})`;
         };
         const inputText = inputPorts.length > 0
             ? inputPorts.map((port, index) => renderPort(port, index, '输入')).join('，')

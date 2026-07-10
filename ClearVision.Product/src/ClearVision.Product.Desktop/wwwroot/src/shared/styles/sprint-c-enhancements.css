@@ -672,6 +672,41 @@
     margin: 4px 0 0;
 }
 
+.preview-capability-region-guidance,
+.operator-preview-region-guidance {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(245, 158, 11, 0.55);
+    border-left: 3px solid #f59e0b;
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.preview-capability-region-guidance h5,
+.operator-preview-region-guidance strong {
+    margin: 0 0 6px;
+    color: #fbbf24;
+    font-size: 12px;
+}
+
+.preview-capability-region-guidance ul,
+.operator-preview-region-guidance ul {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--template-text-muted);
+    font-size: 11px;
+    line-height: 1.55;
+}
+
+html[data-theme="light"] .preview-capability-region-guidance h5,
+html[data-theme="light"] .operator-preview-region-guidance strong {
+    color: #b45309;
+}
+
+.operator-preview-region-guidance[hidden] {
+    display: none;
+}
+
 .preview-capability-parameter-summary {
     display: flex;
     flex-wrap: wrap;

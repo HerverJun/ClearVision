@@ -24,4 +24,6 @@ public sealed class InputPortAttribute : Attribute
     public PortDataType DataType { get; }
 
     public bool IsRequired { get; set; } = true;
+
+    public string? Description { get; set; }
 }

@@ -9,17 +9,17 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Binary Image To Region",
-    Description = "Converts a binary or grayscale image into a run-length encoded Region.",
-    Category = "Region",
+    DisplayName = "二值图转区域",
+    Description = "将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。",
+    Category = "区域处理",
     IconName = "binary-image-to-region",
-    Keywords = new[] { "binary", "image", "region", "mask", "rle", "threshold-to-region", "image-to-region" },
-    Version = "1.0.0"
+    Keywords = new[] { "二值图转区域", "图像转区域", "掩膜", "Region", "mask", "binary", "image-to-region", "RLE" },
+    Version = "1.1.0"
 )]
-[InputPort("Image", "Binary Image", PortDataType.Image, IsRequired = true)]
-[OutputPort("Region", "Region", PortDataType.Region)]
-[OutputPort("Image", "Visualization", PortDataType.Image)]
-[OutputPort("Area", "Region Area", PortDataType.Integer)]
+[InputPort("Image", "二值图/掩膜", PortDataType.Image, IsRequired = true, Description = "待转换的二值图、掩膜或灰度阈值图像。")]
+[OutputPort("Region", "像素区域", PortDataType.Region, Description = "由前景像素生成的 Region/像素区域，可直接连接区域形态学算子。")]
+[OutputPort("Image", "可视化图像", PortDataType.Image, Description = "Region 叠加显示结果，仅用于预览与参考。")]
+[OutputPort("Area", "区域面积", PortDataType.Integer, Description = "Region 包含的前景像素数量。")]
 [OperatorParam("ForegroundMode", "Foreground Mode", "enum", DefaultValue = "NonZero", Options = new[] { "NonZero|Non-zero pixels", "Threshold|Threshold or above" })]
 [OperatorParam("Threshold", "Threshold", "int", DefaultValue = 1, Min = 0, Max = 255)]
 [OperatorParam("Invert", "Invert Foreground", "bool", DefaultValue = false)]
@@ -38,7 +38,7 @@ public sealed class BinaryImageToRegionOperator : OperatorBase
     {
         if (!TryGetInputImage(inputs, "Image", out var imageWrapper) || imageWrapper == null)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("BinaryImageToRegion requires an Image input."));
+            return Task.FromResult(OperatorExecutionOutput.Failure("BinaryImageToRegion 需要 Image/图像输入。"));
         }
 
         var src = imageWrapper.GetMat();

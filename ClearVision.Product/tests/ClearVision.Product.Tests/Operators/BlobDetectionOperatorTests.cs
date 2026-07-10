@@ -1,6 +1,7 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -24,6 +25,29 @@ public class BlobDetectionOperatorTests
     }
 
     [Fact]
+    public void Metadata_ShouldDescribeBlobListsWithoutContourOrAnyMasquerading()
+    {
+        var factory = new OperatorFactory();
+        var metadata = factory.GetMetadata(OperatorType.BlobAnalysis)!;
+        var labelingMetadata = factory.GetMetadata(OperatorType.BlobLabeling)!;
+
+        metadata.OutputPorts.Should().ContainSingle(port =>
+            port.Name == "Blobs" &&
+            port.DataType == PortDataType.BlobList &&
+            port.Description!.Contains("不是 Contour 或 Region", StringComparison.Ordinal));
+        metadata.OutputPorts.Should().ContainSingle(port =>
+            port.Name == "BlobFeatures" &&
+            port.DataType == PortDataType.BlobFeatureList &&
+            port.Description!.Contains("不是轮廓或像素区域", StringComparison.Ordinal));
+        metadata.OutputPorts.Should().ContainSingle(port =>
+            port.Name == "BlobCount" && port.DataType == PortDataType.Integer);
+        metadata.OutputPorts.Single(port => port.Name == "Blobs").DataType.Should().NotBe(PortDataType.Contour);
+        metadata.OutputPorts.Single(port => port.Name == "BlobFeatures").DataType.Should().NotBe(PortDataType.Any);
+        labelingMetadata.InputPorts.Should().ContainSingle(port =>
+            port.Name == "Blobs" && port.DataType == PortDataType.BlobList);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithNullInputs_ShouldReturnFailure()
     {
         var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
@@ -40,6 +64,39 @@ public class BlobDetectionOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().ContainKey("Image");
+        result.OutputData.Should().ContainKey("Blobs");
+        result.OutputData.Should().ContainKey("BlobFeatures");
+        result.OutputData.Should().ContainKey("BlobCount");
+        result.OutputData!["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>();
+        result.OutputData["BlobFeatures"].Should().BeOfType<List<Dictionary<string, object>>>()
+            .Which.Should().BeEmpty("detailed features are opt-in but the output structure remains stable");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDetailedFeatures_ShouldKeepBlobResultsAndFeatureTableDistinct()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("OutputDetailedFeatures", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 10, "int"));
+
+        using var image = TestHelpers.CreateShapeTestImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var blobs = result.OutputData!["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>().Subject;
+        var features = result.OutputData["BlobFeatures"].Should().BeOfType<List<Dictionary<string, object>>>().Subject;
+
+        Convert.ToInt32(result.OutputData["BlobCount"]).Should().Be(blobs.Count);
+        features.Should().HaveCount(blobs.Count);
+        features.Should().NotBeSameAs(blobs);
+        features.Should().AllSatisfy(item =>
+        {
+            item.Should().ContainKey("BlobId");
+            item.Should().ContainKey("Features");
+            item["Features"].Should().BeOfType<Dictionary<string, object>>();
+        });
+        blobs.Should().OnlyContain(item =>
+            item.ContainsKey("Id") && item.ContainsKey("Area") && item.ContainsKey("Width") && item.ContainsKey("Height"));
     }
 
     [Fact]

@@ -36,10 +36,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Subpixel morphology or grayscale morphology on raw image intensity." },
     KnownLimitations = new[] { "Large kernels can remove small or thin regions entirely, which is expected erosion behavior.", "Kernel shapes are discrete Rectangle/Ellipse/Cross rasterizations rather than analytic continuous geometry." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
-[InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Eroded Region", PortDataType.Region)]
-[OutputPort("Image", "Visualization", PortDataType.Image)]
+[InputPort("Region", "输入区域", PortDataType.Region, IsRequired = true, Description = "区域腐蚀的主输入，必须是 Region/像素区域；Image 或 Contour 不能直接替代。")]
+[InputPort("Image", "参考图像（可选）", PortDataType.Image, IsRequired = false, Description = "仅用于参考图和结果可视化，不参与区域腐蚀计算，也不是主输入。")]
+[OutputPort("Region", "腐蚀后区域", PortDataType.Region, Description = "腐蚀运算得到的 Region/像素区域。")]
+[OutputPort("Image", "可视化图像", PortDataType.Image, Description = "在参考图或区域底图上绘制的预览结果。")]
 [OutputPort("Area", "Eroded Area", PortDataType.Integer)]
 [OperatorParam("KernelShape", "Structuring Element Shape", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|Rectangle", "Ellipse|Ellipse", "Cross|Cross" })]
 [OperatorParam("KernelWidth", "Kernel Width", "int", DefaultValue = 3, Min = 1, Max = 99)]
@@ -66,7 +66,7 @@ public class RegionErosionOperator : OperatorBase
         // 获取输入区域
         if (!TryGetInputRegion(inputs, "Region", out var region) || region == null)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Input region is required."));
+            return Task.FromResult(OperatorExecutionOutput.Failure("当前缺少 Region；Image/Contour 不能直接替代；请使用 BinaryImageToRegion 或区域生成算子。"));
         }
 
         if (region.IsEmpty)

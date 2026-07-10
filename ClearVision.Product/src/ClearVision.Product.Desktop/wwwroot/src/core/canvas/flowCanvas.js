@@ -1,6 +1,9 @@
 import {
     arePortTypesCompatible,
+    buildPortTooltipModel,
+    canonicalizeOperatorPortType,
     formatPortTypeForMessage,
+    getPortTypeColor,
     getPortTypeMismatchMessage,
     normalizePortType as normalizeFlowPortType
 } from './portTypeCompatibility.mjs';
@@ -13,33 +16,6 @@ const DEBUG_FLOW_CANVAS = false;
 function flowDebugEnabled() {
     return DEBUG_FLOW_CANVAS || (typeof window !== 'undefined' && window.__FLOW_CANVAS_DEBUG__ === true);
 }
-
-/**
- * 端口数据类型颜色。
- */
-const PORT_TYPE_COLORS = {
-    'Image':           '#52c41a', // 图像
-    'String':          '#1890ff', // 字符串
-    'Integer':         '#fa8c16',  // 整数
-    'Float':           '#fa8c16',  // 浮点数
-    'Boolean':         '#f5222d', // 布尔值
-    'Point':           '#eb2f96', // 点
-    'Rectangle':       '#eb2f96', // 矩形
-    'Contour':         '#722ed1', // 轮廓
-    'PointList':       '#eb2f96', // 点集
-    'DetectionResult': '#13c2c2', // 检测结果
-    'DetectionList':   '#13c2c2', // 检测结果列表
-    'CircleData':      '#2f54eb',  // 圆数据
-    'LineData':        '#2f54eb', // 线数据
-    'Region':          '#8b5cf6', // 区域
-    'Any':             '#bfbfbf', // 任意类型
-    // 兼容后端枚举值。
-    0: '#52c41a',
-    1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
-    4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
-    8: '#eb2f96', 9: '#13c2c2', 10: '#13c2c2', 11: '#2f54eb', 12: '#2f54eb', 13: '#8b5cf6',
-    99: '#bfbfbf'
-};
 
 /**
  * Encoding cleanup: previous comment text was unreadable.
@@ -120,6 +96,7 @@ class FlowCanvas {
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
         this._mouseUpHandler = this.handleMouseUp.bind(this);
+        this._mouseLeaveHandler = () => this.setHoveredPort(null);
         this._wheelHandler = this.handleWheel.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
         this._keyDownHandler = this.handleKeyDown.bind(this);
@@ -164,6 +141,9 @@ class FlowCanvas {
         // 右键菜单
         this.contextMenu = null;
         this._clickOutsideHandler = this.hideContextMenu.bind(this);
+        this._portTooltip = null;
+        this._portTooltipId = `${this.canvas.id || 'flow-canvas'}-port-tooltip`;
+        this._baseCanvasAriaLabel = '流程编辑画布';
 
         this.initialize();
     }
@@ -173,6 +153,9 @@ class FlowCanvas {
      */
     initialize() {
         this.resize();
+        this.canvas.setAttribute?.('aria-label', this._baseCanvasAriaLabel);
+        this.canvas.setAttribute?.('aria-describedby', this._portTooltipId);
+        this.ensurePortTooltip();
 
         // Encoding cleanup: previous comment text was unreadable.
         const ResizeObserverCtor = window.ResizeObserver;
@@ -199,6 +182,7 @@ class FlowCanvas {
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
         this.canvas.addEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.addEventListener('mouseup', this._mouseUpHandler);
+        this.canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
         this.canvas.addEventListener('wheel', this._wheelHandler);
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
@@ -255,6 +239,7 @@ class FlowCanvas {
         this.canvas.removeEventListener('mousedown', this._mouseDownHandler);
         this.canvas.removeEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.removeEventListener('mouseup', this._mouseUpHandler);
+        this.canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
         this.canvas.removeEventListener('wheel', this._wheelHandler);
         this.canvas.removeEventListener('contextmenu', this._contextMenuHandler);
         this.canvas.removeEventListener('dblclick', this._dblClickHandler);
@@ -289,6 +274,9 @@ class FlowCanvas {
             this.minimapToggle = null;
             this._minimapStaticCache = null;
         }
+
+        this._portTooltip?.remove?.();
+        this._portTooltip = null;
 
         this.hideContextMenu();
     }
@@ -724,7 +712,94 @@ class FlowCanvas {
         return left?.nodeId === right?.nodeId &&
             left?.portIndex === right?.portIndex &&
             Boolean(left?.isOutput) === Boolean(right?.isOutput) &&
-            Boolean(left?.hasConnection) === Boolean(right?.hasConnection);
+            Boolean(left?.hasConnection) === Boolean(right?.hasConnection) &&
+            String(left?.compatibility || '') === String(right?.compatibility || '') &&
+            String(left?.incompatibilityMessage || '') === String(right?.incompatibilityMessage || '');
+    }
+
+    ensurePortTooltip() {
+        if (this._portTooltip || typeof document === 'undefined') {
+            return this._portTooltip;
+        }
+
+        const parent = this.canvas.parentElement;
+        if (!parent) {
+            return null;
+        }
+
+        const tooltip = document.createElement('div');
+        tooltip.id = this._portTooltipId;
+        tooltip.className = 'flow-port-tooltip';
+        tooltip.setAttribute('role', 'tooltip');
+        tooltip.setAttribute('aria-live', 'polite');
+        tooltip.hidden = true;
+        parent.appendChild(tooltip);
+        this._portTooltip = tooltip;
+        return tooltip;
+    }
+
+    getPortDefinition(portState) {
+        if (!portState) return null;
+        const node = this.nodes.get(portState.nodeId);
+        if (!node) return null;
+        const ports = portState.isOutput ? (node.outputs || []) : (node.inputs || []);
+        const port = ports[portState.portIndex];
+        return port ? { node, port } : null;
+    }
+
+    setHoveredPort(portState, pointer = null) {
+        const changed = !this._isSamePortState(this.hoveredPort, portState);
+        this.hoveredPort = portState || null;
+        this.updatePortTooltip(this.hoveredPort, pointer);
+        if (changed) {
+            this.invalidate();
+        }
+    }
+
+    updatePortTooltip(portState, pointer = null) {
+        const tooltip = this.ensurePortTooltip();
+        const definition = this.getPortDefinition(portState);
+        if (!tooltip || !definition) {
+            if (tooltip) {
+                tooltip.hidden = true;
+                tooltip.textContent = '';
+                tooltip.removeAttribute?.('data-compatibility');
+            }
+            this.canvas.title = '';
+            this.canvas.setAttribute?.('aria-label', this._baseCanvasAriaLabel);
+            return;
+        }
+
+        const model = buildPortTooltipModel(definition.port, {
+            direction: portState.isOutput ? 'output' : 'input',
+            incompatibilityMessage: portState.incompatibilityMessage
+        });
+        tooltip.textContent = model.text;
+        tooltip.hidden = false;
+        tooltip.setAttribute?.('data-compatibility', portState.compatibility || 'neutral');
+        this.canvas.title = model.text;
+        this.canvas.setAttribute?.('aria-label', model.text);
+
+        const parent = this.canvas.parentElement;
+        const parentRect = parent?.getBoundingClientRect?.();
+        const canvasRect = this.canvas.getBoundingClientRect?.();
+        const portPosition = this.getPortPosition(portState.nodeId, portState.portIndex, portState.isOutput);
+        if (!parentRect || !canvasRect || !portPosition) {
+            return;
+        }
+
+        const pointerLeft = Number.isFinite(pointer?.clientX)
+            ? pointer.clientX - parentRect.left
+            : canvasRect.left - parentRect.left + portPosition.x;
+        const pointerTop = Number.isFinite(pointer?.clientY)
+            ? pointer.clientY - parentRect.top
+            : canvasRect.top - parentRect.top + portPosition.y;
+        const preferredLeft = pointerLeft + (portState.isOutput ? 14 : 18);
+        const preferredTop = pointerTop + 14;
+        const maxLeft = Math.max(8, (parent?.clientWidth || parentRect.width || 0) - (Number(tooltip.offsetWidth) || 0) - 8);
+        const maxTop = Math.max(8, (parent?.clientHeight || parentRect.height || 0) - (Number(tooltip.offsetHeight) || 0) - 8);
+        tooltip.style.left = `${Math.max(8, Math.min(preferredLeft, maxLeft))}px`;
+        tooltip.style.top = `${Math.max(8, Math.min(preferredTop, maxTop))}px`;
     }
 
     /**
@@ -1080,7 +1155,7 @@ class FlowCanvas {
         // Encoding cleanup: previous comment text was unreadable.
         node.inputs.forEach((input, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.inputs.length);
-            const color = PORT_TYPE_COLORS[input.type] || PORT_TYPE_COLORS['Any'];
+            const color = getPortTypeColor(this.readPortType(input));
             
             this.ctx.beginPath();
             this.ctx.arc(x, portY, portRadius, 0, Math.PI * 2);
@@ -1103,7 +1178,7 @@ class FlowCanvas {
         // 绘制输出端口。
         node.outputs.forEach((output, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.outputs.length);
-            const color = PORT_TYPE_COLORS[output.type] || PORT_TYPE_COLORS['Any'];
+            const color = getPortTypeColor(this.readPortType(output));
 
             this.ctx.beginPath();
             this.ctx.arc(x + w, portY, portRadius, 0, Math.PI * 2);
@@ -1274,8 +1349,10 @@ class FlowCanvas {
         const sourcePort = sourceNode.outputs[this.connectingFrom.portIndex];
         const targetPort = targetNode.inputs[portIndex];
 
-        if (!this.checkTypeCompatibility(sourcePort.type, targetPort.type)) {
-            const incompatibilityMessage = this.getPortTypeMismatchMessage(sourcePort.type, targetPort.type);
+        const sourceType = this.readPortType(sourcePort);
+        const targetType = this.readPortType(targetPort);
+        if (!this.checkTypeCompatibility(sourceType, targetType)) {
+            const incompatibilityMessage = this.getPortTypeMismatchMessage(sourceType, targetType);
             console.warn(incompatibilityMessage);
             if (window.showToast) window.showToast(incompatibilityMessage, 'warning');
             this.cancelConnection();
@@ -1347,6 +1424,7 @@ class FlowCanvas {
     cancelConnection() {
         this.isConnecting = false;
         this.connectingFrom = null;
+        this.setHoveredPort(null);
         this.canvas.style.cursor = 'default';
         this.invalidate(); // 刷新以清除连线预览
     }
@@ -1390,7 +1468,7 @@ class FlowCanvas {
 
             const targetPorts = this.connectingFrom.isOutput ? node.inputs : node.outputs;
             targetPorts.forEach((port, index) => {
-                if (this.checkTypeCompatibility(sourcePort.type, port.type)) {
+                if (this.checkTypeCompatibility(this.readPortType(sourcePort), this.readPortType(port))) {
                     const pos = this.getPortPosition(nodeId, index, !this.connectingFrom.isOutput);
                     if (pos) {
                         this.ctx.beginPath();
@@ -1463,7 +1541,7 @@ class FlowCanvas {
             endX, endY
         );
 
-        this.ctx.strokeStyle = '#1890ff';
+        this.ctx.strokeStyle = this.hoveredPort?.compatibility === 'incompatible' ? '#ef4444' : '#1890ff';
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.setLineDash([5 * this.scale, 5 * this.scale]);
         this.ctx.stroke();
@@ -1740,7 +1818,7 @@ class FlowCanvas {
         }
 
         // Encoding cleanup: previous comment text was unreadable.
-        if (this.hoveredPort && !this.isConnecting) {
+        if (this.hoveredPort) {
             this.drawPortHighlight(this.hoveredPort);
         }
 
@@ -1808,6 +1886,8 @@ class FlowCanvas {
                 inputPorts: (node.inputs || []).map(p => ({
                     id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
                     name: p.name,
+                    displayName: p.displayName || p.DisplayName || p.name,
+                    description: p.description || p.Description || '',
                     dataType: this.normalizePortType(p.type), // PortDataType enum
                     direction: 0, // Input
                     isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
@@ -1815,6 +1895,8 @@ class FlowCanvas {
                 outputPorts: (node.outputs || []).map(p => ({
                     id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
                     name: p.name,
+                    displayName: p.displayName || p.DisplayName || p.name,
+                    description: p.description || p.Description || '',
                     dataType: this.normalizePortType(p.type),
                     direction: 1, // Output
                     isRequired: false
@@ -1943,18 +2025,23 @@ class FlowCanvas {
                 const title = op.name ?? op.Name ?? op.title ?? type;
 
                 // 归一化端口数据。
-                const normalizePort = (port) => ({
-                    id: port.id || port.Id || this.generateUUID(),
-                    name: port.name || port.Name,
-                    displayName: port.displayName || port.DisplayName || port.name || port.Name,
-                    description: port.description || port.Description || '',
-                    type: port.type || port.Type || port.dataType || port.DataType || 0,
-                    dataType: port.dataType || port.DataType || port.type || port.Type || 0,
-                    isRequired: Boolean(port.isRequired ?? port.IsRequired ?? false)
-                });
+                const normalizePort = (port, direction) => {
+                    const name = port.name || port.Name;
+                    const declaredType = port.type || port.Type || port.dataType || port.DataType || 0;
+                    const canonicalPortType = canonicalizeOperatorPortType(type, name, direction, declaredType);
+                    return {
+                        id: port.id || port.Id || this.generateUUID(),
+                        name,
+                        displayName: port.displayName || port.DisplayName || name,
+                        description: port.description || port.Description || '',
+                        type: canonicalPortType,
+                        dataType: canonicalPortType,
+                        isRequired: Boolean(port.isRequired ?? port.IsRequired ?? false)
+                    };
+                };
 
-                const inputs = (op.inputPorts || op.InputPorts || op.inputs || []).map(normalizePort);
-                const outputs = (op.outputPorts || op.OutputPorts || op.outputs || []).map(normalizePort);
+                const inputs = (op.inputPorts || op.InputPorts || op.inputs || []).map(port => normalizePort(port, 'input'));
+                const outputs = (op.outputPorts || op.OutputPorts || op.outputs || []).map(port => normalizePort(port, 'output'));
 
                 const node = {
                     id: id,
@@ -2043,20 +2130,26 @@ class FlowCanvas {
     drawPortHighlight(port) {
         const pos = this.getPortPosition(port.nodeId, port.portIndex, port.isOutput);
         if (!pos) return;
+        const definition = this.getPortDefinition(port);
+        const isIncompatible = port.compatibility === 'incompatible';
+        const isCompatible = port.compatibility === 'compatible';
+        const highlightColor = isIncompatible
+            ? '#ef4444'
+            : (isCompatible ? '#22c55e' : getPortTypeColor(this.readPortType(definition?.port)));
 
         // 外圈描边。
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 8 * this.scale, 0, Math.PI * 2);
-        this.ctx.strokeStyle = port.isOutput ? '#1890ff' : '#52c41a';
+        this.ctx.strokeStyle = highlightColor;
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.stroke();
 
         // 半透明填充。
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 12 * this.scale, 0, Math.PI * 2);
-        this.ctx.fillStyle = port.isOutput
-            ? 'rgba(24, 144, 255, 0.2)'
-            : 'rgba(82, 196, 26, 0.2)';
+        this.ctx.fillStyle = isIncompatible
+            ? 'rgba(239, 68, 68, 0.24)'
+            : (isCompatible ? 'rgba(34, 197, 94, 0.2)' : 'rgba(148, 163, 184, 0.18)');
         this.ctx.fill();
 
         // 已连接端口使用红色虚线环提示可断开。
@@ -2202,14 +2295,26 @@ class FlowCanvas {
 
         if (this.isConnecting) {
             const port = this.getPortAt(x, y);
-            const nextHoveredPort = port && !port.isOutput && port.nodeId !== this.connectingFrom?.nodeId
-                ? port
-                : null;
-            const nextCursor = nextHoveredPort ? 'pointer' : 'crosshair';
-            if (!this._isSamePortState(this.hoveredPort, nextHoveredPort) || this.canvas.style.cursor !== nextCursor) {
-                this.hoveredPort = nextHoveredPort;
-                this.canvas.style.cursor = nextCursor;
+            let nextHoveredPort = null;
+            if (port && port.isOutput !== this.connectingFrom?.isOutput && port.nodeId !== this.connectingFrom?.nodeId) {
+                const sourceDefinition = this.getPortDefinition(this.connectingFrom);
+                const targetDefinition = this.getPortDefinition(port);
+                const outputPort = this.connectingFrom.isOutput ? sourceDefinition?.port : targetDefinition?.port;
+                const inputPort = this.connectingFrom.isOutput ? targetDefinition?.port : sourceDefinition?.port;
+                const sourceType = this.readPortType(outputPort);
+                const targetType = this.readPortType(inputPort);
+                const compatible = this.checkTypeCompatibility(sourceType, targetType);
+                nextHoveredPort = {
+                    ...port,
+                    compatibility: compatible ? 'compatible' : 'incompatible',
+                    incompatibilityMessage: compatible ? '' : this.getPortTypeMismatchMessage(sourceType, targetType)
+                };
             }
+            const nextCursor = nextHoveredPort?.compatibility === 'incompatible'
+                ? 'not-allowed'
+                : (nextHoveredPort ? 'pointer' : 'crosshair');
+            this.canvas.style.cursor = nextCursor;
+            this.setHoveredPort(nextHoveredPort, e);
             this.invalidate();
             return;
         }
@@ -2230,7 +2335,7 @@ class FlowCanvas {
                 }
             }
             this.canvas.style.cursor = 'grabbing';
-            this.hoveredPort = null;
+            this.setHoveredPort(null);
             return;
         }
 
@@ -2252,10 +2357,16 @@ class FlowCanvas {
             }
         }
 
-        if (!this._isSamePortState(this.hoveredPort, nextHoveredPort) || this.canvas.style.cursor !== nextCursor) {
-            this.hoveredPort = nextHoveredPort;
+        const hoverChanged = !this._isSamePortState(this.hoveredPort, nextHoveredPort);
+        const cursorChanged = this.canvas.style.cursor !== nextCursor;
+        if (hoverChanged || cursorChanged) {
             this.canvas.style.cursor = nextCursor;
-            this.invalidate();
+            this.setHoveredPort(nextHoveredPort, e);
+            if (!hoverChanged && cursorChanged) {
+                this.invalidate();
+            }
+        } else if (nextHoveredPort) {
+            this.updatePortTooltip(nextHoveredPort, e);
         }
     }
 

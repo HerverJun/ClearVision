@@ -14,6 +14,7 @@ import {
     normalizeArtifactReference,
     redactLocalAbsolutePaths
 } from './operatorResultViewModel.mjs';
+import { buildRegionInputGuidance } from './regionInputGuidance.mjs';
 
 const MAX_ANALYSIS_IMAGE_BASE64_CHARS = 24 * 1024 * 1024;
 
@@ -50,6 +51,7 @@ export class PreviewPanel {
         this.getFlowRevision = options.getFlowRevision ?? (() => this.state?.request?.flowRevision ?? 0);
         this.getNodes = options.getNodes ?? (() => []);
         this.getLiveNode = options.getLiveNode ?? (() => null);
+        this.hasInputConnection = options.hasInputConnection ?? (() => false);
         this.onSelectNode = options.onSelectNode ?? null;
         this.debounceMs = options.debounceMs ?? 500;
         this.maxAnalysisImageBase64Chars = Number.isFinite(options.maxAnalysisImageBase64Chars)
@@ -139,6 +141,8 @@ export class PreviewPanel {
                         <div class="placeholder" id="preview-output-placeholder">暂无输出图像 / 该算子无图像输出</div>
                     </div>
 
+                    <div class="operator-preview-region-guidance" id="preview-region-guidance" role="alert" hidden></div>
+
                     <div class="operator-preview-meta">
                         <div class="operator-preview-status" id="preview-status-text">等待预览</div>
                         <div class="operator-preview-outputs" id="preview-output-list">暂无输出摘要</div>
@@ -205,6 +209,11 @@ export class PreviewPanel {
             return;
         }
 
+        if (this._getRegionInputGuidance(this.getOperator())) {
+            this.applyPreviewState();
+            return;
+        }
+
         if (this.validateBeforePreview({ trigger: 'auto', showToast: false }) === false) {
             return;
         }
@@ -225,6 +234,11 @@ export class PreviewPanel {
             return;
         }
 
+        if (this._getRegionInputGuidance(this.getOperator())) {
+            this.applyPreviewState();
+            return;
+        }
+
         if (this.validateBeforePreview({ trigger: 'manual', showToast: true }) === false) {
             return;
         }
@@ -240,6 +254,16 @@ export class PreviewPanel {
     applyPreviewState() {
         this._resetArtifactReadsIfIdentityChanged();
         const operator = this.getOperator();
+        const regionInputGuidance = this._getRegionInputGuidance(operator);
+        this._setRegionInputGuidance(regionInputGuidance);
+        if (regionInputGuidance) {
+            this._setStatus(regionInputGuidance.title);
+            this._setOutputImage(null, regionInputGuidance.summary);
+            this._renderOutputs(null);
+            this._renderOperatorResultPanel();
+            return;
+        }
+
         if (!operator || !this.state || this.state.activeNodeId !== operator.id) {
             this._setStatus(operator ? '该算子暂无预览结果' : '请选择一个算子节点查看模块结果');
             this._setOutputImage(null, operator ? '暂无输出图像 / 该算子无图像输出' : '请选择一个算子');
@@ -284,6 +308,32 @@ export class PreviewPanel {
         if (statusElement) {
             statusElement.textContent = text;
         }
+    }
+
+    _getRegionInputGuidance(operator = this.getOperator()) {
+        const candidate = buildRegionInputGuidance(operator);
+        if (!candidate || !operator?.id) {
+            return candidate;
+        }
+
+        return this.hasInputConnection(operator.id, candidate.portIndex) ? null : candidate;
+    }
+
+    _setRegionInputGuidance(guidance) {
+        const guidanceContainer = this.container?.querySelector('#preview-region-guidance');
+        const refreshButton = this.container?.querySelector('#btn-preview-refresh');
+        if (refreshButton) {
+            refreshButton.disabled = Boolean(guidance);
+            refreshButton.setAttribute?.('aria-disabled', guidance ? 'true' : 'false');
+        }
+        if (!guidanceContainer) {
+            return;
+        }
+
+        guidanceContainer.hidden = !guidance;
+        guidanceContainer.innerHTML = guidance
+            ? `<strong>${escapeHtml(guidance.title)}</strong><ul>${guidance.lines.map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
+            : '';
     }
 
     _setImage(type, imageSource) {

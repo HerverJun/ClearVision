@@ -11,6 +11,7 @@ import {
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanel.js';
 import {
   PreviewPanelCapabilityOwner,
+  buildRegionInputGuidance,
   createPreviewPanelCapabilityAdapter
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs';
 import {
@@ -695,6 +696,25 @@ function previewActionEvent(action, dataset = {}) {
   };
 }
 
+test('Region morphology preview guidance requires Region and rejects Image or Contour substitutes', () => {
+  const operator = {
+    type: 'RegionErosion',
+    inputPorts: [
+      { name: 'Region', dataType: 'Region', isRequired: true },
+      { name: 'Image', dataType: 'Image', isRequired: false }
+    ]
+  };
+
+  const guidance = buildRegionInputGuidance(operator, { hasRegionInputConnection: false });
+
+  assert.equal(guidance.title, '当前缺少 Region');
+  assert.match(guidance.summary, /Image\/Contour 不能直接替代/);
+  assert.match(guidance.summary, /BinaryImageToRegion/);
+  assert.match(guidance.summary, /可选 Image 输入仅用于参考图和可视化/);
+  assert.equal(buildRegionInputGuidance(operator, { hasRegionInputConnection: true }), null);
+  assert.equal(buildRegionInputGuidance({ ...operator, type: 'BlobAnalysis' }), null);
+});
+
 test('PreviewPanel analysis results avoid retaining input images and oversized previews', () => {
   const panel = new PreviewPanel(null, {
     maxAnalysisImageBase64Chars: 8
@@ -791,6 +811,40 @@ test('PreviewPanel does not fall back to a persistent input image when output is
   assert.match(container.querySelector('#preview-output-placeholder').textContent, /暂无输出图像/);
   assert.equal(container.querySelector('#btn-preview-open-output').disabled, true);
 
+  panel.destroy();
+});
+
+test('PreviewPanel default owner renders and clears missing Region guidance from live connections', () => {
+  let connected = false;
+  const operator = {
+    id: 'region-node',
+    type: 'RegionErosion',
+    title: '区域腐蚀',
+    inputs: [
+      { name: 'Region', dataType: 'Region', isRequired: true },
+      { name: 'Image', dataType: 'Image', isRequired: false }
+    ],
+    parameters: []
+  };
+  const coordinator = createCoordinatorHarness(successState({ activeNodeId: operator.id }));
+  const container = new PreviewPanelFakeContainer();
+  const panel = new PreviewPanel(container, {
+    getOperator: () => operator,
+    previewCoordinator: coordinator,
+    hasInputConnection: () => connected,
+    getFlowRevision: () => 3
+  });
+
+  assert.equal(container.querySelector('#preview-status-text').textContent, '当前缺少 Region');
+  assert.match(container.querySelector('#preview-region-guidance').innerHTML, /Image\/Contour 不能直接替代/);
+  assert.match(container.querySelector('#preview-region-guidance').innerHTML, /BinaryImageToRegion/);
+  assert.equal(container.querySelector('#btn-preview-refresh').disabled, true);
+
+  connected = true;
+  panel.applyPreviewState();
+
+  assert.equal(container.querySelector('#preview-region-guidance').innerHTML, '');
+  assert.equal(container.querySelector('#btn-preview-refresh').disabled, false);
   panel.destroy();
 });
 

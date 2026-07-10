@@ -137,7 +137,8 @@ public class OperatorMetadataScanner
                     Name = attr.Name,
                     DisplayName = attr.DisplayName,
                     DataType = attr.DataType,
-                    IsRequired = attr.IsRequired
+                    IsRequired = attr.IsRequired,
+                    Description = attr.Description
                 })
                 .ToList(),
             OutputPorts = operatorClrType
@@ -146,7 +147,8 @@ public class OperatorMetadataScanner
                 {
                     Name = attr.Name,
                     DisplayName = attr.DisplayName,
-                    DataType = attr.DataType
+                    DataType = attr.DataType,
+                    Description = attr.Description
                 })
                 .ToList(),
             Parameters = operatorClrType

@@ -22,14 +22,14 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Category = "特征提取",
     IconName = "blob",
     Keywords = new[] { "连通域", "缺陷区域", "斑点", "面积提取", "缺陷分析", "Blob", "Connected components" },
-    Version = "1.1.0"
+    Version = "1.2.0"
 )]
-[InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]
-[InputPort("SourceImage", "Source Image", PortDataType.Image, IsRequired = false)]
-[OutputPort("Image", "标记图像", PortDataType.Image)]
-[OutputPort("Blobs", "Blob数据", PortDataType.Contour)]
-[OutputPort("BlobFeatures", "Blob特征", PortDataType.Any)]
-[OutputPort("BlobCount", "Blob数量", PortDataType.Integer)]
+[InputPort("Image", "二值图像", PortDataType.Image, IsRequired = true, Description = "用于连通域分析的二值图或可自动阈值化的灰度图。")]
+[InputPort("SourceImage", "参考图像", PortDataType.Image, IsRequired = false, Description = "可选，仅作为标注结果的参考底图，不替代主 Image 输入。")]
+[OutputPort("Image", "标记图像", PortDataType.Image, Description = "绘制 Blob 边界与中心点的可视化图像。")]
+[OutputPort("Blobs", "Blob结果列表", PortDataType.BlobList, Description = "兼容旧流程端口名的 Blob 结果字典列表，包含边界框、中心、面积及常用度量；不是 Contour 或 Region。")]
+[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "开启“输出详细特征”后填充的 Blob 特征表；不是轮廓或像素区域。")]
+[OutputPort("BlobCount", "Blob数量", PortDataType.Integer, Description = "通过面积、形状与可选特征过滤后的 Blob 数量。")]
 [OperatorParam("MinArea", "最小面积", "int", DefaultValue = 100, Min = 0)]
 [OperatorParam("MaxArea", "最大面积", "int", DefaultValue = 100000, Min = 0)]
 [OperatorParam("Color", "目标颜色", "enum", DefaultValue = "White", Options = new[] { "White|白色", "Black|黑色" })]
@@ -261,6 +261,7 @@ public class BlobDetectionOperator : OperatorBase
             }
 
             var blobs = new List<Dictionary<string, object>>();
+            var blobFeatures = new List<Dictionary<string, object>>();
             var nextId = 1;
             string? filterError = null;
 
@@ -401,9 +402,10 @@ public class BlobDetectionOperator : OperatorBase
                     }
                 }
 
+                var blobId = nextId++;
                 var blobInfo = new Dictionary<string, object>
                 {
-                    { "Id", nextId++ },
+                    { "Id", blobId },
                     { "Area", area },
                     { "ContourArea", contourArea },
                     { "Perimeter", perimeter },
@@ -427,6 +429,15 @@ public class BlobDetectionOperator : OperatorBase
 
                 blobs.Add(blobInfo);
 
+                if (outputDetailedFeatures)
+                {
+                    blobFeatures.Add(new Dictionary<string, object>
+                    {
+                        { "BlobId", blobId },
+                        { "Features", featureValues.ToDictionary(pair => pair.Key, pair => (object)pair.Value, StringComparer.OrdinalIgnoreCase) }
+                    });
+                }
+
                 var offsetContour = contour.Select(p => new Point(p.X + rect.X, p.Y + rect.Y)).ToArray();
                 Cv2.DrawContours(resultImage, new[] { offsetContour }, -1, new Scalar(0, 255, 0), 2);
                 Cv2.Circle(resultImage, (int)Math.Round(centerX), (int)Math.Round(centerY), 3, new Scalar(0, 0, 255), -1);
@@ -441,13 +452,9 @@ public class BlobDetectionOperator : OperatorBase
             var additionalData = new Dictionary<string, object>
             {
                 { "BlobCount", blobs.Count },
-                { "Blobs", blobs }
+                { "Blobs", blobs },
+                { "BlobFeatures", blobFeatures }
             };
-
-            if (outputDetailedFeatures)
-            {
-                additionalData["BlobFeatures"] = blobs;
-            }
 
             return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
         }

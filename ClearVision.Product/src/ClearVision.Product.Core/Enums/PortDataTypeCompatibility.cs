@@ -23,6 +23,8 @@ public static class PortDataTypeCompatibility
             PortDataType.CircleData => CompatibilityFamily.CircleData,
             PortDataType.LineData => CompatibilityFamily.LineData,
             PortDataType.Region => CompatibilityFamily.Region,
+            PortDataType.BlobList => CompatibilityFamily.BlobList,
+            PortDataType.BlobFeatureList => CompatibilityFamily.BlobFeatureList,
             PortDataType.Any => CompatibilityFamily.Any,
             _ => CompatibilityFamily.Other
         };
@@ -40,6 +42,8 @@ public static class PortDataTypeCompatibility
         CircleData,
         LineData,
         Region,
+        BlobList,
+        BlobFeatureList,
         Any,
         Other
     }

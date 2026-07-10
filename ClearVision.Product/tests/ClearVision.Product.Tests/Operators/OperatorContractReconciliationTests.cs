@@ -56,6 +56,9 @@ public class OperatorContractReconciliationTests
             "OutputDetailedFeatures"
         });
         blob.OutputPorts.Select(p => p.Name).Should().Contain("BlobFeatures");
+        blob.OutputPorts.Should().ContainSingle(p => p.Name == "Blobs" && p.DataType == PortDataType.BlobList);
+        blob.OutputPorts.Should().ContainSingle(p => p.Name == "BlobFeatures" && p.DataType == PortDataType.BlobFeatureList);
+        blob.OutputPorts.Should().ContainSingle(p => p.Name == "BlobCount" && p.DataType == PortDataType.Integer);
 
         var caliper = factory.GetMetadata(OperatorType.CaliperTool)!;
         caliper.Parameters.Select(p => p.Name).Should().Contain(new[] { "MeasureMode", "PairDirection" });

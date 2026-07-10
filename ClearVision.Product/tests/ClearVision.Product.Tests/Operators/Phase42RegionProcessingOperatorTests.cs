@@ -61,6 +61,40 @@ public class Phase42RegionProcessingOperatorTests
             .Should().ContainSingle(port => port.Name == "Region" && port.DataType == PortDataType.Region);
         metadataByType[OperatorType.BinaryImageToRegion].OutputPorts
             .Should().ContainSingle(port => port.Name == "Image" && port.DataType == PortDataType.Image);
+
+        var converterMetadata = metadataByType[OperatorType.BinaryImageToRegion];
+        converterMetadata.DisplayName.Should().Be("二值图转区域");
+        converterMetadata.Description.Should().Contain("像素区域 Region");
+        converterMetadata.Keywords.Should().Contain(new[] { "二值图转区域", "图像转区域", "掩膜", "Region", "mask" });
+
+        foreach (var operatorType in new[]
+                 {
+                     OperatorType.RegionErosion,
+                     OperatorType.RegionDilation,
+                     OperatorType.RegionOpening,
+                     OperatorType.RegionClosing
+                 })
+        {
+            metadataByType[operatorType].InputPorts.Should().ContainSingle(port =>
+                port.Name == "Region" &&
+                port.IsRequired &&
+                port.Description!.Contains("Image 或 Contour 不能直接替代", StringComparison.Ordinal));
+            metadataByType[operatorType].InputPorts.Should().ContainSingle(port =>
+                port.Name == "Image" &&
+                !port.IsRequired &&
+                port.Description!.Contains("仅用于参考图和结果可视化", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void RegionCompatibility_ShouldRemainStrictWithoutAnyFallback()
+    {
+        PortDataTypeCompatibility.AreCompatible(PortDataType.Contour, PortDataType.Region).Should().BeFalse();
+        PortDataTypeCompatibility.AreCompatible(PortDataType.Image, PortDataType.Region).Should().BeFalse();
+        PortDataTypeCompatibility.AreCompatible(PortDataType.Region, PortDataType.Region).Should().BeTrue();
+        PortDataTypeCompatibility.AreCompatible(PortDataType.Any, PortDataType.Region).Should().BeTrue();
+        PortDataTypeCompatibility.AreCompatible(PortDataType.BlobList, PortDataType.Region).Should().BeFalse();
+        PortDataTypeCompatibility.AreCompatible(PortDataType.BlobFeatureList, PortDataType.BlobList).Should().BeFalse();
     }
 
     [Fact]
@@ -105,7 +139,54 @@ public class Phase42RegionProcessingOperatorTests
         result.HasErrors.Should().BeTrue();
         result.Issues.Should().ContainSingle(issue =>
             issue.Code == "STRUCT_004" &&
-            issue.Suggestion.Contains("二值图转区域", StringComparison.Ordinal));
+            issue.Suggestion == "当前输出是 Image/图像，不是 Region；请插入 BinaryImageToRegion。");
+    }
+
+    [Fact]
+    public void OperatorFlow_ShouldRejectContourOutputConnectedToRegionInput()
+    {
+        var factory = new OperatorFactory();
+        var contour = factory.CreateOperator(OperatorType.ContourDetection, "ContourDetection", 0, 0);
+        var erosion = factory.CreateOperator(OperatorType.RegionErosion, "RegionErosion", 100, 0);
+        var flow = new OperatorFlow("Contour Region Type Boundary");
+        flow.AddOperator(contour);
+        flow.AddOperator(erosion);
+
+        var connection = new OperatorConnection(
+            contour.Id,
+            contour.OutputPorts.Single(port => port.Name == "Contours").Id,
+            erosion.Id,
+            erosion.InputPorts.Single(port => port.Name == "Region").Id);
+
+        var act = () => flow.AddConnection(connection);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Contour -> Region*");
+    }
+
+    [Fact]
+    public void FlowLinter_ShouldRejectContourToRegionWithSemanticSuggestion()
+    {
+        var factory = new OperatorFactory();
+        var contour = factory.CreateOperator(OperatorType.ContourDetection, "ContourDetection", 0, 0);
+        var erosion = factory.CreateOperator(OperatorType.RegionErosion, "RegionErosion", 100, 0);
+        var flow = new OperatorFlow("Contour Region Type Boundary");
+        flow.AddOperator(contour);
+        flow.AddOperator(erosion);
+        flow.Connections.Add(new OperatorConnection(
+            contour.Id,
+            contour.OutputPorts.Single(port => port.Name == "Contours").Id,
+            erosion.Id,
+            erosion.InputPorts.Single(port => port.Name == "Region").Id));
+
+        var result = new FlowLinter().Lint(flow);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().ContainSingle(issue =>
+            issue.Code == "STRUCT_004" &&
+            issue.Suggestion.Contains("Contour/轮廓", StringComparison.Ordinal) &&
+            issue.Suggestion.Contains("Region/像素区域", StringComparison.Ordinal) &&
+            issue.Suggestion.Contains("BinaryImageToRegion", StringComparison.Ordinal));
     }
 
     [Fact]

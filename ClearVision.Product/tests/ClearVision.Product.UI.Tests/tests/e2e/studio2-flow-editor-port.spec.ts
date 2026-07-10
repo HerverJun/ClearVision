@@ -375,7 +375,7 @@ test('legacy flow editor connection toast reads alternate port type fields', asy
     return document.querySelector('.cv-toast-message')?.textContent ?? '';
   });
 
-  expect(toastMessage).toBe('区域闭运算需要 Region 输入，请先使用二值图转区域/区域生成算子；若要直接处理二值图，请使用图像形态学闭运算。');
+  expect(toastMessage).toBe('当前输出是 Image/图像，不是 Region；请插入 BinaryImageToRegion。');
 });
 
 async function installStudio2FrontendV2Routes(page: Page): Promise<void> {

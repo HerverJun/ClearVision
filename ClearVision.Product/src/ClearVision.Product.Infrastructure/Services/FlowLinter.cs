@@ -25,8 +25,14 @@ namespace ClearVision.Product.Infrastructure.Services;
 /// </summary>
 public class FlowLinter
 {
-    private const string RegionImageMismatchSuggestion =
-        "区域闭运算需要 Region 输入，请先使用二值图转区域/区域生成算子；若要直接处理二值图，请使用图像形态学闭运算。";
+    private const string ImageToRegionMismatchSuggestion =
+        "当前输出是 Image/图像，不是 Region；请插入 BinaryImageToRegion。";
+
+    private const string ContourToRegionMismatchSuggestion =
+        "当前输出是 Contour/轮廓，不是 Region/像素区域。区域形态学需要 Region；请从二值图使用 BinaryImageToRegion 生成 Region，或改用轮廓测量、Blob特征处理算子。";
+
+    private const string BlobListToRegionMismatchSuggestion =
+        "当前输出是 BlobList/Blob结果列表，不是 Region/像素区域。区域形态学需要 Region；请从二值图使用 BinaryImageToRegion 生成 Region，或改用 Blob 特征处理算子。";
 
     private static readonly Lazy<IReadOnlySet<OperatorType>> ExecutableOperatorTypes = new(BuildExecutableOperatorTypes);
 
@@ -319,10 +325,20 @@ public class FlowLinter
     {
         if (source == PortDataType.Image && target == PortDataType.Region)
         {
-            return RegionImageMismatchSuggestion;
+            return ImageToRegionMismatchSuggestion;
         }
 
-        return "请检查端口数据类型匹配，或使用 TypeConvert 算子进行转换。";
+        if (source == PortDataType.Contour && target == PortDataType.Region)
+        {
+            return ContourToRegionMismatchSuggestion;
+        }
+
+        if (source == PortDataType.BlobList && target == PortDataType.Region)
+        {
+            return BlobListToRegionMismatchSuggestion;
+        }
+
+        return $"当前输出是 {source}，目标输入需要 {target}；请连接同类型端口或使用明确支持该转换的算子。";
     }
 
     private static IReadOnlySet<OperatorType> BuildExecutableOperatorTypes()

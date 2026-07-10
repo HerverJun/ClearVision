@@ -22,4 +22,6 @@ public sealed class OutputPortAttribute : Attribute
     public string DisplayName { get; }
 
     public PortDataType DataType { get; }
+
+    public string? Description { get; set; }
 }

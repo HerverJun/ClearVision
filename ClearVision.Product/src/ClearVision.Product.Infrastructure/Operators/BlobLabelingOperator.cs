@@ -19,7 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "blob", "label", "classify connected component" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
-[InputPort("Blobs", "Blobs", PortDataType.Contour, IsRequired = false)]
+[InputPort("Blobs", "Blob结果列表", PortDataType.BlobList, IsRequired = false, Description = "BlobAnalysis.Blobs 输出的 Blob 结果列表；不是 Contour 或 Region。")]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("Labels", "Labels", PortDataType.Any)]
 [OutputPort("Count", "Count", PortDataType.Integer)]

@@ -840,7 +840,11 @@ export class FlowEditorInteraction {
             isOutput: port.type === 'output'
         };
         this.canvas.mousePosition = { ...this.connectionEnd };
-        this.canvas.hoveredPort = null;
+        if (typeof this.canvas.setHoveredPort === 'function') {
+            this.canvas.setHoveredPort(null);
+        } else {
+            this.canvas.hoveredPort = null;
+        }
         this.canvas.invalidate?.();
     }
 
@@ -862,8 +866,43 @@ export class FlowEditorInteraction {
             }
         }
 
-        this.canvas.canvas.style.cursor = 'crosshair';
+        const hoveredPort = this.getPortAt(this.connectionEnd.x, this.connectionEnd.y);
+        let hoverState = null;
+        if (hoveredPort &&
+            hoveredPort.nodeId !== this.connectionStart?.nodeId &&
+            hoveredPort.type !== this.connectionStart?.type) {
+            const source = this.connectionStart.type === 'output' ? this.connectionStart : hoveredPort;
+            const target = this.connectionStart.type === 'input' ? this.connectionStart : hoveredPort;
+            const readPortType = typeof this.canvas.readPortType === 'function'
+                ? port => this.canvas.readPortType(port)
+                : port => port?.type ?? port?.dataType ?? port?.DataType ?? port?.Type ?? 'Any';
+            const sourceType = readPortType(source?.port);
+            const targetType = readPortType(target?.port);
+            const compatible = typeof this.canvas.checkTypeCompatibility === 'function'
+                ? this.canvas.checkTypeCompatibility(sourceType, targetType)
+                : sourceType === targetType;
+            hoverState = {
+                nodeId: hoveredPort.nodeId,
+                portIndex: hoveredPort.portIndex,
+                isOutput: hoveredPort.type === 'output',
+                compatibility: compatible ? 'compatible' : 'incompatible',
+                incompatibilityMessage: compatible
+                    ? ''
+                    : (typeof this.canvas.getPortTypeMismatchMessage === 'function'
+                        ? this.canvas.getPortTypeMismatchMessage(sourceType, targetType)
+                        : `端口类型不匹配：${sourceType} -> ${targetType}`)
+            };
+        }
+
+        this.canvas.canvas.style.cursor = hoverState?.compatibility === 'incompatible'
+            ? 'not-allowed'
+            : (hoverState ? 'pointer' : 'crosshair');
         this.canvas.mousePosition = { ...this.connectionEnd };
+        if (typeof this.canvas.setHoveredPort === 'function') {
+            this.canvas.setHoveredPort(hoverState, e);
+        } else {
+            this.canvas.hoveredPort = hoverState;
+        }
         this.canvas.invalidate?.();
     }
 
@@ -975,7 +1014,11 @@ export class FlowEditorInteraction {
         this.connectionDidDrag = false;
         this.canvas.isConnecting = false;
         this.canvas.connectingFrom = null;
-        this.canvas.hoveredPort = null;
+        if (typeof this.canvas.setHoveredPort === 'function') {
+            this.canvas.setHoveredPort(null);
+        } else {
+            this.canvas.hoveredPort = null;
+        }
         this.canvas.canvas.style.cursor = 'default';
         this.canvas.invalidate?.();
     }

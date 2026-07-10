@@ -417,6 +417,10 @@ public enum PortDataType
 
     Region = 13,
 
+    BlobList = 14,
+
+    BlobFeatureList = 15,
+
     Any = 99
 }
 

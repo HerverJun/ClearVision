@@ -728,6 +728,8 @@ export class TemplateSelector {
             ports.push({
                 id: this._generateId(),
                 name,
+                displayName: metadataPort.displayName || metadataPort.DisplayName || name,
+                description: metadataPort.description || metadataPort.Description || '',
                 dataType,
                 direction: isInput ? 0 : 1,
                 isRequired: Boolean(metadataPort.isRequired ?? metadataPort.IsRequired)

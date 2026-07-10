@@ -31,10 +31,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
     UnsuitableUseCases = new[] { "Maintaining strict separation between adjacent components closer than the selected kernel." },
     KnownLimitations = new[] { "Closing can bridge nearby components when the gap is within kernel reach.", "The operation uses a single dilation+erosion pair; repeated closing requires explicit workflow repetition." }
 )]
-[InputPort("Region", "Input Region", PortDataType.Region, IsRequired = true)]
-[InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]
-[OutputPort("Region", "Closed Region", PortDataType.Region)]
-[OutputPort("Image", "Visualization", PortDataType.Image)]
+[InputPort("Region", "输入区域", PortDataType.Region, IsRequired = true, Description = "区域闭运算的主输入，必须是 Region/像素区域；Image 或 Contour 不能直接替代。")]
+[InputPort("Image", "参考图像（可选）", PortDataType.Image, IsRequired = false, Description = "仅用于参考图和结果可视化，不参与区域闭运算计算，也不是主输入。")]
+[OutputPort("Region", "闭运算后区域", PortDataType.Region, Description = "闭运算得到的 Region/像素区域。")]
+[OutputPort("Image", "可视化图像", PortDataType.Image, Description = "在参考图或区域底图上绘制的预览结果。")]
 [OutputPort("Area", "Closed Area", PortDataType.Integer)]
 [OperatorParam("KernelShape", "Structuring Element Shape", "enum", DefaultValue = "Rectangle", Options = new[] { "Rectangle|Rectangle", "Ellipse|Ellipse", "Cross|Cross" })]
 [OperatorParam("KernelWidth", "Kernel Width", "int", DefaultValue = 3, Min = 1, Max = 99)]
@@ -52,7 +52,7 @@ public class RegionClosingOperator : OperatorBase
         var kernelHeight = GetIntParam(@operator, "KernelHeight", 3, 1, 99);
 
         if (!TryGetInputRegion(inputs, "Region", out var region) || region == null)
-            return Task.FromResult(OperatorExecutionOutput.Failure("Input region required."));
+            return Task.FromResult(OperatorExecutionOutput.Failure("当前缺少 Region；Image/Contour 不能直接替代；请使用 BinaryImageToRegion 或区域生成算子。"));
 
         if (region.IsEmpty)
             return Task.FromResult(CreateEmptyOutput());

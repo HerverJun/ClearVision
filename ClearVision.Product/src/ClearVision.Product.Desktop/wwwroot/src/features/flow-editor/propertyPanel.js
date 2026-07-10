@@ -2010,6 +2010,12 @@ class PropertyPanel {
                 const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
                 return flowCanvas?.nodes?.get?.(nodeId) || null;
             },
+            hasInputConnection: (nodeId, portIndex) => {
+                const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+                const rawCanvas = flowCanvas?.raw || flowCanvas;
+                return Array.isArray(rawCanvas?.connections) && rawCanvas.connections.some(connection =>
+                    connection?.target === nodeId && Number(connection?.targetPort) === Number(portIndex));
+            },
             onSelectNode: nodeId => {
                 const flowCanvas = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
                 if (flowCanvas?.selectNode?.(nodeId)) {
