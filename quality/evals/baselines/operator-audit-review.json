@@ -5,12 +5,14 @@
     "operator": "ForEach",
     "field": "FailFast",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "resolved",
+    "productionReachability": "reachable",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ForEachOperator.cs:98 uses a false GetBoolParam fallback.",
-      "Formal OperatorParam metadata declares FailFast default=true."
+      "Formal metadata declares FailFast=true, while persisted and direct DTO flows can omit the parameter.",
+      "ForEachOperator now uses true when FailFast is absent; Sprint2_ForEachTests covers the missing case and verifies that explicit false still wins."
     ],
-    "reason": "A directly constructed operator that omits FailFast can execute with a different value than factory-created metadata defaults."
+    "reason": "The old false fallback changed loop termination on a production-reachable legacy/DTO path. The runtime fallback now matches formal metadata without overriding an explicit value."
   },
   {
     "reviewId": "OAR-002",
@@ -18,12 +20,14 @@
     "operator": "HttpRequest",
     "field": "Url",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/HttpRequestOperator.cs:236 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Url default=http://localhost:5000/api."
+      "Formal metadata provides http://localhost:5000/api for normal authoring, but HttpRequest execution and validation reject a structurally absent Url.",
+      "ProjectService and FlowEntityMapper can reconstruct historical or direct DTO operators without the field, so the fail-closed branch is reachable."
     ],
-    "reason": "The direct runtime fallback and formal authoring default are different observable values."
+    "reason": "An absent network target is intentionally rejected instead of silently authorizing a localhost request. This safety difference remains separate from normal metadata-default authoring."
   },
   {
     "reviewId": "OAR-003",
@@ -31,12 +35,14 @@
     "operator": "ImageSave",
     "field": "Directory",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageSaveOperator.cs:260 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Directory default=C:\\ClearVision\\NG_Images."
+      "Formal authoring metadata supplies C:\\ClearVision\\NG_Images, while a structurally absent Directory/FolderPath fails before any file write.",
+      "The missing-field branch is reachable through historical persisted flows and direct DTO construction."
     ],
-    "reason": "Missing metadata can redirect the save path away from the formal default."
+    "reason": "The fail-closed runtime branch prevents an omitted output target from silently writing to a machine-local path. It is retained as an intentional side-effect safety boundary."
   },
   {
     "reviewId": "OAR-004",
@@ -44,12 +50,14 @@
     "operator": "ImageSave",
     "field": "FileNameTemplate",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "resolved",
+    "productionReachability": "reachable",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageSaveOperator.cs:281 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares FileNameTemplate default=NG_{yyyyMMdd_HHmmss}_{Guid}.jpg."
+      "Formal metadata declares NG_{yyyyMMdd_HHmmss}_{Guid}.jpg, while the old absent-field path produced image_{timestamp}.png.",
+      "ImageSaveOperator now uses and expands the formal template; ImageSaveOperatorTests observes the resulting JPG name and existing tests preserve explicit canonical and legacy values."
     ],
-    "reason": "The runtime fallback does not preserve the formal file naming contract when the parameter is absent."
+    "reason": "The missing filename changed both the external filename and image format. The fallback and token expansion now match the formal metadata contract."
   },
   {
     "reviewId": "OAR-005",
@@ -57,12 +65,14 @@
     "operator": "MitsubishiMcCommunication",
     "field": "Port",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MitsubishiMcCommunicationOperator.cs:181 uses GetIntParam fallback=0.",
-      "Formal OperatorParam metadata declares Port default=5002."
+      "Formal metadata supplies port 5002 for normal authoring, while ResolveConnectionSettings treats an absent operator endpoint as incomplete unless global fallback is explicitly enabled.",
+      "Historical and direct DTO flows can omit the field, but execution admission remains a separate prerequisite for real PLC I/O."
     ],
-    "reason": "An omitted port resolves to a different network endpoint than the formal metadata contract."
+    "reason": "The zero fallback is a fail-closed signal paired with missing IP handling; changing only the port would not create a complete endpoint and could weaken explicit PLC configuration requirements."
   },
   {
     "reviewId": "OAR-006",
@@ -70,12 +80,14 @@
     "operator": "MqttPublish",
     "field": "Broker",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "not-applicable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs:146 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Broker default=localhost."
+      "MqttPublish metadata marks the operator maturity as placeholder-disabled and Execute always returns MQTT_PUBLISH_DISABLED without publishing.",
+      "Validation rejects a structurally absent Broker even though normal authoring supplies localhost."
     ],
-    "reason": "The communication target differs when Broker is absent."
+    "reason": "The current difference is a deliberate fail-closed validation boundary on a disabled integration; there is no enabled production publish path whose broker behavior can be regressed."
   },
   {
     "reviewId": "OAR-007",
@@ -83,12 +95,14 @@
     "operator": "MqttPublish",
     "field": "Topic",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "not-applicable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs:147 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Topic default=cv/results."
+      "MqttPublish is explicitly placeholder-disabled and never performs a real publish.",
+      "A missing Topic is rejected before the disabled-integration result, while normal authoring metadata supplies cv/results."
     ],
-    "reason": "The publish destination differs when Topic is absent."
+    "reason": "Keeping a missing publish destination fail-closed is intentional until a real MQTT client and execution lifecycle are enabled and reviewed."
   },
   {
     "reviewId": "OAR-008",
@@ -96,12 +110,14 @@
     "operator": "OmronFinsCommunication",
     "field": "Address",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "intentional-difference",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OmronFinsCommunicationOperator.cs:147 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Address default=DM100."
+      "Execution has a DM100 compatibility fallback, but ValidateParameters requires a structurally present address.",
+      "The missing-field validation branch is reachable through historical persisted and direct DTO operators."
     ],
-    "reason": "The PLC memory address differs when the parameter is omitted."
+    "reason": "PLC memory addresses remain fail-closed at validation so an omitted field cannot silently select DM100 for a real read or write."
   },
   {
     "reviewId": "OAR-009",
@@ -109,12 +125,14 @@
     "operator": "PointSetTool",
     "field": "FilterMaxX",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "not-proven",
+    "verdict": "candidate",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PointSetToolOperator.cs:61 uses double.MaxValue as the fallback.",
-      "Formal OperatorParam metadata declares FilterMaxX default=1000000000."
+      "Metadata declares 1000000000 while the absent-field fallback is double.MaxValue.",
+      "A behavioral difference requires Operation=Filter, an omitted FilterMaxX, and input coordinates above 1000000000; no formal production fixture or saved project proving that combination was found."
     ],
-    "reason": "The effective filtering boundary differs for directly constructed operators."
+    "reason": "The static difference is real, but production impact is not established. It remains a candidate rather than being changed to reduce finding count."
   },
   {
     "reviewId": "OAR-010",
@@ -122,12 +140,14 @@
     "operator": "PolarUnwrap",
     "field": "OuterRadius",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "candidate",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PolarUnwrapOperator.cs:113 uses GetIntParam fallback=1.",
-      "Formal OperatorParam metadata declares OuterRadius default=100."
+      "ValidateParameters uses 1 when OuterRadius is structurally absent, while Execute derives half of the input image size and metadata declares 100.",
+      "Historical or direct DTO construction can reach the absent-field path, but the repository does not establish whether the adaptive image-size fallback is an intentional legacy contract."
     ],
-    "reason": "The unwrap geometry changes materially when OuterRadius is absent."
+    "reason": "The three-way difference needs product intent and legacy-project evidence before changing geometry behavior, so it remains a candidate."
   },
   {
     "reviewId": "OAR-011",
@@ -135,12 +155,14 @@
     "operator": "PyramidShapeMatch",
     "field": "AngleRange",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "resolved",
+    "productionReachability": "reachable",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/PyramidShapeMatchOperator.cs:354 uses GetIntParam fallback=0.",
-      "Formal OperatorParam metadata declares AngleRange default=180."
+      "Formal metadata declares AngleRange=180, while both execution and validation previously fell back to 0.",
+      "PyramidShapeMatchOperator now uses 180 for absent values; DefaultFallbackGovernanceTests reads the real MatcherConfig and verifies explicit 15 still wins."
     ],
-    "reason": "The fallback disables the formal angular search range."
+    "reason": "The old fallback disabled angular search on production-reachable incomplete flows. Runtime and validation now match formal metadata."
   },
   {
     "reviewId": "OAR-012",
@@ -148,12 +170,14 @@
     "operator": "StringFormat",
     "field": "Template",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "reachable",
+    "verdict": "open-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/StringFormatOperator.cs:55 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares Template default=Result is {0} and {1}."
+      "Formal metadata declares Result is {0} and {1}, while a structurally absent Template falls back to an empty string and concatenates inputs.",
+      "ProjectService and direct DTO construction can produce an operator without the field, making the output difference observable in formal execution."
     ],
-    "reason": "The formatted output contract differs when Template is absent."
+    "reason": "This is a confirmed production-reachable output difference, but it remains open because the round is capped at five fixes and higher-risk file, state, flow-control, and matching issues were prioritized."
   },
   {
     "reviewId": "OAR-013",
@@ -161,12 +185,14 @@
     "operator": "VariableIncrement",
     "field": "ResetThreshold",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "resolved",
+    "productionReachability": "reachable",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/VariableIncrementOperator.cs:54 uses GetIntParam fallback=0.",
-      "Formal OperatorParam metadata declares ResetThreshold default=100."
+      "Formal metadata declares ResetThreshold=100, while the old absent-field fallback was 0.",
+      "VariableIncrementOperator now uses 100; operator tests cover missing and explicit thresholds, and ProjectServiceTests covers save/load materialization followed by real Execute."
     ],
-    "reason": "The state reset behavior differs for an omitted parameter."
+    "reason": "The old fallback could reset state on nearly every positive counter value. The runtime now preserves the formal threshold and explicit values."
   },
   {
     "reviewId": "OAR-014",
@@ -174,12 +200,14 @@
     "operator": "VariableWrite",
     "field": "StaticValue",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "resolved",
+    "productionReachability": "reachable",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/VariableWriteOperator.cs:611 uses an empty GetStringParam fallback.",
-      "Formal OperatorParam metadata declares StaticValue default=0."
+      "Formal metadata declares StaticValue=0, while the old missing fallback was an empty string.",
+      "VariableWriteOperator now uses 0; VariableWriteOperatorTests observes a missing Int static value writing zero while existing explicit-value tests remain unchanged."
     ],
-    "reason": "The written value differs when StaticValue is omitted."
+    "reason": "The missing static value changed persisted state and could fail numeric conversion. Runtime fallback now matches metadata without overriding upstream or explicit values."
   },
   {
     "reviewId": "OAR-015",
@@ -187,11 +215,13 @@
     "operator": "WidthMeasurement",
     "field": "SampleCount",
     "reviewStatus": "reviewed",
-    "verdict": "true-positive",
+    "staticDifferenceStatus": "present",
+    "productionReachability": "not-applicable",
+    "verdict": "audit-false-positive",
     "evidence": [
-      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/WidthMeasurementOperator.cs:357 uses ReadIntParameter fallback=0.",
-      "Formal OperatorParam metadata declares SampleCount default=24."
+      "ResolveSampleCount reads SampleCount with sentinel 0 only to distinguish an absent canonical value from a configured value.",
+      "The same helper then reads legacy NumSamples with fallback 24 and clamps it to the metadata range, so an operator missing both fields effectively uses 24."
     ],
-    "reason": "The measurement sampling behavior differs when the parameter is absent."
+    "reason": "The static analyzer reports the intermediate sentinel but the observable missing-parameter result already equals the formal metadata default. No production defect is present."
   }
 ]

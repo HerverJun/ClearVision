@@ -95,7 +95,7 @@ public class ForEachOperator : OperatorBase
         var ioMode = GetStringParam(@operator, "IoMode", "Parallel");
         int maxParallelism = GetIntParam(@operator, "MaxParallelism", Environment.ProcessorCount, 1, 64);
         bool orderResults = GetBoolParam(@operator, "OrderResults", true);
-        bool failFast = GetBoolParam(@operator, "FailFast", false);
+        bool failFast = GetBoolParam(@operator, "FailFast", true);
         int timeoutMs = GetTimeoutMs(@operator, clampToRange: true);
 
         Logger.LogInformation("[ForEach] 开始执行: 项目数={Count}, IoMode={IoMode}, MaxParallelism={MaxParallelism}, FailFast={FailFast}",

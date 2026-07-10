@@ -230,6 +230,54 @@ public class Sprint2_ForEachTests
         Assert.Equal(3, executionCount);
     }
 
+    [Theory]
+    [InlineData(null, 3)]
+    [InlineData(false, 6)]
+    public async Task ForEach_SequentialMode_MissingFailFastUsesMetadataDefault_AndExplicitFalseWins(
+        bool? explicitFailFast,
+        int expectedExecutionCount)
+    {
+        var items = Enumerable.Range(0, 6)
+            .Select(i => new ClearVision.Product.Core.ValueObjects.DetectionResult($"Item{i}", 0.9f, i * 10, 0, 10, 10))
+            .ToList();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "IoMode", "Sequential" },
+            { "TimeoutMs", 30000 }
+        });
+        if (explicitFailFast.HasValue)
+        {
+            op.UpdateParameter("FailFast", explicitFailFast.Value);
+        }
+        else
+        {
+            op.Parameters.RemoveAll(parameter => parameter.Name == "FailFast");
+        }
+
+        var executionCount = 0;
+        _flowExecutorMock.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>>(),
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                var currentIndex = executionCount++;
+                return Task.FromResult(currentIndex == 2
+                    ? new FlowExecutionResult { IsSuccess = false, ErrorMessage = "simulated failure" }
+                    : new FlowExecutionResult
+                    {
+                        IsSuccess = true,
+                        OutputData = new Dictionary<string, object> { ["Result"] = true }
+                    });
+            });
+        _operator.SubGraph = new OperatorFlow("SubGraph");
+
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Items"] = items });
+
+        Assert.Equal(expectedExecutionCount, executionCount);
+    }
+
     /// <summary>
     /// 测试：空列表返回空结果
     /// </summary>

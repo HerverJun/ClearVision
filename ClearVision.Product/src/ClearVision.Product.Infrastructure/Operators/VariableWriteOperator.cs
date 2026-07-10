@@ -608,7 +608,7 @@ public class VariableWriteOperator : OperatorBase
     {
         value = string.Empty;
         error = string.Empty;
-        var staticValue = GetStringParam(@operator, "StaticValue", "");
+        var staticValue = GetStringParam(@operator, "StaticValue", "0");
         if (TryConvertRunValue(staticValue, dataType, conversionMode, out value, out error))
         {
             return true;

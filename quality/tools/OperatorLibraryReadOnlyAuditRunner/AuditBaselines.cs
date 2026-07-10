@@ -15,6 +15,8 @@ public sealed record AuditReviewEntry(
     string Operator,
     string Field,
     string ReviewStatus,
+    string StaticDifferenceStatus,
+    string ProductionReachability,
     string Verdict,
     IReadOnlyList<string> Evidence,
     string Reason);
@@ -22,8 +24,14 @@ public sealed record AuditReviewEntry(
 public sealed record AuditReviewSummary(
     int SampleCount,
     int ReviewedCount,
-    int FalsePositiveCount,
-    int UncertainCount,
+    int StaticDifferenceCount,
+    int ResolvedDifferenceCount,
+    int ProductionReachableCount,
+    int FixedProductionDefectCount,
+    int OpenProductionDefectCount,
+    int CandidateCount,
+    int IntentionalDifferenceCount,
+    int AuditFalsePositiveCount,
     IReadOnlyList<string> Categories);
 
 public sealed record ConfirmedFindingBaselineEntry(
@@ -54,9 +62,25 @@ public static class AuditBaselineStore
     private static readonly IReadOnlySet<string> Verdicts =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "true-positive",
-            "false-positive",
-            "uncertain",
+            "fixed-production-defect",
+            "open-production-defect",
+            "candidate",
+            "intentional-difference",
+            "audit-false-positive"
+        };
+
+    private static readonly IReadOnlySet<string> StaticDifferenceStatuses =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "present",
+            "resolved"
+        };
+
+    private static readonly IReadOnlySet<string> ProductionReachabilities =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "reachable",
+            "not-proven",
             "not-applicable"
         };
 
@@ -108,19 +132,47 @@ public static class AuditBaselineStore
                 errors.Add($"invalid reviewStatus:{entry.ReviewId}");
             }
 
+            if (!StaticDifferenceStatuses.Contains(entry.StaticDifferenceStatus))
+            {
+                errors.Add($"invalid staticDifferenceStatus:{entry.ReviewId}");
+            }
+
+            if (!ProductionReachabilities.Contains(entry.ProductionReachability))
+            {
+                errors.Add($"invalid productionReachability:{entry.ReviewId}");
+            }
+
             if (!Verdicts.Contains(entry.Verdict))
             {
                 errors.Add($"invalid verdict:{entry.ReviewId}");
             }
 
-            if (entry.ReviewStatus == "unreviewed" && entry.Verdict is not ("uncertain" or "not-applicable"))
+            if (entry.ReviewStatus == "unreviewed" && entry.Verdict != "candidate")
             {
                 errors.Add($"unreviewed verdict:{entry.ReviewId}");
             }
 
-            if (!findingIdentities.Contains(FindingIdentity(entry.FindingCode, entry.Operator, entry.Field)))
+            var findingExists = findingIdentities.Contains(FindingIdentity(entry.FindingCode, entry.Operator, entry.Field));
+            if (entry.Verdict == "fixed-production-defect")
             {
-                errors.Add($"review finding missing:{entry.ReviewId}");
+                if (entry.StaticDifferenceStatus != "resolved" ||
+                    entry.ProductionReachability != "reachable" ||
+                    findingExists)
+                {
+                    errors.Add($"invalid fixed production defect:{entry.ReviewId}");
+                }
+            }
+            else
+            {
+                if (entry.StaticDifferenceStatus != "present" || !findingExists)
+                {
+                    errors.Add($"review finding missing:{entry.ReviewId}");
+                }
+            }
+
+            if (entry.Verdict == "open-production-defect" && entry.ProductionReachability != "reachable")
+            {
+                errors.Add($"open production defect must be reachable:{entry.ReviewId}");
             }
         }
 
@@ -158,8 +210,14 @@ public static class AuditBaselineStore
         return new AuditReviewSummary(
             entries.Count,
             reviewed.Length,
-            reviewed.Count(item => item.Verdict == "false-positive"),
-            reviewed.Count(item => item.Verdict == "uncertain"),
+            reviewed.Count(item => item.StaticDifferenceStatus == "present"),
+            reviewed.Count(item => item.StaticDifferenceStatus == "resolved"),
+            reviewed.Count(item => item.ProductionReachability == "reachable"),
+            reviewed.Count(item => item.Verdict == "fixed-production-defect"),
+            reviewed.Count(item => item.Verdict == "open-production-defect"),
+            reviewed.Count(item => item.Verdict == "candidate"),
+            reviewed.Count(item => item.Verdict == "intentional-difference"),
+            reviewed.Count(item => item.Verdict == "audit-false-positive"),
             reviewed
                 .Select(item => categories.GetValueOrDefault(item.Operator, "audit-boundary"))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

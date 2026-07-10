@@ -84,7 +84,7 @@ public class PyramidShapeMatchOperator : OperatorBase
         var templatePath = GetStringParam(@operator, "TemplatePath", "");
         var minScore = GetFloatParam(@operator, "MinScore", 80.0f, min: 0.0f, max: 100.0f);
         var matchMode = GetStringParam(@operator, "MatchMode", "Template");
-        var angleRange = GetIntParam(@operator, "AngleRange", 0, min: 0, max: 180);
+        var angleRange = GetIntParam(@operator, "AngleRange", 180, min: 0, max: 180);
         var angleStep = GetIntParam(@operator, "AngleStep", 5, min: 1, max: 45);
         var pyramidLevels = GetIntParam(@operator, "PyramidLevels", 3, min: 1, max: 5);
         var magnitudeThreshold = GetIntParam(@operator, "MagnitudeThreshold", 30, min: 0, max: 255);
@@ -351,7 +351,7 @@ public class PyramidShapeMatchOperator : OperatorBase
             return ValidationResult.Invalid("SpreadT 必须在 1-16 之间");
         }
 
-        var angleRange = GetIntParam(@operator, "AngleRange", 0);
+        var angleRange = GetIntParam(@operator, "AngleRange", 180);
         if (angleRange < 0 || angleRange > 180)
         {
             return ValidationResult.Invalid("角度范围必须在 0-180 之间");

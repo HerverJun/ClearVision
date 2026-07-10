@@ -51,7 +51,7 @@ public class VariableIncrementOperator : OperatorBase
         var variableName = GetStringParam(@operator, "VariableName", "");
         var delta = GetIntParam(@operator, "Delta", 1);
         var resetCondition = GetStringParam(@operator, "ResetCondition", "None");
-        var resetThreshold = GetIntParam(@operator, "ResetThreshold", 0);
+        var resetThreshold = GetIntParam(@operator, "ResetThreshold", 100);
         var resetValue = GetIntParam(@operator, "ResetValue", 0);
 
         if (scope.Equals("Project", StringComparison.OrdinalIgnoreCase))

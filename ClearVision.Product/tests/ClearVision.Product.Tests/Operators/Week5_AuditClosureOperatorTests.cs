@@ -405,6 +405,23 @@ public class VariableReadOperatorTests
 public class VariableWriteOperatorTests
 {
     [Fact]
+    public async Task ExecuteAsync_WhenStaticValueIsMissing_ShouldUseMetadataDefaultZero()
+    {
+        var context = new VariableContext();
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), context);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "lastCount", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("UseInputValue", false, "bool"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        context.GetValue<long>("lastCount").Should().Be(0L);
+        result.OutputData!["Value"].Should().Be(0L);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ShouldWriteInputValueIntoContext()
     {
         var context = new VariableContext();
@@ -908,6 +925,26 @@ public class VariableWriteOperatorTests
 
 public class VariableIncrementOperatorTests
 {
+    [Fact]
+    public async Task ExecuteAsync_WhenResetThresholdIsMissing_ShouldUseMetadataDefaultOneHundred()
+    {
+        var context = new VariableContext();
+        context.SetValue("counter", 50L);
+        var sut = new VariableIncrementOperator(Substitute.For<ILogger<VariableIncrementOperator>>(), context);
+        var op = new Operator("inc", OperatorType.VariableIncrement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "counter", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Delta", 1, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ResetCondition", "GreaterThan", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ResetValue", 0, "int"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["WasReset"].Should().Be(false);
+        result.OutputData["NewValue"].Should().Be(51L);
+        context.GetValue<long>("counter").Should().Be(51L);
+    }
+
     [Fact]
     public async Task ExecuteAsync_ShouldIncrementAndExposeResetState()
     {

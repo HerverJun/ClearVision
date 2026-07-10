@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -40,6 +41,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Quality", "质量", "int", DefaultValue = 90, Min = 1, Max = 100)]
 public class ImageSaveOperator : OperatorBase
 {
+    private const string MetadataDefaultFileNameTemplate = "NG_{yyyyMMdd_HHmmss}_{Guid}.jpg";
+
     public override OperatorType OperatorType => OperatorType.ImageSave;
 
     public ImageSaveOperator(ILogger<ImageSaveOperator> logger) : base(logger) { }
@@ -63,7 +66,7 @@ public class ImageSaveOperator : OperatorBase
         var overwrite = GetBoolParam(@operator, "Overwrite", false);
         var createFolder = GetBoolParam(@operator, "CreateFolder", true);
 
-        if (string.IsNullOrWhiteSpace(folderPath))
+        if (OperatorParameterValueSemantics.IsMissing(folderPath))
         {
             return OperatorExecutionOutput.Failure("Directory/FolderPath 参数不能为空");
         }
@@ -185,6 +188,7 @@ public class ImageSaveOperator : OperatorBase
         var guidToken = Guid.NewGuid().ToString("N");
 
         result = result.Replace("{timestamp}", now.ToString("yyyyMMdd_HHmmss"));
+        result = result.Replace("{yyyyMMdd_HHmmss}", now.ToString("yyyyMMdd_HHmmss"));
         result = result.Replace("{date}", now.ToString("yyyyMMdd"));
         result = result.Replace("{time}", now.ToString("HHmmss"));
         result = result.Replace("{year}", now.Year.ToString());
@@ -202,7 +206,7 @@ public class ImageSaveOperator : OperatorBase
         var format = ResolveFormat(@operator, ResolveFileNameTemplate(@operator));
         var jpegQuality = ResolveJpegQuality(@operator);
 
-        if (string.IsNullOrWhiteSpace(folderPath))
+        if (OperatorParameterValueSemantics.IsMissing(folderPath))
         {
             return ValidationResult.Invalid("Directory/FolderPath 不能为空");
         }
@@ -229,7 +233,7 @@ public class ImageSaveOperator : OperatorBase
     private static bool TryValidateFileName(string fileName, out string error)
     {
         error = string.Empty;
-        if (string.IsNullOrWhiteSpace(fileName))
+        if (OperatorParameterValueSemantics.IsMissing(fileName))
         {
             error = "FileNameTemplate/FileName 不能为空";
             return false;
@@ -278,7 +282,7 @@ public class ImageSaveOperator : OperatorBase
         var hasTemplate = HasParameter(@operator, "FileNameTemplate");
         var hasLegacyTemplate = HasParameter(@operator, "FileName");
         var template = hasTemplate
-            ? GetStringParam(@operator, "FileNameTemplate", "")
+            ? GetStringParam(@operator, "FileNameTemplate", MetadataDefaultFileNameTemplate)
             : string.Empty;
         var legacyTemplate = hasLegacyTemplate
             ? GetStringParam(@operator, "FileName", "")
@@ -299,7 +303,7 @@ public class ImageSaveOperator : OperatorBase
             return template;
         }
 
-        return "image_{timestamp}.png";
+        return MetadataDefaultFileNameTemplate;
     }
 
     private string ResolveFormat(Operator @operator, string fileNameTemplate)
@@ -312,8 +316,8 @@ public class ImageSaveOperator : OperatorBase
 
         var metadataTemplateExplicit = IsExplicitlyConfigured(@operator, "FileNameTemplate");
         var metadataTemplate = HasParameter(@operator, "FileNameTemplate")
-            ? GetStringParam(@operator, "FileNameTemplate", "")
-            : string.Empty;
+            ? GetStringParam(@operator, "FileNameTemplate", MetadataDefaultFileNameTemplate)
+            : MetadataDefaultFileNameTemplate;
         var legacyTemplate = HasParameter(@operator, "FileName")
             ? GetStringParam(@operator, "FileName", "")
             : string.Empty;

@@ -9,9 +9,11 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Operators;
 using ClearVision.Product.Tests.TestData;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
@@ -209,6 +211,167 @@ public class ProjectServiceTests
         execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
         await cameraManager.Received(1).GetOrCreateByBindingAsync("line-camera-01");
         (execution.OutputData!["Image"] as ImageWrapper)?.Release();
+    }
+
+    [Fact]
+    public async Task CreateAndLoadAsync_ShouldCanonicalizeImageSaveAliasesBeforeRealExecute()
+    {
+        var outputDirectory = CreateTempPath();
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        Project? persistedProject = null;
+        string? persistedFlowJson = null;
+        repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
+        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+            .Returns(Task.CompletedTask);
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var request = new CreateProjectRequest
+        {
+            Name = "image-save-alias-round-trip",
+            Flow = new OperatorFlowDto
+            {
+                Name = "image-save-alias-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "save-image",
+                        Type = OperatorType.ImageSave,
+                        Parameters =
+                        [
+                            LegacyParameter("FolderPath", "string", outputDirectory),
+                            LegacyParameter("FileName", "string", "round_trip_{Guid}.jpg"),
+                            LegacyParameter("JpegQuality", "int", 82)
+                        ]
+                    }
+                ]
+            }
+        };
+
+        var created = await service.CreateAsync(request);
+        persistedProject.Should().NotBeNull();
+        persistedFlowJson.Should().NotBeNullOrWhiteSpace();
+        persistedFlowJson.Should().NotContain("\"FolderPath\"");
+        persistedFlowJson.Should().NotContain("\"FileName\"");
+        persistedFlowJson.Should().NotContain("\"JpegQuality\"");
+        repository.GetByIdAsync(created.Id).Returns(Task.FromResult<Project?>(persistedProject));
+        storage.LoadFlowJsonAsync(created.Id).Returns(Task.FromResult(persistedFlowJson));
+
+        var loaded = await service.GetByIdAsync(created.Id);
+        var saveOperator = loaded!.Flow!.ToEntity().Operators.Single();
+        saveOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "Directory")
+            .Which.Value.Should().Be(outputDirectory);
+        saveOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "FileNameTemplate")
+            .Which.Value.Should().Be("round_trip_{Guid}.jpg");
+        saveOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "Quality")
+            .Which.Value.Should().Be(82L);
+
+        var image = TestHelpers.CreateTestImage(12, 8);
+        try
+        {
+            var executor = new ImageSaveOperator(Substitute.For<ILogger<ImageSaveOperator>>());
+            executor.ValidateParameters(saveOperator).IsValid.Should().BeTrue();
+
+            var execution = await executor.ExecuteAsync(
+                saveOperator,
+                TestHelpers.CreateImageInputs(image));
+
+            execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
+            var filePath = execution.OutputData!["FilePath"].Should().BeOfType<string>().Subject;
+            Path.GetDirectoryName(filePath).Should().Be(outputDirectory);
+            Path.GetFileName(filePath).Should().MatchRegex("^round_trip_[0-9a-f]{32}\\.jpg$");
+            File.Exists(filePath).Should().BeTrue();
+        }
+        finally
+        {
+            if (image.RefCount > 0)
+            {
+                image.Release();
+            }
+
+            DeleteDirectoryIfExists(outputDirectory);
+        }
+
+        static ParameterDto LegacyParameter(string name, string dataType, object value) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            DisplayName = name,
+            DataType = dataType,
+            Value = value
+        };
+    }
+
+    [Fact]
+    public async Task CreateAndLoadAsync_WhenResetThresholdIsAbsent_ShouldExecuteWithMetadataDefault()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        Project? persistedProject = null;
+        string? persistedFlowJson = null;
+        repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
+        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+            .Returns(Task.CompletedTask);
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var request = new CreateProjectRequest
+        {
+            Name = "default-fallback-round-trip",
+            Flow = new OperatorFlowDto
+            {
+                Name = "default-fallback-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "counter",
+                        Type = OperatorType.VariableIncrement,
+                        Parameters =
+                        [
+                            Parameter("Scope", "enum", "Run"),
+                            Parameter("VariableName", "string", "counter"),
+                            Parameter("Delta", "int", 1),
+                            Parameter("ResetCondition", "enum", "GreaterThan"),
+                            Parameter("ResetValue", "int", 0)
+                        ]
+                    }
+                ]
+            }
+        };
+
+        var created = await service.CreateAsync(request);
+        persistedProject.Should().NotBeNull();
+        persistedFlowJson.Should().NotBeNullOrWhiteSpace();
+        repository.GetByIdAsync(created.Id).Returns(Task.FromResult<Project?>(persistedProject));
+        storage.LoadFlowJsonAsync(created.Id).Returns(Task.FromResult(persistedFlowJson));
+
+        var loaded = await service.GetByIdAsync(created.Id);
+        var counterOperator = loaded!.Flow!.ToEntity().Operators.Single();
+        counterOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "ResetThreshold")
+            .Which.Value.Should().Be(100L);
+        var context = new VariableContext();
+        context.SetValue("counter", 50L);
+        var executor = new VariableIncrementOperator(
+            Substitute.For<ILogger<VariableIncrementOperator>>(),
+            context);
+
+        var execution = await executor.ExecuteAsync(counterOperator);
+
+        execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
+        execution.OutputData!["WasReset"].Should().Be(false);
+        execution.OutputData["NewValue"].Should().Be(51L);
+
+        static ParameterDto Parameter(string name, string dataType, object value) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            DisplayName = name,
+            DataType = dataType,
+            Value = value
+        };
     }
 
     [Fact]

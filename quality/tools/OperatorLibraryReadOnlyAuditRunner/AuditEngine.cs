@@ -18,8 +18,8 @@ namespace ClearVision.OperatorLibrary.ReadOnlyAudit;
 
 public static class AuditSchema
 {
-    public const string Version = "2026-07-10.operator-audit.v3";
-    public const string SummaryVersion = "2026-07-10.operator-audit-summary.v2";
+    public const string Version = "2026-07-10.operator-audit.v4";
+    public const string SummaryVersion = "2026-07-10.operator-audit-summary.v3";
     public const string ReadOnlyMode = "read-only";
 
     public static readonly IReadOnlySet<string> Classifications =
@@ -964,11 +964,11 @@ public static class AuditEngine
         return new AuditSurface(
             "operatorLibrary",
             "ClearVision.OperatorLibrary packaged assembly file",
-            "available",
-            0,
+            "unavailable",
+            null,
             [],
             [],
-            "The packaged assembly exists, but no formal operator identity index is embedded; the module catalog remains the package identity surface.");
+            "The packaged assembly exists, but it does not expose a readable formal operator identity index. The separate module-catalog surface remains available; an unverifiable package surface is not reported as available with count 0.");
     }
 
     private static IReadOnlyList<string> ReadAiContractIdentities(OperatorFactory factory)
@@ -1261,8 +1261,14 @@ public static class AuditSerialization
             $"| Not reproduced | {report.Summary.NotReproducedCount} |",
             $"| Review baseline entries | {report.Summary.Review.SampleCount} |",
             $"| Reviewed entries | {report.Summary.Review.ReviewedCount} |",
-            $"| Reviewed false positives | {report.Summary.Review.FalsePositiveCount} |",
-            $"| Reviewed uncertain | {report.Summary.Review.UncertainCount} |",
+            $"| Static default differences present | {report.Summary.Review.StaticDifferenceCount} |",
+            $"| Static default differences resolved | {report.Summary.Review.ResolvedDifferenceCount} |",
+            $"| Production reachable reviews | {report.Summary.Review.ProductionReachableCount} |",
+            $"| Fixed production defects | {report.Summary.Review.FixedProductionDefectCount} |",
+            $"| Open production defects | {report.Summary.Review.OpenProductionDefectCount} |",
+            $"| Default mismatch candidates | {report.Summary.Review.CandidateCount} |",
+            $"| Intentional default differences | {report.Summary.Review.IntentionalDifferenceCount} |",
+            $"| Audit false positives | {report.Summary.Review.AuditFalsePositiveCount} |",
             $"| Confirmed baseline | {report.Summary.ConfirmedBaselineCount} |",
             $"| New confirmed | {report.Summary.NewConfirmedCount} |",
             string.Empty,
@@ -1315,12 +1321,12 @@ public static class AuditSerialization
             string.Empty,
             "## Review baseline",
             string.Empty,
-            "| Review | Finding | Operator | Field | Status | Verdict | Evidence | Reason |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |"
+            "| Review | Finding | Operator | Field | Status | Static difference | Production reachability | Verdict | Evidence | Reason |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
         ]);
         foreach (var review in report.ReviewEntries)
         {
-            lines.Add($"| {Escape(review.ReviewId)} | {Escape(review.FindingCode)} | {Escape(review.Operator)} | {Escape(review.Field)} | {Escape(review.ReviewStatus)} | {Escape(review.Verdict)} | {Escape(string.Join("; ", review.Evidence))} | {Escape(review.Reason)} |");
+            lines.Add($"| {Escape(review.ReviewId)} | {Escape(review.FindingCode)} | {Escape(review.Operator)} | {Escape(review.Field)} | {Escape(review.ReviewStatus)} | {Escape(review.StaticDifferenceStatus)} | {Escape(review.ProductionReachability)} | {Escape(review.Verdict)} | {Escape(string.Join("; ", review.Evidence))} | {Escape(review.Reason)} |");
         }
 
         lines.AddRange(

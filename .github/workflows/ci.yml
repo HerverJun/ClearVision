@@ -125,9 +125,10 @@ jobs:
 
           $report = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
           $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-          if ($report.schemaVersion -ne "2026-07-10.operator-audit.v3" -or
+          if ($report.schemaVersion -ne "2026-07-10.operator-audit.v4" -or
               $report.auditMode -ne "read-only" -or
               $report.sourceCommitSha -ne "${{ github.sha }}" -or
+              $summary.schemaVersion -ne "2026-07-10.operator-audit-summary.v3" -or
               $summary.schemaValid -ne $true) {
             throw "Operator audit schema validation failed."
           }

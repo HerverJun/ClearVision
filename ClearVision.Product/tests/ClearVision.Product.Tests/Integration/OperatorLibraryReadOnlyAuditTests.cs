@@ -77,9 +77,31 @@ public sealed class OperatorLibraryReadOnlyAuditTests
         var artifacts = AuditEngine.Generate(new AuditOptions(FindRepoRoot(), "audit-test-sha", ReportOnly: true));
 
         AuditSchemaValidator.Validate(artifacts.Report).Should().BeEmpty();
+        artifacts.Report.SchemaVersion.Should().Be("2026-07-10.operator-audit.v4");
+        artifacts.Summary.SchemaVersion.Should().Be("2026-07-10.operator-audit-summary.v3");
         artifacts.Report.ReviewEntries.Should().HaveCountGreaterOrEqualTo(15);
         artifacts.Summary.Review.ReviewedCount.Should().BeGreaterOrEqualTo(15);
         artifacts.Summary.Review.Categories.Should().HaveCountGreaterOrEqualTo(6);
+        artifacts.Summary.Review.StaticDifferenceCount.Should().Be(10);
+        artifacts.Summary.Review.ResolvedDifferenceCount.Should().Be(5);
+        artifacts.Summary.Review.ProductionReachableCount.Should().Be(11);
+        artifacts.Summary.Review.FixedProductionDefectCount.Should().Be(5);
+        artifacts.Summary.Review.OpenProductionDefectCount.Should().Be(1);
+        artifacts.Summary.Review.CandidateCount.Should().Be(2);
+        artifacts.Summary.Review.IntentionalDifferenceCount.Should().Be(6);
+        artifacts.Summary.Review.AuditFalsePositiveCount.Should().Be(1);
+        artifacts.Report.ReviewEntries.Should().OnlyContain(entry =>
+            !string.IsNullOrWhiteSpace(entry.StaticDifferenceStatus) &&
+            !string.IsNullOrWhiteSpace(entry.ProductionReachability));
+        artifacts.Report.ReviewEntries
+            .Where(entry => entry.Verdict == "fixed-production-defect")
+            .Should().OnlyContain(entry =>
+                entry.StaticDifferenceStatus == "resolved" &&
+                entry.ProductionReachability == "reachable");
+        var operatorLibrary = artifacts.Report.Surfaces.Single(surface => surface.Name == "operatorLibrary");
+        operatorLibrary.Status.Should().Be("unavailable");
+        operatorLibrary.ObservedCount.Should().BeNull();
+        operatorLibrary.FailureReason.Should().NotBeNullOrWhiteSpace();
         artifacts.Report.Findings.Should().OnlyContain(item => AuditSchema.Classifications.Contains(item.Classification));
         artifacts.Json.Should().NotContain("generatedAtUtc");
         artifacts.Json.Should().NotContain("generatedAt");

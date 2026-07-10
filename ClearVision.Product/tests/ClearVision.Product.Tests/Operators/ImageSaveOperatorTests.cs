@@ -81,6 +81,54 @@ public class ImageSaveOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenFileNameTemplateIsMissing_ShouldUseExecutableMetadataDefault()
+    {
+        var outputDir = CreateOutputDirectory();
+        var image = TestHelpers.CreateTestImage();
+
+        try
+        {
+            var op = new Operator("test", OperatorType.ImageSave, 0, 0);
+            op.AddParameter(TestHelpers.CreateParameter("Directory", outputDir, "string"));
+
+            var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            var filePath = result.OutputData!["FilePath"].Should().BeOfType<string>().Subject;
+            Path.GetFileName(filePath).Should().MatchRegex(
+                @"^NG_\d{8}_\d{6}_[0-9a-f]{32}\.jpg$");
+            File.Exists(filePath).Should().BeTrue();
+        }
+        finally
+        {
+            if (image.RefCount > 0)
+            {
+                image.Release();
+            }
+
+            SafeDeleteDirectory(outputDir);
+        }
+    }
+
+    [Fact]
+    public async Task PendingDirectory_ShouldFailValidationAndExecuteBeforeWriting()
+    {
+        var image = TestHelpers.CreateTestImage();
+        var op = new Operator("test", OperatorType.ImageSave, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Directory", "<pending-output-directory>", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FileNameTemplate", "pending-guard.jpg", "string"));
+
+        _operator.ValidateParameters(op).IsValid.Should().BeFalse();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        if (image.RefCount > 0)
+        {
+            image.Release();
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithLegacyParameterNames_ShouldAlsoSaveImage()
     {
         var outputDir = CreateOutputDirectory();
