@@ -667,7 +667,7 @@ export class PreviewPanelCapabilityOwner {
         this.container.addEventListener('keydown', this.handlePixelProbeKeyDown);
         this.container.addEventListener('load', this.handlePreviewImageLoad, true);
         if (typeof document !== 'undefined' && document?.addEventListener) {
-            document.addEventListener('keydown', this.handlePixelProbeKeyDown);
+            document.addEventListener('keydown', this.handlePixelProbeKeyDown, true);
         }
 
         this.unsubscribes.push(
@@ -782,6 +782,7 @@ export class PreviewPanelCapabilityOwner {
         this.pixelProbeStatusText = PIXEL_PROBE_DEFAULT_MESSAGE;
         this.pixelProbeStatusKind = 'default';
         this.syncPixelProbeStatusElement();
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -802,8 +803,33 @@ export class PreviewPanelCapabilityOwner {
         this.syncPixelProbeStatusElement();
     }
 
+    syncPixelProbeSelectionControls() {
+        const hasImage = Boolean(this.previewImageSource);
+        const updateButton = (action, disabled) => {
+            const button = this.container.querySelector?.(`[data-preview-action="${action}"]`);
+            if (!button) {
+                return;
+            }
+
+            button.disabled = disabled;
+            button.setAttribute?.('aria-disabled', disabled ? 'true' : 'false');
+        };
+
+        updateButton('clear-pixel-lock', !hasImage || !this.pixelProbeLockedPoint);
+        updateButton('clear-pixel-roi', !hasImage || !this.pixelProbeRoiSelection);
+    }
+
     getPixelProbeStageFromEvent(event) {
-        return event?.target?.closest?.('.preview-capability-image-stage') || null;
+        const selector = '.preview-capability-image-stage';
+        const targetStage = event?.target?.closest?.(selector) || null;
+        if (targetStage) {
+            return targetStage;
+        }
+
+        const path = typeof event?.composedPath === 'function'
+            ? event.composedPath()
+            : [];
+        return path.find(candidate => candidate?.matches?.(selector)) || null;
     }
 
     getPixelProbeImage(stage = null) {
@@ -921,6 +947,7 @@ export class PreviewPanelCapabilityOwner {
 
         this.pixelProbeLockedPoint = result;
         this.updatePixelProbeStatus(result);
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -931,6 +958,7 @@ export class PreviewPanelCapabilityOwner {
             kind: this.pixelProbeRoiSelection?.kind || 'default',
             message: this.pixelProbeRoiSelection?.message || PIXEL_PROBE_DEFAULT_MESSAGE
         });
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -944,6 +972,7 @@ export class PreviewPanelCapabilityOwner {
         this.pixelProbeRoiSelection = result;
         this.pixelProbeRoiDraft = null;
         this.updatePixelProbeStatus(result);
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -955,6 +984,7 @@ export class PreviewPanelCapabilityOwner {
             kind: this.pixelProbeLockedPoint?.kind || 'default',
             message: this.pixelProbeLockedPoint?.message || PIXEL_PROBE_DEFAULT_MESSAGE
         });
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -967,6 +997,7 @@ export class PreviewPanelCapabilityOwner {
             kind: 'default',
             message: PIXEL_PROBE_DEFAULT_MESSAGE
         });
+        this.syncPixelProbeSelectionControls();
         this.syncPixelProbeOverlayElements();
     }
 
@@ -975,7 +1006,7 @@ export class PreviewPanelCapabilityOwner {
             return;
         }
 
-        const stage = event.target?.closest?.('.preview-capability-image-stage') || null;
+        const stage = this.getPixelProbeStageFromEvent(event);
         if (!stage) {
             if (this.pixelProbeLockedPoint || this.pixelProbeRoiSelection) {
                 this.syncPixelProbeOverlayElements();
@@ -1130,6 +1161,7 @@ export class PreviewPanelCapabilityOwner {
             this.pixelProbeRoiDraft ||
             this.pixelProbePointerDown) {
             event.preventDefault?.();
+            event.stopPropagation?.();
             this.clearPixelProbeSelections();
         }
     }
@@ -1175,13 +1207,11 @@ export class PreviewPanelCapabilityOwner {
 
         if (action === 'clear-pixel-lock') {
             this.clearLockedPixelProbePoint();
-            this.render();
             return;
         }
 
         if (action === 'clear-pixel-roi') {
             this.clearPixelProbeRoiSelection();
-            this.render();
             return;
         }
 
@@ -2033,7 +2063,7 @@ export class PreviewPanelCapabilityOwner {
         this.container.removeEventListener('keydown', this.handlePixelProbeKeyDown);
         this.container.removeEventListener('load', this.handlePreviewImageLoad, true);
         if (typeof document !== 'undefined' && document?.removeEventListener) {
-            document.removeEventListener('keydown', this.handlePixelProbeKeyDown);
+            document.removeEventListener('keydown', this.handlePixelProbeKeyDown, true);
         }
         delete this.container.dataset.previewPanelOwner;
         this.container.innerHTML = '';

@@ -2114,6 +2114,69 @@ test('PreviewPanelCapabilityOwner resets pixel probe status and cache on image m
   owner.dispose();
 });
 
+test('PreviewPanelCapabilityOwner resolves a retargeted pointer path through the image stage', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+  const imageSource = 'data:image/png;base64,RETARGETED_IMAGE';
+  const image = {
+    naturalWidth: 100,
+    naturalHeight: 50,
+    complete: true,
+    currentSrc: imageSource,
+    src: imageSource,
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 200, height: 100, right: 210, bottom: 120 };
+    }
+  };
+  const stage = {
+    matches(selector) {
+      return selector === '.preview-capability-image-stage';
+    },
+    querySelector(selector) {
+      return selector === 'img' ? image : null;
+    }
+  };
+  owner.pixelProbe = {
+    reset() {},
+    probePoint(point, probeImage) {
+      assert.equal(probeImage, image);
+      return {
+        kind: 'pixel',
+        message: `X: ${point.clientX}  Y: ${point.clientY}  RGB: 1,2,3`
+      };
+    }
+  };
+
+  harness.emitPreview({
+    ...successState({
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: imageSource
+      }
+    })
+  });
+
+  owner.handlePixelProbePointerMove({
+    clientX: 30,
+    clientY: 40,
+    target: {
+      closest() {
+        return null;
+      }
+    },
+    composedPath() {
+      return [{}, stage, harness.container];
+    }
+  });
+
+  assert.equal(owner.pixelProbeStatusKind, 'pixel');
+  assert.match(owner.pixelProbeStatusText, /X: 30  Y: 40/);
+  owner.dispose();
+});
+
 test('PreviewPanelCapabilityOwner locks a clicked image point and clears the crosshair', () => {
   const harness = createPreviewCapabilityHarness();
   const owner = new PreviewPanelCapabilityOwner(harness.container, {

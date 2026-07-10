@@ -3,13 +3,15 @@ import { test, expect, Page, TestInfo } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
 type PreviewMode = {
-  value: 'success-no-image' | 'success-image' | 'error' | 'error-diagnostics';
+  value: 'success-no-image' | 'success-image' | 'success-pixel-image' | 'error' | 'error-diagnostics';
   delayMs?: number;
   requests: any[];
 };
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+const PIXEL_PROBE_PNG_BASE64 =
+  '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';
 const STALE_PREVIEW_TEXT = '参数或流程已变更，需重新预览';
 const PROPERTY_RESIZER_SELECTOR = '[data-sidebar-resizer="property"]';
 const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
@@ -215,7 +217,9 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
       contentType: 'application/json',
       body: JSON.stringify({
         success: !isError,
-        outputImageBase64: previewMode.value === 'success-image' ? PNG_BASE64 : null,
+        outputImageBase64: previewMode.value === 'success-pixel-image'
+          ? PIXEL_PROBE_PNG_BASE64
+          : (previewMode.value === 'success-image' ? PNG_BASE64 : null),
         outputData: isError ? null : { Score: 0.982, Width: 320 },
         observation: buildObservation(request, !isError),
         artifacts: [],
@@ -347,6 +351,83 @@ async function collectFlowLayoutMeasurements(page: Page) {
       },
     };
   });
+}
+
+type PixelProbeGeometry = {
+  image: { left: number; top: number; width: number; height: number };
+  content: { left: number; top: number; width: number; height: number };
+  naturalWidth: number;
+  naturalHeight: number;
+};
+
+async function getPixelProbeGeometry(page: Page): Promise<PixelProbeGeometry> {
+  return page.locator('#preview-panel .preview-capability-main-image img').first().evaluate(image => {
+    const rect = image.getBoundingClientRect();
+    const naturalWidth = image.naturalWidth;
+    const naturalHeight = image.naturalHeight;
+    const naturalAspect = naturalWidth / naturalHeight;
+    const elementAspect = rect.width / rect.height;
+    let width = rect.width;
+    let height = rect.height;
+    let left = rect.left;
+    let top = rect.top;
+    if (elementAspect > naturalAspect) {
+      width = height * naturalAspect;
+      left += (rect.width - width) / 2;
+    } else if (elementAspect < naturalAspect) {
+      height = width / naturalAspect;
+      top += (rect.height - height) / 2;
+    }
+
+    return {
+      image: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      content: { left, top, width, height },
+      naturalWidth,
+      naturalHeight,
+    };
+  });
+}
+
+function pointInPixelProbeImage(geometry: PixelProbeGeometry, xRatio: number, yRatio: number) {
+  return {
+    x: geometry.content.left + (geometry.content.width * xRatio),
+    y: geometry.content.top + (geometry.content.height * yRatio),
+  };
+}
+
+async function findFitLetterboxPoint(page: Page, geometry: PixelProbeGeometry) {
+  return page.evaluate(content => {
+    const stage = document.querySelector('#preview-panel .preview-capability-image-stage') as HTMLElement | null;
+    if (!stage) {
+      throw new Error('Pixel probe stage is unavailable while locating a letterbox point.');
+    }
+
+    const bounds = stage.getBoundingClientRect();
+    for (let y = Math.ceil(bounds.top) + 2; y < Math.floor(bounds.bottom) - 1; y += 4) {
+      for (let x = Math.ceil(bounds.left) + 2; x < Math.floor(bounds.right) - 1; x += 4) {
+        const isOutsideImage = x < content.left || x > content.left + content.width ||
+          y < content.top || y > content.top + content.height;
+        const target = document.elementFromPoint(x, y);
+        if (isOutsideImage && target && (target === stage || stage.contains(target))) {
+          return { x, y };
+        }
+      }
+    }
+
+    throw new Error('Fit-mode stage does not expose a hit-testable letterbox point.');
+  }, geometry.content);
+}
+
+function parsePixelProbeCoordinates(text: string) {
+  const match = text.match(/\bX:\s*(\d+)\s+Y:\s*(\d+)/);
+  if (!match) {
+    throw new Error(`Pixel probe coordinates are missing from "${text}".`);
+  }
+
+  return {
+    x: Number.parseInt(match[1], 10),
+    y: Number.parseInt(match[2], 10),
+  };
 }
 
 async function dragPreviewWorkbench(page: Page, deltaX: number) {
@@ -677,6 +758,211 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(workbench.locator('[data-preview-action="image-original"]')).toHaveAttribute('aria-pressed', 'false');
     await assertNoHorizontalOverflow(page);
     await captureFlowLayoutState(page, testInfo, 'success-output-image');
+  });
+
+  test('routes a real retargeted pointermove through the image stage', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', error => consoleErrors.push(error.message));
+
+    previewMode.value = 'success-pixel-image';
+    await addNodeFromFlyout(page);
+    await expect(page.locator('#preview-panel .preview-capability-main-image img')).toBeVisible();
+
+    const target = await page.evaluate(() => {
+      const container = document.querySelector('#preview-panel');
+      const stage = container?.querySelector('.preview-capability-image-stage') as HTMLElement | null;
+      const image = stage?.querySelector('img') as HTMLImageElement | null;
+      if (!container || !stage || !image || !stage.parentElement) {
+        throw new Error('Pixel probe stage is unavailable for retargeted pointer testing.');
+      }
+
+      const host = document.createElement('div');
+      host.dataset.role = 'pixel-probe-retarget-host';
+      host.style.cssText = 'display:block;width:100%;height:260px;position:relative;';
+      const shadow = host.attachShadow({ mode: 'open' });
+      stage.parentElement.replaceChild(host, stage);
+      stage.style.cssText = 'display:block;position:relative;width:100%;height:100%;overflow:hidden;background:#08080a;';
+      image.style.cssText = 'display:block;width:100%;height:100%;object-fit:contain;';
+      shadow.appendChild(stage);
+      container.addEventListener('pointermove', event => {
+        const path = event.composedPath();
+        (window as any).__pixelProbeRetargetPath = {
+          targetIsHost: event.target === host,
+          stageIsInComposedPath: path.includes(stage),
+        };
+      }, { capture: true });
+
+      const rect = image.getBoundingClientRect();
+      return {
+        x: rect.left + (rect.width / 2),
+        y: rect.top + (rect.height / 2),
+      };
+    });
+
+    await page.mouse.move(target.x, target.y);
+    const status = page.locator('#preview-panel [data-role="pixel-probe-status"]');
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    expect(await page.evaluate(() => (window as any).__pixelProbeRetargetPath)).toEqual({
+      targetIsHost: true,
+      stageIsInComposedPath: true,
+    });
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('keeps the pixel probe live across hover, lock, ROI, and preview changes', async ({ page }, testInfo) => {
+    const consoleErrors: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', error => consoleErrors.push(error.message));
+
+    previewMode.value = 'success-pixel-image';
+    await addNodeFromFlyout(page);
+    const workbench = page.locator('.preview-workbench-pane');
+    const image = workbench.locator('.preview-capability-main-image img');
+    const status = workbench.locator('[data-role="pixel-probe-status"]');
+    await expect(image).toBeVisible();
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+
+    await page.evaluate(async () => {
+      const registry = (await import('/src/core/app/serviceRegistry.js')).default;
+      const owner = registry.get('previewPanelCapabilityOwner');
+      if (!owner?.pixelProbe) {
+        throw new Error('PreviewPanelCapabilityOwner is unavailable.');
+      }
+
+      (window as any).__pixelProbeOwner = owner;
+      (window as any).__pixelProbeCalls = 0;
+      const probePoint = owner.pixelProbe.probePoint.bind(owner.pixelProbe);
+      owner.pixelProbe.probePoint = (...args: any[]) => {
+        (window as any).__pixelProbeCalls += 1;
+        return probePoint(...args);
+      };
+    });
+
+    await page.evaluate(() => {
+      const stage = document.querySelector('#preview-panel .preview-capability-image-stage') as HTMLElement | null;
+      if (!stage) {
+        throw new Error('Pixel probe stage is unavailable for fit-mode testing.');
+      }
+
+      stage.style.width = '300px';
+      stage.style.height = '300px';
+      stage.style.minHeight = '0';
+      stage.style.maxHeight = 'none';
+    });
+
+    await image.scrollIntoViewIfNeeded();
+    const fit = await getPixelProbeGeometry(page);
+    expect(fit.naturalWidth).toBe(64);
+    expect(fit.naturalHeight).toBe(48);
+    expect(fit.content.top - fit.image.top).toBeGreaterThan(1);
+
+    const firstPoint = pointInPixelProbeImage(fit, 0.2, 0.25);
+    await page.mouse.move(firstPoint.x, firstPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    const firstText = (await status.textContent()) || '';
+    expect(firstText).toMatch(/X:\s*\d+\s+Y:\s*\d+/);
+    expect(firstText).toMatch(/RGB:\s*\d+,\d+,\d+|灰度:\s*\d+/);
+    expect(firstText).toContain('图像: 64x48');
+    expect(firstText).toMatch(/缩放:\s*\d+%/);
+
+    await page.evaluate(() => {
+      (window as any).__pixelProbeStage = document.querySelector('#preview-panel .preview-capability-image-stage');
+    });
+    const secondPoint = pointInPixelProbeImage(fit, 0.75, 0.75);
+    await page.mouse.move(secondPoint.x, secondPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    const secondText = (await status.textContent()) || '';
+    expect(parsePixelProbeCoordinates(secondText)).not.toEqual(parsePixelProbeCoordinates(firstText));
+    expect(await page.evaluate(() =>
+      (window as any).__pixelProbeStage === document.querySelector('#preview-panel .preview-capability-image-stage'))
+    ).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('pixel-probe-hover.png'), fullPage: false });
+
+    const letterboxPoint = await findFitLetterboxPoint(page, fit);
+    await page.mouse.move(letterboxPoint.x, letterboxPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'outside');
+    await page.mouse.move(5, 5);
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+
+    await workbench.locator('[data-preview-action="image-original"]').click();
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'original');
+    const original = await getPixelProbeGeometry(page);
+    const originalPoint = pointInPixelProbeImage(original, 0.25, 0.25);
+    await page.mouse.move(originalPoint.x, originalPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    expect((await status.textContent()) || '').toMatch(/缩放:\s*100%/);
+
+    await workbench.locator('[data-preview-action="image-fit"]').click();
+    await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'fit');
+    const lockGeometry = await getPixelProbeGeometry(page);
+    const lockPoint = pointInPixelProbeImage(lockGeometry, 0.35, 0.35);
+    const movedPoint = pointInPixelProbeImage(lockGeometry, 0.7, 0.7);
+    await page.mouse.move(lockPoint.x, lockPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    await page.mouse.click(lockPoint.x, lockPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'locked');
+    const lockedText = (await status.textContent()) || '';
+    expect(lockedText).toContain('已锁定');
+    await expect(workbench.locator('[data-role="pixel-probe-crosshair"]')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('pixel-probe-locked.png'), fullPage: false });
+
+    await page.mouse.move(movedPoint.x, movedPoint.y);
+    expect((await status.textContent()) || '').toBe(lockedText);
+
+    await workbench.locator('[data-preview-action="clear-pixel-lock"]').click();
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+    await page.mouse.move(movedPoint.x, movedPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+
+    await page.mouse.click(lockPoint.x, lockPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'locked');
+    await page.keyboard.press('Escape');
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+    await page.mouse.move(movedPoint.x, movedPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+
+    const roiStart = pointInPixelProbeImage(lockGeometry, 0.15, 0.2);
+    const roiEnd = pointInPixelProbeImage(lockGeometry, 0.8, 0.8);
+    await page.mouse.move(roiStart.x, roiStart.y);
+    await page.mouse.down();
+    await page.mouse.move(roiEnd.x, roiEnd.y, { steps: 8 });
+    await page.mouse.up();
+    await expect(status).toHaveAttribute('data-probe-state', 'roi');
+    expect((await status.textContent()) || '').toContain('ROI');
+    await workbench.locator('[data-preview-action="clear-pixel-roi"]').click();
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+    await page.mouse.move(movedPoint.x, movedPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+
+    const requestsBeforeSwitch = previewMode.requests.length;
+    await openPreprocessFlyout(page);
+    await page.locator('#operator-group-flyout .operator-flyout-item[data-operator-type="GaussianBlur"]').click();
+    await expect.poll(() => previewMode.requests.length).toBeGreaterThan(requestsBeforeSwitch);
+    await expect(status).toHaveAttribute('data-probe-state', 'default');
+    expect((await status.textContent()) || '').not.toMatch(/已锁定|ROI/);
+
+    await page.evaluate(() => {
+      (window as any).__pixelProbeCalls = 0;
+    });
+    const switchedGeometry = await getPixelProbeGeometry(page);
+    const switchedPoint = pointInPixelProbeImage(switchedGeometry, 0.5, 0.5);
+    await page.mouse.move(switchedPoint.x, switchedPoint.y);
+    await expect(status).toHaveAttribute('data-probe-state', 'pixel');
+    await expect.poll(() => page.evaluate(() => (window as any).__pixelProbeCalls)).toBe(1);
+    expect(await page.evaluate(async () => {
+      const registry = (await import('/src/core/app/serviceRegistry.js')).default;
+      return registry.get('previewPanelCapabilityOwner') === (window as any).__pixelProbeOwner;
+    })).toBe(true);
+    expect(consoleErrors).toEqual([]);
   });
 
   test('marks old preview stale after parameter edit and clears stale after manual preview', async ({ page }, testInfo) => {
