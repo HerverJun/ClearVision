@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-10T11:21:26.9540273+08:00",
-  "totalCount": 156,
+  "generatedAt": "2026-07-10T18:58:57.8974490+08:00",
+  "totalCount": 158,
   "categories": {
     "3D": {
       "count": 6,
@@ -96,6 +96,12 @@
         "LawsTextureFilter"
       ]
     },
+    "几何": {
+      "count": 1,
+      "operators": [
+        "RectangleRegion"
+      ]
+    },
     "匹配定位": {
       "count": 8,
       "operators": [
@@ -107,6 +113,12 @@
         "PyramidShapeMatch",
         "ShapeMatching",
         "TemplateMatching"
+      ]
+    },
+    "区域处理": {
+      "count": 1,
+      "operators": [
+        "BinaryImageToRegion"
       ]
     },
     "变量": {
@@ -751,7 +763,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -762,7 +774,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -773,7 +785,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -784,7 +796,7 @@
           "defaultValue": "0.5",
           "min": "0",
           "max": "1",
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         }
       ],
@@ -917,15 +929,15 @@
     {
       "id": "Morphology",
       "type": 5,
-      "displayName": "Morphology (Legacy)",
-      "description": "Legacy image morphology node. Use Morphological Operation for image workflows and Region* morphology operators for region workflows.",
+      "displayName": "形态学（旧版）",
+      "description": "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
-        "Compatibility",
-        "Deprecated",
-        "ImageOnly",
-        "Legacy",
+        "compatibility",
+        "deprecated",
+        "image-only",
+        "legacy",
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
@@ -1032,7 +1044,7 @@
       "displayName": "Blob分析",
       "description": "连通区域分析",
       "category": "特征提取",
-      "version": "1.1.0",
+      "version": "1.2.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -1042,13 +1054,13 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "图像",
+          "displayName": "二值图像",
           "dataType": "Image",
           "isRequired": true
         },
         {
           "name": "SourceImage",
-          "displayName": "Source Image",
+          "displayName": "参考图像",
           "dataType": "Image",
           "isRequired": false
         }
@@ -1062,14 +1074,14 @@
         },
         {
           "name": "Blobs",
-          "displayName": "Blob数据",
-          "dataType": "Contour",
+          "displayName": "Blob结果列表",
+          "dataType": "BlobList",
           "isRequired": null
         },
         {
           "name": "BlobFeatures",
-          "displayName": "Blob特征",
-          "dataType": "Any",
+          "displayName": "Blob详细特征",
+          "dataType": "BlobFeatureList",
           "isRequired": null
         },
         {
@@ -1190,13 +1202,13 @@
         },
         {
           "name": "FeatureFilter",
-          "displayName": "Feature Filter",
+          "displayName": "特征过滤表达式",
           "dataType": "string",
-          "description": null,
+          "description": "可选。支持 Area、ContourArea、Perimeter、Circularity、Convexity、Rectangularity、Eccentricity、EulerNumber、MeanGray、GrayDeviation、Width、Height、X、Y、CenterX、CenterY、InertiaRatio、ConvexHullArea、HoleCount；示例：Area >= 100 && Circularity >= 0.8。留空不过滤。",
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -4819,9 +4831,91 @@
           "displayName": "状态",
           "dataType": "Boolean",
           "isRequired": null
+        },
+        {
+          "name": "NormalizedResponse",
+          "displayName": "Normalized Response",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "RequestPayload",
+          "displayName": "Request Payload",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ParseSuccess",
+          "displayName": "Parse Success",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "ParsedValue",
+          "displayName": "Parsed Value",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ParsedFields",
+          "displayName": "Parsed Fields",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ParseError",
+          "displayName": "Parse Error",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "MissingResponseFields",
+          "displayName": "Missing Response Fields",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ResponseAccepted",
+          "displayName": "Response Accepted",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "ResponseMatchError",
+          "displayName": "Response Match Error",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ResponseMatchValue",
+          "displayName": "Response Match Value",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
+        {
+          "name": "ProfileId",
+          "displayName": "全局Profile",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "UseGlobalProfile",
+          "displayName": "使用全局Profile",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
         {
           "name": "Mode",
           "displayName": "模式",
@@ -4876,13 +4970,68 @@
           "options": null
         },
         {
+          "name": "UseFixedSendData",
+          "displayName": "固定发送数据",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PayloadTemplate",
+          "displayName": "报文模板",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "DecodeEscapeSequences",
+          "displayName": "Decode Escape Sequences",
+          "dataType": "bool",
+          "description": "启用后解析发送报文、分隔符和匹配条件中的 \\r、\\n、\\xHH 等转义序列。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "WaitResponse",
+          "displayName": "等待响应",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseTimeoutMs",
+          "displayName": "响应超时(ms)",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "5000",
+          "min": "100",
+          "max": "600000",
+          "isRequired": true,
+          "options": null
+        },
+        {
           "name": "Timeout",
           "displayName": "超时(ms)",
           "dataType": "int",
           "description": null,
           "defaultValue": "5000",
           "min": "100",
-          "max": "30000",
+          "max": "600000",
           "isRequired": true,
           "options": null
         },
@@ -4907,6 +5056,355 @@
             {
               "value": "GBK",
               "label": "GBK"
+            },
+            {
+              "value": "HEX",
+              "label": "HEX"
+            }
+          ]
+        },
+        {
+          "name": "FailOnUnresolvedPayloadPlaceholder",
+          "displayName": "Fail On Unresolved Payload Placeholder",
+          "dataType": "bool",
+          "description": "启用后，请求报文模板中存在未解析占位符时执行失败。",
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnParseError",
+          "displayName": "Fail On Parse Error",
+          "dataType": "bool",
+          "description": "启用后，响应解析失败时执行失败。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnUnexpectedResponse",
+          "displayName": "Fail On Unexpected Response",
+          "dataType": "bool",
+          "description": "启用后，响应未满足期望或命中拒绝条件时执行失败。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseParseMode",
+          "displayName": "Response Parse Mode",
+          "dataType": "enum",
+          "description": "选择响应解析方式：不解析、JSON路径、键值对、正则、分隔符或固定宽度。",
+          "defaultValue": "None",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "None"
+            },
+            {
+              "value": "JsonPath",
+              "label": "JSON path"
+            },
+            {
+              "value": "KeyValue",
+              "label": "Key-value"
+            },
+            {
+              "value": "Regex",
+              "label": "Regex"
+            },
+            {
+              "value": "Delimited",
+              "label": "Delimited"
+            },
+            {
+              "value": "FixedWidth",
+              "label": "Fixed width"
+            }
+          ]
+        },
+        {
+          "name": "ResponseFieldName",
+          "displayName": "Response Field Name",
+          "dataType": "string",
+          "description": "单字段解析目标，例如 JSONPath 或解析字段名。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseFieldNames",
+          "displayName": "Response Field Names",
+          "dataType": "string",
+          "description": "多字段解析名称列表，通常用逗号分隔。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RequiredResponseFields",
+          "displayName": "Required Response Fields",
+          "dataType": "string",
+          "description": "必需响应字段列表，缺失时记录 MissingResponseFields。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseFieldWidths",
+          "displayName": "Response Field Widths",
+          "dataType": "string",
+          "description": "固定宽度解析时每个字段的字符宽度列表。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseRegexPattern",
+          "displayName": "Response Regex Pattern",
+          "dataType": "string",
+          "description": "正则解析或正则匹配使用的表达式。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseRegexIgnoreCase",
+          "displayName": "Response Regex Ignore Case",
+          "dataType": "bool",
+          "description": "启用后，响应正则解析忽略大小写。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseKeyValuePairDelimiter",
+          "displayName": "Response Key-Value Pair Delimiter",
+          "dataType": "string",
+          "description": "键值对响应中不同键值对之间的主分隔符。",
+          "defaultValue": ";",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseKeyValuePairDelimiters",
+          "displayName": "Additional Key-Value Pair Delimiters",
+          "dataType": "string",
+          "description": "键值对响应的附加分隔符，多个值用 | 分隔。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseKeyValueSeparator",
+          "displayName": "Response Key-Value Separator",
+          "dataType": "string",
+          "description": "键和值之间的主分隔符。",
+          "defaultValue": "=",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseKeyValueSeparators",
+          "displayName": "Additional Key-Value Separators",
+          "dataType": "string",
+          "description": "键和值之间的附加分隔符，多个值用 | 分隔。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseDelimiter",
+          "displayName": "Response Delimiter",
+          "dataType": "string",
+          "description": "分隔符解析时使用的主分隔符。",
+          "defaultValue": ",",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseDelimiters",
+          "displayName": "Additional Response Delimiters",
+          "dataType": "string",
+          "description": "分隔符解析时使用的附加分隔符，多个值用 | 分隔。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseIndex",
+          "displayName": "Response Index",
+          "dataType": "int",
+          "description": "分隔符解析时选取的字段索引，从 0 开始。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": "4096",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TrimResponseBeforeParse",
+          "displayName": "Trim Response Before Parse",
+          "dataType": "bool",
+          "description": "解析前先裁剪响应两端空白字符。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseStartMarker",
+          "displayName": "Response Start Marker",
+          "dataType": "string",
+          "description": "响应帧起始标记，配置后仅截取标记后的内容。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseEndMarker",
+          "displayName": "Response End Marker",
+          "dataType": "string",
+          "description": "响应帧结束标记，配置后仅截取标记前的内容。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnMissingResponseFrame",
+          "displayName": "Fail On Missing Response Frame",
+          "dataType": "bool",
+          "description": "启用后，响应未找到配置的起止标记时执行失败。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ExpectedResponse",
+          "displayName": "Expected Response",
+          "dataType": "string",
+          "description": "期望响应内容；配置后用于判断响应是否通过。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RejectedResponse",
+          "displayName": "Rejected Response",
+          "dataType": "string",
+          "description": "拒绝响应内容；命中后 ResponseAccepted 为 false。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseMatchMode",
+          "displayName": "Response Match Mode",
+          "dataType": "enum",
+          "description": "响应判断方式：包含、等于、开头、结尾或正则。",
+          "defaultValue": "Contains",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Contains",
+              "label": "Contains"
+            },
+            {
+              "value": "Equals",
+              "label": "Equals"
+            },
+            {
+              "value": "StartsWith",
+              "label": "Starts with"
+            },
+            {
+              "value": "EndsWith",
+              "label": "Ends with"
+            },
+            {
+              "value": "Regex",
+              "label": "Regex"
+            }
+          ]
+        },
+        {
+          "name": "ResponseMatchIgnoreCase",
+          "displayName": "Response Match Ignore Case",
+          "dataType": "bool",
+          "description": "启用后，期望/拒绝响应匹配忽略大小写。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseMatchSource",
+          "displayName": "Response Match Source",
+          "dataType": "enum",
+          "description": "选择响应判断的数据来源：原始响应、归一化响应或解析值。",
+          "defaultValue": "Response",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Response",
+              "label": "Raw response"
+            },
+            {
+              "value": "NormalizedResponse",
+              "label": "Normalized response"
+            },
+            {
+              "value": "ParsedValue",
+              "label": "Parsed value"
             }
           ]
         }
@@ -5041,6 +5539,12 @@
           "displayName": "判断值",
           "dataType": "Any",
           "isRequired": true
+        },
+        {
+          "name": "Compare",
+          "displayName": "Compare Value",
+          "dataType": "Any",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -5054,6 +5558,24 @@
           "name": "False",
           "displayName": "False分支",
           "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "EvaluationSuccess",
+          "displayName": "Evaluation Success",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "EvaluationError",
+          "displayName": "Evaluation Error",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ActualSource",
+          "displayName": "Actual Source",
+          "dataType": "String",
           "isRequired": null
         }
       ],
@@ -5073,8 +5595,16 @@
               "label": "大于"
             },
             {
+              "value": "GreaterThanOrEqual",
+              "label": "大于等于"
+            },
+            {
               "value": "LessThan",
               "label": "小于"
+            },
+            {
+              "value": "LessThanOrEqual",
+              "label": "小于等于"
             },
             {
               "value": "Equal",
@@ -5085,8 +5615,56 @@
               "label": "不等于"
             },
             {
+              "value": "InRange",
+              "label": "范围内"
+            },
+            {
+              "value": "Between",
+              "label": "介于"
+            },
+            {
+              "value": "NotInRange",
+              "label": "范围外"
+            },
+            {
+              "value": "InList",
+              "label": "列表内"
+            },
+            {
+              "value": "NotInList",
+              "label": "列表外"
+            },
+            {
               "value": "Contains",
               "label": "包含"
+            },
+            {
+              "value": "StartsWith",
+              "label": "开头是"
+            },
+            {
+              "value": "EndsWith",
+              "label": "结尾是"
+            },
+            {
+              "value": "Matches",
+              "label": "正则匹配"
+            },
+            {
+              "value": "IsTrue",
+              "label": "为真/OK"
+            },
+            {
+              "value": "IsFalse",
+              "label": "为假/NG"
+            },
+            {
+              "value": "IsEmpty",
+              "label": "为空"
+            },
+            {
+              "value": "IsNotEmpty",
+              "label": "非空"
             }
           ]
         },
@@ -5102,11 +5680,110 @@
           "options": null
         },
         {
+          "name": "CompareListDelimiter",
+          "displayName": "Compare List Delimiter",
+          "dataType": "string",
+          "description": "列表条件使用的主分隔符。",
+          "defaultValue": ",",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CompareListDelimiters",
+          "displayName": "Additional Compare List Delimiters",
+          "dataType": "string",
+          "description": "列表条件使用的附加分隔符，多个值用 | 分隔。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
           "name": "FieldName",
           "displayName": "字段名",
           "dataType": "string",
           "description": null,
           "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CompareFieldName",
+          "displayName": "Compare Field Name",
+          "dataType": "string",
+          "description": "从 Compare 输入或当前 Value 中读取比较值的字段路径。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnMissingField",
+          "displayName": "Fail On Missing Field",
+          "dataType": "bool",
+          "description": "启用后，FieldName 字段缺失时执行失败。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnEvaluationError",
+          "displayName": "Fail On Evaluation Error",
+          "dataType": "bool",
+          "description": "启用后，条件计算错误时执行失败。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NumericTolerance",
+          "displayName": "Numeric Tolerance",
+          "dataType": "double",
+          "description": "数值比较允许的绝对误差。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "IgnoreCase",
+          "displayName": "Ignore Case",
+          "dataType": "bool",
+          "description": "启用后，字符串比较和正则匹配忽略大小写。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RangeMin",
+          "displayName": "Range Min",
+          "dataType": "double",
+          "description": "范围判断的默认下限。",
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RangeMax",
+          "displayName": "Range Max",
+          "dataType": "double",
+          "description": "范围判断的默认上限。",
+          "defaultValue": "1",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -6621,6 +7298,17 @@
           "description": null,
           "defaultValue": "3000",
           "min": "100",
+          "max": "30000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseWaitMs",
+          "displayName": "响应等待(毫秒)",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "100",
+          "min": "0",
           "max": "30000",
           "isRequired": true,
           "options": null
@@ -8693,6 +9381,12 @@
           "isRequired": null
         },
         {
+          "name": "RawValue",
+          "displayName": "Raw Value",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
           "name": "Exists",
           "displayName": "是否存在",
           "dataType": "Boolean",
@@ -8702,6 +9396,54 @@
           "name": "CycleCount",
           "displayName": "循环计数",
           "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "VariableId",
+          "displayName": "Variable Id",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ValueType",
+          "displayName": "Value Type",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "Version",
+          "displayName": "Version",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "UpdatedAtUtc",
+          "displayName": "Updated At UTC",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "UpdatedBy",
+          "displayName": "Updated By",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ReadSource",
+          "displayName": "Read Source",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "OutputFieldName",
+          "displayName": "Output Field Name",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "OutputFieldFound",
+          "displayName": "Output Field Found",
+          "dataType": "Boolean",
           "isRequired": null
         }
       ],
@@ -8784,8 +9526,34 @@
             {
               "value": "Bool",
               "label": "布尔值"
+            },
+            {
+              "value": "Object",
+              "label": "对象"
             }
           ]
+        },
+        {
+          "name": "OutputFieldName",
+          "displayName": "Output Field Name",
+          "dataType": "string",
+          "description": "Optional field path read from the raw variable value, for example ParsedFields.Score.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnMissingOutputField",
+          "displayName": "Fail On Missing Output Field",
+          "dataType": "bool",
+          "description": "When enabled, a missing OutputFieldName path fails instead of falling back to the full variable value.",
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         },
         {
           "name": "ConversionMode",
@@ -8825,6 +9593,17 @@
           "dataType": "string",
           "description": "Optional controlled expression evaluated after Project variable read. Use value for the current variable value.",
           "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnMissingVariable",
+          "displayName": "Fail On Missing Variable",
+          "dataType": "bool",
+          "description": "When enabled, missing run/project variable values fail instead of returning DefaultValue.",
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -8880,6 +9659,54 @@
           "name": "CycleCount",
           "displayName": "循环计数",
           "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "VariableId",
+          "displayName": "Variable Id",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ValueType",
+          "displayName": "Value Type",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "Version",
+          "displayName": "Version",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "UpdatedAtUtc",
+          "displayName": "Updated At UTC",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "UpdatedBy",
+          "displayName": "Updated By",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "WriteSkipped",
+          "displayName": "Write Skipped",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "SkipReason",
+          "displayName": "Skip Reason",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "InputStatusValue",
+          "displayName": "Input Status Value",
+          "dataType": "String",
           "isRequired": null
         }
       ],
@@ -8951,6 +9778,10 @@
             {
               "value": "Bool",
               "label": "布尔值"
+            },
+            {
+              "value": "Object",
+              "label": "对象"
             }
           ]
         },
@@ -9014,6 +9845,50 @@
           "dataType": "string",
           "description": "Optional controlled expression evaluated before Project variable write. Use value for the raw input.",
           "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "InputFieldName",
+          "displayName": "Input Field Name",
+          "dataType": "string",
+          "description": "Optional upstream field path such as ParsedFields.score.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RequireInputStatus",
+          "displayName": "Require Input Status",
+          "dataType": "bool",
+          "description": "When enabled, write only if the configured upstream status field is true/OK/PASS/1.",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "InputStatusFieldName",
+          "displayName": "Input Status Field Name",
+          "dataType": "string",
+          "description": "Optional upstream status field path such as Status or ResponseAccepted.",
+          "defaultValue": "Status",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FailOnInputStatusFalse",
+          "displayName": "Fail On Input Status False",
+          "dataType": "bool",
+          "description": "Return failure instead of a skipped write when the upstream status is false or missing.",
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -17639,8 +18514,8 @@
         },
         {
           "name": "Blobs",
-          "displayName": "Blobs",
-          "dataType": "Contour",
+          "displayName": "Blob结果列表",
+          "dataType": "BlobList",
           "isRequired": false
         }
       ],
@@ -20679,6 +21554,28 @@
           "options": null
         },
         {
+          "name": "CalibrationAssetId",
+          "displayName": "Runtime Calibration Asset Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CalibrationBundleId",
+          "displayName": "Runtime Calibration Bundle Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
           "name": "UseDistortion",
           "displayName": "Use Distortion Model",
           "dataType": "bool",
@@ -21703,12 +22600,187 @@
       "docPath": "算子资料/算子名片/MinEnclosingGeometry.md"
     },
     {
+      "id": "RectangleRegion",
+      "type": 237,
+      "displayName": "矩形区域",
+      "description": "Outputs a rectangular geometry value for operators that consume Rectangle input ports.",
+      "category": "几何",
+      "version": "1.0.0",
+      "tags": [
+        "功能域:检测",
+        "成熟度:稳定",
+        "算法类型:自研"
+      ],
+      "algorithm": "当前元数据描述为：Outputs a rectangular geometry va…",
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "name": "Rectangle",
+          "displayName": "Rectangle",
+          "dataType": "Rectangle",
+          "isRequired": null
+        }
+      ],
+      "parameters": [
+        {
+          "name": "X",
+          "displayName": "X",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Y",
+          "displayName": "Y",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Width",
+          "displayName": "Width",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "1",
+          "min": "1",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Height",
+          "displayName": "Height",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "1",
+          "min": "1",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        }
+      ],
+      "quality": {
+        "totalScore": 84,
+        "level": "B",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
+        "parameterValidationScore": 100,
+        "errorHandlingScore": 35,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
+      },
+      "docPath": "算子资料/算子名片/RectangleRegion.md"
+    },
+    {
+      "id": "BinaryImageToRegion",
+      "type": 238,
+      "displayName": "二值图转区域",
+      "description": "将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。",
+      "category": "区域处理",
+      "version": "1.1.0",
+      "tags": [
+        "功能域:检测",
+        "成熟度:稳定",
+        "算法类型:自研"
+      ],
+      "algorithm": "该算子用于将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区…",
+      "inputPorts": [
+        {
+          "name": "Image",
+          "displayName": "二值图/掩膜",
+          "dataType": "Image",
+          "isRequired": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "Region",
+          "displayName": "像素区域",
+          "dataType": "Region",
+          "isRequired": null
+        },
+        {
+          "name": "Image",
+          "displayName": "可视化图像",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "Area",
+          "displayName": "区域面积",
+          "dataType": "Integer",
+          "isRequired": null
+        }
+      ],
+      "parameters": [
+        {
+          "name": "ForegroundMode",
+          "displayName": "Foreground Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "NonZero",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "NonZero",
+              "label": "Non-zero pixels"
+            },
+            {
+              "value": "Threshold",
+              "label": "Threshold or above"
+            }
+          ]
+        },
+        {
+          "name": "Threshold",
+          "displayName": "Threshold",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "1",
+          "min": "0",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Invert",
+          "displayName": "Invert Foreground",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        }
+      ],
+      "quality": {
+        "totalScore": 76,
+        "level": "B",
+        "documentationScore": 100,
+        "testCoverageScore": 30,
+        "parameterValidationScore": 100,
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+      },
+      "docPath": "算子资料/算子名片/BinaryImageToRegion.md"
+    },
+    {
       "id": "RegionErosion",
       "type": 240,
       "displayName": "Region Erosion",
       "description": "Erodes a region using a specified structuring element (Region-based morphology).",
       "category": "Morphology",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -21718,13 +22790,13 @@
       "inputPorts": [
         {
           "name": "Region",
-          "displayName": "Input Region",
-          "dataType": "Any",
+          "displayName": "输入区域",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Image",
-          "displayName": "Reference Image (Optional)",
+          "displayName": "参考图像（可选）",
           "dataType": "Image",
           "isRequired": false
         }
@@ -21732,13 +22804,13 @@
       "outputPorts": [
         {
           "name": "Region",
-          "displayName": "Eroded Region",
-          "dataType": "Any",
+          "displayName": "腐蚀后区域",
+          "dataType": "Region",
           "isRequired": null
         },
         {
           "name": "Image",
-          "displayName": "Visualization",
+          "displayName": "可视化图像",
           "dataType": "Image",
           "isRequired": null
         },
@@ -21825,7 +22897,7 @@
       "displayName": "Region Dilation",
       "description": "Dilates a region using a specified structuring element (Region-based morphology).",
       "category": "Morphology",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -21835,13 +22907,13 @@
       "inputPorts": [
         {
           "name": "Region",
-          "displayName": "Input Region",
-          "dataType": "Any",
+          "displayName": "输入区域",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Image",
-          "displayName": "Reference Image (Optional)",
+          "displayName": "参考图像（可选）",
           "dataType": "Image",
           "isRequired": false
         }
@@ -21849,13 +22921,13 @@
       "outputPorts": [
         {
           "name": "Region",
-          "displayName": "Dilated Region",
-          "dataType": "Any",
+          "displayName": "膨胀后区域",
+          "dataType": "Region",
           "isRequired": null
         },
         {
           "name": "Image",
-          "displayName": "Visualization",
+          "displayName": "可视化图像",
           "dataType": "Image",
           "isRequired": null
         },
@@ -21942,7 +23014,7 @@
       "displayName": "Region Opening",
       "description": "Opening operation (erosion followed by dilation) for noise removal and smooth region boundaries.",
       "category": "Morphology",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -21952,13 +23024,13 @@
       "inputPorts": [
         {
           "name": "Region",
-          "displayName": "Input Region",
-          "dataType": "Any",
+          "displayName": "输入区域",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Image",
-          "displayName": "Reference Image (Optional)",
+          "displayName": "参考图像（可选）",
           "dataType": "Image",
           "isRequired": false
         }
@@ -21966,13 +23038,13 @@
       "outputPorts": [
         {
           "name": "Region",
-          "displayName": "Opened Region",
-          "dataType": "Any",
+          "displayName": "开运算后区域",
+          "dataType": "Region",
           "isRequired": null
         },
         {
           "name": "Image",
-          "displayName": "Visualization",
+          "displayName": "可视化图像",
           "dataType": "Image",
           "isRequired": null
         },
@@ -22048,7 +23120,7 @@
       "displayName": "Region Closing",
       "description": "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
       "category": "Morphology",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22058,13 +23130,13 @@
       "inputPorts": [
         {
           "name": "Region",
-          "displayName": "Input Region",
-          "dataType": "Any",
+          "displayName": "输入区域",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Image",
-          "displayName": "Reference Image (Optional)",
+          "displayName": "参考图像（可选）",
           "dataType": "Image",
           "isRequired": false
         }
@@ -22072,13 +23144,13 @@
       "outputPorts": [
         {
           "name": "Region",
-          "displayName": "Closed Region",
-          "dataType": "Any",
+          "displayName": "闭运算后区域",
+          "dataType": "Region",
           "isRequired": null
         },
         {
           "name": "Image",
-          "displayName": "Visualization",
+          "displayName": "可视化图像",
           "dataType": "Image",
           "isRequired": null
         },
@@ -22154,7 +23226,7 @@
       "displayName": "Region Skeleton",
       "description": "Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity.",
       "category": "Morphology",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22165,7 +23237,7 @@
         {
           "name": "Region",
           "displayName": "Input Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         },
         {
@@ -22179,7 +23251,7 @@
         {
           "name": "Region",
           "displayName": "Skeleton Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": null
         },
         {
@@ -22248,7 +23320,7 @@
       "displayName": "Region Union",
       "description": "Computes the union of two regions (A ∪ B).",
       "category": "Region",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22259,13 +23331,13 @@
         {
           "name": "Region1",
           "displayName": "First Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Region2",
           "displayName": "Second Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         }
       ],
@@ -22273,7 +23345,7 @@
         {
           "name": "Region",
           "displayName": "Union Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": null
         },
         {
@@ -22307,7 +23379,7 @@
       "displayName": "Region Intersection",
       "description": "Computes the intersection of two regions (A ∩ B).",
       "category": "Region",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22318,13 +23390,13 @@
         {
           "name": "Region1",
           "displayName": "First Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Region2",
           "displayName": "Second Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         }
       ],
@@ -22332,7 +23404,7 @@
         {
           "name": "Region",
           "displayName": "Intersection Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": null
         },
         {
@@ -22366,7 +23438,7 @@
       "displayName": "Region Difference",
       "description": "Computes the difference of two regions (A - B).",
       "category": "Region",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22377,13 +23449,13 @@
         {
           "name": "Region1",
           "displayName": "First Region (Minuend)",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         },
         {
           "name": "Region2",
           "displayName": "Second Region (Subtrahend)",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         }
       ],
@@ -22391,7 +23463,7 @@
         {
           "name": "Region",
           "displayName": "Difference Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": null
         },
         {
@@ -22425,7 +23497,7 @@
       "displayName": "Region Complement",
       "description": "Computes the complement of a region relative to an image size.",
       "category": "Region",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -22436,7 +23508,7 @@
         {
           "name": "Region",
           "displayName": "Input Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": true
         },
         {
@@ -22462,7 +23534,7 @@
         {
           "name": "Region",
           "displayName": "Complement Region",
-          "dataType": "Any",
+          "dataType": "Region",
           "isRequired": null
         },
         {

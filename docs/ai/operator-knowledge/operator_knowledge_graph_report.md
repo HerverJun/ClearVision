@@ -1,6 +1,6 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-07-05T03:50:25.4336351Z`
+GeneratedAtUtc: `2026-07-10T10:58:03.1511878Z`
 SchemaVersion: `2026-05.operator-knowledge-graph.v1`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 
@@ -8,20 +8,20 @@ Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
 
 | Metric | Value |
 | --- | ---: |
-| Cards | 156 |
-| Edges | 1846 |
+| Cards | 158 |
+| Edges | 1868 |
 
 ## Edge Types
 
 | RelationType | Count |
 | --- | ---: |
-| ALIAS_OF | 846 |
+| ALIAS_OF | 859 |
 | COMMONLY_FOLLOWS | 52 |
 | COMMONLY_PRECEDES | 52 |
-| CONSUMES | 206 |
-| HAS_EVIDENCE | 156 |
-| PRODUCES | 406 |
-| REQUIRES_RESOURCE | 42 |
+| CONSUMES | 207 |
+| HAS_EVIDENCE | 158 |
+| PRODUCES | 415 |
+| REQUIRES_RESOURCE | 39 |
 | USED_IN_TEMPLATE | 86 |
 
 ## Top Operators By Downstream Degree

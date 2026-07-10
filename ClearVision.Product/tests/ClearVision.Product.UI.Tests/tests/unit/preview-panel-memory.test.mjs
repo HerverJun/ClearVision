@@ -776,7 +776,7 @@ test('PreviewPanel renders one output image surface and keeps output summary vis
   assert.equal(container.querySelector('#preview-output-image').getAttribute('src'), 'output-image-src');
   assert.equal(container.querySelector('#preview-output-placeholder').style.display, 'none');
   assert.equal(container.querySelector('#btn-preview-open-output').disabled, false);
-  assert.match(container.querySelector('#preview-output-list').innerHTML, /Score/);
+  assert.match(container.querySelector('#preview-output-list').innerHTML, /分数/);
   assert.doesNotMatch(container.querySelector('#preview-output-list').innerHTML, /SHOULD_BE_SKIPPED/);
   assert.equal(coordinator.listenerCount(), 1);
 
@@ -1432,6 +1432,111 @@ test('PreviewPanelCapabilityOwner renders required states and uses one active pr
   assert.equal(harness.listeners.selection.size, 0);
   assert.equal(harness.listeners.structure.size, 0);
   assert.equal(harness.container.innerHTML, '');
+});
+
+test('PreviewPanelCapabilityOwner keeps Blob semantics outside the pixel probe status', () => {
+  const blobNode = {
+    id: 'node-1',
+    type: 'BlobAnalysis',
+    title: 'Blob 分析',
+    parameters: [{ name: 'MaxArea', value: 1000 }],
+    outputs: [
+      { name: 'Image', type: 'Image' },
+      { name: 'Blobs', type: 'BlobList' },
+      { name: 'BlobCount', type: 'Integer' }
+    ]
+  };
+  const harness = createPreviewCapabilityHarness({ node: blobNode });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState({
+      nodeType: 'BlobAnalysis',
+      parameters: blobNode.parameters,
+      outputData: {
+        BlobCount: 2,
+        Blobs: [{ Id: 1 }, { Id: 2 }]
+      },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: 'data:image/png;base64:BLOB'
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /blob-preview-semantics/);
+  assert.match(harness.container.innerHTML, /BlobCount 为过滤后数量/);
+  assert.match(harness.container.innerHTML, /底图保留原始目标，未标记不表示通过/);
+  const pixelProbeStatus = harness.container.innerHTML.match(/data-role="pixel-probe-status"[^>]*>([^<]*)<\/div>/)?.[1] || '';
+  assert.doesNotMatch(pixelProbeStatus, /BlobCount|底图保留/);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner marks stale Blob output and clears it after a fresh preview', () => {
+  const blobNode = {
+    id: 'node-1',
+    type: 'BlobAnalysis',
+    title: 'Blob 分析',
+    parameters: [{ name: 'MaxArea', value: 200 }],
+    outputs: [
+      { name: 'Image', type: 'Image' },
+      { name: 'Blobs', type: 'BlobList' },
+      { name: 'BlobCount', type: 'Integer' }
+    ]
+  };
+  const harness = createPreviewCapabilityHarness({ node: blobNode });
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState({
+      nodeType: 'BlobAnalysis',
+      parameters: [{ name: 'MaxArea', value: 1000 }],
+      outputData: {
+        BlobCount: 2,
+        Blobs: [{ Id: 1 }, { Id: 2 }]
+      },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: 'data:image/png;base64:OLD_BLOB'
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /data-status="stale"/);
+  assert.match(harness.container.innerHTML, new RegExp(STALE_PREVIEW_MESSAGE));
+  assert.match(harness.container.innerHTML, /旧输出摘要/);
+  assert.match(harness.container.innerHTML, /Blob数量（过滤后）/);
+  assert.match(harness.container.innerHTML, /data-stale="true"/);
+  assert.doesNotMatch(harness.container.innerHTML, /preview-capability-blob-semantics/);
+
+  harness.emitPreview({
+    ...successState({
+      nodeType: 'BlobAnalysis',
+      parameters: blobNode.parameters,
+      outputData: {
+        BlobCount: 1,
+        Blobs: [{ Id: 1 }]
+      },
+      presenter: {
+        statusText: '预览完成',
+        inputImageSrc: null,
+        outputImageSrc: 'data:image/png;base64:NEW_BLOB'
+      }
+    })
+  });
+
+  assert.match(harness.container.innerHTML, /data-status="success"/);
+  assert.match(harness.container.innerHTML, /preview-capability-blob-semantics/);
+  assert.doesNotMatch(harness.container.innerHTML, /data-stale="true"/);
+
+  owner.dispose();
 });
 
 test('PreviewPanelCapabilityOwner renders ImageSave safe preview as completed summary', () => {

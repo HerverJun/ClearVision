@@ -28,7 +28,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("SourceImage", "参考图像", PortDataType.Image, IsRequired = false, Description = "可选，仅作为标注结果的参考底图，不替代主 Image 输入。")]
 [OutputPort("Image", "标记图像", PortDataType.Image, Description = "绘制 Blob 边界与中心点的可视化图像。")]
 [OutputPort("Blobs", "Blob结果列表", PortDataType.BlobList, Description = "兼容旧流程端口名的 Blob 结果字典列表，包含边界框、中心、面积及常用度量；不是 Contour 或 Region。")]
-[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，并提供 Features 嵌套别名。不是轮廓或像素区域。")]
+[OutputPort("BlobFeatures", "Blob详细特征", PortDataType.BlobFeatureList, Description = "稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，兼容路径示例为 BlobFeatures[i].Area、BlobFeatures[i].Circularity、BlobFeatures[i].CenterX，并提供 Features 嵌套别名。不是轮廓或像素区域。")]
 [OutputPort("BlobCount", "Blob数量", PortDataType.Integer, Description = "通过面积、形状与可选特征过滤后的 Blob 数量。")]
 [OperatorParam("MinArea", "最小面积", "int", DefaultValue = 100, Min = 0)]
 [OperatorParam("MaxArea", "最大面积", "int", DefaultValue = 100000, Min = 0)]

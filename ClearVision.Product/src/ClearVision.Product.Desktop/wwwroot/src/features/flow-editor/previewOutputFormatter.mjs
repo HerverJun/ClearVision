@@ -1,3 +1,7 @@
+export const BLOB_PREVIEW_COUNT_MESSAGE = 'BlobCount 为过滤后数量。';
+export const BLOB_PREVIEW_VISUAL_MESSAGE = '绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。';
+export const BLOB_PREVIEW_SEMANTICS_MESSAGE = `${BLOB_PREVIEW_COUNT_MESSAGE}${BLOB_PREVIEW_VISUAL_MESSAGE}`;
+
 const DETECTION_KEYS = new Set(['detections']);
 const SUPPRESSED_DETECTION_KEYS = new Set(['suppresseddetections']);
 const IMAGE_OUTPUT_KEYS = new Set([
@@ -42,7 +46,8 @@ const KEY_OUTPUT_KEYS = new Set([
     'matrix3x3',
     'count',
     'objectcount',
-    'detectioncount'
+    'detectioncount',
+    'blobcount'
 ]);
 const FRIENDLY_FIELD_LABELS = new Map([
     ['inputimage', '输入图像'],

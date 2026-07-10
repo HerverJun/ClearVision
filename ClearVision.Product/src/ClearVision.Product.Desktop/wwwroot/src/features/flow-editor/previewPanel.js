@@ -1,5 +1,6 @@
 import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
 import {
+    BLOB_PREVIEW_SEMANTICS_MESSAGE,
     formatPreviewOutputValue,
     getPreviewResultLabel,
     isPreviewImageLikePayload
@@ -7,6 +8,7 @@ import {
 import {
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_DISPLAY_CHARS,
     MAX_OPERATOR_RESULT_ARTIFACT_TEXT_PREVIEW_BYTES,
+    STALE_PREVIEW_MESSAGE,
     buildOperatorResultViewModel,
     buildSafeJsonPreview,
     formatByteLength,
@@ -299,7 +301,7 @@ export class PreviewPanel {
 
         const presenter = this.state.presenter;
         const resultViewModel = this._buildResultViewModel();
-        this._setStatus(resultViewModel?.stale ? '结果已过期，请重新预览' : presenter.statusText);
+        this._setStatus(resultViewModel?.stale ? STALE_PREVIEW_MESSAGE : presenter.statusText);
         this._setOutputImage(presenter.outputImageSrc || null);
         this._renderOutputs(this.state.status === 'loading' ? null : this.state.outputData);
         this._setBlobPreviewSemantics(operator, this.state.status);
@@ -322,7 +324,7 @@ export class PreviewPanel {
         const isBlobPreview = operator?.type === 'BlobAnalysis' && status === 'success';
         container.hidden = !isBlobPreview;
         container.textContent = isBlobPreview
-            ? 'BlobCount 为过滤后数量。绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。'
+            ? BLOB_PREVIEW_SEMANTICS_MESSAGE
             : '';
     }
 

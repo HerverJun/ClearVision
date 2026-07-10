@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T11:21:26.9540273\u002B08:00",
+  "generatedAt": "2026-07-10T19:02:49.1683436\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -560,6 +560,18 @@
       ]
     },
     {
+      "id": "BinaryImageToRegion",
+      "displayName": "\u4E8C\u503C\u56FE\u8F6C\u533A\u57DF",
+      "category": "\u533A\u57DF\u5904\u7406",
+      "records": [
+        {
+          "version": "1.1.0",
+          "sourceHash": "664B5E76B6D28C39668B01B071A91387F05872055F823EE470223BCF557819A4",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
+        }
+      ]
+    },
+    {
       "id": "BlobAnalysis",
       "displayName": "Blob\u5206\u6790",
       "category": "\u7279\u5F81\u63D0\u53D6",
@@ -658,6 +670,16 @@
           "version": "1.1.0",
           "sourceHash": "A0FC81AFCB84ABE23F5FDBAF0A2C32A182D4C262A3E43D75492C44E3C505BBB9",
           "recordedAt": "2026-07-10T11:21:26.9540273\u002B08:00"
+        },
+        {
+          "version": "1.2.1",
+          "sourceHash": "A975026666EC3B2923AE2A00D7132EF131BCC6BF11AA28245EE7A29956E22356",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
+        },
+        {
+          "version": "1.2.1",
+          "sourceHash": "590011B5BC454F6D3E71F1C3C6C1D5C602A660797CA3CDB6BD74566C23EF97EB",
+          "recordedAt": "2026-07-10T18:58:57.8974490\u002B08:00"
         }
       ]
     },
@@ -5453,7 +5475,7 @@
     },
     {
       "id": "Morphology",
-      "displayName": "Morphology (Legacy)",
+      "displayName": "\u5F62\u6001\u5B66\uFF08\u65E7\u7248\uFF09",
       "category": "\u9884\u5904\u7406",
       "records": [
         {
@@ -7000,6 +7022,18 @@
       ]
     },
     {
+      "id": "RectangleRegion",
+      "displayName": "\u77E9\u5F62\u533A\u57DF",
+      "category": "\u51E0\u4F55",
+      "records": [
+        {
+          "version": "1.0.0",
+          "sourceHash": "6121B78706A3430F8D7DFBBCCEC654050D1FBBA20C420CD50E9DBA33DBEB38F9",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
+        }
+      ]
+    },
+    {
       "id": "RegionClosing",
       "displayName": "Region Closing",
       "category": "Morphology",
@@ -7063,6 +7097,11 @@
           "version": "1.0.1",
           "sourceHash": "736F759419335C928580523E4E2A59E06A98213DAF844FE1647F9C2BF9D4C688",
           "recordedAt": "2026-07-10T11:21:26.9540273\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "736F759419335C928580523E4E2A59E06A98213DAF844FE1647F9C2BF9D4C688",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7135,6 +7174,11 @@
           "version": "1.0.1",
           "sourceHash": "3C64CC70D3EEC47A8F3A34288A6485862F612A98CAD90EBE79D461DECBC72742",
           "recordedAt": "2026-07-07T14:45:14.7543995\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "3C64CC70D3EEC47A8F3A34288A6485862F612A98CAD90EBE79D461DECBC72742",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7192,6 +7236,11 @@
           "version": "1.0.1",
           "sourceHash": "DC1A4ABA1F0153811615CA1EBAA7CC5841726D22DDEC35F1A5C77C6C69364A24",
           "recordedAt": "2026-07-07T14:45:14.7543995\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "DC1A4ABA1F0153811615CA1EBAA7CC5841726D22DDEC35F1A5C77C6C69364A24",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7254,6 +7303,11 @@
           "version": "1.0.1",
           "sourceHash": "DF066CCB35E7FD4BD424D453028BB4F76432877321B2C39227CCF5AEFCC20D6A",
           "recordedAt": "2026-07-10T11:21:26.9540273\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "DF066CCB35E7FD4BD424D453028BB4F76432877321B2C39227CCF5AEFCC20D6A",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7316,6 +7370,11 @@
           "version": "1.0.1",
           "sourceHash": "284BF94D14E09957C30BE2F845392953B1E623F1690CE052751006895E57AC9A",
           "recordedAt": "2026-07-10T11:21:26.9540273\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "284BF94D14E09957C30BE2F845392953B1E623F1690CE052751006895E57AC9A",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7373,6 +7432,11 @@
           "version": "1.0.1",
           "sourceHash": "306A3D0DB82E38ABF14DC92347EE83781477307DB0EF8BE4F6070810AFE4B385",
           "recordedAt": "2026-07-07T14:45:14.7543995\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "306A3D0DB82E38ABF14DC92347EE83781477307DB0EF8BE4F6070810AFE4B385",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7445,6 +7509,11 @@
           "version": "1.0.1",
           "sourceHash": "ACC9110A131FFA989329B5C2E89D3C5BC6E46F4E14F3C594FAED5C965B66BF9D",
           "recordedAt": "2026-07-10T11:21:26.9540273\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "ACC9110A131FFA989329B5C2E89D3C5BC6E46F4E14F3C594FAED5C965B66BF9D",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7517,6 +7586,11 @@
           "version": "1.0.1",
           "sourceHash": "7F7AD10483BA022A7205533E25FB7B707F47154D671EC4DB59748093D859CA88",
           "recordedAt": "2026-07-07T14:45:14.7543995\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "7F7AD10483BA022A7205533E25FB7B707F47154D671EC4DB59748093D859CA88",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },
@@ -7574,6 +7648,11 @@
           "version": "1.0.1",
           "sourceHash": "F73E4EE3B6FEB902B5222F89EC97E6A8CCB78D4CD757FE394402C139374D5A2C",
           "recordedAt": "2026-07-07T14:45:14.7543995\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "F73E4EE3B6FEB902B5222F89EC97E6A8CCB78D4CD757FE394402C139374D5A2C",
+          "recordedAt": "2026-07-10T17:16:27.9254269\u002B08:00"
         }
       ]
     },

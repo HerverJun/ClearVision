@@ -1,4 +1,5 @@
 import {
+    BLOB_PREVIEW_SEMANTICS_MESSAGE,
     buildPreviewSummaryItems,
     formatPreviewOutputValue
 } from './previewOutputFormatter.mjs';
@@ -1697,11 +1698,15 @@ export class PreviewPanelCapabilityOwner {
             stringMaxLength: 64,
             skipImageLikeValues: true
         });
+        const blobSemantics = this.currentOperator?.type === 'BlobAnalysis' && statusInfo.kind === 'success'
+            ? `<div class="blob-preview-semantics preview-capability-blob-semantics" role="note">${escapeHtml(BLOB_PREVIEW_SEMANTICS_MESSAGE)}</div>`
+            : '';
 
         if (summaryItems.length === 0) {
             return `
                 <section class="preview-capability-section">
                     <h5>预览结果</h5>
+                    ${blobSemantics}
                     <div class="preview-capability-empty">暂无输出摘要</div>
                 </section>
             `;
@@ -1710,6 +1715,7 @@ export class PreviewPanelCapabilityOwner {
         return `
             <section class="preview-capability-section">
                 <h5>预览结果</h5>
+                ${blobSemantics}
                 <div class="preview-capability-summary">
                     ${summaryItems.map(item => `
                         <div class="preview-capability-summary-row" data-output-kind="${escapeAttribute(item.kind || 'value')}">

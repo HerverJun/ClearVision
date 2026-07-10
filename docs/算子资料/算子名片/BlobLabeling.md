@@ -50,7 +50,7 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `Blobs` | Blobs | `Contour` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Blobs` | Blob结果列表 | `BlobList` | No | 可选输入；兼容 BlobAnalysis.Blobs 的字典列表，不接收 Contour 冒充。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |

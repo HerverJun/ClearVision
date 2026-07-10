@@ -1,0 +1,93 @@
+{
+    "schemaVersion":  "2026-07-10.operator-library-readonly-audit.v1",
+    "auditMode":  "read-only",
+    "baselineSha":  "dc542913b132a5e788dfdde60fbb25e253483612",
+    "branch":  "codex初稿",
+    "generatedAtUtc":  "2026-07-10T10:59:27.6597302Z",
+    "source":  {
+                   "catalogPath":  "docs/operators/catalog.json",
+                   "operatorEnumPath":  "ClearVision.Product/src/ClearVision.Product.Core/Enums/OperatorEnums.cs",
+                   "operatorSourcePath":  "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators",
+                   "operatorTestPath":  "ClearVision.Product/tests/ClearVision.Product.Tests/Operators",
+                   "documentationRoot":  "docs/operators"
+               },
+    "summary":  {
+                    "catalogOperatorCount":  158,
+                    "catalogDeclaredTotalCount":  158,
+                    "operatorEnumMemberCount":  162,
+                    "operatorSourceFileCount":  173,
+                    "operatorTestFileCount":  152,
+                    "documentationFileCount":  164,
+                    "duplicateCatalogIdCount":  0,
+                    "catalogOnlyIdCount":  0,
+                    "enumOnlyIdCount":  4,
+                    "missingDocumentationCount":  0,
+                    "missingSourceReferenceCount":  0,
+                    "missingTestReferenceCount":  3,
+                    "contractCheckCount":  3,
+                    "contractFailureCount":  0,
+                    "findingCount":  1
+                },
+    "coverageGaps":  [
+                         {
+                             "kind":  "enum-only (legacy/internal candidates)",
+                             "count":  4,
+                             "items":  [
+                                           "GaussianBlur",
+                                           "ModbusRtuCommunication",
+                                           "OnnxInference",
+                                           "Preprocessing"
+                                       ]
+                         },
+                         {
+                             "kind":  "missing documentation",
+                             "count":  0,
+                             "items":  [
+
+                                       ]
+                         },
+                         {
+                             "kind":  "missing source reference",
+                             "count":  0,
+                             "items":  [
+
+                                       ]
+                         },
+                         {
+                             "kind":  "missing test reference",
+                             "count":  3,
+                             "items":  [
+                                           "MitsubishiMcCommunication",
+                                           "OmronFinsCommunication",
+                                           "PyramidShapeMatch"
+                                       ]
+                         }
+                     ],
+    "contractChecks":  [
+                           {
+                               "name":  "BlobAnalysis/BlobLabeling typed list contract",
+                               "passed":  true,
+                               "details":  "BlobAnalysis.Blobs=BlobList; BlobAnalysis.BlobFeatures=BlobFeatureList; BlobLabeling.Blobs=BlobList; legacy feature path documented=True"
+                           },
+                           {
+                               "name":  "Region source contract",
+                               "passed":  true,
+                               "details":  "BinaryImageToRegion.Region=Region; RectangleRegion.inputPorts=0; RectangleRegion.Rectangle=Rectangle"
+                           },
+                           {
+                               "name":  "OperatorLibrary package read-only boundary",
+                               "passed":  true,
+                               "details":  "Package project, module index, smoke index, SBOM, and third-party notices are present."
+                           }
+                       ],
+    "findings":  [
+                     "Catalog operators without an indexed unit-test reference: MitsubishiMcCommunication, OmronFinsCommunication, PyramidShapeMatch"
+                 ],
+    "safetyBoundary":  {
+                           "metadataOnly":  true,
+                           "operatorExecution":  false,
+                           "realResourcesTouched":  false,
+                           "inputsMutated":  false,
+                           "reportOutputsWritten":  true
+                       }
+}

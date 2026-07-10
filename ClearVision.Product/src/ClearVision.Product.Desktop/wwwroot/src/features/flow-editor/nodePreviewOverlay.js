@@ -1,3 +1,8 @@
+import {
+    BLOB_PREVIEW_COUNT_MESSAGE,
+    BLOB_PREVIEW_VISUAL_MESSAGE
+} from './previewOutputFormatter.mjs';
+
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -75,7 +80,7 @@ export class NodePreviewOverlay {
             `).join('')
             : '<div class="node-preview-summary-empty">暂无输出摘要</div>';
         const blobSemantics = this.state?.nodeType === 'BlobAnalysis' && this.state?.status === 'success'
-            ? `<div class="blob-preview-semantics" role="note"><strong>BlobCount 为过滤后数量。</strong>绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。</div>`
+            ? `<div class="blob-preview-semantics" role="note"><strong>${BLOB_PREVIEW_COUNT_MESSAGE}</strong>${BLOB_PREVIEW_VISUAL_MESSAGE}</div>`
             : '';
 
         this.root.classList.remove('hidden');

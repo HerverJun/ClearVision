@@ -104,6 +104,27 @@ jobs:
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
 
+      - name: Audit Operator Library Read-Only (Report Only)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/operator-library-readonly-audit | Out-Null
+          & "./scripts/audit-operator-library-readonly.ps1" `
+            -BaselineSha "$env:CV_DIFF_BASE" `
+            -ReportOnly `
+            -JsonOutputPath "artifacts/operator-library-readonly-audit/operator-library-readonly-audit.json" `
+            -MarkdownOutputPath "artifacts/operator-library-readonly-audit/operator-library-readonly-audit.md"
+
+      - name: Upload Operator Library Read-Only Audit
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-library-readonly-audit
+          if-no-files-found: error
+          path: |
+            artifacts/operator-library-readonly-audit/operator-library-readonly-audit.json
+            artifacts/operator-library-readonly-audit/operator-library-readonly-audit.md
+
       - name: Upload Operator Catalog
         uses: actions/upload-artifact@v4
         if: always()
