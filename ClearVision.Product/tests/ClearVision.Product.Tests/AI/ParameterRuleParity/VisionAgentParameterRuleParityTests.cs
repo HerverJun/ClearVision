@@ -97,6 +97,108 @@ public sealed class VisionAgentParameterRuleParityTests
         }
     }
 
+    [Fact(DisplayName = "Agent validation should canonicalize aliases, prefer canonical, and report conflicts")]
+    public async Task FlowValidation_ShouldCanonicalizeAliasesAndReportConflicts()
+    {
+        var result = await new FlowValidationTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(("flow", new
+            {
+                operators = new[]
+                {
+                    new
+                    {
+                        tempId = "op_camera",
+                        operatorType = "ImageAcquisition",
+                        parameters = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["SourceType"] = "Camera",
+                            ["CameraId"] = "canonical-camera",
+                            ["CameraBindingId"] = "binding-camera",
+                            ["cameraId"] = "legacy-camera"
+                        }
+                    }
+                },
+                connections = Array.Empty<object>()
+            })),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var payload = Json(result.Data);
+        var parameters = payload.GetProperty("canonicalFlow")
+            .GetProperty("operators")[0]
+            .GetProperty("parameters");
+        parameters.GetProperty("CameraId").GetString().Should().Be("canonical-camera");
+        parameters.TryGetProperty("CameraBindingId", out _).Should().BeFalse();
+        parameters.TryGetProperty("cameraId", out _).Should().BeFalse();
+        payload.GetProperty("warnings")
+            .EnumerateArray()
+            .Count(item => item.GetProperty("code").GetString() == "parameter_alias_conflict")
+            .Should().Be(2);
+        MissingParameters(payload).Should().BeEmpty();
+    }
+
+    [Theory(DisplayName = "Agent validation and precheck should share the exact pending sentinel contract")]
+    [InlineData("<pending-camera-binding>", true)]
+    [InlineData("todo-line-camera", false)]
+    [InlineData("customer-todo-approved", false)]
+    [InlineData("<pending-camera binding>", false)]
+    public async Task AgentAndPrecheck_ShouldSharePendingSentinelContract(string cameraId, bool expectedMissing)
+    {
+        var flow = new
+        {
+            operators = new[]
+            {
+                new
+                {
+                    tempId = "op_camera",
+                    operatorType = "ImageAcquisition",
+                    parameters = new Dictionary<string, object?>
+                    {
+                        ["SourceType"] = "Camera",
+                        ["CameraBindingId"] = cameraId
+                    }
+                }
+            },
+            connections = Array.Empty<object>()
+        };
+        var validationResult = await new FlowValidationTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(("flow", flow)),
+            CancellationToken.None);
+        var validation = Json(validationResult.Data);
+        MissingParameters(validation).Contains("CameraId").Should().Be(expectedMissing);
+
+        var confirmations = expectedMissing
+            ? Array.Empty<object>()
+            : new object[]
+            {
+                new
+                {
+                    resourceType = "camera_binding",
+                    operatorId = "op_camera",
+                    parameterName = "CameraBindingId",
+                    resourceKey = "op_camera.CameraBindingId",
+                    metadataOnly = true
+                }
+            };
+        var precheckResult = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", flow),
+                ("validationSummary", validation),
+                ("dryRunSummary", new
+                {
+                    dryRunSucceeded = true,
+                    warnings = Array.Empty<object>(),
+                    blockingIssues = Array.Empty<object>()
+                }),
+                ("manualResourceConfirmations", confirmations)),
+            CancellationToken.None);
+        var precheck = Json(precheckResult.Data);
+        MissingParameters(precheck).Contains("CameraId").Should().Be(expectedMissing);
+    }
+
     [Fact(DisplayName = "executable benchmark source guard should exclude real hardware process and network APIs")]
     public void ExecutableBenchmark_SourceGuard_ShouldExcludeRuntimeHardwareProcessAndNetworkApis()
     {
@@ -241,8 +343,7 @@ public sealed class VisionAgentParameterRuleParityTests
             var value = rawValue.ValueKind == JsonValueKind.String
                 ? rawValue.GetString()
                 : rawValue.GetRawText();
-            if (string.IsNullOrWhiteSpace(value) ||
-                value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
+            if (OperatorParameterValueSemantics.IsMissing(value))
             {
                 continue;
             }

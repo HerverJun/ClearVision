@@ -96,7 +96,7 @@ public class AiFlowValidatorKnowledgeGraphTests
                         DisplayName = "Detector",
                         Parameters = new Dictionary<string, string>
                         {
-                            ["ModelPath"] = "todo"
+                            ["ModelPath"] = "<pending-model-resource>"
                         }
                     },
                     new AiGeneratedOperator
@@ -116,6 +116,93 @@ public class AiFlowValidatorKnowledgeGraphTests
                 item.Code == "knowledge_anti_pattern_detected" &&
                 item.OperatorId == "op_1" &&
                 item.Severity == AiValidationSeverity.Warning);
+        }
+        finally
+        {
+            if (File.Exists(knowledgeGraphPath))
+                File.Delete(knowledgeGraphPath);
+            var parent = Path.GetDirectoryName(knowledgeGraphPath);
+            if (!string.IsNullOrWhiteSpace(parent) && Directory.Exists(parent))
+                Directory.Delete(parent, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Validate_ShouldCanonicalizeCameraAliasesBeforeApplyingMetadataDefaults()
+    {
+        var factory = new OperatorFactory();
+        var validator = new AiFlowValidator(factory, operatorKnowledgeGraphPath: null);
+        var flow = new AiGeneratedFlowJson
+        {
+            Operators =
+            [
+                new AiGeneratedOperator
+                {
+                    TempId = "op_camera",
+                    OperatorType = "ImageAcquisition",
+                    DisplayName = "Camera",
+                    Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["sourceType"] = "Camera",
+                        ["CameraBindingId"] = "line-camera-01"
+                    }
+                }
+            ],
+            Connections = []
+        };
+
+        var result = validator.Validate(flow);
+
+        flow.Operators[0].Parameters.Should().ContainKey("SourceType")
+            .WhoseValue.Should().Be("Camera");
+        flow.Operators[0].Parameters.Should().ContainKey("CameraId")
+            .WhoseValue.Should().Be("line-camera-01");
+        flow.Operators[0].Parameters.Should().NotContainKeys("sourceType", "CameraBindingId");
+        result.Diagnostics.Should().NotContain(item =>
+            item.Code == "missing_conditional_parameter" ||
+            item.Code == "missing_conditional_parameter_group");
+    }
+
+    [Fact]
+    public void Validate_ShouldNotTreatBusinessTodoTextAsMissingResource()
+    {
+        var knowledgeGraphPath = CreateKnowledgeGraphFile(cards:
+        [
+            new OperatorKnowledgeCard
+            {
+                OperatorType = "ImageAcquisition",
+                DisplayName = "ImageAcquisition",
+                Category = "Input",
+                RequiredResources = ["ImageAcquisition.CameraId"]
+            }
+        ]);
+
+        try
+        {
+            var validator = new AiFlowValidator(new OperatorFactory(), knowledgeGraphPath);
+            var flow = new AiGeneratedFlowJson
+            {
+                Operators =
+                [
+                    new AiGeneratedOperator
+                    {
+                        TempId = "op_camera",
+                        OperatorType = "ImageAcquisition",
+                        DisplayName = "Camera",
+                        Parameters = new Dictionary<string, string>
+                        {
+                            ["SourceType"] = "Camera",
+                            ["CameraId"] = "todo-line-camera"
+                        }
+                    }
+                ],
+                Connections = []
+            };
+
+            var result = validator.Validate(flow);
+
+            result.Diagnostics.Should().NotContain(item =>
+                item.Code == "knowledge_required_resource_missing" && item.OperatorId == "op_camera");
         }
         finally
         {

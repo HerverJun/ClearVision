@@ -129,11 +129,11 @@ internal static class VisionAgentFlowDraftNormalizer
                     .ToDictionary(
                         property => property.Name,
                         property => ReadScalar(property.Value),
-                        StringComparer.OrdinalIgnoreCase);
+                        StringComparer.Ordinal);
             }
         }
 
-        return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, string?>(StringComparer.Ordinal);
     }
 
     private static string ReadEndpointTempId(

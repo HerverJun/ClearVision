@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
@@ -168,7 +169,7 @@ public sealed class RuntimePreviewPilotResourceCatalog
         string tempId)
     {
         var raw = ReadString(parameters, parameterName);
-        if (string.IsNullOrWhiteSpace(raw) || raw.Trim().StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
+        if (OperatorParameterValueSemantics.IsMissing(raw))
         {
             return;
         }

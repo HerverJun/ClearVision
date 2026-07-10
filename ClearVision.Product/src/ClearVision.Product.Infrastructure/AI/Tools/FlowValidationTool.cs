@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -68,7 +69,7 @@ internal static class VisionAgentFlowDraftValidator
         var warnings = new List<VisionAgentFlowIssue>();
         var missingResources = new List<VisionAgentMissingResource>();
         var pendingParameters = new List<VisionAgentPendingParameter>();
-        var canonicalFlow = Canonicalize(flow, contractCatalog);
+        var canonicalFlow = Canonicalize(flow, contractCatalog, warnings);
 
         if (canonicalFlow.Operators.Count == 0)
         {
@@ -197,7 +198,8 @@ internal static class VisionAgentFlowDraftValidator
 
     private static VisionAgentFlowDraft Canonicalize(
         VisionAgentFlowDraft flow,
-        IVisionAgentOperatorContractCatalog contractCatalog)
+        IVisionAgentOperatorContractCatalog contractCatalog,
+        List<VisionAgentFlowIssue> warnings)
     {
         return flow with
         {
@@ -206,7 +208,7 @@ internal static class VisionAgentFlowDraftValidator
                 {
                     var operatorType = contractCatalog.CanonicalizeOperatorType(op.OperatorType);
                     var parameters = contractCatalog.TryGet(operatorType, out var contract)
-                        ? CanonicalizeParameters(op.Parameters, contract)
+                        ? CanonicalizeParameters(op, operatorType, contract, warnings)
                         : CopyParameters(op.Parameters);
                     return op with
                     {
@@ -219,24 +221,40 @@ internal static class VisionAgentFlowDraftValidator
     }
 
     private static IReadOnlyDictionary<string, string?> CanonicalizeParameters(
-        IReadOnlyDictionary<string, string?> parameters,
-        VisionAgentOperatorContract contract)
+        VisionAgentFlowOperator op,
+        string operatorType,
+        VisionAgentOperatorContract contract,
+        List<VisionAgentFlowIssue> warnings)
     {
-        var knownParameters = contract.Parameters
-            .ToDictionary(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase);
-        var canonical = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in parameters)
+        var metadata = new OperatorMetadata
         {
-            var key = knownParameters.TryGetValue(pair.Key, out var contractParameter)
-                ? contractParameter.Name
-                : pair.Key;
-            if (!canonical.ContainsKey(key))
+            Parameters = contract.Parameters.Select(parameter => new ParameterDefinition
             {
-                canonical[key] = pair.Value;
-            }
+                Name = parameter.Name,
+                IsRequired = parameter.IsRequired,
+                DefaultValue = parameter.DefaultValue
+            }).ToList(),
+            ParameterConstraints = contract.ParameterConstraints?.ToList() ?? []
+        };
+        var values = op.Parameters.ToDictionary(
+            pair => pair.Key,
+            pair => (object?)pair.Value,
+            StringComparer.Ordinal);
+        var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(metadata, values);
+
+        foreach (var diagnostic in canonicalization.Diagnostics)
+        {
+            warnings.Add(new VisionAgentFlowIssue(
+                "parameter_alias_conflict",
+                $"{operatorType}.{diagnostic.Message}",
+                op.TempId,
+                operatorType));
         }
 
-        return canonical;
+        return canonicalization.ExplicitValues.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value?.ToString(),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyDictionary<string, string?> CopyParameters(
@@ -503,13 +521,7 @@ internal static class VisionAgentFlowDraftValidator
 
     private static bool LooksPending(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
     private static bool IsRecognizedMetadataParameter(

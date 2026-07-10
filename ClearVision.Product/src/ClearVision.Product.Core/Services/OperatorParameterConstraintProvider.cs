@@ -274,14 +274,85 @@ public sealed record OperatorParameterConstraintViolation(
     string? ResourceKind,
     string ReasonCode);
 
+public sealed record OperatorParameterAliasDiagnostic(
+    string Code,
+    string CanonicalParameter,
+    string AliasParameter,
+    string Message);
+
+public sealed record OperatorParameterCanonicalizationResult(
+    IReadOnlyDictionary<string, object?> EffectiveValues,
+    IReadOnlyDictionary<string, object?> ExplicitValues,
+    IReadOnlyList<OperatorParameterAliasDiagnostic> Diagnostics);
+
+public static class OperatorParameterValueSemantics
+{
+    private const string PendingPrefix = "<pending-";
+
+    public static bool IsPendingSentinel(object? value)
+    {
+        var text = value?.ToString()?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        if (text.Equals("<pending>", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!text.StartsWith(PendingPrefix, StringComparison.OrdinalIgnoreCase) ||
+            !text.EndsWith('>'))
+        {
+            return false;
+        }
+
+        var payloadLength = text.Length - PendingPrefix.Length - 1;
+        if (payloadLength <= 0)
+        {
+            return false;
+        }
+
+        for (var index = PendingPrefix.Length; index < text.Length - 1; index++)
+        {
+            if (char.IsWhiteSpace(text[index]) || text[index] is '<' or '>')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool IsMissing(object? value)
+    {
+        if (value is null)
+        {
+            return true;
+        }
+
+        var text = value.ToString();
+        return string.IsNullOrWhiteSpace(text) || IsPendingSentinel(text);
+    }
+}
+
 public static class OperatorParameterConstraintEvaluator
 {
     public static IReadOnlyList<OperatorParameterConstraintState> ResolveStates(
         OperatorMetadata metadata,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlySet<string>? explicitParameterNames = null)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        var normalizedValues = NormalizeValues(metadata, values);
+        var normalizedValues = Canonicalize(metadata, values, explicitParameterNames).EffectiveValues;
+        return ResolveStatesCore(metadata, normalizedValues);
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraintState> ResolveStatesCore(
+        OperatorMetadata metadata,
+        IReadOnlyDictionary<string, object?> normalizedValues)
+    {
         var metadataByName = metadata.Parameters.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
         return metadata.ParameterConstraints
@@ -313,10 +384,11 @@ public static class OperatorParameterConstraintEvaluator
 
     public static IReadOnlyList<OperatorParameterConstraintViolation> Validate(
         OperatorMetadata metadata,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlySet<string>? explicitParameterNames = null)
     {
-        var normalizedValues = NormalizeValues(metadata, values);
-        var states = ResolveStates(metadata, normalizedValues);
+        var normalizedValues = Canonicalize(metadata, values, explicitParameterNames).EffectiveValues;
+        var states = ResolveStatesCore(metadata, normalizedValues);
         var violations = new List<OperatorParameterConstraintViolation>();
 
         foreach (var group in states
@@ -329,7 +401,10 @@ public static class OperatorParameterConstraintEvaluator
                 continue;
             }
 
-            var names = group.Select(item => item.Constraint.Parameter).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var names = active
+                .Select(item => item.Constraint.Parameter)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
             if (names.Any(name => !IsMissing(GetValue(normalizedValues, name))))
             {
                 continue;
@@ -347,7 +422,13 @@ public static class OperatorParameterConstraintEvaluator
                      .Where(item => !string.IsNullOrWhiteSpace(item.Constraint.MutuallyExclusiveGroup))
                      .GroupBy(item => item.Constraint.MutuallyExclusiveGroup!, StringComparer.OrdinalIgnoreCase))
         {
-            var configured = group
+            var active = group.Where(item => !item.EffectiveDisabled).ToArray();
+            if (active.Length == 0)
+            {
+                continue;
+            }
+
+            var configured = active
                 .Select(item => item.Constraint.Parameter)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(name => !IsMissing(GetValue(normalizedValues, name)))
@@ -357,7 +438,7 @@ public static class OperatorParameterConstraintEvaluator
                 continue;
             }
 
-            var primary = group.First().Constraint;
+            var primary = active[0].Constraint;
             violations.Add(new OperatorParameterConstraintViolation(
                 "mutually-exclusive",
                 configured,
@@ -385,46 +466,150 @@ public static class OperatorParameterConstraintEvaluator
 
     public static bool IsMissing(object? value)
     {
-        if (value is null)
-        {
-            return true;
-        }
-
-        var text = value.ToString();
-        return string.IsNullOrWhiteSpace(text) ||
-               text.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("todo", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
-    private static Dictionary<string, object?> NormalizeValues(
+    public static OperatorParameterCanonicalizationResult Canonicalize(
         OperatorMetadata metadata,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlySet<string>? explicitParameterNames = null)
     {
-        var normalized = metadata.Parameters
+        ArgumentNullException.ThrowIfNull(metadata);
+        ArgumentNullException.ThrowIfNull(values);
+
+        var metadataByExactName = metadata.Parameters
+            .GroupBy(parameter => parameter.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var metadataByName = metadata.Parameters
+            .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var constraintsByExactName = metadata.ParameterConstraints
+            .GroupBy(constraint => constraint.Parameter, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var constraintsByName = metadata.ParameterConstraints
+            .GroupBy(constraint => constraint.Parameter, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var aliasConstraints = metadata.ParameterConstraints
+            .Where(item => !string.IsNullOrWhiteSpace(item.AliasFor))
+            .ToArray();
+        var aliasNames = aliasConstraints
+            .Select(item => item.Parameter)
+            .ToHashSet(StringComparer.Ordinal);
+
+        string NormalizeName(string name)
+        {
+            if (metadataByExactName.TryGetValue(name, out var exactParameter))
+            {
+                return exactParameter.Name;
+            }
+
+            if (constraintsByExactName.TryGetValue(name, out var exactConstraint))
+            {
+                return exactConstraint.Parameter;
+            }
+
+            if (metadataByName.TryGetValue(name, out var parameter))
+            {
+                return parameter.Name;
+            }
+
+            if (constraintsByName.TryGetValue(name, out var constraint))
+            {
+                return constraint.Parameter;
+            }
+
+            return name;
+        }
+
+        var explicitNames = explicitParameterNames is null
+            ? null
+            : explicitParameterNames.ToHashSet(StringComparer.Ordinal);
+        var rawExplicit = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var pair in values)
+        {
+            if (explicitNames is not null &&
+                !explicitNames.Contains(pair.Key) &&
+                !explicitNames.Contains(NormalizeName(pair.Key)))
+            {
+                continue;
+            }
+
+            rawExplicit[NormalizeName(pair.Key)] = pair.Value;
+        }
+
+        var explicitValues = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in rawExplicit.Where(pair => !aliasNames.Contains(pair.Key)))
+        {
+            explicitValues[pair.Key] = pair.Value;
+        }
+        var diagnostics = new List<OperatorParameterAliasDiagnostic>();
+
+        foreach (var aliasGroup in aliasConstraints
+                     .GroupBy(item => NormalizeName(item.AliasFor!), StringComparer.OrdinalIgnoreCase))
+        {
+            var canonicalName = aliasGroup.Key;
+            var hasCanonical = rawExplicit.TryGetValue(canonicalName, out var canonicalValue);
+            var configuredAliases = aliasGroup
+                .Where(item => rawExplicit.ContainsKey(item.Parameter))
+                .Select(item => (Constraint: item, Value: rawExplicit[item.Parameter]))
+                .ToArray();
+
+            if (hasCanonical)
+            {
+                explicitValues[canonicalName] = canonicalValue;
+                foreach (var alias in configuredAliases.Where(alias => !ValuesEqual(canonicalValue, alias.Value)))
+                {
+                    diagnostics.Add(new OperatorParameterAliasDiagnostic(
+                        "canonical-overrides-alias",
+                        canonicalName,
+                        alias.Constraint.Parameter,
+                        $"{canonicalName} overrides conflicting alias {alias.Constraint.Parameter}."));
+                }
+
+                continue;
+            }
+
+            if (configuredAliases.Length == 0)
+            {
+                continue;
+            }
+
+            var selected = configuredAliases[0];
+            explicitValues[canonicalName] = selected.Value;
+            foreach (var alias in configuredAliases.Skip(1).Where(alias => !ValuesEqual(selected.Value, alias.Value)))
+            {
+                diagnostics.Add(new OperatorParameterAliasDiagnostic(
+                    "alias-conflict",
+                    canonicalName,
+                    alias.Constraint.Parameter,
+                    $"Alias {selected.Constraint.Parameter} overrides conflicting alias {alias.Constraint.Parameter} for {canonicalName}."));
+            }
+        }
+
+        var effectiveValues = metadata.Parameters
             .Where(parameter => parameter.DefaultValue is not null)
             .ToDictionary(
                 parameter => parameter.Name,
                 parameter => parameter.DefaultValue,
                 StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in values)
+        foreach (var pair in explicitValues)
         {
-            normalized[pair.Key] = pair.Value;
+            effectiveValues[pair.Key] = pair.Value;
         }
 
-        foreach (var alias in metadata.ParameterConstraints.Where(item => !string.IsNullOrWhiteSpace(item.AliasFor)))
+        foreach (var alias in aliasConstraints)
         {
-            if (!normalized.ContainsKey(alias.AliasFor!) && normalized.TryGetValue(alias.Parameter, out var aliasValue))
+            var canonicalName = NormalizeName(alias.AliasFor!);
+            if (effectiveValues.TryGetValue(canonicalName, out var canonicalValue))
             {
-                normalized[alias.AliasFor!] = aliasValue;
-            }
-
-            if (!normalized.ContainsKey(alias.Parameter) && normalized.TryGetValue(alias.AliasFor!, out var canonicalValue))
-            {
-                normalized[alias.Parameter] = canonicalValue;
+                effectiveValues[alias.Parameter] = canonicalValue;
             }
         }
 
-        return normalized;
+        return new OperatorParameterCanonicalizationResult(
+            new ReadOnlyDictionary<string, object?>(effectiveValues),
+            new ReadOnlyDictionary<string, object?>(explicitValues),
+            diagnostics);
     }
 
     private static bool Evaluate(

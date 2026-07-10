@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.Streaming;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Cameras;
@@ -132,7 +133,7 @@ public class ImageAcquisitionOperator : OperatorBase
         if (isCameraSource)
         {
             var cameraId = GetStringParam(@operator, "CameraId", GetStringParam(@operator, "cameraId", string.Empty));
-            if (string.IsNullOrEmpty(cameraId))
+            if (OperatorParameterValueSemantics.IsMissing(cameraId))
             {
                 throw new InvalidOperationException("未选择相机");
             }
@@ -235,7 +236,7 @@ public class ImageAcquisitionOperator : OperatorBase
         if (sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
         {
             var cameraId = GetStringParam(@operator, "CameraId", GetStringParam(@operator, "cameraId", string.Empty));
-            if (string.IsNullOrWhiteSpace(cameraId))
+            if (OperatorParameterValueSemantics.IsMissing(cameraId))
             {
                 return ValidationResult.Invalid("CameraId is required when SourceType is Camera.");
             }

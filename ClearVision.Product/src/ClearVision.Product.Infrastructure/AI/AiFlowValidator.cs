@@ -385,13 +385,49 @@ public class AiFlowValidator : IAiFlowValidator
             if (!metaMap.TryGetValue(op.TempId, out var metadata))
                 continue;
 
-            op.Parameters ??= new Dictionary<string, string>();
+            op.Parameters ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            var explicitParameterNames = op.Parameters.Keys.ToHashSet(StringComparer.Ordinal);
             ApplyIntelligentDefaults(op, metadata, result, operatorField);
 
             var constraintValues = op.Parameters.ToDictionary(
                 pair => pair.Key,
                 pair => (object?)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
+            var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(
+                metadata,
+                constraintValues,
+                explicitParameterNames);
+            foreach (var diagnostic in canonicalization.Diagnostics)
+            {
+                result.AddWarning(
+                    $"算子 {op.TempId}({metadata.DisplayName})：{diagnostic.Message}",
+                    code: "parameter_alias_conflict",
+                    category: "parameter",
+                    relatedFields:
+                    [
+                        $"{operatorField}.parameters.{diagnostic.CanonicalParameter}",
+                        $"{operatorField}.parameters.{diagnostic.AliasParameter}"
+                    ],
+                    operatorId: op.TempId,
+                    parameterName: diagnostic.CanonicalParameter,
+                    repairHint: $"保留 {diagnostic.CanonicalParameter}，移除冲突 alias {diagnostic.AliasParameter}。");
+            }
+
+            foreach (var alias in metadata.ParameterConstraints.Where(constraint =>
+                         !string.IsNullOrWhiteSpace(constraint.AliasFor)))
+            {
+                op.Parameters.Remove(alias.Parameter);
+            }
+
+            foreach (var pair in canonicalization.ExplicitValues)
+            {
+                op.Parameters[pair.Key] = pair.Value?.ToString() ?? string.Empty;
+            }
+
+            constraintValues = op.Parameters.ToDictionary(
+                pair => pair.Key,
+                pair => (object?)pair.Value,
+                StringComparer.Ordinal);
             foreach (var violation in OperatorParameterConstraintEvaluator.Validate(metadata, constraintValues))
             {
                 var fieldNames = string.Join(", ", violation.ParameterNames);
@@ -853,15 +889,7 @@ public class AiFlowValidator : IAiFlowValidator
 
     private static bool IsParameterValueMissing(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return true;
-
-        var normalized = value.Trim();
-        return normalized.Equals("todo", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("tbd", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("placeholder", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("your_", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("to_be_filled", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
     private static bool ContainsNegation(string text)

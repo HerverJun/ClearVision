@@ -2,6 +2,7 @@ import {
     getParameterDisplayName,
     getResourceDisplayName
 } from '../../shared/operatorDisplayNames.js';
+import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
 
 export const aiPanelResourceBindingMixin = {
     _getMissingResourceActionModel(item = {}) {
@@ -641,7 +642,7 @@ export const aiPanelResourceBindingMixin = {
                     ? params.find(item => String(item?.name || item?.Name || '').toLowerCase() === name.toLowerCase())?.value
                     : params[name];
                 const text = String(value ?? '').trim();
-                if (text && !text.toLowerCase().startsWith('<pending') && !text.toLowerCase().includes('todo')) {
+                if (text && !isPendingParameterSentinel(text)) {
                     return { name, value: text };
                 }
             }

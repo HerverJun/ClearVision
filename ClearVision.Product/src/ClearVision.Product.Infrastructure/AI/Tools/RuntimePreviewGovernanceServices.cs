@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
@@ -1955,13 +1956,7 @@ public sealed class RuntimePreviewDeployReadinessService
 
     private static bool IsMissingParameterValue(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
     private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)

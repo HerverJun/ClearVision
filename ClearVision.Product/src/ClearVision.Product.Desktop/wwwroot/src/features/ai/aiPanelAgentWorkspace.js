@@ -1,6 +1,7 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 import { AgentWorkspaceEventTypes } from './agentWorkspaceState.js';
+import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
 
 export const AgentWorkspaceModes = Object.freeze({
     PLAN: 'plan',
@@ -6824,8 +6825,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _isPendingValueSummary(value) {
-        const text = String(value ?? '').toLowerCase();
-        return text.includes('<pending') || text.includes('pending-') || text.includes('missing');
+        return isPendingParameterSentinel(value);
     },
 
     _countBuildBlockers(events = this.activeAgentRunEvents) {

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
@@ -728,8 +729,7 @@ public sealed class RuntimePreviewResourceAllowlistResolver
 
     private static bool IsPending(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ||
-               value.Trim().StartsWith("<pending", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
     private static string? SafeResourceId(string? value)

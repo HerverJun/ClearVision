@@ -3,15 +3,21 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.TestData;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Services;
 
@@ -113,6 +119,96 @@ public class ProjectServiceTests
         dto!.Assets.Should().NotBeNull();
         dto.Assets.CalibrationAssets.Should().BeEmpty();
         dto.Assets.SpatialAssets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAndLoadAsync_ShouldCanonicalizeCameraAliasBeforeRealExecute()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        Project? persistedProject = null;
+        string? persistedFlowJson = null;
+        repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
+        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+            .Returns(Task.CompletedTask);
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var request = new CreateProjectRequest
+        {
+            Name = "camera-alias-round-trip",
+            Flow = new OperatorFlowDto
+            {
+                Name = "camera-alias-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "camera",
+                        Type = OperatorType.ImageAcquisition,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "SourceType",
+                                DisplayName = "SourceType",
+                                DataType = "enum",
+                                Value = "Camera",
+                                DefaultValue = "File"
+                            },
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "CameraId",
+                                DisplayName = "CameraId",
+                                DataType = "cameraBinding",
+                                Value = string.Empty,
+                                DefaultValue = string.Empty
+                            },
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "CameraBindingId",
+                                DisplayName = "CameraBindingId",
+                                DataType = "string",
+                                Value = "line-camera-01"
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        var created = await service.CreateAsync(request);
+        persistedProject.Should().NotBeNull();
+        persistedFlowJson.Should().NotBeNullOrWhiteSpace();
+        persistedFlowJson.Should().NotContain("CameraBindingId");
+        repository.GetByIdAsync(created.Id).Returns(Task.FromResult<Project?>(persistedProject));
+        storage.LoadFlowJsonAsync(created.Id).Returns(Task.FromResult(persistedFlowJson));
+
+        var loaded = await service.GetByIdAsync(created.Id);
+        var cameraOperator = loaded!.Flow!.ToEntity().Operators.Single();
+        cameraOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "CameraId")
+            .Which.Value.Should().Be("line-camera-01");
+
+        using var cameraMat = new Mat(5, 7, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var camera = Substitute.For<ICamera>();
+        camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraMat.ToBytes(".png")));
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns([]);
+        cameraManager.GetOrCreateByBindingAsync("line-camera-01").Returns(Task.FromResult(camera));
+        var executor = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager);
+
+        var execution = await executor.ExecuteAsync(cameraOperator, new Dictionary<string, object>());
+
+        execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
+        await cameraManager.Received(1).GetOrCreateByBindingAsync("line-camera-01");
+        (execution.OutputData!["Image"] as ImageWrapper)?.Release();
     }
 
     [Fact]

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -323,9 +325,61 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             confirmation.MetadataOnly &&
             (string.IsNullOrWhiteSpace(confirmation.ResourceType) ||
              string.Equals(confirmation.ResourceType, resource.ResourceKind, StringComparison.OrdinalIgnoreCase)) &&
-            (string.Equals(confirmation.ResourceKey, resourceKey, StringComparison.OrdinalIgnoreCase) ||
+            (ResourceKeysMatch(confirmation.ResourceKey, resource, resourceKey) ||
              (string.Equals(confirmation.OperatorId, resource.TempId, StringComparison.OrdinalIgnoreCase) &&
-              string.Equals(confirmation.ParameterName, resource.ParameterName, StringComparison.OrdinalIgnoreCase))));
+              ParameterNamesMatch(
+                  resource.OperatorType,
+                  confirmation.ParameterName,
+                  resource.ParameterName))));
+    }
+
+    private static bool ResourceKeysMatch(
+        string confirmationKey,
+        DeploymentResourceRequirement resource,
+        string canonicalResourceKey)
+    {
+        if (string.Equals(confirmationKey, canonicalResourceKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var separatorIndex = confirmationKey.LastIndexOf('.');
+        if (separatorIndex <= 0 || separatorIndex >= confirmationKey.Length - 1)
+        {
+            return false;
+        }
+
+        return string.Equals(
+                   confirmationKey[..separatorIndex],
+                   resource.TempId,
+                   StringComparison.OrdinalIgnoreCase) &&
+               ParameterNamesMatch(
+                   resource.OperatorType,
+                   confirmationKey[(separatorIndex + 1)..],
+                   resource.ParameterName);
+    }
+
+    private static bool ParameterNamesMatch(string operatorType, string left, string right)
+    {
+        return string.Equals(
+            CanonicalizeParameterName(operatorType, left),
+            CanonicalizeParameterName(operatorType, right),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CanonicalizeParameterName(string operatorType, string parameterName)
+    {
+        if (!Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsedType))
+        {
+            return parameterName;
+        }
+
+        var constraint = OperatorParameterConstraintProvider.Instance
+            .GetConstraints(parsedType)
+            .FirstOrDefault(item =>
+                item.Parameter.Equals(parameterName, StringComparison.Ordinal) &&
+                !string.IsNullOrWhiteSpace(item.AliasFor));
+        return constraint?.AliasFor ?? parameterName;
     }
 
     private static string? ReadParameter(
@@ -349,13 +403,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
 
     private static bool IsMissingParameterValue(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+        return OperatorParameterValueSemantics.IsMissing(value);
     }
 
     private static void CheckDryRun(

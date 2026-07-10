@@ -68,6 +68,126 @@ public sealed class OperatorParameterConstraintProviderTests
     }
 
     [Fact]
+    public void Canonicalization_ShouldPreferCanonicalThenAliasThenMetadataDefault()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.ImageAcquisition)!;
+
+        var aliasOnly = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["sourceType"] = "Camera",
+                ["CameraBindingId"] = "binding-camera"
+            });
+        aliasOnly.EffectiveValues["SourceType"].Should().Be("Camera");
+        aliasOnly.EffectiveValues["CameraId"].Should().Be("binding-camera");
+        aliasOnly.ExplicitValues.Keys.Should().Contain(["SourceType", "CameraId"]);
+        aliasOnly.ExplicitValues.Keys.Should().NotContain(["sourceType", "CameraBindingId"]);
+        aliasOnly.Diagnostics.Should().BeEmpty();
+
+        var conflict = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["CameraId"] = "canonical-camera",
+                ["CameraBindingId"] = "binding-camera",
+                ["cameraId"] = "legacy-camera"
+            });
+        conflict.EffectiveValues["CameraId"].Should().Be("canonical-camera");
+        conflict.Diagnostics.Should().HaveCount(2);
+        conflict.Diagnostics.Should().OnlyContain(item => item.Code == "canonical-overrides-alias");
+    }
+
+    [Theory]
+    [InlineData("<pending>", true)]
+    [InlineData("<pending-camera-binding>", true)]
+    [InlineData(" <PENDING-model-resource> ", true)]
+    [InlineData("<pending-camera binding>", false)]
+    [InlineData("<pending-camera-binding", false)]
+    [InlineData("<pendingish>", false)]
+    [InlineData("todo-line-camera", false)]
+    [InlineData("customer-todo-approved", false)]
+    public void PendingSentinel_ShouldRecognizeOnlyTheExplicitContract(string value, bool expected)
+    {
+        OperatorParameterValueSemantics.IsPendingSentinel(value).Should().Be(expected);
+        OperatorParameterConstraintEvaluator.IsMissing(value).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Groups_ShouldCountOnlyActiveNonDisabledParameters()
+    {
+        var metadata = new OperatorMetadata
+        {
+            Parameters =
+            [
+                new ParameterDefinition { Name = "Mode", DefaultValue = "A" },
+                new ParameterDefinition { Name = "A" },
+                new ParameterDefinition { Name = "B" }
+            ],
+            ParameterConstraints =
+            [
+                new OperatorParameterConstraint(
+                    "A",
+                    OperatorParameterRequiredPolicies.Optional,
+                    new OperatorParameterConditionSet(All:
+                    [
+                        new OperatorParameterCondition("Mode", OperatorParameterConditionComparisons.Equal, "A")
+                    ]),
+                    null,
+                    new OperatorParameterConditionSet(All:
+                    [
+                        new OperatorParameterCondition("Mode", OperatorParameterConditionComparisons.Equal, "B")
+                    ]),
+                    "active-source",
+                    "active-source",
+                    null,
+                    false,
+                    "test_resource",
+                    "ACTIVE_A"),
+                new OperatorParameterConstraint(
+                    "B",
+                    OperatorParameterRequiredPolicies.Optional,
+                    new OperatorParameterConditionSet(All:
+                    [
+                        new OperatorParameterCondition("Mode", OperatorParameterConditionComparisons.Equal, "B")
+                    ]),
+                    null,
+                    new OperatorParameterConditionSet(All:
+                    [
+                        new OperatorParameterCondition("Mode", OperatorParameterConditionComparisons.Equal, "A")
+                    ]),
+                    "active-source",
+                    "active-source",
+                    null,
+                    false,
+                    "test_resource",
+                    "ACTIVE_B")
+            ]
+        };
+
+        var staleDisabled = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["Mode"] = "A",
+                ["B"] = "stale-disabled-value"
+            });
+        staleDisabled.Should().ContainSingle(item =>
+            item.Code == "at-least-one" && item.ParameterNames.SequenceEqual(new[] { "A" }));
+        staleDisabled.Should().NotContain(item => item.Code == "mutually-exclusive");
+
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["Mode"] = "A",
+                    ["A"] = "active-value",
+                    ["B"] = "stale-disabled-value"
+                })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void DeepLearning_ShouldRequirePathOrModelIdAndGateCatalogPath()
     {
         var metadata = _factory.GetMetadata(OperatorType.DeepLearning)!;

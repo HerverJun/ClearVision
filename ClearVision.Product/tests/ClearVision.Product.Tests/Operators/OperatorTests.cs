@@ -236,6 +236,43 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithCameraBindingAlias_ShouldReachRealCameraExecution()
+    {
+        using var cameraMat = new Mat(6, 12, MatType.CV_8UC3, new Scalar(80, 90, 100));
+        var camera = Substitute.For<ICamera>();
+        camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraMat.ToBytes(".png")));
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns([]);
+        cameraManager.GetOrCreateByBindingAsync("alias-camera").Returns(Task.FromResult(camera));
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager);
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "SourceType",
+            "SourceType",
+            string.Empty,
+            "enum",
+            "Camera"));
+        op.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "CameraBindingId",
+            "CameraBindingId",
+            string.Empty,
+            "string",
+            "alias-camera"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        await cameraManager.Received(1).GetOrCreateByBindingAsync("alias-camera");
+        (result.OutputData!["Image"] as ImageWrapper)?.Release();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithCameraSourceAndRuntimeImage_ShouldUseProvidedImage()
     {
         using var runtimeMat = new Mat(4, 9, MatType.CV_8UC3, new Scalar(10, 20, 30));

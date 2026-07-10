@@ -1,7 +1,10 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import { getOperatorTypeDisplayName, getParameterDisplayName } from '../../shared/operatorDisplayNames.js';
-import { shouldIncludePendingParameter } from '../../shared/parameterDependencyRules.js';
+import {
+    isPendingParameterSentinel,
+    shouldIncludePendingParameter
+} from '../../shared/parameterDependencyRules.js';
 
 export const aiPanelPendingParametersMixin = {
     _renderParameterDraftEditor(data, flow = null) {
@@ -1046,15 +1049,7 @@ export const aiPanelPendingParametersMixin = {
     },
 
     _isPendingPlaceholderValue(value) {
-        const normalized = String(value ?? '').trim().toLowerCase();
-        return normalized === '<pending-camera-binding>' ||
-            normalized === '<pending-model-path>' ||
-            normalized === '<pending-model-resource>' ||
-            normalized === '<pending-template-path>' ||
-            normalized === '<pending-template-artifact>' ||
-            normalized === '<pending-output-channel>' ||
-            normalized === '<pending-pixel-to-world-scale>' ||
-            normalized === '<pending-wire-sequence-labels>';
+        return isPendingParameterSentinel(value);
     },
 
     _buildEnumOptions(options, currentValue) {

@@ -45,12 +45,7 @@ internal static class VisionAgentParameterRuleCenter
             return;
         }
 
-        var values = contract.Parameters
-            .Where(parameter => parameter.DefaultValue is not null)
-            .ToDictionary(
-                parameter => parameter.Name,
-                parameter => parameter.DefaultValue,
-                StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var pair in op.Parameters)
         {
             values[pair.Key] = pair.Value;

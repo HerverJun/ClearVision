@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -177,7 +178,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// <returns>参数值</returns>
     protected T GetParam<T>(Operator @operator, string paramName, T defaultValue)
     {
-        var param = FindParameter(@operator, paramName);
+        var param = ResolveParameter(@operator, paramName);
         var rawValue = param?.Value;
         if (rawValue == null)
         {
@@ -213,7 +214,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// <returns>参数值；参数不存在或转换失败时返回 null。</returns>
     protected T? GetParamOrNull<T>(Operator @operator, string paramName) where T : struct
     {
-        var param = FindParameter(@operator, paramName);
+        var param = ResolveParameter(@operator, paramName);
         var rawValue = param?.Value;
         if (rawValue == null)
         {
@@ -568,6 +569,61 @@ public abstract class OperatorBase : IOperatorExecutor
     /// <summary>
     /// 转换 JsonElement 为目标类型
     /// </summary>
+    private Parameter? ResolveParameter(Operator @operator, string paramName)
+    {
+        var canonical = FindParameter(@operator, paramName);
+        var aliases = OperatorParameterConstraintProvider.Instance
+            .GetConstraints(OperatorType)
+            .Where(constraint =>
+                !string.IsNullOrWhiteSpace(constraint.AliasFor) &&
+                constraint.AliasFor.Equals(paramName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (aliases.Length == 0)
+        {
+            return canonical;
+        }
+
+        var configuredAliases = aliases
+            .Select(alias => (Constraint: alias, Parameter: FindParameter(@operator, alias.Parameter)))
+            .Where(item => item.Parameter != null)
+            .ToArray();
+        if (IsExplicitlyConfigured(canonical))
+        {
+            foreach (var alias in configuredAliases.Where(alias =>
+                         !ParameterValuesEqual(canonical!.Value, alias.Parameter!.Value)))
+            {
+                Logger.LogWarning(
+                    "[{OperatorType}] {CanonicalParameter} overrides conflicting alias {AliasParameter}.",
+                    OperatorType,
+                    paramName,
+                    alias.Constraint.Parameter);
+            }
+
+            return canonical;
+        }
+
+        return configuredAliases.FirstOrDefault().Parameter ?? canonical;
+    }
+
+    private static bool IsExplicitlyConfigured(Parameter? parameter)
+    {
+        return parameter != null &&
+               !string.Equals(parameter.ValueJson, parameter.DefaultValueJson, StringComparison.Ordinal);
+    }
+
+    private static bool ParameterValuesEqual(object? left, object? right)
+    {
+        if (Equals(left, right))
+        {
+            return true;
+        }
+
+        return string.Equals(
+            left?.ToString()?.Trim(),
+            right?.ToString()?.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Parameter? FindParameter(Operator @operator, string paramName)
     {
         if (string.IsNullOrWhiteSpace(paramName) || @operator.Parameters.Count == 0)

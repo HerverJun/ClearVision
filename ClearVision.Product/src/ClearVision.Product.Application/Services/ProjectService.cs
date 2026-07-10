@@ -79,6 +79,12 @@ public class ProjectService
     {
         var project = new Project(request.Name, request.Description);
         var globalVariables = request.GlobalVariables ?? new ProjectGlobalVariableSchema();
+        if (request.Flow != null)
+        {
+            MigrateFlowDto(request.Flow);
+            EnrichFlowDtoWithMetadata(request.Flow);
+        }
+
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, request.Flow?.ToEntity());
         project.UpdateGlobalVariables(globalVariables);
         await _projectRepository.AddAsync(project);
@@ -814,10 +820,76 @@ public class ProjectService
 
             changed |= NormalizePorts(opDto.InputPorts, metadata.InputPorts, PortDirection.Input);
             changed |= NormalizePorts(opDto.OutputPorts, metadata.OutputPorts, PortDirection.Output);
+            changed |= CanonicalizeParameterAliases(opDto, metadata);
             changed |= NormalizeParameters(opDto.Parameters, metadata.Parameters);
         }
 
         return changed;
+    }
+
+    private bool CanonicalizeParameterAliases(OperatorDto opDto, OperatorMetadata metadata)
+    {
+        var aliases = metadata.ParameterConstraints
+            .Where(constraint => !string.IsNullOrWhiteSpace(constraint.AliasFor))
+            .ToArray();
+        if (aliases.Length == 0)
+        {
+            return false;
+        }
+
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var explicitNames = new HashSet<string>(StringComparer.Ordinal);
+        var aliasNames = aliases.Select(alias => alias.Parameter).ToHashSet(StringComparer.Ordinal);
+        foreach (var parameter in opDto.Parameters)
+        {
+            values[parameter.Name] = parameter.Value;
+            if (aliasNames.Contains(parameter.Name) ||
+                !ParameterMetadataValueEquals(parameter.Value, parameter.DefaultValue))
+            {
+                explicitNames.Add(parameter.Name);
+            }
+        }
+
+        var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            values,
+            explicitNames);
+        foreach (var diagnostic in canonicalization.Diagnostics)
+        {
+            _logger?.LogWarning(
+                "Operator {OperatorType} parameter canonicalization: {Diagnostic}",
+                opDto.Type,
+                diagnostic.Message);
+        }
+
+        var changed = false;
+        foreach (var canonicalName in aliases
+                     .Select(alias => metadata.Parameters.FirstOrDefault(parameter =>
+                         parameter.Name.Equals(alias.AliasFor, StringComparison.OrdinalIgnoreCase))?.Name ?? alias.AliasFor!)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!canonicalization.ExplicitValues.TryGetValue(canonicalName, out var canonicalValue))
+            {
+                continue;
+            }
+
+            var canonicalParameter = opDto.Parameters.FirstOrDefault(parameter =>
+                parameter.Name.Equals(canonicalName, StringComparison.Ordinal));
+            if (canonicalParameter == null)
+            {
+                canonicalParameter = AddParameter(opDto, canonicalName);
+                changed = true;
+            }
+
+            if (!ParameterMetadataValueEquals(canonicalParameter.Value, canonicalValue))
+            {
+                canonicalParameter.Value = canonicalValue;
+                changed = true;
+            }
+        }
+
+        var removed = opDto.Parameters.RemoveAll(parameter => aliasNames.Contains(parameter.Name));
+        return changed || removed > 0;
     }
 
     private static bool NormalizeProjectVariableOperatorNames(

@@ -96,10 +96,24 @@ export function normalizeOperatorType(operatorOrType) {
     ).trim();
 }
 
+export function isPendingParameterSentinel(value) {
+    const text = String(value ?? '').trim();
+    if (text.toLowerCase() === '<pending>') {
+        return true;
+    }
+
+    if (!text.toLowerCase().startsWith('<pending-') || !text.endsWith('>')) {
+        return false;
+    }
+
+    const payload = text.slice('<pending-'.length, -1);
+    return payload.length > 0 && !/[<>\s]/.test(payload);
+}
+
 export function isEmptyParameterValue(value) {
     return value === null ||
         value === undefined ||
-        (typeof value === 'string' && value.trim() === '');
+        (typeof value === 'string' && (value.trim() === '' || isPendingParameterSentinel(value)));
 }
 
 function normalizeConditionComparable(parameterName, value) {
@@ -144,8 +158,32 @@ export function isParameterRawRequired(param) {
     return Boolean(param?.isRequired ?? param?.IsRequired);
 }
 
+function valuesEquivalent(left, right) {
+    if (left === right) return true;
+    return String(left ?? '').trim().toLowerCase() === String(right ?? '').trim().toLowerCase();
+}
+
+function getParameterValueInfo(param) {
+    const hasValue = Boolean(param) && (
+        Object.prototype.hasOwnProperty.call(param, 'value') ||
+        Object.prototype.hasOwnProperty.call(param, 'Value')
+    );
+    const hasDefault = Boolean(param) && (
+        Object.prototype.hasOwnProperty.call(param, 'defaultValue') ||
+        Object.prototype.hasOwnProperty.call(param, 'DefaultValue')
+    );
+    const value = param?.value ?? param?.Value ?? null;
+    const defaultValue = param?.defaultValue ?? param?.DefaultValue ?? null;
+    return {
+        found: Boolean(param),
+        explicit: hasValue && (!hasDefault || !valuesEquivalent(value, defaultValue)),
+        value: hasValue ? value : defaultValue,
+        defaultValue
+    };
+}
+
 export function getParameterEffectiveValue(param) {
-    return param?.value ?? param?.Value ?? param?.defaultValue ?? param?.DefaultValue ?? null;
+    return getParameterValueInfo(param).value;
 }
 
 function getOperatorConstraints(operator) {
@@ -193,8 +231,12 @@ function normalizeServerConditionSet(conditionSet) {
 
 function findOperatorConstraint(operator, parameterName) {
     const normalizedName = normalizeParameterName(parameterName);
-    return getOperatorConstraints(operator)
-        .find(constraint => normalizeParameterName(getConstraintValue(constraint, 'parameter', 'Parameter')) === normalizedName) || null;
+    const constraints = getOperatorConstraints(operator);
+    return constraints.find(constraint =>
+        String(getConstraintValue(constraint, 'parameter', 'Parameter') || '') === String(parameterName || '')) ||
+        constraints.find(constraint =>
+            normalizeParameterName(getConstraintValue(constraint, 'parameter', 'Parameter')) === normalizedName) ||
+        null;
 }
 
 function getConstraintGroupNames(operator, propertyName, groupName) {
@@ -206,72 +248,103 @@ function getConstraintGroupNames(operator, propertyName, groupName) {
         .filter(Boolean);
 }
 
+function getParameterRuleConditionalDisabled(operator, parameterName, rule, values = null) {
+    return Boolean(
+        (rule?.enabledWhen && !evaluateCondition(rule.enabledWhen, operator, values)) ||
+        (rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values)) ||
+        evaluateAnyCondition(rule?.disabledWhenAny, operator, values) ||
+        evaluateAllConditions(rule?.disabledWhenAll, operator, values)
+    );
+}
+
+function getActiveConstraintGroupNames(operator, propertyName, groupName, values = null) {
+    return getConstraintGroupNames(operator, propertyName, groupName)
+        .filter(name => {
+            const rule = getOperatorParameterRule(operator, name);
+            return !getParameterRuleConditionalDisabled(operator, name, rule, values);
+        });
+}
+
 function hasConfiguredMutuallyExclusivePeer(operator, parameterName, groupName, values = null) {
     if (!groupName) return false;
     const normalizedName = normalizeParameterName(parameterName);
-    return getConstraintGroupNames(operator, 'mutuallyExclusiveGroup', groupName)
+    return getActiveConstraintGroupNames(operator, 'mutuallyExclusiveGroup', groupName, values)
         .some(peerName =>
             normalizeParameterName(peerName) !== normalizedName &&
             !isEmptyParameterValue(getOperatorParameterValueDirect(operator, peerName, values))
         );
 }
 
-function getOperatorParameterValueDirect(operator, parameterName, values = null) {
+function findObjectKey(values, parameterName) {
+    if (!values || typeof values !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(values, parameterName)) return parameterName;
+    const normalizedName = normalizeParameterName(parameterName);
+    return Object.keys(values).find(key => normalizeParameterName(key) === normalizedName);
+}
+
+function getOperatorParameterValueInfoDirect(operator, parameterName, values = null) {
     const normalizedName = normalizeParameterName(parameterName);
     if (!normalizedName) {
-        return null;
+        return { found: false, explicit: false, value: null, defaultValue: null };
     }
 
     if (values && typeof values === 'object') {
-        const matchKey = Object.keys(values).find(key => normalizeParameterName(key) === normalizedName);
+        const matchKey = findObjectKey(values, parameterName);
         if (matchKey !== undefined) {
-            return values[matchKey];
+            return { found: true, explicit: true, value: values[matchKey], defaultValue: null };
         }
     }
 
     const parameters = operator?.parameters ?? operator?.Parameters ?? null;
     if (Array.isArray(parameters)) {
-        const parameter = parameters.find(item => normalizeParameterName(getParameterRawName(item)) === normalizedName);
-        return parameter ? getParameterEffectiveValue(parameter) : null;
+        const parameter = parameters.find(item => getParameterRawName(item) === parameterName) ||
+            parameters.find(item => normalizeParameterName(getParameterRawName(item)) === normalizedName);
+        return getParameterValueInfo(parameter);
     }
 
     if (parameters && typeof parameters === 'object') {
-        const matchKey = Object.keys(parameters).find(key => normalizeParameterName(key) === normalizedName);
+        const matchKey = findObjectKey(parameters, parameterName);
         if (matchKey !== undefined) {
-            return parameters[matchKey];
+            return { found: true, explicit: true, value: parameters[matchKey], defaultValue: null };
         }
     }
 
-    return null;
+    return { found: false, explicit: false, value: null, defaultValue: null };
+}
+
+function getOperatorParameterValueDirect(operator, parameterName, values = null) {
+    return getOperatorParameterValueInfoDirect(operator, parameterName, values).value;
 }
 
 export function getOperatorParameterValue(operator, parameterName, values = null) {
-    const directValue = getOperatorParameterValueDirect(operator, parameterName, values);
-    if (!isEmptyParameterValue(directValue)) {
-        return directValue;
-    }
-
-    const normalizedName = normalizeParameterName(parameterName);
     const constraints = getOperatorConstraints(operator);
     const constraint = findOperatorConstraint(operator, parameterName);
     const aliasFor = getConstraintValue(constraint, 'aliasFor', 'AliasFor');
-    const peerNames = [];
-    if (aliasFor) peerNames.push(aliasFor);
-    constraints.forEach(item => {
+    const canonicalName = aliasFor || parameterName;
+    const canonicalInfo = getOperatorParameterValueInfoDirect(operator, canonicalName, values);
+    const aliasNames = constraints.map(item => {
         const itemAliasFor = getConstraintValue(item, 'aliasFor', 'AliasFor');
-        if (normalizeParameterName(itemAliasFor) === normalizedName) {
-            peerNames.push(getConstraintValue(item, 'parameter', 'Parameter'));
-        }
-    });
+        return normalizeParameterName(itemAliasFor) === normalizeParameterName(canonicalName)
+            ? getConstraintValue(item, 'parameter', 'Parameter')
+            : null;
+    }).filter(Boolean);
 
-    for (const peerName of peerNames) {
-        const peerValue = getOperatorParameterValueDirect(operator, peerName, values);
-        if (!isEmptyParameterValue(peerValue)) {
-            return peerValue;
+    if (canonicalInfo.explicit) {
+        return canonicalInfo.value;
+    }
+
+    for (const peerName of aliasNames) {
+        const aliasInfo = getOperatorParameterValueInfoDirect(operator, peerName, values);
+        if (aliasInfo.explicit) {
+            return aliasInfo.value;
         }
     }
 
-    return directValue;
+    if (canonicalInfo.found) {
+        return canonicalInfo.value;
+    }
+
+    return getOperatorParameterValueInfoDirect(operator, parameterName, values).value;
 }
 
 export function getOperatorParameterRule(operatorOrType, parameterName) {
@@ -292,6 +365,7 @@ export function getOperatorParameterRule(operatorOrType, parameterName) {
             requiredWhen,
             enabledWhen,
             disabledWhen,
+            atLeastOneGroup,
             atLeastOneOf: getConstraintGroupNames(operatorOrType, 'atLeastOneGroup', atLeastOneGroup),
             mutuallyExclusiveGroup,
             aliasFor: getConstraintValue(constraint, 'aliasFor', 'AliasFor'),
@@ -383,10 +457,7 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
         ? false
         : isParameterRawRequired(paramOrName);
     const effectiveDisabled = Boolean(
-        (rule?.enabledWhen && !evaluateCondition(rule.enabledWhen, operator, values)) ||
-        (rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values)) ||
-        evaluateAnyCondition(rule?.disabledWhenAny, operator, values) ||
-        evaluateAllConditions(rule?.disabledWhenAll, operator, values) ||
+        getParameterRuleConditionalDisabled(operator, parameterName, rule, values) ||
         hasConfiguredMutuallyExclusivePeer(
             operator,
             parameterName,
@@ -413,7 +484,15 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
     }
 
     if (effectiveRequired && Array.isArray(rule?.atLeastOneOf) && rule.atLeastOneOf.length > 1) {
-        effectiveRequired = !hasAnyPeerValue(operator, rule.atLeastOneOf, values) ||
+        const activeNames = rule?.atLeastOneGroup
+            ? getActiveConstraintGroupNames(
+                operator,
+                'atLeastOneGroup',
+                rule.atLeastOneGroup,
+                values
+            )
+            : rule.atLeastOneOf;
+        effectiveRequired = !hasAnyPeerValue(operator, activeNames, values) ||
             !isEmptyParameterValue(getOperatorParameterValue(operator, parameterName, values));
     }
 
@@ -474,17 +553,25 @@ export function collectEffectiveRequiredParameterErrors(operator, params = null,
 
         const rule = state.rule;
         if (Array.isArray(rule?.atLeastOneOf) && rule.atLeastOneOf.length > 1) {
-            const groupKey = `${normalizeOperatorType(operator)}:${rule.atLeastOneOf.map(normalizeParameterName).sort().join('|')}`;
+            const activeNames = rule?.atLeastOneGroup
+                ? getActiveConstraintGroupNames(
+                    operator,
+                    'atLeastOneGroup',
+                    rule.atLeastOneGroup,
+                    options.values || null
+                )
+                : rule.atLeastOneOf;
+            const groupKey = `${normalizeOperatorType(operator)}:${activeNames.map(normalizeParameterName).sort().join('|')}`;
             if (handledAtLeastOneGroups.has(groupKey)) {
                 return;
             }
             handledAtLeastOneGroups.add(groupKey);
-            if (!hasAnyPeerValue(operator, rule.atLeastOneOf, options.values || null)) {
+            if (!hasAnyPeerValue(operator, activeNames, options.values || null)) {
                 errors.push({
                     name,
-                    parameterNames: rule.atLeastOneOf,
+                    parameterNames: activeNames,
                     kind: 'atLeastOneOf',
-                    message: rule.atLeastOneMessage || `At least one of ${rule.atLeastOneOf.join(', ')} is required.`
+                    message: rule.atLeastOneMessage || `At least one of ${activeNames.join(', ')} is required.`
                 });
             }
             return;
