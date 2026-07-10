@@ -498,7 +498,8 @@ export class PropertyPanelCapabilityAdapter {
             disabled: node.disabled === true,
             inputPorts: node.inputs || metadata.inputPorts || metadata.InputPorts || [],
             outputPorts: node.outputs || metadata.outputPorts || metadata.OutputPorts || [],
-            parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || [])
+            parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || []),
+            parameterConstraints: metadata.parameterConstraints || metadata.ParameterConstraints || []
         };
     }
 

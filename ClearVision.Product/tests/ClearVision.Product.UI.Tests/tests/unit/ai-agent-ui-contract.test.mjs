@@ -407,6 +407,19 @@ function loadParameterRuleParitySpec() {
   return JSON.parse(fs.readFileSync(specPath, 'utf8'));
 }
 
+function canonicalConstraintsFor(operatorType) {
+  const spec = loadParameterRuleParitySpec();
+  return spec.operatorConstraints?.[operatorType] || [];
+}
+
+function withCanonicalConstraints(operator) {
+  const operatorType = operator?.operatorType || operator?.type || '';
+  return {
+    ...operator,
+    parameterConstraints: canonicalConstraintsFor(operatorType)
+  };
+}
+
 function assertWorkflowRunMetadata(workflowRun) {
   assert.ok(workflowRun);
   for (const field of ['commitSha', 'branchName', 'runId', 'runAttempt', 'generatedAtUtc']) {
@@ -427,7 +440,13 @@ function createPanel(AiPanel, overrides = {}) {
   panel.pendingParameterDrafts = {};
   panel.pendingResourceDrafts = {};
   panel.pendingOperatorBindings = {};
-  panel.operatorMetadataCache = new Map();
+  panel.operatorMetadataCache = new Map(
+    Object.entries(loadParameterRuleParitySpec().operatorConstraints || {})
+      .map(([operatorType, parameterConstraints]) => [
+        operatorType.toLowerCase(),
+        { type: operatorType, parameterConstraints }
+      ])
+  );
   panel.operatorMetadataLoading = new Map();
   panel.cameraBindingsCache = [];
   panel.cameraBindingsLoadingPromise = null;
@@ -652,6 +671,7 @@ function imageAcquisitionOperator(sourceType, overrides = {}) {
     type: 'ImageAcquisition',
     title: overrides.title || '采集',
     displayName: overrides.displayName || '采集',
+    parameterConstraints: canonicalConstraintsFor('ImageAcquisition'),
     parameters: [
       { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: sourceType, defaultValue: 'File' },
       { name: 'FilePath', displayName: '文件路径', dataType: 'file', value: overrides.filePath ?? '', isRequired: true },
@@ -9475,7 +9495,7 @@ test('parameter rules cover DeepLearning model source and NMS dependencies', asy
     getParameterEffectiveState,
     shouldIncludePendingParameter
   } = await loadParameterRules();
-  const modelById = {
+  const modelById = withCanonicalConstraints({
     type: 'DeepLearning',
     parameters: {
       ModelId: 'wire-sequence-model',
@@ -9483,15 +9503,15 @@ test('parameter rules cover DeepLearning model source and NMS dependencies', asy
       OutputFormat: 'EndToEndNms',
       EnableInternalNms: true
     }
-  };
-  const missingModel = {
+  });
+  const missingModel = withCanonicalConstraints({
     type: 'DeepLearning',
     parameters: [
       { name: 'ModelPath', value: '' },
       { name: 'ModelId', value: '' },
       { name: 'ModelCatalogPath', value: '' }
     ]
-  };
+  });
 
   assert.equal(getParameterEffectiveState(modelById, 'ModelPath').effectiveDisabled, true);
   assert.equal(getParameterEffectiveState(modelById, 'GpuDeviceId').effectiveDisabled, true);
@@ -9517,11 +9537,11 @@ test('parameter rules cover EdgeDetection Canny and OnnxEdge model source depend
     { name: 'ModelCatalogPath', value: '', isRequired: true },
     { name: 'EdgeBinarizationThreshold', value: 0.5, isRequired: true }
   ];
-  const canny = {
+  const canny = withCanonicalConstraints({
     type: 'EdgeDetection',
     parameters: cannyParameters
-  };
-  const missingOnnxModel = {
+  });
+  const missingOnnxModel = withCanonicalConstraints({
     type: 'EdgeDetection',
     parameters: [
       { name: 'Method', value: 'OnnxEdge' },
@@ -9530,8 +9550,8 @@ test('parameter rules cover EdgeDetection Canny and OnnxEdge model source depend
       { name: 'ModelCatalogPath', value: '', isRequired: false },
       { name: 'EdgeBinarizationThreshold', value: 0.5, isRequired: false }
     ]
-  };
-  const onnxModelById = {
+  });
+  const onnxModelById = withCanonicalConstraints({
     type: 'EdgeDetection',
     parameters: {
       Method: 'OnnxEdge',
@@ -9540,7 +9560,7 @@ test('parameter rules cover EdgeDetection Canny and OnnxEdge model source depend
       ModelCatalogPath: '',
       EdgeBinarizationThreshold: 0.5
     }
-  };
+  });
 
   for (const name of ['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath', 'EdgeBinarizationThreshold']) {
     const parameter = cannyParameters.find(item => item.name === name);
@@ -9553,8 +9573,7 @@ test('parameter rules cover EdgeDetection Canny and OnnxEdge model source depend
   assert.equal(
     missingErrors.some(error =>
       error.kind === 'atLeastOneOf' &&
-      error.parameterNames.includes('EdgeModelPath') &&
-      error.message === 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'),
+      error.parameterNames.includes('EdgeModelPath')),
     true
   );
   assert.deepEqual(
@@ -9564,38 +9583,24 @@ test('parameter rules cover EdgeDetection Canny and OnnxEdge model source depend
   assert.equal(getParameterEffectiveState(onnxModelById, 'EdgeModelPath').effectiveDisabled, true);
 });
 
-test('parameter rules cover ResultOutput channel file and PLC safety dependencies', async () => {
+test('parameter rules keep ResultOutput constrained to its real SaveToFile parameter', async () => {
   const {
     collectEffectiveRequiredParameterErrors,
     getParameterEffectiveState,
-    shouldIncludePendingParameter
+    getOperatorParameterRule
   } = await loadParameterRules();
-  const outputById = {
-    type: 'ResultOutput',
-    parameters: {
-      OutputChannelId: 'qa-board',
-      SaveToFile: false,
-      Channel: 'plc'
-    }
-  };
-  const missingChannel = {
+  const output = withCanonicalConstraints({
     type: 'ResultOutput',
     parameters: [
-      { name: 'Channel', value: '' },
-      { name: 'OutputChannel', value: '' },
-      { name: 'OutputChannelId', value: '' }
+      { name: 'SaveToFile', value: false }
     ]
-  };
+  });
 
-  assert.equal(getParameterEffectiveState(outputById, 'Channel').effectiveDisabled, true);
-  assert.equal(getParameterEffectiveState(outputById, 'FilePath').effectiveDisabled, true);
-  assert.equal(getParameterEffectiveState(outputById, 'PlcAddress').effectiveDisabled, false);
-  assert.equal(shouldIncludePendingParameter(outputById, 'Channel'), false);
-  assert.equal(
-    collectEffectiveRequiredParameterErrors(missingChannel, missingChannel.parameters)
-      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('OutputChannelId')),
-    true
-  );
+  assert.deepEqual(collectEffectiveRequiredParameterErrors(output, output.parameters), []);
+  assert.equal(getParameterEffectiveState(output, 'SaveToFile').effectiveRequired, false);
+  assert.equal(getParameterEffectiveState(output, 'SaveToFile').effectiveDisabled, false);
+  assert.equal(getOperatorParameterRule(output, 'SaveToFile').resourceKind, 'output_file');
+  assert.equal(getOperatorParameterRule(output, 'Channel'), null);
 });
 
 test('shared parameter rule parity spec matches frontend effective states', async () => {
@@ -9606,7 +9611,8 @@ test('shared parameter rule parity spec matches frontend effective states', asyn
     const operator = {
       type: parityCase.operatorType,
       operatorType: parityCase.operatorType,
-      parameters: parityCase.parameters
+      parameters: parityCase.parameters,
+      parameterConstraints: spec.operatorConstraints?.[parityCase.operatorType] || []
     };
 
     for (const [parameterName, expected] of Object.entries(parityCase.uiStates)) {
@@ -9653,7 +9659,7 @@ test('AI pending draft uses effectiveDisabled rules for precheck missing resourc
 test('PropertyPanel model validation uses shared effectiveRequired rules beyond ImageAcquisition', async () => {
   const { PropertyPanel } = await loadPropertyPanel();
   const panel = createPropertyPanel(PropertyPanel, null);
-  const operator = {
+  const operator = withCanonicalConstraints({
     id: 'dl',
     type: 'DeepLearning',
     parameters: [
@@ -9661,7 +9667,7 @@ test('PropertyPanel model validation uses shared effectiveRequired rules beyond 
       { name: 'ModelId', value: '' },
       { name: 'ModelCatalogPath', value: '' }
     ]
-  };
+  });
 
   const errors = panel.validateOperatorModel(operator);
 

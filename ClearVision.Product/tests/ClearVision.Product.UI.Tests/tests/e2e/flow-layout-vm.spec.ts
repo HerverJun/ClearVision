@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
@@ -16,6 +18,10 @@ const STALE_PREVIEW_TEXT = '参数或流程已变更，需重新预览';
 const PROPERTY_RESIZER_SELECTOR = '[data-sidebar-resizer="property"]';
 const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
 const OLD_PREVIEW_WORKBENCH_MAX_WIDTH = 560;
+const parameterRuleParitySpec = JSON.parse(readFileSync(
+  resolve(process.cwd(), '../../../quality/evals/specs/vision_agent_parameter_rule_parity_cases.json'),
+  'utf8'
+));
 
 const operators = [
   {
@@ -23,6 +29,7 @@ const operators = [
     displayName: '图像采集',
     category: '输入',
     description: '从相机或文件读取图像',
+    parameterConstraints: parameterRuleParitySpec.operatorConstraints.ImageAcquisition,
     parameters: [
       { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: 'File', options: [{ value: 'File', label: '文件' }, { value: 'Camera', label: '相机' }] },
       { name: 'FilePath', displayName: '文件路径', dataType: 'string', value: '' },
@@ -1089,8 +1096,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(templatePathGroup).toHaveClass(/is-rule-disabled/);
     await expect(templatePathGroup).toHaveAttribute('data-effective-disabled', 'true');
     await expect(templatePathGroup.locator('.required')).toHaveCount(0);
-    await expect(templatePathGroup.locator('[data-parameter-rule-hint="true"]')).toHaveCount(1);
-    await expect(templatePathGroup.locator('[data-parameter-rule-hint="true"]')).toContainText('已选择模板 ID，模板路径已禁用');
+    await expect(templatePathGroup.locator('[data-parameter-rule-hint="true"]')).toHaveCount(0);
     await expect(templatePathGroup).not.toContainText('Template path is disabled');
     await expect(templateIdInput).toBeEnabled();
     await expect(page.locator('.inspector-pane .validation-error')).toHaveCount(0);
@@ -1108,7 +1114,8 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     const workbench = page.locator('.preview-workbench-pane');
     const cameraGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraId"]');
     const cameraBindingGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraBindingId"]');
-    await expect(page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机或相机绑定' })).toHaveCount(2);
+    const cameraErrors = page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机或相机绑定' });
+    await expect(cameraErrors).toHaveCount(2);
     await expect(cameraGroup).toHaveClass(/invalid/);
     await expect(cameraBindingGroup).toHaveClass(/invalid/);
     await expect(page.locator('.inspector-pane #param-CameraId')).toHaveAttribute('aria-invalid', 'true');

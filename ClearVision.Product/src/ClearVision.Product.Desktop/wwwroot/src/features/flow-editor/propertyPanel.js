@@ -272,7 +272,19 @@ class PropertyPanel {
             this.pendingRecommendation = null;
             this.recommendedFieldNames.clear();
         }
-        this.currentOperator = operator;
+        const metadata = operator
+            ? window.operatorLibraryPanel?.metadataByType?.get?.(operator.type || operator.Type)
+            : null;
+        this.currentOperator = operator && metadata
+            ? {
+                ...operator,
+                parameterConstraints: operator.parameterConstraints ||
+                    operator.ParameterConstraints ||
+                    metadata.parameterConstraints ||
+                    metadata.ParameterConstraints ||
+                    []
+            }
+            : operator;
         this.currentConnection = null;
         this.render();
     }

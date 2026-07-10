@@ -978,11 +978,9 @@ export class PropertyPanelCapabilityOwner {
     }
 
     shouldHideDisabledParameter(input, state) {
-        if (!state?.effectiveDisabled || !this.isImageAcquisitionOperator()) {
-            return false;
-        }
-
-        return ['filepath', 'cameraid', 'camerabindingid'].includes(normalizeParameterName(input?.name));
+        void input;
+        void state;
+        return false;
     }
 
     updateParameterRuleHint(group, state) {
@@ -991,19 +989,6 @@ export class PropertyPanelCapabilityOwner {
         }
 
         let hint = group.querySelector('[data-parameter-rule-hint="true"]');
-        const disabledReason = getLocalizedDisabledReason(state.disabledReason);
-        if (state.effectiveDisabled && disabledReason) {
-            if (!hint) {
-                hint = document.createElement('p');
-                hint.className = 'form-description parameter-rule-hint';
-                hint.dataset.parameterRuleHint = 'true';
-                group.appendChild(hint);
-            }
-
-            hint.textContent = disabledReason;
-            return;
-        }
-
         hint?.remove();
     }
 
@@ -1870,10 +1855,7 @@ export class PropertyPanelCapabilityOwner {
         const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
         const isDisabled = effectiveState.effectiveDisabled;
         const disabled = isDisabled ? 'disabled aria-disabled="true"' : '';
-        const disabledReason = getLocalizedDisabledReason(effectiveState.disabledReason);
-        const disabledHint = effectiveState.effectiveDisabled && disabledReason
-            ? `<p class="form-description parameter-rule-hint" data-parameter-rule-hint="true">${escapeHtml(disabledReason)}</p>`
-            : '';
+        const disabledHint = '';
 
         return `
             <div class="form-group ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-parameter-name="${escapeAttribute(name)}">

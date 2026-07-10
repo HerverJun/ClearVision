@@ -142,7 +142,10 @@ export const aiPanelPendingParametersMixin = {
         return pending.map(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
-            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+            const ruleOperator = {
+                ...(context.operator || { operatorType: context.operatorType, parameters: {} }),
+                parameterConstraints: metadata?.parameterConstraints || metadata?.ParameterConstraints || []
+            };
             const fields = item.parameterNames
                 .filter(parameterName => shouldIncludePendingParameter(ruleOperator, parameterName))
                 .map(parameterName => {
@@ -353,7 +356,10 @@ export const aiPanelPendingParametersMixin = {
         safePending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, safeOperators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
-            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+            const ruleOperator = {
+                ...(context.operator || { operatorType: context.operatorType, parameters: {} }),
+                parameterConstraints: metadata?.parameterConstraints || metadata?.ParameterConstraints || []
+            };
             item.parameterNames.forEach(parameterName => {
                 if (!shouldIncludePendingParameter(ruleOperator, parameterName)) {
                     return;
@@ -462,7 +468,10 @@ export const aiPanelPendingParametersMixin = {
         pending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
-            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+            const ruleOperator = {
+                ...(context.operator || { operatorType: context.operatorType, parameters: {} }),
+                parameterConstraints: metadata?.parameterConstraints || metadata?.ParameterConstraints || []
+            };
             item.parameterNames.forEach(parameterName => {
                 if (!shouldIncludePendingParameter(ruleOperator, parameterName)) {
                     return;
@@ -544,7 +553,11 @@ export const aiPanelPendingParametersMixin = {
         const pendingPart = pending
             .map(item => {
                 const context = this._resolvePendingOperatorContext(item.operatorId, operators);
-                const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+                const metadata = this._getCachedOperatorMetadata(context.operatorType);
+                const ruleOperator = {
+                    ...(context.operator || { operatorType: context.operatorType, parameters: {} }),
+                    parameterConstraints: metadata?.parameterConstraints || metadata?.ParameterConstraints || []
+                };
                 const names = item.parameterNames.filter(parameterName =>
                     shouldIncludePendingParameter(ruleOperator, parameterName)
                 );
@@ -1406,9 +1419,14 @@ export const aiPanelPendingParametersMixin = {
         pending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
             if (!context.operator) return;
+            const metadata = this._getCachedOperatorMetadata(context.operatorType);
+            const ruleOperator = {
+                ...context.operator,
+                parameterConstraints: metadata?.parameterConstraints || metadata?.ParameterConstraints || []
+            };
 
             item.parameterNames.forEach(parameterName => {
-                if (!shouldIncludePendingParameter(context.operator, parameterName)) {
+                if (!shouldIncludePendingParameter(ruleOperator, parameterName)) {
                     return;
                 }
                 if (this._isResourceOnlyDraftParameter?.(context.operatorType, parameterName)) {

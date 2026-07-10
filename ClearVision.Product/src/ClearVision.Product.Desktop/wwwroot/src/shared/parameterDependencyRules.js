@@ -1,51 +1,4 @@
 export const OPERATOR_PARAMETER_RULES = Object.freeze({
-    ImageAcquisition: Object.freeze({
-        parameters: Object.freeze({
-            SourceType: Object.freeze({
-                required: true
-            }),
-            FilePath: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledReason: 'File path is disabled while SourceType is camera.',
-                mutuallyExclusiveGroup: 'image-source'
-            }),
-            CameraId: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                    Object.freeze({ parameter: 'CameraBindingId', notEmpty: true })
-                ]),
-                disabledReason: 'Camera id is disabled in file mode or when CameraBindingId is set.',
-                mutuallyExclusiveGroup: 'image-source',
-                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId']),
-                atLeastOneMessage: 'Camera mode requires CameraId or CameraBindingId.'
-            }),
-            CameraBindingId: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                    Object.freeze({ parameter: 'CameraId', notEmpty: true })
-                ]),
-                disabledReason: 'Camera binding is disabled in file mode or when CameraId is set.',
-                mutuallyExclusiveGroup: 'image-source',
-                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId']),
-                atLeastOneMessage: 'Camera mode requires CameraId or CameraBindingId.'
-            }),
-            ExposureTime: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledReason: 'Camera exposure is disabled for file acquisition.'
-            }),
-            Gain: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledReason: 'Camera gain is disabled for file acquisition.'
-            }),
-            TriggerMode: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledReason: 'Trigger mode is disabled for file acquisition.'
-            })
-        })
-    }),
     TemplateMatching: Object.freeze({
         parameters: Object.freeze({
             TemplatePath: Object.freeze({
@@ -122,212 +75,6 @@ export const OPERATOR_PARAMETER_RULES = Object.freeze({
                 disabledReason: 'Scale step is disabled when EnablePoseSearch is false.'
             })
         })
-    }),
-    EdgeDetection: Object.freeze({
-        parameters: Object.freeze({
-            EdgeModelPath: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
-                    Object.freeze({ parameter: 'EdgeModelId', notEmpty: true }),
-                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
-                ]),
-                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
-                mutuallyExclusiveGroup: 'edge-model-source',
-                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
-            }),
-            EdgeModelId: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
-                    Object.freeze({ parameter: 'EdgeModelPath', notEmpty: true }),
-                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
-                ]),
-                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
-                mutuallyExclusiveGroup: 'edge-model-source',
-                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
-            }),
-            ModelCatalogPath: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'Method', equals: 'OnnxEdge' }),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
-                    Object.freeze({ parameter: 'EdgeModelPath', notEmpty: true }),
-                    Object.freeze({ parameter: 'EdgeModelId', notEmpty: true })
-                ]),
-                disabledReason: 'Canny 模式不需要模型来源；OnnxEdge 已选择其他模型来源时该项已禁用。',
-                mutuallyExclusiveGroup: 'edge-model-source',
-                atLeastOneOf: Object.freeze(['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一'
-            }),
-            EdgeBinarizationThreshold: Object.freeze({
-                required: false,
-                disabledWhen: Object.freeze({ parameter: 'Method', notEquals: 'OnnxEdge' }),
-                disabledReason: 'Canny 模式不使用 ONNX 边缘二值化阈值。'
-            })
-        })
-    }),
-    DeepLearning: Object.freeze({
-        parameters: Object.freeze({
-            ModelPath: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'ModelId', notEmpty: true }),
-                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
-                ]),
-                disabledReason: 'ModelPath is disabled when ModelId or ModelCatalogPath is selected.',
-                mutuallyExclusiveGroup: 'model-source',
-                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
-            }),
-            ModelId: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'ModelPath', notEmpty: true }),
-                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
-                ]),
-                disabledReason: 'ModelId is disabled when ModelPath or ModelCatalogPath is selected.',
-                mutuallyExclusiveGroup: 'model-source',
-                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
-            }),
-            ModelCatalogPath: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'ModelPath', notEmpty: true }),
-                    Object.freeze({ parameter: 'ModelId', notEmpty: true })
-                ]),
-                disabledReason: 'ModelCatalogPath is disabled when ModelPath or ModelId is selected.',
-                mutuallyExclusiveGroup: 'model-source',
-                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
-                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
-            }),
-            GpuDeviceId: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'UseGpu', equals: false }),
-                disabledReason: 'GPU device id is disabled when UseGpu is false.'
-            }),
-            EnableInternalNms: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'OutputFormat', equals: 'EndToEndNms' }),
-                disabledReason: 'Internal NMS is owned by the exported model when OutputFormat is EndToEndNms.'
-            }),
-            NmsIouThreshold: Object.freeze({
-                requiredWhenAll: Object.freeze([
-                    Object.freeze({ parameter: 'OutputFormat', equals: 'RawYolo' }),
-                    Object.freeze({ parameter: 'EnableInternalNms', equals: true })
-                ]),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'OutputFormat', equals: 'EndToEndNms' }),
-                    Object.freeze({ parameter: 'EnableInternalNms', equals: false })
-                ]),
-                disabledReason: 'NMS IoU is disabled when model-side NMS is trusted or internal NMS is off.'
-            })
-        })
-    }),
-    ResultOutput: Object.freeze({
-        parameters: Object.freeze({
-            Channel: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'OutputChannel', notEmpty: true }),
-                    Object.freeze({ parameter: 'OutputChannelId', notEmpty: true })
-                ]),
-                disabledReason: 'Channel is disabled when a concrete output channel id is selected.',
-                mutuallyExclusiveGroup: 'output-channel',
-                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
-                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
-            }),
-            OutputChannel: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEmpty: true }),
-                    Object.freeze({ parameter: 'OutputChannelId', notEmpty: true })
-                ]),
-                disabledReason: 'OutputChannel is disabled when Channel or OutputChannelId is selected.',
-                mutuallyExclusiveGroup: 'output-channel',
-                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
-                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
-            }),
-            OutputChannelId: Object.freeze({
-                required: true,
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEmpty: true }),
-                    Object.freeze({ parameter: 'OutputChannel', notEmpty: true })
-                ]),
-                disabledReason: 'OutputChannelId is disabled when Channel or OutputChannel is selected.',
-                mutuallyExclusiveGroup: 'output-channel',
-                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
-                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
-            }),
-            FilePath: Object.freeze({
-                requiredWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', equals: 'file' }),
-                    Object.freeze({ parameter: 'OutputChannel', equals: 'file' })
-                ]),
-                disabledWhenAll: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEquals: 'file' }),
-                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'file' })
-                ]),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'OutputPath', notEmpty: true })
-                ]),
-                disabledReason: 'File path is enabled only for file output.',
-                mutuallyExclusiveGroup: 'file-output',
-                atLeastOneOf: Object.freeze(['FilePath', 'OutputPath']),
-                atLeastOneMessage: 'File output requires FilePath or OutputPath.'
-            }),
-            OutputPath: Object.freeze({
-                requiredWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', equals: 'file' }),
-                    Object.freeze({ parameter: 'OutputChannel', equals: 'file' })
-                ]),
-                disabledWhenAll: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEquals: 'file' }),
-                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'file' })
-                ]),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'FilePath', notEmpty: true })
-                ]),
-                disabledReason: 'Output path is enabled only for file output.',
-                mutuallyExclusiveGroup: 'file-output',
-                atLeastOneOf: Object.freeze(['FilePath', 'OutputPath']),
-                atLeastOneMessage: 'File output requires FilePath or OutputPath.'
-            }),
-            PlcAddress: Object.freeze({
-                requiredWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', equals: 'plc' }),
-                    Object.freeze({ parameter: 'OutputChannel', equals: 'plc' })
-                ]),
-                disabledWhenAll: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEquals: 'plc' }),
-                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'plc' })
-                ]),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'PLCParameters', notEmpty: true })
-                ]),
-                disabledReason: 'PLC metadata is enabled only for PLC output review.',
-                mutuallyExclusiveGroup: 'plc-output',
-                atLeastOneOf: Object.freeze(['PlcAddress', 'PLCParameters']),
-                atLeastOneMessage: 'PLC output requires PlcAddress or PLCParameters.'
-            }),
-            PLCParameters: Object.freeze({
-                requiredWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', equals: 'plc' }),
-                    Object.freeze({ parameter: 'OutputChannel', equals: 'plc' })
-                ]),
-                disabledWhenAll: Object.freeze([
-                    Object.freeze({ parameter: 'Channel', notEquals: 'plc' }),
-                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'plc' })
-                ]),
-                disabledWhenAny: Object.freeze([
-                    Object.freeze({ parameter: 'PlcAddress', notEmpty: true })
-                ]),
-                disabledReason: 'PLC metadata is enabled only for PLC output review.',
-                mutuallyExclusiveGroup: 'plc-output',
-                atLeastOneOf: Object.freeze(['PlcAddress', 'PLCParameters']),
-                atLeastOneMessage: 'PLC output requires PlcAddress or PLCParameters.'
-            })
-        })
     })
 });
 
@@ -401,7 +148,75 @@ export function getParameterEffectiveValue(param) {
     return param?.value ?? param?.Value ?? param?.defaultValue ?? param?.DefaultValue ?? null;
 }
 
-export function getOperatorParameterValue(operator, parameterName, values = null) {
+function getOperatorConstraints(operator) {
+    const constraints = operator?.parameterConstraints ?? operator?.ParameterConstraints ?? [];
+    return Array.isArray(constraints) ? constraints : [];
+}
+
+function getConstraintValue(constraint, camelName, pascalName) {
+    return constraint?.[camelName] ?? constraint?.[pascalName] ?? null;
+}
+
+function normalizeServerCondition(condition) {
+    if (!condition) {
+        return null;
+    }
+
+    const parameter = getConstraintValue(condition, 'parameter', 'Parameter');
+    const comparison = String(getConstraintValue(condition, 'comparison', 'Comparison') || '').toLowerCase();
+    const value = getConstraintValue(condition, 'value', 'Value');
+    const normalized = { parameter };
+    if (comparison === 'equals') normalized.equals = value;
+    if (comparison === 'not-equals') normalized.notEquals = value;
+    if (comparison === 'empty') normalized.empty = true;
+    if (comparison === 'not-empty') normalized.notEmpty = true;
+    return normalized;
+}
+
+function normalizeServerConditionSet(conditionSet) {
+    if (!conditionSet) {
+        return null;
+    }
+
+    const all = getConstraintValue(conditionSet, 'all', 'All');
+    const any = getConstraintValue(conditionSet, 'any', 'Any');
+    const branches = [];
+    if (Array.isArray(all) && all.length > 0) {
+        branches.push({ all: all.map(normalizeServerCondition).filter(Boolean) });
+    }
+    if (Array.isArray(any) && any.length > 0) {
+        branches.push({ any: any.map(normalizeServerCondition).filter(Boolean) });
+    }
+    if (branches.length === 0) return null;
+    return branches.length === 1 ? branches[0] : { all: branches };
+}
+
+function findOperatorConstraint(operator, parameterName) {
+    const normalizedName = normalizeParameterName(parameterName);
+    return getOperatorConstraints(operator)
+        .find(constraint => normalizeParameterName(getConstraintValue(constraint, 'parameter', 'Parameter')) === normalizedName) || null;
+}
+
+function getConstraintGroupNames(operator, propertyName, groupName) {
+    if (!groupName) return [];
+    const pascalName = propertyName[0].toUpperCase() + propertyName.slice(1);
+    return getOperatorConstraints(operator)
+        .filter(constraint => String(getConstraintValue(constraint, propertyName, pascalName) || '') === String(groupName))
+        .map(constraint => getConstraintValue(constraint, 'parameter', 'Parameter'))
+        .filter(Boolean);
+}
+
+function hasConfiguredMutuallyExclusivePeer(operator, parameterName, groupName, values = null) {
+    if (!groupName) return false;
+    const normalizedName = normalizeParameterName(parameterName);
+    return getConstraintGroupNames(operator, 'mutuallyExclusiveGroup', groupName)
+        .some(peerName =>
+            normalizeParameterName(peerName) !== normalizedName &&
+            !isEmptyParameterValue(getOperatorParameterValueDirect(operator, peerName, values))
+        );
+}
+
+function getOperatorParameterValueDirect(operator, parameterName, values = null) {
     const normalizedName = normalizeParameterName(parameterName);
     if (!normalizedName) {
         return null;
@@ -430,9 +245,62 @@ export function getOperatorParameterValue(operator, parameterName, values = null
     return null;
 }
 
+export function getOperatorParameterValue(operator, parameterName, values = null) {
+    const directValue = getOperatorParameterValueDirect(operator, parameterName, values);
+    if (!isEmptyParameterValue(directValue)) {
+        return directValue;
+    }
+
+    const normalizedName = normalizeParameterName(parameterName);
+    const constraints = getOperatorConstraints(operator);
+    const constraint = findOperatorConstraint(operator, parameterName);
+    const aliasFor = getConstraintValue(constraint, 'aliasFor', 'AliasFor');
+    const peerNames = [];
+    if (aliasFor) peerNames.push(aliasFor);
+    constraints.forEach(item => {
+        const itemAliasFor = getConstraintValue(item, 'aliasFor', 'AliasFor');
+        if (normalizeParameterName(itemAliasFor) === normalizedName) {
+            peerNames.push(getConstraintValue(item, 'parameter', 'Parameter'));
+        }
+    });
+
+    for (const peerName of peerNames) {
+        const peerValue = getOperatorParameterValueDirect(operator, peerName, values);
+        if (!isEmptyParameterValue(peerValue)) {
+            return peerValue;
+        }
+    }
+
+    return directValue;
+}
+
 export function getOperatorParameterRule(operatorOrType, parameterName) {
     const operatorType = normalizeOperatorType(operatorOrType);
     const normalizedName = normalizeParameterName(parameterName);
+    const constraint = typeof operatorOrType === 'object'
+        ? findOperatorConstraint(operatorOrType, parameterName)
+        : null;
+    if (constraint) {
+        const requiredPolicy = String(getConstraintValue(constraint, 'requiredPolicy', 'RequiredPolicy') || 'metadata').toLowerCase();
+        const requiredWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'requiredWhen', 'RequiredWhen'));
+        const enabledWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'enabledWhen', 'EnabledWhen'));
+        const disabledWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'disabledWhen', 'DisabledWhen'));
+        const atLeastOneGroup = getConstraintValue(constraint, 'atLeastOneGroup', 'AtLeastOneGroup');
+        const mutuallyExclusiveGroup = getConstraintValue(constraint, 'mutuallyExclusiveGroup', 'MutuallyExclusiveGroup');
+        return {
+            required: requiredPolicy === 'required' ? true : requiredPolicy === 'optional' ? false : undefined,
+            requiredWhen,
+            enabledWhen,
+            disabledWhen,
+            atLeastOneOf: getConstraintGroupNames(operatorOrType, 'atLeastOneGroup', atLeastOneGroup),
+            mutuallyExclusiveGroup,
+            aliasFor: getConstraintValue(constraint, 'aliasFor', 'AliasFor'),
+            deprecated: Boolean(getConstraintValue(constraint, 'deprecated', 'Deprecated')),
+            resourceKind: getConstraintValue(constraint, 'resourceKind', 'ResourceKind'),
+            reasonCode: getConstraintValue(constraint, 'reasonCode', 'ReasonCode')
+        };
+    }
+
     const rules = OPERATOR_PARAMETER_RULES[operatorType]?.parameters || {};
     return Object.entries(rules)
         .find(([name]) => normalizeParameterName(name) === normalizedName)?.[1] || null;
@@ -515,9 +383,16 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
         ? false
         : isParameterRawRequired(paramOrName);
     const effectiveDisabled = Boolean(
+        (rule?.enabledWhen && !evaluateCondition(rule.enabledWhen, operator, values)) ||
         (rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values)) ||
         evaluateAnyCondition(rule?.disabledWhenAny, operator, values) ||
-        evaluateAllConditions(rule?.disabledWhenAll, operator, values)
+        evaluateAllConditions(rule?.disabledWhenAll, operator, values) ||
+        hasConfiguredMutuallyExclusivePeer(
+            operator,
+            parameterName,
+            rule?.mutuallyExclusiveGroup,
+            values
+        )
     );
     let effectiveRequired = rawRequired;
 

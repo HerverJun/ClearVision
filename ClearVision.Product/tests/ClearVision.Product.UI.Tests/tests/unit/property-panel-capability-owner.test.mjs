@@ -7,6 +7,13 @@ function readRepoText(relativeUrl) {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
 }
 
+function canonicalConstraintsFor(operatorType) {
+  const spec = JSON.parse(readRepoText(
+    '../../../../../quality/evals/specs/vision_agent_parameter_rule_parity_cases.json'
+  ));
+  return spec.operatorConstraints?.[operatorType] || [];
+}
+
 function collectFiles(rootUrl, extension) {
   const files = [];
   for (const entry of readdirSync(rootUrl, { withFileTypes: true })) {
@@ -995,6 +1002,7 @@ test('PropertyPanelCapabilityOwner skips full apply when dependency filtering le
     currentOperator: {
       id: 'deep-learning-empty-write',
       type: 'DeepLearning',
+      parameterConstraints: canonicalConstraintsFor('DeepLearning'),
       parameters: [
         { name: 'UseGpu', value: false, dataType: 'bool' },
         { name: 'GpuDeviceId', value: '', dataType: 'string' }
@@ -1194,6 +1202,7 @@ test('PropertyPanelCapabilityOwner does not clear disabled file paths during pas
     currentOperator: {
       id: 'acq-passive-sync',
       type: 'ImageAcquisition',
+      parameterConstraints: canonicalConstraintsFor('ImageAcquisition'),
       parameters: [
         { name: 'SourceType', value: 'Camera', dataType: 'enum' },
         { name: 'FilePath', value: 'C:\\Data\\stale.png', dataType: 'file' }
@@ -1222,7 +1231,7 @@ test('PropertyPanelCapabilityOwner does not clear disabled file paths during pas
   assert.equal(fileInput['aria-disabled'], 'true');
   assert.equal(pickerButton.disabled, true);
   assert.equal(pickerButton['aria-disabled'], 'true');
-  assert.match(fileRuleHint.textContent, /相机模式/);
+  assert.equal(fileRuleHint.textContent, '');
 });
 
 test('PropertyPanelCapabilityOwner validates EdgeDetection model sources only for OnnxEdge', async () => {
@@ -1239,6 +1248,7 @@ test('PropertyPanelCapabilityOwner validates EdgeDetection model sources only fo
   const createOperator = method => ({
     id: 'edge-detection-1',
     type: 'EdgeDetection',
+    parameterConstraints: canonicalConstraintsFor('EdgeDetection'),
     parameters: [
       { name: 'Method', value: method, dataType: 'enum' },
       { name: 'EdgeModelPath', displayName: '模型路径', value: '', dataType: 'file', isRequired: true },
@@ -1264,12 +1274,15 @@ test('PropertyPanelCapabilityOwner validates EdgeDetection model sources only fo
 
     assert.equal(owner.validationErrors.length, 1);
     assert.equal(owner.validationErrors[0].kind, 'atLeastOneOf');
-    assert.equal(owner.validationErrors[0].message, 'ONNX 边缘检测需要选择模型路径、模型 ID 或模型目录之一');
-    for (const name of ['EdgeModelPath', 'EdgeModelId', 'ModelCatalogPath']) {
+    assert.match(owner.validationErrors[0].message, /模型路径/);
+    assert.match(owner.validationErrors[0].message, /模型 ID/);
+    for (const name of ['EdgeModelPath', 'EdgeModelId']) {
       assert.equal(dom.groups.get(name).classList.contains('invalid'), true, `${name} invalid group`);
       assert.equal(dom.inputs.get(name).getAttribute('aria-invalid'), 'true', `${name} aria-invalid`);
     }
-    assert.equal(dom.messages.length, 3);
+    assert.equal(dom.groups.get('ModelCatalogPath').classList.contains('invalid'), false);
+    assert.equal(dom.inputs.get('ModelCatalogPath').getAttribute('aria-invalid'), null);
+    assert.equal(dom.messages.length, 2);
     assert.equal(dom.messages.every(message => message.textContent === owner.validationErrors[0].message), true);
 
     owner.currentOperator = createOperator('Canny');

@@ -1,5 +1,305 @@
 {
-  "schemaVersion": "2026-06-05.vision-agent-parameter-rule-parity.v1",
+  "schemaVersion": "2026-07-10.vision-agent-parameter-rule-parity.v2",
+  "operatorConstraints": {
+    "ImageAcquisition": [
+      {
+        "parameter": "SourceType",
+        "requiredPolicy": "required",
+        "reasonCode": "IMAGE_SOURCE_TYPE_REQUIRED"
+      },
+      {
+        "parameter": "FilePath",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+          ]
+        },
+        "resourceKind": "image_file",
+        "reasonCode": "IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE"
+      },
+      {
+        "parameter": "CameraId",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "atLeastOneGroup": "image-camera-source",
+        "resourceKind": "camera_binding",
+        "reasonCode": "IMAGE_CAMERA_REQUIRED_FOR_CAMERA_SOURCE"
+      },
+      {
+        "parameter": "CameraBindingId",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "Camera" }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "atLeastOneGroup": "image-camera-source",
+        "aliasFor": "CameraId",
+        "resourceKind": "camera_binding",
+        "reasonCode": "IMAGE_CAMERA_BINDING_ALIAS"
+      },
+      {
+        "parameter": "ExposureTime",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
+      },
+      {
+        "parameter": "Gain",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
+      },
+      {
+        "parameter": "TriggerMode",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "SourceType", "comparison": "equals", "value": "File" }
+          ]
+        },
+        "reasonCode": "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"
+      },
+      {
+        "parameter": "sourceType",
+        "requiredPolicy": "optional",
+        "aliasFor": "SourceType",
+        "deprecated": true,
+        "reasonCode": "IMAGE_SOURCE_TYPE_LEGACY_ALIAS"
+      },
+      {
+        "parameter": "cameraId",
+        "requiredPolicy": "optional",
+        "aliasFor": "CameraId",
+        "deprecated": true,
+        "reasonCode": "IMAGE_CAMERA_ID_LEGACY_ALIAS"
+      }
+    ],
+    "DeepLearning": [
+      {
+        "parameter": "ModelPath",
+        "requiredPolicy": "required",
+        "atLeastOneGroup": "deep-learning-model-source",
+        "mutuallyExclusiveGroup": "deep-learning-model-source",
+        "resourceKind": "model_resource",
+        "reasonCode": "DEEP_LEARNING_MODEL_SOURCE_REQUIRED"
+      },
+      {
+        "parameter": "ModelId",
+        "requiredPolicy": "required",
+        "atLeastOneGroup": "deep-learning-model-source",
+        "mutuallyExclusiveGroup": "deep-learning-model-source",
+        "resourceKind": "model_resource",
+        "reasonCode": "DEEP_LEARNING_MODEL_SOURCE_REQUIRED"
+      },
+      {
+        "parameter": "ModelCatalogPath",
+        "requiredPolicy": "optional",
+        "disabledWhen": {
+          "any": [
+            { "parameter": "ModelId", "comparison": "empty" },
+            { "parameter": "ModelPath", "comparison": "not-empty" }
+          ]
+        },
+        "resourceKind": "model_catalog",
+        "reasonCode": "DEEP_LEARNING_CATALOG_REQUIRES_MODEL_ID"
+      },
+      {
+        "parameter": "LabelsPath",
+        "requiredPolicy": "optional",
+        "resourceKind": "model_labels",
+        "reasonCode": "DEEP_LEARNING_LABELS_OPTIONAL_FALLBACK"
+      },
+      {
+        "parameter": "GpuDeviceId",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "UseGpu", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU"
+      },
+      {
+        "parameter": "EnableInternalNms",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "OutputFormat", "comparison": "equals", "value": "EndToEndNms" }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS"
+      },
+      {
+        "parameter": "NmsIouThreshold",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "OutputFormat", "comparison": "equals", "value": "RawYolo" },
+            { "parameter": "EnableInternalNms", "comparison": "equals", "value": true }
+          ]
+        },
+        "disabledWhen": {
+          "any": [
+            { "parameter": "OutputFormat", "comparison": "equals", "value": "EndToEndNms" },
+            { "parameter": "EnableInternalNms", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS"
+      }
+    ],
+    "EdgeDetection": [
+      {
+        "parameter": "EdgeModelPath",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "Method", "comparison": "equals", "value": "OnnxEdge" }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+          ]
+        },
+        "atLeastOneGroup": "edge-model-source",
+        "mutuallyExclusiveGroup": "edge-model-source",
+        "resourceKind": "model_resource",
+        "reasonCode": "EDGE_ONNX_MODEL_SOURCE_REQUIRED"
+      },
+      {
+        "parameter": "EdgeModelId",
+        "requiredPolicy": "optional",
+        "requiredWhen": {
+          "all": [
+            { "parameter": "Method", "comparison": "equals", "value": "OnnxEdge" }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+          ]
+        },
+        "atLeastOneGroup": "edge-model-source",
+        "mutuallyExclusiveGroup": "edge-model-source",
+        "resourceKind": "model_resource",
+        "reasonCode": "EDGE_ONNX_MODEL_SOURCE_REQUIRED"
+      },
+      {
+        "parameter": "ModelCatalogPath",
+        "requiredPolicy": "optional",
+        "disabledWhen": {
+          "any": [
+            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" },
+            { "parameter": "EdgeModelId", "comparison": "empty" },
+            { "parameter": "EdgeModelPath", "comparison": "not-empty" }
+          ]
+        },
+        "resourceKind": "model_catalog",
+        "reasonCode": "EDGE_MODEL_CATALOG_REQUIRES_MODEL_ID"
+      },
+      {
+        "parameter": "EdgeBinarizationThreshold",
+        "requiredPolicy": "optional",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "Method", "comparison": "not-equals", "value": "OnnxEdge" }
+          ]
+        },
+        "reasonCode": "EDGE_BINARIZATION_ONLY_FOR_ONNX"
+      }
+    ],
+    "ResultOutput": [
+      {
+        "parameter": "SaveToFile",
+        "resourceKind": "output_file",
+        "reasonCode": "RESULT_OUTPUT_OPTIONAL_INTERNAL_FILE_WRITE"
+      }
+    ],
+    "BlobAnalysis": [
+      {
+        "parameter": "FeatureFilter",
+        "requiredPolicy": "optional",
+        "reasonCode": "BLOB_FEATURE_FILTER_OPTIONAL"
+      },
+      {
+        "parameter": "HueLow",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      },
+      {
+        "parameter": "HueHigh",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      },
+      {
+        "parameter": "SatLow",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      },
+      {
+        "parameter": "SatHigh",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      },
+      {
+        "parameter": "ValLow",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      },
+      {
+        "parameter": "ValHigh",
+        "disabledWhen": {
+          "all": [
+            { "parameter": "EnableColorFilter", "comparison": "equals", "value": false }
+          ]
+        },
+        "reasonCode": "BLOB_HSV_ONLY_WITH_COLOR_FILTER"
+      }
+    ]
+  },
   "cases": [
     {
       "caseId": "image_camera_requires_camera_id_or_binding",
@@ -13,8 +313,8 @@
         "CameraId": { "effectiveRequired": true, "effectiveDisabled": false },
         "CameraBindingId": { "effectiveRequired": true, "effectiveDisabled": false }
       },
-      "flowValidationMissingParameters": ["CameraBindingId"],
-      "deploymentPrecheckMissingParameters": ["CameraBindingId"]
+      "flowValidationMissingParameters": ["CameraId"],
+      "deploymentPrecheckMissingParameters": ["CameraId"]
     },
     {
       "caseId": "image_file_requires_file_path",
@@ -31,7 +331,7 @@
       "deploymentPrecheckMissingParameters": ["FilePath"]
     },
     {
-      "caseId": "template_matching_requires_path_or_id",
+      "caseId": "template_matching_requires_runtime_template_input",
       "operatorType": "TemplateMatching",
       "parameters": {},
       "uiStates": {
@@ -42,7 +342,7 @@
       "deploymentPrecheckMissingParameters": ["Template"]
     },
     {
-      "caseId": "template_matching_accepts_template_id",
+      "caseId": "template_matching_legacy_metadata_accepts_template_id",
       "operatorType": "TemplateMatching",
       "parameters": {
         "TemplateId": "mock-template-catalog-item"
@@ -55,19 +355,19 @@
       "deploymentPrecheckMissingParameters": []
     },
     {
-      "caseId": "deep_learning_requires_model_source",
+      "caseId": "deep_learning_requires_model_path_or_id",
       "operatorType": "DeepLearning",
       "parameters": {},
       "uiStates": {
         "ModelPath": { "effectiveRequired": true, "effectiveDisabled": false },
         "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": true, "effectiveDisabled": false }
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true }
       },
       "flowValidationMissingParameters": ["ModelPath"],
       "deploymentPrecheckMissingParameters": ["ModelPath"]
     },
     {
-      "caseId": "deep_learning_accepts_model_id",
+      "caseId": "deep_learning_accepts_model_id_and_enables_catalog",
       "operatorType": "DeepLearning",
       "parameters": {
         "ModelId": "mock-model-catalog-item"
@@ -75,65 +375,97 @@
       "uiStates": {
         "ModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
         "ModelId": { "effectiveRequired": true, "effectiveDisabled": false },
-        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true }
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": false }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
     },
     {
-      "caseId": "result_output_accepts_output_channel_id",
-      "operatorType": "ResultOutput",
+      "caseId": "edge_detection_canny_disables_model_parameters",
+      "operatorType": "EdgeDetection",
       "parameters": {
-        "OutputChannelId": "mock-output-channel"
+        "Method": "Canny"
       },
       "uiStates": {
-        "Channel": { "effectiveRequired": false, "effectiveDisabled": true },
-        "OutputChannel": { "effectiveRequired": false, "effectiveDisabled": true },
-        "OutputChannelId": { "effectiveRequired": true, "effectiveDisabled": false }
+        "EdgeModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "EdgeModelId": { "effectiveRequired": false, "effectiveDisabled": true },
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "EdgeBinarizationThreshold": { "effectiveRequired": false, "effectiveDisabled": true }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []
     },
     {
-      "caseId": "result_output_file_requires_file_path_or_output_path",
-      "operatorType": "ResultOutput",
+      "caseId": "edge_detection_onnx_requires_model_source",
+      "operatorType": "EdgeDetection",
       "parameters": {
-        "Channel": "file"
+        "Method": "OnnxEdge"
       },
       "uiStates": {
-        "FilePath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "OutputPath": { "effectiveRequired": true, "effectiveDisabled": false },
-        "PlcAddress": { "effectiveRequired": false, "effectiveDisabled": true },
-        "PLCParameters": { "effectiveRequired": false, "effectiveDisabled": true }
+        "EdgeModelPath": { "effectiveRequired": true, "effectiveDisabled": false },
+        "EdgeModelId": { "effectiveRequired": true, "effectiveDisabled": false },
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "EdgeBinarizationThreshold": { "effectiveRequired": false, "effectiveDisabled": false }
       },
-      "flowValidationMissingParameters": ["FilePath"],
-      "deploymentPrecheckMissingParameters": ["FilePath"]
+      "flowValidationMissingParameters": ["EdgeModelPath"],
+      "deploymentPrecheckMissingParameters": ["EdgeModelPath"]
     },
     {
-      "caseId": "result_output_plc_requires_address_or_parameters",
-      "operatorType": "ResultOutput",
+      "caseId": "edge_detection_onnx_accepts_model_id",
+      "operatorType": "EdgeDetection",
       "parameters": {
-        "Channel": "plc"
+        "Method": "OnnxEdge",
+        "EdgeModelId": "edge-model-v1",
+        "ModelCatalogPath": "models/catalog.json"
       },
       "uiStates": {
-        "FilePath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "OutputPath": { "effectiveRequired": false, "effectiveDisabled": true },
-        "PlcAddress": { "effectiveRequired": true, "effectiveDisabled": false },
-        "PLCParameters": { "effectiveRequired": true, "effectiveDisabled": false }
+        "EdgeModelPath": { "effectiveRequired": false, "effectiveDisabled": true },
+        "EdgeModelId": { "effectiveRequired": true, "effectiveDisabled": false },
+        "ModelCatalogPath": { "effectiveRequired": false, "effectiveDisabled": false }
       },
-      "flowValidationMissingParameters": ["PlcAddress"],
-      "deploymentPrecheckMissingParameters": ["PlcAddress"]
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
     },
     {
-      "caseId": "result_output_plc_accepts_parameters_metadata",
+      "caseId": "result_output_only_uses_real_save_to_file_parameter",
       "operatorType": "ResultOutput",
       "parameters": {
-        "Channel": "plc",
-        "PLCParameters": "mock-plc-metadata"
+        "SaveToFile": false
       },
       "uiStates": {
-        "PlcAddress": { "effectiveRequired": false, "effectiveDisabled": true },
-        "PLCParameters": { "effectiveRequired": true, "effectiveDisabled": false }
+        "SaveToFile": { "effectiveRequired": false, "effectiveDisabled": false }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "blob_analysis_color_filter_disabled",
+      "operatorType": "BlobAnalysis",
+      "parameters": {
+        "EnableColorFilter": false
+      },
+      "uiStates": {
+        "FeatureFilter": { "effectiveRequired": false, "effectiveDisabled": false },
+        "HueLow": { "effectiveRequired": false, "effectiveDisabled": true },
+        "HueHigh": { "effectiveRequired": false, "effectiveDisabled": true },
+        "SatLow": { "effectiveRequired": false, "effectiveDisabled": true },
+        "SatHigh": { "effectiveRequired": false, "effectiveDisabled": true },
+        "ValLow": { "effectiveRequired": false, "effectiveDisabled": true },
+        "ValHigh": { "effectiveRequired": false, "effectiveDisabled": true }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "blob_analysis_color_filter_enabled",
+      "operatorType": "BlobAnalysis",
+      "parameters": {
+        "EnableColorFilter": true
+      },
+      "uiStates": {
+        "FeatureFilter": { "effectiveRequired": false, "effectiveDisabled": false },
+        "HueLow": { "effectiveRequired": false, "effectiveDisabled": false },
+        "ValHigh": { "effectiveRequired": false, "effectiveDisabled": false }
       },
       "flowValidationMissingParameters": [],
       "deploymentPrecheckMissingParameters": []

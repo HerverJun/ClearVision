@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
 
@@ -12,14 +13,48 @@ public sealed class VisionAgentParameterRuleParityTests
     {
         var spec = LoadSpec();
 
-        spec.SchemaVersion.Should().Be("2026-06-05.vision-agent-parameter-rule-parity.v1");
+        spec.SchemaVersion.Should().Be("2026-07-10.vision-agent-parameter-rule-parity.v2");
         spec.Cases.Select(item => item.OperatorType).Should().Contain([
             "ImageAcquisition",
             "TemplateMatching",
             "DeepLearning",
-            "ResultOutput"]);
+            "EdgeDetection",
+            "ResultOutput",
+            "BlobAnalysis"]);
         spec.Cases.Should().Contain(item => item.CaseId == "image_camera_requires_camera_id_or_binding");
-        spec.Cases.Should().Contain(item => item.CaseId == "result_output_plc_requires_address_or_parameters");
+        spec.Cases.Should().Contain(item => item.CaseId == "result_output_only_uses_real_save_to_file_parameter");
+        spec.Cases
+            .Where(item => item.OperatorType == "ResultOutput")
+            .Should().OnlyContain(item => item.Parameters.Keys.All(name => name == "SaveToFile"));
+    }
+
+    [Fact(DisplayName = "shared parity spec constraints should match the canonical provider facts")]
+    public void SharedSpecConstraints_ShouldMatchCanonicalProviderFacts()
+    {
+        var spec = LoadSpec();
+        var catalog = new VisionAgentOperatorContractCatalog();
+        var migratedOperators = new[]
+        {
+            "ImageAcquisition",
+            "DeepLearning",
+            "EdgeDetection",
+            "ResultOutput",
+            "BlobAnalysis"
+        };
+
+        spec.OperatorConstraints.Keys.Should().BeEquivalentTo(migratedOperators);
+        spec.OperatorConstraints.Should().NotContainKey("TemplateMatching");
+        foreach (var operatorType in migratedOperators)
+        {
+            catalog.TryGet(operatorType, out var contract).Should().BeTrue(operatorType);
+            var actual = contract.ParameterConstraints!
+                .Select(ParameterConstraintSpec.From)
+                .Select(item => item.Identity());
+            var expected = spec.OperatorConstraints[operatorType]
+                .Select(item => item.Identity());
+
+            expected.Should().Equal(actual, operatorType);
+        }
     }
 
     [Fact(DisplayName = "validate_flow should match shared parameter rule parity spec")]
@@ -187,8 +222,6 @@ public sealed class VisionAgentParameterRuleParityTests
         AddIfConfigured(confirmations, testCase, "camera_binding", "CameraId", "CameraBindingId");
         AddIfConfigured(confirmations, testCase, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
         AddIfConfigured(confirmations, testCase, "template_artifact", "Template", "TemplateId", "TemplatePath");
-        AddIfConfigured(confirmations, testCase, "output_channel", "OutputChannel", "OutputChannelId", "Channel");
-        AddIfConfigured(confirmations, testCase, "plc_address", "PlcAddress", "PLCParameters");
         return confirmations.ToArray();
     }
 
@@ -277,7 +310,87 @@ public sealed class VisionAgentParameterRuleParityTests
     private sealed record ParameterRuleParitySpec
     {
         public string SchemaVersion { get; init; } = string.Empty;
+        public IReadOnlyDictionary<string, IReadOnlyList<ParameterConstraintSpec>> OperatorConstraints { get; init; } =
+            new Dictionary<string, IReadOnlyList<ParameterConstraintSpec>>(StringComparer.OrdinalIgnoreCase);
         public IReadOnlyList<ParameterRuleParityCase> Cases { get; init; } = [];
+    }
+
+    private sealed record ParameterConstraintSpec
+    {
+        public string Parameter { get; init; } = string.Empty;
+        public string RequiredPolicy { get; init; } = OperatorParameterRequiredPolicies.Metadata;
+        public ParameterConditionSetSpec? RequiredWhen { get; init; }
+        public ParameterConditionSetSpec? EnabledWhen { get; init; }
+        public ParameterConditionSetSpec? DisabledWhen { get; init; }
+        public string? AtLeastOneGroup { get; init; }
+        public string? MutuallyExclusiveGroup { get; init; }
+        public string? AliasFor { get; init; }
+        public bool Deprecated { get; init; }
+        public string? ResourceKind { get; init; }
+        public string ReasonCode { get; init; } = string.Empty;
+
+        public string Identity() => string.Join("|",
+            Parameter,
+            RequiredPolicy,
+            RequiredWhen?.Identity() ?? string.Empty,
+            EnabledWhen?.Identity() ?? string.Empty,
+            DisabledWhen?.Identity() ?? string.Empty,
+            AtLeastOneGroup ?? string.Empty,
+            MutuallyExclusiveGroup ?? string.Empty,
+            AliasFor ?? string.Empty,
+            Deprecated,
+            ResourceKind ?? string.Empty,
+            ReasonCode);
+
+        public static ParameterConstraintSpec From(OperatorParameterConstraint constraint) => new()
+        {
+            Parameter = constraint.Parameter,
+            RequiredPolicy = constraint.RequiredPolicy,
+            RequiredWhen = ParameterConditionSetSpec.From(constraint.RequiredWhen),
+            EnabledWhen = ParameterConditionSetSpec.From(constraint.EnabledWhen),
+            DisabledWhen = ParameterConditionSetSpec.From(constraint.DisabledWhen),
+            AtLeastOneGroup = constraint.AtLeastOneGroup,
+            MutuallyExclusiveGroup = constraint.MutuallyExclusiveGroup,
+            AliasFor = constraint.AliasFor,
+            Deprecated = constraint.Deprecated,
+            ResourceKind = constraint.ResourceKind,
+            ReasonCode = constraint.ReasonCode
+        };
+    }
+
+    private sealed record ParameterConditionSetSpec
+    {
+        public IReadOnlyList<ParameterConditionSpec>? All { get; init; }
+        public IReadOnlyList<ParameterConditionSpec>? Any { get; init; }
+
+        public string Identity() =>
+            $"all=[{string.Join(';', All?.Select(item => item.Identity()) ?? [])}];" +
+            $"any=[{string.Join(';', Any?.Select(item => item.Identity()) ?? [])}]";
+
+        public static ParameterConditionSetSpec? From(OperatorParameterConditionSet? set) => set is null
+            ? null
+            : new ParameterConditionSetSpec
+            {
+                All = set.All?.Select(ParameterConditionSpec.From).ToArray(),
+                Any = set.Any?.Select(ParameterConditionSpec.From).ToArray()
+            };
+    }
+
+    private sealed record ParameterConditionSpec
+    {
+        public string Parameter { get; init; } = string.Empty;
+        public string Comparison { get; init; } = string.Empty;
+        public JsonElement? Value { get; init; }
+
+        public string Identity() =>
+            $"{Parameter}:{Comparison}:{(Value.HasValue ? Value.Value.GetRawText() : string.Empty)}";
+
+        public static ParameterConditionSpec From(OperatorParameterCondition condition) => new()
+        {
+            Parameter = condition.Parameter,
+            Comparison = condition.Comparison,
+            Value = condition.Value is null ? null : JsonSerializer.SerializeToElement(condition.Value, JsonOptions)
+        };
     }
 
     private sealed record ParameterRuleParityCase
