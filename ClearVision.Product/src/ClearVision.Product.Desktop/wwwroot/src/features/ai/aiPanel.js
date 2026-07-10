@@ -29,6 +29,12 @@ import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
 } from './aiPanelAgentWorkspace.js';
+import {
+    AgentWorkspaceEventTypes,
+    createAgentWorkspaceSnapshot,
+    dispatchAgentWorkspaceEvent,
+    installAgentWorkspaceState
+} from './agentWorkspaceState.js';
 
 /**
  * AI 智能助手面板
@@ -51,6 +57,11 @@ export class AiPanel {
         this.isHistoryPanelOpen = false;
         this.currentThinkingStep = null;
         this.sessionId = this._loadSessionId();
+        installAgentWorkspaceState(this, {
+            sessionId: this.sessionId,
+            requirementMode: 'strict',
+            viewMode: this._loadWorkspaceViewMode?.() || AgentWorkspaceModes.PLAN
+        });
         this.initialAutoRestoreSessionId = this.sessionId;
         this.sessionNavigationEpoch = 0;
         this.pendingSessionLoad = null;
@@ -112,8 +123,6 @@ export class AiPanel {
         this._lastActiveWorkbenchState = AiWorkbenchStates.IDLE;
         this._workbenchStageTimeline = [];
         this._lastAgentRuntime = null;
-        this._clarificationSelectionDraft = {};
-        this._lastClarificationDraftText = '';
         this.isVisionAgentDeveloperUiEnabled = this._isAgentDeveloperControlsEnabled();
         this.useVisionAgentGenerateFlow = this._loadAgentGenerateFlowEnabled();
         this.agentGenerateFlowMode = this._loadAgentGenerateFlowMode();
@@ -185,6 +194,24 @@ export class AiPanel {
             window.__clearVisionFlushAiPanelWorkspace = async (reason = 'host_close') =>
                 (await this._flushWorkspaceSnapshotBeforeBoundary?.(reason)) ?? true;
         }
+    }
+
+    _dispatchAgentWorkspaceEvent(event) {
+        return dispatchAgentWorkspaceEvent(this, {
+            sessionId: this.sessionId,
+            ...event
+        });
+    }
+
+    _ensureAgentWorkspaceState(seed = {}) {
+        return installAgentWorkspaceState(this, {
+            sessionId: this.sessionId,
+            ...seed
+        });
+    }
+
+    _createAgentWorkspaceSnapshot() {
+        return createAgentWorkspaceSnapshot(this.agentWorkspaceState);
     }
 
     _init() {
@@ -905,7 +932,6 @@ export class AiPanel {
                 this._clearPlanQuestionAnswers?.();
             }
             if (!isVisionAgentMode) {
-                this._resetClarificationSelectionDraft();
             }
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
@@ -1547,13 +1573,24 @@ export class AiPanel {
             ? `
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
-                        <div class="ai-followup-section-label">资源审计任务</div>
-                        <div class="ai-followup-section-tip">人工确认写回或稍后处理</div>
+                        <div class="ai-followup-section-label">资源审计证据</div>
+                        <div class="ai-followup-section-tip">只读；请在 Plan 工作台唯一澄清线处理</div>
                     </div>
                     <div class="ai-followup-list">
                         ${missing.map((item, index) => {
-                            const actionModel = this._getMissingResourceActionModel(item);
-                            return this._renderResourceAuditTaskCard(item, actionModel, index);
+                            const type = this._escapeHtml(item?.resourceType || '资源');
+                            const key = this._escapeHtml(item?.resourceKey || item?.description || `resource-${index + 1}`);
+                            return `
+                                <article class="ai-followup-item ai-resource-audit-card is-readonly" data-resource-evidence="${index}">
+                                    <div class="ai-resource-audit-card-head">
+                                        <div>
+                                            <div class="ai-followup-item-title">${type}</div>
+                                            <div class="ai-followup-item-body">${key}</div>
+                                        </div>
+                                        <span class="ai-resource-audit-badge">resource_pending</span>
+                                    </div>
+                                    <div class="ai-followup-item-meta">“稍后绑定”不会把该资源标记为已就绪，部署门禁仍保留。</div>
+                                </article>`;
                         }).join('')}
                     </div>
                 </div>
@@ -1881,7 +1918,6 @@ export class AiPanel {
         const input = this.container.querySelector('#ai-input');
         if(input) input.disabled = busy;
         this._updatePlanBuildActionState?.();
-        this._updateClarificationSendButtonState?.();
         this._updateApplyButtonState();
         this._updatePendingDraftSummary();
     }
@@ -2046,100 +2082,6 @@ export class AiPanel {
         input.style.height = `${input.scrollHeight}px`;
     }
 
-    _resetClarificationSelectionDraft() {
-        this._clarificationSelectionDraft = {};
-        this._lastClarificationDraftText = '';
-    }
-
-    _buildClarificationAnswerDraft(selection = this._clarificationSelectionDraft) {
-        const entries = Object.entries(selection || {})
-            .map(([field, value]) => [String(field || '').trim(), String(value || '').trim()])
-            .filter(([field, value]) => field && value);
-
-        if (entries.length === 0) return '';
-
-        return [
-            '澄清回答：',
-            ...entries.map(([field, value]) => `${this._getRequirementFieldLabel(field)}：${value}`)
-        ].join('\n');
-    }
-
-    _mergeClarificationDraftIntoInput(draftText) {
-        const input = this.container?.querySelector('#ai-input');
-        if (!input) return;
-
-        const nextDraft = String(draftText || '').trim();
-        if (!nextDraft) return;
-
-        const previousDraft = String(this._lastClarificationDraftText || '').trim();
-        const current = String(input.value || '').trim();
-        const nextValue = previousDraft && current.includes(previousDraft)
-            ? current.replace(previousDraft, nextDraft).trim()
-            : current
-                ? `${current}\n\n${nextDraft}`
-                : nextDraft;
-
-        this._lastClarificationDraftText = nextDraft;
-        input.value = nextValue;
-        input.focus();
-        input.style.height = 'auto';
-        input.style.height = `${input.scrollHeight}px`;
-    }
-
-    _updateClarificationSendButtonState() {
-        const buttons = Array.from(this.container?.querySelectorAll?.('[data-brief-action="send-clarification"]') || []);
-        const legacyButton = this.container?.querySelector?.('#ai-btn-send-clarification');
-        if (legacyButton && !buttons.includes(legacyButton)) {
-            buttons.push(legacyButton);
-        }
-        if (buttons.length === 0) return;
-
-        const hasDraft = Boolean(this._buildClarificationAnswerDraft());
-        buttons.forEach(button => {
-            button.disabled = this.isGenerating || !hasDraft;
-            button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
-        });
-    }
-
-    _syncClarificationOptionPressedStates(field, selectedValue) {
-        if (!this.container?.querySelectorAll) return;
-
-        this.container.querySelectorAll('[data-clarification-field][data-clarification-value]').forEach(button => {
-            const sameField = button.getAttribute('data-clarification-field') === field;
-            const sameValue = button.getAttribute('data-clarification-value') === selectedValue;
-            const selected = sameField && sameValue;
-            button.classList.toggle('is-selected', selected);
-            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-        });
-    }
-
-    _handleClarificationOptionSelection(button) {
-        if (!button) return;
-
-        const field = button.getAttribute('data-clarification-field') || '';
-        const value = button.getAttribute('data-clarification-value') || '';
-        if (!field || !value) return;
-
-        this._clarificationSelectionDraft = {
-            ...(this._clarificationSelectionDraft || {}),
-            [field]: value
-        };
-        this._syncClarificationOptionPressedStates(field, value);
-        const draftText = this._buildClarificationAnswerDraft();
-        this._mergeClarificationDraftIntoInput(draftText);
-        this._updateClarificationSendButtonState();
-        this._addMessage('system', `已选择「${value}」，并生成澄清回答草稿。`);
-    }
-
-    _bindClarificationOptionButtons(root) {
-        if (!root?.querySelectorAll) return;
-
-        root.querySelectorAll('[data-clarification-field][data-clarification-value]').forEach(button => {
-            button.addEventListener('click', () => this._handleClarificationOptionSelection(button));
-        });
-        this._updateClarificationSendButtonState();
-    }
-
     _appendManualRetryDraftToInput(manualRetry) {
         const input = this.container?.querySelector('#ai-input');
         if (!input || !manualRetry) return;
@@ -2234,7 +2176,6 @@ export class AiPanel {
         const promptTrace = this.container.querySelector('#ai-result-prompt-trace');
         if (promptTraceCard) promptTraceCard.hidden = true;
         if (promptTrace) promptTrace.innerHTML = '';
-        this._resetClarificationSelectionDraft();
         this.pendingClarificationPayload = null;
         this._renderAgentRuntime(null, { reset: true });
         this._setResultStatusNote('', '');
@@ -2245,53 +2186,6 @@ export class AiPanel {
     _scrollToBottom() {
         const container = this.container.querySelector('#ai-chat-container');
         if(container) container.scrollTop = container.scrollHeight;
-    }
-
-    // ── 缺失字段动作映射 ─────────────────────────────────────
-
-    _getMissingFactAction(fact) {
-        const lower = (fact || '').toLowerCase();
-        if (lower.includes('modelpath') || lower.includes('模型路径') || lower.includes('模型文件')) {
-            return { label: '选择模型文件', action: 'pick_model' };
-        }
-        if (lower.includes('labelspath') || lower.includes('标签')) {
-            return { label: '选择标签文件', action: 'pick_labels' };
-        }
-        if (lower.includes('roi') || lower.includes('区域')) {
-            return { label: '绘制 ROI', action: 'draw_roi', disabled: true, tip: 'ROI 编辑器即将推出' };
-        }
-        if (lower.includes('plc') || lower.includes('modbus')) {
-            return { label: '配置 PLC', action: 'configure_plc', disabled: true, tip: 'PLC 配置即将推出' };
-        }
-        if (lower.includes('阈值') || lower.includes('threshold')) {
-            return { label: '填写阈值', action: 'fill_threshold' };
-        }
-        return null;
-    }
-
-    // ── 缺失字段带动作按钮 ───────────────────────────────────
-
-    _renderMissingFactsWithActions(missingFacts) {
-        if (!Array.isArray(missingFacts) || missingFacts.length === 0) {
-            return '<div class="ai-requirement-brief-empty">当前没有待确认项。</div>';
-        }
-
-        return `<div class="ai-requirement-brief-tags">${missingFacts.map(fact => {
-            const action = this._getMissingFactAction(fact);
-            if (action && !action.disabled) {
-                return `<span class="ai-requirement-brief-tag is-missing ai-requirement-tag-with-action">
-                    ${this._escapeHtml(String(fact))}
-                    <button class="ai-requirement-tag-action" type="button" data-gap-action="${this._escapeHtml(action.action)}" data-gap-fact="${this._escapeHtml(String(fact))}">${this._escapeHtml(action.label)}</button>
-                </span>`;
-            }
-            if (action && action.disabled) {
-                return `<span class="ai-requirement-brief-tag is-missing ai-requirement-tag-with-action" title="${this._escapeHtml(action.tip || '')}">
-                    ${this._escapeHtml(String(fact))}
-                    <span class="ai-requirement-tag-action is-disabled">${this._escapeHtml(action.label)}</span>
-                </span>`;
-            }
-            return `<span class="ai-requirement-brief-tag is-missing">${this._escapeHtml(String(fact))}</span>`;
-        }).join('')}</div>`;
     }
 
     _setupScrollListener() {
@@ -2479,19 +2373,3 @@ Object.assign(
     aiPanelApplyPreviewMixin,
     aiPanelTopologySummaryMixin
 );
-
-Object.defineProperty(AiPanel.prototype, 'planQuestionAnswers', {
-    get() {
-        if (!this._proxyPlanQuestionAnswers) {
-            this._rawPlanQuestionAnswers = {};
-            this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
-        }
-        return this._proxyPlanQuestionAnswers;
-    },
-    set(val) {
-        this._rawPlanQuestionAnswers = val || {};
-        this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
-    },
-    configurable: true,
-    enumerable: true
-});

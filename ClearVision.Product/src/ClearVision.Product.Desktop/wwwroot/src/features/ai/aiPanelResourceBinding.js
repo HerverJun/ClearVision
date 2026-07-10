@@ -215,6 +215,15 @@ export const aiPanelResourceBindingMixin = {
             metadataOnly: true,
             ...entry
         };
+        this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/resource-decision-set',
+            payload: {
+                resource: normalizedItem,
+                decision: this.pendingResourceDrafts[key]
+            },
+            planId: this.agentWorkspaceState?.identity?.planId,
+            planHash: this.agentWorkspaceState?.identity?.planHash
+        });
     },
 
     _handleMissingResourceAction(item = {}, action = '', options = {}) {
@@ -228,6 +237,7 @@ export const aiPanelResourceBindingMixin = {
             this._setPendingResourceDraft(normalizedItem, { status: 'deferred', source: 'user_deferred', value: '' });
             this._setResultStatusNote('已标记为稍后处理；画布仍可应用，部署前会继续提示补齐。', 'info');
             this._addMessage('system', '已标记该资源为稍后处理，部署前仍会保留为待补项。');
+            this._submitClarificationBatchIfComplete?.('resource_deferred');
             this._renderFollowupChecklist(result, flow);
             return false;
         }
@@ -267,6 +277,7 @@ export const aiPanelResourceBindingMixin = {
             confirmedAtUtc: new Date().toISOString(),
             confirmedBy: 'local-user'
         });
+        this._submitClarificationBatchIfComplete?.('resource_bound');
 
         this._appendManualResourceConfirmationRecord(result, normalizedItem, {
             action: normalizedAction,

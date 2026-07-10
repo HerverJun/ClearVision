@@ -91,7 +91,13 @@ public sealed class VisionAgentWorkspaceSnapshot
     public Dictionary<string, string> PlanQuestionSelections { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
     public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; set; } = new();
+    public List<VisionAgentPlanAnswer> OptimisticPlanAnswers { get; set; } = new();
+    public int AnswerRevision { get; set; }
+    public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
+    public Dictionary<string, JsonElement> ResourceDecisions { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public string RequirementMode { get; set; } = AiRequirementModes.Strict;
+    public string WorkspaceViewMode { get; set; } = "plan";
     public bool PlanAcceptedRecommendedDefaults { get; set; }
     public string? PlanRunId { get; set; }
     public string? PlanRunStatus { get; set; }
@@ -112,7 +118,12 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public VisionAgentPlanModeResult? PendingPlanSnapshot { get; set; }
     public Dictionary<string, string>? PlanQuestionSelections { get; set; }
     public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; set; }
+    public List<VisionAgentPlanAnswer>? OptimisticPlanAnswers { get; set; }
+    public int? AnswerRevision { get; set; }
+    public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
+    public Dictionary<string, JsonElement>? ResourceDecisions { get; set; }
     public string? RequirementMode { get; set; }
+    public string? WorkspaceViewMode { get; set; }
     public bool? PlanAcceptedRecommendedDefaults { get; set; }
     public string? PlanRunId { get; set; }
     public string? PlanRunStatus { get; set; }
@@ -1096,19 +1107,60 @@ public class ConversationalFlowService : IConversationalFlowService
             .ToList();
     }
 
-    public static string ComputeWorkspaceMutationFingerprint(VisionAgentWorkspaceSnapshotUpdate update) =>
-        ComputeJsonFingerprint(new
+    public static string ComputeWorkspaceMutationFingerprint(VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        var normalizedSelections = update.PlanQuestionSelections?
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+            .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(pair => new { Key = pair.Key.Trim(), Value = pair.Value?.Trim() ?? string.Empty })
+            .ToList();
+        var hasV2WorkspaceFields = update.OptimisticPlanAnswers != null ||
+            update.AnswerRevision.HasValue ||
+            update.ReadinessPreview != null ||
+            update.ResourceDecisions != null ||
+            update.WorkspaceViewMode != null;
+
+        if (!hasV2WorkspaceFields)
         {
+            return ComputeJsonFingerprint(new
+            {
+                update.ProjectId,
+                update.LifecycleState,
+                update.PendingPlanSnapshot,
+                PlanQuestionSelections = normalizedSelections,
+                update.ConfirmedPlanAnswers,
+                update.RequirementMode,
+                update.PlanAcceptedRecommendedDefaults,
+                update.PlanRunId,
+                update.PlanRunStatus,
+                update.PlanTerminalSequence,
+                update.BuildRunId,
+                update.BuildRunStatus,
+                update.BuildTerminalSequence,
+                update.SubmittedBuildFingerprint,
+                update.UserTurnId,
+                update.UserMessage
+            });
+        }
+
+        return ComputeJsonFingerprint(new
+        {
+            SchemaVersion = 2,
             update.ProjectId,
             update.LifecycleState,
             update.PendingPlanSnapshot,
-            PlanQuestionSelections = update.PlanQuestionSelections?
+            PlanQuestionSelections = normalizedSelections,
+            update.ConfirmedPlanAnswers,
+            update.OptimisticPlanAnswers,
+            update.AnswerRevision,
+            update.ReadinessPreview,
+            ResourceDecisions = update.ResourceDecisions?
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(pair => new { Key = pair.Key.Trim(), Value = pair.Value?.Trim() ?? string.Empty })
+                .Select(pair => new { Key = pair.Key.Trim(), Value = pair.Value })
                 .ToList(),
-            update.ConfirmedPlanAnswers,
             update.RequirementMode,
+            update.WorkspaceViewMode,
             update.PlanAcceptedRecommendedDefaults,
             update.PlanRunId,
             update.PlanRunStatus,
@@ -1120,6 +1172,7 @@ public class ConversationalFlowService : IConversationalFlowService
             update.UserTurnId,
             update.UserMessage
         });
+    }
 
     public static string ComputeTerminalProjectionFingerprint(
         VisionAgentTerminalProjectionRequest request,
@@ -1531,10 +1584,29 @@ public class ConversationalFlowService : IConversationalFlowService
         }
         if (update.ConfirmedPlanAnswers != null)
             snapshot.ConfirmedPlanAnswers = ClonePlanAnswers(update.ConfirmedPlanAnswers);
+        if (update.OptimisticPlanAnswers != null)
+            snapshot.OptimisticPlanAnswers = ClonePlanAnswers(update.OptimisticPlanAnswers);
+        if (update.AnswerRevision.HasValue)
+            snapshot.AnswerRevision = Math.Max(0, update.AnswerRevision.Value);
+        if (update.ReadinessPreview != null)
+            snapshot.ReadinessPreview = CloneReadinessPreview(update.ReadinessPreview);
+        if (update.ResourceDecisions != null)
+        {
+            snapshot.ResourceDecisions = update.ResourceDecisions
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value.Clone(),
+                    StringComparer.OrdinalIgnoreCase);
+        }
         if (update.RequirementMode != null)
             snapshot.RequirementMode = string.IsNullOrWhiteSpace(update.RequirementMode)
                 ? AiRequirementModes.Strict
                 : update.RequirementMode.Trim();
+        if (update.WorkspaceViewMode != null)
+            snapshot.WorkspaceViewMode = string.Equals(update.WorkspaceViewMode, "build", StringComparison.OrdinalIgnoreCase)
+                ? "build"
+                : "plan";
         if (update.PlanAcceptedRecommendedDefaults.HasValue)
             snapshot.PlanAcceptedRecommendedDefaults = update.PlanAcceptedRecommendedDefaults.Value;
         if (update.PlanRunId != null)
@@ -1612,7 +1684,13 @@ public class ConversationalFlowService : IConversationalFlowService
             PlanQuestionSelections = snapshot.PlanQuestionSelections
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
             ConfirmedPlanAnswers = ClonePlanAnswers(snapshot.ConfirmedPlanAnswers),
+            OptimisticPlanAnswers = ClonePlanAnswers(snapshot.OptimisticPlanAnswers),
+            AnswerRevision = snapshot.AnswerRevision,
+            ReadinessPreview = CloneReadinessPreview(snapshot.ReadinessPreview),
+            ResourceDecisions = snapshot.ResourceDecisions
+                .ToDictionary(pair => pair.Key, pair => pair.Value.Clone(), StringComparer.OrdinalIgnoreCase),
             RequirementMode = snapshot.RequirementMode,
+            WorkspaceViewMode = snapshot.WorkspaceViewMode,
             PlanAcceptedRecommendedDefaults = snapshot.PlanAcceptedRecommendedDefaults,
             PlanRunId = snapshot.PlanRunId,
             PlanRunStatus = snapshot.PlanRunStatus,
@@ -1632,6 +1710,16 @@ public class ConversationalFlowService : IConversationalFlowService
 
         var json = JsonSerializer.Serialize(plan, _jsonOptions);
         return JsonSerializer.Deserialize<VisionAgentPlanModeResult>(json, _jsonOptions);
+    }
+
+    private static VisionAgentBuildReadinessPreviewResult? CloneReadinessPreview(
+        VisionAgentBuildReadinessPreviewResult? preview)
+    {
+        if (preview == null)
+            return null;
+
+        var json = JsonSerializer.Serialize(preview, _jsonOptions);
+        return JsonSerializer.Deserialize<VisionAgentBuildReadinessPreviewResult>(json, _jsonOptions);
     }
 
     private static List<VisionAgentPlanAnswer> ClonePlanAnswers(IEnumerable<VisionAgentPlanAnswer>? answers)

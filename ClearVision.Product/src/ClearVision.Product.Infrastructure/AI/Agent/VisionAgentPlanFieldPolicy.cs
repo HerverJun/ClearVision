@@ -428,12 +428,7 @@ public static class VisionAgentPlanFieldPolicy
 
                 if (seenFields.Add(canonicalField))
                 {
-                    var options = (q.Options ?? [])
-                        .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
-                                         !string.IsNullOrWhiteSpace(option.Label))
-                        .Select(NormalizeOptionContract)
-                        .Take(5)
-                        .ToList();
+                    var options = NormalizeQuestionOptions(canonicalField, q.Options);
                     var rawDefault = IsPlaceholderValue(q.DefaultValue) ? string.Empty : q.DefaultValue;
                     var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
                                       options.FirstOrDefault()?.Value ??
@@ -454,7 +449,43 @@ public static class VisionAgentPlanFieldPolicy
             }
         }
 
-        return result.Take(5).ToList();
+        return result.Take(3).ToList();
+    }
+
+    public static List<VisionAgentClarificationOption> NormalizeQuestionOptions(
+        string field,
+        IEnumerable<VisionAgentClarificationOption>? options)
+    {
+        var normalized = (options ?? [])
+            .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
+                             !string.IsNullOrWhiteSpace(option.Label))
+            .Select(NormalizeOptionContract)
+            .GroupBy(option => option.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(5)
+            .ToList();
+        if (normalized.Count < 2)
+        {
+            normalized = BuildFallbackOptions(NormalizeField(field))
+                .Select(NormalizeOptionContract)
+                .Take(5)
+                .ToList();
+        }
+
+        var recommendedIndex = normalized.FindIndex(option => option.Recommended);
+        if (recommendedIndex < 0)
+        {
+            recommendedIndex = normalized.FindIndex(option =>
+                NormalizeAnswerEffect(option) == VisionAgentClarificationAnswerEffects.ResolveField);
+        }
+        if (recommendedIndex < 0)
+        {
+            recommendedIndex = 0;
+        }
+
+        return normalized
+            .Select((option, index) => option with { Recommended = index == recommendedIndex })
+            .ToList();
     }
 
     public static List<VisionAgentClarificationQuestion> BuildFallbackQuestionsForRemaining(

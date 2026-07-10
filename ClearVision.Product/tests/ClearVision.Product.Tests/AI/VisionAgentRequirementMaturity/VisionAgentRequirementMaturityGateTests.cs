@@ -732,6 +732,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
             CancellationToken.None);
 
         plan.CanBuild.Should().BeFalse();
+        plan.CurrentPhase.Should().Be(VisionAgentPlanPhases.ClarificationOnly);
         plan.Intent.Should().Be(AiRequirementMaturity.AbstractGoal);
         plan.RequirementMaturity.Should().NotBeNull();
         plan.RequirementMaturity!.Maturity.Should().Be(AiRequirementMaturity.AbstractGoal);
@@ -739,6 +740,12 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.RecommendedRoute.Operators.Should().BeEmpty();
         plan.RecommendedRoute.Title.Should().NotContain("表面缺陷");
         plan.BlockingReasons.Should().Contain("abstract_goal_needs_decomposition");
+        plan.ClarificationQuestions.Count.Should().BeLessThanOrEqualTo(3);
+        plan.ClarificationQuestions.Should().AllSatisfy(question =>
+        {
+            question.Options.Count.Should().BeInRange(2, 5);
+            question.Options.Count(option => option.Recommended).Should().Be(1);
+        });
     }
 
     [Fact(DisplayName = "BuildFromPlan should not fall back to legacy generation when Build execution is unavailable")]

@@ -446,6 +446,7 @@ PlannerCandidateParsed:
         {
             PlanContractVersion = VisionAgentPlanContractVersions.V2,
             PlanId = baseline.PlanId,
+            CurrentPhase = baseline.CurrentPhase,
             OriginalUserPrompt = SafeText(
                 string.IsNullOrWhiteSpace(baseline.OriginalUserPrompt)
                     ? request.OriginalUserPrompt ?? request.Description
@@ -829,6 +830,12 @@ PlannerCandidateParsed:
         var resolvedFields = baselinePlan.ResolvedPlanFields ?? [];
         var remainingFields = baselinePlan.RemainingPlanFields ?? [];
         var rawCandidate = candidate ?? [];
+        if (rawCandidate.Any(question => (question.Options ?? []).Count(option =>
+                !string.IsNullOrWhiteSpace(option.Value) &&
+                !string.IsNullOrWhiteSpace(option.Label)) < 2))
+        {
+            repairNotes.Add("clarification_question_options_repaired");
+        }
         var repairedPlannerQuestions = rawCandidate
             .Select(RepairQuestion)
             .Where(question => !string.IsNullOrWhiteSpace(question.Id) &&
@@ -838,7 +845,7 @@ PlannerCandidateParsed:
             .ToList();
         if (repairedPlannerQuestions.Count > 0)
         {
-            return repairedPlannerQuestions;
+            return repairedPlannerQuestions.Take(3).ToList();
         }
 
         if (baselinePlan.ClarificationQuestions.Count > 0)
@@ -848,7 +855,7 @@ PlannerCandidateParsed:
                 .Select(RepairQuestion)
                 .Where(question => !string.IsNullOrWhiteSpace(question.Id) &&
                                    !string.IsNullOrWhiteSpace(question.Title))
-                .Take(5)
+                .Take(3)
                 .ToList();
         }
 
@@ -884,17 +891,13 @@ PlannerCandidateParsed:
             filteredQuestions = VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(allowedSet);
         }
 
-        return filteredQuestions.Take(5).ToList();
+        return filteredQuestions.Take(3).ToList();
     }
 
     private static VisionAgentClarificationQuestion RepairQuestion(VisionAgentClarificationQuestion question)
     {
-        var options = (question.Options ?? [])
-            .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
-                             !string.IsNullOrWhiteSpace(option.Label))
-            .Select(VisionAgentPlanFieldPolicy.NormalizeOptionContract)
-            .Take(5)
-            .ToList();
+        var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
+        var options = VisionAgentPlanFieldPolicy.NormalizeQuestionOptions(field, question.Options);
         var recommended = options.FirstOrDefault(option =>
                               option.Recommended &&
                               VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value ??
@@ -905,7 +908,7 @@ PlannerCandidateParsed:
         return question with
         {
             Id = SafeIdentifier(question.Id, "clarification"),
-            Field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question),
+            Field = field,
             Title = FallbackText(question.Title, "关键澄清问题"),
             Why = FallbackText(question.Why, "这会影响算子链、参数或发布就绪。"),
             DefaultValue = FallbackText(question.DefaultValue, recommended),
@@ -1338,7 +1341,10 @@ public sealed class VisionAgentPlanPromptComposer
             "You are ClearVision Plan Mode, an industrial vision engineering planner.",
             "Return exactly one JSON object that matches PlannerCandidate. No prose, markdown, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "You must plan from public metadata only. Do not include local paths, image bytes/base64, tokens, secrets, PLC addresses, Station IPs, camera resource paths, or hidden reasoning.",
-            "Generate 0 to 5 high-value clarification questions targeting ONLY fields listed in [remaining_fields] and NEVER fields in [resolved_fields] or [confirmed_plan_answers]. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Options must include answerEffect: resolve_field, defer, or informational. recommended is orthogonal to answerEffect.",
+            "Generate 0 to 3 high-value clarification questions targeting ONLY fields listed in [remaining_fields] and NEVER fields in [resolved_fields] or [confirmed_plan_answers]. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 business options. Exactly one option per question must have recommended=true. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Options must include answerEffect: resolve_field, defer, or informational. recommended is orthogonal to answerEffect.",
+            ruleBaseline.CurrentPhase == VisionAgentPlanPhases.ClarificationOnly
+                ? "This is clarification-only mode. Ask the minimum questions needed to mature the requirement; do not invent a buildable route and keep canBuildCandidate=false."
+                : "This is planning mode. Produce the public plan and only ask questions for unresolved fields.",
             "Use answerEffect=resolve_field only for concrete choices such as file_sample, station_camera, traditional_rule, or a confirmed output target. Use answerEffect=defer for camera_pending, ok_ng_pending, strategy_pending, placeholder, pending, or *_pending. Use answerEffect=informational only for read-only explanatory items. Do not mark informational as a recommended answer.",
             "Use only operator types from the provided operator catalog. Missing camera/model/template/calibration/PLC resources must be expressed as resource_pending blockers; do not degrade concrete choices into invalid answers.",
             "If a templateSelection is provided, respect it and do not replace it.",

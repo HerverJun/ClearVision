@@ -421,7 +421,7 @@ public static class VisionAgentPlanReadinessEvaluator
                 questionId,
                 blocksResource,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                "资源可在开始构建后补齐。");
+                "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。");
         }
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
@@ -516,7 +516,7 @@ public static class VisionAgentPlanReadinessEvaluator
                 questionId,
                 false,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                "资源可在开始构建后补齐。");
+                "图像来源仍保持待绑定；可生成草稿不代表资源已就绪，部署门禁继续保留。");
         }
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.HardRequirement, StringComparison.OrdinalIgnoreCase) ||

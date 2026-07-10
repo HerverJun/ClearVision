@@ -503,51 +503,51 @@ test('AiPanel request mode inference separates explicit new flow from current-fl
   );
 });
 
-test('AiPanel clarification option selection builds one managed answer draft', async () => {
+test('AiPanel unified clarification selection writes one canonical optimistic answer', async () => {
   installDom();
   const { AiPanel } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
   );
 
   const input = createFakeElement();
-  const planSendButton = createFakeElement();
-  const briefSendButton = createFakeElement();
-  const sceneButton = createFakeElement();
-  sceneButton.setAttribute('data-clarification-field', 'scene');
-  sceneButton.setAttribute('data-clarification-value', '外观缺陷');
-  const objectButton = createFakeElement();
-  objectButton.setAttribute('data-clarification-field', 'object_type');
-  objectButton.setAttribute('data-clarification-value', '金属件');
-
   const panel = Object.create(AiPanel.prototype);
-  panel.container = createContainer(
-    {
-      '#ai-input': input
-    },
-    {
-      '[data-clarification-field][data-clarification-value]': [sceneButton, objectButton],
-      '[data-brief-action="send-clarification"]': [planSendButton, briefSendButton]
-    }
-  );
+  panel.container = createContainer({ '#ai-input': input });
+  panel.sessionId = 'session-canonical-answer';
   panel.isGenerating = false;
-  panel._clarificationSelectionDraft = {};
-  panel._lastClarificationDraftText = '';
   panel._addMessage = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._requestBackendPlanReadinessPreview = () => new Promise(() => {});
+  panel._ensureAgentWorkspaceState();
+  panel.pendingVisionPlan = {
+    planId: 'plan-canonical-answer',
+    planHash: 'sha256:canonical-answer',
+    questions: [{
+      id: 'object_type',
+      field: 'inspection_object',
+      title: '检测对象',
+      options: [
+        { value: 'metal_part', label: '金属件', recommended: true, answerEffect: 'resolve_field' },
+        { value: 'plastic_part', label: '塑料件', recommended: false, answerEffect: 'resolve_field' }
+      ]
+    }],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [{ id: 'hard_requirement:inspection_object_missing', category: 'hard_requirement', field: 'inspection_object', questionId: 'object_type', blocksBuild: true }],
+      resolvedFields: [],
+      remainingFields: ['inspection_object'],
+      primaryMessage: '检测对象待确认',
+      contractVersion: 'v2'
+    }
+  };
 
-  panel._handleClarificationOptionSelection(sceneButton);
+  panel._selectPlanQuestionOption('object_type', 'metal_part');
 
-  assert.match(input.value, /澄清回答：\n场景类型：外观缺陷/);
-  assert.equal(planSendButton.disabled, false);
-  assert.equal(briefSendButton.disabled, false);
-  assert.equal(planSendButton.getAttribute('aria-disabled'), 'false');
-  assert.equal(briefSendButton.getAttribute('aria-disabled'), 'false');
-  assert.equal(sceneButton.getAttribute('aria-pressed'), 'true');
-
-  panel._handleClarificationOptionSelection(objectButton);
-
-  assert.match(input.value, /场景类型：外观缺陷/);
-  assert.match(input.value, /检测对象：金属件/);
-  assert.equal((input.value.match(/澄清回答：/g) || []).length, 1);
+  assert.equal(panel.planQuestionAnswers.inspection_object.value, 'metal_part');
+  assert.equal(panel.planQuestionAnswers.inspection_object.origin, 'explicit_user_selection');
+  assert.equal(panel.agentWorkspaceState.projection.optimisticAnswers.length, 1);
+  assert.equal(panel.agentWorkspaceState.projection.readiness.canBuild, false);
+  assert.equal(input.value, '');
 });
 
 test('AiPanel apply button is disabled until a generated flow is available', async () => {

@@ -552,9 +552,12 @@ export const aiPanelAgentRunMixin = {
         this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
 
-        this.activeAgentRunId = runId;
-        this.activeAgentRunEvents = [];
-        this.activeAgentRunEventKeys = new Set();
+        this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/run-started',
+            payload: { kind: 'build', runId },
+            sessionId: this.sessionId,
+            runId
+        });
         this.agentRunStepMap = new Map();
         this.agentRunToolMap = new Map();
         this.agentRunArtifactMap = new Map();
@@ -642,20 +645,19 @@ export const aiPanelAgentRunMixin = {
             return;
         }
 
-        const key = `${evt.runId}:${evt.sequence}:${evt.eventType}`;
-        this.activeAgentRunEventKeys = this.activeAgentRunEventKeys instanceof Set
-            ? this.activeAgentRunEventKeys
-            : new Set();
-        if (this.activeAgentRunEventKeys.has(key)) {
+        const before = this.agentWorkspaceState;
+        const next = this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/run-event-received',
+            payload: { kind: 'build', event: evt },
+            sessionId: this.sessionId,
+            runId: evt.runId,
+            planId: this.agentWorkspaceState?.identity?.planId,
+            planHash: this.agentWorkspaceState?.identity?.planHash
+        });
+        if (!next || next === before) {
             this._recordPublicLiveEventDrop?.('duplicate');
             return;
         }
-
-        this.activeAgentRunEventKeys.add(key);
-        this.activeAgentRunEvents = Array.isArray(this.activeAgentRunEvents)
-            ? this.activeAgentRunEvents
-            : [];
-        this.activeAgentRunEvents.push(evt);
         this._handleAgentRunWorkspaceEvent?.(evt);
         this._routePublicLiveEvent?.(this._normalizePublicLiveEvent?.(evt, { source: 'agent-run' }));
 

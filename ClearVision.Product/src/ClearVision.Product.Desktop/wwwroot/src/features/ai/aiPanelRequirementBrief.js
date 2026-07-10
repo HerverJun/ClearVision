@@ -22,12 +22,13 @@ export const aiPanelRequirementBriefMixin = {
             return;
         }
 
-        this.requirementMode = normalized;
-        if (this.pendingVisionPlan) {
-            this.pendingVisionPlan.requirementMode = normalized;
-            this._rememberRequirementModeForPlan?.(this.pendingVisionPlan, normalized);
-        }
-        this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/requirement-mode-changed',
+            payload: { mode: normalized },
+            planId: this.agentWorkspaceState?.identity?.planId,
+            planHash: this.agentWorkspaceState?.identity?.planHash
+        });
+        this._rememberRequirementModeForPlan?.(this.pendingVisionPlan, normalized);
         this._queueWorkspaceSnapshotFlush?.('requirement_mode');
         this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'requirement_mode' });
         this._updateRequirementModeUI();

@@ -48,6 +48,13 @@ public static class VisionAgentPlanContractVersions
     public const string V2 = "v2";
 }
 
+public static class VisionAgentPlanPhases
+{
+    public const string ClarificationOnly = "clarification_only";
+    public const string Planning = "planning";
+    public const string ReadyToBuild = "ready_to_build";
+}
+
 public static class VisionAgentPlanAnswerFields
 {
     public const string InspectionObject = "inspection_object";
@@ -283,6 +290,7 @@ public sealed record VisionAgentPlanModeResult
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public string PlanSource { get; init; } = string.Empty;
+    public string CurrentPhase { get; init; } = VisionAgentPlanPhases.Planning;
     public string FallbackReason { get; init; } = string.Empty;
     public string PlannerFailureStage { get; init; } = string.Empty;
     public string PlannerFailureCode { get; init; } = string.Empty;

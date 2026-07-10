@@ -956,6 +956,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             PlanId = $"plan_{Guid.NewGuid():N}",
             OriginalUserPrompt = originalPrompt,
             PlanSource = "rule_baseline",
+            CurrentPhase = updatedMaturity.CanPlan
+                ? canBuild ? VisionAgentPlanPhases.ReadyToBuild : VisionAgentPlanPhases.Planning
+                : VisionAgentPlanPhases.ClarificationOnly,
             Goal = description.Length > 160 ? description[..160] : description,
             Intent = updatedMaturity.CanPlan ? scenario : updatedMaturity.Maturity,
             Confidence = canBuild && scenario != "general_inspection" ? "high" : updatedMaturity.CanPlan ? "low" : "medium",
@@ -1347,6 +1350,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return new
         {
             planContractVersion = VisionAgentPlanContractVersions.V2,
+            currentPhase = Clean(plan.CurrentPhase),
             confirmedPlanAnswers = (plan.ConfirmedPlanAnswers ?? [])
                 .OrderBy(a => a.Field, StringComparer.OrdinalIgnoreCase)
                 .Select(a => new

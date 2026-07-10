@@ -1,6 +1,7 @@
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
+using System.Text.Json;
 
 namespace ClearVision.Product.Tests.AI;
 
@@ -413,6 +414,38 @@ public class ConversationalFlowServiceTests : IDisposable
                     Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
                 }
             ],
+            OptimisticPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "acceptance_criteria",
+                    Field = "acceptance_criteria",
+                    Value = "scratch area above threshold is NG",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                }
+            ],
+            AnswerRevision = 7,
+            ReadinessPreview = new VisionAgentBuildReadinessPreviewResult
+            {
+                PlanId = "plan-1",
+                PlanHash = "sha256:plan",
+                AnswerRevision = 7,
+                BuildReadiness = new VisionAgentBuildReadinessSnapshot
+                {
+                    CanBuild = false,
+                    RemainingFields = ["acceptance_criteria"]
+                }
+            },
+            ResourceDecisions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["model:detector"] = JsonSerializer.SerializeToElement(new
+                {
+                    status = "deferred",
+                    source = "user_deferred",
+                    metadataOnly = true
+                })
+            },
+            WorkspaceViewMode = "build",
             PendingPlanSnapshot = new VisionAgentPlanModeResult
             {
                 PlanId = "plan-1",
@@ -437,6 +470,12 @@ public class ConversationalFlowServiceTests : IDisposable
         reloaded.WorkspaceSnapshot.PlanQuestionSelections.Should().ContainKey("defect_definition");
         reloaded.WorkspaceSnapshot.PlanQuestionSelections["defect_definition"].Should().Be("defer");
         reloaded.WorkspaceSnapshot.ConfirmedPlanAnswers.Should().ContainSingle(answer => answer.Field == "image_source");
+        reloaded.WorkspaceSnapshot.OptimisticPlanAnswers.Should().ContainSingle(answer => answer.Field == "acceptance_criteria");
+        reloaded.WorkspaceSnapshot.AnswerRevision.Should().Be(7);
+        reloaded.WorkspaceSnapshot.ReadinessPreview!.AnswerRevision.Should().Be(7);
+        reloaded.WorkspaceSnapshot.ResourceDecisions["model:detector"].GetProperty("status").GetString()
+            .Should().Be("deferred");
+        reloaded.WorkspaceSnapshot.WorkspaceViewMode.Should().Be("build");
         reloaded.WorkspaceSnapshot.PendingPlanSnapshot!.PlanId.Should().Be("plan-1");
     }
 

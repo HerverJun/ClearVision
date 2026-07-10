@@ -942,7 +942,7 @@ test('AI panel ignores Vision Agent clarification terminal legacy card path', as
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
 });
 
-test('AI panel keeps old requirement brief send button independent from new clarification Plan card', async ({ page }) => {
+test('AI panel keeps old requirement brief as read-only evidence without a second answer button', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await mockShellApis(page);
   await bootAuthenticatedApp(page);
@@ -1023,11 +1023,11 @@ test('AI panel keeps old requirement brief send button independent from new clar
     });
   });
 
-  await expect(page.locator('#ai-btn-send-clarification-brief')).toHaveCount(1);
+  await expect(page.locator('#ai-btn-send-clarification-brief')).toHaveCount(0);
   await expect(page.locator('#ai-btn-send-clarification-plan')).toHaveCount(0);
   await expect(page.locator('#ai-clarification-plan-card')).toHaveCount(0);
   expect(await page.locator('#ai-btn-send-clarification').count()).toBe(0);
-  await expect(page.locator('#ai-btn-send-clarification-brief')).toBeDisabled();
+  await expect(page.locator('#ai-result-requirement-brief')).toContainText('只读');
 
   const retainedFlowOperatorId = await page.evaluate(() =>
     (window as any).aiPanel.currentResult?.flow?.operators?.[0]?.id);
@@ -1235,7 +1235,7 @@ test.skip('AI panel uses WebView2 postMessage contract for generation turns', as
   expect(await page.evaluate(() => (window as any).aiPanel.pendingClarificationPayload)).toBeNull();
 });
 
-test('Plan pending recommendation click keeps DOM selection separate from effective answers', async ({ page }) => {
+test('Plan pending recommendation records defer without becoming an effective answer', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
@@ -1279,6 +1279,7 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
               value: 'camera_pending',
               label: 'Keep image source pending',
               recommended: true,
+              answerEffect: 'defer',
               description: 'Do not guess a camera or file path.',
               impact: 'This keeps Build blocked.',
             },
@@ -1286,6 +1287,7 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
               value: 'file_sample',
               label: 'Offline sample',
               recommended: false,
+              answerEffect: 'resolve_field',
               description: 'Use an offline image sample.',
               impact: 'This resolves the image source.',
             },
@@ -1352,14 +1354,9 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
   });
 
   const pending = page.locator('[data-plan-question-option="camera_pending"]');
-  const concrete = page.locator('[data-plan-question-option="file_sample"]');
-
-  await pending.click();
-  await expect(pending).toHaveClass(/is-selected/);
-  await expect(pending).toHaveClass(/is-recommended/);
-  await expect(pending).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('已选择暂缓确认');
-  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('该字段仍会阻断构建');
+  await pending.evaluate(button => (button as HTMLElement).click());
+  await expect(page.locator('#ai-plan-workspace')).toContainText('稍后绑定');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('该字段仍会阻断构建');
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
     return {
@@ -1374,50 +1371,6 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
     canBuild: false,
     resolved: ['acceptance_criteria', 'inspection_object', 'task_type'],
   });
-
-  await concrete.click();
-  await expect(concrete).toHaveClass(/is-selected/);
-  await expect(concrete).toHaveAttribute('aria-pressed', 'true');
-  await expect(pending).not.toHaveClass(/is-selected/);
-  await expect(pending).toHaveAttribute('aria-pressed', 'false');
-  expect(await page.evaluate(() => {
-    const panel = (window as any).aiPanel;
-    return {
-      selected: panel.planQuestionSelections.image_source,
-      answer: panel.planQuestionAnswers.image_source,
-      canBuild: panel.pendingVisionPlan.buildReadiness.canBuild,
-    };
-  })).toMatchObject({
-    selected: 'file_sample',
-    answer: {
-      field: 'image_source',
-      value: 'file_sample',
-      origin: 'explicit_user_selection',
-    },
-    canBuild: false,
-  });
-
-  await pending.click();
-  await expect(pending).toHaveClass(/is-selected/);
-  await expect(pending).toHaveClass(/is-recommended/);
-  await expect(pending).toHaveAttribute('aria-pressed', 'true');
-  expect(await page.evaluate(() => {
-    const panel = (window as any).aiPanel;
-    panel._renderPlanWorkspace(panel.pendingVisionPlan);
-    return {
-      selected: panel.planQuestionSelections.image_source,
-      hasAnswer: Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'),
-      canBuild: panel.pendingVisionPlan.buildReadiness.canBuild,
-      pendingClass: document.querySelector('[data-plan-question-option="camera_pending"]')?.className,
-      pendingPressed: document.querySelector('[data-plan-question-option="camera_pending"]')?.getAttribute('aria-pressed'),
-    };
-  })).toMatchObject({
-    selected: 'camera_pending',
-    hasAnswer: false,
-    canBuild: false,
-    pendingPressed: 'true',
-  });
-  await expect(pending).toHaveClass(/is-selected/);
 });
 
 test('AI panel posts Build through AgentRun even when WebView2 is available', async ({ page }) => {

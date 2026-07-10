@@ -537,30 +537,6 @@ export const aiPanelChatMixin = {
         return lines.join('\n');
     },
 
-    _buildClarificationSafeHint(brief) {
-        if (!brief) return '';
-
-        const lines = ['需求澄清上下文：'];
-        if (brief.scenarioName) lines.push(`场景：${brief.scenarioName}`);
-        if (brief.intentType) lines.push(`意图：${brief.intentType}`);
-        if (brief.objectName) lines.push(`对象：${brief.objectName}`);
-        if (brief.outputTarget) lines.push(`输出目标：${brief.outputTarget}`);
-        if (brief.knownFacts.length > 0) {
-            lines.push(`已知事实：${brief.knownFacts.join('；')}`);
-        }
-        if (brief.missingFacts.length > 0) {
-            lines.push(`仍缺字段：${brief.missingFacts.join('；')}`);
-        }
-        if (brief.blockingClarificationFields.length > 0) {
-            lines.push(`阻断字段：${brief.blockingClarificationFields.map(field => this._getRequirementFieldLabel(field)).join('；')}`);
-        }
-        if (brief.nonBlockingMissingFields.length > 0) {
-            lines.push(`非阻断待补：${brief.nonBlockingMissingFields.map(field => this._getRequirementFieldLabel(field)).join('；')}`);
-        }
-        lines.push('请只根据用户下一轮明确补充的信息更新需求，不要把上面的澄清问题或示例选项当作用户答案。');
-        return lines.join('\n');
-    },
-
     _getRequirementFieldLabel(field) {
         const key = String(field || '').trim();
         const fieldLabelMap = {
@@ -594,20 +570,17 @@ export const aiPanelChatMixin = {
 
         const brief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
         if (!brief) {
-            this._resetClarificationSelectionDraft();
             card.hidden = true;
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前尚未提炼出需求摘要。</div>';
             return null;
         }
-        this._resetClarificationSelectionDraft();
 
         const confidence = Number.isFinite(brief.confidence) ? brief.confidence : 0;
         const confidenceText = `${Math.max(0, Math.min(100, Math.round(confidence * 100)))}%`;
         const requirementModeLabel = brief.requirementMode === 'draft' ? '构建草稿' : '规划确认';
         const riskLabel = String(brief.draftRiskLevel || 'medium').trim() || 'medium';
         const summary = this._buildClarificationFollowupText(brief);
-        const safeHint = this._buildClarificationSafeHint(brief);
         const requiredQuestionCount = brief.clarificationQuestions.filter(question => question.required).length;
         const confidenceEl = this.container?.querySelector('#ai-requirement-confidence');
         if (confidenceEl) {
@@ -667,15 +640,9 @@ export const aiPanelChatMixin = {
                 const fieldLabel = this._getRequirementFieldLabel(question.field);
                 const options = question.options.length > 0
                     ? `
-                        <div class="ai-requirement-question-options-title">参考选项，点击后生成澄清回答草稿</div>
+                        <div class="ai-requirement-question-options-title">历史参考选项（只读）</div>
                         <div class="ai-requirement-question-options">${question.options
-                            .map(option => `
-                                <button class="ai-requirement-question-option" type="button"
-                                    aria-pressed="false"
-                                    data-clarification-field="${this._escapeHtml(question.field)}"
-                                    data-clarification-value="${this._escapeHtml(option)}">
-                                    ${this._escapeHtml(option)}
-                                </button>`)
+                            .map(option => `<span class="ai-requirement-question-option is-readonly">${this._escapeHtml(option)}</span>`)
                             .join('')}</div>`
                     : '';
                 return `
@@ -708,7 +675,7 @@ export const aiPanelChatMixin = {
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">阻断待确认</div>
-                    ${this._renderMissingFactsWithActions(brief.missingFacts)}
+                    ${renderTagList(brief.missingFacts, '当前没有待确认项。', 'missing')}
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">阻断字段</div>
@@ -727,18 +694,15 @@ export const aiPanelChatMixin = {
                     ${renderTagList(brief.attachmentFacts, '当前没有附件信号。')}
                 </section>
             </div>
-            <div class="ai-requirement-brief-actions">
-                <button class="ai-requirement-brief-action" type="button" data-brief-action="copy">复制澄清清单</button>
-                <button class="ai-requirement-brief-action" type="button" data-brief-action="insert">插入输入框</button>
-                <button class="ai-requirement-brief-action" type="button" data-brief-action="queue">挂到下一轮</button>
-                <button class="ai-requirement-brief-action" type="button" data-brief-action="draft">切到草稿模式</button>
-                <button class="ai-requirement-brief-action is-primary" type="button" id="ai-btn-send-clarification-brief" data-brief-action="send-clarification" disabled>发送澄清回答</button>
+            <div class="ai-requirement-brief-actions is-readonly">
+                <button class="ai-requirement-brief-action" type="button" data-brief-action="copy">复制只读证据</button>
+                <span>请在 Plan 工作台的唯一澄清线回答。</span>
             </div>
         `;
 
         container.querySelectorAll('[data-brief-action]').forEach(button => {
             const action = button.dataset.briefAction;
-            button.disabled = this.isGenerating || action === 'send-clarification';
+            button.disabled = this.isGenerating;
             button.addEventListener('click', async () => {
                 if (action === 'copy') {
                     const copied = await this._copyTextToClipboard(summary);
@@ -746,37 +710,8 @@ export const aiPanelChatMixin = {
                     return;
                 }
 
-                if (action === 'insert') {
-                    this._appendFollowupTextToInput(summary);
-                    this._addMessage('system', '澄清清单已插入输入框。');
-                    return;
-                }
-
-                if (action === 'queue') {
-                    this.nextHintDraft = safeHint || summary;
-                    this._renderQueuedHintBanner();
-                    this._addMessage('system', '已挂载安全澄清上下文，下一轮不会把示例选项误当作用户答案。');
-                    return;
-                }
-
-                if (action === 'draft') {
-                    this._setRequirementMode('draft');
-                    return;
-                }
-
-                if (action === 'send-clarification') {
-                    const draftText = this._buildClarificationAnswerDraft();
-                    if (!draftText) {
-                        this._addMessage('system', '请先选择澄清选项，或直接在输入框里补充答案。');
-                        return;
-                    }
-                    this._mergeClarificationDraftIntoInput(draftText);
-                    this._handleGenerate();
-                }
             });
         });
-
-        this._bindClarificationOptionButtons(container);
 
         return brief;
     },
@@ -819,18 +754,12 @@ export const aiPanelChatMixin = {
                             <div class="ai-assistant-clarification-item-title">${this._escapeHtml(`${index + 1}. ${question.question}`)}</div>
                             ${question.reason ? `<div class="ai-assistant-clarification-item-hint">${this._escapeHtml(question.reason)}</div>` : ''}
                             ${question.options.length > 0 ? `<div class="ai-assistant-clarification-options">${question.options.map(option => `
-                                <button class="ai-assistant-clarification-option" type="button"
-                                    aria-pressed="false"
-                                    data-clarification-field="${this._escapeHtml(question.field)}"
-                                    data-clarification-value="${this._escapeHtml(option)}">
-                                    ${this._escapeHtml(option)}
-                                </button>`).join('')}</div>` : ''}
+                                <span class="ai-assistant-clarification-option is-readonly">${this._escapeHtml(option)}</span>`).join('')}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : '<div class="ai-assistant-clarification-empty">当前没有更多澄清问题。</div>'}
         `;
-        this._bindClarificationOptionButtons(turn.clarificationBody);
         this._scrollToBottom();
     },
 

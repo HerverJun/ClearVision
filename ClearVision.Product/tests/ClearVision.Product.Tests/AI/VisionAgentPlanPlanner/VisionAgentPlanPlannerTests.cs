@@ -52,7 +52,7 @@ public sealed class VisionAgentPlanPlannerTests
         result.ClarificationQuestions.Should().AllSatisfy(question =>
         {
             question.Options.Count.Should().BeInRange(2, 5);
-            question.Options.Should().Contain(option => option.Recommended);
+            question.Options.Count(option => option.Recommended).Should().Be(1);
         });
         result.PublicEvents.Select(evt => evt.Stage).Should().ContainInOrder([
             "collecting_context",
@@ -62,6 +62,66 @@ public sealed class VisionAgentPlanPlannerTests
             "plan_ready"
         ]);
         result.PlanHash.Should().StartWith("sha256:");
+    }
+
+    [Fact(DisplayName = "Clarification-only planner prompt should ask at most three model-led questions")]
+    public async Task CreatePlanAsync_ClarificationOnly_ShouldUseModelQuestionsAndEnforceBatchContract()
+    {
+        VisionAgentPlanCompletionRequest? captured = null;
+        var service = CreateService(request =>
+        {
+            captured = request;
+            return PlannerPlanJson("requirement_clarification", "inspection_object", []);
+        });
+        var baseline = Baseline("做个检测", "ambiguous") with
+        {
+            CurrentPhase = VisionAgentPlanPhases.ClarificationOnly,
+            CanBuild = false,
+            RecommendedRoute = new VisionAgentRecommendedRoute
+            {
+                RouteId = "requirement_decomposition",
+                Title = "需求澄清",
+                Summary = "先补齐需求，不选择算子链。",
+                Operators = []
+            },
+            RemainingPlanFields =
+            [
+                VisionAgentPlanAnswerFields.InspectionObject,
+                VisionAgentPlanAnswerFields.TaskType,
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria
+            ],
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                CanPlan = false,
+                CanBuild = false,
+                MissingFields =
+                [
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ]
+            }
+        };
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "做个检测" },
+            baseline,
+            CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.SystemPrompt.Should().Contain("clarification-only mode");
+        result.PlanSource.Should().Be("model_planner");
+        result.CurrentPhase.Should().Be(VisionAgentPlanPhases.ClarificationOnly);
+        result.CanBuild.Should().BeFalse();
+        result.ClarificationQuestions.Count.Should().BeLessThanOrEqualTo(3);
+        result.ClarificationQuestions.Should().AllSatisfy(question =>
+        {
+            question.Options.Count.Should().BeInRange(2, 5);
+            question.Options.Count(option => option.Recommended).Should().Be(1);
+        });
     }
 
     [Fact(DisplayName = "Plan planner failure should return rule fallback with public diagnostic")]
@@ -411,12 +471,13 @@ public sealed class VisionAgentPlanPlannerTests
 
         result.PlanSource.Should().Be("model_planner");
         result.FallbackReason.Should().BeEmpty();
-        result.ContractRepairNotes.Should().Contain("clarification_questions_repaired_to_baseline");
+        result.ContractRepairNotes.Should().Contain("clarification_question_options_repaired");
         result.ClarificationQuestions.Should().NotBeEmpty();
         result.ClarificationQuestions.Should().AllSatisfy(question =>
         {
             question.Options.Should().NotBeNull();
-            question.Options.Should().Contain(option => option.Recommended);
+            question.Options.Count.Should().BeInRange(2, 5);
+            question.Options.Count(option => option.Recommended).Should().Be(1);
         });
     }
 

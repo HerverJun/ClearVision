@@ -371,8 +371,8 @@ export const aiPanelSessionHistoryMixin = {
             sessionId
         };
 
+        this._restoreWorkspaceSnapshotFromSession(workspaceSnapshot, sessionId, restoredResult);
         if (canvasFlow) {
-            this._setCurrentResult(restoredResult);
             this._rebuildPendingOperatorBindings({
                 pending: this._resolvePendingParametersForDraft(restoredResult),
                 flow: restoredResult?.flow,
@@ -383,7 +383,6 @@ export const aiPanelSessionHistoryMixin = {
             this._resetCurrentResultSyncState();
         }
         this._displayResult(restoredResult, { appendChatMessage: false });
-        this._restoreWorkspaceSnapshotFromSession(workspaceSnapshot, sessionId);
 
         const updatedAtUtc = session.updatedAtUtc ?? session.UpdatedAtUtc ?? new Date().toISOString();
         const latestMessage = normalizedHistory.length > 0
@@ -408,7 +407,12 @@ export const aiPanelSessionHistoryMixin = {
             pendingPlanSnapshot: read('pendingPlanSnapshot'),
             planQuestionSelections: read('planQuestionSelections') || {},
             confirmedPlanAnswers: Array.isArray(read('confirmedPlanAnswers')) ? read('confirmedPlanAnswers') : [],
+            optimisticPlanAnswers: Array.isArray(read('optimisticPlanAnswers')) ? read('optimisticPlanAnswers') : [],
+            answerRevision: Number(read('answerRevision')) || 0,
+            readinessPreview: read('readinessPreview') || null,
+            resourceDecisions: read('resourceDecisions') || {},
             requirementMode: String(read('requirementMode') || 'strict').trim().toLowerCase(),
+            workspaceViewMode: String(read('workspaceViewMode') || 'plan').trim().toLowerCase(),
             planAcceptedRecommendedDefaults: read('planAcceptedRecommendedDefaults') === true,
             planRunId: String(read('planRunId') || '').trim(),
             planRunStatus: String(read('planRunStatus') || '').trim().toLowerCase(),
@@ -420,10 +424,18 @@ export const aiPanelSessionHistoryMixin = {
         };
     },
 
-    _restoreWorkspaceSnapshotFromSession(snapshot, sessionId) {
-        this._resetWorkspaceStateForSessionRestore();
+    _restoreWorkspaceSnapshotFromSession(snapshot, sessionId, result = null) {
         if (!snapshot) {
-            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._dispatchAgentWorkspaceEvent?.({
+                type: 'workspace/session-restored',
+                payload: {
+                    sessionId,
+                    result,
+                    plan: null,
+                    requirementMode: 'strict',
+                    ui: { workspaceMode: AgentWorkspaceModes.PLAN, viewMode: AgentWorkspaceModes.PLAN }
+                }
+            });
             this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._addMessage('system', '该历史版本不包含完整工作台状态，已仅恢复对话和可用结果。');
             this._renderAgentWorkspaceOverview?.();
@@ -434,37 +446,58 @@ export const aiPanelSessionHistoryMixin = {
 
         this._applyWorkspaceSnapshotSummary?.(snapshot);
         const planSnapshot = snapshot.pendingPlanSnapshot;
+        let normalizedPlan = null;
         if (planSnapshot && typeof this._normalizeBackendPlanResult === 'function') {
             const fallback = planSnapshot.originalUserPrompt || planSnapshot.OriginalUserPrompt || this.lastUserPrompt || '';
-            this.pendingVisionPlan = this._normalizeBackendPlanResult(planSnapshot, fallback);
-            this.pendingVisionPlan.requirementMode = snapshot.requirementMode || this.pendingVisionPlan.requirementMode || 'strict';
+            normalizedPlan = this._normalizeBackendPlanResult(planSnapshot, fallback);
         }
-
-        this.planQuestionSelections = { ...(snapshot.planQuestionSelections || {}) };
-        this.planQuestionAnswers = {};
-        snapshot.confirmedPlanAnswers.forEach(answer => {
-            const normalized = this._normalizePlanAnswer?.(answer) || answer;
-            const key = normalized?.questionId || normalized?.field || normalized?.Field || normalized?.QuestionId || '';
-            if (key) {
-                this.planQuestionAnswers[key] = normalized;
+        this.planAcceptedRecommendedDefaults = snapshot.planAcceptedRecommendedDefaults === true;
+        this.activePlanRunRequestId = snapshot.planRunId ? `session-restore-plan-${snapshot.planRunId}` : null;
+        this.activePlanRunCompletion = null;
+        const lifecycle = snapshot.lifecycleState.toLowerCase();
+        const workspaceMode = lifecycle.includes('build') || snapshot.buildRunId
+            ? AgentWorkspaceModes.BUILD : AgentWorkspaceModes.PLAN;
+        this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/session-restored',
+            payload: {
+                sessionId,
+                revision: snapshot.revision,
+                planId: normalizedPlan?.planId,
+                planHash: normalizedPlan?.planHash,
+                planRevision: snapshot.revision,
+                plan: normalizedPlan,
+                result,
+                requirementMode: snapshot.requirementMode,
+                confirmedAnswers: snapshot.confirmedPlanAnswers,
+                optimisticAnswers: snapshot.optimisticPlanAnswers,
+                answerRevision: snapshot.answerRevision,
+                selections: snapshot.planQuestionSelections,
+                readiness: normalizedPlan?.buildReadiness,
+                readinessPreview: snapshot.readinessPreview || normalizedPlan?.effectiveReadiness,
+                readinessStatus: snapshot.readinessPreview || normalizedPlan ? 'ready' : 'idle',
+                resourceDecisions: snapshot.resourceDecisions,
+                run: {
+                    plan: { runId: snapshot.planRunId || '', status: snapshot.planRunStatus || 'idle', events: [], eventKeys: {}, terminalSequence: snapshot.planTerminalSequence },
+                    build: { runId: snapshot.buildRunId || '', status: snapshot.buildRunStatus || 'idle', events: [], eventKeys: {}, terminalSequence: snapshot.buildTerminalSequence }
+                },
+                persistence: {
+                    snapshotRevision: snapshot.revision,
+                    buildRunId: snapshot.buildRunId || '',
+                    submittedBuildFingerprint: snapshot.submittedBuildFingerprint || ''
+                },
+                ui: {
+                    workspaceMode,
+                    viewMode: snapshot.workspaceViewMode === AgentWorkspaceModes.BUILD
+                        ? AgentWorkspaceModes.BUILD
+                        : AgentWorkspaceModes.PLAN
+                }
             }
         });
-        this.requirementMode = snapshot.requirementMode === 'draft' ? 'draft' : 'strict';
-        this.planAcceptedRecommendedDefaults = snapshot.planAcceptedRecommendedDefaults === true;
-        this.activePlanRunId = snapshot.planRunId || null;
-        this.activePlanRunRequestId = snapshot.planRunId ? `session-restore-plan-${snapshot.planRunId}` : null;
-        this.activePlanRunEvents = [];
-        this.activePlanRunEventKeys = new Set();
-        this.activePlanRunCompletion = null;
-        this.activeAgentRunId = snapshot.buildRunId || null;
-        this.activeAgentRunEvents = [];
-        this.activeAgentRunEventKeys = new Set();
-
-        const lifecycle = snapshot.lifecycleState.toLowerCase();
-        this.agentWorkspaceMode = lifecycle.includes('build') || snapshot.buildRunId
-            ? AgentWorkspaceModes.BUILD
-            : AgentWorkspaceModes.PLAN;
-        this._setWorkspaceViewMode(snapshot.buildRunId ? AgentWorkspaceModes.BUILD : AgentWorkspaceModes.PLAN, { render: false });
+        this._setWorkspaceViewMode(
+            snapshot.workspaceViewMode === AgentWorkspaceModes.BUILD
+                ? AgentWorkspaceModes.BUILD
+                : AgentWorkspaceModes.PLAN,
+            { render: false });
 
         this._renderAgentWorkspaceOverview?.();
         this._renderPlanWorkspace?.(this.pendingVisionPlan);
@@ -473,41 +506,6 @@ export const aiPanelSessionHistoryMixin = {
 
         this._restoreWorkspaceRunReplays(snapshot, sessionId);
         return true;
-    },
-
-    _resetWorkspaceStateForSessionRestore() {
-        this.pendingVisionPlan = null;
-        this.pendingClarificationPayload = null;
-        this.planQuestionSelections = {};
-        this.planQuestionAnswers = {};
-        this.planAnswerRevision = 0;
-        this.planAcceptedRecommendedDefaults = false;
-        this.currentPlanIdentity = '';
-        this.effectiveReadiness = null;
-        this.previewState = 'idle';
-        this.activePlanReadinessPreviewController?.abort?.();
-        this.activePlanReadinessPreviewController = null;
-        this.activePlanReadinessPreviewRequest = null;
-        this.lastPlanReadinessPreviewError = '';
-        this.workspaceSnapshotRevision = 0;
-        this.workspaceSnapshotDirty = false;
-        this.workspaceSnapshotSaveQueue = Promise.resolve();
-        this.workspaceMutationGeneration = 0;
-        this.workspacePersistedGeneration = 0;
-        this.workspacePendingMutationCount = 0;
-        this.workspaceSaveErrorGeneration = 0;
-        this.workspaceBoundaryInProgress = false;
-        this.workspaceBuildRunId = '';
-        this.workspaceSubmittedBuildFingerprint = '';
-        this.activePlanRunId = null;
-        this.activePlanRunRequestId = null;
-        this.activePlanRunEvents = [];
-        this.activePlanRunEventKeys = new Set();
-        this.activePlanRunCompletion = null;
-        this._resetAgentRunState?.();
-        this.workspacePersistenceWarning = null;
-        this._workspacePersistenceStatusNoteActive = false;
-        this._workspacePersistenceStatusNoteText = '';
     },
 
     async _restoreWorkspaceRunReplays(snapshot, sessionId) {
@@ -667,6 +665,10 @@ export const aiPanelSessionHistoryMixin = {
         const current = String(this.sessionId || '').trim();
         if (normalized.toLowerCase() === current.toLowerCase()) {
             this.sessionId = normalized || null;
+            this._dispatchAgentWorkspaceEvent?.({
+                type: 'workspace/session-adopted',
+                payload: { sessionId: this.sessionId || '' }
+            });
             this._saveSessionId?.(this.sessionId);
             return false;
         }
@@ -674,6 +676,10 @@ export const aiPanelSessionHistoryMixin = {
         this.sessionNavigationEpoch = (Number(this.sessionNavigationEpoch) || 0) + 1;
         this.pendingSessionLoad = null;
         this.sessionId = normalized || null;
+        this._dispatchAgentWorkspaceEvent?.({
+            type: 'workspace/session-adopted',
+            payload: { sessionId: this.sessionId || '' }
+        });
         this._saveSessionId?.(this.sessionId);
         return true;
     }

@@ -1272,6 +1272,7 @@ public sealed class AgentRunEndpointsTests
 
         releaseFirstBuild.SetResult();
         await host.WaitForTerminalAsync(firstRunId);
+        await host.WaitForWorkspaceBuildStatusAsync(sessionId, AgentRunEventStatuses.Completed);
         host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.BuildRunStatus
             .Should().Be(AgentRunEventStatuses.Completed);
     }
@@ -2607,6 +2608,24 @@ public sealed class AgentRunEndpointsTests
             }
 
             throw new TimeoutException($"Conversation session '{sessionId}' did not reach {expectedCount} history entries.");
+        }
+
+        public async Task WaitForWorkspaceBuildStatusAsync(string sessionId, string expectedStatus)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (!cts.IsCancellationRequested)
+            {
+                var status = ConversationService.GetSession(sessionId)?.WorkspaceSnapshot?.BuildRunStatus;
+                if (string.Equals(status, expectedStatus, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                await Task.Delay(20, cts.Token);
+            }
+
+            throw new TimeoutException(
+                $"Conversation session '{sessionId}' did not reach Build status '{expectedStatus}'.");
         }
 
         public async Task WaitForEventAsync(string runId, string eventType)

@@ -179,7 +179,12 @@ public static class AgentRunEndpoints
             LifecycleState = request.LifecycleState,
             PlanQuestionSelections = request.PlanQuestionSelections,
             ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
+            OptimisticPlanAnswers = request.OptimisticPlanAnswers,
+            AnswerRevision = request.AnswerRevision,
+            ReadinessPreview = request.ReadinessPreview,
+            ResourceDecisions = request.ResourceDecisions,
             RequirementMode = request.RequirementMode,
+            WorkspaceViewMode = request.WorkspaceViewMode,
             PlanAcceptedRecommendedDefaults = request.PlanAcceptedRecommendedDefaults,
             SubmittedBuildFingerprint = request.SubmittedBuildFingerprint
         });
@@ -1925,7 +1930,12 @@ public sealed record VisionAgentWorkspaceSnapshotDeltaRequest
     public string? LifecycleState { get; init; }
     public Dictionary<string, string>? PlanQuestionSelections { get; init; }
     public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; init; }
+    public List<VisionAgentPlanAnswer>? OptimisticPlanAnswers { get; init; }
+    public int? AnswerRevision { get; init; }
+    public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; init; }
+    public Dictionary<string, JsonElement>? ResourceDecisions { get; init; }
     public string? RequirementMode { get; init; }
+    public string? WorkspaceViewMode { get; init; }
     public bool? PlanAcceptedRecommendedDefaults { get; init; }
     public string? SubmittedBuildFingerprint { get; init; }
 }
