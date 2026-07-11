@@ -19,49 +19,49 @@ public class InspectionJudgmentResolverTests
     [InlineData("NotApplicable", DecisionOutcome.NotApplicable)]
     [InlineData("Error", DecisionOutcome.Invalid)]
     [InlineData("surprise", DecisionOutcome.Invalid)]
-    public void DetermineDecisionFromFlowOutput_MapsExplicitJudgmentKeywords(
+    public void LegacyHeuristic_MapsExplicitJudgmentKeywords(
         string value,
         DecisionOutcome expected)
     {
-        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(
             new Dictionary<string, object> { ["JudgmentResult"] = value });
 
         evaluation.Decision.Should().Be(expected);
-        evaluation.DecisionSource.Should().Be("JudgmentResult");
+        evaluation.DecisionSource.Should().Be("LegacyHeuristic:JudgmentResult");
         evaluation.MissingJudgmentSignal.Should().BeFalse();
     }
 
     [Fact]
-    public void DetermineDecisionFromFlowOutput_WhenAcceptedIsFalse_ReturnsNg()
+    public void LegacyHeuristic_WhenAcceptedIsFalse_ReturnsNg()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(
             new Dictionary<string, object> { ["Accepted"] = false });
 
         evaluation.Decision.Should().Be(DecisionOutcome.Ng);
-        evaluation.DecisionSource.Should().Be("Accepted");
+        evaluation.DecisionSource.Should().Be("LegacyHeuristic:Accepted");
         evaluation.ReasonCode.Should().Be("DerivedFromAccepted");
     }
 
     [Fact]
-    public void DetermineDecisionFromFlowOutput_PreservesLegacyRecursiveScanForPromptOne()
+    public void LegacyHeuristic_PreservesRecursiveScanForPreviewCompatibility()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(new Dictionary<string, object>
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(new Dictionary<string, object>
         {
             ["Diagnostics"] = new Dictionary<string, object> { ["HueValid"] = true }
         });
 
         evaluation.Decision.Should().Be(DecisionOutcome.Ok);
-        evaluation.DecisionSource.Should().Be("Diagnostics.HueValid");
+        evaluation.DecisionSource.Should().Be("LegacyHeuristic:Diagnostics.HueValid");
     }
 
     [Fact]
-    public void DetermineDecisionFromFlowOutput_WhenNoJudgmentSignalExists_ReturnsUndetermined()
+    public void LegacyHeuristic_WhenNoJudgmentSignalExists_ReturnsUndetermined()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(
             new Dictionary<string, object> { ["BlobCount"] = 3, ["Measurement"] = 12.5 });
 
         evaluation.Decision.Should().Be(DecisionOutcome.Undetermined);
-        evaluation.DecisionSource.Should().Be("None");
+        evaluation.DecisionSource.Should().Be("LegacyHeuristic:None");
         evaluation.ReasonCode.Should().Be("MissingJudgmentSignal");
         evaluation.Message.Should().BeNull();
         evaluation.MissingJudgmentSignal.Should().BeTrue();
@@ -71,9 +71,9 @@ public class InspectionJudgmentResolverTests
     [InlineData(null)]
     [InlineData(true)]
     [InlineData(42)]
-    public void DetermineDecisionFromFlowOutput_WhenExplicitJudgmentTypeIsInvalid_ReturnsInvalid(object? value)
+    public void LegacyHeuristic_WhenExplicitJudgmentTypeIsInvalid_ReturnsInvalid(object? value)
     {
-        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(
             new Dictionary<string, object> { ["JudgmentResult"] = value! });
 
         evaluation.Decision.Should().Be(DecisionOutcome.Invalid);

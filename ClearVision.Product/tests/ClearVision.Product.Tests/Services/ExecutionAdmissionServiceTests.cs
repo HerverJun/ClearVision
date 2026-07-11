@@ -3,6 +3,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using NSubstitute;
 
@@ -196,6 +197,67 @@ public sealed class ExecutionAdmissionServiceTests
         result.IsAllowed.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ValidateFlowAsync_OfficialSurfaceWithoutDecisionBinding_ShouldRejectSynchronously()
+    {
+        var projectId = Guid.NewGuid();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var flow = new OperatorFlow("missing-binding");
+        flow.AddOperator(new Operator(Guid.NewGuid(), "Output", OperatorType.ResultOutput, 0, 0));
+
+        var result = await new ExecutionAdmissionService(repository).ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.StudioInspectionRun);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_DECISION_BINDING_REQUIRED");
+        result.Violations.Should().ContainSingle(item => item.Code == "DECISION_BINDING_REQUIRED");
+    }
+
+    [Fact]
+    public async Task ValidateFlowAsync_PreviewSurfaceWithoutDecisionBinding_ShouldRemainAllowed()
+    {
+        var projectId = Guid.NewGuid();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var flow = new OperatorFlow("preview-without-binding");
+        flow.AddOperator(new Operator(Guid.NewGuid(), "Threshold", OperatorType.Thresholding, 0, 0));
+
+        var result = await new ExecutionAdmissionService(repository).ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.NodePreview);
+
+        result.IsAllowed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateFlowAsync_OfficialSurfaceWithActiveRuntime_ShouldRejectWithStableCode()
+    {
+        var projectId = Guid.NewGuid();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        coordinator.GetState(projectId).Returns(new RuntimeState
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Status = RuntimeStatus.Running,
+            StartedAt = DateTime.UtcNow
+        });
+        var flow = SingleOperatorFlow(OperatorType.ResultOutput);
+
+        var result = await new ExecutionAdmissionService(repository, coordinator).ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.StoredProjectExecution);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_RUNTIME_ALREADY_ACTIVE");
+    }
+
     [Theory]
     [MemberData(nameof(OfficialSurfaces_Data))]
     public async Task ValidateFlowAsync_OnOfficialSurface_WithMissingProject_ShouldStillEnforceProjectGate(
@@ -271,7 +333,7 @@ public sealed class ExecutionAdmissionServiceTests
         }
 
         flow.AddOperator(op);
-        return flow;
+        return flow.BindStringDecision(op);
     }
 
     private static string InferDataType(object value) =>

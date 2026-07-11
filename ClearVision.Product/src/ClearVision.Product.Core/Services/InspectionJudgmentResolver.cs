@@ -8,7 +8,8 @@ public readonly record struct InspectionDecisionEvaluation(
     DecisionOutcome Decision,
     string DecisionSource,
     string ReasonCode,
-    string? Message)
+    string? Message,
+    bool HasJudgmentSignal = true)
 {
     public bool MissingJudgmentSignal => ReasonCode == "MissingJudgmentSignal";
 }
@@ -28,7 +29,7 @@ public static class InspectionJudgmentResolver
         new("IsAnomaly", PositiveMeansOk: false, "DerivedFromIsAnomaly")
     ];
 
-    public static InspectionDecisionEvaluation DetermineDecisionFromFlowOutput(Dictionary<string, object>? outputData)
+    public static InspectionDecisionEvaluation DetermineDecisionFromLegacyHeuristic(Dictionary<string, object>? outputData)
     {
         if (outputData == null)
         {
@@ -40,6 +41,10 @@ public static class InspectionJudgmentResolver
             sourcePrefix: null,
             depth: 0);
     }
+
+    [Obsolete("Use FinalDecisionResolver for official execution. This method is legacy preview compatibility only.")]
+    public static InspectionDecisionEvaluation DetermineDecisionFromFlowOutput(Dictionary<string, object>? outputData) =>
+        DetermineDecisionFromLegacyHeuristic(outputData);
 
     private static InspectionDecisionEvaluation DetermineDecisionFromFlowOutput(
         IReadOnlyDictionary<string, object>? outputData,
@@ -315,7 +320,7 @@ public static class InspectionJudgmentResolver
         Math.Truncate(value) == value;
 
     private static InspectionDecisionEvaluation MissingJudgmentSignal() =>
-        Decided(DecisionOutcome.Undetermined, "None", "MissingJudgmentSignal");
+        new(DecisionOutcome.Undetermined, "LegacyHeuristic:None", "MissingJudgmentSignal", null, false);
 
     private static InspectionDecisionEvaluation BuildInvalidTypeResult(
         string fieldName,
@@ -333,13 +338,13 @@ public static class InspectionJudgmentResolver
         DecisionOutcome decision,
         string source,
         string reasonCode) =>
-        new(decision, source, reasonCode, null);
+        new(decision, $"LegacyHeuristic:{source}", reasonCode, null, true);
 
     private static InspectionDecisionEvaluation Invalid(
         string source,
         string reasonCode,
         string message) =>
-        new(DecisionOutcome.Invalid, source, reasonCode, message);
+        new(DecisionOutcome.Invalid, $"LegacyHeuristic:{source}", reasonCode, message, true);
 
     private static string ComposeDecisionSource(string? prefix, string fieldName) =>
         string.IsNullOrWhiteSpace(prefix) ? fieldName : $"{prefix}.{fieldName}";

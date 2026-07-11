@@ -59,6 +59,7 @@ public static class InspectionRealtimeEventMapper
                         decisionOutcome = result.DecisionOutcome,
                         decisionSource = result.DecisionSource,
                         reasonCode = result.ReasonCode,
+                        hasJudgmentSignal = result.HasJudgmentSignal,
                         defectCount = result.DefectCount,
                         processingTimeMs = result.ProcessingTimeMs,
                         errorMessage = result.ErrorMessage,

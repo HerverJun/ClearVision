@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -119,6 +120,7 @@ public class RuntimeMvpTests
 
             studioResult.Status.Should().Be(InspectionStatus.OK);
             stationResult.Outcome.Should().Be(RuntimeRunOutcome.Ok);
+            stationResult.HasJudgmentSignal.Should().BeTrue();
             stationResult.InspectionStatus.Should().Be(studioResult.Status);
             stationResult.PrimaryOutputs["JudgmentResult"]?.ToString().Should().Be("OK");
             stationResult.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("2");
@@ -1098,6 +1100,8 @@ public class RuntimeMvpTests
 
     private static ProjectDto CreateProjectDto(string name)
     {
+        var operatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         return new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -1106,15 +1110,17 @@ public class RuntimeMvpTests
             {
                 Id = Guid.NewGuid(),
                 Name = "runtime-flow",
+                DecisionConfiguration = CreateStringDecisionConfiguration(operatorId, decisionPortId),
                 Operators =
                 [
                     new OperatorDto
                     {
-                        Id = Guid.NewGuid(),
+                        Id = operatorId,
                         Name = "ResultOutput",
                         Type = OperatorType.ResultOutput,
                         X = 0,
-                        Y = 0
+                        Y = 0,
+                        OutputPorts = [CreateDecisionPort(decisionPortId)]
                     }
                 ]
             }
@@ -1127,6 +1133,7 @@ public class RuntimeMvpTests
         var acquisitionOutputPortId = Guid.NewGuid();
         var resultId = Guid.NewGuid();
         var resultInputPortId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         return new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -1135,6 +1142,7 @@ public class RuntimeMvpTests
             {
                 Id = Guid.NewGuid(),
                 Name = "package-configured-flow",
+                DecisionConfiguration = CreateStringDecisionConfiguration(resultId, decisionPortId),
                 Operators =
                 [
                     new OperatorDto
@@ -1167,7 +1175,8 @@ public class RuntimeMvpTests
                                 DataType = PortDataType.Image,
                                 IsRequired = false
                             }
-                        ]
+                        ],
+                        OutputPorts = [CreateDecisionPort(decisionPortId)]
                     }
                 ],
                 Connections =
@@ -1192,6 +1201,8 @@ public class RuntimeMvpTests
         string bundleId = "bundle-pixel-to-world")
     {
         var projectRevision = includeAsset ? 22 : 0;
+        var operatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         var project = new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -1201,11 +1212,12 @@ public class RuntimeMvpTests
             {
                 Id = Guid.NewGuid(),
                 Name = "pixel-to-world-flow",
+                DecisionConfiguration = CreateStringDecisionConfiguration(operatorId, decisionPortId),
                 Operators =
                 [
                     new OperatorDto
                     {
-                        Id = Guid.NewGuid(),
+                        Id = operatorId,
                         Name = "PixelToWorld",
                         Type = OperatorType.PixelToWorldTransform,
                         Parameters =
@@ -1237,7 +1249,8 @@ public class RuntimeMvpTests
                                 Name = "TransformResult",
                                 Direction = PortDirection.Output,
                                 DataType = PortDataType.Any
-                            }
+                            },
+                            CreateDecisionPort(decisionPortId)
                         ]
                     }
                 ],
@@ -1275,6 +1288,65 @@ public class RuntimeMvpTests
 
         return project;
     }
+
+    [Fact]
+    public async Task RuntimeHost_LegacyPackageWithoutDecisionBinding_ShouldLoadButRejectBeforeRunStarts()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectDto("legacy-runtime-package");
+            project.Flow!.DecisionConfiguration = null;
+            var export = await new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance)
+                .ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = project,
+                    TargetRootDirectory = root
+                });
+            var resultCount = 0;
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            runtimeHost.ResultAvailable += _ => resultCount++;
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var act = async () => await runtimeHost.RunPackageConfiguredSingleAsync();
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("ADMISSION_DECISION_BINDING_REQUIRED:*");
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            resultCount.Should().Be(0);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    private static DecisionConfiguration CreateStringDecisionConfiguration(Guid operatorId, Guid portId) =>
+        new()
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = operatorId,
+                SourceOutputPortId = portId,
+                SourceOutputName = "JudgmentResult",
+                DataType = DecisionValueType.String,
+                Rule = DecisionInterpretationRule.StringMap,
+                OkValue = "OK",
+                NgValue = "NG"
+            }
+        };
+
+    private static PortDto CreateDecisionPort(Guid portId) => new()
+    {
+        Id = portId,
+        Name = "JudgmentResult",
+        Direction = PortDirection.Output,
+        DataType = PortDataType.String
+    };
 
     private static ParameterDto CreateParameterDto(string name, string dataType, object? value) =>
         new()

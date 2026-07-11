@@ -1720,43 +1720,25 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         FlowExecutionPlan plan,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs)
     {
-        var resultOutputWithJudgment = TryFindCandidateWithJudgment(plan.ResultOutputCandidates, operatorOutputs);
-        if (resultOutputWithJudgment != null)
+        foreach (var candidate in plan.ResultOutputCandidates)
         {
-            return resultOutputWithJudgment;
+            if (operatorOutputs.ContainsKey(candidate.Id))
+            {
+                return candidate;
+            }
         }
 
-        var resultJudgmentWithJudgment = TryFindCandidateWithJudgment(plan.ResultJudgmentCandidates, operatorOutputs);
-        if (resultJudgmentWithJudgment != null)
+        foreach (var candidate in plan.ResultJudgmentCandidates)
         {
-            return resultJudgmentWithJudgment;
+            if (operatorOutputs.ContainsKey(candidate.Id))
+            {
+                return candidate;
+            }
         }
 
         foreach (var op in plan.ReverseExecutionOrder)
         {
             if (operatorOutputs.ContainsKey(op.Id))
-            {
-                return op;
-            }
-        }
-
-        return null;
-    }
-
-    private Operator? TryFindCandidateWithJudgment(
-        IEnumerable<Operator> candidates,
-        ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs)
-    {
-        foreach (var op in candidates)
-        {
-            if (!operatorOutputs.TryGetValue(op.Id, out var rawOutput))
-            {
-                continue;
-            }
-
-            var normalizedOutput = ConvertImageWrappersToBytes(rawOutput);
-            var judgment = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(normalizedOutput);
-            if (!judgment.MissingJudgmentSignal)
             {
                 return op;
             }

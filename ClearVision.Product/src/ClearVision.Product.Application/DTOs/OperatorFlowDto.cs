@@ -4,6 +4,7 @@
 
 namespace ClearVision.Product.Application.DTOs;
 
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -33,13 +34,18 @@ public class OperatorFlowDto
     /// </summary>
     public List<OperatorConnectionDto> Connections { get; set; } = new();
 
+    public DecisionConfiguration? DecisionConfiguration { get; set; }
+
     /// <summary>
     /// 转换为实体对象
     /// </summary>
     public OperatorFlow ToEntity()
     {
         // 创建空流程
-        var flow = new OperatorFlow(Name);
+        var flow = new OperatorFlow(Name)
+        {
+            DecisionConfiguration = DecisionConfiguration
+        };
 
         // 添加算子
         foreach (var op in Operators)
@@ -115,6 +121,9 @@ public class UpdateFlowRequest
 
     public long? ExpectedPersistenceRevision { get; set; }
 
+    public DecisionConfiguration? DecisionConfiguration { get; set; }
+
     public List<OperatorDto> Operators { get; set; } = new();
     public List<OperatorConnectionDto> Connections { get; set; } = new();
+
 }

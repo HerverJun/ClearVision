@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -46,7 +47,8 @@ public sealed record ExecutionAdmissionViolation(
     string OperatorName,
     OperatorType OperatorType,
     string Reason,
-    string? ParameterName = null);
+    string? ParameterName = null,
+    string? Code = null);
 
 public sealed class ExecutionAdmissionResult
 {
@@ -93,6 +95,10 @@ public interface IExecutionAdmissionService
         ExecutionAdmissionSurface surface,
         CancellationToken cancellationToken = default);
 
+    ExecutionAdmissionResult ValidateFlowDefinition(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface);
+
     ExecutionAdmissionResult ValidateFlowSideEffects(
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface);
@@ -130,10 +136,17 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
     ];
 
     private readonly IProjectRepository _projectRepository;
+    private readonly IInspectionRuntimeCoordinator? _runtimeCoordinator;
+    private readonly IFlowExecutionService? _flowExecutionService;
 
-    public ExecutionAdmissionService(IProjectRepository projectRepository)
+    public ExecutionAdmissionService(
+        IProjectRepository projectRepository,
+        IInspectionRuntimeCoordinator? runtimeCoordinator = null,
+        IFlowExecutionService? flowExecutionService = null)
     {
         _projectRepository = projectRepository;
+        _runtimeCoordinator = runtimeCoordinator;
+        _flowExecutionService = flowExecutionService;
     }
 
     /// <summary>
@@ -193,16 +206,101 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         }
 
         var projectAdmission = await ValidateProjectAsync(projectId, surface, cancellationToken);
-        if (!projectAdmission.IsAllowed || IsOfficialExecutionSurface(surface))
+        if (!projectAdmission.IsAllowed)
         {
             // 正式运行 surface：项目校验通过即放行，允许流程声明的真实 I/O。
             return projectAdmission;
         }
 
-        return ValidateFlowSideEffects(flow, surface);
+        if (IsOfficialExecutionSurface(surface) && _runtimeCoordinator?.GetState(projectId) != null)
+        {
+            return ExecutionAdmissionResult.Reject(
+                "ADMISSION_RUNTIME_ALREADY_ACTIVE",
+                $"Project '{projectId}' already has an active runtime session.");
+        }
+
+        return ValidateFlowDefinition(flow, surface);
+    }
+
+    public ExecutionAdmissionResult ValidateFlowDefinition(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface)
+    {
+        var admission = ValidateStandaloneFlow(flow, surface);
+        if (!admission.IsAllowed || flow == null || _flowExecutionService == null)
+        {
+            return admission;
+        }
+
+        var validation = _flowExecutionService.ValidateFlow(flow);
+        if (validation == null)
+        {
+            return admission;
+        }
+        return validation.IsValid
+            ? admission
+            : ExecutionAdmissionResult.Reject(
+                "ADMISSION_FLOW_INVALID",
+                validation.Errors.Count > 0
+                    ? string.Join("; ", validation.Errors)
+                    : "Flow validation failed.");
+    }
+
+    public static ExecutionAdmissionResult ValidateStandaloneFlow(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface)
+    {
+        if (!HasExecutableFlow(flow))
+        {
+            return ExecutionAdmissionResult.Reject(
+                "ADMISSION_FLOW_REQUIRED",
+                "An executable flow is required.");
+        }
+
+        var structure = ValidateStructureAndRequiredParameters(flow!);
+        if (!structure.IsAllowed)
+        {
+            return structure;
+        }
+
+        if (IsOfficialExecutionSurface(surface))
+        {
+            var decisionIssues = FinalDecisionResolver.Validate(flow);
+            if (decisionIssues.Count > 0)
+            {
+                var violations = decisionIssues.Select(issue =>
+                {
+                    var op = issue.OperatorId.HasValue
+                        ? flow!.Operators.FirstOrDefault(candidate => candidate.Id == issue.OperatorId.Value)
+                        : null;
+                    return new ExecutionAdmissionViolation(
+                        issue.OperatorId ?? Guid.Empty,
+                        op?.Name ?? string.Empty,
+                        op?.Type ?? default,
+                        issue.Message,
+                        issue.OutputName,
+                        issue.Code);
+                }).ToList();
+                return ExecutionAdmissionResult.Reject(
+                    $"ADMISSION_{decisionIssues[0].Code}",
+                    decisionIssues[0].Message,
+                    violations);
+            }
+
+            return ExecutionAdmissionResult.Allow();
+        }
+
+        return ValidateFlowSideEffectsCore(flow, surface);
     }
 
     public ExecutionAdmissionResult ValidateFlowSideEffects(
+        OperatorFlow? flow,
+        ExecutionAdmissionSurface surface)
+    {
+        return ValidateFlowSideEffectsCore(flow, surface);
+    }
+
+    private static ExecutionAdmissionResult ValidateFlowSideEffectsCore(
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface)
     {
@@ -270,6 +368,63 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 
     private static bool HasExecutableFlow(OperatorFlow? flow) =>
         flow?.Operators?.Count > 0;
+
+    private static ExecutionAdmissionResult ValidateStructureAndRequiredParameters(OperatorFlow flow)
+    {
+        var violations = new List<ExecutionAdmissionViolation>();
+        var duplicateOperators = flow.Operators
+            .GroupBy(op => op.Id)
+            .Where(group => group.Key == Guid.Empty || group.Count() > 1)
+            .SelectMany(group => group);
+        foreach (var op in duplicateOperators)
+        {
+            violations.Add(new(op.Id, op.Name, op.Type, "Operator IDs must be non-empty and unique.", Code: "FLOW_OPERATOR_ID_INVALID"));
+        }
+
+        var operatorById = flow.Operators
+            .GroupBy(op => op.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        foreach (var connection in flow.Connections)
+        {
+            if (!operatorById.TryGetValue(connection.SourceOperatorId, out var source) ||
+                !operatorById.TryGetValue(connection.TargetOperatorId, out var target) ||
+                source.OutputPorts.All(port => port.Id != connection.SourcePortId) ||
+                target.InputPorts.All(port => port.Id != connection.TargetPortId))
+            {
+                violations.Add(new(
+                    connection.SourceOperatorId,
+                    source?.Name ?? string.Empty,
+                    source?.Type ?? default,
+                    "Connection references a missing operator or port.",
+                    Code: "FLOW_CONNECTION_INVALID"));
+            }
+        }
+
+        foreach (var op in flow.Operators.Where(op => op.IsEnabled))
+        {
+            foreach (var parameter in op.Parameters.Where(parameter => parameter.IsRequired))
+            {
+                var value = parameter.GetValue();
+                if (value == null)
+                {
+                    violations.Add(new(
+                        op.Id,
+                        op.Name,
+                        op.Type,
+                        $"Required parameter '{parameter.Name}' is missing.",
+                        parameter.Name,
+                        "FLOW_REQUIRED_PARAMETER_MISSING"));
+                }
+            }
+        }
+
+        return violations.Count == 0
+            ? ExecutionAdmissionResult.Allow()
+            : ExecutionAdmissionResult.Reject(
+                $"ADMISSION_{violations[0].Code}",
+                violations[0].Reason,
+                violations);
+    }
 
     private static ExecutionAdmissionViolation? TryCreateViolation(
         Operator @operator,

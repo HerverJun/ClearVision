@@ -346,6 +346,7 @@ public class ProjectService
         var flowDto = new OperatorFlowDto
         {
             Name = ResolveFlowName(request.Name, existingFlow?.Name, project.Flow?.Name),
+            DecisionConfiguration = request.DecisionConfiguration ?? existingFlow?.DecisionConfiguration,
             Operators = request.Operators,
             Connections = request.Connections
         };
@@ -387,7 +388,10 @@ public class ProjectService
     /// </summary>
     private OperatorFlow MapDtoToFlow(OperatorFlowDto dto, Guid? flowId = null)
     {
-        var flow = new OperatorFlow(dto.Name);
+        var flow = new OperatorFlow(dto.Name)
+        {
+            DecisionConfiguration = dto.DecisionConfiguration
+        };
 
         // 【关键修复】如果指定了 flowId (通常是 Project.Id)，强制设置它
         // EF Core Table Splitting 要求 Project.Id == Flow.Id
@@ -708,6 +712,7 @@ public class ProjectService
         {
             Id = flow.Id,
             Name = flow.Name,
+            DecisionConfiguration = flow.DecisionConfiguration,
             Operators = flow.Operators.Select(MapOperatorToDto).ToList(),
             Connections = flow.Connections.Select(MapConnectionToDto).ToList()
         };

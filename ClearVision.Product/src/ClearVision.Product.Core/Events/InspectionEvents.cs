@@ -33,6 +33,7 @@ public record InspectionResultEvent : IInspectionEvent
     public string? DecisionOutcome { get; init; }
     public string? DecisionSource { get; init; }
     public string? ReasonCode { get; init; }
+    public bool HasJudgmentSignal { get; init; }
     public required int DefectCount { get; init; }
     public required long ProcessingTimeMs { get; init; }
     public string? ErrorMessage { get; init; }

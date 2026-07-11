@@ -232,6 +232,7 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 DecisionOutcome = r.DecisionOutcome,
                 DecisionSource = r.DecisionSource,
                 ReasonCode = r.ReasonCode,
+                HasJudgmentSignal = r.HasJudgmentSignal,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -273,6 +274,7 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 DecisionOutcome = r.DecisionOutcome,
                 DecisionSource = r.DecisionSource,
                 ReasonCode = r.ReasonCode,
+                HasJudgmentSignal = r.HasJudgmentSignal,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -316,6 +318,7 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 DecisionOutcome = r.DecisionOutcome,
                 DecisionSource = r.DecisionSource,
                 ReasonCode = r.ReasonCode,
+                HasJudgmentSignal = r.HasJudgmentSignal,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -357,7 +360,10 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                     item.DecisionOutcome.Value,
                     item.DecisionSource,
                     item.ReasonCode,
-                    item.ErrorMessage),
+                    item.ErrorMessage,
+                    item.HasJudgmentSignal ??
+                    (item.ExecutionOutcome.Value == ClearVision.Product.Core.Outcomes.ExecutionOutcome.Succeeded &&
+                     item.DecisionOutcome.Value is ClearVision.Product.Core.Outcomes.DecisionOutcome.Ok or ClearVision.Product.Core.Outcomes.DecisionOutcome.Ng)),
                 item.ProcessingTimeMs,
                 item.ConfidenceScore);
         }

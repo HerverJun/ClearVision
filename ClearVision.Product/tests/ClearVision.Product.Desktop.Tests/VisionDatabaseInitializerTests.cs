@@ -1,5 +1,7 @@
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Infrastructure.Data;
+using ClearVision.Product.Core.Decisions;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Outcomes;
 using FluentAssertions;
@@ -12,6 +14,62 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public sealed class VisionDatabaseInitializerTests
 {
+    [Fact]
+    public async Task InitializeAsync_ShouldRoundTripProjectDecisionConfiguration()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+            var projectId = Guid.Empty;
+            var operatorId = Guid.NewGuid();
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+                var project = new Project("decision-roundtrip");
+                projectId = project.Id;
+                var op = new Operator(operatorId, "FinalJudge", OperatorType.ResultJudgment, 0, 0);
+                op.AddOutputPort("IsOk", PortDataType.Boolean);
+                project.Flow.AddOperator(op);
+                project.Flow.DecisionConfiguration = new DecisionConfiguration
+                {
+                    FinalDecisionBinding = new FinalDecisionBinding
+                    {
+                        SourceOperatorId = operatorId,
+                        SourceOutputPortId = op.OutputPorts.Single().Id,
+                        SourceOutputName = "IsOk",
+                        DataType = DecisionValueType.Boolean,
+                        Rule = DecisionInterpretationRule.Boolean
+                    },
+                    MissingDecisionPolicy = MissingDecisionPolicy.Invalid
+                };
+                dbContext.Projects.Add(project);
+                await dbContext.SaveChangesAsync();
+            }
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                var reloaded = await dbContext.Projects
+                    .Include(project => project.Flow)
+                    .SingleAsync(project => project.Id == projectId);
+                reloaded.Flow.DecisionConfiguration.Should().NotBeNull();
+                reloaded.Flow.DecisionConfiguration!.FinalDecisionBinding!.SourceOperatorId.Should().Be(operatorId);
+                reloaded.Flow.DecisionConfiguration.MissingDecisionPolicy.Should().Be(MissingDecisionPolicy.Invalid);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     [Fact]
     public async Task InitializeAsync_ShouldCreateNewSqliteDatabase_WithCurrentSchemaVersion()
     {
@@ -117,6 +175,8 @@ public sealed class VisionDatabaseInitializerTests
             (await ColumnExistsAsync(connection, "InspectionResults", "DecisionOutcome")).Should().BeTrue();
             (await ColumnExistsAsync(connection, "InspectionResults", "DecisionSource")).Should().BeTrue();
             (await ColumnExistsAsync(connection, "InspectionResults", "ReasonCode")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "InspectionResults", "HasJudgmentSignal")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "Projects", "Flow_DecisionConfiguration")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationResultSummaries")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationNodes_StationId")).Should().BeTrue();
@@ -168,8 +228,10 @@ public sealed class VisionDatabaseInitializerTests
 
                 legacy.ExecutionOutcome.Should().BeNull();
                 legacy.DecisionOutcome.Should().BeNull();
+                legacy.HasJudgmentSignal.Should().BeNull();
                 legacy.GetOutcome().Execution.Should().Be(ExecutionOutcome.Succeeded);
                 legacy.GetOutcome().Decision.Should().Be(DecisionOutcome.Ok);
+                legacy.GetOutcome().HasJudgmentSignal.Should().BeTrue();
             }
         }
         finally

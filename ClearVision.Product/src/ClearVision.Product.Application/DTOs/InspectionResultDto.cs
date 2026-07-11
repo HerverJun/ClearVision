@@ -31,6 +31,8 @@ public class InspectionResultDto
 
     public DecisionOutcome DecisionOutcome { get; set; }
 
+    public bool HasJudgmentSignal { get; set; }
+
     public string? DecisionSource { get; set; }
 
     public string? ReasonCode { get; set; }

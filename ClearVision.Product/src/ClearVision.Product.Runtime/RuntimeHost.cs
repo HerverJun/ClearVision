@@ -339,6 +339,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             EnsurePackageLoaded();
             EnsureNotRunning();
+            ValidateRuntimeAdmission(_loadedPackage!);
             runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             runGeneration = Interlocked.Increment(ref _runGenerationCounter);
             _activeRunGeneration = runGeneration;
@@ -374,6 +375,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             EnsurePackageLoaded();
             EnsureNotRunning();
+            ValidateRuntimeAdmission(_loadedPackage!);
 
             var files = EnumerateReplayFiles(folderPath, _loadedPackage!.RuntimeProfile).ToList();
             if (files.Count == 0)
@@ -673,6 +675,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 imagePath,
                 sourceImageBytes,
                 flowResult,
+                flow,
                 startedAt,
                 DateTimeOffset.UtcNow,
                 timeoutCts.IsCancellationRequested);
@@ -1126,6 +1129,24 @@ public sealed class RuntimeHost : IAsyncDisposable
             _ => outcome.ToString()
         };
     }
+
+    private void ValidateRuntimeAdmission(RuntimePackage package)
+    {
+        var flow = RuntimeFlowAdapter.ToEntity(package.Flow);
+        var admission = ExecutionAdmissionService.ValidateStandaloneFlow(
+            flow,
+            ExecutionAdmissionSurface.StationRuntimeExecution);
+        if (!admission.IsAllowed)
+        {
+            throw new RuntimePackageException($"{admission.Code}: {admission.Message}");
+        }
+
+        var validation = _flowExecutionService.ValidateFlow(flow);
+        if (!validation.IsValid)
+        {
+            throw new RuntimePackageException($"ADMISSION_FLOW_INVALID: {string.Join("; ", validation.Errors)}");
+        }
+    }
 }
 
 internal static class RuntimeFlowAdapter
@@ -1154,6 +1175,7 @@ public sealed class RuntimeResultNormalizer
         string? imagePath,
         byte[]? sourceImageBytes,
         FlowExecutionResult flowResult,
+        OperatorFlow flow,
         DateTimeOffset startedAtUtc,
         DateTimeOffset completedAtUtc,
         bool cancellationRequested)
@@ -1166,7 +1188,7 @@ public sealed class RuntimeResultNormalizer
                 "RuntimeHost",
                 "Canceled",
                 "Run canceled.")
-            : InspectionOutcomeResolver.Resolve(flowResult);
+            : InspectionOutcomeResolver.Resolve(flowResult, flow);
 
         var outcome = ResolveOutcome(canonicalOutcome);
         InspectionStatus? inspectionStatus = canonicalOutcome.Execution == ExecutionOutcome.Cancelled
@@ -1192,7 +1214,7 @@ public sealed class RuntimeResultNormalizer
             ExecutionTimeMs = flowResult.ExecutionTimeMs,
             DiagnosticCode = diagnosticCode,
             DiagnosticMessage = diagnosticMessage,
-            HasJudgmentSignal = canonicalOutcome.ReasonCode != "MissingJudgmentSignal",
+            HasJudgmentSignal = canonicalOutcome.HasJudgmentSignal,
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = completedAtUtc,
             PrimaryOutputs = BuildPrimaryOutputs(outputData),

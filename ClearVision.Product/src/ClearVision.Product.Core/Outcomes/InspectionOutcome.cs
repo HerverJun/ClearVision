@@ -28,7 +28,8 @@ public readonly record struct InspectionOutcome(
     DecisionOutcome Decision,
     string? DecisionSource,
     string? ReasonCode,
-    string? Message);
+    string? Message,
+    bool HasJudgmentSignal = false);
 
 public static class LegacyInspectionStatusProjection
 {
@@ -67,5 +68,11 @@ public static class LegacyInspectionStatusProjection
     }
 
     private static InspectionOutcome Legacy(ExecutionOutcome execution, DecisionOutcome decision) =>
-        new(execution, decision, "LegacyInspectionStatus", "LegacyInspectionStatusProjection", null);
+        new(
+            execution,
+            decision,
+            "LegacyInspectionStatus",
+            "LegacyInspectionStatusProjection",
+            null,
+            execution == ExecutionOutcome.Succeeded && decision is DecisionOutcome.Ok or DecisionOutcome.Ng);
 }

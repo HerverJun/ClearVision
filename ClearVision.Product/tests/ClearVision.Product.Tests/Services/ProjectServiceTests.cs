@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
@@ -812,6 +813,61 @@ public class ProjectServiceTests
         storage.LastPersistenceRevision.Should().Be(1);
         DeserializeFlow(storage.LastSavedFlowJson!).Name.Should().Be("InspectionFlow");
         await repository.Received(1).UpdateAsync(project);
+    }
+
+    [Fact]
+    public async Task UpdateFlowAsync_ShouldPersistAndReturnFinalDecisionConfiguration()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = new RecordingProjectFlowStorage();
+        var project = new Project("decision-project");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        var operatorId = Guid.NewGuid();
+        var portId = Guid.NewGuid();
+        var configuration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = operatorId,
+                SourceOutputPortId = portId,
+                SourceOutputName = "IsOk",
+                DataType = DecisionValueType.Boolean,
+                Rule = DecisionInterpretationRule.Boolean,
+                TrueMeansOk = true
+            },
+            MissingDecisionPolicy = MissingDecisionPolicy.Invalid
+        };
+        var sut = new ProjectService(repository, storage, new OperatorFactory());
+
+        var saved = await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            DecisionConfiguration = configuration,
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = operatorId,
+                    Name = "FinalJudge",
+                    Type = OperatorType.ResultJudgment,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = portId,
+                            Name = "IsOk",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Boolean
+                        }
+                    ]
+                }
+            ]
+        });
+
+        saved.Flow!.DecisionConfiguration.Should().BeEquivalentTo(configuration);
+        DeserializeFlow(storage.LastSavedFlowJson!).DecisionConfiguration.Should().BeEquivalentTo(configuration);
     }
 
     [Fact]

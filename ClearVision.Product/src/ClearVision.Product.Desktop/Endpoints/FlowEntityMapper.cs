@@ -49,7 +49,7 @@ internal static class FlowEntityMapper
     public static OperatorFlow ToEntity(UpdateFlowRequest flowData, string flowName = "PreviewFlow", Guid? flowId = null)
     {
         ArgumentNullException.ThrowIfNull(flowData);
-        return BuildFlow(
+        var flow = BuildFlow(
             flowId ?? Guid.Empty,
             string.IsNullOrWhiteSpace(flowName) ? "PreviewFlow" : flowName,
             flowData.Operators,
@@ -58,6 +58,8 @@ internal static class FlowEntityMapper
                 connection.SourcePortId,
                 connection.TargetOperatorId,
                 connection.TargetPortId)));
+        flow.DecisionConfiguration = flowData.DecisionConfiguration;
+        return flow;
     }
 
     public static OperatorFlow ToPreviewEntity(UpdateFlowRequest flowData, Guid targetNodeId, string flowName = "PreviewFlow", Guid? flowId = null)
@@ -407,6 +409,7 @@ internal static class FlowEntityMapper
 
         return new UpdateFlowRequest
         {
+            DecisionConfiguration = flowData.DecisionConfiguration,
             Operators = flowData.Operators
                 .Where(@operator => relevantIds.Contains(@operator.Id))
                 .ToList(),

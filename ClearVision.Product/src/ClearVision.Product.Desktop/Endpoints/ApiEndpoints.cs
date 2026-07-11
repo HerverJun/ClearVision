@@ -1172,6 +1172,7 @@ public static class ApiEndpoints
             result.DecisionOutcome,
             result.DecisionSource,
             result.ReasonCode,
+            result.HasJudgmentSignal,
             result.ErrorMessage);
         return new
         {
@@ -1183,6 +1184,7 @@ public static class ApiEndpoints
             decisionOutcome = outcome.Decision.ToString(),
             decisionSource = outcome.DecisionSource,
             reasonCode = outcome.ReasonCode,
+            hasJudgmentSignal = outcome.HasJudgmentSignal,
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
             processingTimeMs = result.ProcessingTimeMs,
@@ -1218,6 +1220,7 @@ public static class ApiEndpoints
             result.DecisionOutcome,
             result.DecisionSource,
             result.ReasonCode,
+            result.HasJudgmentSignal,
             result.ErrorMessage);
         var outputPreview = SafeJsonPreviewBuilder.Build(result.OutputDataJson);
         var analysisPreview = SafeJsonPreviewBuilder.Build(result.AnalysisDataJson);
@@ -1240,6 +1243,7 @@ public static class ApiEndpoints
             decisionOutcome = outcome.Decision.ToString(),
             decisionSource = outcome.DecisionSource,
             reasonCode = outcome.ReasonCode,
+            hasJudgmentSignal = outcome.HasJudgmentSignal,
             defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
@@ -1293,10 +1297,18 @@ public static class ApiEndpoints
         DecisionOutcome? decision,
         string? decisionSource,
         string? reasonCode,
+        bool? hasJudgmentSignal,
         string? message)
     {
         return execution.HasValue && decision.HasValue
-            ? new InspectionOutcome(execution.Value, decision.Value, decisionSource, reasonCode, message)
+            ? new InspectionOutcome(
+                execution.Value,
+                decision.Value,
+                decisionSource,
+                reasonCode,
+                message,
+                hasJudgmentSignal ??
+                (execution.Value == ExecutionOutcome.Succeeded && decision.Value is DecisionOutcome.Ok or DecisionOutcome.Ng))
             : LegacyInspectionStatusProjection.FromLegacy(status) with { Message = message };
     }
 

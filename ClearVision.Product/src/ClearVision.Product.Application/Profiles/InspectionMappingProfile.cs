@@ -22,6 +22,7 @@ public class InspectionMappingProfile : Profile
                 src.OutputImage != null ? Convert.ToBase64String(src.OutputImage) : null))
             .ForMember(dest => dest.ExecutionOutcome, opt => opt.MapFrom(src => src.GetOutcome().Execution))
             .ForMember(dest => dest.DecisionOutcome, opt => opt.MapFrom(src => src.GetOutcome().Decision))
+            .ForMember(dest => dest.HasJudgmentSignal, opt => opt.MapFrom(src => src.GetOutcome().HasJudgmentSignal))
             .ForMember(dest => dest.DecisionSource, opt => opt.MapFrom(src => src.GetOutcome().DecisionSource))
             .ForMember(dest => dest.ReasonCode, opt => opt.MapFrom(src => src.GetOutcome().ReasonCode))
             .ForMember(dest => dest.OutputData, opt => opt.MapFrom(src =>

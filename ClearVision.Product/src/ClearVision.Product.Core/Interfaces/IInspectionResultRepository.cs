@@ -111,6 +111,7 @@ public class InspectionHistoryItem
     public DecisionOutcome? DecisionOutcome { get; set; }
     public string? DecisionSource { get; set; }
     public string? ReasonCode { get; set; }
+    public bool? HasJudgmentSignal { get; set; }
     public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
     public long ProcessingTimeMs { get; set; }
     public Guid? ImageId { get; set; }
@@ -138,6 +139,7 @@ public class InspectionHistoryDetail
     public DecisionOutcome? DecisionOutcome { get; set; }
     public string? DecisionSource { get; set; }
     public string? ReasonCode { get; set; }
+    public bool? HasJudgmentSignal { get; set; }
     public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
     public long ProcessingTimeMs { get; set; }
     public Guid? ImageId { get; set; }

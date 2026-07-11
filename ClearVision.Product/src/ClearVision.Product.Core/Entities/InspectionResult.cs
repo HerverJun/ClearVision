@@ -28,6 +28,8 @@ public class InspectionResult : Entity
 
     public DecisionOutcome? DecisionOutcome { get; private set; }
 
+    public bool? HasJudgmentSignal { get; private set; }
+
     public string? DecisionSource { get; private set; }
 
     public string? ReasonCode { get; private set; }
@@ -129,12 +131,16 @@ public class InspectionResult : Entity
     {
         ExecutionOutcome = outcome.Execution;
         DecisionOutcome = outcome.Decision;
+        HasJudgmentSignal = outcome.HasJudgmentSignal;
         DecisionSource = NormalizeOptional(outcome.DecisionSource);
         ReasonCode = NormalizeOptional(outcome.ReasonCode);
         Status = LegacyInspectionStatusProjection.Project(outcome);
         ProcessingTimeMs = processingTimeMs;
         ConfidenceScore = confidenceScore;
-        ErrorMessage = NormalizeOptional(outcome.Message);
+        ErrorMessage = outcome.Execution is ClearVision.Product.Core.Outcomes.ExecutionOutcome.Failed or ClearVision.Product.Core.Outcomes.ExecutionOutcome.TimedOut ||
+                       outcome.Decision == ClearVision.Product.Core.Outcomes.DecisionOutcome.Invalid
+            ? NormalizeOptional(outcome.Message)
+            : null;
         MarkAsModified();
     }
 
@@ -163,7 +169,10 @@ public class InspectionResult : Entity
                 DecisionOutcome.Value,
                 DecisionSource,
                 ReasonCode,
-                ErrorMessage);
+                ErrorMessage,
+                HasJudgmentSignal ??
+                (ExecutionOutcome.Value == ClearVision.Product.Core.Outcomes.ExecutionOutcome.Succeeded &&
+                 DecisionOutcome.Value is ClearVision.Product.Core.Outcomes.DecisionOutcome.Ok or ClearVision.Product.Core.Outcomes.DecisionOutcome.Ng));
         }
 
         return LegacyInspectionStatusProjection.FromLegacy(Status) with { Message = ErrorMessage };

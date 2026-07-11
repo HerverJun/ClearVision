@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.Streaming;
@@ -13,6 +14,7 @@ using ClearVision.Product.Infrastructure.Continuous;
 using ClearVision.Product.Infrastructure.Diagnostics;
 using ClearVision.Product.Infrastructure.Replay;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -233,7 +235,7 @@ public class ContinuousRuntimeTests
         await worker.RunAsync(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new OperatorFlow("continuous-test"),
+            CreateDecisionFlow("continuous-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -266,6 +268,58 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public async Task ContinuousInspectionWorker_Primary_FlowFailure_ShouldPublishCanonicalFailureWithoutConsensusVote()
+    {
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32),
+            CreateFrame(2, new Scalar(255, 255, 255), 32)
+        };
+        var stream = new FakeStreamCoordinator(frames);
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "inference failed"
+            }));
+        var writer = new CapturingResultWriter();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        writer.Written += () => cts.Cancel();
+
+        await new ContinuousInspectionWorker(NullLogger.Instance).RunAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CreateDecisionFlow("continuous-failure"),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Primary,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 1,
+                ConsensusThreshold = 1,
+                PreEventFrames = 0,
+                PostEventFrames = 0
+            },
+            ContinuousInspectionMode.Primary,
+            stream,
+            flowExecution,
+            writer,
+            NullInspectionImagePersistenceService.Instance,
+            new CapturingEventBus(),
+            cts.Token);
+
+        writer.Results.Should().ContainSingle();
+        writer.Results[0].GetOutcome().Execution.Should().Be(ExecutionOutcome.Failed);
+        writer.Results[0].GetOutcome().Decision.Should().Be(DecisionOutcome.Undetermined);
+        writer.Results[0].GetOutcome().DecisionSource.Should().Be("FlowExecution");
+    }
+
+    [Fact]
     public async Task ContinuousInspectionWorker_Primary_WithNgOutputImage_ShouldPersistResultImage()
     {
         var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 8, 7, 6 };
@@ -292,7 +346,7 @@ public class ContinuousRuntimeTests
         await worker.RunAsync(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new OperatorFlow("continuous-ng-test"),
+            CreateDecisionFlow("continuous-ng-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -348,7 +402,7 @@ public class ContinuousRuntimeTests
         await worker.RunAsync(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new OperatorFlow("continuous-restart-test"),
+            CreateDecisionFlow("continuous-restart-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -403,7 +457,7 @@ public class ContinuousRuntimeTests
         await worker.RunAsync(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new OperatorFlow("continuous-shadow-project-variables"),
+            CreateDecisionFlow("continuous-shadow-project-variables"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -450,6 +504,14 @@ public class ContinuousRuntimeTests
             mat.ToBytes(".png"),
             TimestampSource: FrameTimestampSource.HostFallback,
             CorrelationId: $"corr-{sequence}");
+    }
+
+    private static OperatorFlow CreateDecisionFlow(string name)
+    {
+        var flow = new OperatorFlow(name);
+        var op = new Operator(Guid.NewGuid(), "Decision", OperatorType.ResultOutput, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op);
     }
 
     private static ProjectGlobalVariableSchema CreateProjectVariableSchema(Guid variableId)

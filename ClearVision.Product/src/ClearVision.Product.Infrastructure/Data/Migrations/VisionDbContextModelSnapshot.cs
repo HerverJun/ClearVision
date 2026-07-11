@@ -90,6 +90,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<int?>("ExecutionOutcome")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool?>("HasJudgmentSignal")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FlowVersionHash")
                         .HasColumnType("TEXT");
 
@@ -198,6 +201,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("Flow_CreatedAt");
+
+                    b.Property<string>("DecisionConfiguration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Flow_DecisionConfiguration");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER")

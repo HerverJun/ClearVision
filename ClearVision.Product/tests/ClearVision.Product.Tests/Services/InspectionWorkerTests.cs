@@ -16,6 +16,7 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -624,7 +625,7 @@ public class InspectionWorkerTests
 
         var result = await InvokeExecuteCycleAsync(
             worker,
-            new OperatorFlow("NgOutputImageFlow"),
+            CreateDecisionFlow("NgOutputImageFlow", "JudgmentResult"),
             null,
             flowExecution,
             imageAcquisition,
@@ -704,7 +705,7 @@ public class InspectionWorkerTests
 
         await InvokeRunRealtimeLoopAsync(
             worker,
-            new OperatorFlow("ConsecutiveNg"),
+            CreateDecisionFlow("ConsecutiveNg", "Result"),
             flowExecution,
             imageAcquisition,
             resultChannelWriter,
@@ -779,7 +780,7 @@ public class InspectionWorkerTests
 
         await InvokeRunRealtimeLoopAsync(
             worker,
-            new OperatorFlow("FrameDrivenRelease"),
+            CreateDecisionFlow("FrameDrivenRelease", "JudgmentResult"),
             flowExecution,
             imageAcquisition,
             resultChannelWriter,
@@ -795,6 +796,14 @@ public class InspectionWorkerTests
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
         return new FlowExecutionResult { IsSuccess = true };
+    }
+
+    private static OperatorFlow CreateDecisionFlow(string name, string outputName)
+    {
+        var flow = new OperatorFlow(name);
+        var op = new Operator(Guid.NewGuid(), "Decision", OperatorType.ResultOutput, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op, outputName);
     }
 
     private static ServiceProvider BuildScopedServices(

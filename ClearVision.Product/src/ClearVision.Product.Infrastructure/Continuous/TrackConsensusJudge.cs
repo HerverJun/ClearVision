@@ -8,7 +8,8 @@ public sealed record TrackFrameJudgment(
     string TrackId,
     long Sequence,
     Dictionary<string, object>? OutputData,
-    double Confidence = 1.0);
+    double Confidence = 1.0,
+    InspectionOutcome? Outcome = null);
 
 public sealed record TrackDecision(
     string TrackId,
@@ -18,7 +19,8 @@ public sealed record TrackDecision(
     int NgVotes,
     long BestSequence,
     double ConsensusScore,
-    bool IsFinal);
+    bool IsFinal,
+    InspectionOutcome? Outcome = null);
 
 public sealed record TrackConsensusSnapshot(
     int PendingTrackCount,
@@ -91,14 +93,27 @@ public sealed class TrackConsensusJudge
             }
 
             var evaluated = list
-                .Select(item => (Item: item, Evaluation: InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(item.OutputData)))
+                .Select(item => (Item: item, Outcome: item.Outcome ?? FromLegacyHeuristic(item.OutputData)))
                 .ToList();
-            var okVotes = evaluated.Count(item => item.Evaluation.Decision == DecisionOutcome.Ok);
-            var ngVotes = evaluated.Count(item => item.Evaluation.Decision == DecisionOutcome.Ng);
+            var comparable = evaluated
+                .Where(item => item.Outcome.Execution == ExecutionOutcome.Succeeded &&
+                               item.Outcome.Decision is DecisionOutcome.Ok or DecisionOutcome.Ng)
+                .ToList();
+            var okVotes = comparable.Count(item => item.Outcome.Decision == DecisionOutcome.Ok);
+            var ngVotes = comparable.Count(item => item.Outcome.Decision == DecisionOutcome.Ng);
             var totalVotes = okVotes + ngVotes;
+            if (evaluated.Any(item => item.Outcome.Decision == DecisionOutcome.Invalid))
+            {
+                return FinalizeNonComparable(judgment.TrackId, list, DecisionOutcome.Invalid);
+            }
             if (totalVotes == 0)
             {
-                return null;
+                var terminalDecision = evaluated.Any(item => item.Outcome.Decision == DecisionOutcome.Invalid)
+                    ? DecisionOutcome.Invalid
+                    : evaluated.All(item => item.Outcome.Decision == DecisionOutcome.NotApplicable)
+                        ? DecisionOutcome.NotApplicable
+                        : DecisionOutcome.Undetermined;
+                return FinalizeNonComparable(judgment.TrackId, list, terminalDecision);
             }
             var majorityStatus = ngVotes > okVotes ? InspectionStatus.NG : InspectionStatus.OK;
             var majorityVotes = majorityStatus == InspectionStatus.NG ? ngVotes : okVotes;
@@ -121,13 +136,70 @@ public sealed class TrackConsensusJudge
                 ngVotes,
                 best.Sequence,
                 score,
-                IsFinal: true);
+                IsFinal: true,
+                new InspectionOutcome(
+                    ExecutionOutcome.Succeeded,
+                    majorityStatus == InspectionStatus.OK ? DecisionOutcome.Ok : DecisionOutcome.Ng,
+                    "ContinuousConsensus",
+                    "CONTINUOUS_CONSENSUS_REACHED",
+                    null,
+                    HasJudgmentSignal: true));
 
             AddFinalizedTrack(judgment.TrackId);
             _frames.Remove(judgment.TrackId);
             _pendingTrackTouches.Remove(judgment.TrackId);
             return decision;
         }
+    }
+
+    private TrackDecision FinalizeNonComparable(
+        string trackId,
+        IReadOnlyList<TrackFrameJudgment> frames,
+        DecisionOutcome decisionOutcome)
+    {
+        var best = frames
+            .OrderByDescending(item => item.Confidence)
+            .ThenBy(item => item.Sequence)
+            .First();
+        var outcome = new InspectionOutcome(
+            ExecutionOutcome.Succeeded,
+            decisionOutcome,
+            "ContinuousConsensus",
+            decisionOutcome switch
+            {
+                DecisionOutcome.Invalid => "CONTINUOUS_CONSENSUS_INVALID",
+                DecisionOutcome.NotApplicable => "CONTINUOUS_CONSENSUS_NOT_APPLICABLE",
+                _ => "CONTINUOUS_CONSENSUS_NO_VALID_VOTES"
+            },
+            "Continuous consensus completed without comparable OK/NG votes.",
+            HasJudgmentSignal: decisionOutcome == DecisionOutcome.Invalid &&
+                               frames.Any(frame => frame.Outcome?.HasJudgmentSignal == true));
+        var decision = new TrackDecision(
+            trackId,
+            LegacyInspectionStatusProjection.Project(outcome),
+            frames.Count,
+            0,
+            0,
+            best.Sequence,
+            0,
+            IsFinal: true,
+            outcome);
+        AddFinalizedTrack(trackId);
+        _frames.Remove(trackId);
+        _pendingTrackTouches.Remove(trackId);
+        return decision;
+    }
+
+    private static InspectionOutcome FromLegacyHeuristic(Dictionary<string, object>? outputData)
+    {
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromLegacyHeuristic(outputData);
+        return new InspectionOutcome(
+            ExecutionOutcome.Succeeded,
+            evaluation.Decision,
+            evaluation.DecisionSource,
+            evaluation.ReasonCode,
+            evaluation.Message,
+            evaluation.HasJudgmentSignal);
     }
 
     public TrackConsensusSnapshot Snapshot()

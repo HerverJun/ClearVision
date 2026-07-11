@@ -546,7 +546,8 @@ class ProjectManager {
 function toUpdateFlowRequest(flow, expectedPersistenceRevision = null) {
     const request = {
         operators: Array.isArray(flow?.operators) ? flow.operators : (flow?.Operators || []),
-        connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || [])
+        connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || []),
+        decisionConfiguration: flow?.decisionConfiguration ?? flow?.DecisionConfiguration ?? null
     };
     const name = flow?.name ?? flow?.Name;
     if (typeof name === 'string' && name.trim()) {

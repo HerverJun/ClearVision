@@ -169,6 +169,40 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WithoutDecisionBinding_ShouldRejectBeforeCoordinatorOrHistory()
+    {
+        var projectId = Guid.NewGuid();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var flow = new OperatorFlow("unbound-official-flow");
+        flow.AddOperator(new Operator(Guid.NewGuid(), "Output", OperatorType.ResultOutput, 0, 0));
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            Substitute.For<IFlowExecutionService>(),
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            coordinator,
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1 }, flow);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("ADMISSION_DECISION_BINDING_REQUIRED:*");
+        await coordinator.DidNotReceive().TryStartAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WithInlineFlowAndSoftDeletedProject_ShouldRejectWithoutPersistingResult()
     {
         var projectId = Guid.NewGuid();
@@ -487,7 +521,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenResultOutputMissingJudgmentAndResultJudgmentOk_ShouldUseResultJudgment()
+    public async Task ExecuteSingleAsync_WhenBoundResultOutputIsMissing_ShouldNotFallbackToResultJudgmentOk()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -501,18 +535,18 @@ public class InspectionServiceSingleRunTests
                 ["Payload"] = "business-only"
             });
 
-        result.Status.Should().Be(InspectionStatus.OK);
+        result.Status.Should().Be(InspectionStatus.NotInspected);
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
-        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DerivedFromJudgmentResult");
-        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_SIGNAL_MISSING");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenResultOutputMissingJudgmentAndResultJudgmentNg_ShouldUseResultJudgment()
+    public async Task ExecuteSingleAsync_WhenBoundResultOutputIsMissing_ShouldNotFallbackToResultJudgmentNg()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -526,13 +560,13 @@ public class InspectionServiceSingleRunTests
                 ["Payload"] = "business-only"
             });
 
-        result.Status.Should().Be(InspectionStatus.NG);
+        result.Status.Should().Be(InspectionStatus.NotInspected);
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
-        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -555,8 +589,8 @@ public class InspectionServiceSingleRunTests
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Result");
-        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DerivedFromResult");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_BOUND_VALUE_RESOLVED");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 
@@ -576,11 +610,11 @@ public class InspectionServiceSingleRunTests
             });
 
         result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Contain("Invalid judgment type at IsOk");
+        result.ErrorMessage.Should().Contain("not Boolean");
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("IsOk");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 
@@ -600,7 +634,7 @@ public class InspectionServiceSingleRunTests
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-judgment");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("JudgmentResult");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 
@@ -626,8 +660,8 @@ public class InspectionServiceSingleRunTests
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("None");
-        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("MissingJudgmentSignal");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
+        doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_SIGNAL_MISSING");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
@@ -644,6 +678,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        explicitFlow.BindBooleanDecision(explicitFlow.Operators.Single(), "IsOk");
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
@@ -674,11 +709,11 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 9, 9, 9 }, explicitFlow);
 
         result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Contain("Invalid judgment type at IsOk");
+        result.ErrorMessage.Should().Contain("not Boolean");
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenWrappedResultContainsIsMatch_ShouldTreatAsOk()
+    public async Task ExecuteSingleAsync_WhenOnlyNestedLegacySignalExists_ShouldRemainUndetermined()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -726,12 +761,12 @@ public class InspectionServiceSingleRunTests
 
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 7, 8, 9 }, explicitFlow);
 
-        result.Status.Should().Be(InspectionStatus.OK);
+        result.Status.Should().Be(InspectionStatus.NotInspected);
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Result.IsMatch");
-        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
+        doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -747,6 +782,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
+        explicitFlow.BindStringDecision(explicitFlow.Operators.Single(), "Result");
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
@@ -787,7 +823,7 @@ public class InspectionServiceSingleRunTests
         result.GetOutcome().Decision.Should().Be(DecisionOutcome.Invalid);
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Result");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 
@@ -1584,7 +1620,7 @@ public class InspectionServiceSingleRunTests
             flow.AddOperator(op);
         }
 
-        return flow;
+        return flow.BindStringDecision(flow.Operators.Last());
     }
 
     private static string FindSavedImagePath(string root, InspectionResult result, string extension)
@@ -1645,7 +1681,7 @@ public class InspectionServiceSingleRunTests
         return await service.ExecuteSingleAsync(
             projectId,
             new byte[] { 1, 2, 3 },
-            CreateResultSelectionFlow(includeResultOutput: resultOutputData != null));
+            CreateResultSelectionFlow(resultOutputData));
     }
 
     private static IOperatorExecutor CreateStaticOutputExecutor(
@@ -1667,15 +1703,15 @@ public class InspectionServiceSingleRunTests
         return executor;
     }
 
-    private static OperatorFlow CreateResultSelectionFlow(bool includeResultOutput)
+    private static OperatorFlow CreateResultSelectionFlow(Dictionary<string, object>? resultOutputData)
     {
         var flow = new OperatorFlow("result-selection-flow");
         var judgment = CreateResultSelectionOperator("Judge", OperatorType.ResultJudgment);
         flow.AddOperator(judgment);
 
-        if (!includeResultOutput)
+        if (resultOutputData == null)
         {
-            return flow;
+            return flow.BindStringDecision(judgment, "JudgmentResult");
         }
 
         var output = CreateResultSelectionOperator("Output", OperatorType.ResultOutput);
@@ -1685,7 +1721,15 @@ public class InspectionServiceSingleRunTests
             judgment.OutputPorts.Single().Id,
             output.Id,
             output.InputPorts.Single().Id));
-        return flow;
+        if (resultOutputData?.TryGetValue("Result", out var resultValue) == true && resultValue is bool)
+        {
+            return flow.BindBooleanDecision(output, "Result");
+        }
+        if (resultOutputData?.ContainsKey("IsOk") == true)
+        {
+            return flow.BindBooleanDecision(output, "IsOk");
+        }
+        return flow.BindStringDecision(output, "JudgmentResult");
     }
 
     private static Operator CreateResultSelectionOperator(string name, OperatorType operatorType)
@@ -1699,8 +1743,9 @@ public class InspectionServiceSingleRunTests
     private static OperatorFlow CreateFlow(string operatorName)
     {
         var flow = new OperatorFlow("test-flow");
-        flow.AddOperator(new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultOutput, 0, 0));
-        return flow;
+        var op = new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultOutput, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op);
     }
 
     private static OperatorFlow CreateResultOutputSaveToFileFlow()
@@ -1709,14 +1754,15 @@ public class InspectionServiceSingleRunTests
         var output = new Operator(Guid.NewGuid(), "ResultOutput", OperatorType.ResultOutput, 0, 0);
         output.AddParameter(new Parameter(Guid.NewGuid(), "SaveToFile", "SaveToFile", string.Empty, "bool", true));
         flow.AddOperator(output);
-        return flow;
+        return flow.BindStringDecision(output);
     }
 
     private static OperatorFlow CreateSideEffectFlow(OperatorType operatorType)
     {
         var flow = new OperatorFlow("side-effect-flow");
-        flow.AddOperator(new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0));
-        return flow;
+        var op = new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op);
     }
 
     private static ImageDto CreateCameraImageDto()
@@ -1754,23 +1800,48 @@ public class InspectionServiceSingleRunTests
         acquisition.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
         acquisition.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", cameraId));
         flow.AddOperator(acquisition);
-        return flow;
+        return flow.BindStringDecision(acquisition);
     }
 
     private static string SerializeFlowDto(string operatorName)
     {
+        var operatorId = Guid.NewGuid();
+        var outputPortId = Guid.NewGuid();
         var dto = new OperatorFlowDto
         {
             Name = "stored-flow",
+            DecisionConfiguration = new ClearVision.Product.Core.Decisions.DecisionConfiguration
+            {
+                FinalDecisionBinding = new ClearVision.Product.Core.Decisions.FinalDecisionBinding
+                {
+                    SourceOperatorId = operatorId,
+                    SourceOutputPortId = outputPortId,
+                    SourceOutputName = "JudgmentResult",
+                    DataType = ClearVision.Product.Core.Decisions.DecisionValueType.String,
+                    Rule = ClearVision.Product.Core.Decisions.DecisionInterpretationRule.StringMap,
+                    OkValue = "OK",
+                    NgValue = "NG"
+                }
+            },
             Operators = new List<OperatorDto>
             {
                 new()
                 {
-                    Id = Guid.NewGuid(),
+                    Id = operatorId,
                     Name = operatorName,
                     Type = OperatorType.ResultOutput,
                     X = 0,
-                    Y = 0
+                    Y = 0,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = outputPortId,
+                            Name = "JudgmentResult",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.String
+                        }
+                    ]
                 }
             }
         };

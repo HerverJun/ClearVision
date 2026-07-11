@@ -43,7 +43,7 @@ public class InspectionOutcomeTests
 
         outcome.Execution.Should().Be(ExecutionOutcome.Succeeded);
         outcome.Decision.Should().Be(DecisionOutcome.Undetermined);
-        outcome.ReasonCode.Should().Be("MissingJudgmentSignal");
+        outcome.ReasonCode.Should().Be("MissingDecisionConfiguration");
         outcome.Message.Should().BeNull();
     }
 
@@ -61,6 +61,26 @@ public class InspectionOutcomeTests
         outcome.Execution.Should().Be(ExecutionOutcome.Succeeded);
         outcome.Decision.Should().Be(DecisionOutcome.Undetermined);
         outcome.Message.Should().BeNull();
+    }
+
+    [Fact]
+    public void PreviewResolver_WithoutDecisionBinding_ExecutesSuccessfullyAsUndetermined()
+    {
+        var flow = new OperatorFlow("preview");
+        flow.AddOperator(new Operator(Guid.NewGuid(), "Preview", OperatorType.Thresholding, 0, 0));
+
+        var outcome = InspectionOutcomeResolver.ResolvePreview(
+            new FlowExecutionResult
+            {
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object> { ["Measurement"] = 12.5 }
+            },
+            flow);
+
+        outcome.Execution.Should().Be(ExecutionOutcome.Succeeded);
+        outcome.Decision.Should().Be(DecisionOutcome.Undetermined);
+        outcome.DecisionSource.Should().Be("LegacyHeuristic:None");
+        outcome.HasJudgmentSignal.Should().BeFalse();
     }
 
     [Fact]
@@ -101,7 +121,8 @@ public class InspectionOutcomeTests
             DecisionOutcome.Ng,
             "LegacyInspectionStatus",
             "LegacyInspectionStatusProjection",
-            null));
+            null,
+            true));
     }
 
     [Fact]

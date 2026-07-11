@@ -41,7 +41,10 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
                 item.DecisionOutcome.Value,
                 item.DecisionSource,
                 item.ReasonCode,
-                item.ErrorMessage)
+                item.ErrorMessage,
+                item.HasJudgmentSignal ??
+                (item.ExecutionOutcome.Value == ExecutionOutcome.Succeeded &&
+                 item.DecisionOutcome.Value is DecisionOutcome.Ok or DecisionOutcome.Ng))
             : LegacyInspectionStatusProjection.FromLegacy(item.Status) with { Message = item.ErrorMessage };
 
         return new InspectionResultDto
@@ -53,6 +56,7 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
             DecisionOutcome = outcome.Decision,
             DecisionSource = outcome.DecisionSource,
             ReasonCode = outcome.ReasonCode,
+            HasJudgmentSignal = outcome.HasJudgmentSignal,
             Defects = item.Defects.Select(ToDto).ToList(),
             ProcessingTimeMs = item.ProcessingTimeMs,
             ImageId = item.ImageId,

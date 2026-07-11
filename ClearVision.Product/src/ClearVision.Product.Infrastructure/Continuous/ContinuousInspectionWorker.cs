@@ -82,21 +82,96 @@ public sealed class ContinuousInspectionWorker
                     cameraId,
                     scheduled.Frame.Sequence,
                     scheduled.TrackId);
+                var failure = BuildExecutionFailureResult(
+                    projectId,
+                    sessionId,
+                    scheduled,
+                    "CONTINUOUS_INFERENCE_EXCEPTION",
+                    scheduled.Error.Message,
+                    mode);
+                await PublishOrSuppressAsync(
+                    failure,
+                    mode,
+                    imagePersistenceService,
+                    imageCacheRepository,
+                    resultChannelWriter,
+                    eventBus,
+                    projectId,
+                    sessionId,
+                    cancellationToken);
                 return;
             }
 
-            if (scheduled.Result == null || string.IsNullOrWhiteSpace(scheduled.TrackId))
+            if (scheduled.Result == null)
             {
+                var failure = BuildExecutionFailureResult(
+                    projectId,
+                    sessionId,
+                    scheduled,
+                    "CONTINUOUS_EMPTY_INFERENCE_RESULT",
+                    "Continuous inference returned no flow result.",
+                    mode);
+                await PublishOrSuppressAsync(
+                    failure,
+                    mode,
+                    imagePersistenceService,
+                    imageCacheRepository,
+                    resultChannelWriter,
+                    eventBus,
+                    projectId,
+                    sessionId,
+                    cancellationToken);
                 return;
             }
 
             var outputData = scheduled.Result.OutputData ?? new Dictionary<string, object>();
-            var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(outputData);
+            scheduled.Result.OutputData = outputData;
+            var frameOutcome = InspectionOutcomeResolver.Resolve(scheduled.Result, flow);
+            InspectionOutcomeResolver.SetDiagnostics(outputData, frameOutcome);
+            if (frameOutcome.Execution != ExecutionOutcome.Succeeded)
+            {
+                var failure = BuildFrameResult(projectId, sessionId, scheduled, frameOutcome, mode);
+                await PublishOrSuppressAsync(
+                    failure,
+                    mode,
+                    imagePersistenceService,
+                    imageCacheRepository,
+                    resultChannelWriter,
+                    eventBus,
+                    projectId,
+                    sessionId,
+                    cancellationToken);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(scheduled.TrackId))
+            {
+                var failure = BuildExecutionFailureResult(
+                    projectId,
+                    sessionId,
+                    scheduled,
+                    "CONTINUOUS_TRACK_ID_MISSING",
+                    "Continuous inference completed without a track id.",
+                    mode);
+                await PublishOrSuppressAsync(
+                    failure,
+                    mode,
+                    imagePersistenceService,
+                    imageCacheRepository,
+                    resultChannelWriter,
+                    eventBus,
+                    projectId,
+                    sessionId,
+                    cancellationToken);
+                return;
+            }
+
             var decision = consensus.AddFrame(new TrackFrameJudgment(
                 scheduled.TrackId,
                 scheduled.Frame.Sequence,
                 outputData,
-                ResolveConfidence(outputData)));
+                ResolveConfidence(outputData),
+                frameOutcome));
             if (decision == null)
             {
                 return;
@@ -105,29 +180,23 @@ public sealed class ContinuousInspectionWorker
             metrics.RecordDecisionFinalized();
             await PersistReplayIfNeededAsync(streamCoordinator, cameraId, config, replay, decision, cancellationToken);
 
-            var result = BuildInspectionResult(projectId, sessionId, scheduled, decision, evaluation, mode);
+            var result = BuildInspectionResult(projectId, sessionId, scheduled, decision, mode);
             AppendRuntimeMetrics(
                 result,
                 outputData,
                 metrics.Snapshot(),
                 scheduler.Snapshot(),
                 streamCoordinator.SnapshotFrameBufferStats(cameraId));
-            if (mode == ContinuousInspectionMode.Primary)
-            {
-                await imagePersistenceService.PersistAsync(result, cancellationToken);
-                await CacheResultImageAsync(imageCacheRepository, result);
-                await resultChannelWriter.WriteAsync(result, cancellationToken);
-                await PublishResultEventAsync(eventBus, projectId, sessionId, result, cancellationToken);
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "[ContinuousInspection] Shadow decision suppressed. CameraId={CameraId}, TrackId={TrackId}, Status={Status}, BestSequence={BestSequence}",
-                    cameraId,
-                    decision.TrackId,
-                    decision.Status,
-                    decision.BestSequence);
-            }
+            await PublishOrSuppressAsync(
+                result,
+                mode,
+                imagePersistenceService,
+                imageCacheRepository,
+                resultChannelWriter,
+                eventBus,
+                projectId,
+                sessionId,
+                cancellationToken);
         };
 
         while (!cancellationToken.IsCancellationRequested)
@@ -371,7 +440,6 @@ public sealed class ContinuousInspectionWorker
         Guid sessionId,
         ScheduledInferenceResult scheduled,
         TrackDecision decision,
-        InspectionDecisionEvaluation evaluation,
         ContinuousInspectionMode mode)
     {
         var outputData = scheduled.Result?.OutputData ?? new Dictionary<string, object>();
@@ -390,13 +458,16 @@ public sealed class ContinuousInspectionWorker
         };
 
         var result = new InspectionResult(projectId);
+        var consensusOutcome = decision.Outcome ?? new InspectionOutcome(
+            ExecutionOutcome.Succeeded,
+            decision.Status == InspectionStatus.OK ? DecisionOutcome.Ok : DecisionOutcome.Ng,
+            "ContinuousConsensus",
+            "CONTINUOUS_CONSENSUS_REACHED",
+            null,
+            HasJudgmentSignal: true);
+        InspectionOutcomeResolver.SetDiagnostics(outputData, consensusOutcome);
         result.SetOutcome(
-            new InspectionOutcome(
-                ExecutionOutcome.Succeeded,
-                decision.Status == InspectionStatus.OK ? DecisionOutcome.Ok : DecisionOutcome.Ng,
-                evaluation.DecisionSource,
-                evaluation.ReasonCode,
-                evaluation.Decision == DecisionOutcome.Invalid ? evaluation.Message : null),
+            consensusOutcome,
             Math.Max(0, (long)scheduled.Latency.TotalMilliseconds),
             decision.ConsensusScore);
         result.SetTraceability(null, null, sessionId);
@@ -405,6 +476,82 @@ public sealed class ContinuousInspectionWorker
             result.SetOutputImage(imageBytes);
         }
         return result;
+    }
+
+    private static InspectionResult BuildFrameResult(
+        Guid projectId,
+        Guid sessionId,
+        ScheduledInferenceResult scheduled,
+        InspectionOutcome outcome,
+        ContinuousInspectionMode mode)
+    {
+        var outputData = scheduled.Result?.OutputData ?? new Dictionary<string, object>();
+        outputData["ContinuousInspection"] = new Dictionary<string, object?>
+        {
+            ["Mode"] = mode.ToString(),
+            ["TrackId"] = scheduled.TrackId,
+            ["BestSequence"] = scheduled.Frame.Sequence,
+            ["CorrelationId"] = scheduled.Frame.EffectiveCorrelationId,
+            ["LatencyMs"] = scheduled.Latency.TotalMilliseconds
+        };
+        InspectionOutcomeResolver.SetDiagnostics(outputData, outcome);
+        var result = new InspectionResult(projectId);
+        result.SetOutcome(outcome, Math.Max(0, (long)scheduled.Latency.TotalMilliseconds));
+        result.SetTraceability(null, null, sessionId);
+        if (outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes)
+        {
+            result.SetOutputImage(imageBytes);
+        }
+        AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputData, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        return result;
+    }
+
+    private static InspectionResult BuildExecutionFailureResult(
+        Guid projectId,
+        Guid sessionId,
+        ScheduledInferenceResult scheduled,
+        string reasonCode,
+        string message,
+        ContinuousInspectionMode mode) =>
+        BuildFrameResult(
+            projectId,
+            sessionId,
+            scheduled,
+            new InspectionOutcome(
+                ExecutionOutcome.Failed,
+                DecisionOutcome.Undetermined,
+                "ContinuousPrimary",
+                reasonCode,
+                message,
+                HasJudgmentSignal: false),
+            mode);
+
+    private async Task PublishOrSuppressAsync(
+        InspectionResult result,
+        ContinuousInspectionMode mode,
+        IInspectionImagePersistenceService imagePersistenceService,
+        IImageCacheRepository? imageCacheRepository,
+        IInspectionResultChannelWriter resultChannelWriter,
+        IInspectionEventBus eventBus,
+        Guid projectId,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (mode == ContinuousInspectionMode.Primary)
+        {
+            await imagePersistenceService.PersistAsync(result, cancellationToken);
+            await CacheResultImageAsync(imageCacheRepository, result);
+            await resultChannelWriter.WriteAsync(result, cancellationToken);
+            await PublishResultEventAsync(eventBus, projectId, sessionId, result, cancellationToken);
+            return;
+        }
+
+        var outcome = result.GetOutcome();
+        _logger.LogInformation(
+            "[ContinuousInspection] Shadow outcome suppressed. Execution={Execution}, Decision={Decision}, Reason={ReasonCode}",
+            outcome.Execution,
+            outcome.Decision,
+            outcome.ReasonCode);
     }
 
     private static void AppendRuntimeMetrics(
@@ -453,6 +600,7 @@ public sealed class ContinuousInspectionWorker
             DecisionOutcome = result.GetOutcome().Decision.ToString(),
             DecisionSource = result.GetOutcome().DecisionSource,
             ReasonCode = result.GetOutcome().ReasonCode,
+            HasJudgmentSignal = result.GetOutcome().HasJudgmentSignal,
             DefectCount = result.Defects.Count,
             ProcessingTimeMs = result.ProcessingTimeMs,
             ErrorMessage = result.ErrorMessage,

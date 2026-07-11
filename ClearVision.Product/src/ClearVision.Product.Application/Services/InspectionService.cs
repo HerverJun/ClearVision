@@ -90,7 +90,10 @@ public class InspectionService : IInspectionService
         _evidenceManifestService = evidenceManifestService;
         _projectVariableSessions = projectVariableSessions;
         _projectSaveCoordinator = projectSaveCoordinator;
-        _executionAdmissionService = executionAdmissionService ?? new ExecutionAdmissionService(projectRepository);
+        _executionAdmissionService = executionAdmissionService ?? new ExecutionAdmissionService(
+            projectRepository,
+            coordinator,
+            flowExecutionService);
         _logger = logger;
     }
 
@@ -184,9 +187,22 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
+        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow,
+            HasExecutableFlow(flow)
+                ? ExecutionAdmissionSurface.StudioInspectionRun
+                : ExecutionAdmissionSurface.StoredProjectExecution,
+            cancellationToken);
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            sessionId => ExecuteSingleCoreAsync(projectId, imageData, flow, sessionId, cancellationToken),
+            sessionId => ExecuteSingleResolvedCoreAsync(
+                projectId,
+                imageData,
+                actualFlow,
+                globalVariables,
+                sessionId,
+                cancellationToken),
             cancellationToken);
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
@@ -309,9 +325,22 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
+        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow,
+            HasExecutableFlow(flow)
+                ? ExecutionAdmissionSurface.StudioInspectionRun
+                : ExecutionAdmissionSurface.StoredProjectExecution,
+            cancellationToken);
         return await ExecuteSingleWithCoordinatorAsync(
             projectId,
-            sessionId => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow, sessionId, cancellationToken),
+            sessionId => ExecuteSingleFromCameraCoreAsync(
+                projectId,
+                cameraId,
+                actualFlow,
+                globalVariables,
+                sessionId,
+                cancellationToken),
             cancellationToken);
     }
 
@@ -761,7 +790,7 @@ public class InspectionService : IInspectionService
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 
-            var outcome = InspectionOutcomeResolver.Resolve(flowResult);
+            var outcome = InspectionOutcomeResolver.Resolve(flowResult, actualFlow);
             if (outcome.Execution == ExecutionOutcome.Skipped)
             {
                 outputData["NoMaterialFrame"] = true;
@@ -841,20 +870,14 @@ public class InspectionService : IInspectionService
     private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(
         Guid projectId,
         string cameraId,
-        OperatorFlow? flow,
+        OperatorFlow actualFlow,
+        ProjectGlobalVariableSchema? globalVariables,
         Guid sessionId,
         CancellationToken cancellationToken)
     {
         ImageDto? imageDto = null;
         try
         {
-            var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
-                projectId,
-                flow,
-                HasExecutableFlow(flow)
-                    ? ExecutionAdmissionSurface.StudioInspectionRun
-                    : ExecutionAdmissionSurface.StoredProjectExecution,
-                cancellationToken);
             if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))
             {
                 _logger.LogInformation(
@@ -961,11 +984,21 @@ public class InspectionService : IInspectionService
             var fileFlow = await LoadFlowFromStorageAsync(projectId);
             if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
             {
+                ThrowIfAdmissionRejected(await _executionAdmissionService.ValidateFlowAsync(
+                    projectId,
+                    project.Flow,
+                    surface,
+                    cancellationToken));
                 return (project.Flow, project.GlobalVariables);
             }
 
             if (HasExecutableFlow(fileFlow))
             {
+                ThrowIfAdmissionRejected(await _executionAdmissionService.ValidateFlowAsync(
+                    projectId,
+                    fileFlow,
+                    surface,
+                    cancellationToken));
                 _logger.LogWarning(
                     "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
                     projectId,

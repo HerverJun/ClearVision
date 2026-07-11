@@ -611,6 +611,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         DecisionOutcome = canonicalOutcome.Decision.ToString(),
                         DecisionSource = canonicalOutcome.DecisionSource,
                         ReasonCode = canonicalOutcome.ReasonCode,
+                        HasJudgmentSignal = canonicalOutcome.HasJudgmentSignal,
                         DefectCount = result.Defects.Count,
                         ProcessingTimeMs = result.ProcessingTimeMs,
                         ErrorMessage = result.ErrorMessage,
@@ -1053,7 +1054,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 outputData["StatusReason"] = "NoMaterialFrame";
                 outputData["MissingJudgmentSignal"] = false;
 
-                var skippedOutcome = InspectionOutcomeResolver.Resolve(flowResult);
+                var skippedOutcome = InspectionOutcomeResolver.Resolve(flowResult, flow);
                 InspectionOutcomeResolver.SetDiagnostics(outputData, skippedOutcome);
                 result.SetOutcome(skippedOutcome, flowResult.ExecutionTimeMs);
                 result.SetTraceability(
@@ -1067,7 +1068,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             // 判定状态
-            var outcome = InspectionOutcomeResolver.Resolve(flowResult);
+            var outcome = InspectionOutcomeResolver.Resolve(flowResult, flow);
             InspectionOutcomeResolver.SetDiagnostics(outputData, outcome);
             var status = LegacyInspectionStatusProjection.Project(outcome);
 
@@ -1191,7 +1192,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         isPreview: true),
                     cancellationToken: ct);
             var shadowOutput = shadowResult.OutputData ?? new Dictionary<string, object>();
-            var candidateOutcome = InspectionOutcomeResolver.Resolve(shadowResult);
+            var candidateOutcome = InspectionOutcomeResolver.Resolve(shadowResult, flow);
             var outcomeComparison = ShadowOutcomeComparison.Evaluate(baselineOutcome, candidateOutcome);
             var latencyMs = Math.Max(0, (DateTime.UtcNow - started).TotalMilliseconds);
             var buffer = streamCoordinator.SnapshotFrameBufferStats(resolvedCameraId);

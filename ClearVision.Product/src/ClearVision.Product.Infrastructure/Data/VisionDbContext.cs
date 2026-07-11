@@ -2,6 +2,7 @@
 // VisionDbContext实现
 // 作者：蘅芜君
 
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
@@ -104,6 +105,11 @@ public class VisionDbContext : DbContext
 
             // 映射属性到指定列名 (保持与原来 OwnsOne 的命名习惯兼容)
             entity.Property(e => e.Name).HasColumnName("Flow_Name").IsRequired().HasMaxLength(200);
+            entity.Property(e => e.DecisionConfiguration)
+                .HasColumnName("Flow_DecisionConfiguration")
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<DecisionConfiguration>(v, (System.Text.Json.JsonSerializerOptions?)null));
 
             // 解决共享列冲突：映射到不同列
             entity.Property(e => e.CreatedAt).HasColumnName("Flow_CreatedAt");
@@ -185,6 +191,7 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.ExecutionOutcome);
             entity.Property(e => e.DecisionOutcome);
+            entity.Property(e => e.HasJudgmentSignal);
             entity.Property(e => e.DecisionSource).HasMaxLength(500);
             entity.Property(e => e.ReasonCode).HasMaxLength(200);
             entity.Property(e => e.ProcessingTimeMs).IsRequired();

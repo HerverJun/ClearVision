@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using System.Text.Json.Serialization;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -28,6 +29,9 @@ public class OperatorFlow : Entity
     /// </summary>
     [JsonInclude]
     public List<OperatorConnection> Connections { get; set; } = [];
+
+    [JsonInclude]
+    public DecisionConfiguration? DecisionConfiguration { get; set; }
 
     [JsonConstructor]
     public OperatorFlow()

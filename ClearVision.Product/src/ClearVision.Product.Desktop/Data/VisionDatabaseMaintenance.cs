@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 3;
+    public const int CurrentSqliteSchemaVersion = 4;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -728,7 +728,8 @@ internal static class VisionDatabaseMaintenance
                      (Name: "ExecutionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionOutcome\" INTEGER NULL;"),
                      (Name: "DecisionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionOutcome\" INTEGER NULL;"),
                      (Name: "DecisionSource", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionSource\" TEXT NULL;"),
-                     (Name: "ReasonCode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ReasonCode\" TEXT NULL;")
+                     (Name: "ReasonCode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ReasonCode\" TEXT NULL;"),
+                     (Name: "HasJudgmentSignal", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"HasJudgmentSignal\" INTEGER NULL;")
                  })
         {
             if (!await ColumnExistsAsync(
@@ -739,6 +740,17 @@ internal static class VisionDatabaseMaintenance
             {
                 await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
             }
+        }
+
+        if (!await ColumnExistsAsync(
+                dbContext.Database.GetDbConnection(),
+                "Projects",
+                "Flow_DecisionConfiguration",
+                cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Projects" ADD COLUMN "Flow_DecisionConfiguration" TEXT NULL;""",
+                cancellationToken);
         }
 
         foreach (var statement in LegacyStationSyncSchemaStatements)
@@ -1131,6 +1143,8 @@ internal static class VisionDatabaseMaintenance
         "column:InspectionResults.DecisionOutcome",
         "column:InspectionResults.DecisionSource",
         "column:InspectionResults.ReasonCode",
+        "column:InspectionResults.HasJudgmentSignal",
+        "column:Projects.Flow_DecisionConfiguration",
         "table:StationAlarmEvents",
         "table:StationAuditRecords",
         "table:StationCommandRecords",

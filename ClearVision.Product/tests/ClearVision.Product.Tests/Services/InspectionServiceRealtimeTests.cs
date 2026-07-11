@@ -9,6 +9,7 @@ using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.Runtime;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,7 +30,7 @@ public class InspectionServiceRealtimeTests
 
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            new OperatorFlow("Realtime"),
+            CreateDecisionFlow("Realtime"),
             cameraId: null,
             CancellationToken.None);
 
@@ -51,7 +52,7 @@ public class InspectionServiceRealtimeTests
 
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            new OperatorFlow("Realtime"),
+            CreateDecisionFlow("Realtime"),
             cameraId: null,
             CancellationToken.None);
 
@@ -63,7 +64,7 @@ public class InspectionServiceRealtimeTests
 
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            new OperatorFlow("Realtime-Restart"),
+            CreateDecisionFlow("Realtime-Restart"),
             cameraId: null,
             CancellationToken.None);
 
@@ -96,7 +97,7 @@ public class InspectionServiceRealtimeTests
 
         var act = async () => await service.StartRealtimeInspectionFlowAsync(
             projectId,
-            new OperatorFlow("Realtime-Start-Failure"),
+            CreateDecisionFlow("Realtime-Start-Failure"),
             cameraId: null,
             cancellation.Token);
 
@@ -238,8 +239,17 @@ public class InspectionServiceRealtimeTests
     private static OperatorFlow CreateSideEffectFlow(OperatorType operatorType)
     {
         var flow = new OperatorFlow("side-effect-realtime-flow");
-        flow.AddOperator(new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0));
-        return flow;
+        var op = new Operator(Guid.NewGuid(), operatorType.ToString(), operatorType, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op);
+    }
+
+    private static OperatorFlow CreateDecisionFlow(string name)
+    {
+        var flow = new OperatorFlow(name);
+        var op = new Operator(Guid.NewGuid(), "ResultOutput", OperatorType.ResultOutput, 0, 0);
+        flow.AddOperator(op);
+        return flow.BindStringDecision(op);
     }
 
     private sealed record TestContext(
