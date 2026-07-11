@@ -336,8 +336,9 @@ public sealed class StationCentralStore
             .AsEnumerable()
             .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
             .Where(item => !toUtc.HasValue || item.CompletedAtUtc <= toUtc.Value)
-            .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
             .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
+            .Select(ToDto)
+            .Where(item => StationOutcomeStatisticsBuilder.MatchesStatus(item, status))
             .OrderByDescending(item => item.CompletedAtUtc)
             .ThenByDescending(item => item.SequenceId)
             .ToList();
@@ -347,7 +348,6 @@ public sealed class StationCentralStore
             Items = filtered
                 .Skip(normalizedPageIndex * normalizedPageSize)
                 .Take(normalizedPageSize)
-                .Select(ToDto)
                 .ToList(),
             TotalCount = filtered.Count,
             PageIndex = normalizedPageIndex,
@@ -602,12 +602,12 @@ public sealed class StationCentralStore
             .ToList();
     }
 
-    public object GetStatistics(DateTimeOffset? fromUtc, DateTimeOffset? toUtc)
+    public StationResultStatisticsViewModel GetStatistics(DateTimeOffset? fromUtc, DateTimeOffset? toUtc)
     {
         return GetStatistics(fromUtc, toUtc, null, null, null);
     }
 
-    public object GetStatistics(
+    public StationResultStatisticsViewModel GetStatistics(
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
         string? stationId,
@@ -626,83 +626,13 @@ public sealed class StationCentralStore
         var results = query
             .AsEnumerable()
             .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
-            .Where(item => !toUtc.HasValue || item.CompletedAtUtc < toUtc.Value)
-            .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
+            .Where(item => !toUtc.HasValue || item.CompletedAtUtc <= toUtc.Value)
             .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
+            .Select(ToDto)
+            .Where(item => StationOutcomeStatisticsBuilder.MatchesStatus(item, status))
             .ToList();
 
-        static bool IsOutcome(StationResultSummaryEntity item, string value)
-        {
-            return string.Equals(item.Outcome, value, StringComparison.OrdinalIgnoreCase);
-        }
-
-        var total = results.Count;
-        var ok = results.Count(item => IsOutcome(item, "Ok"));
-        var ng = results.Count(item => IsOutcome(item, "Ng"));
-        var error = results.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled"));
-        var byDiagnosticCode = results
-            .GroupBy(item => string.IsNullOrWhiteSpace(item.DiagnosticCode) ? "Unknown" : item.DiagnosticCode, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new { diagnosticCode = group.Key, defectType = group.Key, count = group.Count() })
-            .OrderByDescending(item => item.count)
-            .Take(20)
-            .ToList();
-        var hourlyTrend = results
-            .GroupBy(item => new DateTimeOffset(item.CompletedAtUtc.Year, item.CompletedAtUtc.Month, item.CompletedAtUtc.Day, item.CompletedAtUtc.Hour, 0, 0, TimeSpan.Zero))
-            .Select(group => new
-            {
-                hourUtc = group.Key,
-                timestamp = group.Key,
-                total = group.Count(),
-                totalCount = group.Count(),
-                ok = group.Count(item => IsOutcome(item, "Ok")),
-                okCount = group.Count(item => IsOutcome(item, "Ok")),
-                ng = group.Count(item => IsOutcome(item, "Ng")),
-                ngCount = group.Count(item => IsOutcome(item, "Ng")),
-                error = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
-                errorCount = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
-                defectCount = group.Count(item => IsOutcome(item, "Ng"))
-            })
-            .OrderBy(item => item.hourUtc)
-            .ToList();
-
-        return new
-        {
-            fromUtc,
-            toUtc,
-            total,
-            totalCount = total,
-            ok,
-            okCount = ok,
-            ng,
-            ngCount = ng,
-            error,
-            errorCount = error,
-            yieldRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
-            okRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
-            averageExecutionTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs),
-            averageProcessingTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs),
-            byStation = results
-                .GroupBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new
-                {
-                    stationId = group.Key,
-                    total = group.Count(),
-                    totalCount = group.Count(),
-                    ok = group.Count(item => IsOutcome(item, "Ok")),
-                    okCount = group.Count(item => IsOutcome(item, "Ok")),
-                    ng = group.Count(item => IsOutcome(item, "Ng")),
-                    ngCount = group.Count(item => IsOutcome(item, "Ng")),
-                    error = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
-                    errorCount = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
-                    averageExecutionTimeMs = group.Average(item => item.ExecutionTimeMs)
-                })
-                .OrderByDescending(item => item.total)
-                .ToList(),
-            byDiagnosticCode,
-            defectDistribution = new { items = byDiagnosticCode },
-            hourlyTrend,
-            trend = new { dataPoints = hourlyTrend }
-        };
+        return StationOutcomeStatisticsBuilder.Build(results, fromUtc, toUtc);
     }
 
     private static StationNodeEntity GetOrCreateNode(VisionDbContext db, string stationId, DateTimeOffset now)
@@ -793,6 +723,11 @@ public sealed class StationCentralStore
             ImageId = dto.ImageId,
             Outcome = dto.Outcome.ToString(),
             InspectionStatus = dto.InspectionStatus?.ToString(),
+            ExecutionOutcome = dto.ExecutionOutcome?.ToString(),
+            DecisionOutcome = dto.DecisionOutcome?.ToString(),
+            HasJudgmentSignal = dto.HasJudgmentSignal,
+            DecisionSource = dto.DecisionSource,
+            ReasonCode = dto.ReasonCode,
             ExecutionTimeMs = dto.ExecutionTimeMs,
             DiagnosticCode = dto.DiagnosticCode,
             DiagnosticMessage = dto.DiagnosticMessage,
@@ -869,6 +804,11 @@ public sealed class StationCentralStore
             ImageId = entity.ImageId,
             Outcome = Enum.TryParse<RuntimeRunOutcome>(entity.Outcome, true, out var outcome) ? outcome : RuntimeRunOutcome.Error,
             InspectionStatus = Enum.TryParse<ClearVision.Product.Core.Enums.InspectionStatus>(entity.InspectionStatus, true, out var status) ? status : null,
+            ExecutionOutcome = Enum.TryParse<ClearVision.Product.Core.Outcomes.ExecutionOutcome>(entity.ExecutionOutcome, true, out var executionOutcome) ? executionOutcome : null,
+            DecisionOutcome = Enum.TryParse<ClearVision.Product.Core.Outcomes.DecisionOutcome>(entity.DecisionOutcome, true, out var decisionOutcome) ? decisionOutcome : null,
+            HasJudgmentSignal = entity.HasJudgmentSignal,
+            DecisionSource = entity.DecisionSource,
+            ReasonCode = entity.ReasonCode,
             ExecutionTimeMs = entity.ExecutionTimeMs,
             DiagnosticCode = entity.DiagnosticCode,
             DiagnosticMessage = entity.DiagnosticMessage,
@@ -1173,18 +1113,6 @@ public sealed class StationCentralStore
                value.Contains("apikey", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("apiKey", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("authorization", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool MatchesStatus(string? outcome, string? inspectionStatus, string? requestedStatus)
-    {
-        if (string.IsNullOrWhiteSpace(requestedStatus) ||
-            string.Equals(requestedStatus, "all", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return string.Equals(outcome, requestedStatus, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(inspectionStatus, requestedStatus, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool MatchesText(string? value, string? requestedValue)

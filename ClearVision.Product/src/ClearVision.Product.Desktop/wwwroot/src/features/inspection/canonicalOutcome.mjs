@@ -131,43 +131,55 @@ export function calculateCanonicalStatistics(records = []) {
 }
 
 export function normalizeCanonicalStatistics(source = {}) {
-    const readNumber = (...keys) => Number(readFirst(source, ...keys) ?? 0);
-    const ok = readNumber('okCount', 'OKCount', 'ok', 'Ok');
-    const ng = readNumber('ngCount', 'NGCount', 'ng', 'Ng');
-    const validDecisions = readNumber('validDecisionCount', 'ValidDecisionCount') || ok + ng;
-    const executionSucceeded = readNumber('executionSucceededCount', 'ExecutionSucceededCount');
-    const failed = readNumber('failedCount', 'FailedCount');
-    const timedOut = readNumber('timedOutCount', 'TimedOutCount');
-    const executionFailures = readNumber('executionFailureCount', 'ExecutionFailureCount')
-        || failed + timedOut
-        || readNumber('errorCount', 'ErrorCount', 'error', 'Error');
+    const readNumber = (...keys) => {
+        const value = readFirst(source, ...keys);
+        if (value === null) return null;
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : 0;
+    };
+    const valueOrZero = (value) => value === null ? 0 : value;
+    const ok = valueOrZero(readNumber('okCount', 'OKCount', 'ok', 'Ok'));
+    const ng = valueOrZero(readNumber('ngCount', 'NGCount', 'ng', 'Ng'));
+    const canonicalValidDecisions = readNumber('validDecisionCount', 'ValidDecisionCount');
+    const validDecisions = canonicalValidDecisions === null ? ok + ng : canonicalValidDecisions;
+    const executionSucceeded = valueOrZero(readNumber('executionSucceededCount', 'ExecutionSucceededCount'));
+    const failed = valueOrZero(readNumber('failedCount', 'FailedCount'));
+    const timedOut = valueOrZero(readNumber('timedOutCount', 'TimedOutCount'));
+    const canonicalExecutionFailures = readNumber('executionFailureCount', 'ExecutionFailureCount');
+    const hasCanonicalFailureBreakdown = readNumber('failedCount', 'FailedCount') !== null ||
+        readNumber('timedOutCount', 'TimedOutCount') !== null;
+    const executionFailures = canonicalExecutionFailures !== null
+        ? canonicalExecutionFailures
+        : hasCanonicalFailureBreakdown
+            ? failed + timedOut
+            : valueOrZero(readNumber('errorCount', 'ErrorCount', 'error', 'Error'));
     const yieldRateValue = readFirst(source, 'yieldRate', 'YieldRate');
     const coverageValue = readFirst(source, 'decisionCoverageRate', 'DecisionCoverageRate');
 
     return {
-        total: readNumber('totalCount', 'TotalCount', 'totalAttemptCount', 'TotalAttemptCount', 'total', 'Total'),
+        total: valueOrZero(readNumber('totalAttemptCount', 'TotalAttemptCount', 'totalCount', 'TotalCount', 'total', 'Total')),
         executionSucceeded,
         validDecisions,
         ok,
         ng,
-        undetermined: readNumber('undeterminedCount', 'UndeterminedCount'),
-        notApplicable: readNumber('notApplicableCount', 'NotApplicableCount'),
-        invalid: readNumber('invalidCount', 'InvalidCount'),
+        undetermined: valueOrZero(readNumber('undeterminedCount', 'UndeterminedCount')),
+        notApplicable: valueOrZero(readNumber('notApplicableCount', 'NotApplicableCount')),
+        invalid: valueOrZero(readNumber('invalidCount', 'InvalidCount')),
         failed,
-        cancelled: readNumber('cancelledCount', 'CancelledCount', 'canceledCount', 'CanceledCount'),
+        cancelled: valueOrZero(readNumber('cancelledCount', 'CancelledCount', 'canceledCount', 'CanceledCount')),
         timedOut,
-        skipped: readNumber('skippedCount', 'SkippedCount'),
+        skipped: valueOrZero(readNumber('skippedCount', 'SkippedCount')),
         executionFailures,
         yieldRate: yieldRateValue === null ? (validDecisions > 0 ? ok / validDecisions : 0) : Number(yieldRateValue),
         decisionCoverageRate: coverageValue === null
             ? (executionSucceeded > 0 ? validDecisions / executionSucceeded : 0)
             : Number(coverageValue),
-        avgTime: Math.round(readNumber(
+        avgTime: Math.round(valueOrZero(readNumber(
             'averageProcessingTimeMs',
             'AverageProcessingTimeMs',
             'averageExecutionTimeMs',
             'AverageExecutionTimeMs',
-            'avgTime'))
+            'avgTime')))
     };
 }
 

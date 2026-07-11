@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Runtime.Abstractions;
 
 namespace ClearVision.Product.Station.Sync;
@@ -9,6 +10,13 @@ public static class StationResultMapper
 
     public static StationResultSummaryDto ToSummary(RuntimeNormalizedResult result, StationIdentityContext identity)
     {
+        var canonical = new InspectionOutcome(
+            result.ExecutionOutcome,
+            result.DecisionOutcome,
+            result.DecisionSource,
+            result.ReasonCode,
+            result.DiagnosticMessage,
+            result.HasJudgmentSignal);
         return new StationResultSummaryDto
         {
             SchemaVersion = StationSyncContractDefaults.SchemaVersion,
@@ -21,8 +29,15 @@ public static class StationResultMapper
             PackageVersion = identity.CurrentPackageVersion ?? string.Empty,
             FlowHash = result.FlowHash,
             ImageId = result.ImageId,
-            Outcome = result.Outcome,
-            InspectionStatus = result.InspectionStatus,
+            // Retain legacy projections for old Studio consumers. v2 consumers use the
+            // canonical fields below as the factual Station result.
+            Outcome = StationCanonicalOutcomeProjection.ProjectRuntimeOutcome(canonical),
+            InspectionStatus = LegacyInspectionStatusProjection.Project(canonical),
+            ExecutionOutcome = result.ExecutionOutcome,
+            DecisionOutcome = result.DecisionOutcome,
+            HasJudgmentSignal = result.HasJudgmentSignal,
+            DecisionSource = result.DecisionSource,
+            ReasonCode = result.ReasonCode,
             ExecutionTimeMs = result.ExecutionTimeMs,
             DiagnosticCode = result.DiagnosticCode,
             DiagnosticMessage = Truncate(result.DiagnosticMessage, MaxPreviewValueLength),

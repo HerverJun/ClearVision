@@ -1062,18 +1062,26 @@ class StationMonitorView {
         }
 
         const snapshot = this.getStationRenderSnapshot();
-        const totalOk = this.summary?.totalOkCount ?? snapshot.totalOk;
-        const totalNg = this.summary?.totalNgCount ?? snapshot.totalNg;
-        const totalError = this.summary?.totalErrorCount ?? snapshot.totalError;
+        const outcomeStatistics = this.summary?.outcomeStatistics ?? snapshot.outcomeStatistics ??
+            normalizeCanonicalStatistics({
+                okCount: snapshot.totalOk,
+                ngCount: snapshot.totalNg,
+                errorCount: snapshot.totalError
+            });
+        const totalOk = outcomeStatistics.ok;
+        const totalNg = outcomeStatistics.ng;
+        const executionFailures = outcomeStatistics.executionFailures;
+        const invalid = outcomeStatistics.invalid;
+        const undetermined = outcomeStatistics.undetermined;
         const avgExecutionTime = this.summary?.averageExecutionTimeMs ??
             snapshot.averageExecutionTimeMs;
-        const validDecisions = totalOk + totalNg;
-        const yieldRate = validDecisions === 0 ? '--' : `${Math.round((totalOk / validDecisions) * 1000) / 10}%`;
+        const validDecisions = outcomeStatistics.validDecisions;
+        const yieldRate = validDecisions === 0 ? '--' : `${Math.round(outcomeStatistics.yieldRate * 1000) / 10}%`;
 
         const cards = [
             { label: '在线', value: `${snapshot.onlineCount}/${snapshot.stations.length || 0}`, meta: `${snapshot.stations.length - snapshot.onlineCount} 个离线`, tone: 'success' },
             { label: '告警', value: String(snapshot.alertCount), meta: '故障或超时', tone: snapshot.alertCount > 0 ? 'warning' : 'default' },
-            { label: '良率', value: yieldRate, meta: `${totalOk} OK / ${totalNg} NG / ${totalError} ERR`, tone: 'accent' },
+            { label: '良率', value: yieldRate, meta: `${totalOk} OK / ${totalNg} NG · ${executionFailures} 执行异常 · ${invalid} 判定无效 · ${undetermined} 未判定`, tone: 'accent' },
             { label: '平均节拍', value: this.formatMilliseconds(avgExecutionTime), meta: `${this.offlineThresholdSeconds} 秒后判定超时`, tone: 'info' }
         ];
 
@@ -1118,7 +1126,12 @@ class StationMonitorView {
         this.matrix.innerHTML = stations.map((station) => {
             const isOnline = this.computeIsOnline(station);
             const isSelected = station.stationId === this.selectedStationId;
-            const outcomeLabel = this.formatOutcome(station.lastOutcome, station.lastInspectionStatus);
+            const outcomeLabel = this.formatOutcome(
+                station.lastOutcome,
+                station.lastInspectionStatus,
+                station.lastExecutionOutcome,
+                station.lastDecisionOutcome);
+            const stationStats = station.sessionOutcomeStatistics;
             const stateLabel = station.onlineState && station.onlineState !== 'Online'
                 ? station.onlineState
                 : this.formatState(station.state, isOnline);
@@ -1137,9 +1150,10 @@ class StationMonitorView {
                         <span class="sm-station-line">${this.escapeHtml(station.lineName || station.machineName || station.stationId)}</span>
                     </div>
                     <div class="sm-station-stats">
-                        <span class="sm-stat"><b>${Number(station.sessionOkCount || 0)}</b> OK</span>
-                        <span class="sm-stat"><b>${Number(station.sessionNgCount || 0)}</b> NG</span>
-                        <span class="sm-stat"><b>${Number(station.sessionErrorCount || 0)}</b> ERR</span>
+                        <span class="sm-stat"><b>${stationStats.ok}</b> OK</span>
+                        <span class="sm-stat"><b>${stationStats.ng}</b> NG</span>
+                        <span class="sm-stat"><b>${stationStats.executionFailures}</b> 执行异常</span>
+                        <span class="sm-stat"><b>${stationStats.invalid}</b> 无效 / <b>${stationStats.undetermined}</b> 未判定</span>
                     </div>
                     <div class="sm-station-foot">
                         <span>${this.escapeHtml(outcomeLabel)}</span>
@@ -1217,14 +1231,15 @@ class StationMonitorView {
                 : ''}
             ${this.renderStationDiagnosticAdvice(activeDiagnosticCode, activeDiagnosticMessage)}
             <div class="sm-detail-stats">
-                <div><span>良品</span><b>${Number(detail.sessionOkCount || 0)}</b></div>
-                <div><span>不良</span><b>${Number(detail.sessionNgCount || 0)}</b></div>
-                <div><span>异常</span><b>${Number(detail.sessionErrorCount || 0)}</b></div>
+                <div><span>良品</span><b>${detail.sessionOutcomeStatistics.ok}</b></div>
+                <div><span>不良</span><b>${detail.sessionOutcomeStatistics.ng}</b></div>
+                <div><span>执行异常</span><b>${detail.sessionOutcomeStatistics.executionFailures}</b></div>
+                <div><span>无效 / 未判定</span><b>${detail.sessionOutcomeStatistics.invalid} / ${detail.sessionOutcomeStatistics.undetermined}</b></div>
                 <div><span>平均</span><b>${this.formatMilliseconds(detail.averageExecutionTimeMs)}</b></div>
             </div>
             <dl class="sm-detail-meta">
                 <div><dt>上次在线</dt><dd>${this.escapeHtml(this.formatRelativeTime(detail.lastSeenAtUtc))}</dd></div>
-                <div><dt>最近结果</dt><dd>${this.escapeHtml(this.formatOutcome(detail.lastOutcome, detail.lastInspectionStatus))}</dd></div>
+                <div><dt>最近结果</dt><dd>${this.escapeHtml(this.formatOutcome(detail.lastOutcome, detail.lastInspectionStatus, detail.lastExecutionOutcome, detail.lastDecisionOutcome))}</dd></div>
                 <div><dt>诊断码</dt><dd>${this.escapeHtml(activeDiagnosticCode || activeDiagnosticMessage || '--')}</dd></div>
                 <div><dt>包版本</dt><dd>${this.escapeHtml(detail.packageId || '--')}</dd></div>
                 <div><dt>缓存队列</dt><dd>${Number(detail.spoolPendingCount || latestHealth.spoolPendingCount || 0)} / ${this.formatBytes(detail.spoolBytes || latestHealth.spoolBytes || 0)}</dd></div>
@@ -1268,7 +1283,7 @@ class StationMonitorView {
             ${this.renderDetailSection('近期结果', recentResults, (result) => `
                 <article class="sm-row">
                     <div class="sm-row-main">
-                        <span class="sm-row-label">${this.escapeHtml(this.formatOutcome(result.outcome, result.inspectionStatus))}</span>
+                        <span class="sm-row-label">${this.escapeHtml(this.formatOutcome(result.outcome, result.inspectionStatus, result.executionOutcome, result.decisionOutcome))}</span>
                         <span class="sm-row-sublabel">${this.escapeHtml(result.imageId || result.runId || '--')}</span>
                     </div>
                     <div class="sm-row-side">
@@ -1584,6 +1599,8 @@ class StationMonitorView {
                 <dl>
                     <div><dt>序号</dt><dd>${Number(record.sequenceId || 0)}</dd></div>
                     <div><dt>诊断</dt><dd>${this.escapeHtml(record.diagnosticCode || '--')}</dd></div>
+                    <div><dt>判定来源</dt><dd>${this.escapeHtml(record.decisionSource || '--')}</dd></div>
+                    <div><dt>判定原因</dt><dd>${this.escapeHtml(record.reasonCode || '--')}</dd></div>
                     <div><dt>耗时</dt><dd>${this.formatMilliseconds(record.executionTimeMs)}</dd></div>
                     <div><dt>包</dt><dd>${this.escapeHtml(record.packageName || record.packageId || '--')}</dd></div>
                 </dl>
@@ -1621,10 +1638,8 @@ class StationMonitorView {
         const entries = this.getStationRenderEntries();
         let onlineCount = 0;
         let alertCount = 0;
-        let totalOk = 0;
-        let totalNg = 0;
-        let totalError = 0;
         let totalExecutionTime = 0;
+        const sessionStatistics = [];
 
         for (const entry of entries) {
             const station = entry.station;
@@ -1634,9 +1649,7 @@ class StationMonitorView {
             if (!entry.isOnline || station.state === 'Faulted') {
                 alertCount += 1;
             }
-            totalOk += Number(station.sessionOkCount || 0);
-            totalNg += Number(station.sessionNgCount || 0);
-            totalError += Number(station.sessionErrorCount || 0);
+            sessionStatistics.push(station.sessionOutcomeStatistics);
             totalExecutionTime += Number(station.averageExecutionTimeMs || 0);
         }
 
@@ -1644,9 +1657,7 @@ class StationMonitorView {
             stations: entries.map((entry) => entry.station),
             onlineCount,
             alertCount,
-            totalOk,
-            totalNg,
-            totalError,
+            outcomeStatistics: this.combineCanonicalStatistics(sessionStatistics),
             averageExecutionTimeMs: entries.length === 0 ? 0 : totalExecutionTime / entries.length
         };
 
@@ -1757,6 +1768,13 @@ class StationMonitorView {
             return null;
         }
 
+        const nestedOutcomeStatistics = summary.outcomeStatistics ?? summary.OutcomeStatistics;
+        const outcomeSource = nestedOutcomeStatistics ?? {
+            totalCount: summary.totalAttemptCount ?? summary.TotalAttemptCount,
+            okCount: summary.totalOkCount ?? summary.TotalOkCount,
+            ngCount: summary.totalNgCount ?? summary.TotalNgCount,
+            errorCount: summary.totalErrorCount ?? summary.TotalErrorCount
+        };
         return {
             totalStations: Number(summary.totalStations ?? summary.TotalStations ?? 0),
             onlineStations: Number(summary.onlineStations ?? summary.OnlineStations ?? 0),
@@ -1767,6 +1785,7 @@ class StationMonitorView {
             totalOkCount: Number(summary.totalOkCount ?? summary.TotalOkCount ?? 0),
             totalNgCount: Number(summary.totalNgCount ?? summary.TotalNgCount ?? 0),
             totalErrorCount: Number(summary.totalErrorCount ?? summary.TotalErrorCount ?? 0),
+            outcomeStatistics: normalizeCanonicalStatistics(outcomeSource),
             averageExecutionTimeMs: Number(summary.averageExecutionTimeMs ?? summary.AverageExecutionTimeMs ?? 0),
             offlineThresholdSeconds: Number(summary.offlineThresholdSeconds ?? summary.OfflineThresholdSeconds ?? 15)
         };
@@ -1777,6 +1796,12 @@ class StationMonitorView {
         const recentHealth = station?.recentHealth ?? station?.RecentHealth;
         const recentLogs = station?.recentLogs ?? station?.RecentLogs;
         const recentCommands = station?.recentCommands ?? station?.RecentCommands;
+        const canonicalSessionStatistics = station?.sessionOutcomeStatistics ?? station?.SessionOutcomeStatistics;
+        const sessionOutcomeStatistics = normalizeCanonicalStatistics(canonicalSessionStatistics ?? {
+            okCount: station?.sessionOkCount ?? station?.SessionOkCount ?? 0,
+            ngCount: station?.sessionNgCount ?? station?.SessionNgCount ?? 0,
+            errorCount: station?.sessionErrorCount ?? station?.SessionErrorCount ?? 0
+        });
         return {
             stationId: station?.stationId ?? station?.StationId ?? '--',
             stationName: station?.stationName ?? station?.StationName ?? '',
@@ -1804,8 +1829,18 @@ class StationMonitorView {
             sessionOkCount: Number(station?.sessionOkCount ?? station?.SessionOkCount ?? 0),
             sessionNgCount: Number(station?.sessionNgCount ?? station?.SessionNgCount ?? 0),
             sessionErrorCount: Number(station?.sessionErrorCount ?? station?.SessionErrorCount ?? 0),
+            sessionOutcomeStatistics,
+            sessionOutcomeStatisticsIsLegacyProjection: Boolean(
+                station?.sessionOutcomeStatisticsIsLegacyProjection
+                ?? station?.SessionOutcomeStatisticsIsLegacyProjection
+                ?? !canonicalSessionStatistics),
             lastOutcome: station?.lastOutcome ?? station?.LastOutcome ?? null,
             lastInspectionStatus: station?.lastInspectionStatus ?? station?.LastInspectionStatus ?? null,
+            lastExecutionOutcome: station?.lastExecutionOutcome ?? station?.LastExecutionOutcome ?? null,
+            lastDecisionOutcome: station?.lastDecisionOutcome ?? station?.LastDecisionOutcome ?? null,
+            lastHasJudgmentSignal: station?.lastHasJudgmentSignal ?? station?.LastHasJudgmentSignal ?? null,
+            lastDecisionSource: station?.lastDecisionSource ?? station?.LastDecisionSource ?? null,
+            lastReasonCode: station?.lastReasonCode ?? station?.LastReasonCode ?? null,
             lastDiagnosticCode: station?.lastDiagnosticCode ?? station?.LastDiagnosticCode ?? null,
             lastDiagnosticMessage: station?.lastDiagnosticMessage ?? station?.LastDiagnosticMessage ?? null,
             lastResultAtUtc: station?.lastResultAtUtc ?? station?.LastResultAtUtc ?? null,
@@ -1929,6 +1964,9 @@ class StationMonitorView {
             inspectionStatus: result?.inspectionStatus ?? result?.InspectionStatus ?? null,
             executionOutcome: result?.executionOutcome ?? result?.ExecutionOutcome ?? null,
             decisionOutcome: result?.decisionOutcome ?? result?.DecisionOutcome ?? null,
+            hasJudgmentSignal: result?.hasJudgmentSignal ?? result?.HasJudgmentSignal ?? null,
+            decisionSource: result?.decisionSource ?? result?.DecisionSource ?? null,
+            reasonCode: result?.reasonCode ?? result?.ReasonCode ?? null,
             executionTimeMs: Number(result?.executionTimeMs ?? result?.ExecutionTimeMs ?? 0),
             diagnosticCode: result?.diagnosticCode ?? result?.DiagnosticCode ?? null,
             diagnosticMessage: result?.diagnosticMessage ?? result?.DiagnosticMessage ?? null,
@@ -2339,8 +2377,27 @@ class StationMonitorView {
         }
     }
 
-    formatOutcome(outcome, inspectionStatus) {
-        return normalizeCanonicalOutcome({ outcome, inspectionStatus }).label;
+    combineCanonicalStatistics(statisticsList) {
+        const fields = [
+            'total', 'executionSucceeded', 'validDecisions', 'ok', 'ng', 'undetermined',
+            'notApplicable', 'invalid', 'failed', 'cancelled', 'timedOut', 'skipped'
+        ];
+        const combined = Object.fromEntries(fields.map((field) => [field, 0]));
+        (Array.isArray(statisticsList) ? statisticsList : []).forEach((statistics) => {
+            fields.forEach((field) => {
+                combined[field] += Number(statistics?.[field] ?? 0);
+            });
+        });
+        combined.executionFailures = combined.failed + combined.timedOut;
+        combined.yieldRate = combined.validDecisions > 0 ? combined.ok / combined.validDecisions : 0;
+        combined.decisionCoverageRate = combined.executionSucceeded > 0
+            ? combined.validDecisions / combined.executionSucceeded
+            : 0;
+        return combined;
+    }
+
+    formatOutcome(outcome, inspectionStatus, executionOutcome = null, decisionOutcome = null) {
+        return normalizeCanonicalOutcome({ outcome, inspectionStatus, executionOutcome, decisionOutcome }).label;
     }
 
     toCssToken(value) {

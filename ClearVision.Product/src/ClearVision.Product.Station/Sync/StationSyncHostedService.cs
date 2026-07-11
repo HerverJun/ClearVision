@@ -6,6 +6,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
@@ -773,15 +774,20 @@ public sealed class StationSyncHostedService : BackgroundService
             ? await _runtimeHost.RunSingleAsync(payload.ImagePath, cancellationToken)
             : await _runtimeHost.RunPackageConfiguredSingleAsync(cancellationToken);
 
+        var commandStatus = result.ExecutionOutcome switch
+        {
+            ExecutionOutcome.Failed or ExecutionOutcome.TimedOut => StationCommandStatus.Failed,
+            ExecutionOutcome.Cancelled => StationCommandStatus.Cancelled,
+            _ => StationCommandStatus.Succeeded
+        };
+
         await ReportCommandAsync(
             command,
-            result.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled
-                ? StationCommandStatus.Failed
-                : StationCommandStatus.Succeeded,
+            commandStatus,
             100,
-            $"Runtime completed: {result.Outcome}, runId={result.RunId}, diagnostic={result.DiagnosticCode}.",
+            $"Runtime completed: execution={result.ExecutionOutcome}, decision={result.DecisionOutcome}, runId={result.RunId}, diagnostic={result.DiagnosticCode}.",
             cancellationToken,
-            result.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled ? result.DiagnosticCode : null,
+            commandStatus is StationCommandStatus.Failed or StationCommandStatus.Cancelled ? result.DiagnosticCode : null,
             result.DiagnosticMessage);
     }
 
@@ -1090,7 +1096,8 @@ public sealed class StationSyncHostedService : BackgroundService
             CurrentRunId = snapshot.CurrentRunId,
             SessionOkCount = snapshot.SessionOkCount,
             SessionNgCount = snapshot.SessionNgCount,
-            SessionErrorCount = snapshot.SessionErrorCount
+            SessionErrorCount = snapshot.SessionErrorCount,
+            SessionOutcomeStatistics = snapshot.SessionOutcomeStatistics
         };
     }
 
@@ -1114,6 +1121,7 @@ public sealed class StationSyncHostedService : BackgroundService
             SessionOkCount = snapshot.SessionOkCount,
             SessionNgCount = snapshot.SessionNgCount,
             SessionErrorCount = snapshot.SessionErrorCount,
+            SessionOutcomeStatistics = snapshot.SessionOutcomeStatistics,
             StationLocalOffsetMinutes = (int)TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.Now).TotalMinutes
         };
     }

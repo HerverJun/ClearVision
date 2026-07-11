@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Runtime;
@@ -1387,7 +1388,8 @@ public sealed class MainForm : Form
             _ => SystemColors.ControlText
         };
 
-        _statsValueLabel.Text = $"统计：OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
+        var statistics = snapshot.SessionOutcomeStatistics;
+        _statsValueLabel.Text = $"统计：OK {statistics.OkCount} / NG {statistics.NgCount} / 执行异常 {statistics.ExecutionFailureCount} / 无效 {statistics.InvalidCount} / 未判定 {statistics.UndeterminedCount}";
     }
 
     private void ApplyResult(RuntimeNormalizedResult result)
@@ -1407,7 +1409,7 @@ public sealed class MainForm : Form
 
         var item = new ListViewItem(result.CompletedAtUtc.LocalDateTime.ToString("HH:mm:ss"));
         item.SubItems.Add(Path.GetFileName(result.SourceImagePath) ?? result.ImageId);
-        item.SubItems.Add(result.Outcome.ToString().ToUpperInvariant());
+        item.SubItems.Add(FormatCanonicalOutcome(result));
         item.SubItems.Add(result.ExecutionTimeMs.ToString());
         item.SubItems.Add(result.DiagnosticCode);
         _recentResultsView.Items.Insert(0, item);
@@ -1415,15 +1417,6 @@ public sealed class MainForm : Form
         {
             _recentResultsView.Items.RemoveAt(_recentResultsView.Items.Count - 1);
         }
-
-        item.SubItems[2].Text = result.Outcome switch
-        {
-            RuntimeRunOutcome.Ok => "OK",
-            RuntimeRunOutcome.Ng => "NG",
-            RuntimeRunOutcome.Error => "异常",
-            RuntimeRunOutcome.Canceled => "已取消",
-            _ => result.Outcome.ToString()
-        };
 
         _timingValueLabel.Text = $"最近推理：{result.ExecutionTimeMs} ms | 平均 {ComputeAverageMs():F1} ms | P95 {ComputeP95Ms():F1} ms";
 
@@ -1679,12 +1672,13 @@ public sealed class MainForm : Form
 
     private void RefreshProductionCards(RuntimeHostSnapshot snapshot)
     {
-        var totalCount = snapshot.SessionOkCount + snapshot.SessionNgCount + snapshot.SessionErrorCount;
+        var statistics = snapshot.SessionOutcomeStatistics;
+        var totalCount = statistics.TotalAttemptCount;
         _productionValueLabel.Text = totalCount.ToString();
         _productionValueLabel.ForeColor = totalCount > 0 ? Color.MediumSlateBlue : Color.DimGray;
-        _productionDetailLabel.Text = $"OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
+        _productionDetailLabel.Text = $"OK {statistics.OkCount} / NG {statistics.NgCount} / 执行异常 {statistics.ExecutionFailureCount} / 无效 {statistics.InvalidCount} / 未判定 {statistics.UndeterminedCount}";
 
-        var inspectedCount = snapshot.SessionOkCount + snapshot.SessionNgCount;
+        var inspectedCount = statistics.ValidDecisionCount;
         if (inspectedCount <= 0)
         {
             _yieldValueLabel.Text = "--";
@@ -1693,7 +1687,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var yieldRate = snapshot.SessionOkCount * 100.0 / inspectedCount;
+        var yieldRate = statistics.YieldRate * 100.0;
         _yieldValueLabel.Text = $"{yieldRate:F1}%";
         _yieldValueLabel.ForeColor = yieldRate >= 95 ? Color.SeaGreen : (yieldRate >= 80 ? Color.DarkOrange : Color.Firebrick);
         _yieldDetailLabel.Text = $"按 OK / (OK + NG) 计算，当前有效样本 {inspectedCount}";
@@ -1701,26 +1695,24 @@ public sealed class MainForm : Form
 
     private void RefreshOverviewCards(RuntimeHostSnapshot snapshot)
     {
-        _statusValueLabel.Text = _recentResults.FirstOrDefault()?.Outcome switch
-        {
-            RuntimeRunOutcome.Ok => "OK",
-            RuntimeRunOutcome.Ng => "NG",
-            RuntimeRunOutcome.Error => "异常",
-            RuntimeRunOutcome.Canceled => "已取消",
-            _ => snapshot.State switch
+        _statusValueLabel.Text = _recentResults.FirstOrDefault() is { } latestResult
+            ? FormatCanonicalOutcome(latestResult)
+            : snapshot.State switch
             {
                 RuntimeHostState.Running => "运行中",
                 RuntimeHostState.Stopping => "停止中",
                 RuntimeHostState.Faulted => "故障",
                 RuntimeHostState.Loaded => "就绪",
                 _ => "空闲"
-            }
-        };
+            };
         _statusValueLabel.ForeColor = _statusValueLabel.Text switch
         {
             "OK" => Color.SeaGreen,
             "NG" => Color.DarkOrange,
-            "异常" => Color.Firebrick,
+            "执行失败" or "执行超时" => Color.Firebrick,
+            "判定无效" => Color.DarkOrange,
+            "未判定" => Color.Goldenrod,
+            "不适用" or "未检测" => Color.SlateGray,
             "已取消" => Color.SlateGray,
             "运行中" => Color.DodgerBlue,
             "停止中" => Color.DarkOrange,
@@ -1740,10 +1732,11 @@ public sealed class MainForm : Form
             ? $"平均 {ComputeAverageMs():F1} ms | P95 {ComputeP95Ms():F1} ms"
             : "等待形成耗时统计";
 
-        var totalCount = snapshot.SessionOkCount + snapshot.SessionNgCount + snapshot.SessionErrorCount;
+        var statistics = snapshot.SessionOutcomeStatistics;
+        var totalCount = statistics.TotalAttemptCount;
         _statsValueLabel.Text = totalCount.ToString();
         _statsValueLabel.ForeColor = totalCount > 0 ? Color.MediumSlateBlue : Color.DimGray;
-        _statsDetailLabel.Text = $"OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
+        _statsDetailLabel.Text = $"OK {statistics.OkCount} / NG {statistics.NgCount} / 执行异常 {statistics.ExecutionFailureCount} / 无效 {statistics.InvalidCount} / 未判定 {statistics.UndeterminedCount}";
 
         var currentTaskName = _selectedImagePath != null
             ? Path.GetFileName(_selectedImagePath)
@@ -1754,6 +1747,30 @@ public sealed class MainForm : Form
             ? "单张图片运行"
             : (_selectedFolderPath != null ? "批量文件夹运行" : "请选择图片或文件夹");
         _taskDetailLabel.Text = taskSource;
+    }
+
+    private static string FormatCanonicalOutcome(RuntimeNormalizedResult result)
+    {
+        var outcome = new InspectionOutcome(
+            result.ExecutionOutcome,
+            result.DecisionOutcome,
+            result.DecisionSource,
+            result.ReasonCode,
+            result.DiagnosticMessage,
+            result.HasJudgmentSignal);
+        return InspectionOutcomeClassifier.Classify(outcome) switch
+        {
+            CanonicalInspectionOutcomeKind.Ok => "OK",
+            CanonicalInspectionOutcomeKind.Ng => "NG",
+            CanonicalInspectionOutcomeKind.Undetermined => "未判定",
+            CanonicalInspectionOutcomeKind.NotApplicable => "不适用",
+            CanonicalInspectionOutcomeKind.Invalid => "判定无效",
+            CanonicalInspectionOutcomeKind.Failed => "执行失败",
+            CanonicalInspectionOutcomeKind.Cancelled => "已取消",
+            CanonicalInspectionOutcomeKind.TimedOut => "执行超时",
+            CanonicalInspectionOutcomeKind.Skipped => "未检测",
+            _ => "判定无效"
+        };
     }
 
     private static bool ProfilesMatch(RuntimeSiteProfile? left, RuntimeSiteProfile? right)

@@ -866,6 +866,14 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DecisionOutcome")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DecisionSource")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DiagnosticCode")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -877,6 +885,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<long>("ExecutionTimeMs")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ExecutionOutcome")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FlowHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -884,6 +896,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("ImageId")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool?>("HasJudgmentSignal")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("InspectionStatus")
                         .HasMaxLength(50)
@@ -917,6 +932,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset>("ReceivedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -941,6 +960,8 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.HasIndex("MessageId");
 
                     b.HasIndex("StationId", "CompletedAtUtc");
+
+                    b.HasIndex("StationId", "ExecutionOutcome", "DecisionOutcome");
 
                     b.HasIndex("StationId", "SequenceId")
                         .IsUnique();

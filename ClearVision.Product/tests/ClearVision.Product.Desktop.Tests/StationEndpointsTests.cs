@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Desktop.Station;
@@ -90,6 +91,11 @@ public sealed class StationEndpointsTests
             FlowHash = "sha256:def",
             ImageId = "image-9",
             Outcome = RuntimeRunOutcome.Ok,
+            ExecutionOutcome = ExecutionOutcome.Succeeded,
+            DecisionOutcome = DecisionOutcome.Invalid,
+            HasJudgmentSignal = false,
+            DecisionSource = "FinalDecisionBinding:judge:Judgment",
+            ReasonCode = "DecisionValueInvalid",
             ExecutionTimeMs = 18,
             DiagnosticCode = "OK",
             StartedAtUtc = DateTimeOffset.UtcNow.AddMilliseconds(-18),
@@ -107,6 +113,9 @@ public sealed class StationEndpointsTests
         replayChunk.Should().Contain($"id: {checkpoint + 1}");
         replayChunk.Should().Contain("\"stationId\":\"station-b\"");
         replayChunk.Should().Contain("\"diagnosticCode\":\"OK\"");
+        replayChunk.Should().Contain("\"executionOutcome\":\"Succeeded\"");
+        replayChunk.Should().Contain("\"decisionOutcome\":\"Invalid\"");
+        replayChunk.Should().Contain("\"reasonCode\":\"DecisionValueInvalid\"");
     }
 
     [Theory]

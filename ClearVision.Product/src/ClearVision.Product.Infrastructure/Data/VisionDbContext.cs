@@ -261,9 +261,14 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.PackageVersion).HasMaxLength(80);
             entity.Property(e => e.Outcome).HasMaxLength(50);
             entity.Property(e => e.InspectionStatus).HasMaxLength(50);
+            entity.Property(e => e.ExecutionOutcome).HasMaxLength(50);
+            entity.Property(e => e.DecisionOutcome).HasMaxLength(50);
+            entity.Property(e => e.DecisionSource).HasMaxLength(500);
+            entity.Property(e => e.ReasonCode).HasMaxLength(200);
             entity.Property(e => e.DiagnosticCode).HasMaxLength(200);
             entity.HasIndex(e => new { e.StationId, e.SequenceId }).IsUnique();
             entity.HasIndex(e => new { e.StationId, e.CompletedAtUtc });
+            entity.HasIndex(e => new { e.StationId, e.ExecutionOutcome, e.DecisionOutcome });
             entity.HasIndex(e => e.MessageId);
         });
 

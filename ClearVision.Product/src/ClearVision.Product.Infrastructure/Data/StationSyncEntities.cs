@@ -75,6 +75,17 @@ public sealed class StationResultSummaryEntity
 
     public string? InspectionStatus { get; set; }
 
+    // Nullable canonical fields preserve the absence present in legacy Station payloads.
+    public string? ExecutionOutcome { get; set; }
+
+    public string? DecisionOutcome { get; set; }
+
+    public bool? HasJudgmentSignal { get; set; }
+
+    public string? DecisionSource { get; set; }
+
+    public string? ReasonCode { get; set; }
+
     public long ExecutionTimeMs { get; set; }
 
     public string DiagnosticCode { get; set; } = string.Empty;

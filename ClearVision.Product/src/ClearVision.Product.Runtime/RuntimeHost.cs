@@ -36,6 +36,13 @@ public sealed class RuntimeHost : IAsyncDisposable
     private int _sessionOkCount;
     private int _sessionNgCount;
     private int _sessionErrorCount;
+    private int _sessionUndeterminedCount;
+    private int _sessionNotApplicableCount;
+    private int _sessionInvalidCount;
+    private int _sessionFailedCount;
+    private int _sessionCancelledCount;
+    private int _sessionTimedOutCount;
+    private int _sessionSkippedCount;
     private int _pendingCount;
     private IRuntimeResultRecordWriter? _resultWriter;
     private IRuntimeImageWriter? _imageWriter;
@@ -111,7 +118,8 @@ public sealed class RuntimeHost : IAsyncDisposable
             CurrentRunId = _currentRunId,
             SessionOkCount = _sessionOkCount,
             SessionNgCount = _sessionNgCount,
-            SessionErrorCount = _sessionErrorCount
+            SessionErrorCount = _sessionErrorCount,
+            SessionOutcomeStatistics = BuildSessionOutcomeStatistics()
         };
     }
 
@@ -775,23 +783,92 @@ public sealed class RuntimeHost : IAsyncDisposable
         _sessionOkCount = 0;
         _sessionNgCount = 0;
         _sessionErrorCount = 0;
+        _sessionUndeterminedCount = 0;
+        _sessionNotApplicableCount = 0;
+        _sessionInvalidCount = 0;
+        _sessionFailedCount = 0;
+        _sessionCancelledCount = 0;
+        _sessionTimedOutCount = 0;
+        _sessionSkippedCount = 0;
         _pendingCount = 0;
     }
 
     private void UpdateSessionCounters(RuntimeNormalizedResult result)
     {
-        switch (result.Outcome)
+        var canonical = new InspectionOutcome(
+            result.ExecutionOutcome,
+            result.DecisionOutcome,
+            result.DecisionSource,
+            result.ReasonCode,
+            result.DiagnosticMessage,
+            result.HasJudgmentSignal);
+        switch (InspectionOutcomeClassifier.Classify(canonical))
         {
-            case RuntimeRunOutcome.Ok:
+            case CanonicalInspectionOutcomeKind.Ok:
                 _sessionOkCount += 1;
                 break;
-            case RuntimeRunOutcome.Ng:
+            case CanonicalInspectionOutcomeKind.Ng:
                 _sessionNgCount += 1;
                 break;
+            case CanonicalInspectionOutcomeKind.Undetermined:
+                _sessionUndeterminedCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.NotApplicable:
+                _sessionNotApplicableCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.Invalid:
+                _sessionInvalidCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.Failed:
+                _sessionFailedCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.Cancelled:
+                _sessionCancelledCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.TimedOut:
+                _sessionTimedOutCount += 1;
+                break;
+            case CanonicalInspectionOutcomeKind.Skipped:
+                _sessionSkippedCount += 1;
+                break;
+        }
+
+        // Compatibility counter: historic Station UIs classified Invalid together with
+        // execution errors. Canonical consumers use SessionOutcomeStatistics instead.
+        switch (result.Outcome)
+        {
             case RuntimeRunOutcome.Error:
                 _sessionErrorCount += 1;
                 break;
         }
+    }
+
+    private InspectionOutcomeStatistics BuildSessionOutcomeStatistics()
+    {
+        var executionSucceeded = _sessionOkCount +
+                                 _sessionNgCount +
+                                 _sessionUndeterminedCount +
+                                 _sessionNotApplicableCount +
+                                 _sessionInvalidCount;
+        return new InspectionOutcomeStatistics
+        {
+            TotalAttemptCount = executionSucceeded +
+                                _sessionFailedCount +
+                                _sessionCancelledCount +
+                                _sessionTimedOutCount +
+                                _sessionSkippedCount,
+            ExecutionSucceededCount = executionSucceeded,
+            ValidDecisionCount = _sessionOkCount + _sessionNgCount,
+            OkCount = _sessionOkCount,
+            NgCount = _sessionNgCount,
+            UndeterminedCount = _sessionUndeterminedCount,
+            NotApplicableCount = _sessionNotApplicableCount,
+            InvalidCount = _sessionInvalidCount,
+            FailedCount = _sessionFailedCount,
+            CancelledCount = _sessionCancelledCount,
+            TimedOutCount = _sessionTimedOutCount,
+            SkippedCount = _sessionSkippedCount
+        };
     }
 
     private int GetDroppedCount()

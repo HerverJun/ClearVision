@@ -38,7 +38,13 @@ const stations = [
   },
 ];
 
-function buildResult(stationId: string, sequenceId: number, outcome: string, diagnosticCode: string) {
+function buildResult(
+  stationId: string,
+  sequenceId: number,
+  outcome: string,
+  diagnosticCode: string,
+  canonical: { executionOutcome?: string; decisionOutcome?: string; hasJudgmentSignal?: boolean } = {},
+) {
   return {
     stationId,
     lineName: stationId === 'station-a' ? 'Line 1' : 'Line 2',
@@ -52,6 +58,9 @@ function buildResult(stationId: string, sequenceId: number, outcome: string, dia
     imageId: `image-${sequenceId}`,
     outcome,
     inspectionStatus: outcome === 'Ok' ? 'OK' : outcome === 'Ng' ? 'NG' : 'Error',
+    executionOutcome: canonical.executionOutcome ?? (outcome === 'Ok' || outcome === 'Ng' ? 'Succeeded' : 'Failed'),
+    decisionOutcome: canonical.decisionOutcome ?? (outcome === 'Ok' ? 'Ok' : outcome === 'Ng' ? 'Ng' : 'Undetermined'),
+    hasJudgmentSignal: canonical.hasJudgmentSignal ?? (outcome === 'Ok' || outcome === 'Ng'),
     executionTimeMs: 20 + sequenceId,
     diagnosticCode,
     diagnosticMessage: diagnosticCode,
@@ -219,6 +228,28 @@ test.describe('Station monitor', () => {
     await openMonitor(page);
 
     await expect(page.locator('#sm-result-list')).toContainText('LIVE_NG');
+  });
+
+  test('renders canonical Invalid as decision invalid instead of execution failure', async ({ page }) => {
+    const invalidResult = buildResult('station-a', 10, 'Error', 'LIVE_INVALID', {
+      executionOutcome: 'Succeeded',
+      decisionOutcome: 'Invalid',
+      hasJudgmentSignal: false,
+    });
+    const eventBody = [
+      'id: 10',
+      'event: stationResultAdded',
+      `data: ${JSON.stringify({ stationId: 'station-a', station: stations[0], result: invalidResult })}`,
+      '',
+      '',
+    ].join('\n');
+
+    await mockStationApis(page, eventBody);
+    await openMonitor(page);
+
+    const invalidCard = page.locator('.sm-monitor-result').filter({ hasText: 'LIVE_INVALID' });
+    await expect(invalidCard).toContainText('判定无效');
+    await expect(invalidCard).not.toContainText('执行失败');
   });
 
   test('surfaces backpressure troubleshooting advice in station detail', async ({ page }) => {

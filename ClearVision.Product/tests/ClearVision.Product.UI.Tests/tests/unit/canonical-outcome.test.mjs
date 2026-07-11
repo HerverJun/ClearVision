@@ -77,3 +77,20 @@ test('server statistics normalization preserves canonical rates and compatibilit
   assert.equal(stats.executionFailures, 2);
   assert.equal(stats.avgTime, 13);
 });
+
+test('explicit canonical zero execution failures override legacy error count for invalid-only data', () => {
+  const stats = normalizeCanonicalStatistics({
+    totalAttemptCount: 3,
+    executionSucceededCount: 3,
+    validDecisionCount: 0,
+    invalidCount: 3,
+    failedCount: 0,
+    timedOutCount: 0,
+    executionFailureCount: 0,
+    errorCount: 3
+  });
+
+  assert.equal(stats.invalid, 3);
+  assert.equal(stats.executionFailures, 0);
+  assert.equal(stats.yieldRate, 0);
+});

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Runtime.Abstractions;
 
 namespace ClearVision.Product.Tests.Runtime;
@@ -31,6 +32,11 @@ public sealed class StationSyncContractsSerializationTests
             ImageId = "image-7",
             Outcome = RuntimeRunOutcome.Ng,
             InspectionStatus = InspectionStatus.NG,
+            ExecutionOutcome = ExecutionOutcome.Succeeded,
+            DecisionOutcome = DecisionOutcome.Ng,
+            HasJudgmentSignal = true,
+            DecisionSource = "FinalDecisionBinding:judge:Judgment",
+            ReasonCode = "StringMapNg",
             ExecutionTimeMs = 28,
             DiagnosticCode = "JudgeNg",
             DiagnosticMessage = "threshold exceeded",
@@ -45,7 +51,29 @@ public sealed class StationSyncContractsSerializationTests
         Assert.Contains("\"sequenceId\":42", json);
         Assert.Contains("\"outcome\":\"Ng\"", json);
         Assert.Contains("\"inspectionStatus\":\"NG\"", json);
+        Assert.Contains("\"executionOutcome\":\"Succeeded\"", json);
+        Assert.Contains("\"decisionOutcome\":\"Ng\"", json);
+        Assert.Contains("\"hasJudgmentSignal\":true", json);
+        Assert.Contains("\"decisionSource\":\"FinalDecisionBinding:judge:Judgment\"", json);
+        Assert.Contains("\"reasonCode\":\"StringMapNg\"", json);
         Assert.Contains("\"completedAtUtc\":\"2026-05-04T10:00:00.028+00:00\"", json);
+    }
+
+    [Fact]
+    public void LegacyStationResultSummary_DeserializesWithoutInventingCanonicalFields()
+    {
+        const string json = """
+            {"stationId":"station-legacy","outcome":"Error","inspectionStatus":"Error"}
+            """;
+
+        var restored = JsonSerializer.Deserialize<StationResultSummaryDto>(json, JsonOptions);
+
+        Assert.NotNull(restored);
+        Assert.Null(restored!.ExecutionOutcome);
+        Assert.Null(restored.DecisionOutcome);
+        Assert.Null(restored.HasJudgmentSignal);
+        Assert.Null(restored.DecisionSource);
+        Assert.Null(restored.ReasonCode);
     }
 
     [Fact]
@@ -63,7 +91,17 @@ public sealed class StationSyncContractsSerializationTests
             CurrentRunId = "run-99",
             SessionOkCount = 12,
             SessionNgCount = 3,
-            SessionErrorCount = 1
+            SessionErrorCount = 1,
+            SessionOutcomeStatistics = new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = 17,
+                ExecutionSucceededCount = 15,
+                ValidDecisionCount = 15,
+                OkCount = 12,
+                NgCount = 3,
+                FailedCount = 1,
+                TimedOutCount = 1
+            }
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -76,6 +114,9 @@ public sealed class StationSyncContractsSerializationTests
         Assert.Equal(12, restored.SessionOkCount);
         Assert.Equal(3, restored.SessionNgCount);
         Assert.Equal(1, restored.SessionErrorCount);
+        Assert.NotNull(restored.SessionOutcomeStatistics);
+        Assert.Equal(17, restored.SessionOutcomeStatistics!.TotalAttemptCount);
+        Assert.Equal(2, restored.SessionOutcomeStatistics.ExecutionFailureCount);
     }
 
     [Fact]

@@ -366,6 +366,12 @@ public sealed class RuntimeHostSnapshot
     public int SessionNgCount { get; set; }
 
     public int SessionErrorCount { get; set; }
+
+    /// <summary>
+    /// Canonical session counters used by Station-to-Studio synchronization. The legacy
+    /// OK/NG/Error counters remain for compatibility with pre-v2 Station consumers.
+    /// </summary>
+    public InspectionOutcomeStatistics SessionOutcomeStatistics { get; set; } = new();
 }
 
 public sealed class RuntimeStopSummary

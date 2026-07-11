@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -91,6 +92,7 @@ public sealed class StationRegistryService
                 heartbeat.SessionOkCount,
                 heartbeat.SessionNgCount,
                 heartbeat.SessionErrorCount,
+                heartbeat.SessionOutcomeStatistics,
                 heartbeat.SpoolPendingCount,
                 connectionId,
                 now);
@@ -130,6 +132,7 @@ public sealed class StationRegistryService
                 snapshot.SessionOkCount,
                 snapshot.SessionNgCount,
                 snapshot.SessionErrorCount,
+                snapshot.SessionOutcomeStatistics,
                 entry.SpoolPendingCount,
                 connectionId,
                 now);
@@ -181,8 +184,14 @@ public sealed class StationRegistryService
                 return BuildCursor(entry);
             }
 
-            entry.LastOutcome = result.Outcome;
-            entry.LastInspectionStatus = result.InspectionStatus;
+            var canonical = StationCanonicalOutcomeProjection.Resolve(result);
+            entry.LastOutcome = StationCanonicalOutcomeProjection.ProjectRuntimeOutcome(canonical);
+            entry.LastInspectionStatus = LegacyInspectionStatusProjection.Project(canonical);
+            entry.LastExecutionOutcome = canonical.Execution;
+            entry.LastDecisionOutcome = canonical.Decision;
+            entry.LastHasJudgmentSignal = canonical.HasJudgmentSignal;
+            entry.LastDecisionSource = canonical.DecisionSource;
+            entry.LastReasonCode = canonical.ReasonCode;
             entry.LastDiagnosticCode = result.DiagnosticCode;
             entry.LastDiagnosticMessage = result.DiagnosticMessage;
             entry.LastResultAtUtc = result.CompletedAtUtc;
@@ -512,8 +521,15 @@ public sealed class StationRegistryService
                 SessionOkCount = status.SessionOkCount,
                 SessionNgCount = status.SessionNgCount,
                 SessionErrorCount = status.SessionErrorCount,
+                SessionOutcomeStatistics = status.SessionOutcomeStatistics,
+                SessionOutcomeStatisticsIsLegacyProjection = status.SessionOutcomeStatisticsIsLegacyProjection,
                 LastOutcome = status.LastOutcome,
                 LastInspectionStatus = status.LastInspectionStatus,
+                LastExecutionOutcome = status.LastExecutionOutcome,
+                LastDecisionOutcome = status.LastDecisionOutcome,
+                LastHasJudgmentSignal = status.LastHasJudgmentSignal,
+                LastDecisionSource = status.LastDecisionSource,
+                LastReasonCode = status.LastReasonCode,
                 LastDiagnosticCode = status.LastDiagnosticCode,
                 LastDiagnosticMessage = status.LastDiagnosticMessage,
                 LastResultAtUtc = status.LastResultAtUtc,
@@ -606,7 +622,7 @@ public sealed class StationRegistryService
         }
     }
 
-    public object GetStatistics(
+    public StationResultStatisticsViewModel GetStatistics(
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
         string? stationId,
@@ -625,79 +641,12 @@ public sealed class StationRegistryService
                                 string.Equals(entry.StationId, stationId, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(entry => entry.RecentResults.Select(CloneResult))
                 .Where(result => !fromUtc.HasValue || result.CompletedAtUtc >= fromUtc.Value)
-                .Where(result => !toUtc.HasValue || result.CompletedAtUtc < toUtc.Value)
+                .Where(result => !toUtc.HasValue || result.CompletedAtUtc <= toUtc.Value)
                 .Where(result => MatchesStatus(result, status))
                 .Where(result => MatchesText(result.DiagnosticCode, diagnosticCode))
                 .ToList();
 
-            var total = results.Count;
-            var ok = results.Count(item => item.Outcome == RuntimeRunOutcome.Ok);
-            var ng = results.Count(item => item.Outcome == RuntimeRunOutcome.Ng);
-            var error = results.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled);
-            var averageExecutionTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs);
-            var byDiagnosticCode = results
-                .GroupBy(item => string.IsNullOrWhiteSpace(item.DiagnosticCode) ? "Unknown" : item.DiagnosticCode, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new { diagnosticCode = group.Key, defectType = group.Key, count = group.Count() })
-                .OrderByDescending(item => item.count)
-                .Take(20)
-                .ToList();
-            var hourlyTrend = results
-                .GroupBy(item => new DateTimeOffset(item.CompletedAtUtc.Year, item.CompletedAtUtc.Month, item.CompletedAtUtc.Day, item.CompletedAtUtc.Hour, 0, 0, TimeSpan.Zero))
-                .Select(group => new
-                {
-                    hourUtc = group.Key,
-                    timestamp = group.Key,
-                    total = group.Count(),
-                    totalCount = group.Count(),
-                    ok = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
-                    okCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
-                    ng = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
-                    ngCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
-                    error = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
-                    errorCount = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
-                    defectCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng)
-                })
-                .OrderBy(item => item.hourUtc)
-                .ToList();
-
-            return new
-            {
-                fromUtc,
-                toUtc,
-                total,
-                totalCount = total,
-                ok,
-                okCount = ok,
-                ng,
-                ngCount = ng,
-                error,
-                errorCount = error,
-                yieldRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
-                okRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
-                averageExecutionTimeMs,
-                averageProcessingTimeMs = averageExecutionTimeMs,
-                byStation = results
-                    .GroupBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => new
-                    {
-                        stationId = group.Key,
-                        total = group.Count(),
-                        totalCount = group.Count(),
-                        ok = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
-                        okCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
-                        ng = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
-                        ngCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
-                        error = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
-                        errorCount = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
-                        averageExecutionTimeMs = group.Average(item => item.ExecutionTimeMs)
-                    })
-                    .OrderByDescending(item => item.total)
-                    .ToList(),
-                byDiagnosticCode,
-                defectDistribution = new { items = byDiagnosticCode },
-                hourlyTrend,
-                trend = new { dataPoints = hourlyTrend }
-            };
+            return StationOutcomeStatisticsBuilder.Build(results, fromUtc, toUtc);
         }
     }
 
@@ -823,6 +772,7 @@ public sealed class StationRegistryService
         int sessionOkCount,
         int sessionNgCount,
         int sessionErrorCount,
+        InspectionOutcomeStatistics? sessionOutcomeStatistics,
         int spoolPendingCount,
         string connectionId,
         DateTimeOffset now)
@@ -842,8 +792,17 @@ public sealed class StationRegistryService
         entry.SessionOkCount = sessionOkCount;
         entry.SessionNgCount = sessionNgCount;
         entry.SessionErrorCount = sessionErrorCount;
+        entry.SessionOutcomeStatistics = sessionOutcomeStatistics;
         entry.SpoolPendingCount = spoolPendingCount;
         TouchConnectionLocked(entry, connectionId, now);
+    }
+
+    private static InspectionOutcomeStatistics ResolveSessionOutcomeStatistics(StationRegistryEntry entry)
+    {
+        return entry.SessionOutcomeStatistics ?? StationOutcomeStatisticsBuilder.ProjectLegacySession(
+            entry.SessionOkCount,
+            entry.SessionNgCount,
+            entry.SessionErrorCount);
     }
 
     private static void ApplyIdentityLocked(StationRegistryEntry entry, StationIdentityUpdateRequest request)
@@ -909,8 +868,15 @@ public sealed class StationRegistryService
             SessionOkCount = entry.SessionOkCount,
             SessionNgCount = entry.SessionNgCount,
             SessionErrorCount = entry.SessionErrorCount,
+            SessionOutcomeStatistics = ResolveSessionOutcomeStatistics(entry),
+            SessionOutcomeStatisticsIsLegacyProjection = entry.SessionOutcomeStatistics == null,
             LastOutcome = entry.LastOutcome,
             LastInspectionStatus = entry.LastInspectionStatus,
+            LastExecutionOutcome = entry.LastExecutionOutcome,
+            LastDecisionOutcome = entry.LastDecisionOutcome,
+            LastHasJudgmentSignal = entry.LastHasJudgmentSignal,
+            LastDecisionSource = entry.LastDecisionSource,
+            LastReasonCode = entry.LastReasonCode,
             LastDiagnosticCode = entry.LastDiagnosticCode,
             LastDiagnosticMessage = entry.LastDiagnosticMessage,
             LastResultAtUtc = entry.LastResultAtUtc,
@@ -941,6 +907,7 @@ public sealed class StationRegistryService
         var warningStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Warning || entry.OnlineState == StationOnlineState.Degraded);
         var criticalStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Critical);
 
+        var outcomeStatistics = StationOutcomeStatisticsBuilder.Combine(stations.Select(ResolveSessionOutcomeStatistics));
         return new StationSummaryViewModel
         {
             TotalStations = stations.Count,
@@ -951,9 +918,10 @@ public sealed class StationRegistryService
             AlertCount = stations.Count(entry => !IsOnlineLocked(entry, now) || entry.State == RuntimeHostState.Faulted || entry.OnlineState is StationOnlineState.Warning or StationOnlineState.Degraded or StationOnlineState.Critical),
             WarningStations = warningStations,
             CriticalStations = criticalStations,
-            TotalOkCount = stations.Sum(entry => entry.SessionOkCount),
-            TotalNgCount = stations.Sum(entry => entry.SessionNgCount),
-            TotalErrorCount = stations.Sum(entry => entry.SessionErrorCount),
+            TotalOkCount = outcomeStatistics.OkCount,
+            TotalNgCount = outcomeStatistics.NgCount,
+            TotalErrorCount = outcomeStatistics.ExecutionFailureCount,
+            OutcomeStatistics = outcomeStatistics,
             AverageExecutionTimeMs = recentResults.Count == 0 ? 0 : recentResults.Average(result => result.ExecutionTimeMs),
             OfflineThresholdSeconds = Math.Max(1, _options.OfflineThresholdSeconds),
             UpdatedAtUtc = now
@@ -967,17 +935,8 @@ public sealed class StationRegistryService
                now - entry.LastSeenAtUtc <= TimeSpan.FromSeconds(Math.Max(1, _options.OfflineThresholdSeconds));
     }
 
-    private static bool MatchesStatus(StationResultSummaryDto result, string? requestedStatus)
-    {
-        if (string.IsNullOrWhiteSpace(requestedStatus) ||
-            string.Equals(requestedStatus, "all", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return string.Equals(result.Outcome.ToString(), requestedStatus, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(result.InspectionStatus?.ToString(), requestedStatus, StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool MatchesStatus(StationResultSummaryDto result, string? requestedStatus) =>
+        StationOutcomeStatisticsBuilder.MatchesStatus(result, requestedStatus);
 
     private static bool MatchesText(string? value, string? requestedValue)
     {
@@ -1111,6 +1070,11 @@ public sealed class StationRegistryService
             ImageId = result.ImageId,
             Outcome = result.Outcome,
             InspectionStatus = result.InspectionStatus,
+            ExecutionOutcome = result.ExecutionOutcome,
+            DecisionOutcome = result.DecisionOutcome,
+            HasJudgmentSignal = result.HasJudgmentSignal,
+            DecisionSource = result.DecisionSource,
+            ReasonCode = result.ReasonCode,
             ExecutionTimeMs = result.ExecutionTimeMs,
             DiagnosticCode = result.DiagnosticCode,
             DiagnosticMessage = result.DiagnosticMessage,
@@ -1270,9 +1234,21 @@ public sealed class StationRegistryService
 
         public int SessionErrorCount { get; set; }
 
+        public InspectionOutcomeStatistics? SessionOutcomeStatistics { get; set; }
+
         public RuntimeRunOutcome? LastOutcome { get; set; }
 
         public InspectionStatus? LastInspectionStatus { get; set; }
+
+        public ExecutionOutcome? LastExecutionOutcome { get; set; }
+
+        public DecisionOutcome? LastDecisionOutcome { get; set; }
+
+        public bool? LastHasJudgmentSignal { get; set; }
+
+        public string? LastDecisionSource { get; set; }
+
+        public string? LastReasonCode { get; set; }
 
         public string? LastDiagnosticCode { get; set; }
 

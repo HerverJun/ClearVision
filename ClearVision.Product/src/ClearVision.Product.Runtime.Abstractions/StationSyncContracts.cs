@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Runtime.Abstractions;
 
@@ -10,7 +12,7 @@ public static class StationSyncContractDefaults
     /// <summary>
     /// Current schema version for Station sync payloads.
     /// </summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>
     /// SignalR hub route used by Station clients.
@@ -312,6 +314,13 @@ public sealed class StationHeartbeatDto
     /// <summary>Session error count reported by the runtime host.</summary>
     public int SessionErrorCount { get; set; }
 
+    /// <summary>
+    /// Canonical session outcome statistics. Null means this is a legacy Station payload
+    /// and the three compatibility counters must be projected in Studio.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public InspectionOutcomeStatistics? SessionOutcomeStatistics { get; set; }
+
     /// <summary>Number of locally queued result summaries waiting for ACK.</summary>
     public int SpoolPendingCount { get; set; }
 
@@ -399,6 +408,12 @@ public sealed class StationSnapshotDto
 
     /// <summary>Session error count reported by the runtime host.</summary>
     public int SessionErrorCount { get; set; }
+
+    /// <summary>
+    /// Canonical session outcome statistics. Null is preserved for legacy Station payloads.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public InspectionOutcomeStatistics? SessionOutcomeStatistics { get; set; }
 
     /// <summary>When this payload was created.</summary>
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
@@ -541,6 +556,30 @@ public sealed class StationResultSummaryDto
 
     /// <summary>Normalized inspection status when available.</summary>
     public InspectionStatus? InspectionStatus { get; set; }
+
+    /// <summary>
+    /// Canonical execution outcome. Null means the sender uses the legacy Outcome projection.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ExecutionOutcome? ExecutionOutcome { get; set; }
+
+    /// <summary>
+    /// Canonical decision outcome. Null means the sender uses the legacy Outcome projection.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DecisionOutcome? DecisionOutcome { get; set; }
+
+    /// <summary>Whether the runtime observed a usable judgment signal.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? HasJudgmentSignal { get; set; }
+
+    /// <summary>Canonical final-decision source when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DecisionSource { get; set; }
+
+    /// <summary>Stable canonical reason code distinct from transport diagnostics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReasonCode { get; set; }
 
     /// <summary>End-to-end execution time in milliseconds.</summary>
     public long ExecutionTimeMs { get; set; }

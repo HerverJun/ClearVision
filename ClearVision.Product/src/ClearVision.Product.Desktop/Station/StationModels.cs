@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Runtime.Abstractions;
 
 namespace ClearVision.Product.Desktop.Station;
@@ -62,6 +63,35 @@ public sealed class StationSummaryViewModel
 
     public int TotalErrorCount { get; set; }
 
+    /// <summary>Canonical aggregate of the latest Station session counters.</summary>
+    public InspectionOutcomeStatistics OutcomeStatistics { get; set; } = new();
+
+    public int TotalAttemptCount => OutcomeStatistics.TotalAttemptCount;
+
+    public int ExecutionSucceededCount => OutcomeStatistics.ExecutionSucceededCount;
+
+    public int ValidDecisionCount => OutcomeStatistics.ValidDecisionCount;
+
+    public int UndeterminedCount => OutcomeStatistics.UndeterminedCount;
+
+    public int NotApplicableCount => OutcomeStatistics.NotApplicableCount;
+
+    public int InvalidCount => OutcomeStatistics.InvalidCount;
+
+    public int FailedCount => OutcomeStatistics.FailedCount;
+
+    public int CancelledCount => OutcomeStatistics.CancelledCount;
+
+    public int TimedOutCount => OutcomeStatistics.TimedOutCount;
+
+    public int SkippedCount => OutcomeStatistics.SkippedCount;
+
+    public int ExecutionFailureCount => OutcomeStatistics.ExecutionFailureCount;
+
+    public double YieldRate => OutcomeStatistics.YieldRate;
+
+    public double DecisionCoverageRate => OutcomeStatistics.DecisionCoverageRate;
+
     public double AverageExecutionTimeMs { get; set; }
 
     public int OfflineThresholdSeconds { get; set; }
@@ -123,9 +153,24 @@ public class StationStatusViewModel
 
     public int SessionErrorCount { get; set; }
 
+    /// <summary>Canonical session counters, projected from legacy counters when absent.</summary>
+    public InspectionOutcomeStatistics SessionOutcomeStatistics { get; set; } = new();
+
+    public bool SessionOutcomeStatisticsIsLegacyProjection { get; set; }
+
     public RuntimeRunOutcome? LastOutcome { get; set; }
 
     public InspectionStatus? LastInspectionStatus { get; set; }
+
+    public ExecutionOutcome? LastExecutionOutcome { get; set; }
+
+    public DecisionOutcome? LastDecisionOutcome { get; set; }
+
+    public bool? LastHasJudgmentSignal { get; set; }
+
+    public string? LastDecisionSource { get; set; }
+
+    public string? LastReasonCode { get; set; }
 
     public string? LastDiagnosticCode { get; set; }
 

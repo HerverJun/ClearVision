@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station.Sync;
@@ -93,6 +94,37 @@ public sealed class StationOfflineReplayTests
             restarted.AckedSequenceId.Should().Be(3);
             restarted.GetPendingBatch(10).Should().BeEmpty();
             File.ReadLines(spoolFilePath).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteTempDirectory(spoolDirectory);
+        }
+    }
+
+    [Fact]
+    public void OfflineSpool_ShouldPreserveCanonicalOutcomeFieldsAcrossRestart()
+    {
+        var spoolDirectory = CreateTempDirectory();
+        try
+        {
+            var source = BuildResult(0, "run-canonical-replay");
+            source.Outcome = RuntimeRunOutcome.Error;
+            source.InspectionStatus = InspectionStatus.Error;
+            source.ExecutionOutcome = ExecutionOutcome.Succeeded;
+            source.DecisionOutcome = DecisionOutcome.Invalid;
+            source.HasJudgmentSignal = false;
+            source.DecisionSource = "FinalDecisionBinding:judge:Judgment";
+            source.ReasonCode = "DecisionValueInvalid";
+
+            var spool = CreateSpool(spoolDirectory, maxBufferedResults: 10);
+            spool.Enqueue(source);
+
+            var replayed = CreateSpool(spoolDirectory, maxBufferedResults: 10).GetPendingBatch(10).Single();
+            replayed.ExecutionOutcome.Should().Be(ExecutionOutcome.Succeeded);
+            replayed.DecisionOutcome.Should().Be(DecisionOutcome.Invalid);
+            replayed.HasJudgmentSignal.Should().BeFalse();
+            replayed.DecisionSource.Should().Be("FinalDecisionBinding:judge:Judgment");
+            replayed.ReasonCode.Should().Be("DecisionValueInvalid");
         }
         finally
         {

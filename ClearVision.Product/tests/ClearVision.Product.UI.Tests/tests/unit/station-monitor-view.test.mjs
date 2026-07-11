@@ -95,6 +95,26 @@ test('station monitor normalizes server statistics for the result workbench', as
   assert.equal(stats.hourlyTrend[0].count, 3);
 });
 
+test('station monitor preserves explicit zero execution failures over legacy error count', async () => {
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+
+  const view = Object.create(StationMonitorView.prototype);
+  const statistics = view.normalizeResultStatistics({
+    totalAttemptCount: 2,
+    executionSucceededCount: 2,
+    invalidCount: 2,
+    failedCount: 0,
+    timedOutCount: 0,
+    executionFailureCount: 0,
+    errorCount: 2
+  });
+
+  assert.equal(statistics.invalid, 2);
+  assert.equal(statistics.executionFailures, 0);
+});
+
 test('station monitor skips KPI DOM rebuild when summary signature is unchanged', async () => {
   const { StationMonitorView } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'

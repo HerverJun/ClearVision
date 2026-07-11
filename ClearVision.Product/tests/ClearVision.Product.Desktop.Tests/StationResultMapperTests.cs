@@ -1,5 +1,6 @@
 using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station.Sync;
+using ClearVision.Product.Core.Outcomes;
 using FluentAssertions;
 
 namespace ClearVision.Product.Desktop.Tests;
@@ -17,6 +18,11 @@ public sealed class StationResultMapperTests
             FlowHash = "sha256:flow",
             ImageId = "image-1",
             Outcome = RuntimeRunOutcome.Ok,
+            ExecutionOutcome = ExecutionOutcome.Succeeded,
+            DecisionOutcome = DecisionOutcome.Ok,
+            HasJudgmentSignal = true,
+            DecisionSource = "FinalDecisionBinding:judge:Judgment",
+            ReasonCode = "DecisionResolved",
             ExecutionTimeMs = 12,
             DiagnosticCode = "OK",
             StartedAtUtc = DateTimeOffset.UtcNow.AddMilliseconds(-12),
@@ -53,6 +59,11 @@ public sealed class StationResultMapperTests
             key.Contains("base64", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("binaryBlob", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("scene", StringComparison.OrdinalIgnoreCase) ||
-            key.Contains("artifactPayload", StringComparison.OrdinalIgnoreCase));
+               key.Contains("artifactPayload", StringComparison.OrdinalIgnoreCase));
+        summary.ExecutionOutcome.Should().Be(ExecutionOutcome.Succeeded);
+        summary.DecisionOutcome.Should().Be(DecisionOutcome.Ok);
+        summary.HasJudgmentSignal.Should().BeTrue();
+        summary.DecisionSource.Should().Be("FinalDecisionBinding:judge:Judgment");
+        summary.ReasonCode.Should().Be("DecisionResolved");
     }
 }

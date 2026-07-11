@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 4;
+    public const int CurrentSqliteSchemaVersion = 5;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -698,6 +698,7 @@ internal static class VisionDatabaseMaintenance
         }
 
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
+        await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken);
         await SetUserVersionAsync(dbContext.Database.GetDbConnection(), CurrentSqliteSchemaVersion, cancellationToken);
@@ -758,6 +759,8 @@ internal static class VisionDatabaseMaintenance
             await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
         }
 
+        await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
+
         if (!await ColumnExistsAsync(
                 dbContext.Database.GetDbConnection(),
                 "StationPackageRecords",
@@ -767,6 +770,55 @@ internal static class VisionDatabaseMaintenance
             await dbContext.Database.ExecuteSqlRawAsync(
                 """ALTER TABLE "StationPackageRecords" ADD COLUMN "PackageKind" TEXT NOT NULL DEFAULT 'Production';""",
                 cancellationToken);
+        }
+    }
+
+    private static async Task EnsureStationCanonicalOutcomeSchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            if (!await TableExistsAsync(connection, "StationResultSummaries", cancellationToken))
+            {
+                return;
+            }
+
+            foreach (var column in new[]
+                     {
+                         (Name: "ExecutionOutcome", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionOutcome\" TEXT NULL;"),
+                         (Name: "DecisionOutcome", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"DecisionOutcome\" TEXT NULL;"),
+                         (Name: "HasJudgmentSignal", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"HasJudgmentSignal\" INTEGER NULL;"),
+                         (Name: "DecisionSource", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"DecisionSource\" TEXT NULL;"),
+                         (Name: "ReasonCode", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ReasonCode\" TEXT NULL;")
+                     })
+            {
+                if (!await ColumnExistsAsync(connection, "StationResultSummaries", column.Name, cancellationToken))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
+                }
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_StationResultSummaries_StationId_ExecutionOutcome_DecisionOutcome"
+                ON "StationResultSummaries" ("StationId", "ExecutionOutcome", "DecisionOutcome");
+                """,
+                cancellationToken);
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
         }
     }
 
@@ -1156,6 +1208,11 @@ internal static class VisionDatabaseMaintenance
         "column:StationPackageRecords.PackageKind",
         "table:StationResultSummaries",
         "table:StationSyncCursors",
+        "column:StationResultSummaries.ExecutionOutcome",
+        "column:StationResultSummaries.DecisionOutcome",
+        "column:StationResultSummaries.HasJudgmentSignal",
+        "column:StationResultSummaries.DecisionSource",
+        "column:StationResultSummaries.ReasonCode",
         "index:IX_StationAlarmEvents_AlarmId",
         "index:IX_StationAlarmEvents_StationId_IsActive",
         "index:IX_StationAuditRecords_AuditId",
@@ -1174,6 +1231,7 @@ internal static class VisionDatabaseMaintenance
         "index:IX_StationPackageRecords_PackageId",
         "index:IX_StationResultSummaries_MessageId",
         "index:IX_StationResultSummaries_StationId_CompletedAtUtc",
+        "index:IX_StationResultSummaries_StationId_ExecutionOutcome_DecisionOutcome",
         "index:IX_StationResultSummaries_StationId_SequenceId",
         "index:IX_StationSyncCursors_StationId"
     };

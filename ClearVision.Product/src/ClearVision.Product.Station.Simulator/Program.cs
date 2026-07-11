@@ -1,3 +1,4 @@
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -42,7 +43,7 @@ internal static class Program
         var controlSequenceId = 0L;
         var okCount = 0;
         var ngCount = 0;
-        var errorCount = 0;
+        var failedCount = 0;
         var lastHeartbeatAtUtc = DateTimeOffset.MinValue;
         var lastHealthAtUtc = DateTimeOffset.MinValue;
         var lastCommandPollAtUtc = DateTimeOffset.MinValue;
@@ -64,7 +65,7 @@ internal static class Program
                 {
                     await connection.InvokeAsync<StationAckDto>(
                         StationHubMethods.Heartbeat,
-                        BuildHeartbeat(stationId, index, Interlocked.Increment(ref controlSequenceId), okCount, ngCount, errorCount),
+                        BuildHeartbeat(stationId, index, Interlocked.Increment(ref controlSequenceId), okCount, ngCount, failedCount),
                         cancellationToken);
                     lastHeartbeatAtUtc = now;
                 }
@@ -99,16 +100,16 @@ internal static class Program
                     random,
                     options.NgProbability,
                     options.ErrorProbability);
-                switch (result.Outcome)
+                switch (result.DecisionOutcome)
                 {
-                    case RuntimeRunOutcome.Ok:
+                    case DecisionOutcome.Ok:
                         okCount++;
                         break;
-                    case RuntimeRunOutcome.Ng:
+                    case DecisionOutcome.Ng:
                         ngCount++;
                         break;
                     default:
-                        errorCount++;
+                        failedCount++;
                         break;
                 }
 
@@ -200,7 +201,7 @@ internal static class Program
         long sequenceId,
         int okCount,
         int ngCount,
-        int errorCount)
+        int failedCount)
     {
         return new StationHeartbeatDto
         {
@@ -217,7 +218,16 @@ internal static class Program
             CurrentRunId = $"sim-run-{sequenceId}",
             SessionOkCount = okCount,
             SessionNgCount = ngCount,
-            SessionErrorCount = errorCount,
+            SessionErrorCount = failedCount,
+            SessionOutcomeStatistics = new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = okCount + ngCount + failedCount,
+                ExecutionSucceededCount = okCount + ngCount,
+                ValidDecisionCount = okCount + ngCount,
+                OkCount = okCount,
+                NgCount = ngCount,
+                FailedCount = failedCount
+            },
             StationLocalOffsetMinutes = (int)TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.Now).TotalMinutes,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
@@ -266,6 +276,15 @@ internal static class Program
             : roll < errorProbability + ngProbability
                 ? RuntimeRunOutcome.Ng
                 : RuntimeRunOutcome.Ok;
+        var executionOutcome = outcome == RuntimeRunOutcome.Error
+            ? ExecutionOutcome.Failed
+            : ExecutionOutcome.Succeeded;
+        var decisionOutcome = outcome switch
+        {
+            RuntimeRunOutcome.Ok => DecisionOutcome.Ok,
+            RuntimeRunOutcome.Ng => DecisionOutcome.Ng,
+            _ => DecisionOutcome.Undetermined
+        };
         return new StationResultSummaryDto
         {
             StationId = stationId,
@@ -279,6 +298,11 @@ internal static class Program
             FlowHash = "sim-flow",
             ImageId = $"frame-{sequenceId:000000}",
             Outcome = outcome,
+            ExecutionOutcome = executionOutcome,
+            DecisionOutcome = decisionOutcome,
+            HasJudgmentSignal = decisionOutcome is DecisionOutcome.Ok or DecisionOutcome.Ng,
+            DecisionSource = "Simulator",
+            ReasonCode = outcome == RuntimeRunOutcome.Ok ? "SIM_OK" : outcome == RuntimeRunOutcome.Ng ? "SIM_NG" : "SIM_FAILED",
             ExecutionTimeMs = random.Next(40, 240),
             DiagnosticCode = outcome == RuntimeRunOutcome.Ok ? "OK" : outcome == RuntimeRunOutcome.Ng ? "SIM_NG" : "SIM_ERROR",
             DiagnosticMessage = outcome == RuntimeRunOutcome.Ok ? null : "Simulator generated condition.",
