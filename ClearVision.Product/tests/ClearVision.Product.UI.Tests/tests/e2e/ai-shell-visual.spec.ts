@@ -175,6 +175,63 @@ async function switchCompactPane(page: Page, pane: 'workbench' | 'conversation')
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
+async function restoreLegacySession(page: Page, options: { messageOnly?: boolean } = {}): Promise<void> {
+  await page.evaluate(({ messageOnly }) => {
+    const panel = (window as any).aiPanel;
+    const sessionId = messageOnly ? 'legacy-message-only' : 'legacy-result-only';
+    const requestId = `${sessionId}-request`;
+    const navigationEpoch = Number(panel.sessionNavigationEpoch || 0);
+    panel.pendingSessionLoad = {
+      sessionId,
+      source: 'history_switch',
+      epoch: navigationEpoch,
+      requestId,
+    };
+    const history = messageOnly
+      ? [
+          { role: 'user', message: '恢复这条只有历史消息的会话' },
+          { role: 'assistant', message: '历史消息已恢复，但没有方案或构建结果。' },
+        ]
+      : [
+          { role: 'user', message: '恢复旧版构建结果' },
+          {
+            role: 'assistant',
+            message: '历史构建结果已恢复。',
+            payload: {
+              reply: '历史构建结果已恢复。',
+              buildResult: {
+                status: 'completed',
+                applyGate: {
+                  canvasApplyReady: false,
+                  blocked: true,
+                  status: 'blocked',
+                },
+              },
+              applyGate: {
+                canvasApplyReady: false,
+                blocked: true,
+                status: 'blocked',
+              },
+            },
+          },
+        ];
+    panel._handleGetAiSessionResult({
+      payload: {
+        success: true,
+        sessionId,
+        requestId,
+        navigationEpoch,
+        session: {
+          sessionId,
+          history,
+          workspaceSnapshot: null,
+          updatedAtUtc: '2026-07-11T08:00:00.000Z',
+        },
+      },
+    });
+  }, options);
+}
+
 test('default startup uses legacy AiPanel and idle examples only fill the composer', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768 });
 
@@ -214,6 +271,142 @@ test('default startup uses legacy AiPanel and idle examples only fill the compos
   await expect(page.locator('#ai-btn-start-build')).toHaveCount(0);
   await expect(page.locator('#ai-btn-apply')).toHaveCount(1);
   await expectNoPageOverflow(page);
+});
+
+test('Router pending activates the shell before the first canonical result without opening business gates', async ({ page }) => {
+  let releaseRouter!: () => void;
+  let markRouterRequested!: () => void;
+  const routerRequested = new Promise<void>(resolve => { markRouterRequested = resolve; });
+  const routerReleased = new Promise<void>(resolve => { releaseRouter = resolve; });
+  await page.route('**/api/ai/agent-intent-router-runs', async route => {
+    markRouterRequested();
+    await routerReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        intent: 'ambiguous_vision_requirement',
+        confidence: 'medium',
+        shouldOpenPlan: false,
+        shouldBuildDirectly: false,
+        canPlan: true,
+        canBuild: false,
+        needsClarification: true,
+        publicReason: '请补充检测对象。',
+        assistantReply: '请补充检测对象。',
+        metadataOnly: true,
+      }),
+    });
+  });
+  await openAi(page, { width: 1366, height: 768 });
+
+  await page.locator('#ai-input').fill('帮我创建一个检测任务');
+  await page.locator('#ai-btn-gen').click();
+  await routerRequested;
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'active');
+  await expect(page.locator('.ai-message.user')).toContainText('帮我创建一个检测任务');
+  await expect(page.locator('#ai-chat-container')).toContainText('正在判断请求类型');
+  await expect(page.locator('#ai-input')).toBeVisible();
+  await expect(page.locator('#ai-btn-start-build')).toHaveCount(0);
+  await expect(page.locator('#ai-btn-apply')).toBeDisabled();
+  const pendingGate = await page.evaluate(() => ({
+    phase: (window as any).aiPanel.agentWorkspaceState.projection.phase,
+    canBuild: (window as any).aiPanel.agentWorkspaceState.projection.buildAction.canBuild,
+    applyStatus: (window as any).aiPanel.agentWorkspaceState.apply.status,
+  }));
+  expect(pendingGate).toEqual({ phase: 'idle', canBuild: false, applyStatus: 'idle' });
+
+  releaseRouter();
+  await expect(page.locator('[data-ai-hook="task-phase"]')).toHaveText('正在判断请求类型');
+  await expect.poll(() => page.evaluate(() => (window as any).aiPanel.agentWorkspaceState.projection.phase)).toBe('routing');
+  await expect(page.locator('#ai-btn-apply')).toBeDisabled();
+});
+
+test('legacy Result-only restore stays active while Apply remains governed by the existing gate', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await restoreLegacySession(page);
+
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'active');
+  await expect(page.locator('#ai-chat-container')).toContainText('历史构建结果已恢复');
+  await expect(page.locator('[data-ai-hook="workbench-pane"]')).toBeVisible();
+  await expect(page.locator('#ai-result-summary')).not.toHaveText('--');
+  await expect(page.locator('#ai-btn-apply')).toBeDisabled();
+  const restored = await page.evaluate(() => ({
+    plan: (window as any).aiPanel.agentWorkspaceState.plan,
+    projectionPhase: (window as any).aiPanel.agentWorkspaceState.projection.phase,
+    applyStatus: (window as any).aiPanel.agentWorkspaceState.apply.status,
+  }));
+  expect(restored).toEqual({ plan: null, projectionPhase: 'idle', applyStatus: 'idle' });
+  await expect(page.locator('[data-ai-hook="idle-intro"]')).toBeHidden();
+});
+
+test('message-only restore activates conversation without inventing a result or primary action', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await restoreLegacySession(page, { messageOnly: true });
+
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'active');
+  await expect(page.locator('#ai-chat-container')).toContainText('恢复这条只有历史消息的会话');
+  await expect(page.locator('[data-ai-hook="task-primary-action"] button')).toHaveCount(0);
+  await expect(page.locator('#ai-result-summary')).toHaveText('--');
+  await expect(page.locator('[data-ai-hook="idle-intro"]')).toBeHidden();
+});
+
+test('event-only Result and RESET synchronize the shell without changing canonical gates', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  const before = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    const gate = structuredClone(panel.agentWorkspaceState.projection.buildAction);
+    const apply = structuredClone(panel.agentWorkspaceState.apply);
+    panel._dispatchAgentWorkspaceEvent({
+      type: 'workspace/result-received',
+      payload: { result: { aiExplanation: 'Result-only canonical payload' } },
+    });
+    return { gate, apply };
+  });
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'active');
+  const afterResult = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    return {
+      phase: panel.agentWorkspaceState.projection.phase,
+      gate: panel.agentWorkspaceState.projection.buildAction,
+      apply: panel.agentWorkspaceState.apply,
+    };
+  });
+  expect(afterResult.phase).toBe('idle');
+  expect(afterResult.gate).toEqual(before.gate);
+  expect(afterResult.apply).toEqual(before.apply);
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.lastUserPrompt = '';
+    panel.activeGenerateRequestId = null;
+    panel.activeIntentRouterRequestId = null;
+    panel.isGenerating = false;
+    panel._dispatchAgentWorkspaceEvent({ type: 'workspace/reset', payload: { preserveSession: true } });
+  });
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'idle');
+  await expect(page.locator('[data-ai-hook="workbench-pane"]')).toBeHidden();
+  await expect(page.locator('[data-ai-hook="idle-intro"]')).toBeVisible();
+});
+
+test('repeated shell synchronization does not duplicate recent-task navigation', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.history = [{
+      sessionId: 'recent-once',
+      lastMessage: '只切换一次的历史任务',
+      updatedAtUtc: '2026-07-11T08:00:00.000Z',
+      turnCount: 2,
+    }];
+    panel.__shellSwitchCount = 0;
+    panel._switchToSession = () => { panel.__shellSwitchCount += 1; };
+    panel._renderHistoryList();
+    panel._renderHistoryList();
+    panel._renderAgentWorkspaceOverview();
+  });
+  await page.locator('[data-ai-hook="idle-recent-item"]').click();
+  await expect.poll(() => page.evaluate(() => (window as any).aiPanel.__shellSwitchCount)).toBe(1);
 });
 
 test('active desktop shell keeps workbench left, conversation right, and one primary action', async ({ page }) => {
