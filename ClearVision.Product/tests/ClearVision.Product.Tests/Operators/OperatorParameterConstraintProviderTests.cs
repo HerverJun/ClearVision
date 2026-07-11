@@ -60,8 +60,7 @@ public sealed class OperatorParameterConstraintProviderTests
             new Dictionary<string, object?> { ["SourceType"] = "Camera" });
         cameraViolations.Should().ContainSingle(item =>
             item.Code == "at-least-one" &&
-            item.ParameterNames.Contains("CameraId") &&
-            item.ParameterNames.Contains("CameraBindingId"));
+            item.ParameterNames.SequenceEqual(new[] { "CameraId" }));
 
         OperatorParameterConstraintEvaluator.Validate(
                 metadata,
@@ -102,6 +101,18 @@ public sealed class OperatorParameterConstraintProviderTests
         conflict.EffectiveValues["CameraId"].Should().Be("canonical-camera");
         conflict.Diagnostics.Should().HaveCount(2);
         conflict.Diagnostics.Should().OnlyContain(item => item.Code == "canonical-overrides-alias");
+
+        var defaultConflict = OperatorParameterConstraintEvaluator.Canonicalize(
+            metadata,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["CameraId"] = string.Empty,
+                ["CameraBindingId"] = "binding-camera"
+            });
+        defaultConflict.ExplicitValues["CameraId"].Should().Be(string.Empty);
+        defaultConflict.EffectiveValues["CameraId"].Should().Be(string.Empty);
+        defaultConflict.Diagnostics.Should().ContainSingle(item =>
+            item.Code == "canonical-overrides-alias" && item.AliasParameter == "CameraBindingId");
     }
 
     [Theory]
@@ -345,6 +356,30 @@ public sealed class OperatorParameterConstraintProviderTests
                 item.Code == "required" &&
                 item.ParameterNames.SequenceEqual(new[] { "FilePath" }) &&
                 item.ResourceKind == "output_file");
+    }
+
+    [Fact]
+    public void ResourceDefaults_ShouldRequireAnExplicitConfigurationForDeploymentValidation()
+    {
+        var imageSave = _factory.GetMetadata(OperatorType.ImageSave)!;
+
+        OperatorParameterConstraintEvaluator.Validate(
+                imageSave,
+                new Dictionary<string, object?>(),
+                requireExplicitResourceConfiguration: true)
+            .Should().ContainSingle(item =>
+                item.Code == "required" &&
+                item.ParameterNames.SequenceEqual(new[] { "Directory" }) &&
+                item.ResourceKind == "output_file");
+
+        OperatorParameterConstraintEvaluator.Validate(
+                imageSave,
+                new Dictionary<string, object?>
+                {
+                    ["Directory"] = "C:\\ClearVision\\NG_Images"
+                },
+                requireExplicitResourceConfiguration: true)
+            .Should().BeEmpty("an explicitly supplied resource value may equal its metadata default");
     }
 
     [Fact]

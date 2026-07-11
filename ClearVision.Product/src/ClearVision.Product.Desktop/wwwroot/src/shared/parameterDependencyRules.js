@@ -158,11 +158,6 @@ export function isParameterRawRequired(param) {
     return Boolean(param?.isRequired ?? param?.IsRequired);
 }
 
-function valuesEquivalent(left, right) {
-    if (left === right) return true;
-    return String(left ?? '').trim().toLowerCase() === String(right ?? '').trim().toLowerCase();
-}
-
 function getParameterValueInfo(param) {
     const hasValue = Boolean(param) && (
         Object.prototype.hasOwnProperty.call(param, 'value') ||
@@ -176,7 +171,7 @@ function getParameterValueInfo(param) {
     const defaultValue = param?.defaultValue ?? param?.DefaultValue ?? null;
     return {
         found: Boolean(param),
-        explicit: hasValue && (!hasDefault || !valuesEquivalent(value, defaultValue)),
+        explicit: hasValue,
         value: hasValue ? value : defaultValue,
         defaultValue
     };
@@ -526,7 +521,8 @@ export function getOperatorParameterStates(operator, params = null, options = {}
 }
 
 export function shouldIncludePendingParameter(operator, parameterName, options = {}) {
-    return !getParameterEffectiveState(operator, parameterName, options).effectiveDisabled;
+    const state = getParameterEffectiveState(operator, parameterName, options);
+    return !state.effectiveDisabled && !state.rule?.aliasFor;
 }
 
 export function collectEffectiveRequiredParameterErrors(operator, params = null, options = {}) {

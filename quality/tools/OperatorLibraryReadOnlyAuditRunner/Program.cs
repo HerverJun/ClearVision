@@ -26,8 +26,11 @@ try
     Console.WriteLine(
         $"Operator audit: canonical={artifacts.Summary.CanonicalOperatorCount}, " +
         $"aliases={artifacts.Summary.LegacyAliasCount}, " +
-        $"confirmed={artifacts.Summary.ConfirmedCount}, " +
+        $"static-confirmed={artifacts.Summary.ConfirmedCount}, " +
+        $"accepted-intentional-differences={artifacts.Summary.Review.IntentionalDifferenceCount}, " +
+        $"open-production-defects={artifacts.Summary.Review.OpenProductionDefectCount}, " +
         $"new-confirmed={artifacts.Summary.NewConfirmedCount}, " +
+        $"new-confirmed-gate={(artifacts.Summary.NewConfirmedCount == 0 ? "pass" : "fail")}, " +
         $"candidate={artifacts.Summary.CandidateCount}, " +
         $"not-reproduced={artifacts.Summary.NotReproducedCount}");
 

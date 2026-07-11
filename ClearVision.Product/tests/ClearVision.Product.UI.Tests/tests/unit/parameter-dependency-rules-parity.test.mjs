@@ -20,10 +20,8 @@ function imageAcquisitionConstraints() {
     {
       parameter: 'CameraBindingId',
       requiredPolicy: 'optional',
-      requiredWhen: { all: [{ parameter: 'SourceType', comparison: 'equals', value: 'Camera' }] },
-      disabledWhen: { all: [{ parameter: 'SourceType', comparison: 'equals', value: 'File' }] },
-      atLeastOneGroup: 'image-camera-source',
-      aliasFor: 'CameraId'
+      aliasFor: 'CameraId',
+      deprecated: true
     },
     {
       parameter: 'cameraId',
@@ -54,10 +52,9 @@ test('pending sentinel contract is exact and does not classify business todo val
   }
 });
 
-test('canonical parameter value wins over aliases and aliases win over metadata defaults', () => {
+test('a present canonical parameter wins over aliases, including when it equals its metadata default', () => {
   const aliasOnly = acquisition([
     { name: 'SourceType', value: 'Camera', defaultValue: 'File' },
-    { name: 'CameraId', value: '', defaultValue: '' },
     { name: 'CameraBindingId', value: 'binding-camera' }
   ]);
   assert.equal(getOperatorParameterValue(aliasOnly, 'CameraId'), 'binding-camera');
@@ -65,10 +62,19 @@ test('canonical parameter value wins over aliases and aliases win over metadata 
 
   const legacyAlias = acquisition([
     { name: 'SourceType', value: 'Camera', defaultValue: 'File' },
-    { name: 'CameraId', value: '', defaultValue: '' },
     { name: 'cameraId', value: 'legacy-camera' }
   ]);
   assert.equal(getOperatorParameterValue(legacyAlias, 'CameraId'), 'legacy-camera');
+
+  const canonicalDefaultConflict = acquisition([
+    { name: 'SourceType', value: 'Camera', defaultValue: 'File' },
+    { name: 'CameraId', value: '', defaultValue: '' },
+    { name: 'CameraBindingId', value: 'binding-camera' },
+    { name: 'cameraId', value: 'legacy-camera' }
+  ]);
+  assert.equal(getOperatorParameterValue(canonicalDefaultConflict, 'CameraId'), '');
+  assert.equal(getOperatorParameterValue(canonicalDefaultConflict, 'CameraBindingId'), '');
+  assert.equal(getOperatorParameterValue(canonicalDefaultConflict, 'cameraId'), '');
 
   const conflict = acquisition([
     { name: 'SourceType', value: 'Camera', defaultValue: 'File' },
@@ -89,7 +95,7 @@ test('pending and business todo values produce the same property-panel readiness
   ]);
   const pendingErrors = collectEffectiveRequiredParameterErrors(pending);
   assert.equal(pendingErrors.length, 1);
-  assert.equal(pendingErrors[0].kind, 'atLeastOneOf');
+  assert.equal(pendingErrors[0].kind, 'required');
 
   const businessTodo = acquisition([
     { name: 'SourceType', value: 'Camera', defaultValue: 'File' },

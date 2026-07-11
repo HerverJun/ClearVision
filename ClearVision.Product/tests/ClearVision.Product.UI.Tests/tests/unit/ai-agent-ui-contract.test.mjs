@@ -9425,8 +9425,26 @@ test('AI pending draft excludes FilePath when ImageAcquisition SourceType is Cam
   const groups = panel._collectPendingDraftGroups(pending, response.flow.operators);
   const names = groups.flatMap(group => group.fields.map(field => field.parameterName));
 
-  assert.deepEqual(names.sort(), ['CameraBindingId', 'CameraId', 'SourceType'].sort());
+  assert.deepEqual(names.sort(), ['CameraId', 'SourceType'].sort());
   assert.equal(names.includes('FilePath'), false);
+  assert.equal(names.includes('CameraBindingId'), false);
+});
+
+test('parameter rules keep an explicitly present canonical default over a conflicting camera alias', async () => {
+  const { getOperatorParameterValue } = await loadParameterRules();
+  const operator = {
+    parameterConstraints: [
+      { parameter: 'CameraId' },
+      { parameter: 'CameraBindingId', aliasFor: 'CameraId', deprecated: true }
+    ],
+    parameters: [
+      { name: 'CameraId', value: '', defaultValue: '' },
+      { name: 'CameraBindingId', value: 'legacy-camera' }
+    ]
+  };
+
+  assert.equal(getOperatorParameterValue(operator, 'CameraId'), '');
+  assert.equal(getOperatorParameterValue(operator, 'CameraBindingId'), '');
 });
 
 test('AI pending draft excludes camera binding fields when ImageAcquisition SourceType is File', async () => {

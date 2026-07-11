@@ -140,6 +140,78 @@ public sealed class VisionAgentDeploymentPrepareTests
         payload.GetProperty("manualConfirmationRequired").GetBoolean().Should().BeTrue();
     }
 
+    [Fact(DisplayName = "Agent validation and precheck should not authorize output resource metadata defaults")]
+    public async Task AgentAndPrecheck_ShouldFailClosedForDefaultOutputResources()
+    {
+        var flow = new
+        {
+            operators = new[]
+            {
+                new { tempId = "op_image_save", operatorType = "ImageSave", parameters = new Dictionary<string, string?>() },
+                new { tempId = "op_text_save", operatorType = "TextSave", parameters = new Dictionary<string, string?>() }
+            },
+            connections = Array.Empty<object>()
+        };
+        var validation = await ValidateAsync(flow);
+        MissingParameters(Json(validation)).Should().Contain(["Directory", "FilePath"]);
+
+        var precheckResult = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", flow),
+                ("validationSummary", validation),
+                ("dryRunSummary", await DryRunAsync(flow))),
+            CancellationToken.None);
+
+        var precheck = Json(precheckResult.Data);
+        MissingParameters(precheck).Should().Contain(["Directory", "FilePath"]);
+        precheck.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "explicit output resource configuration with manual confirmation should pass static precheck")]
+    public async Task Precheck_ShouldAcceptExplicitConfirmedOutputResource()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), "ClearVision", "precheck", "confirmed-output.txt");
+        var flow = new
+        {
+            operators = new[]
+            {
+                new
+                {
+                    tempId = "op_text_save",
+                    operatorType = "TextSave",
+                    parameters = new Dictionary<string, string?> { ["FilePath"] = filePath }
+                }
+            },
+            connections = Array.Empty<object>()
+        };
+        var validation = await ValidateAsync(flow);
+
+        var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", flow),
+                ("validationSummary", validation),
+                ("dryRunSummary", await DryRunAsync(flow)),
+                ("manualResourceConfirmations", new[]
+                {
+                    new
+                    {
+                        resourceType = "output_file",
+                        operatorId = "op_text_save",
+                        parameterName = "FilePath",
+                        resourceKey = "op_text_save.FilePath",
+                        metadataOnly = true
+                    }
+                })),
+            CancellationToken.None);
+
+        var payload = Json(result.Data);
+        MissingParameters(payload).Should().NotContain("FilePath");
+        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+        payload.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+    }
+
     [Fact(DisplayName = "runtime_package_precheck should block deployment for structural validation issues")]
     public async Task Precheck_ShouldBlockDeploymentForStructuralErrors()
     {
@@ -687,6 +759,15 @@ public sealed class VisionAgentDeploymentPrepareTests
         return payload.GetProperty(propertyName)
             .EnumerateArray()
             .Select(issue => issue.GetProperty("code").GetString() ?? string.Empty)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> MissingParameters(JsonElement payload)
+    {
+        return payload.GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString() ?? string.Empty)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToList();
     }
 

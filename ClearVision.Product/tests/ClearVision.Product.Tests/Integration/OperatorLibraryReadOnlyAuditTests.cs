@@ -105,6 +105,11 @@ public sealed class OperatorLibraryReadOnlyAuditTests
         artifacts.Report.Findings.Should().OnlyContain(item => AuditSchema.Classifications.Contains(item.Classification));
         artifacts.Json.Should().NotContain("generatedAtUtc");
         artifacts.Json.Should().NotContain("generatedAt");
+        artifacts.Markdown.Should().Contain("| Static confirmed findings |");
+        artifacts.Markdown.Should().Contain("| Accepted intentional differences | 6 |");
+        artifacts.Markdown.Should().Contain("| Open production defects | 1 |");
+        artifacts.Markdown.Should().Contain("| New confirmed gate | pass (0) |");
+        artifacts.Markdown.Should().Contain("- Open production defects: 1");
         artifacts.Summary.SchemaValid.Should().BeTrue();
     }
 

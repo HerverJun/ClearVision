@@ -95,11 +95,8 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
             Constraint(
                 "CameraBindingId",
                 OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: cameraMode,
-                disabledWhen: fileMode,
-                atLeastOneGroup: "image-camera-source",
                 aliasFor: "CameraId",
-                resourceKind: "camera_binding",
+                deprecated: true,
                 reasonCode: "IMAGE_CAMERA_BINDING_ALIAS"),
             Constraint("ExposureTime", disabledWhen: fileMode, reasonCode: "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"),
             Constraint("Gain", disabledWhen: fileMode, reasonCode: "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"),
@@ -694,11 +691,36 @@ public static class OperatorParameterConstraintEvaluator
     public static IReadOnlyList<OperatorParameterConstraintViolation> Validate(
         OperatorMetadata metadata,
         IReadOnlyDictionary<string, object?> values,
-        IReadOnlySet<string>? explicitParameterNames = null)
+        IReadOnlySet<string>? explicitParameterNames = null,
+        bool requireExplicitResourceConfiguration = false)
     {
-        var normalizedValues = Canonicalize(metadata, values, explicitParameterNames).EffectiveValues;
+        var canonicalization = Canonicalize(metadata, values, explicitParameterNames);
+        var normalizedValues = canonicalization.EffectiveValues;
         var states = ResolveStatesCore(metadata, normalizedValues);
         var violations = new List<OperatorParameterConstraintViolation>();
+
+        bool IsConfigured(OperatorParameterConstraintState state)
+        {
+            var effectiveValue = GetValue(normalizedValues, state.Constraint.Parameter);
+            if (IsMissing(effectiveValue))
+            {
+                return false;
+            }
+
+            if (IsInactiveResourceSwitch(effectiveValue))
+            {
+                return true;
+            }
+
+            if (!requireExplicitResourceConfiguration ||
+                string.IsNullOrWhiteSpace(state.Constraint.ResourceKind))
+            {
+                return true;
+            }
+
+            return canonicalization.ExplicitValues.TryGetValue(state.Constraint.Parameter, out var explicitValue) &&
+                   !IsMissing(explicitValue);
+        }
 
         foreach (var group in states
                      .Where(item => !string.IsNullOrWhiteSpace(item.Constraint.AtLeastOneGroup))
@@ -714,7 +736,7 @@ public static class OperatorParameterConstraintEvaluator
                 .Select(item => item.Constraint.Parameter)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            if (names.Any(name => !IsMissing(GetValue(normalizedValues, name))))
+            if (active.Any(IsConfigured))
             {
                 continue;
             }
@@ -758,7 +780,7 @@ public static class OperatorParameterConstraintEvaluator
         foreach (var state in states.Where(item =>
                      item.EffectiveRequired &&
                      string.IsNullOrWhiteSpace(item.Constraint.AtLeastOneGroup) &&
-                     IsMissing(GetValue(normalizedValues, item.Constraint.Parameter))))
+                     !IsConfigured(item)))
         {
             violations.Add(new OperatorParameterConstraintViolation(
                 "required",
@@ -949,6 +971,13 @@ public static class OperatorParameterConstraintEvaluator
 
     private static object? GetValue(IReadOnlyDictionary<string, object?> values, string name) =>
         values.TryGetValue(name, out var value) ? value : null;
+
+    private static bool IsInactiveResourceSwitch(object? value)
+    {
+        return value is bool boolean
+            ? !boolean
+            : bool.TryParse(value?.ToString(), out var parsed) && !parsed;
+    }
 
     private static bool ValuesEqual(object? left, object? right)
     {

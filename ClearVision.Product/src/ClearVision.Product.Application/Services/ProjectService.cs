@@ -843,11 +843,7 @@ public class ProjectService
         foreach (var parameter in opDto.Parameters)
         {
             values[parameter.Name] = parameter.Value;
-            if (aliasNames.Contains(parameter.Name) ||
-                !ParameterMetadataValueEquals(parameter.Value, parameter.DefaultValue))
-            {
-                explicitNames.Add(parameter.Name);
-            }
+            explicitNames.Add(parameter.Name);
         }
 
         var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(

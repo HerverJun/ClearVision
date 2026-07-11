@@ -162,15 +162,6 @@ public class ProjectServiceTests
                             new ParameterDto
                             {
                                 Id = Guid.NewGuid(),
-                                Name = "CameraId",
-                                DisplayName = "CameraId",
-                                DataType = "cameraBinding",
-                                Value = string.Empty,
-                                DefaultValue = string.Empty
-                            },
-                            new ParameterDto
-                            {
-                                Id = Guid.NewGuid(),
                                 Name = "CameraBindingId",
                                 DisplayName = "CameraBindingId",
                                 DataType = "string",
@@ -211,6 +202,101 @@ public class ProjectServiceTests
         execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
         await cameraManager.Received(1).GetOrCreateByBindingAsync("line-camera-01");
         (execution.OutputData!["Image"] as ImageWrapper)?.Release();
+    }
+
+    [Fact]
+    public async Task CreateAndLoadAsync_ShouldKeepExplicitCanonicalCameraDefaultOverConflictingAlias()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        Project? persistedProject = null;
+        string? persistedFlowJson = null;
+        repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
+        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+            .Returns(Task.CompletedTask);
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var request = new CreateProjectRequest
+        {
+            Name = "camera-canonical-default-round-trip",
+            Flow = new OperatorFlowDto
+            {
+                Name = "camera-canonical-default-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "camera",
+                        Type = OperatorType.ImageAcquisition,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "SourceType",
+                                DisplayName = "SourceType",
+                                DataType = "enum",
+                                Value = "Camera",
+                                DefaultValue = "File"
+                            },
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "CameraId",
+                                DisplayName = "CameraId",
+                                DataType = "cameraBinding",
+                                Value = string.Empty,
+                                DefaultValue = string.Empty
+                            },
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "CameraBindingId",
+                                DisplayName = "CameraBindingId",
+                                DataType = "string",
+                                Value = "line-camera-01"
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        var created = await service.CreateAsync(request);
+        persistedProject.Should().NotBeNull();
+        persistedFlowJson.Should().NotContain("CameraBindingId");
+        repository.GetByIdAsync(created.Id).Returns(Task.FromResult<Project?>(persistedProject));
+        storage.LoadFlowJsonAsync(created.Id).Returns(Task.FromResult(persistedFlowJson));
+
+        var loaded = await service.GetByIdAsync(created.Id);
+        var cameraOperator = loaded!.Flow!.ToEntity().Operators.Single();
+        cameraOperator.Parameters.Should().ContainSingle(parameter => parameter.Name == "CameraId")
+            .Which.Value.Should().Be(string.Empty);
+        cameraOperator.Parameters.Should().NotContain(parameter => parameter.Name == "CameraBindingId");
+    }
+
+    [Fact]
+    public async Task ImageAcquisitionRuntime_ShouldKeepARealCanonicalDefaultOverAConflictingAlias()
+    {
+        var @operator = new Operator("camera", OperatorType.ImageAcquisition, 0, 0);
+        @operator.AddParameter(new Parameter(
+            Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
+        @operator.AddParameter(new Parameter(
+            Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", string.Empty));
+        @operator.AddParameter(new Parameter(
+            Guid.NewGuid(), "CameraBindingId", "CameraBindingId", string.Empty, "cameraBinding", "line-camera-01"));
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        var executor = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager);
+
+        var execution = await executor.ExecuteAsync(@operator, new Dictionary<string, object>());
+
+        execution.IsSuccess.Should().BeFalse();
+        execution.ErrorMessage.Should().Contain("未选择相机");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
     }
 
     [Fact]

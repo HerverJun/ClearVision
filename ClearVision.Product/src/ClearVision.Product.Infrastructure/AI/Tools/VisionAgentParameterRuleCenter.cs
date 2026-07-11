@@ -78,7 +78,10 @@ internal static class VisionAgentParameterRuleCenter
                 ParameterConstraints = constraints.ToList()
             };
 
-            issues.AddRange(OperatorParameterConstraintEvaluator.Validate(metadata, values)
+            issues.AddRange(OperatorParameterConstraintEvaluator.Validate(
+                    metadata,
+                    values,
+                    requireExplicitResourceConfiguration: true)
                 .Select(violation => new VisionAgentParameterConstraintIssue(
                     op.TempId,
                     op.OperatorType,

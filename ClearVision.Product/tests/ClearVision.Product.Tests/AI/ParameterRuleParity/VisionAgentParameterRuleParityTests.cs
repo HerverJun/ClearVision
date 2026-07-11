@@ -105,8 +105,8 @@ public sealed class VisionAgentParameterRuleParityTests
         }
     }
 
-    [Fact(DisplayName = "Agent validation should canonicalize aliases, prefer canonical, and report conflicts")]
-    public async Task FlowValidation_ShouldCanonicalizeAliasesAndReportConflicts()
+    [Fact(DisplayName = "Agent validation should keep an explicit canonical default over conflicting aliases")]
+    public async Task FlowValidation_ShouldCanonicalizeAliasesAndKeepExplicitCanonicalDefaults()
     {
         var result = await new FlowValidationTool().ExecuteAsync(
             new VisionAgentToolContext(),
@@ -121,7 +121,7 @@ public sealed class VisionAgentParameterRuleParityTests
                         parameters = new Dictionary<string, object?>(StringComparer.Ordinal)
                         {
                             ["SourceType"] = "Camera",
-                            ["CameraId"] = "canonical-camera",
+                            ["CameraId"] = string.Empty,
                             ["CameraBindingId"] = "binding-camera",
                             ["cameraId"] = "legacy-camera"
                         }
@@ -136,14 +136,14 @@ public sealed class VisionAgentParameterRuleParityTests
         var parameters = payload.GetProperty("canonicalFlow")
             .GetProperty("operators")[0]
             .GetProperty("parameters");
-        parameters.GetProperty("CameraId").GetString().Should().Be("canonical-camera");
+        parameters.GetProperty("CameraId").GetString().Should().BeEmpty();
         parameters.TryGetProperty("CameraBindingId", out _).Should().BeFalse();
         parameters.TryGetProperty("cameraId", out _).Should().BeFalse();
         payload.GetProperty("warnings")
             .EnumerateArray()
             .Count(item => item.GetProperty("code").GetString() == "parameter_alias_conflict")
             .Should().Be(2);
-        MissingParameters(payload).Should().BeEmpty();
+        MissingParameters(payload).Should().ContainSingle().Which.Should().Be("CameraId");
     }
 
     [Theory(DisplayName = "Agent validation and precheck should share the exact pending sentinel contract")]

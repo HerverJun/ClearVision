@@ -59,27 +59,8 @@
       {
         "parameter": "CameraBindingId",
         "requiredPolicy": "optional",
-        "requiredWhen": {
-          "all": [
-            {
-              "parameter": "SourceType",
-              "comparison": "equals",
-              "value": "Camera"
-            }
-          ]
-        },
-        "disabledWhen": {
-          "all": [
-            {
-              "parameter": "SourceType",
-              "comparison": "equals",
-              "value": "File"
-            }
-          ]
-        },
-        "atLeastOneGroup": "image-camera-source",
         "aliasFor": "CameraId",
-        "resourceKind": "camera_binding",
+        "deprecated": true,
         "reasonCode": "IMAGE_CAMERA_BINDING_ALIAS"
       },
       {
@@ -1421,7 +1402,7 @@
           "effectiveDisabled": false
         },
         "CameraBindingId": {
-          "effectiveRequired": true,
+          "effectiveRequired": false,
           "effectiveDisabled": false
         }
       },
@@ -1449,7 +1430,7 @@
         },
         "CameraBindingId": {
           "effectiveRequired": false,
-          "effectiveDisabled": true
+          "effectiveDisabled": false
         }
       },
       "flowValidationMissingParameters": [
@@ -1914,6 +1895,7 @@
       "caseId": "tcp_no_response_ignores_stale_regex_values",
       "operatorType": "TcpCommunication",
       "parameters": {
+        "IpAddress": "127.0.0.1",
         "WaitResponse": false,
         "ResponseParseMode": "Regex",
         "ResponseRegexPattern": "<pending-regex>",
@@ -1973,6 +1955,7 @@
       "caseId": "tcp_regex_parse_requires_pattern",
       "operatorType": "TcpCommunication",
       "parameters": {
+        "IpAddress": "127.0.0.1",
         "WaitResponse": true,
         "ResponseParseMode": "Regex",
         "ResponseRegexPattern": ""
@@ -2006,6 +1989,7 @@
       "caseId": "tcp_delimited_mode_ignores_stale_fixed_width_values",
       "operatorType": "TcpCommunication",
       "parameters": {
+        "IpAddress": "127.0.0.1",
         "WaitResponse": true,
         "ResponseParseMode": "Delimited",
         "ResponseDelimiter": ",",
@@ -2040,6 +2024,7 @@
       "caseId": "tcp_key_value_requires_delimiter_groups",
       "operatorType": "TcpCommunication",
       "parameters": {
+        "IpAddress": "127.0.0.1",
         "WaitResponse": true,
         "ResponseParseMode": "KeyValue",
         "ResponseKeyValuePairDelimiter": "",

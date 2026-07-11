@@ -587,7 +587,7 @@ public abstract class OperatorBase : IOperatorExecutor
             .Select(alias => (Constraint: alias, Parameter: FindParameter(@operator, alias.Parameter)))
             .Where(item => item.Parameter != null)
             .ToArray();
-        if (IsExplicitlyConfigured(canonical))
+        if (canonical != null)
         {
             foreach (var alias in configuredAliases.Where(alias =>
                          !ParameterValuesEqual(canonical!.Value, alias.Parameter!.Value)))
@@ -603,12 +603,6 @@ public abstract class OperatorBase : IOperatorExecutor
         }
 
         return configuredAliases.FirstOrDefault().Parameter ?? canonical;
-    }
-
-    private static bool IsExplicitlyConfigured(Parameter? parameter)
-    {
-        return parameter != null &&
-               !string.Equals(parameter.ValueJson, parameter.DefaultValueJson, StringComparison.Ordinal);
     }
 
     private static bool ParameterValuesEqual(object? left, object? right)

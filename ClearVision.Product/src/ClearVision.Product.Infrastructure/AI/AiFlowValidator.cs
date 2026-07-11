@@ -428,7 +428,10 @@ public class AiFlowValidator : IAiFlowValidator
                 pair => pair.Key,
                 pair => (object?)pair.Value,
                 StringComparer.Ordinal);
-            foreach (var violation in OperatorParameterConstraintEvaluator.Validate(metadata, constraintValues))
+            foreach (var violation in OperatorParameterConstraintEvaluator.Validate(
+                         metadata,
+                         constraintValues,
+                         requireExplicitResourceConfiguration: true))
             {
                 var fieldNames = string.Join(", ", violation.ParameterNames);
                 var code = violation.Code switch
