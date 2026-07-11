@@ -672,6 +672,123 @@ public sealed class StationRegistryServiceTests
             NullLogger<StationRegistryService>.Instance);
     }
 
+    [Fact]
+    public async Task ExecutionIdentity_ShouldRoundTripRegistryDatabaseSseAndDetail()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationIdentityTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(root, "vision.db")}"))
+            .BuildServiceProvider();
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var snapshotId = Guid.NewGuid();
+            var central = CreateCentralStore(provider);
+            var registry = CreateRegistry(central);
+            registry.UpsertHeartbeat("conn", new StationHeartbeatDto
+            {
+                StationId = "station-identity",
+                State = RuntimeHostState.Running,
+                PackageId = "pkg-site",
+                PackageFlowHash = "sha256:package",
+                ExecutionFlowHash = "sha256:site-profile",
+                FlowHash = "sha256:site-profile",
+                ExecutionSnapshotId = snapshotId,
+                ProjectRevision = 42,
+                DecisionConfigurationHash = "sha256:decision",
+                ExecutionRunMode = "StationRuntime",
+                CurrentRunId = "run-site"
+            });
+            var result = BuildResult(1, "station-identity");
+            result.PackageId = "pkg-site";
+            result.PackageFlowHash = "sha256:package";
+            result.ExecutionFlowHash = "sha256:site-profile";
+            result.FlowHash = result.ExecutionFlowHash;
+            result.ExecutionSnapshotId = snapshotId;
+            result.ProjectRevision = 42;
+            result.DecisionConfigurationHash = "sha256:decision";
+            result.ExecutionRunMode = "StationRuntime";
+            result.RunId = "run-site";
+            registry.UpsertResultSummary("conn", result);
+
+            var detail = registry.GetStation("station-identity")!;
+            var sse = registry.GetSseSnapshot().Stations.Single(item => item.StationId == "station-identity");
+            detail.ExecutionFlowHash.Should().Be(result.ExecutionFlowHash);
+            detail.ExecutionSnapshotId.Should().Be(snapshotId);
+            detail.ProjectRevision.Should().Be(42);
+            detail.DecisionConfigurationHash.Should().Be(result.DecisionConfigurationHash);
+            sse.Should().BeEquivalentTo(detail, options => options.ExcludingMissingMembers());
+
+            var reloaded = CreateRegistry(CreateCentralStore(provider)).GetStation("station-identity")!;
+            reloaded.PackageFlowHash.Should().Be("sha256:package");
+            reloaded.ExecutionFlowHash.Should().Be("sha256:site-profile");
+            reloaded.FlowHash.Should().Be(reloaded.ExecutionFlowHash);
+            reloaded.ExecutionSnapshotId.Should().Be(snapshotId);
+            reloaded.ProjectRevision.Should().Be(42);
+            reloaded.DecisionConfigurationHash.Should().Be("sha256:decision");
+            reloaded.ExecutionRunMode.Should().Be("StationRuntime");
+            reloaded.CurrentRunId.Should().Be("run-site");
+
+            var persistedResult = central.GetRecentResults("station-identity", 10).Single();
+            persistedResult.PackageFlowHash.Should().Be(result.PackageFlowHash);
+            persistedResult.ExecutionFlowHash.Should().Be(result.ExecutionFlowHash);
+            persistedResult.FlowHash.Should().Be(result.ExecutionFlowHash);
+            persistedResult.ExecutionSnapshotId.Should().Be(result.ExecutionSnapshotId);
+            persistedResult.ProjectRevision.Should().Be(result.ProjectRevision);
+            persistedResult.DecisionConfigurationHash.Should().Be(result.DecisionConfigurationHash);
+            persistedResult.ExecutionRunMode.Should().Be(result.ExecutionRunMode);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void LegacyHeartbeat_ShouldProjectFlowHashWithoutInventingCanonicalIdentity()
+    {
+        var registry = CreateRegistry();
+        registry.UpsertHeartbeat("legacy", new StationHeartbeatDto
+        {
+            StationId = "legacy-station",
+            FlowHash = "sha256:legacy"
+        });
+
+        var station = registry.GetStation("legacy-station")!;
+        station.ExecutionFlowHash.Should().Be("sha256:legacy");
+        station.FlowHash.Should().Be("sha256:legacy");
+        station.PackageFlowHash.Should().BeNull();
+        station.ExecutionSnapshotId.Should().BeNull();
+        station.ProjectRevision.Should().BeNull();
+        station.DecisionConfigurationHash.Should().BeNull();
+    }
+
+    private static StationRegistryService CreateRegistry(StationCentralStore centralStore)
+    {
+        return new StationRegistryService(
+            Options.Create(new StationIngressOptions
+            {
+                Enabled = true,
+                OfflineThresholdSeconds = 15,
+                ResultBufferPerStation = 20,
+                EventBufferSize = 50
+            }),
+            NullLogger<StationRegistryService>.Instance,
+            centralStore);
+    }
+
     private static StationCentralStore CreateCentralStore(ServiceProvider provider)
     {
         return new StationCentralStore(

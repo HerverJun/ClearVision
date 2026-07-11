@@ -44,6 +44,22 @@ public sealed class StationNodeEntity
 
     public string? CurrentPackageVersion { get; set; }
 
+    public string? PackageFlowHash { get; set; }
+
+    public string? ExecutionFlowHash { get; set; }
+
+    public string? FlowHash { get; set; }
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public long? ProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
+    public string? ExecutionRunMode { get; set; }
+
+    public string? CurrentRunId { get; set; }
+
     public bool IsEnabled { get; set; } = true;
 
     public string? Remark { get; set; }
@@ -68,6 +84,18 @@ public sealed class StationResultSummaryEntity
     public string PackageVersion { get; set; } = string.Empty;
 
     public string FlowHash { get; set; } = string.Empty;
+
+    public string? PackageFlowHash { get; set; }
+
+    public string? ExecutionFlowHash { get; set; }
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public long? ProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
+    public string? ExecutionRunMode { get; set; }
 
     public string ImageId { get; set; } = string.Empty;
 

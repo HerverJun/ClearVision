@@ -886,6 +886,7 @@ public class ContinuousRuntimeTests
         }
 
         public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+            GovernedOperatorExecutionContext context,
             Operator @operator,
             Dictionary<string, object>? inputs = null,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

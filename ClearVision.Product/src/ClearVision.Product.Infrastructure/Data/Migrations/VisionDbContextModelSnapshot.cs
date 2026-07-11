@@ -740,7 +740,30 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("CurrentPackageVersion")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CurrentRunId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DecisionConfigurationHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionFlowHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionRunMode")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ExecutionSnapshotId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset>("FirstSeenAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FlowHash")
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("InspectionNodeName")
@@ -778,6 +801,13 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.Property<string>("Owner")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("PackageFlowHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ProjectRevision")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Remark")
                         .HasColumnType("TEXT");
@@ -839,6 +869,7 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.Property<string>("FlowHash")
                         .IsRequired()
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PackageId")
@@ -896,6 +927,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DecisionConfigurationHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DecisionSource")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -913,6 +948,17 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.Property<string>("ExecutionOutcome")
                         .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionFlowHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionRunMode")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ExecutionSnapshotId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FlowHash")
@@ -945,6 +991,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PackageFlowHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PackageName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -957,6 +1007,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("PrimaryOutputsPreviewJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("ProjectRevision")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReasonCode")
                         .HasMaxLength(200)

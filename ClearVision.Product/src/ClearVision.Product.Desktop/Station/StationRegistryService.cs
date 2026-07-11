@@ -25,6 +25,7 @@ public sealed class StationRegistryService
         _options = options.Value;
         _logger = logger;
         _centralStore = centralStore;
+        RestorePersistedStations();
     }
 
     public StationReplayCursorDto UpsertRegistration(
@@ -87,7 +88,13 @@ public sealed class StationRegistryService
                 heartbeat.PackageId,
                 heartbeat.PackageName,
                 heartbeat.CurrentPackageVersion,
+                heartbeat.PackageFlowHash,
+                heartbeat.ExecutionFlowHash,
                 heartbeat.FlowHash,
+                heartbeat.ExecutionSnapshotId,
+                heartbeat.ProjectRevision,
+                heartbeat.DecisionConfigurationHash,
+                heartbeat.ExecutionRunMode,
                 heartbeat.CurrentRunId,
                 heartbeat.SessionOkCount,
                 heartbeat.SessionNgCount,
@@ -120,6 +127,7 @@ public sealed class StationRegistryService
         lock (_syncRoot)
         {
             var entry = GetOrCreateEntryLocked(snapshot.StationId);
+            entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, _centralStore?.UpsertSnapshot(snapshot) ?? 0);
             ApplySnapshotLocked(
                 entry,
                 snapshot.LineName,
@@ -127,7 +135,13 @@ public sealed class StationRegistryService
                 snapshot.PackageId,
                 snapshot.PackageName,
                 snapshot.CurrentPackageVersion,
+                snapshot.PackageFlowHash,
+                snapshot.ExecutionFlowHash,
                 snapshot.FlowHash,
+                snapshot.ExecutionSnapshotId,
+                snapshot.ProjectRevision,
+                snapshot.DecisionConfigurationHash,
+                snapshot.ExecutionRunMode,
                 snapshot.CurrentRunId,
                 snapshot.SessionOkCount,
                 snapshot.SessionNgCount,
@@ -198,6 +212,14 @@ public sealed class StationRegistryService
             entry.PackageId = result.PackageId;
             entry.PackageName = result.PackageName;
             entry.PackageVersion = result.PackageVersion;
+            entry.PackageFlowHash = NullIfWhiteSpace(result.PackageFlowHash);
+            entry.ExecutionFlowHash = NullIfWhiteSpace(result.ExecutionFlowHash) ?? NullIfWhiteSpace(result.FlowHash);
+            entry.FlowHash = entry.ExecutionFlowHash;
+            entry.ExecutionSnapshotId = result.ExecutionSnapshotId;
+            entry.ProjectRevision = result.ProjectRevision == 0 ? null : result.ProjectRevision;
+            entry.DecisionConfigurationHash = NullIfWhiteSpace(result.DecisionConfigurationHash);
+            entry.ExecutionRunMode = NullIfWhiteSpace(result.ExecutionRunMode);
+            entry.CurrentRunId = NullIfWhiteSpace(result.RunId);
 
             entry.RecentResults.Insert(0, CloneResult(result));
             while (entry.RecentResults.Count > Math.Max(10, _options.ResultBufferPerStation))
@@ -516,7 +538,13 @@ public sealed class StationRegistryService
                 LastSeenAtUtc = status.LastSeenAtUtc,
                 PackageId = status.PackageId,
                 PackageName = status.PackageName,
+                PackageFlowHash = status.PackageFlowHash,
+                ExecutionFlowHash = status.ExecutionFlowHash,
                 FlowHash = status.FlowHash,
+                ExecutionSnapshotId = status.ExecutionSnapshotId,
+                ProjectRevision = status.ProjectRevision,
+                DecisionConfigurationHash = status.DecisionConfigurationHash,
+                ExecutionRunMode = status.ExecutionRunMode,
                 CurrentRunId = status.CurrentRunId,
                 SessionOkCount = status.SessionOkCount,
                 SessionNgCount = status.SessionNgCount,
@@ -767,7 +795,13 @@ public sealed class StationRegistryService
         string? packageId,
         string? packageName,
         string? packageVersion,
+        string? packageFlowHash,
+        string? executionFlowHash,
         string? flowHash,
+        Guid? executionSnapshotId,
+        long? projectRevision,
+        string? decisionConfigurationHash,
+        string? executionRunMode,
         string? currentRunId,
         int sessionOkCount,
         int sessionNgCount,
@@ -787,7 +821,13 @@ public sealed class StationRegistryService
         entry.PackageId = packageId;
         entry.PackageName = packageName;
         entry.PackageVersion = packageVersion;
-        entry.FlowHash = flowHash;
+        entry.PackageFlowHash = NullIfWhiteSpace(packageFlowHash);
+        entry.ExecutionFlowHash = NullIfWhiteSpace(executionFlowHash) ?? NullIfWhiteSpace(flowHash);
+        entry.FlowHash = entry.ExecutionFlowHash;
+        entry.ExecutionSnapshotId = executionSnapshotId;
+        entry.ProjectRevision = projectRevision;
+        entry.DecisionConfigurationHash = NullIfWhiteSpace(decisionConfigurationHash);
+        entry.ExecutionRunMode = NullIfWhiteSpace(executionRunMode);
         entry.CurrentRunId = currentRunId;
         entry.SessionOkCount = sessionOkCount;
         entry.SessionNgCount = sessionNgCount;
@@ -832,6 +872,48 @@ public sealed class StationRegistryService
         return string.IsNullOrWhiteSpace(candidate) ? existing : candidate.Trim();
     }
 
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void RestorePersistedStations()
+    {
+        if (_centralStore == null)
+        {
+            return;
+        }
+
+        foreach (var status in _centralStore.GetStationStatuses())
+        {
+            var entry = GetOrCreateEntryLocked(status.StationId);
+            entry.StationName = status.StationName;
+            entry.LineName = status.LineName;
+            entry.AreaName = status.AreaName;
+            entry.WorkcellName = status.WorkcellName;
+            entry.InspectionNodeName = status.InspectionNodeName;
+            entry.CameraAlias = status.CameraAlias;
+            entry.StationRole = status.StationRole;
+            entry.Owner = status.Owner;
+            entry.MachineName = status.MachineName;
+            entry.IsEnabled = status.IsEnabled;
+            entry.Remark = status.Remark;
+            entry.OnlineState = status.OnlineState;
+            entry.State = status.State;
+            entry.RuntimeState = status.RuntimeState;
+            entry.StartedAtUtc = status.StartedAtUtc;
+            entry.LastSeenAtUtc = status.LastSeenAtUtc;
+            entry.PackageId = status.PackageId;
+            entry.PackageName = status.PackageName;
+            entry.PackageFlowHash = status.PackageFlowHash;
+            entry.ExecutionFlowHash = status.ExecutionFlowHash;
+            entry.FlowHash = status.ExecutionFlowHash ?? status.FlowHash;
+            entry.ExecutionSnapshotId = status.ExecutionSnapshotId;
+            entry.ProjectRevision = status.ProjectRevision;
+            entry.DecisionConfigurationHash = status.DecisionConfigurationHash;
+            entry.ExecutionRunMode = status.ExecutionRunMode;
+            entry.CurrentRunId = status.CurrentRunId;
+        }
+    }
+
     private void TouchConnectionLocked(StationRegistryEntry entry, string connectionId, DateTimeOffset now)
     {
         entry.ConnectionId = connectionId;
@@ -863,7 +945,13 @@ public sealed class StationRegistryService
             LastSeenAtUtc = entry.LastSeenAtUtc,
             PackageId = entry.PackageId,
             PackageName = entry.PackageName,
+            PackageFlowHash = entry.PackageFlowHash,
+            ExecutionFlowHash = entry.ExecutionFlowHash,
             FlowHash = entry.FlowHash,
+            ExecutionSnapshotId = entry.ExecutionSnapshotId,
+            ProjectRevision = entry.ProjectRevision,
+            DecisionConfigurationHash = entry.DecisionConfigurationHash,
+            ExecutionRunMode = entry.ExecutionRunMode,
             CurrentRunId = entry.CurrentRunId,
             SessionOkCount = entry.SessionOkCount,
             SessionNgCount = entry.SessionNgCount,
@@ -1230,7 +1318,19 @@ public sealed class StationRegistryService
 
         public string? PackageVersion { get; set; }
 
+        public string? PackageFlowHash { get; set; }
+
+        public string? ExecutionFlowHash { get; set; }
+
         public string? FlowHash { get; set; }
+
+        public Guid? ExecutionSnapshotId { get; set; }
+
+        public long? ProjectRevision { get; set; }
+
+        public string? DecisionConfigurationHash { get; set; }
+
+        public string? ExecutionRunMode { get; set; }
 
         public string? CurrentRunId { get; set; }
 

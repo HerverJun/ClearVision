@@ -49,7 +49,10 @@ internal sealed class OperatorExecutionMessageHandler
             using var scope = _scopeFactory.CreateScope();
             var flowService = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
             var op = await ResolveOperatorAsync(scope.ServiceProvider, command.OperatorId);
-            var result = await flowService.ExecuteOperatorAsync(op, NormalizeDictionary(command.Inputs));
+            var result = await flowService.ExecuteOperatorAsync(
+                GovernedOperatorExecutionContext.Preview(),
+                op,
+                NormalizeDictionary(command.Inputs));
 
             _client.SendEvent(new OperatorExecutedEvent
             {

@@ -626,22 +626,12 @@ public sealed class RuntimeHost : IAsyncDisposable
     private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(string? imagePath, CancellationToken cancellationToken)
     {
         var package = _loadedPackage ?? throw new RuntimePackageException("当前尚未加载运行包。");
-        byte[]? sourceImageBytes = null;
-        if (!string.IsNullOrWhiteSpace(imagePath) && !File.Exists(imagePath))
-        {
-            throw new RuntimePackageException($"输入图片不存在：{imagePath}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(imagePath))
-        {
-            sourceImageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-        }
-
         var imageId = string.IsNullOrWhiteSpace(imagePath)
             ? BuildGeneratedImageId()
             : BuildImageId(imagePath);
         var startedAt = DateTimeOffset.UtcNow;
         var runId = Guid.NewGuid().ToString("N");
+        byte[]? sourceImageBytes = null;
         var runtimeSnapshot = package.ExecutionSnapshot
             ?? throw new RuntimePackageException("The loaded package does not contain a runtime execution snapshot.");
         try
@@ -654,6 +644,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             _currentExecutionSnapshot = runtimeSnapshot;
             _currentRunId = runId;
             EmitSnapshot();
+            sourceImageBytes = await PrepareRuntimeInputAsync(imagePath, cancellationToken);
             var flow = runtimeSnapshot.CreateExecutionFlow();
             _currentFlowId = flow.Id;
             var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
@@ -720,6 +711,23 @@ public sealed class RuntimeHost : IAsyncDisposable
                 DateTimeOffset.UtcNow);
             await PersistResultAsync(canceled, CancellationToken.None);
             return canceled;
+        }
+        catch (RuntimeInputPreparationException ex)
+        {
+            _logger.LogWarning(ex, "Runtime input preparation failed for image {ImagePath}", imagePath);
+            var failure = _resultNormalizer.CreateInputFailure(
+                package,
+                runtimeSnapshot,
+                runId,
+                imageId,
+                imagePath,
+                sourceImageBytes,
+                ex.ReasonCode,
+                ex.Message,
+                startedAt,
+                DateTimeOffset.UtcNow);
+            await PersistResultAsync(failure, CancellationToken.None);
+            return failure;
         }
         catch (Exception ex)
         {
@@ -885,6 +893,72 @@ public sealed class RuntimeHost : IAsyncDisposable
                 _sessionErrorCount += 1;
                 break;
         }
+    }
+
+    private static async Task<byte[]?> PrepareRuntimeInputAsync(
+        string? imagePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath))
+        {
+            return null;
+        }
+
+        if (!File.Exists(imagePath))
+        {
+            throw new RuntimeInputPreparationException("InputFileNotFound", $"Input image does not exist: {imagePath}");
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new RuntimeInputPreparationException("InputReadFailed", $"Failed to read input image: {ex.Message}", ex);
+        }
+
+        if (bytes.Length == 0)
+        {
+            throw new RuntimeInputPreparationException("InputImageEmpty", "Input image data is empty.");
+        }
+
+        if (!HasSupportedImageSignature(bytes, Path.GetExtension(imagePath)))
+        {
+            throw new RuntimeInputPreparationException("InputDecodeFailed", "Input image data is not a valid supported image payload.");
+        }
+
+        return bytes;
+    }
+
+    private static bool HasSupportedImageSignature(ReadOnlySpan<byte> bytes, string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".png" => bytes.Length >= 8 && bytes[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
+            ".jpg" or ".jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
+            ".bmp" => bytes.Length >= 2 && bytes[0] == (byte)'B' && bytes[1] == (byte)'M',
+            ".tif" or ".tiff" => bytes.Length >= 4 &&
+                ((bytes[0] == (byte)'I' && bytes[1] == (byte)'I' && bytes[2] == 42 && bytes[3] == 0) ||
+                 (bytes[0] == (byte)'M' && bytes[1] == (byte)'M' && bytes[2] == 0 && bytes[3] == 42)),
+            _ => false
+        };
+    }
+
+    private sealed class RuntimeInputPreparationException : Exception
+    {
+        public RuntimeInputPreparationException(string reasonCode, string message, Exception? innerException = null)
+            : base(message, innerException)
+        {
+            ReasonCode = reasonCode;
+        }
+
+        public string ReasonCode { get; }
     }
 
     private InspectionOutcomeStatistics BuildSessionOutcomeStatistics()
@@ -1426,6 +1500,33 @@ public sealed class RuntimeResultNormalizer
             InspectionStatus.Error,
             "ExecutionFailed",
             exception.Message,
+            startedAtUtc,
+            completedAtUtc);
+    }
+
+    public RuntimeNormalizedResult CreateInputFailure(
+        RuntimePackage package,
+        ExecutionSnapshot snapshot,
+        string runId,
+        string imageId,
+        string? imagePath,
+        byte[]? sourceImageBytes,
+        string reasonCode,
+        string message,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset completedAtUtc)
+    {
+        return CreateFixedResult(
+            package,
+            snapshot,
+            runId,
+            imageId,
+            imagePath,
+            sourceImageBytes,
+            RuntimeRunOutcome.Error,
+            InspectionStatus.Error,
+            reasonCode,
+            message,
             startedAtUtc,
             completedAtUtc);
     }

@@ -173,6 +173,19 @@ public sealed class RuntimeDependencyBoundaryTests
     }
 
     [Fact]
+    public void ProductFacingSingleOperatorExecution_RequiresGovernedContext()
+    {
+        var productMethod = typeof(IFlowExecutionService).GetMethods()
+            .Single(method => method.Name == nameof(IFlowExecutionService.ExecuteOperatorAsync));
+        var rawMethod = typeof(IFlowExecutionEngine).GetMethods()
+            .Single(method => method.Name == nameof(IFlowExecutionEngine.ExecuteOperatorAsync));
+
+        Assert.Equal(typeof(GovernedOperatorExecutionContext), productMethod.GetParameters()[0].ParameterType);
+        Assert.Equal(typeof(ClearVision.Product.Core.Entities.Operator), productMethod.GetParameters()[1].ParameterType);
+        Assert.Equal(typeof(ClearVision.Product.Core.Entities.Operator), rawMethod.GetParameters()[0].ParameterType);
+    }
+
+    [Fact]
     public void RuntimeWorkers_DoNotExposeOperatorFlowStartBypasses()
     {
         var inspectionBypasses = typeof(IInspectionWorker).GetMethods()

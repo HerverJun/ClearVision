@@ -254,6 +254,12 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.MachineName).HasMaxLength(200);
             entity.Property(e => e.OnlineState).HasMaxLength(50);
             entity.Property(e => e.RuntimeState).HasMaxLength(50);
+            entity.Property(e => e.PackageFlowHash).HasMaxLength(128);
+            entity.Property(e => e.ExecutionFlowHash).HasMaxLength(128);
+            entity.Property(e => e.FlowHash).HasMaxLength(128);
+            entity.Property(e => e.DecisionConfigurationHash).HasMaxLength(128);
+            entity.Property(e => e.ExecutionRunMode).HasMaxLength(50);
+            entity.Property(e => e.CurrentRunId).HasMaxLength(128);
             entity.HasIndex(e => e.StationId).IsUnique();
             entity.HasIndex(e => e.LastSeenAtUtc);
         });
@@ -266,6 +272,11 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.RunId).HasMaxLength(128);
             entity.Property(e => e.PackageId).HasMaxLength(128);
             entity.Property(e => e.PackageVersion).HasMaxLength(80);
+            entity.Property(e => e.PackageFlowHash).HasMaxLength(128);
+            entity.Property(e => e.ExecutionFlowHash).HasMaxLength(128);
+            entity.Property(e => e.FlowHash).HasMaxLength(128);
+            entity.Property(e => e.DecisionConfigurationHash).HasMaxLength(128);
+            entity.Property(e => e.ExecutionRunMode).HasMaxLength(50);
             entity.Property(e => e.Outcome).HasMaxLength(50);
             entity.Property(e => e.InspectionStatus).HasMaxLength(50);
             entity.Property(e => e.ExecutionOutcome).HasMaxLength(50);

@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
@@ -22,6 +23,8 @@ namespace ClearVision.Product.Tests.Runtime;
 public class RuntimeMvpTests
 {
     private static readonly TimeSpan RuntimeHostAsyncSignalTimeout = TimeSpan.FromMinutes(5);
+    private static readonly byte[] ValidImageBytes = Convert.FromBase64String(
+        "Qk1GAAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAP///w==");
 
     [Fact]
     public async Task PackageExporterAndLoader_ShouldRoundTripValidPackage()
@@ -100,8 +103,8 @@ public class RuntimeMvpTests
                 TargetRootDirectory = root
             });
 
-            var imageBytes = new byte[] { 2, 4, 6, 8 };
-            var imagePath = Path.Combine(root, "input.png");
+            var imageBytes = ValidImageBytes;
+            var imagePath = Path.Combine(root, "input.bmp");
             await File.WriteAllBytesAsync(imagePath, imageBytes);
 
             var flowExecutionService = CreateFlowExecutionService(new DeterministicJudgmentExecutor());
@@ -123,7 +126,7 @@ public class RuntimeMvpTests
             stationResult.HasJudgmentSignal.Should().BeTrue();
             stationResult.InspectionStatus.Should().Be(studioResult.Status);
             stationResult.PrimaryOutputs["JudgmentResult"]?.ToString().Should().Be("OK");
-            stationResult.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("2");
+            stationResult.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be(imageBytes[0].ToString());
             stationResult.ExecutionSnapshotId.Should().NotBeNull();
             stationResult.ExecutionSnapshotId.Should().NotBe(Guid.ParseExact(stationResult.RunId, "N"));
             stationResult.FlowHash.Should().Be(export.Manifest.FlowHash);
@@ -545,7 +548,7 @@ public class RuntimeMvpTests
 
             var replayRoot = Path.Combine(root, "replay");
             Directory.CreateDirectory(replayRoot);
-            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input.png"), new byte[] { 2, 4, 6, 8 });
+            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input.bmp"), ValidImageBytes);
 
             var started = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -623,8 +626,8 @@ public class RuntimeMvpTests
                 snapshot.VariableId == variableId &&
                 Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 9L);
 
-            var imagePath = Path.Combine(root, "old-package-input.png");
-            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var imagePath = Path.Combine(root, "old-package-input.bmp");
+            await File.WriteAllBytesAsync(imagePath, ValidImageBytes);
             var runResult = await runtimeHost.RunSingleAsync(imagePath);
             runResult.Outcome.Should().Be(RuntimeRunOutcome.Ok);
         }
@@ -693,8 +696,8 @@ public class RuntimeMvpTests
                 snapshot.VariableId == variableId &&
                 Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 9L);
 
-            var imagePath = Path.Combine(root, "rollback-input.png");
-            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var imagePath = Path.Combine(root, "rollback-input.bmp");
+            await File.WriteAllBytesAsync(imagePath, ValidImageBytes);
             var run = await runtimeHost.RunSingleAsync(imagePath);
             run.Outcome.Should().Be(RuntimeRunOutcome.Ok);
         }
@@ -804,8 +807,8 @@ public class RuntimeMvpTests
             resultWriters[0].DisposeCount.Should().Be(1);
             imageWriters[0].DisposeCount.Should().Be(1);
 
-            var imagePath = Path.Combine(root, "new-package-input.png");
-            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var imagePath = Path.Combine(root, "new-package-input.bmp");
+            await File.WriteAllBytesAsync(imagePath, ValidImageBytes);
             var run = await runtimeHost.RunSingleAsync(imagePath);
             run.Outcome.Should().Be(RuntimeRunOutcome.Ok);
             resultWriters[1].EnqueueCount.Should().BeGreaterThan(0);
@@ -866,7 +869,7 @@ public class RuntimeMvpTests
             Directory.CreateDirectory(replayRoot);
             for (var index = 0; index < 5; index += 1)
             {
-                await File.WriteAllBytesAsync(Path.Combine(replayRoot, $"input-{index}.png"), new byte[] { (byte)(index + 1), 1, 1 });
+                await File.WriteAllBytesAsync(Path.Combine(replayRoot, $"input-{index}.bmp"), ValidImageBytes);
             }
 
             var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
@@ -910,7 +913,7 @@ public class RuntimeMvpTests
         {
             var replayRoot = Path.Combine(root, "replay");
             Directory.CreateDirectory(replayRoot);
-            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input-1.png"), new byte[] { 2, 4, 6, 8 });
+            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input-1.bmp"), ValidImageBytes);
 
             var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
@@ -1009,6 +1012,106 @@ public class RuntimeMvpTests
                 new VariableContext()));
     }
 
+    [Theory]
+    [InlineData("missing", "InputFileNotFound")]
+    [InlineData("empty", "InputImageEmpty")]
+    [InlineData("decode", "InputDecodeFailed")]
+    public async Task RuntimeHost_InputPreparationFailure_ShouldPersistOneCanonicalTerminalResult(
+        string failureKind,
+        string expectedReasonCode)
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateProjectDto($"input-failure-{failureKind}"),
+                TargetRootDirectory = root
+            });
+            var inputPath = Path.Combine(root, $"{failureKind}.bmp");
+            if (failureKind == "empty")
+            {
+                await File.WriteAllBytesAsync(inputPath, []);
+            }
+            else if (failureKind == "decode")
+            {
+                await File.WriteAllBytesAsync(inputPath, [1, 2, 3, 4]);
+            }
+
+            TrackingRuntimeResultWriter? writer = null;
+            var published = new List<RuntimeNormalizedResult>();
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                writerFactory: null,
+                resultWriterFactory: (_, _) => writer = new TrackingRuntimeResultWriter());
+            runtimeHost.ResultAvailable += published.Add;
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var result = await runtimeHost.RunSingleAsync(inputPath);
+
+            result.ExecutionOutcome.Should().Be(ExecutionOutcome.Failed);
+            result.ReasonCode.Should().Be(expectedReasonCode);
+            result.ExecutionSnapshotId.Should().NotBeNull();
+            result.PackageId.Should().Be(export.Manifest.PackageId);
+            result.PackageFlowHash.Should().Be(export.Manifest.FlowHash);
+            result.ExecutionFlowHash.Should().Be(export.Manifest.FlowHash);
+            result.FlowHash.Should().Be(result.ExecutionFlowHash);
+            result.ProjectRevision.Should().Be(export.Manifest.SourceProjectRevision);
+            result.DecisionConfigurationHash.Should().Be(export.Manifest.DecisionConfigurationHash);
+            result.ExecutionRunMode.Should().Be(ExecutionRunMode.StationRuntime.ToString());
+            published.Should().ContainSingle().Which.RunId.Should().Be(result.RunId);
+            writer.Should().NotBeNull();
+            writer!.EnqueueCount.Should().Be(1);
+            runtimeHost.GetSnapshot().SessionOutcomeStatistics.FailedCount.Should().Be(1);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_InputReadFailure_ShouldPersistOneCanonicalTerminalResult()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateProjectDto("input-read-failure"),
+                TargetRootDirectory = root
+            });
+            var inputPath = Path.Combine(root, "locked.bmp");
+            await File.WriteAllBytesAsync(inputPath, ValidImageBytes);
+            await using var locked = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.None);
+            TrackingRuntimeResultWriter? writer = null;
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                writerFactory: null,
+                resultWriterFactory: (_, _) => writer = new TrackingRuntimeResultWriter());
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var result = await runtimeHost.RunSingleAsync(inputPath);
+
+            result.ExecutionOutcome.Should().Be(ExecutionOutcome.Failed);
+            result.ReasonCode.Should().Be("InputReadFailed");
+            result.ExecutionSnapshotId.Should().NotBeNull();
+            writer!.EnqueueCount.Should().Be(1);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     [Fact]
     public async Task RuntimeHost_SiteProfileOverride_ShouldCreateNewExecutionIdentityAndKeepSnapshotAligned()
     {
@@ -1049,7 +1152,7 @@ public class RuntimeMvpTests
                     TargetRootDirectory = root
                 });
             var inputPath = Path.Combine(root, "input.bin");
-            await File.WriteAllBytesAsync(inputPath, [9, 8, 7]);
+            await File.WriteAllBytesAsync(inputPath, ValidImageBytes);
 
             await using var runtimeHost = new RuntimeHost(
                 CreateFlowExecutionService(new TunableDeepLearningExecutor()),

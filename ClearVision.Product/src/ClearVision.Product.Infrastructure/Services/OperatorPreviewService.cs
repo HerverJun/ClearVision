@@ -67,7 +67,11 @@ public sealed class OperatorPreviewService
 
         try
         {
-            execution = await _flowExecutionService.ExecuteOperatorAsync(previewOperator, inputs, cancellationToken);
+            execution = await _flowExecutionService.ExecuteOperatorAsync(
+                GovernedOperatorExecutionContext.Preview(),
+                previewOperator,
+                inputs,
+                cancellationToken);
 
             var result = new OperatorPreviewResult
             {

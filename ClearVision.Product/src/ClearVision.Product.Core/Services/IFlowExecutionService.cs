@@ -34,6 +34,7 @@ public interface IFlowExecutionService
         CancellationToken cancellationToken = default);
 
     Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        GovernedOperatorExecutionContext context,
         Operator @operator,
         Dictionary<string, object>? inputs = null,
         CancellationToken cancellationToken = default);
@@ -47,6 +48,28 @@ public interface IFlowExecutionService
     Dictionary<string, object>? GetDebugIntermediateResult(Guid debugSessionId, Guid operatorId);
 
     Task ClearDebugCacheAsync(Guid debugSessionId);
+}
+
+public sealed class GovernedOperatorExecutionContext
+{
+    private GovernedOperatorExecutionContext(ExecutionRunMode runMode, bool hasIsolatedState)
+    {
+        RunMode = runMode;
+        HasIsolatedState = hasIsolatedState;
+        SideEffectPolicy = ExecutionSideEffectPolicy.For(runMode);
+    }
+
+    public ExecutionRunMode RunMode { get; }
+
+    public bool HasIsolatedState { get; }
+
+    public ExecutionSideEffectPolicy SideEffectPolicy { get; }
+
+    public static GovernedOperatorExecutionContext Preview(bool hasIsolatedState = false) =>
+        new(ExecutionRunMode.Preview, hasIsolatedState);
+
+    public static GovernedOperatorExecutionContext Debug(bool hasIsolatedState = false) =>
+        new(ExecutionRunMode.Debug, hasIsolatedState);
 }
 
 /// <summary>

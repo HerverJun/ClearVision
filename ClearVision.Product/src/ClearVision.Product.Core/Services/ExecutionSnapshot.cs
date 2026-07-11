@@ -240,6 +240,29 @@ public sealed class ExecutionSideEffectPolicy
             .Cast<ExecutionSideEffectViolation>()
             .ToArray();
     }
+
+    public IReadOnlyList<ExecutionSideEffectViolation> Validate(Operator? @operator)
+    {
+        if (@operator == null || !@operator.IsEnabled)
+        {
+            return Array.Empty<ExecutionSideEffectViolation>();
+        }
+
+        var required = ExecutionSideEffectCatalog.GetCapabilities(@operator);
+        var disallowed = required & ~AllowedCapabilities;
+        return disallowed == ExecutionSideEffect.None
+            ? Array.Empty<ExecutionSideEffectViolation>()
+            :
+            [
+                new ExecutionSideEffectViolation(
+                    @operator.Id,
+                    @operator.Name,
+                    @operator.Type,
+                    disallowed,
+                    "SIDE_EFFECT_POLICY_BLOCKED",
+                    $"{@operator.Type} requires '{disallowed}', which is not allowed in {RunMode}.")
+            ];
+    }
 }
 
 /// <summary>

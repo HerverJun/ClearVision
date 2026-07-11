@@ -699,6 +699,7 @@ internal static class VisionDatabaseMaintenance
 
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
+        await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken);
         await SetUserVersionAsync(dbContext.Database.GetDbConnection(), CurrentSqliteSchemaVersion, cancellationToken);
@@ -767,6 +768,7 @@ internal static class VisionDatabaseMaintenance
         }
 
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
+        await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
 
         if (!await ColumnExistsAsync(
                 dbContext.Database.GetDbConnection(),
@@ -819,6 +821,53 @@ internal static class VisionDatabaseMaintenance
                 ON "StationResultSummaries" ("StationId", "ExecutionOutcome", "DecisionOutcome");
                 """,
                 cancellationToken);
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task EnsureStationExecutionIdentitySchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            foreach (var column in new[]
+                     {
+                         (Table: "StationNodes", Name: "PackageFlowHash", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"PackageFlowHash\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "ExecutionFlowHash", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"ExecutionFlowHash\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "FlowHash", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"FlowHash\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "ExecutionSnapshotId", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"ExecutionSnapshotId\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "ProjectRevision", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"ProjectRevision\" INTEGER NULL;"),
+                         (Table: "StationNodes", Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "ExecutionRunMode", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"ExecutionRunMode\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "CurrentRunId", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"CurrentRunId\" TEXT NULL;"),
+                         (Table: "StationResultSummaries", Name: "PackageFlowHash", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"PackageFlowHash\" TEXT NULL;"),
+                         (Table: "StationResultSummaries", Name: "ExecutionFlowHash", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionFlowHash\" TEXT NULL;"),
+                         (Table: "StationResultSummaries", Name: "ExecutionSnapshotId", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionSnapshotId\" TEXT NULL;"),
+                         (Table: "StationResultSummaries", Name: "ProjectRevision", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ProjectRevision\" INTEGER NULL;"),
+                         (Table: "StationResultSummaries", Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;"),
+                         (Table: "StationResultSummaries", Name: "ExecutionRunMode", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionRunMode\" TEXT NULL;")
+                     })
+            {
+                if (await TableExistsAsync(connection, column.Table, cancellationToken) &&
+                    !await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
+                }
+            }
         }
         finally
         {
@@ -1218,6 +1267,14 @@ internal static class VisionDatabaseMaintenance
         "table:StationHealthSnapshots",
         "table:StationLogSummaries",
         "table:StationNodes",
+        "column:StationNodes.PackageFlowHash",
+        "column:StationNodes.ExecutionFlowHash",
+        "column:StationNodes.FlowHash",
+        "column:StationNodes.ExecutionSnapshotId",
+        "column:StationNodes.ProjectRevision",
+        "column:StationNodes.DecisionConfigurationHash",
+        "column:StationNodes.ExecutionRunMode",
+        "column:StationNodes.CurrentRunId",
         "table:StationPackageRecords",
         "column:StationPackageRecords.PackageKind",
         "table:StationResultSummaries",
@@ -1227,6 +1284,12 @@ internal static class VisionDatabaseMaintenance
         "column:StationResultSummaries.HasJudgmentSignal",
         "column:StationResultSummaries.DecisionSource",
         "column:StationResultSummaries.ReasonCode",
+        "column:StationResultSummaries.PackageFlowHash",
+        "column:StationResultSummaries.ExecutionFlowHash",
+        "column:StationResultSummaries.ExecutionSnapshotId",
+        "column:StationResultSummaries.ProjectRevision",
+        "column:StationResultSummaries.DecisionConfigurationHash",
+        "column:StationResultSummaries.ExecutionRunMode",
         "index:IX_StationAlarmEvents_AlarmId",
         "index:IX_StationAlarmEvents_StationId_IsActive",
         "index:IX_StationAuditRecords_AuditId",

@@ -51,10 +51,40 @@ public sealed class GovernedFlowExecutionService : IFlowExecutionService, IFlowD
             cancellationToken);
 
     public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        GovernedOperatorExecutionContext context,
         Operator @operator,
         Dictionary<string, object>? inputs = null,
-        CancellationToken cancellationToken = default) =>
-        _engine.ExecuteOperatorAsync(@operator, inputs, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(@operator);
+        var violations = context.SideEffectPolicy.Validate(@operator).ToList();
+        if (context.RunMode is ExecutionRunMode.Preview or ExecutionRunMode.Debug &&
+            !context.HasIsolatedState &&
+            ExecutionSideEffectCatalog.GetCapabilities(@operator).HasFlag(ExecutionSideEffect.StateWrite))
+        {
+            violations.Add(new ExecutionSideEffectViolation(
+                @operator.Id,
+                @operator.Name,
+                @operator.Type,
+                ExecutionSideEffect.StateWrite,
+                "SIDE_EFFECT_ISOLATED_STATE_REQUIRED",
+                $"{@operator.Type} requires isolated state in {context.RunMode}."));
+        }
+
+        if (violations.Count > 0)
+        {
+            return Task.FromResult(new OperatorExecutionResult
+            {
+                OperatorId = @operator.Id,
+                OperatorName = @operator.Name,
+                IsSuccess = false,
+                ErrorMessage = string.Join("; ", violations.Select(item => $"{item.Code}: {item.Message}"))
+            });
+        }
+
+        return _engine.ExecuteOperatorAsync(@operator, inputs, cancellationToken);
+    }
 
     public FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot)
     {

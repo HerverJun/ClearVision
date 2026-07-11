@@ -143,7 +143,20 @@ public class StationStatusViewModel
 
     public string? PackageName { get; set; }
 
+    public string? PackageFlowHash { get; set; }
+
+    public string? ExecutionFlowHash { get; set; }
+
+    /// <summary>Compatibility alias for ExecutionFlowHash.</summary>
     public string? FlowHash { get; set; }
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public long? ProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
+    public string? ExecutionRunMode { get; set; }
 
     public string? CurrentRunId { get; set; }
 

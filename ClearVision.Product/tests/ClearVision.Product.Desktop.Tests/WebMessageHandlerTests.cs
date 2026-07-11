@@ -112,6 +112,7 @@ public class WebMessageHandlerTests
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         flowStorage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(flowDto)));
         flowExecutionService.ExecuteOperatorAsync(
+                Arg.Any<GovernedOperatorExecutionContext>(),
                 Arg.Any<Operator>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
@@ -150,6 +151,7 @@ public class WebMessageHandlerTests
         response.Success.Should().BeFalse();
         response.Error.Should().Contain("Legacy WebMessage");
         await flowExecutionService.DidNotReceiveWithAnyArgs().ExecuteOperatorAsync(
+            Arg.Any<GovernedOperatorExecutionContext>(),
             Arg.Any<Operator>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<CancellationToken>());

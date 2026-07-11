@@ -75,7 +75,6 @@ public sealed class StationCentralStore
             node.CurrentPackageId = ChooseNullable(dto.CurrentPackageId, node.CurrentPackageId);
             node.CurrentPackageName = ChooseNullable(dto.CurrentPackageName, node.CurrentPackageName);
             node.CurrentPackageVersion = ChooseNullable(dto.CurrentPackageVersion, node.CurrentPackageVersion);
-
             var cursor = GetOrCreateCursor(db, dto.StationId);
             cursor.UpdatedAtUtc = now;
             db.SaveChanges();
@@ -85,6 +84,80 @@ public sealed class StationCentralStore
         {
             _logger.LogWarning(ex, "Failed to persist Station registration for {StationId}", dto.StationId);
             return 0;
+        }
+    }
+
+    public long UpsertSnapshot(StationSnapshotDto dto)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var node = GetOrCreateNode(db, dto.StationId, now);
+            node.LineName = ChooseNullable(dto.LineName, node.LineName);
+            node.LastSeenAtUtc = now;
+            node.OnlineState = StationOnlineState.Online.ToString();
+            node.RuntimeState = dto.RuntimeState.ToString();
+            node.CurrentPackageId = dto.CurrentPackageId;
+            node.CurrentPackageName = dto.CurrentPackageName;
+            node.CurrentPackageVersion = dto.CurrentPackageVersion;
+            ApplyExecutionIdentity(node, dto.PackageFlowHash, dto.ExecutionFlowHash, dto.FlowHash,
+                dto.ExecutionSnapshotId, dto.ProjectRevision, dto.DecisionConfigurationHash,
+                dto.ExecutionRunMode, dto.CurrentRunId);
+            var cursor = GetOrCreateCursor(db, dto.StationId);
+            cursor.UpdatedAtUtc = now;
+            db.SaveChanges();
+            return cursor.LastPersistedSequenceId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist Station snapshot for {StationId}", dto.StationId);
+            return 0;
+        }
+    }
+
+    public IReadOnlyList<StationStatusViewModel> GetStationStatuses()
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            return db.StationNodes.AsNoTracking().OrderBy(item => item.StationId).AsEnumerable().Select(node => new StationStatusViewModel
+            {
+                StationId = node.StationId,
+                StationName = node.StationName,
+                LineName = node.LineName,
+                AreaName = node.AreaName,
+                WorkcellName = node.WorkcellName,
+                InspectionNodeName = node.InspectionNodeName,
+                CameraAlias = node.CameraAlias,
+                StationRole = node.StationRole,
+                Owner = node.Owner,
+                MachineName = node.MachineName,
+                IsEnabled = node.IsEnabled,
+                Remark = node.Remark,
+                OnlineState = Enum.TryParse<StationOnlineState>(node.OnlineState, true, out var online) ? online : StationOnlineState.Unknown,
+                RuntimeState = Enum.TryParse<StationRuntimeState>(node.RuntimeState, true, out var runtime) ? runtime : StationRuntimeState.Unknown,
+                State = StationSyncStateMapper.ToRuntimeHostState(Enum.TryParse<StationRuntimeState>(node.RuntimeState, true, out var state) ? state : StationRuntimeState.Unknown),
+                StartedAtUtc = node.FirstSeenAtUtc,
+                LastSeenAtUtc = node.LastSeenAtUtc,
+                PackageId = node.CurrentPackageId,
+                PackageName = node.CurrentPackageName,
+                PackageFlowHash = node.PackageFlowHash,
+                ExecutionFlowHash = node.ExecutionFlowHash,
+                FlowHash = node.ExecutionFlowHash ?? node.FlowHash,
+                ExecutionSnapshotId = node.ExecutionSnapshotId,
+                ProjectRevision = node.ProjectRevision,
+                DecisionConfigurationHash = node.DecisionConfigurationHash,
+                ExecutionRunMode = node.ExecutionRunMode,
+                CurrentRunId = node.CurrentRunId
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to reload Station registry status.");
+            return Array.Empty<StationStatusViewModel>();
         }
     }
 
@@ -104,6 +177,9 @@ public sealed class StationCentralStore
             node.CurrentPackageId = ChooseNullable(dto.CurrentPackageId, node.CurrentPackageId);
             node.CurrentPackageName = ChooseNullable(dto.CurrentPackageName, node.CurrentPackageName);
             node.CurrentPackageVersion = ChooseNullable(dto.CurrentPackageVersion, node.CurrentPackageVersion);
+            ApplyExecutionIdentity(node, dto.PackageFlowHash, dto.ExecutionFlowHash, dto.FlowHash,
+                dto.ExecutionSnapshotId, dto.ProjectRevision, dto.DecisionConfigurationHash,
+                dto.ExecutionRunMode, dto.CurrentRunId);
             var cursor = GetOrCreateCursor(db, dto.StationId);
             cursor.UpdatedAtUtc = now;
             db.SaveChanges();
@@ -140,6 +216,9 @@ public sealed class StationCentralStore
                 node.CurrentPackageId = ChooseNullable(dto.PackageId, node.CurrentPackageId);
                 node.CurrentPackageName = ChooseNullable(dto.PackageName, node.CurrentPackageName);
                 node.CurrentPackageVersion = ChooseNullable(dto.PackageVersion, node.CurrentPackageVersion);
+                ApplyExecutionIdentity(node, dto.PackageFlowHash, dto.ExecutionFlowHash, dto.FlowHash,
+                    dto.ExecutionSnapshotId, dto.ProjectRevision, dto.DecisionConfigurationHash,
+                    dto.ExecutionRunMode, dto.RunId);
             }
 
             db.SaveChanges();
@@ -720,6 +799,12 @@ public sealed class StationCentralStore
             PackageName = dto.PackageName,
             PackageVersion = dto.PackageVersion,
             FlowHash = dto.FlowHash,
+            PackageFlowHash = dto.PackageFlowHash,
+            ExecutionFlowHash = dto.ExecutionFlowHash,
+            ExecutionSnapshotId = dto.ExecutionSnapshotId,
+            ProjectRevision = dto.ProjectRevision,
+            DecisionConfigurationHash = dto.DecisionConfigurationHash,
+            ExecutionRunMode = dto.ExecutionRunMode,
             ImageId = dto.ImageId,
             Outcome = dto.Outcome.ToString(),
             InspectionStatus = dto.InspectionStatus?.ToString(),
@@ -801,6 +886,12 @@ public sealed class StationCentralStore
             PackageName = entity.PackageName,
             PackageVersion = entity.PackageVersion,
             FlowHash = entity.FlowHash,
+            PackageFlowHash = entity.PackageFlowHash ?? string.Empty,
+            ExecutionFlowHash = entity.ExecutionFlowHash ?? entity.FlowHash,
+            ExecutionSnapshotId = entity.ExecutionSnapshotId,
+            ProjectRevision = entity.ProjectRevision ?? 0,
+            DecisionConfigurationHash = entity.DecisionConfigurationHash,
+            ExecutionRunMode = entity.ExecutionRunMode,
             ImageId = entity.ImageId,
             Outcome = Enum.TryParse<RuntimeRunOutcome>(entity.Outcome, true, out var outcome) ? outcome : RuntimeRunOutcome.Error,
             InspectionStatus = Enum.TryParse<ClearVision.Product.Core.Enums.InspectionStatus>(entity.InspectionStatus, true, out var status) ? status : null,
@@ -817,6 +908,28 @@ public sealed class StationCentralStore
             CompletedAtUtc = entity.CompletedAtUtc,
             CreatedAtUtc = entity.CreatedAtUtc
         };
+    }
+
+    private static void ApplyExecutionIdentity(
+        StationNodeEntity node,
+        string? packageFlowHash,
+        string? executionFlowHash,
+        string? legacyFlowHash,
+        Guid? executionSnapshotId,
+        long? projectRevision,
+        string? decisionConfigurationHash,
+        string? executionRunMode,
+        string? currentRunId)
+    {
+        var canonicalExecutionHash = string.IsNullOrWhiteSpace(executionFlowHash) ? legacyFlowHash : executionFlowHash;
+        node.PackageFlowHash = string.IsNullOrWhiteSpace(packageFlowHash) ? null : packageFlowHash;
+        node.ExecutionFlowHash = string.IsNullOrWhiteSpace(canonicalExecutionHash) ? null : canonicalExecutionHash;
+        node.FlowHash = node.ExecutionFlowHash;
+        node.ExecutionSnapshotId = executionSnapshotId;
+        node.ProjectRevision = projectRevision;
+        node.DecisionConfigurationHash = string.IsNullOrWhiteSpace(decisionConfigurationHash) ? null : decisionConfigurationHash;
+        node.ExecutionRunMode = string.IsNullOrWhiteSpace(executionRunMode) ? null : executionRunMode;
+        node.CurrentRunId = string.IsNullOrWhiteSpace(currentRunId) ? null : currentRunId;
     }
 
     private static StationHealthSnapshotDto ToDto(StationHealthSnapshotEntity entity)

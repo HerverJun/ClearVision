@@ -14,6 +14,25 @@ namespace ClearVision.Product.Tests.Services;
 public sealed class OperatorPreviewServiceAdmissionTests
 {
     [Fact]
+    public async Task GovernedAdapter_ShouldBlockSingleOperatorSideEffectsWithoutCallingRawEngine()
+    {
+        var engine = Substitute.For<IFlowExecutionEngine>();
+        var adapter = new GovernedFlowExecutionService(engine);
+        var sideEffectOperator = new OperatorFactory().CreateOperator(OperatorType.TextSave, "TextSave", 0, 0);
+
+        var result = await adapter.ExecuteOperatorAsync(
+            GovernedOperatorExecutionContext.Preview(),
+            sideEffectOperator);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("SIDE_EFFECT_POLICY_BLOCKED");
+        await engine.DidNotReceiveWithAnyArgs().ExecuteOperatorAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PreviewAsync_WithSideEffectOperator_ShouldReturnBlockedWithoutExecuting()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -31,6 +50,7 @@ public sealed class OperatorPreviewServiceAdmissionTests
         result.ErrorCode.Should().Be("OperatorPreviewSideEffectBlocked");
         result.ErrorMessage.Should().Contain("TextSave");
         await flowExecution.DidNotReceiveWithAnyArgs().ExecuteOperatorAsync(
+            Arg.Any<GovernedOperatorExecutionContext>(),
             Arg.Any<Operator>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<CancellationToken>());
