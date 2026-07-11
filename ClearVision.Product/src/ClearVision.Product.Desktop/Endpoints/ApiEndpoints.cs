@@ -10,6 +10,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
@@ -1165,12 +1166,23 @@ public static class ApiEndpoints
 
     private static object ToInspectionHistoryListItem(InspectionHistoryItem result)
     {
+        var outcome = ResolveHistoryOutcome(
+            result.Status,
+            result.ExecutionOutcome,
+            result.DecisionOutcome,
+            result.DecisionSource,
+            result.ReasonCode,
+            result.ErrorMessage);
         return new
         {
             id = result.Id,
             resultId = result.Id,
             projectId = result.ProjectId,
             status = result.Status.ToString(),
+            executionOutcome = outcome.Execution.ToString(),
+            decisionOutcome = outcome.Decision.ToString(),
+            decisionSource = outcome.DecisionSource,
+            reasonCode = outcome.ReasonCode,
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
             processingTimeMs = result.ProcessingTimeMs,
@@ -1200,6 +1212,13 @@ public static class ApiEndpoints
         InspectionHistoryDetail result,
         InspectionEvidenceSummary? evidenceSummary = null)
     {
+        var outcome = ResolveHistoryOutcome(
+            result.Status,
+            result.ExecutionOutcome,
+            result.DecisionOutcome,
+            result.DecisionSource,
+            result.ReasonCode,
+            result.ErrorMessage);
         var outputPreview = SafeJsonPreviewBuilder.Build(result.OutputDataJson);
         var analysisPreview = SafeJsonPreviewBuilder.Build(result.AnalysisDataJson);
         var hasImageReference = result.ImageId.HasValue;
@@ -1217,6 +1236,10 @@ public static class ApiEndpoints
             resultId = result.Id,
             projectId = result.ProjectId,
             status = result.Status.ToString(),
+            executionOutcome = outcome.Execution.ToString(),
+            decisionOutcome = outcome.Decision.ToString(),
+            decisionSource = outcome.DecisionSource,
+            reasonCode = outcome.ReasonCode,
             defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
@@ -1262,6 +1285,19 @@ public static class ApiEndpoints
             errorMessage = result.ErrorMessage,
             isHistoryDetail = true
         };
+    }
+
+    private static InspectionOutcome ResolveHistoryOutcome(
+        InspectionStatus status,
+        ExecutionOutcome? execution,
+        DecisionOutcome? decision,
+        string? decisionSource,
+        string? reasonCode,
+        string? message)
+    {
+        return execution.HasValue && decision.HasValue
+            ? new InspectionOutcome(execution.Value, decision.Value, decisionSource, reasonCode, message)
+            : LegacyInspectionStatusProjection.FromLegacy(status) with { Message = message };
     }
 
     internal static object ToInspectionEvidenceManifestResponse(InspectionEvidenceManifestReadResult result)

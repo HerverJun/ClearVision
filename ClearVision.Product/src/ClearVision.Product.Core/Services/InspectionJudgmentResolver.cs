@@ -1,14 +1,17 @@
 using System.Collections;
 using System.Text.Json;
-using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Core.Services;
 
-public readonly record struct InspectionJudgmentEvaluation(
-    InspectionStatus Status,
-    string JudgmentSource,
-    string StatusReason,
-    bool MissingJudgmentSignal);
+public readonly record struct InspectionDecisionEvaluation(
+    DecisionOutcome Decision,
+    string DecisionSource,
+    string ReasonCode,
+    string? Message)
+{
+    public bool MissingJudgmentSignal => ReasonCode == "MissingJudgmentSignal";
+}
 
 public static class InspectionJudgmentResolver
 {
@@ -25,23 +28,20 @@ public static class InspectionJudgmentResolver
         new("IsAnomaly", PositiveMeansOk: false, "DerivedFromIsAnomaly")
     ];
 
-    public static InspectionJudgmentEvaluation DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)
+    public static InspectionDecisionEvaluation DetermineDecisionFromFlowOutput(Dictionary<string, object>? outputData)
     {
         if (outputData == null)
         {
-            return DetermineStatusFromFlowOutput(null, sourcePrefix: null, depth: 0);
+            return DetermineDecisionFromFlowOutput(null, sourcePrefix: null, depth: 0);
         }
 
-        var normalizedOutput = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in outputData)
-        {
-            normalizedOutput[key] = value;
-        }
-
-        return DetermineStatusFromFlowOutput(normalizedOutput, sourcePrefix: null, depth: 0);
+        return DetermineDecisionFromFlowOutput(
+            new Dictionary<string, object>(outputData, StringComparer.OrdinalIgnoreCase),
+            sourcePrefix: null,
+            depth: 0);
     }
 
-    private static InspectionJudgmentEvaluation DetermineStatusFromFlowOutput(
+    private static InspectionDecisionEvaluation DetermineDecisionFromFlowOutput(
         IReadOnlyDictionary<string, object>? outputData,
         string? sourcePrefix,
         int depth)
@@ -53,21 +53,21 @@ public static class InspectionJudgmentResolver
 
         if (depth > 8)
         {
-            return new InspectionJudgmentEvaluation(
-                InspectionStatus.Error,
-                ComposeJudgmentSource(sourcePrefix, "Depth"),
+            return Invalid(
+                ComposeDecisionSource(sourcePrefix, "Depth"),
                 "JudgmentTraversalDepthExceeded",
-                false);
+                "Judgment payload traversal exceeded the supported depth.");
         }
 
         if (outputData.TryGetValue("JudgmentResult", out var judgmentResult))
         {
+            var source = ComposeDecisionSource(sourcePrefix, "JudgmentResult");
             if (!TryGetStringValue(judgmentResult, out var judgmentText))
             {
-                return BuildInvalidTypeResult(ComposeJudgmentSource(sourcePrefix, "JudgmentResult"), "string", judgmentResult);
+                return BuildInvalidTypeResult(source, "string", judgmentResult);
             }
 
-            return ParseJudgmentResult(judgmentText!, ComposeJudgmentSource(sourcePrefix, "JudgmentResult"));
+            return ParseExplicitJudgment(judgmentText!, source, "DerivedFromJudgmentResult");
         }
 
         foreach (var signal in DirectBooleanSignals)
@@ -80,69 +80,52 @@ public static class InspectionJudgmentResolver
 
         if (outputData.TryGetValue("Result", out var resultValue))
         {
+            var source = ComposeDecisionSource(sourcePrefix, "Result");
             if (TryGetBoolValue(resultValue, out var resultBool))
             {
-                return resultBool
-                    ? new InspectionJudgmentEvaluation(
-                        InspectionStatus.OK,
-                        ComposeJudgmentSource(sourcePrefix, "Result"),
-                        "DerivedFromResult",
-                        false)
-                    : new InspectionJudgmentEvaluation(
-                        InspectionStatus.NG,
-                        ComposeJudgmentSource(sourcePrefix, "Result"),
-                        "DerivedFromResult",
-                        false);
+                return Decided(
+                    resultBool ? DecisionOutcome.Ok : DecisionOutcome.Ng,
+                    source,
+                    "DerivedFromResult");
             }
 
-            if (TryGetStringValue(resultValue, out var resultText) &&
-                TryParseExactJudgmentKeyword(resultText!, out var resultStatus))
+            if (TryGetStringValue(resultValue, out var resultText))
             {
-                return new InspectionJudgmentEvaluation(
-                    resultStatus,
-                    ComposeJudgmentSource(sourcePrefix, "Result"),
-                    "DerivedFromResultText",
-                    false);
+                return ParseExplicitJudgment(resultText!, source, "DerivedFromResultText");
+            }
+
+            if (!TryExtractNestedJudgmentPayload(resultValue, out _))
+            {
+                return BuildInvalidTypeResult(source, "bool or string", resultValue);
             }
         }
 
         if (outputData.TryGetValue("DefectCount", out var defectCountValue))
         {
+            var source = ComposeDecisionSource(sourcePrefix, "DefectCount");
             if (!TryGetIntValue(defectCountValue, out var defectCount))
             {
-                return BuildInvalidTypeResult(ComposeJudgmentSource(sourcePrefix, "DefectCount"), "int", defectCountValue);
+                return BuildInvalidTypeResult(source, "int", defectCountValue);
             }
 
-            return defectCount > 0
-                ? new InspectionJudgmentEvaluation(
-                    InspectionStatus.NG,
-                    ComposeJudgmentSource(sourcePrefix, "DefectCount"),
-                    "DerivedFromDefectCount",
-                    false)
-                : new InspectionJudgmentEvaluation(
-                    InspectionStatus.OK,
-                    ComposeJudgmentSource(sourcePrefix, "DefectCount"),
-                    "DerivedFromDefectCount",
-                    false);
+            return Decided(
+                defectCount > 0 ? DecisionOutcome.Ng : DecisionOutcome.Ok,
+                source,
+                "DerivedFromDefectCount");
         }
 
+        // Prompt 1 deliberately keeps the legacy recursive scan. Explicit binding replaces it in Prompt 2.
         foreach (var (key, value) in outputData)
         {
-            if (value == null)
+            if (value == null || !TryExtractNestedJudgmentPayload(value, out var nestedPayload))
             {
                 continue;
             }
 
-            if (!TryExtractNestedJudgmentPayload(value, out var nestedPayload))
-            {
-                continue;
-            }
-
-            var nestedEvaluation = DetermineStatusFromFlowOutput(
+            var nestedEvaluation = DetermineDecisionFromFlowOutput(
                 nestedPayload,
-                ComposeJudgmentSource(sourcePrefix, key),
+                ComposeDecisionSource(sourcePrefix, key),
                 depth + 1);
-
             if (!nestedEvaluation.MissingJudgmentSignal)
             {
                 return nestedEvaluation;
@@ -152,29 +135,54 @@ public static class InspectionJudgmentResolver
         return MissingJudgmentSignal();
     }
 
-    private static InspectionJudgmentEvaluation ParseJudgmentResult(string judgmentText, string source)
+    private static InspectionDecisionEvaluation ParseExplicitJudgment(
+        string judgmentText,
+        string source,
+        string decidedReasonCode)
     {
         var normalized = judgmentText.Trim();
-        if (normalized.Equals("Error", StringComparison.OrdinalIgnoreCase))
-        {
-            return new InspectionJudgmentEvaluation(InspectionStatus.Error, source, "DerivedFromJudgmentResult", false);
-        }
-
         if (normalized.Equals("OK", StringComparison.OrdinalIgnoreCase) ||
             normalized.Equals("Pass", StringComparison.OrdinalIgnoreCase) ||
             normalized.Equals("Passed", StringComparison.OrdinalIgnoreCase))
         {
-            return new InspectionJudgmentEvaluation(InspectionStatus.OK, source, "DerivedFromJudgmentResult", false);
+            return Decided(DecisionOutcome.Ok, source, decidedReasonCode);
         }
 
-        return new InspectionJudgmentEvaluation(InspectionStatus.NG, source, "DerivedFromJudgmentResult", false);
+        if (normalized.Equals("NG", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("Fail", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return Decided(DecisionOutcome.Ng, source, decidedReasonCode);
+        }
+
+        if (normalized.Equals("Unknown", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+        {
+            return Decided(DecisionOutcome.Undetermined, source, "JudgmentUndetermined");
+        }
+
+        if (normalized.Equals("Skipped", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("NotApplicable", StringComparison.OrdinalIgnoreCase))
+        {
+            return Decided(DecisionOutcome.NotApplicable, source, "JudgmentNotApplicable");
+        }
+
+        if (normalized.Equals("Error", StringComparison.OrdinalIgnoreCase))
+        {
+            return Invalid(source, "ExplicitJudgmentError", "The explicit judgment value is Error.");
+        }
+
+        return Invalid(
+            source,
+            "UnrecognizedJudgmentValue",
+            $"Unrecognized explicit judgment value '{normalized}'.");
     }
 
     private static bool TryEvaluateBooleanSignal(
         IReadOnlyDictionary<string, object> outputData,
         JudgmentBooleanSignal signal,
         string? sourcePrefix,
-        out InspectionJudgmentEvaluation evaluation)
+        out InspectionDecisionEvaluation evaluation)
     {
         evaluation = default;
         if (!outputData.TryGetValue(signal.FieldName, out var rawValue))
@@ -182,18 +190,17 @@ public static class InspectionJudgmentResolver
             return false;
         }
 
+        var source = ComposeDecisionSource(sourcePrefix, signal.FieldName);
         if (!TryGetBoolValue(rawValue, out var boolValue))
         {
-            evaluation = BuildInvalidTypeResult(ComposeJudgmentSource(sourcePrefix, signal.FieldName), "bool", rawValue);
+            evaluation = BuildInvalidTypeResult(source, "bool", rawValue);
             return true;
         }
 
-        var status = signal.PositiveMeansOk == boolValue ? InspectionStatus.OK : InspectionStatus.NG;
-        evaluation = new InspectionJudgmentEvaluation(
-            status,
-            ComposeJudgmentSource(sourcePrefix, signal.FieldName),
-            signal.StatusReason,
-            false);
+        evaluation = Decided(
+            signal.PositiveMeansOk == boolValue ? DecisionOutcome.Ok : DecisionOutcome.Ng,
+            source,
+            signal.ReasonCode);
         return true;
     }
 
@@ -300,65 +307,47 @@ public static class InspectionJudgmentResolver
         }
     }
 
-    private static bool IsWholeNumberInIntRange(double value)
-    {
-        return !double.IsNaN(value) &&
-               !double.IsInfinity(value) &&
-               value >= int.MinValue &&
-               value <= int.MaxValue &&
-               Math.Truncate(value) == value;
-    }
+    private static bool IsWholeNumberInIntRange(double value) =>
+        !double.IsNaN(value) &&
+        !double.IsInfinity(value) &&
+        value >= int.MinValue &&
+        value <= int.MaxValue &&
+        Math.Truncate(value) == value;
 
-    private static bool TryParseExactJudgmentKeyword(string value, out InspectionStatus status)
-    {
-        var normalized = value.Trim();
-        if (normalized.Equals("OK", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Equals("NG", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Equals("Error", StringComparison.OrdinalIgnoreCase))
-        {
-            status = normalized.Equals("OK", StringComparison.OrdinalIgnoreCase)
-                ? InspectionStatus.OK
-                : normalized.Equals("Error", StringComparison.OrdinalIgnoreCase)
-                    ? InspectionStatus.Error
-                    : InspectionStatus.NG;
-            return true;
-        }
+    private static InspectionDecisionEvaluation MissingJudgmentSignal() =>
+        Decided(DecisionOutcome.Undetermined, "None", "MissingJudgmentSignal");
 
-        status = InspectionStatus.NotInspected;
-        return false;
-    }
-
-    private static InspectionJudgmentEvaluation MissingJudgmentSignal()
-    {
-        return new InspectionJudgmentEvaluation(InspectionStatus.Error, "None", "MissingJudgmentSignal", true);
-    }
-
-    private static InspectionJudgmentEvaluation BuildInvalidTypeResult(
+    private static InspectionDecisionEvaluation BuildInvalidTypeResult(
         string fieldName,
         string expectedType,
         object? actualValue)
     {
-        return new InspectionJudgmentEvaluation(
-            InspectionStatus.Error,
+        var actualType = DescribeType(actualValue);
+        return Invalid(
             fieldName,
-            $"InvalidJudgmentType:{fieldName}:Expected={expectedType}:Actual={DescribeType(actualValue)}",
-            false);
+            "InvalidJudgmentType",
+            $"Invalid judgment type at {fieldName}. Expected {expectedType}, actual {actualType}.");
     }
 
-    private static string ComposeJudgmentSource(string? prefix, string fieldName)
-    {
-        return string.IsNullOrWhiteSpace(prefix)
-            ? fieldName
-            : $"{prefix}.{fieldName}";
-    }
+    private static InspectionDecisionEvaluation Decided(
+        DecisionOutcome decision,
+        string source,
+        string reasonCode) =>
+        new(decision, source, reasonCode, null);
 
-    private static string DescribeType(object? value)
-    {
-        return value?.GetType().Name ?? "null";
-    }
+    private static InspectionDecisionEvaluation Invalid(
+        string source,
+        string reasonCode,
+        string message) =>
+        new(DecisionOutcome.Invalid, source, reasonCode, message);
+
+    private static string ComposeDecisionSource(string? prefix, string fieldName) =>
+        string.IsNullOrWhiteSpace(prefix) ? fieldName : $"{prefix}.{fieldName}";
+
+    private static string DescribeType(object? value) => value?.GetType().Name ?? "null";
 
     private readonly record struct JudgmentBooleanSignal(
         string FieldName,
         bool PositiveMeansOk,
-        string StatusReason);
+        string ReasonCode);
 }

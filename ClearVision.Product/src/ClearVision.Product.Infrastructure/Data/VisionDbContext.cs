@@ -183,6 +183,10 @@ public class VisionDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.ExecutionOutcome);
+            entity.Property(e => e.DecisionOutcome);
+            entity.Property(e => e.DecisionSource).HasMaxLength(500);
+            entity.Property(e => e.ReasonCode).HasMaxLength(200);
             entity.Property(e => e.ProcessingTimeMs).IsRequired();
             entity.Property(e => e.InspectionTime).IsRequired();
             entity.HasIndex(e => e.ProjectId);

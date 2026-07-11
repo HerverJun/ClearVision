@@ -1755,7 +1755,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
 
             var normalizedOutput = ConvertImageWrappersToBytes(rawOutput);
-            var judgment = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(normalizedOutput);
+            var judgment = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(normalizedOutput);
             if (!judgment.MissingJudgmentSignal)
             {
                 return op;

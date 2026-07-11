@@ -225,9 +225,11 @@ public sealed class InspectionServiceHistoryComparisonTests
 
     private static InspectionService CreateService(IInspectionResultRepository repository)
     {
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("history-comparison-project"));
         return new InspectionService(
             repository,
-            Substitute.For<IProjectRepository>(),
+            projectRepository,
             Substitute.For<IFlowExecutionService>(),
             Substitute.For<IImageAcquisitionService>(),
             Substitute.For<IConfigurationService>(),

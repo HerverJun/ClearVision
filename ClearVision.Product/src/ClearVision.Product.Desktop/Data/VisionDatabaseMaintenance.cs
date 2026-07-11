@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 2;
+    public const int CurrentSqliteSchemaVersion = 3;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -721,6 +721,24 @@ internal static class VisionDatabaseMaintenance
             await dbContext.Database.ExecuteSqlRawAsync(
                 """ALTER TABLE "InspectionResults" ADD COLUMN "AnalysisDataJson" TEXT NULL;""",
                 cancellationToken);
+        }
+
+        foreach (var column in new[]
+                 {
+                     (Name: "ExecutionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionOutcome\" INTEGER NULL;"),
+                     (Name: "DecisionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionOutcome\" INTEGER NULL;"),
+                     (Name: "DecisionSource", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionSource\" TEXT NULL;"),
+                     (Name: "ReasonCode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ReasonCode\" TEXT NULL;")
+                 })
+        {
+            if (!await ColumnExistsAsync(
+                    dbContext.Database.GetDbConnection(),
+                    "InspectionResults",
+                    column.Name,
+                    cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
+            }
         }
 
         foreach (var statement in LegacyStationSyncSchemaStatements)
@@ -1109,6 +1127,10 @@ internal static class VisionDatabaseMaintenance
     private static readonly HashSet<string> RepairableLegacySqliteSchemaItems = new(StringComparer.OrdinalIgnoreCase)
     {
         "column:InspectionResults.AnalysisDataJson",
+        "column:InspectionResults.ExecutionOutcome",
+        "column:InspectionResults.DecisionOutcome",
+        "column:InspectionResults.DecisionSource",
+        "column:InspectionResults.ReasonCode",
         "table:StationAlarmEvents",
         "table:StationAuditRecords",
         "table:StationCommandRecords",

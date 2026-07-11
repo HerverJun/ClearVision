@@ -1,5 +1,7 @@
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Infrastructure.Data;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -111,10 +113,64 @@ public sealed class VisionDatabaseInitializerTests
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
             (await MigrationHistoryCountAsync(connection)).Should().Be(CurrentMigrationCount());
             (await ColumnExistsAsync(connection, "InspectionResults", "AnalysisDataJson")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "InspectionResults", "ExecutionOutcome")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "InspectionResults", "DecisionOutcome")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "InspectionResults", "DecisionSource")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "InspectionResults", "ReasonCode")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationResultSummaries")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationNodes_StationId")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationResultSummaries_StationId_SequenceId")).Should().BeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldUpgradePreviousDatabaseAndReadLegacyInspectionResult()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var resultId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            await using (var oldContext = new VisionDbContext(options))
+            {
+                var migrator = oldContext.GetService<IMigrator>();
+                await migrator.MigrateAsync("20260628000000_AddProjectPersistenceRevision");
+                await oldContext.Database.ExecuteSqlRawAsync(
+                    """
+                    INSERT INTO "InspectionResults"
+                        ("Id", "ProjectId", "Status", "ProcessingTimeMs", "InspectionTime", "CreatedAt", "IsDeleted")
+                    VALUES
+                        ({0}, {1}, {2}, 7, {3}, {3}, 0);
+                    """,
+                    resultId,
+                    projectId,
+                    (int)InspectionStatus.OK,
+                    DateTime.UtcNow);
+            }
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+                var legacy = await dbContext.InspectionResults.SingleAsync(item => item.Id == resultId);
+
+                legacy.ExecutionOutcome.Should().BeNull();
+                legacy.DecisionOutcome.Should().BeNull();
+                legacy.GetOutcome().Execution.Should().Be(ExecutionOutcome.Succeeded);
+                legacy.GetOutcome().Decision.Should().Be(DecisionOutcome.Ok);
+            }
         }
         finally
         {

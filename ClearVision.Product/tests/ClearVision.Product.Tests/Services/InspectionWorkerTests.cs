@@ -10,6 +10,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Events;
@@ -500,7 +501,7 @@ public class InspectionWorkerTests
             new AnalysisDataBuilder());
 
         using var cts = new CancellationTokenSource();
-        await InvokeExecuteCycleAsync(
+        var result = await InvokeExecuteCycleAsync(
             worker,
             new OperatorFlow("TokenFlow"),
             "cam-ct",
@@ -509,6 +510,10 @@ public class InspectionWorkerTests
             cts.Token);
 
         observedToken.Should().Be(cts.Token);
+        result.Status.Should().Be(InspectionStatus.NotInspected);
+        result.ErrorMessage.Should().BeNull();
+        result.GetOutcome().Execution.Should().Be(ExecutionOutcome.Succeeded);
+        result.GetOutcome().Decision.Should().Be(DecisionOutcome.Undetermined);
         await imageAcquisition.Received(1).AcquireFromCameraAsync("cam-ct", cts.Token);
     }
 

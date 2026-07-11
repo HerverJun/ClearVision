@@ -5,6 +5,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
@@ -351,6 +352,10 @@ public sealed class ApiEndpointsInspectionHistoryTests
             Id = Guid.NewGuid(),
             ProjectId = projectId,
             Status = InspectionStatus.NG,
+            ExecutionOutcome = ExecutionOutcome.Succeeded,
+            DecisionOutcome = DecisionOutcome.Ng,
+            DecisionSource = "JudgmentResult",
+            ReasonCode = "DerivedFromJudgmentResult",
             ProcessingTimeMs = 123,
             ImageId = imageId,
             ConfidenceScore = 0.87,
@@ -441,6 +446,11 @@ public sealed class ApiEndpointsInspectionHistoryTests
         item.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
         item.GetProperty("defectCount").GetInt32().Should().Be(1);
         item.GetProperty("processingTimeMs").GetInt64().Should().Be(123);
+        item.GetProperty("status").GetString().Should().Be("NG");
+        item.GetProperty("executionOutcome").GetString().Should().Be("Succeeded");
+        item.GetProperty("decisionOutcome").GetString().Should().Be("Ng");
+        item.GetProperty("decisionSource").GetString().Should().Be("JudgmentResult");
+        item.GetProperty("reasonCode").GetString().Should().Be("DerivedFromJudgmentResult");
     }
 
     [Fact]
@@ -471,6 +481,9 @@ public sealed class ApiEndpointsInspectionHistoryTests
         root.GetProperty("analysisDataPreview").GetProperty("error").GetString().Should().Be("MalformedJson");
         root.TryGetProperty("outputData", out _).Should().BeFalse();
         root.TryGetProperty("analysisData", out _).Should().BeFalse();
+        root.GetProperty("status").GetString().Should().Be("Error");
+        root.GetProperty("executionOutcome").GetString().Should().Be("Failed");
+        root.GetProperty("decisionOutcome").GetString().Should().Be("Undetermined");
     }
 
     [Fact]

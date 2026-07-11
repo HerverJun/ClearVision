@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using MediatR;
 
 namespace ClearVision.Product.Application.Queries.Inspections;
@@ -34,11 +35,24 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
 
     private static InspectionResultDto ToDto(InspectionHistoryItem item)
     {
+        var outcome = item.ExecutionOutcome.HasValue && item.DecisionOutcome.HasValue
+            ? new InspectionOutcome(
+                item.ExecutionOutcome.Value,
+                item.DecisionOutcome.Value,
+                item.DecisionSource,
+                item.ReasonCode,
+                item.ErrorMessage)
+            : LegacyInspectionStatusProjection.FromLegacy(item.Status) with { Message = item.ErrorMessage };
+
         return new InspectionResultDto
         {
             Id = item.Id,
             ProjectId = item.ProjectId,
             Status = item.Status,
+            ExecutionOutcome = outcome.Execution,
+            DecisionOutcome = outcome.Decision,
+            DecisionSource = outcome.DecisionSource,
+            ReasonCode = outcome.ReasonCode,
             Defects = item.Defects.Select(ToDto).ToList(),
             ProcessingTimeMs = item.ProcessingTimeMs,
             ImageId = item.ImageId,

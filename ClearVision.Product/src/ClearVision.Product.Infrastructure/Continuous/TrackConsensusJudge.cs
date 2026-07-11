@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Infrastructure.Continuous;
 
@@ -90,11 +91,15 @@ public sealed class TrackConsensusJudge
             }
 
             var evaluated = list
-                .Select(item => (Item: item, Evaluation: InspectionJudgmentResolver.DetermineStatusFromFlowOutput(item.OutputData)))
+                .Select(item => (Item: item, Evaluation: InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(item.OutputData)))
                 .ToList();
-            var okVotes = evaluated.Count(item => item.Evaluation.Status == InspectionStatus.OK);
-            var ngVotes = evaluated.Count(item => item.Evaluation.Status == InspectionStatus.NG);
-            var totalVotes = Math.Max(1, okVotes + ngVotes);
+            var okVotes = evaluated.Count(item => item.Evaluation.Decision == DecisionOutcome.Ok);
+            var ngVotes = evaluated.Count(item => item.Evaluation.Decision == DecisionOutcome.Ng);
+            var totalVotes = okVotes + ngVotes;
+            if (totalVotes == 0)
+            {
+                return null;
+            }
             var majorityStatus = ngVotes > okVotes ? InspectionStatus.NG : InspectionStatus.OK;
             var majorityVotes = majorityStatus == InspectionStatus.NG ? ngVotes : okVotes;
             var score = majorityVotes / (double)totalVotes;

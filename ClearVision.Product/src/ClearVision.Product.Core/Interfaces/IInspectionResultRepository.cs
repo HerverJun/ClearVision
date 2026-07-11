@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Core.Interfaces;
 
@@ -106,6 +107,10 @@ public class InspectionHistoryItem
     public Guid Id { get; set; }
     public Guid ProjectId { get; set; }
     public InspectionStatus Status { get; set; }
+    public ExecutionOutcome? ExecutionOutcome { get; set; }
+    public DecisionOutcome? DecisionOutcome { get; set; }
+    public string? DecisionSource { get; set; }
+    public string? ReasonCode { get; set; }
     public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
     public long ProcessingTimeMs { get; set; }
     public Guid? ImageId { get; set; }
@@ -129,6 +134,10 @@ public class InspectionHistoryDetail
     public Guid Id { get; set; }
     public Guid ProjectId { get; set; }
     public InspectionStatus Status { get; set; }
+    public ExecutionOutcome? ExecutionOutcome { get; set; }
+    public DecisionOutcome? DecisionOutcome { get; set; }
+    public string? DecisionSource { get; set; }
+    public string? ReasonCode { get; set; }
     public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
     public long ProcessingTimeMs { get; set; }
     public Guid? ImageId { get; set; }

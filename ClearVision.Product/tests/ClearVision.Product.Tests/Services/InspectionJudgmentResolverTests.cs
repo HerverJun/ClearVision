@@ -1,4 +1,4 @@
-using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.Services;
 using FluentAssertions;
 
@@ -6,88 +6,78 @@ namespace ClearVision.Product.Tests.Services;
 
 public class InspectionJudgmentResolverTests
 {
-    [Fact]
-    public void DetermineStatusFromFlowOutput_WhenAcceptedIsFalse_ShouldReturnNg()
+    [Theory]
+    [InlineData("OK", DecisionOutcome.Ok)]
+    [InlineData("Pass", DecisionOutcome.Ok)]
+    [InlineData("Passed", DecisionOutcome.Ok)]
+    [InlineData("NG", DecisionOutcome.Ng)]
+    [InlineData("Fail", DecisionOutcome.Ng)]
+    [InlineData("Failed", DecisionOutcome.Ng)]
+    [InlineData("Unknown", DecisionOutcome.Undetermined)]
+    [InlineData("Pending", DecisionOutcome.Undetermined)]
+    [InlineData("Skipped", DecisionOutcome.NotApplicable)]
+    [InlineData("NotApplicable", DecisionOutcome.NotApplicable)]
+    [InlineData("Error", DecisionOutcome.Invalid)]
+    [InlineData("surprise", DecisionOutcome.Invalid)]
+    public void DetermineDecisionFromFlowOutput_MapsExplicitJudgmentKeywords(
+        string value,
+        DecisionOutcome expected)
     {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
-        {
-            ["Accepted"] = false
-        });
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+            new Dictionary<string, object> { ["JudgmentResult"] = value });
 
-        evaluation.Status.Should().Be(InspectionStatus.NG);
-        evaluation.JudgmentSource.Should().Be("Accepted");
-        evaluation.StatusReason.Should().Be("DerivedFromAccepted");
+        evaluation.Decision.Should().Be(expected);
+        evaluation.DecisionSource.Should().Be("JudgmentResult");
         evaluation.MissingJudgmentSignal.Should().BeFalse();
     }
 
     [Fact]
-    public void DetermineStatusFromFlowOutput_WhenVerificationFailsButIsMatchedTrue_ShouldPreferVerificationPassed()
+    public void DetermineDecisionFromFlowOutput_WhenAcceptedIsFalse_ReturnsNg()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
-        {
-            ["IsMatched"] = true,
-            ["VerificationPassed"] = false
-        });
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+            new Dictionary<string, object> { ["Accepted"] = false });
 
-        evaluation.Status.Should().Be(InspectionStatus.NG);
-        evaluation.JudgmentSource.Should().Be("VerificationPassed");
-        evaluation.StatusReason.Should().Be("DerivedFromVerificationPassed");
+        evaluation.Decision.Should().Be(DecisionOutcome.Ng);
+        evaluation.DecisionSource.Should().Be("Accepted");
+        evaluation.ReasonCode.Should().Be("DerivedFromAccepted");
     }
 
     [Fact]
-    public void DetermineStatusFromFlowOutput_WhenNestedDiagnosticsContainHueValid_ShouldReturnOk()
+    public void DetermineDecisionFromFlowOutput_PreservesLegacyRecursiveScanForPromptOne()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(new Dictionary<string, object>
         {
-            ["Diagnostics"] = new Dictionary<string, object>
-            {
-                ["HueValid"] = true
-            }
+            ["Diagnostics"] = new Dictionary<string, object> { ["HueValid"] = true }
         });
 
-        evaluation.Status.Should().Be(InspectionStatus.OK);
-        evaluation.JudgmentSource.Should().Be("Diagnostics.HueValid");
-        evaluation.StatusReason.Should().Be("DerivedFromHueValid");
-        evaluation.MissingJudgmentSignal.Should().BeFalse();
+        evaluation.Decision.Should().Be(DecisionOutcome.Ok);
+        evaluation.DecisionSource.Should().Be("Diagnostics.HueValid");
     }
 
     [Fact]
-    public void DetermineStatusFromFlowOutput_WhenTopLevelSignalUsesCamelCase_ShouldReturnOk()
+    public void DetermineDecisionFromFlowOutput_WhenNoJudgmentSignalExists_ReturnsUndetermined()
     {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
-        {
-            ["isOk"] = true
-        });
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+            new Dictionary<string, object> { ["BlobCount"] = 3, ["Measurement"] = 12.5 });
 
-        evaluation.Status.Should().Be(InspectionStatus.OK);
-        evaluation.JudgmentSource.Should().Be("IsOk");
-        evaluation.StatusReason.Should().Be("DerivedFromIsOk");
-    }
-
-    [Fact]
-    public void DetermineStatusFromFlowOutput_WhenDefectCountIsWholeNumberDouble_ShouldReturnOk()
-    {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
-        {
-            ["DefectCount"] = 0.0d
-        });
-
-        evaluation.Status.Should().Be(InspectionStatus.OK);
-        evaluation.JudgmentSource.Should().Be("DefectCount");
-        evaluation.StatusReason.Should().Be("DerivedFromDefectCount");
-    }
-
-    [Fact]
-    public void DetermineStatusFromFlowOutput_WhenNoJudgmentSignalExists_ShouldFailClosed()
-    {
-        var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(new Dictionary<string, object>
-        {
-            ["Message"] = "Only diagnostics text"
-        });
-
-        evaluation.Status.Should().Be(InspectionStatus.Error);
-        evaluation.JudgmentSource.Should().Be("None");
-        evaluation.StatusReason.Should().Be("MissingJudgmentSignal");
+        evaluation.Decision.Should().Be(DecisionOutcome.Undetermined);
+        evaluation.DecisionSource.Should().Be("None");
+        evaluation.ReasonCode.Should().Be("MissingJudgmentSignal");
+        evaluation.Message.Should().BeNull();
         evaluation.MissingJudgmentSignal.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(42)]
+    public void DetermineDecisionFromFlowOutput_WhenExplicitJudgmentTypeIsInvalid_ReturnsInvalid(object? value)
+    {
+        var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(
+            new Dictionary<string, object> { ["JudgmentResult"] = value! });
+
+        evaluation.Decision.Should().Be(DecisionOutcome.Invalid);
+        evaluation.ReasonCode.Should().Be("InvalidJudgmentType");
+        evaluation.Message.Should().NotBeNullOrWhiteSpace();
     }
 }

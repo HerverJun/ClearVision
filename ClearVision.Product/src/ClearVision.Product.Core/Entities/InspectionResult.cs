@@ -5,6 +5,7 @@
 using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Core.Entities;
 
@@ -22,6 +23,14 @@ public class InspectionResult : Entity
     /// 检测状态
     /// </summary>
     public InspectionStatus Status { get; private set; }
+
+    public ExecutionOutcome? ExecutionOutcome { get; private set; }
+
+    public DecisionOutcome? DecisionOutcome { get; private set; }
+
+    public string? DecisionSource { get; private set; }
+
+    public string? ReasonCode { get; private set; }
 
     /// <summary>
     /// 缺陷列表
@@ -106,10 +115,26 @@ public class InspectionResult : Entity
     /// </summary>
     public void SetResult(InspectionStatus status, long processingTimeMs, double? confidenceScore = null, string? errorMessage = null)
     {
-        Status = status;
+        var legacyOutcome = LegacyInspectionStatusProjection.FromLegacy(status) with
+        {
+            Message = errorMessage
+        };
+        SetOutcome(legacyOutcome, processingTimeMs, confidenceScore);
+    }
+
+    public void SetOutcome(
+        InspectionOutcome outcome,
+        long processingTimeMs,
+        double? confidenceScore = null)
+    {
+        ExecutionOutcome = outcome.Execution;
+        DecisionOutcome = outcome.Decision;
+        DecisionSource = NormalizeOptional(outcome.DecisionSource);
+        ReasonCode = NormalizeOptional(outcome.ReasonCode);
+        Status = LegacyInspectionStatusProjection.Project(outcome);
         ProcessingTimeMs = processingTimeMs;
         ConfidenceScore = confidenceScore;
-        ErrorMessage = errorMessage;
+        ErrorMessage = NormalizeOptional(outcome.Message);
         MarkAsModified();
     }
 
@@ -118,9 +143,30 @@ public class InspectionResult : Entity
     /// </summary>
     public void MarkAsError(string errorMessage)
     {
-        Status = InspectionStatus.Error;
-        ErrorMessage = errorMessage;
-        MarkAsModified();
+        SetOutcome(
+            new InspectionOutcome(
+                ClearVision.Product.Core.Outcomes.ExecutionOutcome.Failed,
+                ClearVision.Product.Core.Outcomes.DecisionOutcome.Undetermined,
+                "InspectionResult",
+                "MarkedAsError",
+                errorMessage),
+            ProcessingTimeMs,
+            ConfidenceScore);
+    }
+
+    public InspectionOutcome GetOutcome()
+    {
+        if (ExecutionOutcome.HasValue && DecisionOutcome.HasValue)
+        {
+            return new InspectionOutcome(
+                ExecutionOutcome.Value,
+                DecisionOutcome.Value,
+                DecisionSource,
+                ReasonCode,
+                ErrorMessage);
+        }
+
+        return LegacyInspectionStatusProjection.FromLegacy(Status) with { Message = ErrorMessage };
     }
 
     /// <summary>
@@ -203,6 +249,9 @@ public class InspectionResult : Entity
         CreatedAt = createdAt;
         ModifiedAt = modifiedAt;
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 /// <summary>

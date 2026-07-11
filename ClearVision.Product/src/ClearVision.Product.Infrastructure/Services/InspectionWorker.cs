@@ -17,6 +17,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Metrics;
@@ -572,9 +573,11 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         ct);
 
                     // 保存结果(异步非阻塞)
-                    if (IsNoMaterialSkippedResult(result))
+                    var canonicalOutcome = result.GetOutcome();
+                    if (canonicalOutcome.Execution == ExecutionOutcome.Skipped)
                     {
-                        consecutiveNgCount = 0;
+                        var skippedPolicy = ContinuousInspectionOutcomePolicy.Evaluate(consecutiveNgCount, canonicalOutcome);
+                        consecutiveNgCount = skippedPolicy.ConsecutiveNgCount;
                         currentIntervalMs = 500;
                         cycleSucceeded = true;
 
@@ -585,10 +588,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                             ProcessedCount = cycleCount
                         }, ct);
 
-                        continue;
                     }
-
-                    await resultChannelWriter.WriteAsync(result, ct);
+                    else
+                    {
+                        await resultChannelWriter.WriteAsync(result, ct);
 
                     var outputPayload = EnsureTraceabilityPayload(
                         AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
@@ -604,6 +607,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         ResultId = result.Id,
                         ImageId = result.ImageId,
                         Status = result.Status.ToString(),
+                        ExecutionOutcome = canonicalOutcome.Execution.ToString(),
+                        DecisionOutcome = canonicalOutcome.Decision.ToString(),
+                        DecisionSource = canonicalOutcome.DecisionSource,
+                        ReasonCode = canonicalOutcome.ReasonCode,
                         DefectCount = result.Defects.Count,
                         ProcessingTimeMs = result.ProcessingTimeMs,
                         ErrorMessage = result.ErrorMessage,
@@ -623,9 +630,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     }, ct);
 
                     // 连续 NG 检查
-                    if (result.Status == InspectionStatus.NG)
+                    var outcomePolicy = ContinuousInspectionOutcomePolicy.Evaluate(consecutiveNgCount, canonicalOutcome);
+                    consecutiveNgCount = outcomePolicy.ConsecutiveNgCount;
+                    if (outcomePolicy.IsNgStopCandidate)
                     {
-                        consecutiveNgCount++;
                         var protectionOptions = ResolveRuntimeProtectionOptions(configurationService);
                         if (protectionOptions.ApplyProtectionRules &&
                             protectionOptions.StopOnConsecutiveNg > 0 &&
@@ -638,20 +646,16 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                             break;
                         }
                     }
-                    else
+                    if (outcomePolicy.IsExecutionFailure)
                     {
-                        consecutiveNgCount = 0;
-                    }
-
-                    if (result.Status == InspectionStatus.Error)
-                    {
-                        _metrics.RecordInspectionFailed(result.ErrorMessage ?? InspectionStatus.Error.ToString());
+                        _metrics.RecordInspectionFailed(result.ErrorMessage ?? canonicalOutcome.Execution.ToString());
                         currentIntervalMs = Math.Min(currentIntervalMs * 2, maxIntervalMs);
                     }
                     else
                     {
                         currentIntervalMs = 500;
                         cycleSucceeded = true;
+                    }
                     }
                 }
                 catch (OperationCanceledException)
@@ -1049,7 +1053,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 outputData["StatusReason"] = "NoMaterialFrame";
                 outputData["MissingJudgmentSignal"] = false;
 
-                result.SetResult(InspectionStatus.NotInspected, flowResult.ExecutionTimeMs, null, null);
+                var skippedOutcome = InspectionOutcomeResolver.Resolve(flowResult);
+                InspectionOutcomeResolver.SetDiagnostics(outputData, skippedOutcome);
+                result.SetOutcome(skippedOutcome, flowResult.ExecutionTimeMs);
                 result.SetTraceability(
                     ComputeFlowVersionHash(flow),
                     TryResolveCalibrationBundleId(flowResult.OutputData),
@@ -1061,23 +1067,11 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             // 判定状态
-            var judgmentEvaluation = flowResult.IsSuccess
-                ? DetermineStatusFromFlowOutput(outputData)
-                : new InspectionJudgmentEvaluation(
-                    InspectionStatus.Error,
-                    "FlowExecution",
-                    string.IsNullOrWhiteSpace(flowResult.ErrorMessage)
-                        ? "FlowExecutionFailed"
-                        : $"FlowExecutionFailed:{flowResult.ErrorMessage}",
-                    false);
-            SetJudgmentDiagnostics(outputData, judgmentEvaluation);
+            var outcome = InspectionOutcomeResolver.Resolve(flowResult);
+            InspectionOutcomeResolver.SetDiagnostics(outputData, outcome);
+            var status = LegacyInspectionStatusProjection.Project(outcome);
 
-            var status = judgmentEvaluation.Status;
-            var errorMessage = !flowResult.IsSuccess
-                ? (string.IsNullOrWhiteSpace(flowResult.ErrorMessage) ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage)
-                : (status == InspectionStatus.Error ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage);
-
-            result.SetResult(status, flowResult.ExecutionTimeMs, null, errorMessage);
+            result.SetOutcome(outcome, flowResult.ExecutionTimeMs);
             result.SetTraceability(
                 ComputeFlowVersionHash(flow),
                 TryResolveCalibrationBundleId(flowResult.OutputData),
@@ -1125,7 +1119,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     cameraId,
                     streamCoordinator,
                     flowExecution,
-                    status,
+                    outcome,
                     projectVariableSession,
                     projectVariableBindingIndex,
                     ct);
@@ -1143,7 +1137,14 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         catch (Exception ex)
         {
             stopwatch.Stop();
-            result.SetResult(InspectionStatus.Error, stopwatch.ElapsedMilliseconds, null, ex.Message);
+            result.SetOutcome(
+                new InspectionOutcome(
+                    ExecutionOutcome.Failed,
+                    DecisionOutcome.Undetermined,
+                    "InspectionWorker",
+                    "CycleExecutionException",
+                    ex.Message),
+                stopwatch.ElapsedMilliseconds);
             result.SetTraceability(ComputeFlowVersionHash(flow), null, sessionId);
 
             var outputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
@@ -1157,33 +1158,13 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
     }
 
-    private static bool IsNoMaterialSkippedResult(InspectionResult result)
-    {
-        if (result.Status != InspectionStatus.NotInspected || string.IsNullOrWhiteSpace(result.OutputDataJson))
-        {
-            return false;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(result.OutputDataJson);
-            return doc.RootElement.ValueKind == JsonValueKind.Object
-                && doc.RootElement.TryGetProperty("NoMaterialFrame", out var noMaterial)
-                && noMaterial.ValueKind == JsonValueKind.True;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private async Task TryAppendShadowComparisonAsync(
         InspectionResult baselineResult,
         OperatorFlow flow,
         string? cameraId,
         ICameraFrameStreamCoordinator streamCoordinator,
         IFlowExecutionService flowExecution,
-        InspectionStatus baselineStatus,
+        InspectionOutcome baselineOutcome,
         IProjectVariableSession? projectVariableSession,
         ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
@@ -1210,23 +1191,22 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         isPreview: true),
                     cancellationToken: ct);
             var shadowOutput = shadowResult.OutputData ?? new Dictionary<string, object>();
-            var shadowEvaluation = shadowResult.IsSuccess
-                ? DetermineStatusFromFlowOutput(shadowOutput)
-                : new InspectionJudgmentEvaluation(
-                    InspectionStatus.Error,
-                    "ShadowFlowExecution",
-                    string.IsNullOrWhiteSpace(shadowResult.ErrorMessage)
-                        ? "ShadowFlowExecutionFailed"
-                        : $"ShadowFlowExecutionFailed:{shadowResult.ErrorMessage}",
-                    false);
+            var candidateOutcome = InspectionOutcomeResolver.Resolve(shadowResult);
+            var outcomeComparison = ShadowOutcomeComparison.Evaluate(baselineOutcome, candidateOutcome);
             var latencyMs = Math.Max(0, (DateTime.UtcNow - started).TotalMilliseconds);
             var buffer = streamCoordinator.SnapshotFrameBufferStats(resolvedCameraId);
             var comparison = new Dictionary<string, object?>
             {
                 ["Mode"] = ContinuousInspectionMode.Shadow.ToString(),
-                ["BaselineStatus"] = baselineStatus.ToString(),
-                ["ContinuousStatus"] = shadowEvaluation.Status.ToString(),
-                ["Matched"] = baselineStatus == shadowEvaluation.Status,
+                ["BaselineStatus"] = LegacyInspectionStatusProjection.Project(baselineOutcome).ToString(),
+                ["ContinuousStatus"] = LegacyInspectionStatusProjection.Project(candidateOutcome).ToString(),
+                ["Comparable"] = outcomeComparison.Comparable,
+                ["ComparisonReason"] = outcomeComparison.ComparisonReason,
+                ["BaselineExecution"] = baselineOutcome.Execution.ToString(),
+                ["BaselineDecision"] = baselineOutcome.Decision.ToString(),
+                ["CandidateExecution"] = candidateOutcome.Execution.ToString(),
+                ["CandidateDecision"] = candidateOutcome.Decision.ToString(),
+                ["Matched"] = outcomeComparison.Matched,
                 ["Sequence"] = envelope.Sequence,
                 ["CorrelationId"] = envelope.EffectiveCorrelationId,
                 ["LatencyMs"] = latencyMs,
@@ -1236,8 +1216,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 ["BufferCapacity"] = buffer.Capacity,
                 ["BufferCount"] = buffer.Count,
                 ["BufferOverwrittenCount"] = buffer.OverwrittenCount,
-                ["StatusReason"] = shadowEvaluation.StatusReason,
-                ["ErrorMessage"] = shadowResult.ErrorMessage
+                ["StatusReason"] = candidateOutcome.ReasonCode,
+                ["ErrorMessage"] = candidateOutcome.Message
             };
 
             var outputPayload = AnalysisPayloadSerialization.DeserializeJsonDictionary(baselineResult.OutputDataJson)
@@ -1461,20 +1441,6 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
 
         return false;
-    }
-
-    private static InspectionJudgmentEvaluation DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)
-    {
-        return InspectionJudgmentResolver.DetermineStatusFromFlowOutput(outputData);
-    }
-
-    private static void SetJudgmentDiagnostics(
-        Dictionary<string, object> outputData,
-        InspectionJudgmentEvaluation evaluation)
-    {
-        outputData["MissingJudgmentSignal"] = evaluation.MissingJudgmentSignal;
-        outputData["JudgmentSource"] = evaluation.JudgmentSource;
-        outputData["StatusReason"] = evaluation.StatusReason;
     }
 
     private async Task CacheResultImageAsync(InspectionResult result)

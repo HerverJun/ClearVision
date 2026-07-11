@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Application.DTOs;
 
@@ -25,6 +26,14 @@ public class InspectionResultDto
     /// 检测状态
     /// </summary>
     public InspectionStatus Status { get; set; }
+
+    public ExecutionOutcome ExecutionOutcome { get; set; }
+
+    public DecisionOutcome DecisionOutcome { get; set; }
+
+    public string? DecisionSource { get; set; }
+
+    public string? ReasonCode { get; set; }
 
     /// <summary>
     /// 缺陷列表

@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.RuntimeAssets;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
@@ -784,7 +785,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             case RuntimeRunOutcome.Ng:
                 _sessionNgCount += 1;
                 break;
-            default:
+            case RuntimeRunOutcome.Error:
                 _sessionErrorCount += 1;
                 break;
         }
@@ -1121,6 +1122,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             RuntimeRunOutcome.Ng => "NG",
             RuntimeRunOutcome.Error => "异常",
             RuntimeRunOutcome.Canceled => "已取消",
+            RuntimeRunOutcome.Undetermined => "未判定",
             _ => outcome.ToString()
         };
     }
@@ -1157,22 +1159,21 @@ public sealed class RuntimeResultNormalizer
         bool cancellationRequested)
     {
         var outputData = flowResult.OutputData ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        var evaluation = flowResult.IsSuccess
-            ? InspectionJudgmentResolver.DetermineStatusFromFlowOutput(outputData)
-            : new InspectionJudgmentEvaluation(
-                InspectionStatus.Error,
-                "FlowExecution",
-                string.IsNullOrWhiteSpace(flowResult.ErrorMessage)
-                    ? "ExecutionFailed"
-                    : flowResult.ErrorMessage,
-                false);
+        var canonicalOutcome = cancellationRequested
+            ? new InspectionOutcome(
+                ExecutionOutcome.Cancelled,
+                DecisionOutcome.Undetermined,
+                "RuntimeHost",
+                "Canceled",
+                "Run canceled.")
+            : InspectionOutcomeResolver.Resolve(flowResult);
 
-        var outcome = ResolveOutcome(flowResult, evaluation, cancellationRequested);
-        var inspectionStatus = outcome == RuntimeRunOutcome.Canceled
+        var outcome = ResolveOutcome(canonicalOutcome);
+        InspectionStatus? inspectionStatus = canonicalOutcome.Execution == ExecutionOutcome.Cancelled
             ? null
-            : (InspectionStatus?)evaluation.Status;
-        var diagnosticCode = ResolveDiagnosticCode(outcome, evaluation, flowResult);
-        var diagnosticMessage = ResolveDiagnosticMessage(outcome, evaluation, flowResult);
+            : LegacyInspectionStatusProjection.Project(canonicalOutcome);
+        var diagnosticCode = canonicalOutcome.ReasonCode ?? string.Empty;
+        var diagnosticMessage = canonicalOutcome.Message;
 
         return new RuntimeNormalizedResult
         {
@@ -1184,10 +1185,14 @@ public sealed class RuntimeResultNormalizer
             SourceImagePath = imagePath,
             Outcome = outcome,
             InspectionStatus = inspectionStatus,
+            ExecutionOutcome = canonicalOutcome.Execution,
+            DecisionOutcome = canonicalOutcome.Decision,
+            DecisionSource = canonicalOutcome.DecisionSource,
+            ReasonCode = canonicalOutcome.ReasonCode,
             ExecutionTimeMs = flowResult.ExecutionTimeMs,
             DiagnosticCode = diagnosticCode,
             DiagnosticMessage = diagnosticMessage,
-            HasJudgmentSignal = !evaluation.MissingJudgmentSignal,
+            HasJudgmentSignal = canonicalOutcome.ReasonCode != "MissingJudgmentSignal",
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = completedAtUtc,
             PrimaryOutputs = BuildPrimaryOutputs(outputData),
@@ -1290,6 +1295,20 @@ public sealed class RuntimeResultNormalizer
             SourceImagePath = imagePath,
             Outcome = outcome,
             InspectionStatus = inspectionStatus,
+            ExecutionOutcome = outcome switch
+            {
+                RuntimeRunOutcome.Canceled => ExecutionOutcome.Cancelled,
+                RuntimeRunOutcome.Error => ExecutionOutcome.Failed,
+                _ => ExecutionOutcome.Succeeded
+            },
+            DecisionOutcome = inspectionStatus switch
+            {
+                InspectionStatus.OK => DecisionOutcome.Ok,
+                InspectionStatus.NG => DecisionOutcome.Ng,
+                _ => DecisionOutcome.Undetermined
+            },
+            DecisionSource = "RuntimeHost",
+            ReasonCode = diagnosticCode,
             ExecutionTimeMs = (long)Math.Max(0, (completedAtUtc - startedAtUtc).TotalMilliseconds),
             DiagnosticCode = diagnosticCode,
             DiagnosticMessage = diagnosticMessage,
@@ -1305,64 +1324,25 @@ public sealed class RuntimeResultNormalizer
         };
     }
 
-    private static RuntimeRunOutcome ResolveOutcome(
-        FlowExecutionResult flowResult,
-        InspectionJudgmentEvaluation evaluation,
-        bool cancellationRequested)
+    private static RuntimeRunOutcome ResolveOutcome(InspectionOutcome outcome)
     {
-        if (cancellationRequested ||
-            string.Equals(flowResult.ErrorMessage, "Flow was canceled.", StringComparison.OrdinalIgnoreCase))
+        if (outcome.Execution == ExecutionOutcome.Cancelled)
         {
             return RuntimeRunOutcome.Canceled;
         }
 
-        if (!flowResult.IsSuccess)
+        if (outcome.Execution is ExecutionOutcome.Failed or ExecutionOutcome.TimedOut ||
+            outcome.Decision == DecisionOutcome.Invalid)
         {
             return RuntimeRunOutcome.Error;
         }
 
-        return evaluation.Status switch
+        return outcome.Decision switch
         {
-            InspectionStatus.OK => RuntimeRunOutcome.Ok,
-            InspectionStatus.NG => RuntimeRunOutcome.Ng,
-            _ => RuntimeRunOutcome.Error
+            DecisionOutcome.Ok => RuntimeRunOutcome.Ok,
+            DecisionOutcome.Ng => RuntimeRunOutcome.Ng,
+            _ => RuntimeRunOutcome.Undetermined
         };
-    }
-
-    private static string ResolveDiagnosticCode(
-        RuntimeRunOutcome outcome,
-        InspectionJudgmentEvaluation evaluation,
-        FlowExecutionResult flowResult)
-    {
-        if (outcome == RuntimeRunOutcome.Canceled)
-        {
-            return "Canceled";
-        }
-
-        if (!flowResult.IsSuccess)
-        {
-            return "ExecutionFailed";
-        }
-
-        return evaluation.MissingJudgmentSignal ? "FlowInvalid" : evaluation.StatusReason;
-    }
-
-    private static string? ResolveDiagnosticMessage(
-        RuntimeRunOutcome outcome,
-        InspectionJudgmentEvaluation evaluation,
-        FlowExecutionResult flowResult)
-    {
-        if (outcome == RuntimeRunOutcome.Canceled)
-        {
-            return "Run canceled.";
-        }
-
-        if (!string.IsNullOrWhiteSpace(flowResult.ErrorMessage))
-        {
-            return flowResult.ErrorMessage;
-        }
-
-        return evaluation.Status == InspectionStatus.Error ? evaluation.StatusReason : null;
     }
 
     private static Dictionary<string, object?> BuildPrimaryOutputs(Dictionary<string, object> outputData)

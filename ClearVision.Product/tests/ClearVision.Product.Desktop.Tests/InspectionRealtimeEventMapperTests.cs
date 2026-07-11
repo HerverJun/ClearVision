@@ -21,6 +21,10 @@ public class InspectionRealtimeEventMapperTests
         var analysisData = GetProperty(payloadJson.RootElement, "analysisData");
 
         GetProperty(payloadJson.RootElement, "status").GetString().Should().Be("OK");
+        GetProperty(payloadJson.RootElement, "executionOutcome").GetString().Should().Be("Succeeded");
+        GetProperty(payloadJson.RootElement, "decisionOutcome").GetString().Should().Be("Ok");
+        GetProperty(payloadJson.RootElement, "decisionSource").GetString().Should().Be("JudgmentResult");
+        GetProperty(payloadJson.RootElement, "reasonCode").GetString().Should().Be("DerivedFromJudgmentResult");
         GetProperty(payloadJson.RootElement, "errorMessage").GetString().Should().Be("missing signal");
         GetProperty(payloadJson.RootElement, "imageId").GetGuid().Should().NotBeEmpty();
         GetProperty(analysisData, "version").GetInt32().Should().Be(1);
@@ -70,6 +74,10 @@ public class InspectionRealtimeEventMapperTests
         SetProperty(evt, nameof(InspectionResultEvent.ResultId), Guid.NewGuid());
         SetProperty(evt, nameof(InspectionResultEvent.ImageId), Guid.NewGuid());
         SetProperty(evt, nameof(InspectionResultEvent.Status), "OK");
+        SetProperty(evt, nameof(InspectionResultEvent.ExecutionOutcome), "Succeeded");
+        SetProperty(evt, nameof(InspectionResultEvent.DecisionOutcome), "Ok");
+        SetProperty(evt, nameof(InspectionResultEvent.DecisionSource), "JudgmentResult");
+        SetProperty(evt, nameof(InspectionResultEvent.ReasonCode), "DerivedFromJudgmentResult");
         SetProperty(evt, nameof(InspectionResultEvent.DefectCount), 0);
         SetProperty(evt, nameof(InspectionResultEvent.ProcessingTimeMs), 18L);
         SetProperty(evt, nameof(InspectionResultEvent.ErrorMessage), "missing signal");

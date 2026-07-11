@@ -29,6 +29,10 @@ public record InspectionResultEvent : IInspectionEvent
     public required Guid ResultId { get; init; }
     public Guid? ImageId { get; init; }
     public required string Status { get; init; }  // OK, NG, Error
+    public string? ExecutionOutcome { get; init; }
+    public string? DecisionOutcome { get; init; }
+    public string? DecisionSource { get; init; }
+    public string? ReasonCode { get; init; }
     public required int DefectCount { get; init; }
     public required long ProcessingTimeMs { get; init; }
     public string? ErrorMessage { get; init; }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Runtime.Abstractions;
 
@@ -18,7 +19,8 @@ public enum RuntimeRunOutcome
     Ok = 0,
     Ng = 1,
     Error = 2,
-    Canceled = 3
+    Canceled = 3,
+    Undetermined = 4
 }
 
 public enum RuntimeIssueSeverity
@@ -311,6 +313,14 @@ public sealed class RuntimeNormalizedResult
     public RuntimeRunOutcome Outcome { get; set; }
 
     public InspectionStatus? InspectionStatus { get; set; }
+
+    public ExecutionOutcome ExecutionOutcome { get; set; }
+
+    public DecisionOutcome DecisionOutcome { get; set; }
+
+    public string? DecisionSource { get; set; }
+
+    public string? ReasonCode { get; set; }
 
     public long ExecutionTimeMs { get; set; }
 

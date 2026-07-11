@@ -228,6 +228,10 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 Id = r.Id,
                 ProjectId = r.ProjectId,
                 Status = r.Status,
+                ExecutionOutcome = r.ExecutionOutcome,
+                DecisionOutcome = r.DecisionOutcome,
+                DecisionSource = r.DecisionSource,
+                ReasonCode = r.ReasonCode,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -265,6 +269,10 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 Id = r.Id,
                 ProjectId = r.ProjectId,
                 Status = r.Status,
+                ExecutionOutcome = r.ExecutionOutcome,
+                DecisionOutcome = r.DecisionOutcome,
+                DecisionSource = r.DecisionSource,
+                ReasonCode = r.ReasonCode,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -304,6 +312,10 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 Id = r.Id,
                 ProjectId = r.ProjectId,
                 Status = r.Status,
+                ExecutionOutcome = r.ExecutionOutcome,
+                DecisionOutcome = r.DecisionOutcome,
+                DecisionSource = r.DecisionSource,
+                ReasonCode = r.ReasonCode,
                 Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
                 {
                     Id = d.Id,
@@ -337,7 +349,22 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     private static InspectionResult ToInspectionResultWithoutOutputImage(InspectionHistoryItem item)
     {
         var result = new InspectionResult(item.ProjectId, item.ImageId);
-        result.SetResult(item.Status, item.ProcessingTimeMs, item.ConfidenceScore, item.ErrorMessage);
+        if (item.ExecutionOutcome.HasValue && item.DecisionOutcome.HasValue)
+        {
+            result.SetOutcome(
+                new ClearVision.Product.Core.Outcomes.InspectionOutcome(
+                    item.ExecutionOutcome.Value,
+                    item.DecisionOutcome.Value,
+                    item.DecisionSource,
+                    item.ReasonCode,
+                    item.ErrorMessage),
+                item.ProcessingTimeMs,
+                item.ConfidenceScore);
+        }
+        else
+        {
+            result.SetResult(item.Status, item.ProcessingTimeMs, item.ConfidenceScore, item.ErrorMessage);
+        }
 
         if (!string.IsNullOrWhiteSpace(item.OutputDataJson))
         {

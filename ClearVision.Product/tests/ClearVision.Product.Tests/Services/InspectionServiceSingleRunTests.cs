@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
@@ -434,7 +435,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenJudgmentSignalMissing_ShouldFailClosed()
+    public async Task ExecuteSingleAsync_WhenJudgmentSignalMissing_ShouldReturnSucceededUndetermined()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -475,8 +476,10 @@ public class InspectionServiceSingleRunTests
 
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
 
-        result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Be("MissingJudgmentSignal");
+        result.Status.Should().Be(InspectionStatus.NotInspected);
+        result.ErrorMessage.Should().BeNull();
+        result.GetOutcome().Execution.Should().Be(ExecutionOutcome.Succeeded);
+        result.GetOutcome().Decision.Should().Be(DecisionOutcome.Undetermined);
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.TryGetProperty("MissingJudgmentSignal", out var missingSignal).Should().BeTrue();
@@ -573,7 +576,7 @@ public class InspectionServiceSingleRunTests
             });
 
         result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Contain("InvalidJudgmentType:IsOk");
+        result.ErrorMessage.Should().Contain("Invalid judgment type at IsOk");
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
@@ -602,7 +605,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenResultOutputAndResultJudgmentBothMissingJudgment_ShouldKeepMissingSignalError()
+    public async Task ExecuteSingleAsync_WhenResultOutputAndResultJudgmentBothMissingJudgment_ShouldKeepUndeterminedOutcome()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -616,8 +619,10 @@ public class InspectionServiceSingleRunTests
                 ["Payload"] = "output-business-only"
             });
 
-        result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Be("MissingJudgmentSignal");
+        result.Status.Should().Be(InspectionStatus.NotInspected);
+        result.ErrorMessage.Should().BeNull();
+        result.GetOutcome().Execution.Should().Be(ExecutionOutcome.Succeeded);
+        result.GetOutcome().Decision.Should().Be(DecisionOutcome.Undetermined);
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
         doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
@@ -669,7 +674,7 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 9, 9, 9 }, explicitFlow);
 
         result.Status.Should().Be(InspectionStatus.Error);
-        result.ErrorMessage.Should().Contain("InvalidJudgmentType:IsOk");
+        result.ErrorMessage.Should().Contain("Invalid judgment type at IsOk");
     }
 
     [Fact]
@@ -730,7 +735,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenDataWrapperContainsIsAnomaly_ShouldTreatAsNg()
+    public async Task ExecuteSingleAsync_WhenUnknownExplicitResultPrecedesNestedSignal_ShouldReturnInvalid()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -778,10 +783,11 @@ public class InspectionServiceSingleRunTests
 
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
 
-        result.Status.Should().Be(InspectionStatus.NG);
+        result.Status.Should().Be(InspectionStatus.Error);
+        result.GetOutcome().Decision.Should().Be(DecisionOutcome.Invalid);
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Data.IsAnomaly");
+        doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("Result");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 

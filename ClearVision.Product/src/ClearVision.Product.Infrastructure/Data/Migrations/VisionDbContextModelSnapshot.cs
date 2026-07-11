@@ -87,7 +87,17 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ExecutionOutcome")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FlowVersionHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DecisionOutcome")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DecisionSource")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ImageId")
@@ -112,6 +122,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("SessionId")

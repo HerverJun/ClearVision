@@ -204,7 +204,7 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
     private static InspectionResult SnapshotResult(InspectionResult source)
     {
         var snapshot = new InspectionResult(source.ProjectId, source.ImageId);
-        snapshot.SetResult(source.Status, source.ProcessingTimeMs, source.ConfidenceScore, source.ErrorMessage);
+        snapshot.SetOutcome(source.GetOutcome(), source.ProcessingTimeMs, source.ConfidenceScore);
         snapshot.SetOutputImage(source.OutputImage!.ToArray());
         if (!string.IsNullOrWhiteSpace(source.OutputDataJson))
         {

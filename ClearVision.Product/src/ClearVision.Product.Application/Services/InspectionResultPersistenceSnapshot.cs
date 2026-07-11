@@ -9,7 +9,7 @@ public static class InspectionResultPersistenceSnapshot
         ArgumentNullException.ThrowIfNull(source);
 
         var snapshot = new InspectionResult(source.ProjectId, source.ImageId);
-        snapshot.SetResult(source.Status, source.ProcessingTimeMs, source.ConfidenceScore, source.ErrorMessage);
+        snapshot.SetOutcome(source.GetOutcome(), source.ProcessingTimeMs, source.ConfidenceScore);
 
         if (!string.IsNullOrWhiteSpace(source.OutputDataJson))
         {

@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Diagnostics;
@@ -90,7 +91,7 @@ public sealed class ContinuousInspectionWorker
             }
 
             var outputData = scheduled.Result.OutputData ?? new Dictionary<string, object>();
-            var evaluation = InspectionJudgmentResolver.DetermineStatusFromFlowOutput(outputData);
+            var evaluation = InspectionJudgmentResolver.DetermineDecisionFromFlowOutput(outputData);
             var decision = consensus.AddFrame(new TrackFrameJudgment(
                 scheduled.TrackId,
                 scheduled.Frame.Sequence,
@@ -370,7 +371,7 @@ public sealed class ContinuousInspectionWorker
         Guid sessionId,
         ScheduledInferenceResult scheduled,
         TrackDecision decision,
-        InspectionJudgmentEvaluation evaluation,
+        InspectionDecisionEvaluation evaluation,
         ContinuousInspectionMode mode)
     {
         var outputData = scheduled.Result?.OutputData ?? new Dictionary<string, object>();
@@ -389,11 +390,15 @@ public sealed class ContinuousInspectionWorker
         };
 
         var result = new InspectionResult(projectId);
-        result.SetResult(
-            decision.Status,
+        result.SetOutcome(
+            new InspectionOutcome(
+                ExecutionOutcome.Succeeded,
+                decision.Status == InspectionStatus.OK ? DecisionOutcome.Ok : DecisionOutcome.Ng,
+                evaluation.DecisionSource,
+                evaluation.ReasonCode,
+                evaluation.Decision == DecisionOutcome.Invalid ? evaluation.Message : null),
             Math.Max(0, (long)scheduled.Latency.TotalMilliseconds),
-            decision.ConsensusScore,
-            evaluation.Status == InspectionStatus.Error ? evaluation.StatusReason : null);
+            decision.ConsensusScore);
         result.SetTraceability(null, null, sessionId);
         if (outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes)
         {
@@ -444,6 +449,10 @@ public sealed class ContinuousInspectionWorker
             ResultId = result.Id,
             ImageId = result.ImageId,
             Status = result.Status.ToString(),
+            ExecutionOutcome = result.GetOutcome().Execution.ToString(),
+            DecisionOutcome = result.GetOutcome().Decision.ToString(),
+            DecisionSource = result.GetOutcome().DecisionSource,
+            ReasonCode = result.GetOutcome().ReasonCode,
             DefectCount = result.Defects.Count,
             ProcessingTimeMs = result.ProcessingTimeMs,
             ErrorMessage = result.ErrorMessage,

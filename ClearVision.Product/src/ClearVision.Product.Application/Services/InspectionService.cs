@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
@@ -760,18 +761,14 @@ public class InspectionService : IInspectionService
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 
-            var judgmentEvaluation = flowResult.IsSuccess
-                ? DetermineStatusFromFlowOutput(outputData)
-                : new InspectionJudgmentEvaluation(
-                    InspectionStatus.Error,
-                    "FlowExecution",
-                    string.IsNullOrWhiteSpace(flowResult.ErrorMessage)
-                        ? "FlowExecutionFailed"
-                        : $"FlowExecutionFailed:{flowResult.ErrorMessage}",
-                    false);
+            var outcome = InspectionOutcomeResolver.Resolve(flowResult);
+            if (outcome.Execution == ExecutionOutcome.Skipped)
+            {
+                outputData["NoMaterialFrame"] = true;
+            }
 
-            SetJudgmentDiagnostics(outputData, judgmentEvaluation);
-            var status = judgmentEvaluation.Status;
+            InspectionOutcomeResolver.SetDiagnostics(outputData, outcome);
+            var status = LegacyInspectionStatusProjection.Project(outcome);
 
             if (!flowResult.IsSuccess)
             {
@@ -782,11 +779,7 @@ public class InspectionService : IInspectionService
                 _logger.LogInformation("[InspectionService] 判定结果: {Status}", status);
             }
 
-            var errorMessage = !flowResult.IsSuccess
-                ? (string.IsNullOrWhiteSpace(flowResult.ErrorMessage) ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage)
-                : (status == InspectionStatus.Error ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage);
-
-            result.SetResult(status, flowResult.ExecutionTimeMs, null, errorMessage);
+            result.SetOutcome(outcome, flowResult.ExecutionTimeMs);
             result.SetTraceability(
                 ComputeFlowVersionHash(actualFlow),
                 TryResolveCalibrationBundleId(flowResult.OutputData),
@@ -1064,20 +1057,6 @@ public class InspectionService : IInspectionService
         {
             throw new InvalidOperationException($"{admission.Code}: {admission.Message}");
         }
-    }
-
-    private static InspectionJudgmentEvaluation DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)
-    {
-        return InspectionJudgmentResolver.DetermineStatusFromFlowOutput(outputData);
-    }
-
-    private static void SetJudgmentDiagnostics(
-        Dictionary<string, object> outputData,
-        InspectionJudgmentEvaluation evaluation)
-    {
-        outputData["MissingJudgmentSignal"] = evaluation.MissingJudgmentSignal;
-        outputData["JudgmentSource"] = evaluation.JudgmentSource;
-        outputData["StatusReason"] = evaluation.StatusReason;
     }
 
     private Dictionary<string, object>? EnsureTraceabilityPayload(
