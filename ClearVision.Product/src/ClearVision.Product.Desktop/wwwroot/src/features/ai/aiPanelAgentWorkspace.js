@@ -4327,7 +4327,7 @@ export const aiPanelAgentWorkspaceMixin = {
                                 aria-selected="${key === viewMode ? 'true' : 'false'}"
                                 ${disabled ? 'disabled aria-disabled="true"' : ''}
                                 class="${key === phase ? 'is-active' : ''} ${key === viewMode ? 'is-selected' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
-                                <span>${key === AgentWorkspaceModes.PLAN ? '初步方案' : '构建草稿'}</span>
+                                <span>${key === AgentWorkspaceModes.PLAN ? '方案' : '构建与验证'}</span>
                                 <small>${this._escapeHtml(statusLabel)}</small>
                             </button>
                         `;

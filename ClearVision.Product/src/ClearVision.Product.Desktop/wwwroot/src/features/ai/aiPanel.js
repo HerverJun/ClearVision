@@ -29,6 +29,7 @@ import {
     initializeAiPanelShell,
     installAiPanelShellPresentation
 } from './aiPanelShellPresentation.js';
+import { installAiPanelPlanPresentation } from './aiPanelPlanPresentation.js';
 import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
@@ -2419,4 +2420,5 @@ Object.assign(
     aiPanelTopologySummaryMixin
 );
 
+installAiPanelPlanPresentation(AiPanel.prototype);
 installAiPanelShellPresentation(AiPanel.prototype);

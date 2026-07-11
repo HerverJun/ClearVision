@@ -1,0 +1,285 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { deriveAiPlanPresentation } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelPlanPresentation.js';
+import {
+  deriveAiClarificationPresentation,
+  renderAiClarification,
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelClarificationPresentation.js';
+
+function createQuestion(overrides = {}) {
+  return {
+    id: 'question-image-source',
+    questionId: 'question-image-source',
+    field: 'image_source',
+    title: '图像从哪里获取？',
+    why: '图像来源会影响采集算子和验证方式。',
+    blocksBuild: true,
+    interactive: true,
+    kind: 'question',
+    options: [
+      {
+        value: 'industrial_camera',
+        label: '工业相机',
+        recommended: true,
+        answerEffect: 'resolve_field',
+        description: '使用现场相机作为稳定输入。',
+      },
+      {
+        value: 'image_folder',
+        label: '图片目录',
+        recommended: false,
+        answerEffect: 'resolve_field',
+        description: '先使用离线图片完成验证。',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createPlan(overrides = {}) {
+  const question = createQuestion();
+  return {
+    planId: 'plan-v2',
+    planHash: 'sha256:plan-v2',
+    confidence: 'high',
+    planSource: 'model_router',
+    operatorCatalogVersion: 'catalog-1',
+    templateCatalogVersion: 'template-1',
+    route: {
+      title: '包装箱外观检测流程',
+      summary: '采集图像后限定检测区域并判断破损。',
+      operators: ['ImageAcquisition', 'RoiManager', 'SurfaceDefectDetection', 'ResultOutput'],
+    },
+    semanticExtraction: {
+      inspectionObject: '包装箱表面',
+      taskType: 'surface_defect',
+      imageSource: '',
+      defectType: '破损',
+      okCondition: '表面完整',
+      ngCondition: '存在可见破损',
+      outputTarget: 'OK/NG',
+    },
+    questions: [question],
+    assumptions: ['光照保持稳定'],
+    acceptanceCriteria: ['破损样本输出 NG'],
+    risks: ['现场光照需要复核'],
+    contractRepairNotes: [],
+    ...overrides,
+  };
+}
+
+function createPanel({ queue = [], batch = queue, confirmed = {}, optimistic = {}, readinessStatus = 'ready', readinessError = '' } = {}) {
+  return {
+    requirementMode: 'strict',
+    agentWorkspaceState: {
+      answers: {
+        confirmedByField: confirmed,
+        optimisticByField: optimistic,
+        selectionByQuestion: {},
+      },
+      readinessStatus,
+      readinessError,
+      projection: {
+        clarificationQueue: queue,
+        clarificationBatch: batch,
+        readiness: { canBuild: false, blockers: [] },
+      },
+    },
+    _escapeHtml: value => String(value ?? ''),
+    _localizeDisplayText: value => String(value ?? ''),
+    _formatRequirementTaskTypeLabel: value => value === 'surface_defect' ? '表面缺陷检测' : value,
+    _formatOperatorType: value => ({
+      ImageAcquisition: '图像采集',
+      RoiManager: '检测区域',
+      SurfaceDefectDetection: '表面缺陷检测',
+      ResultOutput: '结果输出',
+    }[value] || value),
+    _inferPlanQuestionFieldForQuestion: question => question.field,
+    _canViewBuildWorkspace: () => false,
+    _isPlanSnapshotReadOnly: () => false,
+  };
+}
+
+test('Plan-ready presentation shows understanding and recommendation without changing the gate', () => {
+  const panel = createPanel({ queue: [], batch: [] });
+  panel.agentWorkspaceState.projection.readiness = { canBuild: true, blockers: [] };
+  const beforeGate = structuredClone(panel.agentWorkspaceState.projection.readiness);
+  const presentation = deriveAiPlanPresentation(panel, createPlan({ questions: [] }));
+
+  assert.equal(presentation.understanding.find(item => item.field === 'inspection_object').value, '包装箱表面');
+  assert.equal(presentation.understanding.find(item => item.field === 'task_type').value, '表面缺陷检测');
+  assert.equal(presentation.route.title, '包装箱外观检测流程');
+  assert.equal(presentation.route.operators.length, 4);
+  assert.deepEqual(panel.agentWorkspaceState.projection.readiness, beforeGate);
+});
+
+test('task understanding presents canonical answer labels instead of internal enum values', () => {
+  const question = createQuestion();
+  const panel = createPanel({
+    queue: [],
+    batch: [],
+    confirmed: {
+      image_source: { field: 'image_source', questionId: question.id, value: 'industrial_camera', resolved: true },
+    },
+  });
+  const presentation = deriveAiPlanPresentation(panel, createPlan({ questions: [question] }));
+  const imageSource = presentation.understanding.find(item => item.field === 'image_source');
+
+  assert.equal(imageSource.value, '工业相机');
+  assert.notEqual(imageSource.value, 'industrial_camera');
+});
+
+test('single canonical question exposes recommended and ordinary choices with impact copy', () => {
+  const question = createQuestion();
+  const panel = createPanel({ queue: [question], batch: [question] });
+  const presentation = deriveAiClarificationPresentation(panel, createPlan());
+  const html = renderAiClarification(panel, createPlan());
+
+  assert.equal(presentation.activeQuestion.field, 'image_source');
+  assert.equal(presentation.activeQuestion.options.length, 2);
+  assert.match(html, /推荐/);
+  assert.match(html, /使用现场相机作为稳定输入/);
+  assert.match(html, /先使用离线图片完成验证/);
+});
+
+test('multiple questions highlight only the first and report remaining progress', () => {
+  const first = createQuestion();
+  const second = createQuestion({
+    id: 'question-output',
+    questionId: 'question-output',
+    field: 'output_target',
+    title: '结果输出到哪里？',
+  });
+  const panel = createPanel({ queue: [first, second], batch: [first, second] });
+  const presentation = deriveAiClarificationPresentation(panel, createPlan({ questions: [first, second] }));
+  const html = renderAiClarification(panel, createPlan({ questions: [first, second] }));
+
+  assert.equal(presentation.activeQuestion.field, 'image_source');
+  assert.equal(presentation.unresolvedCount, 2);
+  assert.equal((html.match(/data-ai-hook="clarification-question"/g) || []).length, 1);
+  assert.match(html, /还需确认 2 项 · 当前第 1 项/);
+});
+
+test('optimistic answer remains visible as confirming until canonical confirmation arrives', () => {
+  const question = createQuestion();
+  const optimistic = {
+    image_source: { field: 'image_source', questionId: question.id, value: 'industrial_camera', origin: 'explicit_user_selection', resolved: true },
+  };
+  const panel = createPanel({ queue: [question], batch: [question], optimistic, readinessStatus: 'validating' });
+  let presentation = deriveAiClarificationPresentation(panel, createPlan());
+  assert.equal(presentation.activeQuestion.confirming, true);
+  assert.match(renderAiClarification(panel, createPlan()), /正在等待权威 Readiness 确认/);
+
+  panel.agentWorkspaceState.answers.optimisticByField = {};
+  panel.agentWorkspaceState.answers.confirmedByField = {
+    image_source: { field: 'image_source', questionId: question.id, value: 'industrial_camera', origin: 'explicit_user_selection', resolved: true },
+  };
+  panel.agentWorkspaceState.readinessStatus = 'ready';
+  presentation = deriveAiClarificationPresentation(panel, createPlan());
+  assert.equal(presentation.activeQuestion, null);
+  assert.equal(presentation.confirmedItems[0].confirmedAnswer.value, 'industrial_camera');
+  assert.equal(presentation.confirmedItems[0].confirmedDisplayValue, '工业相机');
+  assert.doesNotMatch(renderAiClarification(panel, createPlan()), /industrial_camera/);
+});
+
+test('Readiness failure restores question operability and never opens Build locally', () => {
+  const question = createQuestion();
+  const optimistic = {
+    image_source: { field: 'image_source', questionId: question.id, value: 'image_folder', origin: 'explicit_user_selection', resolved: true },
+  };
+  const panel = createPanel({
+    queue: [question],
+    batch: [question],
+    optimistic,
+    readinessStatus: 'failed',
+    readinessError: '权威校验失败',
+  });
+  const html = renderAiClarification(panel, createPlan());
+  assert.match(html, /权威校验失败/);
+  assert.doesNotMatch(html, /data-ai-plan-option="true"[^>]*disabled/);
+  assert.equal(panel.agentWorkspaceState.projection.readiness.canBuild, false);
+});
+
+test('newer optimistic choice wins over stale confirmed choice in presentation', () => {
+  const question = createQuestion();
+  const panel = createPanel({
+    queue: [question],
+    batch: [question],
+    confirmed: {
+      image_source: { field: 'image_source', questionId: question.id, value: 'industrial_camera', resolved: true },
+    },
+    optimistic: {
+      image_source: { field: 'image_source', questionId: question.id, value: 'image_folder', resolved: true },
+    },
+    readinessStatus: 'validating',
+  });
+  const presentation = deriveAiClarificationPresentation(panel, createPlan());
+  assert.equal(presentation.activeQuestion.selectedValue, 'image_folder');
+  assert.equal(presentation.activeQuestion.confirming, true);
+});
+
+test('accept-all recommendation is hidden for safety, resource, or non-resolving recommendations', () => {
+  const safe = createQuestion();
+  const safePanel = createPanel({ queue: [safe], batch: [safe] });
+  assert.equal(deriveAiClarificationPresentation(safePanel, createPlan()).canAcceptAllRecommended, true);
+
+  const unsafe = createQuestion({ category: 'safety_blocker' });
+  const unsafePanel = createPanel({ queue: [unsafe], batch: [unsafe] });
+  assert.equal(deriveAiClarificationPresentation(unsafePanel, createPlan({ questions: [unsafe] })).canAcceptAllRecommended, false);
+});
+
+test('manual supplement is scoped to the current canonical question and does not duplicate the composer', () => {
+  const question = createQuestion();
+  const panel = createPanel({ queue: [question], batch: [question] });
+  const html = renderAiClarification(panel, createPlan());
+  assert.match(html, /补充内容将用于「图像从哪里获取？」/);
+  assert.equal((html.match(/<textarea/g) || []).length, 1);
+  assert.doesNotMatch(html, /id="ai-input"/);
+});
+
+test('canonical restored confirmed and validating answers rebuild summary and confirming state', () => {
+  const first = createQuestion();
+  const second = createQuestion({ id: 'question-output', questionId: 'question-output', field: 'output_target', title: '输出目标' });
+  const panel = createPanel({
+    queue: [first, second],
+    batch: [first, second],
+    confirmed: {
+      image_source: { field: 'image_source', questionId: first.id, value: 'industrial_camera', resolved: true },
+    },
+    optimistic: {
+      output_target: { field: 'output_target', questionId: second.id, value: 'image_folder', resolved: true },
+    },
+    readinessStatus: 'validating',
+  });
+  const presentation = deriveAiClarificationPresentation(panel, createPlan({ questions: [first, second] }));
+  assert.equal(presentation.confirmedItems[0].field, 'image_source');
+  assert.equal(presentation.activeQuestion.field, 'output_target');
+  assert.equal(presentation.activeQuestion.confirming, true);
+});
+
+test('Router text and local clarification payload cannot create a second question card', () => {
+  const panel = createPanel({ queue: [], batch: [] });
+  panel.pendingClarificationPayload = {
+    questions: [{ id: 'legacy-router-question', title: '旧 Router 问题' }],
+  };
+  const presentation = deriveAiClarificationPresentation(panel, createPlan({ questions: [] }));
+  const html = renderAiClarification(panel, createPlan({ questions: [] }));
+  assert.equal(presentation.activeQuestion, null);
+  assert.doesNotMatch(html, /旧 Router 问题/);
+});
+
+test('resource pending remains a lightweight boundary notice without binding controls', () => {
+  const resource = {
+    id: 'resource:model',
+    field: 'model_asset',
+    title: '缺陷检测模型',
+    kind: 'resource',
+    category: 'resource_pending',
+    blocksBuild: true,
+    interactive: true,
+  };
+  const panel = createPanel({ queue: [resource], batch: [resource] });
+  const html = renderAiClarification(panel, createPlan({ questions: [] }));
+  assert.match(html, /完整资源补齐将在后续阶段处理/);
+  assert.doesNotMatch(html, /type="file"|data-resource-action|路径/);
+});

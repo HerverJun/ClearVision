@@ -659,7 +659,7 @@ test('AI panel obeys ambiguous Router shouldOpenPlan=false without legacy card',
   await expect(page.locator('#ai-btn-send-clarification-plan')).toHaveCount(0);
   await expect(page.locator('.ai-assistant-clarification-section').last()).toBeHidden();
   expect(await page.evaluate(() => (window as any).aiPanel.pendingClarificationPayload)).toBeNull();
-  await expect(page.locator('#ai-plan-workspace .ai-plan-empty')).toBeVisible();
+  await expect(page.locator('#ai-plan-workspace .ai-plan-v2-empty')).toBeVisible();
   const state = await page.evaluate(() => {
     const panel = (window as any).aiPanel;
     return {
@@ -1364,10 +1364,10 @@ test('Plan pending recommendation records defer without becoming an effective an
     panel._renderPlanWorkspace(plan);
   });
 
-  const pending = page.locator('[data-plan-question-option="camera_pending"]');
-  await pending.evaluate(button => (button as HTMLElement).click());
-  await expect(page.locator('#ai-plan-workspace')).toContainText('稍后绑定');
-  await expect(page.locator('#ai-plan-workspace')).toContainText('该字段仍会阻断构建');
+  const pending = page.locator('input[data-ai-plan-option="true"][value="camera_pending"]');
+  await pending.check();
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('建议暂缓');
+  await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
     return {
@@ -1556,18 +1556,21 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
     panel._renderPlanWorkspace(plan);
   });
 
-  await expect(page.locator('#ai-plan-workspace')).toContainText('我理解的需求');
-  await expect(page.locator('#ai-plan-workspace')).toContainText('推荐流程');
-  await expect(page.locator('#ai-plan-workspace')).toContainText('还需要确认的信息');
-  await expect(page.locator('#ai-plan-workspace')).toContainText('下一步动作');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('AI 理解成了什么');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('推荐方案');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('关键问题');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('风险与工程详情');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('前端不会创建替代答案入口');
+  await expect(page.locator('[data-workspace-view-mode="plan"]')).toContainText('方案');
+  await expect(page.locator('[data-workspace-view-mode="build"]')).toContainText('构建与验证');
+  await expect(page.locator('[data-workspace-view-mode="build"]')).toBeDisabled();
   await expect(page.locator('#ai-agent-workspace-overview')).toContainText('已形成初步方案');
   await expect(page.locator('#ai-agent-workspace-overview')).toContainText('还需补充 2 项信息');
   await expect(page.locator('#ai-agent-workspace-overview')).toContainText('暂不能构建');
   await expect(page.locator('#ai-agent-workspace-overview')).not.toContainText('可构建：否');
   await expect(page.locator('.ai-agent-overview-card')).toHaveClass(/is-warning/);
   await expect(page.locator('.ai-agent-overview-card')).not.toHaveClass(/is-danger/);
-  await expect(page.getByText('已启用规则兜底。还需补充 2 项信息，暂不能构建。')).toBeVisible();
-  await expect(page.locator('#ai-plan-workspace')).toContainText('总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项');
+  await expect(page.locator('[data-ai-hook="task-blockers"]')).toContainText('2 项阻断');
   const visibleRawSnippets = await page.evaluate(() => {
     const root = document.querySelector('#ai-plan-workspace');
     const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];
@@ -1597,43 +1600,13 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
     });
   });
   expect(visibleRawSnippets).toEqual([]);
-  const visibleDetailTitles = await page.evaluate(() => {
-    const root = document.querySelector('#ai-plan-workspace');
-    const titles = ['推荐默认值', '风险', '可执行计划', '验收标准'];
-    if (!root) return titles;
-    const isTextVisible = (node: Text) => {
-      const parent = node.parentElement;
-      const closedDetails = parent?.closest('details:not([open])');
-      if (closedDetails && !parent?.closest('summary')) {
-        return false;
-      }
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const visible = Array.from(range.getClientRects()).some(rect => rect.width > 0 && rect.height > 0);
-      range.detach();
-      return visible;
-    };
-    return titles.filter(title => {
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let current = walker.nextNode() as Text | null;
-      while (current) {
-        if ((current.nodeValue || '').trim() === title && isTextVisible(current)) {
-          return true;
-        }
-        current = walker.nextNode() as Text | null;
-      }
-      return false;
-    });
-  });
-  expect(visibleDetailTitles).toEqual([]);
-
   await mkdir(workbenchEvidenceDir, { recursive: true });
   await page.screenshot({
     path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-no-raw-semantic.png'),
     fullPage: true,
   });
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await expect(page.locator('#ai-agent-workspace-overview')).toContainText('还需补充 2 项信息');
+  await expect(page.locator('[data-workspace-view-mode="build"]')).toContainText('构建与验证');
   await page.screenshot({
     path: path.join(workbenchEvidenceDir, 'default-plan-1920x1080-no-raw-semantic.png'),
     fullPage: true,
@@ -1645,39 +1618,11 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
     fullPage: true,
   });
 
-  await expectCtaHitTarget(page, '#ai-plan-focus-confirmation');
-  await page.locator('#ai-plan-focus-confirmation').click();
-  await expect(page.locator('.ai-plan-more-details')).toHaveJSProperty('open', true);
-  await expect(page.locator('#ai-input')).toBeFocused();
-  await expect(page.locator('.ai-plan-cta-feedback', {
-    hasText: '当前没有可展开的关键问题，请在右侧输入框补充信息。',
-  })).toBeVisible();
-  await page.screenshot({
-    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-supplement-click.png'),
-    fullPage: true,
-  });
+  await expect(page.locator('#ai-plan-focus-confirmation')).toHaveCount(0);
+  await expect(page.locator('#ai-plan-use-recommended-defaults')).toHaveCount(0);
+  await expect(page.locator('#ai-plan-view-draft')).toHaveCount(0);
 
-  await expectCtaHitTarget(page, '#ai-plan-use-recommended-defaults');
-  await page.locator('#ai-plan-use-recommended-defaults').click();
-  await expect(page.locator('.ai-plan-cta-feedback', {
-    hasText: '仍需先确认 2 项构建前信息。',
-  })).toBeVisible();
-  await page.screenshot({
-    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-recommended-click.png'),
-    fullPage: true,
-  });
-
-  await expectCtaHitTarget(page, '#ai-plan-view-draft');
-  await page.locator('#ai-plan-view-draft').click();
-  await expect(page.locator('.ai-plan-cta-feedback', {
-    hasText: '开始构建后会生成可查看的流程草稿。',
-  })).toBeVisible();
-  await page.screenshot({
-    path: path.join(workbenchEvidenceDir, 'default-plan-1280x820-after-view-draft-click.png'),
-    fullPage: true,
-  });
-
-  await page.locator('summary', { hasText: '规划诊断' }).click();
+  await page.locator('summary', { hasText: '风险与工程详情' }).click();
   await expect(page.locator('.ai-plan-raw-diagnostic-rows span', { hasText: 'semantic.taskType' })).toBeVisible();
   await expect(page.locator('.ai-plan-raw-diagnostic-rows span', { hasText: 'semantic.failureCode' })).toBeVisible();
   await expect(page.locator('.ai-plan-raw-diagnostic-block > span', { hasText: 'Agent Trace' })).toBeVisible();

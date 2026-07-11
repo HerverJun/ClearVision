@@ -2588,9 +2588,9 @@ test('Plan workspace shows rule fallback as recoverable confirmation state', asy
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
   const actionState = panel._getPlanBuildActionState(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /已形成初步方案/);
-  assert.match(planWorkspace.innerHTML, /已启用规则兜底。还需补充 1 项信息，暂不能构建。/);
-  assert.match(planWorkspace.innerHTML, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
+  assert.match(planWorkspace.innerHTML, /AI 理解成了什么/);
+  assert.match(planWorkspace.innerHTML, /还需确认 1 项/);
+  assert.match(planWorkspace.innerHTML, /规则兜底/);
   assert.match(actionState.statusText, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
   assert.equal(actionState.label, '还需补充 1 项信息');
   assert.match(planWorkspace.innerHTML, /id="ai-btn-start-build">开始构建/);
@@ -2685,16 +2685,12 @@ test('Plan workspace hides raw semantic diagnostics until diagnostics details', 
 
   const visibleHtml = planWorkspace.innerHTML.replace(/<details[\s\S]*<\/details>/g, '');
   assert.doesNotMatch(visibleHtml, /semantic\.taskType|semantic\.failureCode|failureCode|objectSignals|metadataOnly|Agent Trace|Trace/);
-  assert.match(visibleHtml, /我理解的需求/);
-  assert.match(visibleHtml, /推荐流程/);
-  assert.match(visibleHtml, /还需要确认的信息/);
-  assert.match(visibleHtml, /下一步动作/);
-  assert.ok(visibleHtml.indexOf('我理解的需求') < visibleHtml.indexOf('还需要确认的信息'));
-  assert.ok(visibleHtml.indexOf('还需要确认的信息') < visibleHtml.indexOf('推荐流程'));
-  assert.ok(visibleHtml.indexOf('推荐流程') < visibleHtml.indexOf('下一步动作'));
-  assert.doesNotMatch(visibleHtml, /ai-workspace-section-title">推荐默认值|ai-workspace-section-title">风险|ai-workspace-section-title">可执行计划|ai-workspace-section-title">验收标准/);
-  assert.match(planWorkspace.innerHTML, /更多方案细节/);
-  assert.match(planWorkspace.innerHTML, /诊断详情 \/ 原始事件 \/ Agent Trace/);
+  assert.match(visibleHtml, /AI 理解成了什么/);
+  assert.match(visibleHtml, /推荐方案/);
+  assert.match(visibleHtml, /关键问题/);
+  assert.ok(visibleHtml.indexOf('AI 理解成了什么') < visibleHtml.indexOf('推荐方案'));
+  assert.ok(visibleHtml.indexOf('推荐方案') < visibleHtml.indexOf('关键问题'));
+  assert.match(planWorkspace.innerHTML, /风险与工程详情/);
   assert.match(planWorkspace.innerHTML, /semantic\.taskType/);
   assert.match(planWorkspace.innerHTML, /semantic\.failureCode/);
   assert.match(planWorkspace.innerHTML, /objectSignals/);
@@ -2753,20 +2749,14 @@ test('Plan workspace missing fields render user-facing missing information count
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /还需补充 2 项信息/);
-  assert.match(planWorkspace.innerHTML, /总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项/);
+  assert.match(planWorkspace.innerHTML, /还需确认 2 项/);
   assert.match(planWorkspace.innerHTML, /图像来源/);
-  assert.match(planWorkspace.innerHTML, /检测目标\/判定标准/);
-  assert.match(planWorkspace.innerHTML, /补充信息/);
-  assert.match(planWorkspace.innerHTML, /使用推荐默认值继续/);
-  assert.match(planWorkspace.innerHTML, /查看草稿/);
-  assert.match(turn.card.innerHTML, /还需补充 2 项信息/);
-  assert.match(turn.card.innerHTML, /总计 2 项；构建前必须确认 2 项；可构建后补齐 0 项/);
-  assert.match(turn.card.innerHTML, /图像来源/);
-  assert.match(turn.card.innerHTML, /判定标准/);
+  assert.match(planWorkspace.innerHTML, /OK \/ NG 判定/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"|id="ai-plan-use-recommended-defaults"/);
+  assert.doesNotMatch(turn.card.innerHTML, /还需补充 2 项信息|补充信息/);
 });
 
-test('Plan workspace supplement CTA expands details and scrolls to first key question', async () => {
+test('Plan workspace makes the first canonical question focal without a supplement CTA', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2830,21 +2820,12 @@ test('Plan workspace supplement CTA expands details and scrolls to first key que
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  const button = planWorkspace.querySelector('#ai-plan-focus-confirmation');
-  assert.ok(button);
-  assert.equal(button.disabled, false);
-  await button.click();
-
-  const details = planWorkspace.querySelector('.ai-plan-more-details');
-  const question = planWorkspace.querySelector('.ai-plan-question');
-  assert.equal(details.open, true);
-  assert.equal(question.scrollIntoViewCalled, true);
-  assert.equal(question.focused, true);
-  assert.match(panel.lastResultStatusNote.text, /已展开更多方案细节/);
-  assert.equal(panel.lastResultStatusNote.tone, 'info');
+  assert.match(planWorkspace.innerHTML, /data-ai-hook="clarification-question"/);
+  assert.match(planWorkspace.innerHTML, /图像来源是什么？/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"|更多方案细节/);
 });
 
-test('Plan workspace supplement CTA focuses chat input when no key questions exist', async () => {
+test('Plan workspace does not fall back to the Composer when canonical options are unavailable', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2883,15 +2864,12 @@ test('Plan workspace supplement CTA focuses chat input when no key questions exi
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  await planWorkspace.querySelector('#ai-plan-focus-confirmation').click();
-
-  assert.equal(planWorkspace.querySelector('.ai-plan-more-details').open, true);
-  assert.equal(input.focused, true);
-  assert.match(panel.lastResultStatusNote.text, /右侧输入框补充信息/);
-  assert.equal(panel.lastResultStatusNote.tone, 'info');
+  assert.equal(input.focused, false);
+  assert.match(planWorkspace.innerHTML, /前端不会创建替代答案入口/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"/);
 });
 
-test('Plan workspace recommended defaults CTA reports blocked count instead of staying silent', async () => {
+test('Plan recommended-answer handler reports blocked count instead of opening Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2931,16 +2909,13 @@ test('Plan workspace recommended defaults CTA reports blocked count instead of s
   };
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  const button = planWorkspace.querySelector('#ai-plan-use-recommended-defaults');
-  assert.ok(button);
-  assert.equal(button.disabled, false);
-  await button.click();
+  await panel._handlePlanUseRecommendedDefaultsClick(panel.pendingVisionPlan);
 
   assert.match(panel.lastResultStatusNote.text, /仍需先确认 2 项构建前信息/);
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
 });
 
-test('Plan workspace recommended defaults CTA starts Build when plan is already buildable', async () => {
+test('Plan recommended-answer handler keeps the existing buildable path', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2977,14 +2952,14 @@ test('Plan workspace recommended defaults CTA starts Build when plan is already 
   };
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  await planWorkspace.querySelector('#ai-plan-use-recommended-defaults').click();
+  await panel._handlePlanUseRecommendedDefaultsClick(panel.pendingVisionPlan);
 
   assert.equal(started, true);
   assert.match(panel.lastResultStatusNote.text, /正在进入构建/);
   assert.equal(panel.lastResultStatusNote.tone, 'info');
 });
 
-test('Plan workspace view draft CTA switches to draft view or explains no draft exists', async () => {
+test('Plan draft-view handler switches view or explains no draft exists', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -3000,7 +2975,7 @@ test('Plan workspace view draft CTA switches to draft view or explains no draft 
   }), '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  await planWorkspace.querySelector('#ai-plan-view-draft').click();
+  panel._handlePlanViewDraftClick();
   assert.match(panel.lastResultStatusNote.text, /开始构建后会生成可查看的流程草稿/);
   assert.equal(panel.lastResultStatusNote.tone, 'info');
 
@@ -3011,7 +2986,7 @@ test('Plan workspace view draft CTA switches to draft view or explains no draft 
     panel.workspaceViewMode = mode;
   };
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
-  await planWorkspace.querySelector('#ai-plan-view-draft').click();
+  panel._handlePlanViewDraftClick();
 
   assert.equal(switchedTo, 'build');
   assert.match(panel.lastResultStatusNote.text, /已切换到构建草稿视图/);
@@ -3190,7 +3165,7 @@ test('ambiguous Intent Router result obeys canonical shouldOpenPlan=false withou
   assert.equal(panel.lastWorkbenchState, 'idle');
   assert.equal(panel.pendingClarificationPayload, null);
   assert.doesNotMatch(plan.innerHTML, /ai-clarification-plan-card|ClarificationPlanCard|clarification_1/);
-  assert.match(plan.innerHTML, /ai-plan-empty/);
+  assert.match(plan.innerHTML, /ai-plan-v2-empty/);
   assert.equal(build.hidden, true);
   assert.equal(panel.isGenerating, false);
   assert.equal(panel.lastResultStatusNote.text, '');
@@ -3299,7 +3274,7 @@ test('Intent Router failure delegates to backend Plan without local business rou
   assert.equal(panel.pendingVisionPlan.goal, 'backend planner decides');
   assert.equal(typeof panel._buildLocalIntentRouterFallback, 'undefined');
 });
-test('Plan Mode renders one unified clarification line without starting Build', async () => {
+test('Plan Mode renders one canonical clarification workspace without starting Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const overview = createFakeElement();
@@ -3318,9 +3293,9 @@ test('Plan Mode renders one unified clarification line without starting Build', 
   await flushAsync();
   assert.equal(panel.activeAgentRunId, null);
   assert.equal(panel.agentWorkspaceMode, 'plan');
-  assert.match(plan.innerHTML, /ai-unified-clarification-line/);
-  assert.match(plan.innerHTML, /本轮最多 3 项/);
-  assert.equal((plan.innerHTML.match(/ai-unified-clarification-line/g) || []).length, 1);
+  assert.match(plan.innerHTML, /data-ai-hook="clarification-workspace"/);
+  assert.match(plan.innerHTML, /还需确认 \d+ 项/);
+  assert.equal((plan.innerHTML.match(/data-ai-hook="clarification-workspace"/g) || []).length, 1);
   assert.doesNotMatch(plan.innerHTML, /资源补齐会在开始构建后出现|ai-clarification-plan-card/);
   assert.match(overview.innerHTML, /暂不能构建/);
 });
@@ -3582,7 +3557,7 @@ test('ordinary build prompt stays Plan-first even when Tool Loop mode is selecte
   assert.equal(panel.pendingVisionPlan.goal, 'packaging box appearance inspection workflow');
   assert.match(plan.innerHTML, /推荐方案/);
   assert.match(plan.innerHTML, /关键问题/);
-  assert.match(plan.innerHTML, /推荐默认值/);
+  assert.match(plan.innerHTML, /关键假设/);
   assert.match(plan.innerHTML, /开始构建/);
   assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
   assert.doesNotMatch(overview.innerHTML, /VisionAgentLoop/);
@@ -3795,7 +3770,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
   assert.match(collectProcessText(turn), /契约校验：完成/);
   assert.match(collectProcessText(turn), /安全约束：完成/);
   assert.match(overview.innerHTML, /streamed plan ready/);
-  assert.match(plan.innerHTML, /规划诊断/);
+  assert.match(plan.innerHTML, /风险与工程详情/);
   assert.doesNotMatch(turn.replyBody.textContent, /collecting_context|planning_with_model|rawPrompt|chain/i);
 });
 
@@ -4526,8 +4501,8 @@ test('Contract-invalid empty-option questions fail closed instead of creating a 
   panel.pendingVisionPlan = plan;
   panel._renderPlanWorkspace(plan);
   assert.equal(panel.agentWorkspaceState.projection.buildAction.canStart, false);
-  assert.doesNotMatch(planWorkspace.innerHTML, /ai-plan-custom-input-field|data-plan-question-option=/);
-  assert.match(planWorkspace.innerHTML, /等待后端刷新澄清队列/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /ai-plan-custom-input-field|data-ai-plan-option=/);
+  assert.match(planWorkspace.innerHTML, /前端不会创建替代答案入口/);
 });
 test('Draft Plan can start Build with legal Planner route without accepting strategy', async () => {
   const { AiPanel } = await loadAiPanel();
@@ -5074,8 +5049,8 @@ test('Plan main CTA ignores model NextAction and uses canonical readiness', asyn
   panel.pendingVisionPlan = plan;
   panel._renderPlanWorkspace(plan);
 
-  assert.match(planWorkspace.innerHTML, /模型 NextAction/);
-  assert.match(planWorkspace.innerHTML, /Deploy now from model advice/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /Deploy now from model advice/);
+  assert.match(planWorkspace.innerHTML, /风险与工程详情/);
   assert.match(panel._getPlanBuildActionState(plan).label, /^还需补充 \d+ 项信息$/);
   assert.notEqual(mainButton.textContent, 'Deploy now from model advice');
 });
@@ -9027,7 +9002,8 @@ test('Unified resource clarification redacts unsafe metadata while old evidence 
   panel.pendingVisionPlan = plan;
   panel._renderPlanWorkspace(plan);
   assertNoSensitiveLeak(planWorkspace.innerHTML);
-  assert.equal((planWorkspace.innerHTML.match(/ai-unified-clarification-line/g) || []).length, 1);
+  assert.equal((planWorkspace.innerHTML.match(/data-ai-hook="clarification-resources"/g) || []).length, 1);
+  assert.doesNotMatch(planWorkspace.innerHTML, /data-resource-action|type="file"/);
 });
 test('resource binding action writes metadata and updates pending, missing, and apply gate state', async () => {
   const { AiPanel } = await loadAiPanel();
