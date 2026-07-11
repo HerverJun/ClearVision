@@ -73,6 +73,52 @@ public class InspectionRuntimeCoordinatorTests
         coordinator.GetState(projectId)!.SessionId.Should().Be(secondSessionId);
     }
 
+    [Theory]
+    [InlineData(RuntimeStatus.Stopped)]
+    [InlineData(RuntimeStatus.Faulted)]
+    public async Task TryStartAsync_AfterTerminalStateBeforeAsyncCleanup_ShouldStartReplacement(RuntimeStatus terminalStatus)
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var firstSessionId = Guid.NewGuid();
+        var replacementSessionId = Guid.NewGuid();
+
+        (await coordinator.TryStartAsync(projectId, firstSessionId, CancellationToken.None))
+            .Should().Be(StartResult.Success);
+        if (terminalStatus == RuntimeStatus.Stopped)
+        {
+            coordinator.MarkAsStopped(projectId, firstSessionId);
+        }
+        else
+        {
+            coordinator.MarkAsFaulted(projectId, firstSessionId, "synthetic fault");
+        }
+
+        var restart = await coordinator.TryStartAsync(projectId, replacementSessionId, CancellationToken.None);
+
+        restart.Should().Be(StartResult.Success);
+        coordinator.GetState(projectId)!.SessionId.Should().Be(replacementSessionId);
+        coordinator.GetState(projectId)!.Status.Should().Be(RuntimeStatus.Starting);
+    }
+
+    [Fact]
+    public async Task TryStartAsync_WhenStopping_ShouldRejectDuplicateStart()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        (await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None))
+            .Should().Be(StartResult.Success);
+        coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Stopping);
+
+        var duplicate = await coordinator.TryStartAsync(projectId, Guid.NewGuid(), CancellationToken.None);
+
+        duplicate.Should().Be(StartResult.AlreadyRunning);
+        coordinator.GetState(projectId)!.SessionId.Should().Be(sessionId);
+        coordinator.GetState(projectId)!.Status.Should().Be(RuntimeStatus.Stopping);
+    }
+
     [Fact]
     public async Task TryAcquireMutationLease_WhenRunActive_ShouldReturnNull()
     {

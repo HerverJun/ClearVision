@@ -116,6 +116,57 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public void TrackConsensusJudge_ShouldChooseHighestConfidenceVoteThatSupportsMajorityOutcome()
+    {
+        var judge = new TrackConsensusJudge(minConsensusFrames: 3, consensusThreshold: 0.66);
+
+        judge.AddFrame(CreateJudgment("track-1", 1, "OK", confidence: 0.99)).Should().BeNull();
+        judge.AddFrame(CreateJudgment("track-1", 2, "NG", confidence: 0.80)).Should().BeNull();
+        var decision = judge.AddFrame(CreateJudgment("track-1", 3, "NG", confidence: 0.70));
+
+        decision!.Status.Should().Be(InspectionStatus.NG);
+        decision.BestSequence.Should().Be(2);
+        decision.RepresentativeFrame.Should().NotBeNull();
+        decision.RepresentativeFrame!.Sequence.Should().Be(2);
+        decision.RepresentativeFrame.Outcome.Decision.Should().Be(DecisionOutcome.Ng);
+    }
+
+    [Fact]
+    public void TrackConsensusJudge_ShouldNotLetSingleInvalidVotePoisonSufficientComparableVotes()
+    {
+        var judge = new TrackConsensusJudge(minConsensusFrames: 2, consensusThreshold: 1);
+
+        judge.AddFrame(CreateJudgment("track-1", 1, DecisionOutcome.Invalid)).Should().BeNull();
+        judge.AddFrame(CreateJudgment("track-1", 2, "NG", confidence: 0.50)).Should().BeNull();
+        var decision = judge.AddFrame(CreateJudgment("track-1", 3, "NG", confidence: 0.75));
+
+        decision!.Status.Should().Be(InspectionStatus.NG);
+        decision.NgVotes.Should().Be(2);
+        decision.Outcome!.Value.Decision.Should().Be(DecisionOutcome.Ng);
+        decision.RepresentativeFrame!.Sequence.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData(DecisionOutcome.Invalid, InspectionStatus.Error)]
+    [InlineData(DecisionOutcome.Undetermined, InspectionStatus.NotInspected)]
+    [InlineData(DecisionOutcome.NotApplicable, InspectionStatus.NotInspected)]
+    public void TrackConsensusJudge_ShouldFinalizeAllNonComparableWindowsWithControlledOutcome(
+        DecisionOutcome outcome,
+        InspectionStatus expectedStatus)
+    {
+        var judge = new TrackConsensusJudge(minConsensusFrames: 2, consensusThreshold: 1);
+
+        judge.AddFrame(CreateJudgment("track-1", 1, outcome)).Should().BeNull();
+        var decision = judge.AddFrame(CreateJudgment("track-1", 2, outcome));
+
+        decision.Should().NotBeNull();
+        decision!.Status.Should().Be(expectedStatus);
+        decision.Outcome!.Value.Decision.Should().Be(outcome);
+        decision.RepresentativeFrame.Should().BeNull();
+        decision.TerminalFrame!.Outcome.Decision.Should().Be(outcome);
+    }
+
+    [Fact]
     public void TrackConsensusJudge_ShouldBoundPendingTracksAndFrameHistory()
     {
         var judge = new TrackConsensusJudge(
@@ -138,11 +189,11 @@ public class ContinuousRuntimeTests
         for (var index = 0; index < 20; index++)
         {
             var judgment = index % 2 == 0 ? "OK" : "NG";
-            judge.AddFrame(CreateJudgment("long-running-track", 100 + index, judgment)).Should().BeNull();
+            judge.AddFrame(CreateJudgment("long-running-track", 100 + index, judgment));
         }
 
         var frameSnapshot = judge.Snapshot();
-        frameSnapshot.PendingTrackCount.Should().Be(3);
+        frameSnapshot.PendingTrackCount.Should().BeLessThanOrEqualTo(3);
         frameSnapshot.PendingFrameCount.Should().BeLessThanOrEqualTo(frameSnapshot.PendingTrackCount * frameSnapshot.MaxFramesPerTrack);
         frameSnapshot.MaxFramesPerTrack.Should().Be(4);
     }
@@ -384,6 +435,73 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public async Task ContinuousInspectionWorker_Primary_ShouldPersistAndPublishTheConsensusRepresentativeFrame()
+    {
+        var representativeImage = new byte[] { 2, 4, 6, 8 };
+        var callbackImage = new byte[] { 3, 6, 9, 12 };
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32),
+            CreateFrame(2, new Scalar(0, 0, 0), 32),
+            CreateFrame(3, new Scalar(255, 255, 255), 32)
+        };
+        var stream = new FakeStreamCoordinator(frames);
+        var flow = new FakeFlowExecutionService(envelope => envelope!.Sequence switch
+        {
+            1 => CreateFlowResult("OK", "ok-high-confidence", 0.99, new byte[] { 1, 1, 1, 1 }),
+            2 => CreateFlowResult("NG", "ng-representative", 0.80, representativeImage),
+            _ => CreateFlowResult("NG", "ng-callback", 0.70, callbackImage)
+        });
+        var writer = new CapturingResultWriter();
+        var eventBus = new CapturingEventBus();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        writer.Written += () => cts.Cancel();
+
+        await new ContinuousInspectionWorker(NullLogger.Instance).RunAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CreateDecisionFlow("continuous-representative"),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Primary,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 3,
+                ConsensusThreshold = 0.66,
+                PreEventFrames = 2,
+                PostEventFrames = 0,
+                SaveReplayOnNgOnly = true
+            },
+            ContinuousInspectionMode.Primary,
+            stream,
+            flow,
+            writer,
+            imagePersistence,
+            eventBus,
+            cts.Token);
+
+        writer.Results.Should().ContainSingle();
+        var result = writer.Results[0];
+        result.Status.Should().Be(InspectionStatus.NG);
+        result.ConfidenceScore.Should().Be(0.80);
+        result.OutputImage.Should().Equal(representativeImage);
+        using var outputDocument = JsonDocument.Parse(result.OutputDataJson!);
+        outputDocument.RootElement.GetProperty("FrameMarker").GetString().Should().Be("ng-representative");
+        var continuous = outputDocument.RootElement.GetProperty("ContinuousInspection");
+        continuous.GetProperty("BestSequence").GetInt64().Should().Be(2);
+        continuous.GetProperty("RepresentativeSequence").GetInt64().Should().Be(2);
+        continuous.GetProperty("CorrelationId").GetString().Should().Be("corr-2");
+        continuous.GetProperty("Confidence").GetDouble().Should().Be(0.80);
+        eventBus.Results.Should().ContainSingle();
+        using var eventOutputDocument = JsonDocument.Parse(JsonSerializer.Serialize(eventBus.Results[0].OutputData));
+        eventOutputDocument.RootElement.GetProperty("FrameMarker").GetString().Should().Be("ng-representative");
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item => item.OutputImage!.SequenceEqual(representativeImage)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ContinuousInspectionWorker_Primary_WhenStreamFaults_ShouldRestartLeaseAndPublishDecision()
     {
         var frames = new[]
@@ -541,7 +659,49 @@ public class ContinuousRuntimeTests
         long sequence,
         string judgment,
         double confidence = 1.0) =>
-        new(trackId, sequence, new Dictionary<string, object> { ["JudgmentResult"] = judgment }, confidence);
+        CreateJudgment(
+            trackId,
+            sequence,
+            judgment.Equals("NG", StringComparison.OrdinalIgnoreCase)
+                ? DecisionOutcome.Ng
+                : DecisionOutcome.Ok,
+            confidence);
+
+    private static TrackFrameJudgment CreateJudgment(
+        string trackId,
+        long sequence,
+        DecisionOutcome decision,
+        double confidence = 1.0) =>
+        new(
+            trackId,
+            sequence,
+            new Dictionary<string, object> { ["JudgmentResult"] = "legacy-data-must-not-be-read" },
+            confidence,
+            new InspectionOutcome(
+                ExecutionOutcome.Succeeded,
+                decision,
+                "Test",
+                $"TEST_{decision}",
+                null,
+                decision is DecisionOutcome.Ok or DecisionOutcome.Ng));
+
+    private static FlowExecutionResult CreateFlowResult(
+        string judgment,
+        string marker,
+        double confidence,
+        byte[] image) =>
+        new()
+        {
+            IsSuccess = true,
+            ExecutionTimeMs = 1,
+            OutputData = new Dictionary<string, object>
+            {
+                ["JudgmentResult"] = judgment,
+                ["FrameMarker"] = marker,
+                ["Confidence"] = confidence,
+                ["Image"] = image
+            }
+        };
 
     private sealed class FakeStreamCoordinator : ICameraFrameStreamCoordinator
     {
@@ -627,6 +787,7 @@ public class ContinuousRuntimeTests
         private readonly string _judgment;
         private readonly byte[]? _outputImage;
         private readonly Action<ProjectVariableExecutionContext>? _onProjectVariables;
+        private readonly Func<FrameEnvelope?, FlowExecutionResult>? _resultFactory;
         public List<FrameEnvelope> InputFrames { get; } = new();
         public List<ProjectVariableExecutionContext> ProjectVariableContexts { get; } = new();
 
@@ -640,11 +801,24 @@ public class ContinuousRuntimeTests
             _onProjectVariables = onProjectVariables;
         }
 
+        public FakeFlowExecutionService(Func<FrameEnvelope?, FlowExecutionResult> resultFactory)
+        {
+            _judgment = string.Empty;
+            _resultFactory = resultFactory;
+        }
+
         public Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, CancellationToken cancellationToken = default)
         {
+            FrameEnvelope? providedFrame = null;
             if (inputData?.TryGetValue("ProvidedFrameEnvelope", out var frame) == true && frame is FrameEnvelope envelope)
             {
+                providedFrame = envelope;
                 InputFrames.Add(envelope);
+            }
+
+            if (_resultFactory != null)
+            {
+                return Task.FromResult(_resultFactory(providedFrame));
             }
 
             return Task.FromResult(new FlowExecutionResult

@@ -171,7 +171,10 @@ public sealed class ContinuousInspectionWorker
                 scheduled.Frame.Sequence,
                 outputData,
                 ResolveConfidence(outputData),
-                frameOutcome));
+                frameOutcome,
+                scheduled.Frame.EffectiveCorrelationId,
+                ResolveOutputImage(outputData),
+                scheduled.Latency));
             if (decision == null)
             {
                 return;
@@ -180,10 +183,10 @@ public sealed class ContinuousInspectionWorker
             metrics.RecordDecisionFinalized();
             await PersistReplayIfNeededAsync(streamCoordinator, cameraId, config, replay, decision, cancellationToken);
 
-            var result = BuildInspectionResult(projectId, sessionId, scheduled, decision, mode);
+            var result = BuildInspectionResult(projectId, sessionId, decision, mode);
             AppendRuntimeMetrics(
                 result,
-                outputData,
+                decision.ResultFrame?.OutputData ?? new Dictionary<string, object>(),
                 metrics.Snapshot(),
                 scheduler.Snapshot(),
                 streamCoordinator.SnapshotFrameBufferStats(cameraId));
@@ -422,9 +425,14 @@ public sealed class ContinuousInspectionWorker
             return;
         }
 
+        if (decision.ResultFrame == null)
+        {
+            return;
+        }
+
         var frames = streamCoordinator.GetFrameEnvelopeWindow(
             cameraId,
-            decision.BestSequence,
+            decision.ResultFrame.Sequence,
             config.PreEventFrames,
             config.PostEventFrames);
         if (frames.Count == 0)
@@ -438,11 +446,14 @@ public sealed class ContinuousInspectionWorker
     private static InspectionResult BuildInspectionResult(
         Guid projectId,
         Guid sessionId,
-        ScheduledInferenceResult scheduled,
         TrackDecision decision,
         ContinuousInspectionMode mode)
     {
-        var outputData = scheduled.Result?.OutputData ?? new Dictionary<string, object>();
+        // The consensus decision owns its selected frame. Never fall back to the
+        // callback that happened to close the window: its data can support the
+        // opposite conclusion.
+        var resultFrame = decision.ResultFrame;
+        var outputData = resultFrame?.OutputData ?? new Dictionary<string, object>();
         outputData["ContinuousInspection"] = new Dictionary<string, object?>
         {
             ["Mode"] = mode.ToString(),
@@ -452,9 +463,11 @@ public sealed class ContinuousInspectionWorker
             ["OkVotes"] = decision.OkVotes,
             ["NgVotes"] = decision.NgVotes,
             ["BestSequence"] = decision.BestSequence,
+            ["RepresentativeSequence"] = decision.RepresentativeFrame?.Sequence,
             ["ConsensusScore"] = decision.ConsensusScore,
-            ["CorrelationId"] = scheduled.Frame.EffectiveCorrelationId,
-            ["LatencyMs"] = scheduled.Latency.TotalMilliseconds
+            ["CorrelationId"] = resultFrame?.CorrelationId,
+            ["LatencyMs"] = resultFrame?.Latency.TotalMilliseconds ?? 0,
+            ["Confidence"] = resultFrame?.Confidence
         };
 
         var result = new InspectionResult(projectId);
@@ -468,12 +481,12 @@ public sealed class ContinuousInspectionWorker
         InspectionOutcomeResolver.SetDiagnostics(outputData, consensusOutcome);
         result.SetOutcome(
             consensusOutcome,
-            Math.Max(0, (long)scheduled.Latency.TotalMilliseconds),
-            decision.ConsensusScore);
+            Math.Max(0, (long)(resultFrame?.Latency.TotalMilliseconds ?? 0)),
+            resultFrame?.Confidence);
         result.SetTraceability(null, null, sessionId);
-        if (outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes)
+        if (resultFrame?.OutputImage is { Length: > 0 } outputImage)
         {
-            result.SetOutputImage(imageBytes);
+            result.SetOutputImage(outputImage);
         }
         return result;
     }
@@ -565,7 +578,7 @@ public sealed class ContinuousInspectionWorker
             value is Dictionary<string, object?> continuous)
         {
             continuous["DroppedFrames"] = metrics.DroppedInferences;
-            continuous["LatencyMs"] = metrics.AverageInferenceLatencyMs;
+            continuous["AverageInferenceLatencyMs"] = metrics.AverageInferenceLatencyMs;
             continuous["QueueDepth"] = scheduler.QueueDepth;
             continuous["BufferCapacity"] = buffer.Capacity;
             continuous["BufferCount"] = buffer.Count;
@@ -648,4 +661,9 @@ public sealed class ContinuousInspectionWorker
 
         return 1.0;
     }
+
+    private static byte[]? ResolveOutputImage(Dictionary<string, object> outputData) =>
+        outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes
+            ? imageBytes
+            : null;
 }

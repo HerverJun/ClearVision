@@ -212,7 +212,9 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             return projectAdmission;
         }
 
-        if (IsOfficialExecutionSurface(surface) && _runtimeCoordinator?.GetState(projectId) != null)
+        var runtimeState = _runtimeCoordinator?.GetState(projectId);
+        if (IsOfficialExecutionSurface(surface) &&
+            runtimeState?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
         {
             return ExecutionAdmissionResult.Reject(
                 "ADMISSION_RUNTIME_ALREADY_ACTIVE",

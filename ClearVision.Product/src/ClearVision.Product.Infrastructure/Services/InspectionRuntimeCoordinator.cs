@@ -69,7 +69,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                 // 双重检查：避免锁等待期间状态变化
                 if (_sessions.TryGetValue(projectId, out var existing))
                 {
-                    if (existing.Status == RuntimeStatus.Running || existing.Status == RuntimeStatus.Starting)
+                    if (existing.Status is RuntimeStatus.Running or RuntimeStatus.Starting or RuntimeStatus.Stopping)
                     {
                         _logger.LogWarning("[Coordinator] 项目 {ProjectId} 已在运行中: {SessionId}",
                             projectId, existing.SessionId);

@@ -233,8 +233,11 @@ public sealed class ExecutionAdmissionServiceTests
         result.IsAllowed.Should().BeTrue();
     }
 
-    [Fact]
-    public async Task ValidateFlowAsync_OfficialSurfaceWithActiveRuntime_ShouldRejectWithStableCode()
+    [Theory]
+    [InlineData(RuntimeStatus.Starting)]
+    [InlineData(RuntimeStatus.Running)]
+    [InlineData(RuntimeStatus.Stopping)]
+    public async Task ValidateFlowAsync_OfficialSurfaceWithActiveRuntime_ShouldRejectWithStableCode(RuntimeStatus status)
     {
         var projectId = Guid.NewGuid();
         var repository = Substitute.For<IProjectRepository>();
@@ -244,7 +247,7 @@ public sealed class ExecutionAdmissionServiceTests
         {
             ProjectId = projectId,
             SessionId = Guid.NewGuid(),
-            Status = RuntimeStatus.Running,
+            Status = status,
             StartedAt = DateTime.UtcNow
         });
         var flow = SingleOperatorFlow(OperatorType.ResultOutput);
@@ -256,6 +259,34 @@ public sealed class ExecutionAdmissionServiceTests
 
         result.IsAllowed.Should().BeFalse();
         result.Code.Should().Be("ADMISSION_RUNTIME_ALREADY_ACTIVE");
+    }
+
+    [Theory]
+    [InlineData(RuntimeStatus.Stopped)]
+    [InlineData(RuntimeStatus.Faulted)]
+    public async Task ValidateFlowAsync_OfficialSurfaceWithTerminalRuntimeResidue_ShouldAllowCoordinatorToDecide(RuntimeStatus status)
+    {
+        var projectId = Guid.NewGuid();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        coordinator.GetState(projectId).Returns(new RuntimeState
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Status = status,
+            StartedAt = DateTime.UtcNow,
+            StoppedAt = DateTime.UtcNow
+        });
+        var flow = SingleOperatorFlow(OperatorType.ResultOutput);
+
+        var result = await new ExecutionAdmissionService(repository, coordinator).ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.StoredProjectExecution);
+
+        result.IsAllowed.Should().BeTrue();
+        result.Code.Should().Be("ADMISSION_ALLOWED");
     }
 
     [Theory]
