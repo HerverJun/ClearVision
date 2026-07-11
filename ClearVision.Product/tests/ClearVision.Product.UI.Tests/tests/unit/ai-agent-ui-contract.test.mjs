@@ -3588,35 +3588,25 @@ test('ordinary build prompt stays Plan-first even when Tool Loop mode is selecte
   assert.doesNotMatch(overview.innerHTML, /VisionAgentLoop/);
 });
 
-test('quick example selection submits through Plan-first path', async () => {
+test('quick example selection only fills the shared composer without sending', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const input = createFakeElement();
-  const plan = createFakeElement();
   panel.attachments = [];
   panel.container = createContainer({
     '#ai-input': input,
-    '#ai-chat-container': createFakeElement(),
-    '#ai-agent-workspace-overview': createFakeElement(),
-    '#ai-plan-workspace': plan,
-    '#ai-build-workspace': createFakeElement(),
-    '#ai-result-status-note': createFakeElement()
+    '#ai-chat-container': createFakeElement()
   });
-  let capturedPlanRequest = null;
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async request => {
-    capturedPlanRequest = request;
-    return backendPlanResult({ goal: 'quick example plan' });
+  let sendCount = 0;
+  panel._handleGenerate = () => {
+    sendCount += 1;
   };
 
-  await panel._handleQuickExampleSelection('检测金属零件表面的划痕缺陷。');
-  await flushAsync();
+  const selected = await panel._handleQuickExampleSelection('检测金属零件表面的划痕缺陷。');
 
-  assert.equal(capturedPlanRequest.description, '检测金属零件表面的划痕缺陷。');
-  assert.equal(panel.agentWorkspaceMode, 'plan');
-  assert.equal(panel.pendingVisionPlan.goal, 'quick example plan');
-  assert.match(plan.innerHTML, /开始构建/);
-  assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
+  assert.equal(selected, true);
+  assert.equal(input.value, '检测金属零件表面的划痕缺陷。');
+  assert.equal(sendCount, 0);
 });
 
 test('unknown skipPlan and build-like explicit modes cannot bypass Plan', async () => {
@@ -9796,9 +9786,11 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
   const productRoot = path.resolve(testProjectRoot, '..', '..');
   const sourcePath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanel.js');
-  const cssPath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'shared', 'styles', 'ai-panel.css');
+  const styleDir = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'shared', 'styles');
   const source = fs.readFileSync(sourcePath, 'utf8');
-  const css = fs.readFileSync(cssPath, 'utf8');
+  const shellCss = fs.readFileSync(path.resolve(styleDir, 'ai-shell.css'), 'utf8');
+  const conversationCss = fs.readFileSync(path.resolve(styleDir, 'ai-conversation.css'), 'utf8');
+  const responsiveCss = fs.readFileSync(path.resolve(styleDir, 'ai-responsive.css'), 'utf8');
 
   assert.match(source, /data-ai-workbench-pane="true"/);
   assert.match(source, /data-ai-chat-pane="true"/);
@@ -9808,13 +9800,15 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.match(source, /aiPanelValidationPreviewMixin/);
   assert.ok(source.split(/\r?\n/).length < 2500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
-  assert.match(css, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#f3f6fa[^}]*background:\s*var\(--ai-surface-page\)/s);
-  assert.match(css, /\[data-theme="dark"\]\s+\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#14181d/s);
-  assert.match(css, /\.ai-workspace\s*{[^}]*2\.05fr[^}]*clamp\(22rem,\s*26vw,\s*31rem\)/s);
-  assert.match(css, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
-  assert.match(css, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);
-  assert.match(css, /\.ai-results-scroll\s*{[^}]*grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\)/s);
-  assert.match(css, /@media \(max-width:\s*1180px\)[\s\S]*\.ai-pane-right\s*{[\s\S]*grid-row:\s*1;[\s\S]*\.ai-pane-left\s*{[\s\S]*grid-row:\s*2;/);
+  assert.match(shellCss, /--ai-surface-page:\s*var\(--theme-surface-0\)/);
+  assert.match(shellCss, /\.ai-workspace\s*{[^}]*clamp\(380px,\s*23vw,\s*440px\)/s);
+  assert.match(shellCss, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
+  assert.match(shellCss, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);
+  assert.match(conversationCss, /\.ai-view-container\s+\.ai-chat-container\s*{[^}]*background-image:\s*none/s);
+  assert.match(responsiveCss, /@media \(max-width:\s*1179px\)[\s\S]*data-ai-active-pane="workbench"[\s\S]*data-ai-active-pane="conversation"/);
+  assert.match(responsiveCss, /@media \(max-width:\s*899px\)/);
+  assert.doesNotMatch(`${shellCss}\n${conversationCss}\n${responsiveCss}`, /#[0-9a-f]{3,8}|rgba?\(/i);
+  assert.doesNotMatch(`${shellCss}\n${conversationCss}\n${responsiveCss}`, /!important/);
 });
 
 test('AI panel productization modules carry remaining workbench responsibilities', () => {
@@ -9835,6 +9829,10 @@ test('AI panel productization modules carry remaining workbench responsibilities
     assert.match(source, new RegExp(`export const ${exportName}`));
     assert.match(mainSource, new RegExp(exportName));
   }
+
+  const shellSource = fs.readFileSync(path.resolve(aiSourceDir, 'aiPanelShellPresentation.js'), 'utf8');
+  assert.match(shellSource, /export function installAiPanelShellPresentation/);
+  assert.match(mainSource, /installAiPanelShellPresentation\(AiPanel\.prototype\)/);
 
   const runtimePreviewSource = fs.readFileSync(path.resolve(aiSourceDir, 'aiPanelRuntimePreview.js'), 'utf8');
   assert.match(runtimePreviewSource, /normalizeRuntimePreviewSummary/);

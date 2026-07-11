@@ -459,6 +459,13 @@ async function mockShellApis(page: Page): Promise<void> {
   await page.route('**/api/health', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
   });
+  await page.route('**/api/inspection/decision-configuration/validate', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ isValid: true, issues: [], eligibleOutputs: [] }),
+    });
+  });
 }
 
 async function installFakeWebView2(page: Page): Promise<void> {
@@ -680,6 +687,10 @@ test('AI assistant diagnostic text stays collapsed by default', async ({ page })
 
   await page.evaluate(() => {
     const panel = (window as any).aiPanel;
+    panel._dispatchAgentWorkspaceEvent({
+      type: 'workspace/intent-resolved',
+      payload: { intent: { description: '生成诊断可见性测试' } },
+    });
     panel.activeGenerateRequestId = 'diagnostic-default';
     panel.isGenerating = true;
     panel._startAssistantTurn();

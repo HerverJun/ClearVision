@@ -1,0 +1,209 @@
+/* AI shell responsive behavior and scroll ownership. */
+body:has(#ai-view:not(.hidden)) .main-content,
+body:has(#ai-view:not(.hidden)) #ai-view {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+body:has(#ai-view:not(.hidden)) .main-content {
+    align-items: stretch;
+}
+
+@media (max-width: 1179px) {
+    .ai-shell[data-ai-shell-state="active"] {
+        grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .ai-shell[data-ai-shell-state="active"] .ai-shell-tabs {
+        display: flex;
+    }
+
+    .ai-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .ai-pane-left,
+    .ai-pane-right {
+        grid-column: 1;
+        grid-row: 1;
+        border-left: 0;
+    }
+
+    .ai-shell[data-ai-shell-state="active"][data-ai-active-pane="workbench"] .ai-pane-left,
+    .ai-shell[data-ai-shell-state="active"][data-ai-active-pane="conversation"] .ai-pane-right {
+        display: none;
+    }
+
+    .ai-task-context {
+        gap: 12px;
+        padding: 10px 14px;
+    }
+
+    .ai-plan-workspace,
+    .ai-build-workspace {
+        padding: 14px;
+    }
+}
+
+@media (max-width: 899px) {
+    .ai-task-context {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        padding: 9px 10px;
+    }
+
+    .ai-task-context-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 3px 8px;
+    }
+
+    .ai-task-context-kicker {
+        display: none;
+    }
+
+    .ai-task-context h2 {
+        grid-column: 1;
+        font-size: var(--font-size-md);
+    }
+
+    .ai-task-context-phase,
+    .ai-task-context-blockers {
+        padding-left: 0;
+        border-left: 0;
+        font-size: var(--font-size-xs);
+    }
+
+    .ai-task-context-phase {
+        grid-column: 1;
+    }
+
+    .ai-task-context-blockers {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .ai-task-context p {
+        display: none;
+    }
+
+    .ai-task-primary-action > button {
+        min-width: 0;
+        max-width: 132px;
+        padding-inline: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ai-task-more-button {
+        min-width: 38px;
+        padding-inline: 8px;
+        font-size: 0;
+    }
+
+    .ai-task-more-button::after {
+        content: "•••";
+        font-size: var(--font-size-sm);
+        letter-spacing: 1px;
+    }
+
+    .ai-shell-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 4px 8px;
+    }
+
+    .ai-shell-tabs button {
+        width: 100%;
+        padding: 0 8px;
+    }
+
+    .ai-pane-header {
+        flex-basis: 40px;
+        height: 40px;
+        padding-inline: 10px;
+    }
+
+    .ai-plan-workspace,
+    .ai-build-workspace {
+        padding: 10px;
+        scrollbar-gutter: auto;
+    }
+
+    .ai-chat-container {
+        padding: 12px;
+        scrollbar-gutter: auto;
+    }
+
+    .ai-input-section {
+        padding: 8px;
+    }
+
+    .ai-idle-recent-list {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-shell[data-ai-shell-state="idle"] .ai-workspace {
+        padding: 10px;
+    }
+
+    .ai-shell[data-ai-shell-state="idle"] .ai-pane-left {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .ai-shell[data-ai-shell-state="idle"] .ai-idle-intro {
+        align-content: center;
+        padding: 48px 18px 8px;
+    }
+
+    .ai-idle-copy h2 {
+        font-size: 24px;
+    }
+
+    .ai-idle-copy p {
+        font-size: var(--font-size-sm);
+    }
+
+    .ai-shell[data-ai-shell-state="idle"] .ai-input-section {
+        width: calc(100% - 28px);
+        padding-bottom: 18px;
+    }
+
+    .ai-example-tags {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-height: 720px) {
+    .ai-shell[data-ai-shell-state="idle"] .ai-idle-intro {
+        gap: 12px;
+        padding-top: 34px;
+    }
+
+    .ai-idle-copy h2 {
+        font-size: 24px;
+    }
+
+    .ai-shell[data-ai-shell-state="idle"] .ai-input-section {
+        padding-bottom: 14px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-view-container *,
+    .ai-view-container *::before,
+    .ai-view-container *::after {
+        scroll-behavior: auto;
+    }
+}

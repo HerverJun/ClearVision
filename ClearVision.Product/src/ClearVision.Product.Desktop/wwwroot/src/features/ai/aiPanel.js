@@ -26,6 +26,10 @@ import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
 import { aiPanelLiveEventsMixin } from './aiPanelLiveEvents.js';
 import { aiPanelLifecycleMixin } from './aiPanelLifecycle.js';
 import {
+    initializeAiPanelShell,
+    installAiPanelShellPresentation
+} from './aiPanelShellPresentation.js';
+import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
 } from './aiPanelAgentWorkspace.js';
@@ -422,8 +426,33 @@ export class AiPanel {
 
     render() {
         this.container.innerHTML = `
-            <div class="ai-workspace">
-                <aside class="ai-pane-left" data-ai-chat-pane="true">
+            <div class="ai-shell" data-ai-hook="shell" data-ai-shell-state="idle" data-ai-active-pane="workbench">
+                <header class="ai-task-context" data-ai-hook="task-context" hidden>
+                    <div class="ai-task-context-copy">
+                        <div class="ai-task-context-heading">
+                            <span class="ai-task-context-kicker">当前任务</span>
+                            <h2 data-ai-hook="task-title" hidden></h2>
+                            <span class="ai-task-context-phase" data-ai-hook="task-phase"></span>
+                            <span class="ai-task-context-blockers" data-ai-hook="task-blockers" hidden></span>
+                        </div>
+                        <p data-ai-hook="task-next-step" hidden></p>
+                    </div>
+                    <div class="ai-task-context-actions">
+                        <div class="ai-task-primary-action" data-ai-hook="task-primary-action"></div>
+                        <button class="ai-task-more-button" data-ai-hook="task-more" type="button" aria-expanded="false">
+                            更多
+                        </button>
+                        <div class="ai-task-more-menu" data-ai-hook="task-more-menu" hidden></div>
+                    </div>
+                </header>
+
+                <nav class="ai-shell-tabs" data-ai-hook="compact-tabs" aria-label="AI 页面区域">
+                    <button type="button" data-ai-hook="compact-tab" data-ai-shell-pane="workbench" aria-selected="true">工作台</button>
+                    <button type="button" data-ai-hook="compact-tab" data-ai-shell-pane="conversation" aria-selected="false">会话</button>
+                </nav>
+
+                <div class="ai-workspace" data-ai-hook="workspace">
+                <aside class="ai-pane-left" data-ai-chat-pane="true" data-ai-hook="conversation-pane">
                     <div class="ai-pane-header">
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
@@ -448,6 +477,19 @@ export class AiPanel {
                             </button>
                         </div>
                     </div>
+
+                    <section class="ai-idle-intro" data-ai-hook="idle-intro">
+                        <div class="ai-idle-utility" data-ai-hook="idle-actions"></div>
+                        <div class="ai-idle-copy">
+                            <span>ClearVision AI</span>
+                            <h2>描述你的视觉任务</h2>
+                            <p>从检测对象、图像来源和输出目标开始，AI 会沿用现有规划、构建与恢复链路。</p>
+                        </div>
+                        <div class="ai-idle-recent" data-ai-hook="idle-recent" hidden>
+                            <div class="ai-idle-recent-heading">最近任务</div>
+                            <div class="ai-idle-recent-list" data-ai-hook="idle-recent-list"></div>
+                        </div>
+                    </section>
 
                     <div class="ai-history-panel" id="ai-history-panel">
                         <div class="ai-history-panel-inner">
@@ -504,7 +546,7 @@ export class AiPanel {
                     </div>
                 </aside>
 
-                <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true">
+                <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true" data-ai-hook="workbench-pane">
                     <div class="ai-pane-header">
                         <span class="pane-icon ai-badge">AI</span>
                         <span class="pane-title">视觉智能体工作台</span>
@@ -616,6 +658,7 @@ export class AiPanel {
                     </div>
                     </div>
                 </aside>
+                </div>
             </div>
         `;
 
@@ -669,6 +712,8 @@ export class AiPanel {
             aiInput.style.height = (aiInput.scrollHeight) + 'px';
         });
 
+        initializeAiPanelShell(this);
+
         this._renderAttachments();
         this._updateRequirementModeUI();
         this._renderQueuedHintBanner();
@@ -685,7 +730,7 @@ export class AiPanel {
         input.focus?.();
         input.style.height = 'auto';
         input.style.height = `${input.scrollHeight || 0}px`;
-        return this._handleGenerate();
+        return true;
     }
 
     _checkConnection() {
@@ -2373,3 +2418,5 @@ Object.assign(
     aiPanelApplyPreviewMixin,
     aiPanelTopologySummaryMixin
 );
+
+installAiPanelShellPresentation(AiPanel.prototype);
