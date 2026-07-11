@@ -39,9 +39,8 @@ public sealed class ContinuousInspectionWorker
     }
 
     public async Task RunAsync(
-        Guid projectId,
+        ExecutionSnapshot executionSnapshot,
         Guid sessionId,
-        OperatorFlow flow,
         string cameraId,
         ContinuousInspectionConfig config,
         ContinuousInspectionMode mode,
@@ -55,26 +54,21 @@ public sealed class ContinuousInspectionWorker
         IImageCacheRepository? imageCacheRepository = null,
         IProjectVariableSession? projectVariableSession = null,
         ProjectVariableBindingIndex? projectVariableBindingIndex = null,
-        ProjectVariableCommitHandler? projectVariableCommitHandler = null,
-        long persistenceRevision = 0)
+        ProjectVariableCommitHandler? projectVariableCommitHandler = null)
     {
+        ArgumentNullException.ThrowIfNull(executionSnapshot);
+        if (mode != ContinuousInspectionMode.Primary ||
+            executionSnapshot.RunMode != ExecutionRunMode.FormalPrimary)
+        {
+            throw new InvalidOperationException(
+                "ContinuousInspectionWorker executes the primary baseline only; shadow requires an explicit candidate snapshot in InspectionWorker.");
+        }
+
+        var projectId = executionSnapshot.ProjectId;
+        var flow = executionSnapshot.CreateExecutionFlow();
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
         config.Normalize();
-
-        var executionSnapshot = new ExecutionSnapshot(
-            projectId,
-            flow,
-            persistenceRevision,
-            mode == ContinuousInspectionMode.Shadow
-                ? ExecutionSnapshotSource.ShadowCandidate
-                : ExecutionSnapshotSource.PersistedProject,
-            mode == ContinuousInspectionMode.Shadow
-                ? ExecutionRunMode.ShadowCandidate
-                : ExecutionRunMode.FormalPrimary,
-            shadowRole: mode == ContinuousInspectionMode.Shadow
-                ? ShadowExecutionRole.Candidate
-                : ShadowExecutionRole.None);
 
         await using var scheduler = new InferenceScheduler(config.SchedulerQueueLength);
         using var detector = new FrameDifferenceArrivalDetector();
@@ -260,17 +254,10 @@ public sealed class ContinuousInspectionWorker
                                      (envelope, ct) =>
                                      {
                                          var inputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
-                                         var executionFlow = executionSnapshot.CreateExecutionFlow();
-                                         var policyViolations = executionSnapshot.SideEffectPolicy.Validate(executionFlow);
-                                         if (policyViolations.Count > 0)
-                                         {
-                                             return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(policyViolations));
-                                         }
-
                                          if (projectVariableSession == null || projectVariableBindingIndex == null)
                                          {
-                                            return flowExecution.ExecuteFlowAsync(executionFlow, inputs, cancellationToken: ct);
-                                        }
+                                            return flowExecution.ExecuteWithSnapshotAsync(executionSnapshot, inputs, cancellationToken: ct);
+                                         }
 
                                         var isPreview = mode != ContinuousInspectionMode.Primary;
                                         var context = new ProjectVariableExecutionContext(
@@ -279,7 +266,7 @@ public sealed class ContinuousInspectionWorker
                                             Guid.NewGuid(),
                                             isPreview,
                                             isPreview ? null : projectVariableCommitHandler);
-                                        return flowExecution.ExecuteFlowAsync(executionFlow, inputs, context, cancellationToken: ct);
+                                        return flowExecution.ExecuteWithSnapshotAsync(executionSnapshot, inputs, context, cancellationToken: ct);
                                     }));
                                 if (scheduled)
                                 {

@@ -47,12 +47,24 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             return Task.FromResult(StartResult.ShutdownInProgress);
         }
 
-        return StartAsyncInternal(projectId, sessionId, ct);
+        return StartAsyncInternal(projectId, sessionId, null, ct);
+    }
+
+    public Task<StartResult> TryStartAsync(ExecutionSnapshot snapshot, Guid sessionId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (_isShuttingDown)
+        {
+            return Task.FromResult(StartResult.ShutdownInProgress);
+        }
+
+        return StartAsyncInternal(snapshot.ProjectId, sessionId, snapshot, ct);
     }
 
     private async Task<StartResult> StartAsyncInternal(
         Guid projectId,
         Guid sessionId,
+        ExecutionSnapshot? snapshot,
         CancellationToken ct)
     {
         StateChangedEventArgs? stateChanged = null;
@@ -79,12 +91,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                     {
                         // 清理旧会话状态
                         CleanupSessionCore(projectId, existing.SessionId);
-                        result = TryCreateSessionLocked(projectId, sessionId, out stateChanged);
+                        result = TryCreateSessionLocked(projectId, sessionId, snapshot, out stateChanged);
                     }
                 }
                 else
                 {
-                    result = TryCreateSessionLocked(projectId, sessionId, out stateChanged);
+                    result = TryCreateSessionLocked(projectId, sessionId, snapshot, out stateChanged);
                 }
             }
         }
@@ -198,7 +210,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             Status = session.Status,
             StartedAt = session.StartedAt,
             StoppedAt = session.StoppedAt,
-            ErrorMessage = session.ErrorMessage
+            ErrorMessage = session.ErrorMessage,
+            ExecutionSnapshotId = session.ExecutionSnapshot?.SnapshotId,
+            FlowHash = session.ExecutionSnapshot?.FlowHash,
+            ProjectRevision = session.ExecutionSnapshot?.PersistenceRevision,
+            DecisionConfigurationHash = session.ExecutionSnapshot?.DecisionConfigurationHash,
+            ExecutionSource = session.ExecutionSnapshot?.Source.ToString()
         };
     }
 
@@ -331,6 +348,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
     private StartResult TryCreateSessionLocked(
         Guid projectId,
         Guid sessionId,
+        ExecutionSnapshot? snapshot,
         out StateChangedEventArgs? stateChanged)
     {
         stateChanged = null;
@@ -351,7 +369,8 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             SessionId = sessionId,
             Status = RuntimeStatus.Starting,
             StartedAt = DateTime.UtcNow,
-            CancellationTokenSource = cts
+            CancellationTokenSource = cts,
+            ExecutionSnapshot = snapshot
         };
 
         _sessions[projectId] = session;
@@ -565,4 +584,5 @@ public class RuntimeSession
     public DateTime? StoppedAt { get; set; }
     public string? ErrorMessage { get; set; }
     public CancellationTokenSource? CancellationTokenSource { get; set; }
+    public ExecutionSnapshot? ExecutionSnapshot { get; init; }
 }

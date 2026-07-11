@@ -317,9 +317,8 @@ public class ContinuousRuntimeTests
 
         var worker = new ContinuousInspectionWorker(NullLogger.Instance);
         await worker.RunAsync(
+            CreateExecutionSnapshot("continuous-test"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -376,9 +375,8 @@ public class ContinuousRuntimeTests
         writer.Written += () => cts.Cancel();
 
         await new ContinuousInspectionWorker(NullLogger.Instance).RunAsync(
+            CreateExecutionSnapshot("continuous-failure"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-failure"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -428,9 +426,8 @@ public class ContinuousRuntimeTests
 
         var worker = new ContinuousInspectionWorker(NullLogger.Instance);
         await worker.RunAsync(
+            CreateExecutionSnapshot("continuous-ng-test"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-ng-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -492,9 +489,8 @@ public class ContinuousRuntimeTests
         writer.Written += () => cts.Cancel();
 
         await new ContinuousInspectionWorker(NullLogger.Instance).RunAsync(
+            CreateExecutionSnapshot("continuous-representative"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-representative"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -551,9 +547,8 @@ public class ContinuousRuntimeTests
 
         var worker = new ContinuousInspectionWorker(NullLogger.Instance);
         await worker.RunAsync(
+            CreateExecutionSnapshot("continuous-restart-test"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-restart-test"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -580,7 +575,7 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
-    public async Task ContinuousInspectionWorker_Shadow_WithProjectVariables_ShouldUsePreviewContextAndNotCommit()
+    public async Task ContinuousInspectionWorker_ShadowWithoutCandidateAuthority_ShouldRejectBeforeExecution()
     {
         var frames = new[]
         {
@@ -605,10 +600,9 @@ public class ContinuousRuntimeTests
         };
 
         var worker = new ContinuousInspectionWorker(NullLogger.Instance);
-        await worker.RunAsync(
+        var act = async () => await worker.RunAsync(
+            CreateExecutionSnapshot("continuous-shadow-project-variables"),
             Guid.NewGuid(),
-            Guid.NewGuid(),
-            CreateDecisionFlow("continuous-shadow-project-variables"),
             "cam-1",
             new ContinuousInspectionConfig
             {
@@ -631,11 +625,9 @@ public class ContinuousRuntimeTests
             projectVariableBindingIndex: ProjectVariableBindingIndex.Build(schema),
             projectVariableCommitHandler: commitHandler);
 
-        flow.ProjectVariableContexts.Should().ContainSingle();
-        var capturedContext = flow.ProjectVariableContexts[0];
-        capturedContext.IsPreview.Should().BeTrue();
-        capturedContext.Session.Should().BeSameAs(session);
-        capturedContext.CommitHandler.Should().BeNull();
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*explicit candidate snapshot*");
+        flow.ProjectVariableContexts.Should().BeEmpty();
         commitCalls.Should().Be(0);
         writer.Results.Should().BeEmpty();
         eventBus.Results.Should().BeEmpty();
@@ -664,6 +656,14 @@ public class ContinuousRuntimeTests
         flow.AddOperator(op);
         return flow.BindStringDecision(op);
     }
+
+    private static ExecutionSnapshot CreateExecutionSnapshot(string name) =>
+        new(
+            Guid.NewGuid(),
+            CreateDecisionFlow(name),
+            persistenceRevision: 1,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary);
 
     private static ProjectGlobalVariableSchema CreateProjectVariableSchema(Guid variableId)
     {

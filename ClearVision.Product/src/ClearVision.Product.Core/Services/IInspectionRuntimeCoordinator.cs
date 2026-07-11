@@ -21,6 +21,9 @@ public interface IInspectionRuntimeCoordinator
     /// <returns>启动结果</returns>
     Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct);
 
+    Task<StartResult> TryStartAsync(ExecutionSnapshot snapshot, Guid sessionId, CancellationToken ct) =>
+        TryStartAsync(snapshot.ProjectId, sessionId, ct);
+
     /// <summary>
     /// 尝试获取项目级配置变更租约。成功后调用方必须释放租约。
     /// </summary>
@@ -129,6 +132,11 @@ public class RuntimeState
     public required DateTime StartedAt { get; init; }
     public DateTime? StoppedAt { get; set; }
     public string? ErrorMessage { get; set; }
+    public Guid? ExecutionSnapshotId { get; init; }
+    public string? FlowHash { get; init; }
+    public long? ProjectRevision { get; init; }
+    public string? DecisionConfigurationHash { get; init; }
+    public string? ExecutionSource { get; init; }
 }
 
 /// <summary>

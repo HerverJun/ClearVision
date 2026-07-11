@@ -39,9 +39,17 @@ public class ExecuteInspectionCommandHandler : IRequestHandler<ExecuteInspection
         if (project == null)
             throw new KeyNotFoundException($"Project {request.ProjectId} not found");
 
-        var flowResult = await _flowExecutionService.ExecuteFlowAsync(project.Flow, request.Parameters);
+        var snapshot = new ExecutionSnapshot(
+            project.Id,
+            project.Flow,
+            project.PersistenceRevision,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            globalVariables: project.GlobalVariables);
+        var flowResult = await _flowExecutionService.ExecuteWithSnapshotAsync(snapshot, request.Parameters);
 
         var inspectionResult = new InspectionResult(project.Id, null);
+        inspectionResult.SetExecutionTraceability(snapshot, null, null);
 
         if (flowResult.IsSuccess)
         {

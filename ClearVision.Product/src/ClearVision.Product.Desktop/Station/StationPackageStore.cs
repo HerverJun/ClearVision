@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Data;
+using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -135,7 +137,8 @@ public sealed class StationPackageStore
 
         var flow = CreateSmokeFlow(packageId);
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, StablePackageJsonOptions);
-        var flowHash = ComputeSha256WithPrefix(flowBytes);
+        var flowEntity = flow.ToEntity();
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flowEntity);
         var runtimeManifest = new RuntimePackageManifest
         {
             PackageId = packageId,
@@ -147,6 +150,8 @@ public sealed class StationPackageStore
             SourceProjectId = Guid.Empty,
             EntryFlow = "flow.json",
             FlowHash = flowHash,
+            DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                flowEntity.DecisionConfiguration),
             OperatorCatalogVersion = "test-package",
             ExportAllowed = true,
             PendingParameters = [],

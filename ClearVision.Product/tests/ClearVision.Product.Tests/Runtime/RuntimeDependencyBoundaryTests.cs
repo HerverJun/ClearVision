@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.Continuous;
 using ClearVision.Product.Infrastructure.DependencyInjection;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.DependencyInjection;
@@ -121,6 +122,61 @@ public sealed class RuntimeDependencyBoundaryTests
         Assert.True(
             missingRequiredTypes.Count == 0,
             "Required operator executors not registered: " + string.Join(", ", missingRequiredTypes));
+    }
+
+    [Fact]
+    public void ProductExecutionEntrypoints_DoNotCallLegacyPolicylessFlowOverloads()
+    {
+        var repoRoot = FindRepoRoot();
+        var relativeFiles = new[]
+        {
+            "src/ClearVision.Product.Application/Services/InspectionService.cs",
+            "src/ClearVision.Product.Application/Commands/Inspections/ExecuteInspectionCommand.cs",
+            "src/ClearVision.Product.Infrastructure/Services/InspectionWorker.cs",
+            "src/ClearVision.Product.Infrastructure/Continuous/ContinuousInspectionWorker.cs",
+            "src/ClearVision.Product.Infrastructure/Services/FlowNodePreviewService.cs",
+            "src/ClearVision.Product.Infrastructure/Services/AutoTuneService.cs",
+            "src/ClearVision.Product.Infrastructure/AI/DryRun/DryRunService.cs",
+            "src/ClearVision.Product.Infrastructure/Services/IntelligentDetectionService.cs",
+            "src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs",
+            "src/ClearVision.Product.Runtime/RuntimeHost.cs"
+        };
+        var legacyCall = new Regex(@"\.ExecuteFlow(?:Debug)?Async\s*\(", RegexOptions.CultureInvariant);
+        var disabledBlock = new Regex(@"#if\s+false[\s\S]*?#endif", RegexOptions.CultureInvariant);
+
+        var hits = relativeFiles
+            .Select(relative => new
+            {
+                Relative = relative,
+                Text = disabledBlock.Replace(File.ReadAllText(Path.Combine(repoRoot, relative)), string.Empty)
+            })
+            .SelectMany(item => item.Text.Split('\n')
+                .Select((line, index) => new { item.Relative, Line = line, Index = index + 1 }))
+            .Where(item => legacyCall.IsMatch(item.Line))
+            .Select(item => $"{item.Relative}:{item.Index}:{item.Line.Trim()}")
+            .ToList();
+
+        Assert.True(
+            hits.Count == 0,
+            "Policyless flow execution calls found in product entrypoints: " + string.Join("; ", hits));
+    }
+
+    [Fact]
+    public void RuntimeWorkers_DoNotExposeOperatorFlowStartBypasses()
+    {
+        var inspectionBypasses = typeof(IInspectionWorker).GetMethods()
+            .Where(method => method.Name == nameof(IInspectionWorker.TryStartRunAsync))
+            .Where(method => method.GetParameters().Any(parameter => parameter.ParameterType == typeof(ClearVision.Product.Core.Entities.OperatorFlow)))
+            .Select(method => method.ToString())
+            .ToList();
+        var continuousBypasses = typeof(ContinuousInspectionWorker).GetMethods()
+            .Where(method => method.Name == nameof(ContinuousInspectionWorker.RunAsync))
+            .Where(method => method.GetParameters().Any(parameter => parameter.ParameterType == typeof(ClearVision.Product.Core.Entities.OperatorFlow)))
+            .Select(method => method.ToString())
+            .ToList();
+
+        Assert.Empty(inspectionBypasses);
+        Assert.Empty(continuousBypasses);
     }
 
     private static List<Type> GetRuntimeOperatorExecutorImplementationTypes()

@@ -261,7 +261,10 @@ public class AutoTuneService : IAutoTuneService
                 };
 
                 var inputData = new Dictionary<string, object> { ["Image"] = inputMat };
-                var execResult = await _flowExecution.ExecuteFlowDebugAsync(flow, options, inputData);
+                var execResult = await _flowExecution.ExecuteDebugWithSnapshotAsync(
+                    CreatePreviewSnapshot(flow),
+                    options,
+                    inputData);
 
                 // 获取目标算子输出
                 if (!execResult.IntermediateResults.TryGetValue(targetNodeId, out var targetOutput))
@@ -1070,8 +1073,19 @@ public class AutoTuneService : IAutoTuneService
             EnableIntermediateCache = true
         };
 
-        return await _flowExecution.ExecuteFlowDebugAsync(flow, options, inputData);
+        return await _flowExecution.ExecuteDebugWithSnapshotAsync(
+            CreatePreviewSnapshot(flow),
+            options,
+            inputData);
     }
+
+    private static ExecutionSnapshot CreatePreviewSnapshot(OperatorFlow flow) =>
+        new(
+            flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
+            flow,
+            persistenceRevision: 0,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview);
 
     private static Mat? TryCreateOwnedPreviewImage(Dictionary<string, object>? outputData)
     {

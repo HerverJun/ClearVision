@@ -196,6 +196,8 @@ public sealed class RuntimePackageManifest
 
     public string FlowHash { get; set; } = string.Empty;
 
+    public string DecisionConfigurationHash { get; set; } = string.Empty;
+
     public string OperatorCatalogVersion { get; set; } = string.Empty;
 
     public bool ExportAllowed { get; set; } = true;

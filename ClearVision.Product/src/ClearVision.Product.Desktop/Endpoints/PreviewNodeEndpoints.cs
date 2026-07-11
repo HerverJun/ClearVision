@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
@@ -284,18 +285,12 @@ public static class PreviewNodeEndpoints
                 }
 
                 // 执行调试流程（自动执行上游子图到目标节点）
-                var result = projectVariables == null
-                    ? await flowService.ExecuteFlowDebugAsync(
-                        flow,
-                        debugOptions,
-                        inputData,
-                        previewCancellation.Token)
-                    : await flowService.ExecuteFlowDebugAsync(
-                        flow,
-                        debugOptions,
-                        inputData,
-                        projectVariables,
-                        previewCancellation.Token);
+                var result = await flowService.ExecuteDebugWithSnapshotAsync(
+                    CreatePreviewSnapshot(request.ProjectId, flow),
+                    debugOptions,
+                    inputData,
+                    projectVariables,
+                    previewCancellation.Token);
 
                 // 获取目标节点的输出
                 if (!result.IntermediateResults.TryGetValue(request.TargetNodeId, out var nodeOutput))
@@ -687,18 +682,12 @@ public static class PreviewNodeEndpoints
             ImageFormat = request.ImageFormat ?? ".png"
         };
 
-        var result = projectVariables == null
-            ? await flowService.ExecuteFlowDebugAsync(
-                dryRunFlow,
-                debugOptions,
-                inputData,
-                cancellationToken)
-            : await flowService.ExecuteFlowDebugAsync(
-                dryRunFlow,
-                debugOptions,
-                inputData,
-                projectVariables,
-                cancellationToken);
+        var result = await flowService.ExecuteDebugWithSnapshotAsync(
+            CreatePreviewSnapshot(request.ProjectId, dryRunFlow),
+            debugOptions,
+            inputData,
+            projectVariables,
+            cancellationToken);
 
         result.DebugSessionId = request.DebugSessionId;
 
@@ -830,18 +819,12 @@ public static class PreviewNodeEndpoints
                 ImageFormat = request.ImageFormat ?? ".png"
             };
 
-            result = projectVariables == null
-                ? await flowService.ExecuteFlowDebugAsync(
-                    dryRunFlow,
-                    debugOptions,
-                    inputData,
-                    cancellationToken)
-                : await flowService.ExecuteFlowDebugAsync(
-                    dryRunFlow,
-                    debugOptions,
-                    inputData,
-                    projectVariables,
-                    cancellationToken);
+            result = await flowService.ExecuteDebugWithSnapshotAsync(
+                CreatePreviewSnapshot(request.ProjectId, dryRunFlow),
+                debugOptions,
+                inputData,
+                projectVariables,
+                cancellationToken);
         }
 
         result.DebugSessionId = request.DebugSessionId;
@@ -2772,6 +2755,16 @@ public static class PreviewNodeEndpoints
     private sealed record BoundedMetricsInput(
         Dictionary<string, object> OutputData,
         List<string> Diagnostics);
+
+    private static ExecutionSnapshot CreatePreviewSnapshot(Guid projectId, OperatorFlow flow) =>
+        new(
+            projectId == Guid.Empty
+                ? flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id
+                : projectId,
+            flow,
+            persistenceRevision: 0,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview);
 
     private static double ComputeBinaryRatio(byte[]? outputImageBytes)
     {

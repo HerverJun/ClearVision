@@ -24,14 +24,7 @@ public interface IFlowExecutionService
         bool enableParallel = false,
         System.Threading.CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        var violations = snapshot.SideEffectPolicy.Validate(snapshot.CreateExecutionFlow());
-        if (violations.Count > 0)
-        {
-            return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations));
-        }
-
-        return ExecuteFlowAsync(snapshot.CreateExecutionFlow(), inputData, enableParallel, cancellationToken);
+        return this.ExecuteWithSnapshotAsync(snapshot, inputData, enableParallel, cancellationToken);
     }
 
     /// <summary>Snapshot overload for project-global-variable formal runs.</summary>
@@ -42,14 +35,7 @@ public interface IFlowExecutionService
         bool enableParallel = false,
         System.Threading.CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        var violations = snapshot.SideEffectPolicy.Validate(snapshot.CreateExecutionFlow());
-        if (violations.Count > 0)
-        {
-            return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations));
-        }
-
-        return ExecuteFlowAsync(snapshot.CreateExecutionFlow(), inputData, projectVariables, enableParallel, cancellationToken);
+        return this.ExecuteWithSnapshotAsync(snapshot, inputData, projectVariables, enableParallel, cancellationToken);
     }
 
     /// <summary>
@@ -156,6 +142,116 @@ public interface IFlowExecutionService
     /// </summary>
     /// <param name="debugSessionId">调试会话ID</param>
     Task ClearDebugCacheAsync(Guid debugSessionId);
+}
+
+/// <summary>
+/// The compatibility boundary between governed execution and the legacy flow
+/// engine overloads. Product entrypoints call these methods with an explicit
+/// immutable snapshot; only this adapter invokes the legacy engine contract.
+/// </summary>
+public static class GovernedFlowExecution
+{
+    public static Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        this IFlowExecutionService service,
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData = null,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var flow = snapshot.CreateExecutionFlow();
+        var violations = ValidateGovernedExecution(snapshot, flow, projectVariables: null);
+        return violations.Count > 0
+            ? Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations))
+            : service.ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+    }
+
+    public static Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        this IFlowExecutionService service,
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(projectVariables);
+        var flow = snapshot.CreateExecutionFlow();
+        var violations = ValidateGovernedExecution(snapshot, flow, projectVariables);
+        return violations.Count > 0
+            ? Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations))
+            : service.ExecuteFlowAsync(flow, inputData, projectVariables, enableParallel, cancellationToken);
+    }
+
+    public static Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(
+        this IFlowExecutionService service,
+        ExecutionSnapshot snapshot,
+        DebugOptions options,
+        Dictionary<string, object>? inputData = null,
+        ProjectVariableExecutionContext? projectVariables = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(options);
+        var flow = snapshot.CreateExecutionFlow();
+        var violations = ValidateGovernedExecution(snapshot, flow, projectVariables);
+        if (violations.Count > 0)
+        {
+            return Task.FromResult(new FlowDebugExecutionResult
+            {
+                DebugSessionId = options.DebugSessionId,
+                IsSuccess = false,
+                ErrorMessage = $"SIDE_EFFECT_POLICY_BLOCKED: {string.Join("; ", violations.Select(item => item.Message))}",
+                OperatorResults = violations.Select(item => new OperatorExecutionResult
+                {
+                    OperatorId = item.OperatorId,
+                    OperatorName = item.OperatorName,
+                    IsSuccess = false,
+                    ErrorMessage = $"{item.Code}: {item.Message}"
+                }).ToList()
+            });
+        }
+
+        return projectVariables == null
+            ? service.ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken)
+            : service.ExecuteFlowDebugAsync(flow, options, inputData, projectVariables, cancellationToken);
+    }
+
+    private static IReadOnlyList<ExecutionSideEffectViolation> ValidateGovernedExecution(
+        ExecutionSnapshot snapshot,
+        OperatorFlow flow,
+        ProjectVariableExecutionContext? projectVariables)
+    {
+        var violations = snapshot.SideEffectPolicy.Validate(flow).ToList();
+        if (snapshot.RunMode is not (ExecutionRunMode.Preview or ExecutionRunMode.Debug) ||
+            !flow.Operators.Any(@operator =>
+                @operator.IsEnabled &&
+                ExecutionSideEffectCatalog.GetCapabilities(@operator).HasFlag(ExecutionSideEffect.StateWrite)))
+        {
+            return violations;
+        }
+
+        if (projectVariables is { IsPreview: true, CommitHandler: null })
+        {
+            return violations;
+        }
+
+        violations.AddRange(flow.Operators
+            .Where(@operator =>
+                @operator.IsEnabled &&
+                ExecutionSideEffectCatalog.GetCapabilities(@operator).HasFlag(ExecutionSideEffect.StateWrite))
+            .Select(@operator => new ExecutionSideEffectViolation(
+                @operator.Id,
+                @operator.Name,
+                @operator.Type,
+                ExecutionSideEffect.StateWrite,
+                "SIDE_EFFECT_ISOLATED_STATE_REQUIRED",
+                $"{@operator.Type} requires an isolated preview variable context in {snapshot.RunMode}.")));
+        return violations;
+    }
 }
 
 public enum FlowExecutionMode

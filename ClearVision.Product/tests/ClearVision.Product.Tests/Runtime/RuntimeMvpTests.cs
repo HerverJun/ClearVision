@@ -124,6 +124,11 @@ public class RuntimeMvpTests
             stationResult.InspectionStatus.Should().Be(studioResult.Status);
             stationResult.PrimaryOutputs["JudgmentResult"]?.ToString().Should().Be("OK");
             stationResult.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("2");
+            stationResult.ExecutionSnapshotId.Should().NotBeNull();
+            stationResult.ExecutionSnapshotId.Should().NotBe(Guid.ParseExact(stationResult.RunId, "N"));
+            stationResult.FlowHash.Should().Be(export.Manifest.FlowHash);
+            stationResult.DecisionConfigurationHash.Should().Be(export.Manifest.DecisionConfigurationHash);
+            stationResult.ProjectRevision.Should().Be(export.Manifest.SourceProjectRevision);
         }
         finally
         {

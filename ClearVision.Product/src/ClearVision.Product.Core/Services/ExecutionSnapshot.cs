@@ -5,6 +5,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 
 namespace ClearVision.Product.Core.Services;
@@ -201,11 +202,12 @@ public sealed class ExecutionSideEffectPolicy
             new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.DeviceRead | ExecutionSideEffect.FileRead |
                 ExecutionSideEffect.FileWrite | ExecutionSideEffect.NetworkWrite | ExecutionSideEffect.DeviceWrite |
                 ExecutionSideEffect.StateWrite),
-        // Reading a declared local sample is useful for preview, but it cannot
-        // write or operate a device. Shadow intentionally receives no shared
-        // state write capability.
+        // Preview/debug may mutate variables only inside an isolated preview
+        // session. GovernedFlowExecution verifies that context before invoking
+        // the engine. External writes and device operations remain forbidden.
         ExecutionRunMode.Preview or ExecutionRunMode.Debug =>
             new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.FileRead | ExecutionSideEffect.StateWrite),
+        // Shadow intentionally receives no shared state write capability.
         ExecutionRunMode.ShadowCandidate =>
             new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.FileRead),
         _ => new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.None)
@@ -248,6 +250,7 @@ public sealed class ExecutionSideEffectPolicy
 public sealed class ExecutionSnapshot
 {
     private readonly OperatorFlow _flow;
+    private readonly ProjectGlobalVariableSchema _globalVariables;
 
     public ExecutionSnapshot(
         Guid projectId,
@@ -258,7 +261,8 @@ public sealed class ExecutionSnapshot
         IReadOnlyDictionary<string, string>? resourceBindings = null,
         string? runtimePackageId = null,
         ShadowExecutionRole shadowRole = ShadowExecutionRole.None,
-        Guid? snapshotId = null)
+        Guid? snapshotId = null,
+        ProjectGlobalVariableSchema? globalVariables = null)
     {
         if (projectId == Guid.Empty)
         {
@@ -276,6 +280,7 @@ public sealed class ExecutionSnapshot
             : Guid.NewGuid();
         RuntimePackageId = NormalizeOptional(runtimePackageId);
         _flow = ExecutionFlowIdentity.CloneFlow(flow);
+        _globalVariables = CloneGlobalVariables(globalVariables);
         FlowHash = ExecutionFlowIdentity.ComputeFlowHash(_flow);
         DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(_flow.DecisionConfiguration);
         ResourceBindings = new ReadOnlyDictionary<string, string>(
@@ -298,8 +303,22 @@ public sealed class ExecutionSnapshot
 
     public OperatorFlow CreateExecutionFlow() => ExecutionFlowIdentity.CloneFlow(_flow);
 
+    public ProjectGlobalVariableSchema CreateGlobalVariables() => CloneGlobalVariables(_globalVariables);
+
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ProjectGlobalVariableSchema CloneGlobalVariables(ProjectGlobalVariableSchema? schema)
+    {
+        if (schema == null)
+        {
+            return new ProjectGlobalVariableSchema();
+        }
+
+        var json = JsonSerializer.Serialize(schema);
+        return JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(json)
+            ?? new ProjectGlobalVariableSchema();
+    }
 }
 
 /// <summary>Canonical execution identity and snapshot clone implementation.</summary>
@@ -410,7 +429,11 @@ public static class ExecutionFlowIdentity
 
         foreach (var connection in source.Connections)
         {
-            clone.AddConnection(new OperatorConnection(
+            // Preserve the captured graph exactly, including legacy/imported graphs whose
+            // connections predate port metadata. Admission remains responsible for deciding
+            // whether such a graph is executable; snapshot construction must not mutate or
+            // reject the object before the caller reaches that boundary.
+            clone.Connections.Add(new OperatorConnection(
                 connection.SourceOperatorId,
                 connection.SourcePortId,
                 connection.TargetOperatorId,

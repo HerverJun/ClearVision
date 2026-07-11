@@ -58,6 +58,30 @@ public sealed class ExecutionSnapshotTests
         ExecutionSideEffectPolicy.For(ExecutionRunMode.FormalPrimary).Validate(flow).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(ExecutionRunMode.Preview)]
+    [InlineData(ExecutionRunMode.Debug)]
+    public void PreviewAndDebugPolicies_AllowIsolatedStateButBlockExternalWrites(ExecutionRunMode runMode)
+    {
+        var flow = new OperatorFlow("side-effects");
+        flow.AddOperator(new Operator("state", OperatorType.VariableWrite, 0, 0));
+        flow.AddOperator(new Operator("file", OperatorType.TextSave, 0, 0));
+        flow.AddOperator(new Operator("network", OperatorType.HttpRequest, 0, 0));
+        flow.AddOperator(new Operator("device", OperatorType.TriggerModule, 0, 0));
+
+        var capabilities = ExecutionSideEffectPolicy.For(runMode)
+            .Validate(flow)
+            .SelectMany(item => Enum.GetValues<ExecutionSideEffect>()
+                .Where(flag => flag != ExecutionSideEffect.None && item.Capability.HasFlag(flag)))
+            .ToHashSet();
+
+        capabilities.Should().NotContain(ExecutionSideEffect.StateWrite);
+        capabilities.Should().Contain([
+            ExecutionSideEffect.FileWrite,
+            ExecutionSideEffect.NetworkWrite,
+            ExecutionSideEffect.DeviceWrite]);
+    }
+
     private static OperatorFlow CreateFlow()
     {
         var flow = new OperatorFlow("identity");

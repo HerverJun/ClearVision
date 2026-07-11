@@ -63,15 +63,21 @@ public class DryRunService
 
         try
         {
+            var snapshot = new ExecutionSnapshot(
+                flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
+                flow,
+                persistenceRevision: 0,
+                ExecutionSnapshotSource.Draft,
+                ExecutionRunMode.Preview);
             // 执行流程
             var flowResult = projectVariables == null
-                ? await _flowExecutionService.ExecuteFlowAsync(
-                    flow,
+                ? await _flowExecutionService.ExecuteWithSnapshotAsync(
+                    snapshot,
                     testInputs,
                     enableParallel: false,
                     cancellationToken)
-                : await _flowExecutionService.ExecuteFlowAsync(
-                    flow,
+                : await _flowExecutionService.ExecuteWithSnapshotAsync(
+                    snapshot,
                     testInputs,
                     new ProjectVariableExecutionContext(
                         projectVariables.Session,

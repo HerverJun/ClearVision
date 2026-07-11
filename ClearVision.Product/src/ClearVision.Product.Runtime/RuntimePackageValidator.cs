@@ -82,6 +82,18 @@ public sealed partial class RuntimePackageValidator
                 $"The manifest flowHash '{manifest.FlowHash}' does not match the actual flow hash '{computedHash}'.");
         }
 
+        var computedDecisionHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+            package.Flow.ToEntity().DecisionConfiguration);
+        if (string.IsNullOrWhiteSpace(manifest.DecisionConfigurationHash) ||
+            !string.Equals(manifest.DecisionConfigurationHash, computedDecisionHash, StringComparison.OrdinalIgnoreCase))
+        {
+            AddIssue(
+                result,
+                RuntimeIssueSeverity.Error,
+                "DecisionConfigurationHashMismatch",
+                $"The manifest decisionConfigurationHash '{manifest.DecisionConfigurationHash}' does not match the actual decision configuration hash '{computedDecisionHash}'.");
+        }
+
         if (manifest.EntryFlow.Contains("..", StringComparison.Ordinal))
         {
             AddIssue(

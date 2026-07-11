@@ -150,6 +150,8 @@ public sealed class RuntimePackageExporter
                 SourceProjectRevision = project.PersistenceRevision,
                 EntryFlow = "flow.json",
                 FlowHash = flowHash,
+                DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                    packagedFlow.ToEntity().DecisionConfiguration),
                 OperatorCatalogVersion = BuildOperatorCatalogVersion(),
                 ExportAllowed = true,
                 PendingParameters = parameterValidationErrors,

@@ -634,6 +634,8 @@ public sealed class RuntimeHost : IAsyncDisposable
             : BuildImageId(imagePath);
         var startedAt = DateTimeOffset.UtcNow;
         var runId = Guid.NewGuid().ToString("N");
+        var runtimeSnapshot = package.ExecutionSnapshot
+            ?? throw new RuntimePackageException("The loaded package does not contain a runtime execution snapshot.");
         _currentRunId = runId;
         EmitSnapshot();
 
@@ -641,7 +643,9 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             var profile = GetActiveSiteProfileSnapshot(package);
             var applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
-            var flow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
+            var appliedFlow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
+            runtimeSnapshot = CreateRuntimeExecutionSnapshot(package, appliedFlow, runtimeSnapshot);
+            var flow = runtimeSnapshot.CreateExecutionFlow();
             _currentFlowId = flow.Id;
             var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
             var variableContext = new ProjectVariableExecutionContext(
@@ -655,6 +659,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             {
                 var invalidResult = _resultNormalizer.CreateValidationFailure(
                     package,
+                    runtimeSnapshot,
                     runId,
                     imageId,
                     imagePath,
@@ -669,8 +674,8 @@ public sealed class RuntimeHost : IAsyncDisposable
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(package.RuntimeProfile.SingleRunTimeoutMs));
 
-            var flowResult = await _flowExecutionService.ExecuteFlowAsync(
-                flow,
+            var flowResult = await _flowExecutionService.ExecuteWithSnapshotAsync(
+                runtimeSnapshot,
                 BuildFlowInputData(sourceImageBytes, package.AssetContext),
                 variableContext,
                 cancellationToken: timeoutCts.Token);
@@ -678,6 +683,7 @@ public sealed class RuntimeHost : IAsyncDisposable
 
             var normalizedResult = _resultNormalizer.Normalize(
                 package,
+                runtimeSnapshot,
                 runId,
                 imageId,
                 imagePath,
@@ -696,6 +702,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             var canceled = _resultNormalizer.CreateCanceledResult(
                 package,
+                runtimeSnapshot,
                 runId,
                 imageId,
                 imagePath,
@@ -710,6 +717,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             _logger.LogError(ex, "Single run failed for image {ImagePath}", imagePath);
             var failure = _resultNormalizer.CreateUnhandledFailure(
                 package,
+                runtimeSnapshot,
                 runId,
                 imageId,
                 imagePath,
@@ -726,6 +734,30 @@ public sealed class RuntimeHost : IAsyncDisposable
             _currentRunId = null;
             EmitSnapshot();
         }
+    }
+
+    private static ExecutionSnapshot CreateRuntimeExecutionSnapshot(
+        RuntimePackage package,
+        OperatorFlow appliedFlow,
+        ExecutionSnapshot loadedSnapshot)
+    {
+        var appliedFlowHash = ExecutionFlowIdentity.ComputeFlowHash(appliedFlow);
+        var appliedDecisionHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+            appliedFlow.DecisionConfiguration);
+        if (string.Equals(appliedFlowHash, loadedSnapshot.FlowHash, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(appliedDecisionHash, loadedSnapshot.DecisionConfigurationHash, StringComparison.OrdinalIgnoreCase))
+        {
+            return loadedSnapshot;
+        }
+
+        return new ExecutionSnapshot(
+            loadedSnapshot.ProjectId,
+            appliedFlow,
+            package.Manifest.SourceProjectRevision,
+            ExecutionSnapshotSource.RuntimePackage,
+            ExecutionRunMode.StationRuntime,
+            runtimePackageId: package.Manifest.PackageId,
+            globalVariables: package.GlobalVariables);
     }
 
     private static void AttachPublicGlobalVariables(
@@ -1247,6 +1279,7 @@ public sealed class RuntimeResultNormalizer
 {
     public RuntimeNormalizedResult Normalize(
         RuntimePackage package,
+        ExecutionSnapshot snapshot,
         string runId,
         string imageId,
         string? imagePath,
@@ -1279,11 +1312,11 @@ public sealed class RuntimeResultNormalizer
             RunId = runId,
             PackageId = package.Manifest.PackageId,
             PackageName = package.Manifest.PackageName,
-            FlowHash = package.Manifest.FlowHash,
-            ProjectRevision = package.Manifest.SourceProjectRevision,
-            DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(flow.DecisionConfiguration),
-            ExecutionSnapshotId = Guid.TryParse(runId, out var executionSnapshotId) ? executionSnapshotId : null,
-            ExecutionRunMode = ExecutionRunMode.StationRuntime.ToString(),
+            FlowHash = snapshot.FlowHash,
+            ProjectRevision = snapshot.PersistenceRevision,
+            DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
+            ExecutionSnapshotId = snapshot.SnapshotId,
+            ExecutionRunMode = snapshot.RunMode.ToString(),
             ImageId = imageId,
             SourceImagePath = imagePath,
             Outcome = outcome,
@@ -1306,6 +1339,7 @@ public sealed class RuntimeResultNormalizer
 
     public RuntimeNormalizedResult CreateValidationFailure(
         RuntimePackage package,
+        ExecutionSnapshot snapshot,
         string runId,
         string imageId,
         string? imagePath,
@@ -1316,6 +1350,7 @@ public sealed class RuntimeResultNormalizer
     {
         return CreateFixedResult(
             package,
+            snapshot,
             runId,
             imageId,
             imagePath,
@@ -1330,6 +1365,7 @@ public sealed class RuntimeResultNormalizer
 
     public RuntimeNormalizedResult CreateCanceledResult(
         RuntimePackage package,
+        ExecutionSnapshot snapshot,
         string runId,
         string imageId,
         string? imagePath,
@@ -1339,6 +1375,7 @@ public sealed class RuntimeResultNormalizer
     {
         return CreateFixedResult(
             package,
+            snapshot,
             runId,
             imageId,
             imagePath,
@@ -1353,6 +1390,7 @@ public sealed class RuntimeResultNormalizer
 
     public RuntimeNormalizedResult CreateUnhandledFailure(
         RuntimePackage package,
+        ExecutionSnapshot snapshot,
         string runId,
         string imageId,
         string? imagePath,
@@ -1363,6 +1401,7 @@ public sealed class RuntimeResultNormalizer
     {
         return CreateFixedResult(
             package,
+            snapshot,
             runId,
             imageId,
             imagePath,
@@ -1377,6 +1416,7 @@ public sealed class RuntimeResultNormalizer
 
     private static RuntimeNormalizedResult CreateFixedResult(
         RuntimePackage package,
+        ExecutionSnapshot snapshot,
         string runId,
         string imageId,
         string? imagePath,
@@ -1393,11 +1433,11 @@ public sealed class RuntimeResultNormalizer
             RunId = runId,
             PackageId = package.Manifest.PackageId,
             PackageName = package.Manifest.PackageName,
-            FlowHash = package.Manifest.FlowHash,
-            ProjectRevision = package.Manifest.SourceProjectRevision,
-            DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(package.Flow.ToEntity().DecisionConfiguration),
-            ExecutionSnapshotId = Guid.TryParse(runId, out var executionSnapshotId) ? executionSnapshotId : null,
-            ExecutionRunMode = ExecutionRunMode.StationRuntime.ToString(),
+            FlowHash = snapshot.FlowHash,
+            ProjectRevision = snapshot.PersistenceRevision,
+            DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
+            ExecutionSnapshotId = snapshot.SnapshotId,
+            ExecutionRunMode = snapshot.RunMode.ToString(),
             ImageId = imageId,
             SourceImagePath = imagePath,
             Outcome = outcome,

@@ -1,3 +1,4 @@
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -7,6 +8,29 @@ namespace ClearVision.Product.Tests.Services;
 
 public class InspectionRuntimeCoordinatorTests
 {
+    [Fact]
+    public async Task TryStartAsync_WithSnapshot_ShouldExposeCapturedExecutionIdentity()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            new OperatorFlow("coordinator-snapshot"),
+            persistenceRevision: 41,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary);
+
+        (await coordinator.TryStartAsync(snapshot, Guid.NewGuid(), CancellationToken.None))
+            .Should().Be(StartResult.Success);
+
+        var state = coordinator.GetState(projectId)!;
+        state.ExecutionSnapshotId.Should().Be(snapshot.SnapshotId);
+        state.FlowHash.Should().Be(snapshot.FlowHash);
+        state.ProjectRevision.Should().Be(41);
+        state.DecisionConfigurationHash.Should().Be(snapshot.DecisionConfigurationHash);
+        state.ExecutionSource.Should().Be(ExecutionSnapshotSource.PersistedProject.ToString());
+    }
+
     [Fact]
     public async Task TryStartAsync_ForSameProjectTwice_ReturnsAlreadyRunningOnSecondCall()
     {

@@ -20,6 +20,102 @@ namespace ClearVision.Product.Tests.Runtime;
 public class RuntimePackageExporterValidationTests
 {
     [Fact]
+    public async Task RuntimePackage_ShouldCarryDecisionIdentityAndCreateLoadedSnapshot()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = new ProjectDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "runtime-identity",
+                PersistenceRevision = 23,
+                Flow = new OperatorFlowDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "main",
+                    Operators =
+                    [
+                        CreateOperatorDto(
+                            "Result output",
+                            OperatorType.ResultOutput,
+                            CreateParameter("Format", "enum", "JSON"))
+                    ]
+                }
+            };
+            var export = await CreateExporter().ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            export.Manifest.DecisionConfigurationHash.Should().NotBeNullOrWhiteSpace();
+            var package = await new RuntimePackageLoader(
+                new RuntimePackageValidator(),
+                NullLogger<RuntimePackageLoader>.Instance).LoadAsync(export.PackageRootPath);
+
+            package.ExecutionSnapshot.Should().NotBeNull();
+            package.ExecutionSnapshot!.RuntimePackageId.Should().Be(export.Manifest.PackageId);
+            package.ExecutionSnapshot.PersistenceRevision.Should().Be(23);
+            package.ExecutionSnapshot.FlowHash.Should().Be(export.Manifest.FlowHash);
+            package.ExecutionSnapshot.DecisionConfigurationHash.Should().Be(export.Manifest.DecisionConfigurationHash);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenDecisionConfigurationHashIsTampered_ShouldRejectPackage()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var export = await CreateExporter().ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = new ProjectDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "decision-hash-tamper",
+                    Flow = new OperatorFlowDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "main",
+                        Operators =
+                        [
+                            CreateOperatorDto(
+                                "Result output",
+                                OperatorType.ResultOutput,
+                                CreateParameter("Format", "enum", "JSON"))
+                        ]
+                    }
+                },
+                TargetRootDirectory = root
+            });
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = JsonSerializer.Deserialize<RuntimePackageManifest>(
+                await File.ReadAllTextAsync(manifestPath),
+                CreateJsonOptions())!;
+            manifest.DecisionConfigurationHash = new string('0', 64);
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(manifest, CreateJsonOptions()));
+
+            var act = async () => await new RuntimePackageLoader(
+                new RuntimePackageValidator(),
+                NullLogger<RuntimePackageLoader>.Instance).LoadAsync(export.PackageRootPath);
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*DecisionConfigurationHashMismatch*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task ExportAsync_ShouldAllowConditionallyOptionalParametersAndIgnoreNonPathFlags()
     {
         var root = CreateTempDirectory();

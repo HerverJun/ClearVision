@@ -2,6 +2,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.RuntimeAssets;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -92,6 +93,15 @@ public sealed class RuntimePackageLoader
 
             package.AssetContext = await LoadAssetContextAsync(manifest, normalizedRoot, cancellationToken);
 
+            package.ExecutionSnapshot = new ExecutionSnapshot(
+                ResolveSnapshotProjectId(manifest),
+                flow.ToEntity(),
+                manifest.SourceProjectRevision,
+                ExecutionSnapshotSource.RuntimePackage,
+                ExecutionRunMode.StationRuntime,
+                runtimePackageId: manifest.PackageId,
+                globalVariables: globalVariables);
+
             RebasePackageRelativeFileParameters(package.Flow, normalizedRoot);
 
             _logger.LogInformation(
@@ -109,6 +119,18 @@ public sealed class RuntimePackageLoader
         {
             throw new RuntimePackageException("加载运行包失败。", ex);
         }
+    }
+
+    private static Guid ResolveSnapshotProjectId(RuntimePackageManifest manifest)
+    {
+        if (manifest.SourceProjectId != Guid.Empty)
+        {
+            return manifest.SourceProjectId;
+        }
+
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(manifest.PackageId ?? string.Empty));
+        return new Guid(bytes.AsSpan(0, 16));
     }
 
     private static async Task<T?> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)

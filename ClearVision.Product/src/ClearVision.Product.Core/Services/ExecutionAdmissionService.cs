@@ -110,6 +110,10 @@ public interface IExecutionAdmissionService
         Operator @operator,
         ExecutionAdmissionSurface surface);
 
+    ExecutionAdmissionResult ValidateSnapshot(
+        ExecutionSnapshot snapshot,
+        ExecutionAdmissionSurface surface);
+
     ExecutionAdmissionResult ValidateLegacyWebMessage(string messageType);
 }
 
@@ -337,6 +341,23 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
                 ResolveBlockedCode(surface),
                 BuildBlockedMessage(surface, [violation]),
                 [violation]);
+    }
+
+    public ExecutionAdmissionResult ValidateSnapshot(
+        ExecutionSnapshot snapshot,
+        ExecutionAdmissionSurface surface)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var runtimeState = _runtimeCoordinator?.GetState(snapshot.ProjectId);
+        if (IsOfficialExecutionSurface(surface) &&
+            runtimeState?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
+        {
+            return ExecutionAdmissionResult.Reject(
+                "ADMISSION_RUNTIME_ALREADY_ACTIVE",
+                $"Project '{snapshot.ProjectId}' already has an active runtime session.");
+        }
+
+        return ValidateFlowDefinition(snapshot.CreateExecutionFlow(), surface);
     }
 
     public ExecutionAdmissionResult ValidateLegacyWebMessage(string messageType)

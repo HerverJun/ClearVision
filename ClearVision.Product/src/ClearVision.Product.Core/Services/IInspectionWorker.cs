@@ -18,7 +18,11 @@ public interface IInspectionWorker
     /// <param name="flow">流程定义</param>
     /// <param name="cameraId">相机ID（可选）</param>
     /// <returns>是否成功启动</returns>
-    Task<bool> TryStartRunAsync(Guid projectId, Guid sessionId, Entities.OperatorFlow flow, string? cameraId);
+    Task<bool> TryStartRunAsync(
+        Guid sessionId,
+        ExecutionSnapshot snapshot,
+        string? cameraId,
+        ExecutionSnapshot? shadowCandidateSnapshot = null);
 
     /// <summary>
     /// 等待后台任务真正退出并完成清理。

@@ -33,6 +33,12 @@ public class IntelligentDetectionService : IIntelligentDetectionService
         CancellationToken cancellationToken = default)
     {
         DetectionResult? lastResult = null;
+        var snapshot = new ExecutionSnapshot(
+            flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
+            flow,
+            persistenceRevision: 0,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.FormalPrimary);
 
         for (int attempt = 0; attempt <= policy.MaxRetries; attempt++)
         {
@@ -47,7 +53,7 @@ public class IntelligentDetectionService : IIntelligentDetectionService
                 var imageBytes = await camera.AcquireSingleFrameAsync();
 
                 // 执行流程
-                var flowResult = await flowService.ExecuteFlowAsync(flow, new Dictionary<string, object>
+                var flowResult = await flowService.ExecuteWithSnapshotAsync(snapshot, new Dictionary<string, object>
                 {
                     { "Image", imageBytes }
                 }, cancellationToken: cancellationToken);

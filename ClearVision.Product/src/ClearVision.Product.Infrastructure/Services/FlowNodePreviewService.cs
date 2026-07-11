@@ -86,9 +86,18 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             ? inputImage
             : null;
         var inputData = BuildInputData(externalInputImage);
-        var result = projectVariables == null
-            ? await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, ct)
-            : await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, projectVariables, ct);
+        var snapshot = new ExecutionSnapshot(
+            flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
+            flow,
+            persistenceRevision: 0,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview);
+        var result = await _flowExecution.ExecuteDebugWithSnapshotAsync(
+            snapshot,
+            debugOptions,
+            inputData,
+            projectVariables,
+            ct);
 
         if (!result.IntermediateResults.TryGetValue(targetNodeId, out var nodeOutput))
         {

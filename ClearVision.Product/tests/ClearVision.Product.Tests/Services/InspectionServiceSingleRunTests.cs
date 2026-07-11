@@ -128,7 +128,7 @@ public class InspectionServiceSingleRunTests
         persistedResult.CalibrationBundleId.Should().Be("bundle-single-run");
         persistedResult.SessionId.Should().NotBeNull();
         persistedResult.OutputDataJson.Should().Contain("Traceability");
-        await projectRepository.Received(2).GetByIdFreshAsync(projectId);
+        await projectRepository.Received(1).GetByIdFreshAsync(projectId);
         _ = projectRepository.DidNotReceive().GetWithFlowAsync(Arg.Any<Guid>());
         _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(Arg.Any<Guid>());
     }
@@ -162,8 +162,7 @@ public class InspectionServiceSingleRunTests
 
         var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("ADMISSION_PROJECT_NOT_ACTIVE:*");
+        await act.Should().ThrowAsync<ClearVision.Product.Core.Exceptions.ProjectNotFoundException>();
         await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
             Arg.Any<OperatorFlow>(),
             Arg.Any<Dictionary<string, object>?>(),
@@ -235,8 +234,7 @@ public class InspectionServiceSingleRunTests
 
         var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, CreateFlow("client-flow"));
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("ADMISSION_PROJECT_NOT_ACTIVE:*");
+        await act.Should().ThrowAsync<ClearVision.Product.Core.Exceptions.ProjectNotFoundException>();
         await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
             Arg.Any<OperatorFlow>(),
             Arg.Any<Dictionary<string, object>?>(),

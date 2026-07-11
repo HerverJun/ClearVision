@@ -84,9 +84,9 @@ public class InspectionServiceRealtimeTests
         var worker = Substitute.For<IInspectionWorker>();
         worker.TryStartRunAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<OperatorFlow>(),
-                Arg.Any<string?>())
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<string?>(),
+                Arg.Any<ExecutionSnapshot?>())
             .Returns(_ =>
             {
                 cancellation.Cancel();
@@ -116,9 +116,9 @@ public class InspectionServiceRealtimeTests
         var worker = Substitute.For<IInspectionWorker>();
         worker.TryStartRunAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<OperatorFlow>(),
-                Arg.Any<string?>())
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<string?>(),
+                Arg.Any<ExecutionSnapshot?>())
             .Returns(Task.FromResult(true));
         var service = CreateService(coordinator, worker);
         var projectId = Guid.NewGuid();
@@ -130,10 +130,12 @@ public class InspectionServiceRealtimeTests
             CancellationToken.None);
 
         await worker.Received(1).TryStartRunAsync(
-            projectId,
             Arg.Any<Guid>(),
-            Arg.Is<OperatorFlow>(flow => flow.Operators.Any(op => op.Type == OperatorType.TextSave)),
-            Arg.Any<string?>());
+            Arg.Is<ExecutionSnapshot>(snapshot =>
+                snapshot.ProjectId == projectId &&
+                snapshot.CreateExecutionFlow().Operators.Any(op => op.Type == OperatorType.TextSave)),
+            Arg.Any<string?>(),
+            Arg.Any<ExecutionSnapshot?>());
     }
 
     private static TestContext CreateContext()
