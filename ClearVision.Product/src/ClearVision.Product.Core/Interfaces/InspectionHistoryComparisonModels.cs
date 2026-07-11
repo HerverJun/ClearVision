@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Core.Interfaces;
 
@@ -28,6 +29,10 @@ public sealed class InspectionHistoryComparisonSummary
     public Guid ProjectId { get; init; }
 
     public InspectionStatus Status { get; init; }
+
+    public ExecutionOutcome ExecutionOutcome { get; init; }
+
+    public DecisionOutcome DecisionOutcome { get; init; }
 
     public DateTime InspectionTime { get; init; }
 

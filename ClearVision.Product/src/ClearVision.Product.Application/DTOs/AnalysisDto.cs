@@ -17,6 +17,18 @@ public class InspectionStatisticsDto
     public int NGCount { get; set; }
     public int ErrorCount { get; set; }
     public double OKRate { get; set; }
+    public double YieldRate { get; set; }
+    public int ExecutionSucceededCount { get; set; }
+    public int ValidDecisionCount { get; set; }
+    public double DecisionCoverageRate { get; set; }
+    public int ExecutionFailureCount { get; set; }
+    public int UndeterminedCount { get; set; }
+    public int NotApplicableCount { get; set; }
+    public int InvalidCount { get; set; }
+    public int FailedCount { get; set; }
+    public int CancelledCount { get; set; }
+    public int TimedOutCount { get; set; }
+    public int SkippedCount { get; set; }
     public double NGRate { get; set; }
     public double ErrorRate { get; set; }
     public double AverageProcessingTimeMs { get; set; }
@@ -91,6 +103,11 @@ public class TrendDataPointDto
     public int NGCount { get; set; }
     public int ErrorCount { get; set; }
     public double OKRate { get; set; }
+    public double YieldRate { get; set; }
+    public int ValidDecisionCount { get; set; }
+    public int ExecutionFailureCount { get; set; }
+    public int UndeterminedCount { get; set; }
+    public int InvalidCount { get; set; }
     public int DefectCount { get; set; }
     public double AverageProcessingTime { get; set; }
 }
@@ -203,6 +220,10 @@ public class InspectionResultExportItemDto
     public Guid Id { get; set; }
     public DateTime InspectionTime { get; set; }
     public string Status { get; set; } = string.Empty;
+    public string ExecutionOutcome { get; set; } = string.Empty;
+    public string DecisionOutcome { get; set; } = string.Empty;
+    public string CanonicalOutcome { get; set; } = string.Empty;
+    public string? ReasonCode { get; set; }
     public long ProcessingTimeMs { get; set; }
     public double? ConfidenceScore { get; set; }
     public string? ErrorMessage { get; set; }

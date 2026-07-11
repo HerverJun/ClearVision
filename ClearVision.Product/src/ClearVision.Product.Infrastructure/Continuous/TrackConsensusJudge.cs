@@ -139,6 +139,7 @@ public sealed class TrackConsensusJudge
                 return FinalizeNonComparable(
                     judgment.TrackId,
                     list,
+                    comparable,
                     DetermineTerminalDecision(evaluated));
             }
 
@@ -188,13 +189,22 @@ public sealed class TrackConsensusJudge
     private TrackDecision FinalizeNonComparable(
         string trackId,
         IReadOnlyList<TrackFrameJudgment> frames,
+        IReadOnlyList<(TrackFrameJudgment Item, InspectionOutcome Outcome)> comparable,
         DecisionOutcome decisionOutcome)
     {
-        var terminalFrame = frames
-            .Where(frame => frame.Outcome.Decision == decisionOutcome)
+        var okVotes = comparable.Count(item => item.Outcome.Decision == DecisionOutcome.Ok);
+        var ngVotes = comparable.Count(item => item.Outcome.Decision == DecisionOutcome.Ng);
+        var totalVotes = okVotes + ngVotes;
+        var evidenceFrame = (totalVotes > 0
+                ? comparable.Select(item => item.Item)
+                : frames.Where(frame => frame.Outcome.Decision == decisionOutcome))
             .OrderByDescending(item => item.Confidence)
             .ThenBy(item => item.Sequence)
             .FirstOrDefault();
+        var consensusScore = totalVotes > 0
+            ? Math.Max(okVotes, ngVotes) / (double)totalVotes
+            : 0;
+        var isConflict = totalVotes > 0 && decisionOutcome == DecisionOutcome.Undetermined;
         var outcome = new InspectionOutcome(
             ExecutionOutcome.Succeeded,
             decisionOutcome,
@@ -203,22 +213,27 @@ public sealed class TrackConsensusJudge
             {
                 DecisionOutcome.Invalid => "CONTINUOUS_CONSENSUS_INVALID",
                 DecisionOutcome.NotApplicable => "CONTINUOUS_CONSENSUS_NOT_APPLICABLE",
+                DecisionOutcome.Undetermined when isConflict => "CONTINUOUS_CONSENSUS_CONFLICT",
                 _ => "CONTINUOUS_CONSENSUS_NO_VALID_VOTES"
             },
-            "Continuous consensus completed without comparable OK/NG votes.",
-            HasJudgmentSignal: decisionOutcome == DecisionOutcome.Invalid &&
+            isConflict
+                ? "Continuous consensus window exhausted with conflicting OK/NG votes."
+                : "Continuous consensus completed without comparable OK/NG votes.",
+            HasJudgmentSignal: totalVotes > 0 ||
+                               decisionOutcome == DecisionOutcome.Invalid &&
                                frames.Any(frame => frame.Outcome.HasJudgmentSignal));
         var decision = new TrackDecision(
             trackId,
             LegacyInspectionStatusProjection.Project(outcome),
             frames.Count,
-            0,
-            0,
-            terminalFrame?.Sequence ?? 0,
-            0,
+            okVotes,
+            ngVotes,
+            evidenceFrame?.Sequence ?? 0,
+            consensusScore,
             IsFinal: true,
             outcome,
-            TerminalFrame: terminalFrame);
+            RepresentativeFrame: isConflict ? evidenceFrame : null,
+            TerminalFrame: isConflict ? null : evidenceFrame);
         FinalizeTrack(trackId);
         return decision;
     }

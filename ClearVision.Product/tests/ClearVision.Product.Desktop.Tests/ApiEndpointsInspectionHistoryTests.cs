@@ -316,6 +316,9 @@ public sealed class ApiEndpointsInspectionHistoryTests
         root.GetProperty("outputImage").ValueKind.Should().Be(JsonValueKind.Null);
         root.GetProperty("outputData").GetProperty("score").GetInt32().Should().Be(88);
         root.GetProperty("defectCount").GetInt32().Should().Be(1);
+        root.GetProperty("executionOutcome").GetString().Should().Be("Succeeded");
+        root.GetProperty("decisionOutcome").GetString().Should().Be("Ng");
+        root.GetProperty("hasJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -337,6 +340,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
         var root = document.RootElement;
         root.GetProperty("imageId").ValueKind.Should().Be(JsonValueKind.Null);
         root.GetProperty("outputImage").GetString().Should().Be(Convert.ToBase64String(outputImage));
+        root.GetProperty("executionOutcome").GetString().Should().Be("Succeeded");
+        root.GetProperty("decisionOutcome").GetString().Should().Be("Ok");
     }
 
     [Fact]

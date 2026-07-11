@@ -43,6 +43,7 @@
                     "src/shared/styles/settings-view-override.css",
                     "src/shared/styles/operator-library.css",
                     "src/shared/styles/flow-editor-layout.css",
+                    "src/shared/styles/final-decision.css",
                     "src/features/settings/userManagement.css",
                     "src/shared/styles/ai-panel.css",
                     "src/shared/styles/sprint-c-enhancements.css",
@@ -97,6 +98,15 @@
                     </nav>
                 </div>
                 <div class="toolbar-right">
+                    <button
+                        id="btn-final-decision"
+                        class="btn btn-secondary btn-with-icon final-decision-entry"
+                        data-decision-state="unconfigured"
+                        title="最终判定：等待流程"
+                    >
+                        <span class="final-decision-entry-dot" aria-hidden="true"></span>
+                        <span>最终判定</span>
+                    </button>
                     <button
                         id="btn-save"
                         class="btn btn-primary btn-with-icon"
@@ -458,7 +468,7 @@
                                 </div>
                             </div>
                             <div class="glass-card kpi-card-v3">
-                                <span class="kpi-label-v3">异常报警</span>
+                                <span class="kpi-label-v3">执行失败</span>
                                 <div class="mt-2">
                                     <span class="kpi-value-v3 error" id="kpi-error">0</span>
                                     <div class="kpi-change-v3 down" id="kpi-error-change">
@@ -469,10 +479,32 @@
                                 </div>
                             </div>
                             <div class="glass-card kpi-card-v3">
-                                <span class="kpi-label-v3">综合良率</span>
+                                <span class="kpi-label-v3">未判定</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-undetermined">0</span>
+                                    <div class="kpi-change-v3 down" id="kpi-undetermined-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">有效判定良率</span>
                                 <div class="mt-2">
                                     <span class="kpi-value-v3" id="kpi-yield">0%</span>
                                     <div class="kpi-change-v3 up" id="kpi-yield-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">判定覆盖率</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-coverage">0%</span>
+                                    <div class="kpi-change-v3 up" id="kpi-coverage-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
                                         <span class="change-value">--</span>
                                         <span class="change-ref">无历史窗口</span>
@@ -648,7 +680,13 @@
                                     <option value="all">全部</option>
                                     <option value="ok">OK</option>
                                     <option value="ng">NG</option>
-                                    <option value="error">错误</option>
+                                    <option value="undetermined">未判定</option>
+                                    <option value="notApplicable">不适用</option>
+                                    <option value="invalid">判定无效</option>
+                                    <option value="failed">执行失败</option>
+                                    <option value="timedOut">执行超时</option>
+                                    <option value="cancelled">已取消</option>
+                                    <option value="skipped">未检测</option>
                                 </select>
                             </div>
                             <div class="filter-group">

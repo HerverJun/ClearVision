@@ -295,6 +295,17 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         return ValidateFlowSideEffectsCore(flow, surface);
     }
 
+    public sealed class ExecutionAdmissionRejectedException : InvalidOperationException
+    {
+        public ExecutionAdmissionRejectedException(ExecutionAdmissionResult admission)
+            : base($"{admission.Code}: {admission.Message}")
+        {
+            Admission = admission;
+        }
+
+        public ExecutionAdmissionResult Admission { get; }
+    }
+
     public ExecutionAdmissionResult ValidateFlowSideEffects(
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface)

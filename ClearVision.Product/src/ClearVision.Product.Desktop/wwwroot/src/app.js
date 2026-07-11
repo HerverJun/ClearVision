@@ -68,6 +68,7 @@ import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
 import FlowCanvas from './core/canvas/flowCanvas.js';
 import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteraction.js';
+import FinalDecisionPanel from './features/flow-editor/finalDecisionPanel.js';
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
 import OperatorPaletteShell from './features/flow-editor/operatorPaletteShell.js';
@@ -207,6 +208,7 @@ let operatorLibraryPanel = null;
 let operatorPaletteShell = null;
 let flowCanvas = null;
 let flowEditorInteraction = null;
+let finalDecisionPanel = null;
 let propertyPanel = null;
 let propertyPanelOwner = null;
 let propertyPanelCapabilityAdapter = null;
@@ -2022,6 +2024,8 @@ async function initializeFlowEditor() {
 
     flowEditorInteraction = new FlowEditorInteraction(flowCanvas, { projectManager });
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
+    finalDecisionPanel = new FinalDecisionPanel(flowCanvas);
+    serviceRegistry.register('finalDecisionPanel', finalDecisionPanel);
     startAutoSave();
 
     debugLogger.debug('[App] 流程编辑器初始化完成');

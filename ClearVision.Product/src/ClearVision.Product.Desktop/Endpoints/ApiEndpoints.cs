@@ -7,6 +7,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -570,6 +571,19 @@ public static class ApiEndpoints
 
     private static void MapInspectionEndpoints(IEndpointRouteBuilder app)
     {
+        app.MapPost("/api/inspection/decision-configuration/validate", (OperatorFlowDto request) =>
+        {
+            var flow = request.ToEntity();
+            var issues = FinalDecisionResolver.Validate(flow);
+            var candidates = FinalDecisionConfigurationCatalog.GetEligibleOutputs(flow);
+            return Results.Ok(new
+            {
+                IsValid = issues.Count == 0,
+                Issues = issues,
+                EligibleOutputs = candidates
+            });
+        });
+
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
             ExecuteInspectionRequest request,
@@ -615,6 +629,10 @@ public static class ApiEndpoints
                         cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
+            }
+            catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
+            {
+                return ToAdmissionFailure(ex.Admission);
             }
             catch (InvalidOperationException ex)
             {
@@ -816,6 +834,10 @@ public static class ApiEndpoints
                         CameraId = request.CameraId
                     });
                 }
+            }
+            catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
+            {
+                return ToAdmissionFailure(ex.Admission);
             }
             catch (InvalidOperationException ex)
             {
@@ -1203,8 +1225,8 @@ public static class ApiEndpoints
             imageReference = BuildImageReference(result.ImageId),
             hasOutputData = result.HasOutputData,
             hasAnalysisData = result.HasAnalysisData,
-            diagnosticCode = result.Status == InspectionStatus.Error ? "InspectionError" : null,
-            diagnosticMessage = result.ErrorMessage,
+            diagnosticCode = outcome.ReasonCode,
+            diagnosticMessage = outcome.Message,
             errorMessage = result.ErrorMessage,
             isHistoryListItem = true
         };
@@ -1284,8 +1306,8 @@ public static class ApiEndpoints
             evidenceMessage = evidenceSummary.Message,
             outputDataPreview = outputPreview,
             analysisDataPreview = analysisPreview,
-            diagnosticCode = result.Status == InspectionStatus.Error ? "InspectionError" : null,
-            diagnosticMessage = result.ErrorMessage,
+            diagnosticCode = outcome.ReasonCode,
+            diagnosticMessage = outcome.Message,
             errorMessage = result.ErrorMessage,
             isHistoryDetail = true
         };
@@ -1371,6 +1393,8 @@ public static class ApiEndpoints
             id = summary.ResultId,
             projectId = summary.ProjectId,
             status = summary.Status.ToString(),
+            executionOutcome = summary.ExecutionOutcome.ToString(),
+            decisionOutcome = summary.DecisionOutcome.ToString(),
             timestamp = summary.InspectionTime,
             inspectionTime = summary.InspectionTime,
             defectCount = summary.DefectCount,
@@ -1446,11 +1470,17 @@ public static class ApiEndpoints
 
     internal static object ToInspectionExecutionResponse(InspectionResult result)
     {
+        var outcome = result.GetOutcome();
         return new
         {
             id = result.Id,
             projectId = result.ProjectId,
             status = result.Status.ToString(),
+            executionOutcome = outcome.Execution.ToString(),
+            decisionOutcome = outcome.Decision.ToString(),
+            decisionSource = outcome.DecisionSource,
+            reasonCode = outcome.ReasonCode,
+            hasJudgmentSignal = outcome.HasJudgmentSignal,
             defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
             defectCount = result.Defects.Count,
             processingTime = result.ProcessingTimeMs,
@@ -1466,6 +1496,19 @@ public static class ApiEndpoints
             analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
             errorMessage = result.ErrorMessage
         };
+    }
+
+    private static IResult ToAdmissionFailure(ExecutionAdmissionResult admission)
+    {
+        return Results.BadRequest(new
+        {
+            Code = admission.Code,
+            Error = admission.Message,
+            Violations = admission.Violations,
+            Action = admission.Code.Contains("DECISION", StringComparison.OrdinalIgnoreCase)
+                ? "ConfigureFinalDecision"
+                : null
+        });
     }
 
     private static object ToInspectionDefectListItem(Defect defect)

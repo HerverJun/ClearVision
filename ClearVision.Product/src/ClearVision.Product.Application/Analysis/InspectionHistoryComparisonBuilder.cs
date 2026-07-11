@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ResultPaths;
 
 namespace ClearVision.Product.Application.Analysis;
@@ -31,7 +32,10 @@ public static class InspectionHistoryComparisonBuilder
         var fieldDiffs = new List<InspectionHistoryFieldDiff>();
         var traceabilityDiffs = new List<InspectionHistoryFieldDiff>();
 
-        fieldDiffs.Add(CompareField(Path("status"), "status / outcome", left.Status.ToString(), right.Status.ToString()));
+        var leftOutcome = ResolveOutcome(left);
+        var rightOutcome = ResolveOutcome(right);
+        fieldDiffs.Add(CompareField(Path("outcome", "execution"), "executionOutcome", leftOutcome.Execution, rightOutcome.Execution));
+        fieldDiffs.Add(CompareField(Path("outcome", "decision"), "decisionOutcome", leftOutcome.Decision, rightOutcome.Decision));
         fieldDiffs.Add(CompareField(Path("defectCount"), "defectCount", left.Defects.Count, right.Defects.Count));
         fieldDiffs.Add(CompareField(Path("processingTimeMs"), "processingTimeMs", left.ProcessingTimeMs, right.ProcessingTimeMs));
         fieldDiffs.Add(CompareField(Path("confidenceScore"), "confidenceScore", left.ConfidenceScore, right.ConfidenceScore));
@@ -140,11 +144,14 @@ public static class InspectionHistoryComparisonBuilder
     {
         ArgumentNullException.ThrowIfNull(result);
 
+        var outcome = ResolveOutcome(result);
         return new InspectionHistoryComparisonSummary
         {
             ResultId = result.Id,
             ProjectId = result.ProjectId,
             Status = result.Status,
+            ExecutionOutcome = outcome.Execution,
+            DecisionOutcome = outcome.Decision,
             InspectionTime = result.InspectionTime,
             DefectCount = result.Defects.Count,
             ProcessingTimeMs = result.ProcessingTimeMs,
@@ -595,7 +602,18 @@ public static class InspectionHistoryComparisonBuilder
     }
 
     private static string? GetDiagnosticCode(InspectionHistoryDetail result) =>
-        result.Status == InspectionStatus.Error ? "InspectionError" : null;
+        ResolveOutcome(result).ReasonCode;
+
+    private static InspectionOutcome ResolveOutcome(InspectionHistoryDetail result) =>
+        result.ExecutionOutcome.HasValue && result.DecisionOutcome.HasValue
+            ? new InspectionOutcome(
+                result.ExecutionOutcome.Value,
+                result.DecisionOutcome.Value,
+                result.DecisionSource,
+                result.ReasonCode,
+                result.ErrorMessage,
+                result.HasJudgmentSignal ?? false)
+            : LegacyInspectionStatusProjection.FromLegacy(result.Status) with { Message = result.ErrorMessage };
 
     private static bool IsMissing(object? value) =>
         value == null ||

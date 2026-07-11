@@ -158,10 +158,16 @@ test('result panel accepts station statistics shape for trace dashboard analytic
     { hourUtc: '2026-03-20T10:00:00Z', total: 4, ngCount: 1 }
   ]);
 
-  assert.deepEqual(normalizedStats, { total: 4, ok: 3, ng: 1, error: 0, avgTime: 31 });
+  assert.equal(normalizedStats.total, 4);
+  assert.equal(normalizedStats.ok, 3);
+  assert.equal(normalizedStats.ng, 1);
+  assert.equal(normalizedStats.validDecisions, 4);
+  assert.equal(normalizedStats.yieldRate, 0.75);
+  assert.equal(normalizedStats.executionFailures, 0);
+  assert.equal(normalizedStats.avgTime, 31);
   assert.equal(defects.WIRE_SWAP, 2);
   assert.equal(trend[0].count, 4);
-  assert.equal(trend[0].status, 'NG');
+  assert.equal(trend[0].status, 'ng');
 });
 
 test('result panel can request station history without a project context', async () => {

@@ -1,0 +1,205 @@
+.final-decision-entry {
+    gap: 7px;
+}
+
+.final-decision-entry-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #94a3b8;
+    box-shadow: 0 0 0 3px rgb(148 163 184 / 14%);
+}
+
+.final-decision-entry[data-decision-state="valid"] .final-decision-entry-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgb(34 197 94 / 16%);
+}
+
+.final-decision-entry[data-decision-state="invalid"] .final-decision-entry-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 18%);
+}
+
+.final-decision-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: none;
+    place-items: center;
+    padding: 24px;
+    background: rgb(2 8 23 / 72%);
+    backdrop-filter: blur(6px);
+}
+
+.final-decision-overlay.show {
+    display: grid;
+}
+
+.final-decision-dialog {
+    width: min(680px, 96vw);
+    max-height: min(820px, 92vh);
+    overflow: hidden;
+    border: 1px solid rgb(148 163 184 / 22%);
+    border-radius: 14px;
+    background: var(--bg-secondary, #111827);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 42%);
+    color: var(--text-primary, #e5e7eb);
+}
+
+.final-decision-dialog > header,
+.final-decision-dialog > footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-color: rgb(148 163 184 / 16%);
+}
+
+.final-decision-dialog > header {
+    justify-content: space-between;
+    border-bottom: 1px solid rgb(148 163 184 / 16%);
+}
+
+.final-decision-dialog > header div {
+    display: grid;
+    gap: 3px;
+}
+
+.final-decision-dialog > header strong {
+    font-size: 17px;
+}
+
+.final-decision-dialog > header span,
+.final-decision-field small {
+    color: var(--text-secondary, #94a3b8);
+    font-size: 12px;
+}
+
+.final-decision-dialog > header button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 26px;
+    cursor: pointer;
+}
+
+.final-decision-body {
+    display: grid;
+    gap: 16px;
+    overflow: auto;
+    max-height: calc(92vh - 138px);
+    padding: 20px;
+}
+
+.final-decision-status {
+    padding: 12px 14px;
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+.final-decision-status.valid {
+    border-color: rgb(34 197 94 / 34%);
+    background: rgb(34 197 94 / 8%);
+}
+
+.final-decision-status.invalid {
+    border-color: rgb(245 158 11 / 38%);
+    background: rgb(245 158 11 / 8%);
+}
+
+.final-decision-status ul {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.final-decision-status li {
+    display: grid;
+    gap: 3px;
+}
+
+.final-decision-status code {
+    color: #fbbf24;
+    font-size: 11px;
+}
+
+.final-decision-field {
+    display: grid;
+    gap: 7px;
+}
+
+.final-decision-field > span {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.final-decision-field select,
+.final-decision-field input {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid rgb(148 163 184 / 26%);
+    border-radius: 8px;
+    background: rgb(15 23 42 / 72%);
+    color: inherit;
+}
+
+.final-decision-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.final-decision-rule-summary {
+    display: grid;
+    gap: 5px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: rgb(59 130 246 / 8%);
+    color: var(--text-secondary, #cbd5e1);
+    font-size: 13px;
+}
+
+.final-decision-rule-summary strong {
+    color: var(--text-primary, #f8fafc);
+}
+
+.final-decision-empty {
+    padding: 18px;
+    border: 1px dashed rgb(148 163 184 / 28%);
+    border-radius: 9px;
+    color: var(--text-secondary, #94a3b8);
+    text-align: center;
+}
+
+.final-decision-dialog > footer {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    border-top: 1px solid rgb(148 163 184 / 16%);
+}
+
+@media (max-width: 720px) {
+    .final-decision-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .final-decision-dialog > footer {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .final-decision-dialog > footer > span {
+        display: none;
+    }
+}
+
+[data-theme="light"] .final-decision-dialog {
+    background: #fff;
+    color: #0f172a;
+}
+
+[data-theme="light"] .final-decision-field select,
+[data-theme="light"] .final-decision-field input {
+    background: #f8fafc;
+}

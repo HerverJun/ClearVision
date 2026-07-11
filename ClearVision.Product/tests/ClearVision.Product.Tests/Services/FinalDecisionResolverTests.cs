@@ -109,4 +109,54 @@ public sealed class FinalDecisionResolverTests
         outcome.ReasonCode.Should().Be("DECISION_SOURCE_OPERATOR_NOT_FOUND");
         outcome.HasJudgmentSignal.Should().BeFalse();
     }
+
+    [Fact]
+    public void ConfigurationCatalog_ReturnsOnlySimpleCompatibleOutputs()
+    {
+        var flow = new OperatorFlow("catalog");
+        var enabled = new Operator(Guid.NewGuid(), "Enabled", OperatorType.ResultOutput, 0, 0);
+        enabled.AddOutputPort("Bool", PortDataType.Boolean);
+        enabled.AddOutputPort("Text", PortDataType.String);
+        enabled.AddOutputPort("Count", PortDataType.Integer);
+        enabled.AddOutputPort("Score", PortDataType.Float);
+        enabled.AddOutputPort("Image", PortDataType.Image);
+        enabled.AddOutputPort("Payload", PortDataType.Any);
+        var disabled = new Operator(Guid.NewGuid(), "Disabled", OperatorType.ResultOutput, 0, 0);
+        disabled.AddOutputPort("Decision", PortDataType.Boolean);
+        disabled.Disable();
+        flow.AddOperator(enabled);
+        flow.AddOperator(disabled);
+
+        var candidates = FinalDecisionConfigurationCatalog.GetEligibleOutputs(flow);
+
+        candidates.Select(candidate => candidate.OutputName)
+            .Should().BeEquivalentTo("Bool", "Text", "Count", "Score");
+        candidates.Should().OnlyContain(candidate => candidate.OperatorId == enabled.Id);
+    }
+
+    [Fact]
+    public void Validate_RejectsAmbiguousAnyOutput()
+    {
+        var flow = new OperatorFlow("any-output");
+        var op = new Operator(Guid.NewGuid(), "Any", OperatorType.ResultOutput, 0, 0);
+        op.AddOutputPort("Payload", PortDataType.Any);
+        flow.AddOperator(op);
+        var port = op.OutputPorts.Single();
+        flow.DecisionConfiguration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = op.Id,
+                SourceOutputPortId = port.Id,
+                SourceOutputName = port.Name,
+                DataType = DecisionValueType.String,
+                Rule = DecisionInterpretationRule.StringMap,
+                OkValue = "OK",
+                NgValue = "NG"
+            }
+        };
+
+        FinalDecisionResolver.Validate(flow)
+            .Should().ContainSingle(issue => issue.Code == "DECISION_SOURCE_TYPE_MISMATCH");
+    }
 }

@@ -9,6 +9,7 @@ import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { createSignal } from '../../core/state/store.js';
 import { getStoredToken } from '../auth/authStorage.js';
 import { buildSseHeaders, buildSseUrl, parseSseFrame } from './inspectionSseClient.mjs';
+import { normalizeCanonicalOutcome } from './canonicalOutcome.mjs';
 
 // 检测状态
 const [getInspectionState, setInspectionState, subscribeInspectionState] = createSignal({
@@ -45,6 +46,22 @@ const LOCKED_RUNTIME_STATES_FOR_SNAPSHOT = new Set(['starting', 'running', 'stop
 
 function readProjectId(payload, fallback = null) {
     return payload?.projectId ?? payload?.ProjectId ?? fallback ?? null;
+}
+
+function notifyDecisionAdmissionFailure(error) {
+    const payload = error?.payload || {};
+    const code = payload.code || payload.Code || '';
+    const action = payload.action || payload.Action || '';
+    if (action !== 'ConfigureFinalDecision' && !String(code).includes('DECISION')) {
+        return;
+    }
+    window.dispatchEvent(new CustomEvent('clearvision:open-final-decision', {
+        detail: {
+            code,
+            violations: payload.violations || payload.Violations || [],
+            message: payload.error || payload.Error || error?.message || ''
+        }
+    }));
 }
 
 function getInlineResultImageBase64(result) {
@@ -701,6 +718,11 @@ class InspectionController {
             projectId: data.projectId ?? data.ProjectId,
             imageId: data.imageId ?? data.ImageId,
             status: data.status ?? data.Status,
+            executionOutcome: data.executionOutcome ?? data.ExecutionOutcome,
+            decisionOutcome: data.decisionOutcome ?? data.DecisionOutcome,
+            decisionSource: data.decisionSource ?? data.DecisionSource,
+            reasonCode: data.reasonCode ?? data.ReasonCode,
+            hasJudgmentSignal: data.hasJudgmentSignal ?? data.HasJudgmentSignal,
             errorMessage: data.errorMessage ?? data.ErrorMessage,
             defects: data.defects ?? data.Defects ?? [],
             defectCount: data.defectCount ?? data.DefectCount,
@@ -1032,7 +1054,9 @@ class InspectionController {
             isRunning: false,
             isRealtime: false,
             progress: 100,
-            status: normalizedResult.status === 'Error' ? 'error' : 'completed'
+            status: ['failed', 'timedOut', 'invalid'].includes(normalizedResult.outcomeCategory)
+                ? 'error'
+                : 'completed'
         });
 
         if (isDuplicate) {
@@ -1058,6 +1082,7 @@ class InspectionController {
      * 处理检测错误
      */
     handleInspectionError(error) {
+        notifyDecisionAdmissionFailure(error);
         setInspectionState({
             ...getInspectionState(),
             projectId: this.projectId,
@@ -1270,6 +1295,18 @@ class InspectionController {
         normalized.id = normalized.id ?? normalized.Id;
         normalized.projectId = normalized.projectId ?? normalized.ProjectId ?? this.projectId ?? null;
         normalized.status = this.normalizeInspectionStatus(normalized.status ?? normalized.Status);
+        normalized.executionOutcome = normalized.executionOutcome ?? normalized.ExecutionOutcome;
+        normalized.decisionOutcome = normalized.decisionOutcome ?? normalized.DecisionOutcome;
+        normalized.decisionSource = normalized.decisionSource ?? normalized.DecisionSource;
+        normalized.reasonCode = normalized.reasonCode ?? normalized.ReasonCode;
+        normalized.hasJudgmentSignal = normalized.hasJudgmentSignal ?? normalized.HasJudgmentSignal ?? false;
+        const canonicalOutcome = normalizeCanonicalOutcome(normalized);
+        normalized.executionOutcome = canonicalOutcome.executionOutcome;
+        normalized.decisionOutcome = canonicalOutcome.decisionOutcome;
+        normalized.outcomeCategory = canonicalOutcome.category;
+        normalized.outcomeLabel = canonicalOutcome.label;
+        normalized.outcomeTone = canonicalOutcome.tone;
+        normalized.isLegacyOutcomeProjection = canonicalOutcome.isLegacyProjection;
         normalized.confidenceScore = normalized.confidenceScore ?? normalized.ConfidenceScore;
         normalized.errorMessage = normalized.errorMessage ?? normalized.ErrorMessage;
 

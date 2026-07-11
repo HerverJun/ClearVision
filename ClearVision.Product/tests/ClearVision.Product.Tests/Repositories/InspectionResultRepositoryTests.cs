@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
 using FluentAssertions;
@@ -36,7 +37,54 @@ public sealed class InspectionResultRepositoryTests
             stats.NGCount.Should().Be(1);
             stats.ErrorCount.Should().Be(1);
             stats.AverageProcessingTimeMs.Should().Be(20);
-            stats.OKRate.Should().BeApproximately(1.0 / 3.0, 0.0001);
+            stats.OKRate.Should().Be(0.5);
+            stats.YieldRate.Should().Be(0.5);
+            stats.ValidDecisionCount.Should().Be(2);
+            stats.ExecutionFailureCount.Should().Be(1);
+            stats.DecisionCoverageRate.Should().Be(1);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task GetStatisticsAsync_ShouldExcludeNonDecisionsAndProjectLegacyRows()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await using var db = CreateContext(root);
+            await db.Database.EnsureCreatedAsync();
+            var repository = new InspectionResultRepository(db);
+            var projectId = Guid.NewGuid();
+            var ok = CreateOutcomeResult(projectId, ExecutionOutcome.Succeeded, DecisionOutcome.Ok);
+            var ng = CreateOutcomeResult(projectId, ExecutionOutcome.Succeeded, DecisionOutcome.Ng);
+            var undetermined = CreateOutcomeResult(projectId, ExecutionOutcome.Succeeded, DecisionOutcome.Undetermined);
+            var invalid = CreateOutcomeResult(projectId, ExecutionOutcome.Succeeded, DecisionOutcome.Invalid);
+            var failed = CreateOutcomeResult(projectId, ExecutionOutcome.Failed, DecisionOutcome.Undetermined);
+            var timedOut = CreateOutcomeResult(projectId, ExecutionOutcome.TimedOut, DecisionOutcome.Undetermined);
+            var legacyNg = CreateResult(projectId, InspectionStatus.NG, 10);
+
+            await repository.AddRangeAsync([ok, ng, undetermined, invalid, failed, timedOut, legacyNg]);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE InspectionResults SET ExecutionOutcome = NULL, DecisionOutcome = NULL, HasJudgmentSignal = NULL WHERE Id = {legacyNg.Id}");
+            db.ChangeTracker.Clear();
+
+            var stats = await repository.GetStatisticsAsync(projectId);
+
+            stats.TotalCount.Should().Be(7);
+            stats.OKCount.Should().Be(1);
+            stats.NGCount.Should().Be(2);
+            stats.ValidDecisionCount.Should().Be(3);
+            stats.YieldRate.Should().BeApproximately(1.0 / 3.0, 0.0001);
+            stats.UndeterminedCount.Should().Be(1);
+            stats.InvalidCount.Should().Be(1);
+            stats.FailedCount.Should().Be(1);
+            stats.TimedOutCount.Should().Be(1);
+            stats.ExecutionFailureCount.Should().Be(2);
+            stats.DecisionCoverageRate.Should().Be(0.6);
         }
         finally
         {
@@ -391,6 +439,16 @@ public sealed class InspectionResultRepositoryTests
     {
         var result = new InspectionResult(projectId);
         result.SetResult(status, processingTimeMs);
+        return result;
+    }
+
+    private static InspectionResult CreateOutcomeResult(
+        Guid projectId,
+        ExecutionOutcome execution,
+        DecisionOutcome decision)
+    {
+        var result = new InspectionResult(projectId);
+        result.SetOutcome(new InspectionOutcome(execution, decision, "test", "test", null), 10);
         return result;
     }
 

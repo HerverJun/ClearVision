@@ -10,6 +10,7 @@ import serviceRegistry from '../../core/app/serviceRegistry.js';
 import { getCurrentProject } from '../project/projectManager.js';
 import { AnalysisCardsPanel, buildDiagnosticsAnalysisData } from './analysisCardsPanel.js';
 import { showToast } from '../../shared/components/uiComponents.js';
+import { normalizeCanonicalOutcome } from './canonicalOutcome.mjs';
 
 const DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS = 120;
 const RECENT_RESULTS_PREVIEW_LIMIT = 3;
@@ -32,8 +33,12 @@ const [getStats, setStats, subscribeStats] = createSignal({
     total: 0,
     ok: 0,
     ng: 0,
-    error: 0,
-    yield: 0
+    executionFailure: 0,
+    undetermined: 0,
+    executionSucceeded: 0,
+    validDecisions: 0,
+    yield: 0,
+    coverage: 0
 });
 
 // 检测耗时统计
@@ -459,20 +464,29 @@ class InspectionPanel {
             }
         }
 
-        const status = result.status === 'OK' ? 'ok' : result.status === 'Error' ? 'error' : 'ng';
-        const statusText = result.status === 'OK' ? '通过' : result.status === 'Error' ? '错误' : '不通过';
+        const canonicalOutcome = normalizeCanonicalOutcome(result);
+        const status = ['failed', 'timedOut', 'invalid'].includes(canonicalOutcome.category)
+            ? 'error'
+            : (canonicalOutcome.category === 'ok' ? 'ok' : (canonicalOutcome.category === 'ng' ? 'ng' : 'idle'));
+        const statusText = canonicalOutcome.label;
         if (shouldRender) {
             this.updateStatus(status, statusText);
         }
 
         const stats = getStats();
+        const executionSucceededIncrement = String(canonicalOutcome.executionOutcome).toLowerCase() === 'succeeded' ? 1 : 0;
+        const validDecisionIncrement = canonicalOutcome.category === 'ok' || canonicalOutcome.category === 'ng' ? 1 : 0;
         const newStats = {
             total: stats.total + 1,
-            ok: stats.ok + (result.status === 'OK' ? 1 : 0),
-            ng: stats.ng + (result.status !== 'OK' && result.status !== 'Error' ? 1 : 0),
-            error: stats.error + (result.status === 'Error' ? 1 : 0)
+            ok: stats.ok + (canonicalOutcome.category === 'ok' ? 1 : 0),
+            ng: stats.ng + (canonicalOutcome.category === 'ng' ? 1 : 0),
+            executionFailure: stats.executionFailure + (canonicalOutcome.category === 'failed' || canonicalOutcome.category === 'timedOut' ? 1 : 0),
+            undetermined: stats.undetermined + (canonicalOutcome.category === 'undetermined' ? 1 : 0),
+            executionSucceeded: stats.executionSucceeded + executionSucceededIncrement,
+            validDecisions: stats.validDecisions + validDecisionIncrement
         };
-        newStats.yield = newStats.total > 0 ? ((newStats.ok / newStats.total) * 100).toFixed(1) : 0;
+        newStats.yield = newStats.validDecisions > 0 ? ((newStats.ok / newStats.validDecisions) * 100).toFixed(1) : 0;
+        newStats.coverage = newStats.executionSucceeded > 0 ? ((newStats.validDecisions / newStats.executionSucceeded) * 100).toFixed(1) : 0;
         setStats(newStats);
 
         if (result.processingTimeMs) {
@@ -494,7 +508,7 @@ class InspectionPanel {
             this._countersDirty = true;
         }
 
-        if (result.status === 'NG') {
+        if (canonicalOutcome.category === 'ng') {
             this.consecutiveNgCount += 1;
         } else {
             this.consecutiveNgCount = 0;
@@ -819,11 +833,19 @@ class InspectionPanel {
                         </div>
                         <div class="counter-item counter-error">
                             <span class="counter-value" id="counter-error">0</span>
-                            <span class="counter-label">异常</span>
+                            <span class="counter-label">执行失败</span>
+                        </div>
+                        <div class="counter-item counter-undetermined">
+                            <span class="counter-value" id="counter-undetermined">0</span>
+                            <span class="counter-label">未判定</span>
                         </div>
                         <div class="counter-item counter-yield">
                             <span class="counter-value" id="counter-yield">0%</span>
                             <span class="counter-label">良率</span>
+                        </div>
+                        <div class="counter-item counter-coverage">
+                            <span class="counter-value" id="counter-coverage">0%</span>
+                            <span class="counter-label">判定覆盖率</span>
                         </div>
                     </div>
                 </div>
@@ -983,13 +1005,17 @@ class InspectionPanel {
         const ngEl = this.container.querySelector('#counter-ng');
         const totalEl = this.container.querySelector('#counter-total');
         const errorEl = this.container.querySelector('#counter-error');
+        const undeterminedEl = this.container.querySelector('#counter-undetermined');
         const yieldEl = this.container.querySelector('#counter-yield');
+        const coverageEl = this.container.querySelector('#counter-coverage');
         
         if (okEl) okEl.textContent = stats.ok;
         if (ngEl) ngEl.textContent = stats.ng;
         if (totalEl) totalEl.textContent = stats.total;
-        if (errorEl) errorEl.textContent = stats.error;
+        if (errorEl) errorEl.textContent = stats.executionFailure;
+        if (undeterminedEl) undeterminedEl.textContent = stats.undetermined;
         if (yieldEl) yieldEl.textContent = `${stats.yield}%`;
+        if (coverageEl) coverageEl.textContent = `${stats.coverage}%`;
         
         // 更新耗时（移至右侧面板，使用 document.getElementById 全局查找）
         const avgEl = document.getElementById('timing-avg');
@@ -1018,9 +1044,14 @@ class InspectionPanel {
     }
 
     createRecentResultSummary(result) {
+        const outcome = normalizeCanonicalOutcome(result);
         return {
             id: result?.id ?? result?.Id ?? result?.resultId ?? result?.ResultId ?? null,
             status: result?.status ?? result?.Status ?? 'NG',
+            executionOutcome: outcome.executionOutcome,
+            decisionOutcome: outcome.decisionOutcome,
+            outcomeCategory: outcome.category,
+            outcomeLabel: outcome.label,
             timestamp: result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime ?? null,
             textPreview: this.extractTextPreview(
                 result?.outputData
@@ -1048,13 +1079,11 @@ class InspectionPanel {
         }
 
         container.innerHTML = visibleResults.map((result) => {
-            const rawStatus = String(result?.status ?? result?.Status ?? 'NG').toUpperCase();
-            const status = rawStatus === 'OK'
-                ? 'OK'
-                : (rawStatus === 'ERROR' ? 'ERROR' : 'NG');
-            const statusClass = status === 'OK'
+            const outcome = normalizeCanonicalOutcome(result);
+            const status = outcome.label;
+            const statusClass = outcome.category === 'ok'
                 ? 'result-ok'
-                : (status === 'ERROR' ? 'result-error' : 'result-ng');
+                : (outcome.category === 'ng' ? 'result-ng' : (['failed', 'timedOut', 'invalid'].includes(outcome.category) ? 'result-error' : 'result-neutral'));
             const timestamp = result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime;
             const timeText = timestamp
                 ? new Date(timestamp).toLocaleTimeString([], { hour12: false })
@@ -1086,7 +1115,17 @@ class InspectionPanel {
         this._recentResultsDirty = false;
         this._countersDirty = false;
 
-        setStats({ total: 0, ok: 0, ng: 0, error: 0, yield: 0 });
+        setStats({
+            total: 0,
+            ok: 0,
+            ng: 0,
+            executionFailure: 0,
+            undetermined: 0,
+            executionSucceeded: 0,
+            validDecisions: 0,
+            yield: 0,
+            coverage: 0
+        });
         setTimingStats({ avg: 0, min: Infinity, max: 0, history: [] });
         setRecentResults([]);
 

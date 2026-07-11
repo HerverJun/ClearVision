@@ -47,6 +47,24 @@ function syncDraftBeforeSave(propertyPanel) {
     return true;
 }
 
+function tryOpenFinalDecisionFromError(error) {
+    const payload = error?.payload || {};
+    const code = payload.code || payload.Code || '';
+    const action = payload.action || payload.Action || '';
+    if (action !== 'ConfigureFinalDecision' && !String(code).includes('DECISION')) {
+        return false;
+    }
+
+    window.dispatchEvent(new CustomEvent('clearvision:open-final-decision', {
+        detail: {
+            code,
+            violations: payload.violations || payload.Violations || [],
+            message: payload.error || payload.Error || error?.message || ''
+        }
+    }));
+    return true;
+}
+
 /**
  * @typedef {Object} ToolbarCommandOptions
  * @property {Document} documentRef
@@ -193,6 +211,10 @@ export function bindToolbarCommands(options) {
             await inspectionController.executeSingle();
         } catch (error) {
             console.error('[CommandHandlers] run failed', error);
+            if (tryOpenFinalDecisionFromError(error)) {
+                showToast('正式运行被最终判定配置阻断，请按定位信息修复', 'warning');
+                return;
+            }
             showToast(`检测失败: ${error?.message || error}`, 'error');
         }
     }, cleanup);

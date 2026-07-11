@@ -5,6 +5,7 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClearVision.Product.Infrastructure.Repositories;
@@ -96,7 +97,8 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
             .Where(r =>
                 r.ProjectId == projectId &&
                 !r.IsDeleted &&
-                r.Status == InspectionStatus.OK &&
+                ((r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Ok) ||
+                 ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.OK)) &&
                 r.InspectionTime < beforeTime);
 
         if (!string.IsNullOrWhiteSpace(flowVersionHash))
@@ -136,21 +138,50 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     {
         var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
 
-        var totalCount = await query.CountAsync();
-        var okCount = await query.CountAsync(r => r.Status == InspectionStatus.OK);
-        var ngCount = await query.CountAsync(r => r.Status == InspectionStatus.NG);
-        var errorCount = await query.CountAsync(r => r.Status == InspectionStatus.Error);
-        var avgTime = await query
-            .Select(r => (double?)r.ProcessingTimeMs)
-            .AverageAsync() ?? 0;
+        var records = await query
+            .AsNoTracking()
+            .Select(r => new
+            {
+                r.Status,
+                r.ExecutionOutcome,
+                r.DecisionOutcome,
+                r.HasJudgmentSignal,
+                r.ProcessingTimeMs
+            })
+            .ToListAsync();
+        var outcomeStatistics = InspectionOutcomeStatistics.Calculate(records.Select(record =>
+            record.ExecutionOutcome.HasValue && record.DecisionOutcome.HasValue
+                ? new InspectionOutcome(
+                    record.ExecutionOutcome.Value,
+                    record.DecisionOutcome.Value,
+                    null,
+                    null,
+                    null,
+                    record.HasJudgmentSignal ??
+                    (record.ExecutionOutcome.Value == ExecutionOutcome.Succeeded &&
+                     record.DecisionOutcome.Value is DecisionOutcome.Ok or DecisionOutcome.Ng))
+                : LegacyInspectionStatusProjection.FromLegacy(record.Status)));
+        var avgTime = records.Count > 0 ? records.Average(record => record.ProcessingTimeMs) : 0;
 
         return new InspectionStatistics
         {
-            TotalCount = totalCount,
-            OKCount = okCount,
-            NGCount = ngCount,
-            ErrorCount = errorCount,
-            OKRate = totalCount > 0 ? (double)okCount / totalCount : 0,
+            TotalCount = outcomeStatistics.TotalAttemptCount,
+            OKCount = outcomeStatistics.OkCount,
+            NGCount = outcomeStatistics.NgCount,
+            ErrorCount = outcomeStatistics.ExecutionFailureCount + outcomeStatistics.InvalidCount,
+            OKRate = outcomeStatistics.YieldRate,
+            YieldRate = outcomeStatistics.YieldRate,
+            ExecutionSucceededCount = outcomeStatistics.ExecutionSucceededCount,
+            ValidDecisionCount = outcomeStatistics.ValidDecisionCount,
+            DecisionCoverageRate = outcomeStatistics.DecisionCoverageRate,
+            ExecutionFailureCount = outcomeStatistics.ExecutionFailureCount,
+            UndeterminedCount = outcomeStatistics.UndeterminedCount,
+            NotApplicableCount = outcomeStatistics.NotApplicableCount,
+            InvalidCount = outcomeStatistics.InvalidCount,
+            FailedCount = outcomeStatistics.FailedCount,
+            CancelledCount = outcomeStatistics.CancelledCount,
+            TimedOutCount = outcomeStatistics.TimedOutCount,
+            SkippedCount = outcomeStatistics.SkippedCount,
             AverageProcessingTimeMs = avgTime
         };
     }
@@ -196,10 +227,9 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
             query = query.Where(r => r.InspectionTime <= endTime.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(status) &&
-            Enum.TryParse<InspectionStatus>(status, true, out var parsedStatus))
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(r => r.Status == parsedStatus);
+            query = ApplyOutcomeFilter(query, status.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(defectType))
@@ -217,6 +247,64 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         }
 
         return query;
+    }
+
+    private static IQueryable<InspectionResult> ApplyOutcomeFilter(
+        IQueryable<InspectionResult> query,
+        string status)
+    {
+        if (Enum.TryParse<CanonicalInspectionOutcomeKind>(status, true, out var outcomeKind))
+        {
+            return outcomeKind switch
+            {
+                CanonicalInspectionOutcomeKind.Ok => query.Where(r =>
+                    (r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Ok) ||
+                    ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.OK)),
+                CanonicalInspectionOutcomeKind.Ng => query.Where(r =>
+                    (r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Ng) ||
+                    ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.NG)),
+                CanonicalInspectionOutcomeKind.Undetermined => query.Where(r =>
+                    r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Undetermined ||
+                    ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.Inspecting)),
+                CanonicalInspectionOutcomeKind.NotApplicable => query.Where(r =>
+                    r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.NotApplicable),
+                CanonicalInspectionOutcomeKind.Invalid => query.Where(r =>
+                    r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Invalid),
+                CanonicalInspectionOutcomeKind.Failed => query.Where(r =>
+                    r.ExecutionOutcome == ExecutionOutcome.Failed ||
+                    ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.Error)),
+                CanonicalInspectionOutcomeKind.Cancelled => query.Where(r => r.ExecutionOutcome == ExecutionOutcome.Cancelled),
+                CanonicalInspectionOutcomeKind.TimedOut => query.Where(r => r.ExecutionOutcome == ExecutionOutcome.TimedOut),
+                CanonicalInspectionOutcomeKind.Skipped => query.Where(r =>
+                    r.ExecutionOutcome == ExecutionOutcome.Skipped ||
+                    ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.NotInspected)),
+                _ => query
+            };
+        }
+
+        if (!Enum.TryParse<InspectionStatus>(status, true, out var legacyStatus))
+        {
+            return query;
+        }
+
+        return legacyStatus switch
+        {
+            InspectionStatus.OK => ApplyOutcomeFilter(query, CanonicalInspectionOutcomeKind.Ok.ToString()),
+            InspectionStatus.NG => ApplyOutcomeFilter(query, CanonicalInspectionOutcomeKind.Ng.ToString()),
+            InspectionStatus.Error => query.Where(r =>
+                r.ExecutionOutcome == ExecutionOutcome.Failed ||
+                r.ExecutionOutcome == ExecutionOutcome.TimedOut ||
+                (r.ExecutionOutcome == ExecutionOutcome.Succeeded && r.DecisionOutcome == DecisionOutcome.Invalid) ||
+                ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.Error)),
+            InspectionStatus.NotInspected => query.Where(r =>
+                r.ExecutionOutcome == ExecutionOutcome.Cancelled ||
+                r.ExecutionOutcome == ExecutionOutcome.Skipped ||
+                (r.ExecutionOutcome == ExecutionOutcome.Succeeded &&
+                 (r.DecisionOutcome == DecisionOutcome.Undetermined || r.DecisionOutcome == DecisionOutcome.NotApplicable)) ||
+                ((!r.ExecutionOutcome.HasValue || !r.DecisionOutcome.HasValue) && r.Status == InspectionStatus.NotInspected)),
+            InspectionStatus.Inspecting => ApplyOutcomeFilter(query, CanonicalInspectionOutcomeKind.Undetermined.ToString()),
+            _ => query
+        };
     }
 
     private static IQueryable<InspectionHistoryItem> SelectHistoryListItems(IQueryable<InspectionResult> query)

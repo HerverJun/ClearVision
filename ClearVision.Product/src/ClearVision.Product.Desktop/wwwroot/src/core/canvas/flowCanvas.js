@@ -55,6 +55,7 @@ class FlowCanvas {
         this.ctx = this.canvas.getContext('2d');
         this.nodes = new Map();
         this.connections = [];
+        this.decisionConfiguration = null;
         this.selectedNode = null;
         this.selectionRevision = 0;
         this.draggedNode = null;
@@ -1987,7 +1988,10 @@ class FlowCanvas {
         // Encoding cleanup: previous comment text was unreadable.
         const result = {
             operators: operators,
-            connections: connections
+            connections: connections,
+            decisionConfiguration: this.decisionConfiguration
+                ? JSON.parse(JSON.stringify(this.decisionConfiguration))
+                : null
         };
 
         if (debug) {
@@ -2008,6 +2012,9 @@ class FlowCanvas {
 
         // 兼容项目包装结构和直接流程结构。
         const flowData = data.project?.flow || data.flow || data;
+        this.decisionConfiguration = flowData.decisionConfiguration
+            ?? flowData.DecisionConfiguration
+            ?? null;
 
         // 兼容后端 DTO 和前端节点命名。
         const operators = flowData.operators || flowData.Operators || flowData.nodes || [];
@@ -2711,6 +2718,7 @@ class FlowCanvas {
         const hadSelection = Boolean(this.selectedNode || this.selectedConnection);
         this.nodes.clear();
         this.connections = [];
+        this.decisionConfiguration = null;
         this._connectionById.clear();
         this._connectionsByOutputPort.clear();
         this._connectionByInputPort.clear();

@@ -630,7 +630,16 @@ public class InspectionService : IInspectionService
                 return null;
             }
 
-            if (current.Status == InspectionStatus.OK)
+            var currentOutcome = current.ExecutionOutcome.HasValue && current.DecisionOutcome.HasValue
+                ? new InspectionOutcome(
+                    current.ExecutionOutcome.Value,
+                    current.DecisionOutcome.Value,
+                    current.DecisionSource,
+                    current.ReasonCode,
+                    current.ErrorMessage,
+                    current.HasJudgmentSignal ?? false)
+                : LegacyInspectionStatusProjection.FromLegacy(current.Status);
+            if (InspectionOutcomeClassifier.Classify(currentOutcome) == CanonicalInspectionOutcomeKind.Ok)
             {
                 return InspectionHistoryComparisonBuilder.BuildPreviousSuccessReference(
                     current,
@@ -1088,7 +1097,7 @@ public class InspectionService : IInspectionService
     {
         if (!admission.IsAllowed)
         {
-            throw new InvalidOperationException($"{admission.Code}: {admission.Message}");
+            throw new ExecutionAdmissionService.ExecutionAdmissionRejectedException(admission);
         }
     }
 

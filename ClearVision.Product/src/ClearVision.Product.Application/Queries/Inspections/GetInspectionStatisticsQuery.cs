@@ -26,6 +26,17 @@ public class InspectionStatisticsDto
     public int OKCount { get; set; }
     public int NGCount { get; set; }
     public double YieldRate { get; set; }
+    public int ExecutionSucceededCount { get; set; }
+    public int ValidDecisionCount { get; set; }
+    public double DecisionCoverageRate { get; set; }
+    public int ExecutionFailureCount { get; set; }
+    public int UndeterminedCount { get; set; }
+    public int NotApplicableCount { get; set; }
+    public int InvalidCount { get; set; }
+    public int FailedCount { get; set; }
+    public int CancelledCount { get; set; }
+    public int TimedOutCount { get; set; }
+    public int SkippedCount { get; set; }
     public double AverageTimeMs { get; set; }
 }
 
@@ -47,7 +58,18 @@ public class GetInspectionStatisticsQueryHandler : IRequestHandler<GetInspection
             TotalCount = stats.TotalCount,
             OKCount = stats.OKCount,
             NGCount = stats.NGCount,
-            YieldRate = stats.OKRate,
+            YieldRate = stats.YieldRate,
+            ExecutionSucceededCount = stats.ExecutionSucceededCount,
+            ValidDecisionCount = stats.ValidDecisionCount,
+            DecisionCoverageRate = stats.DecisionCoverageRate,
+            ExecutionFailureCount = stats.ExecutionFailureCount,
+            UndeterminedCount = stats.UndeterminedCount,
+            NotApplicableCount = stats.NotApplicableCount,
+            InvalidCount = stats.InvalidCount,
+            FailedCount = stats.FailedCount,
+            CancelledCount = stats.CancelledCount,
+            TimedOutCount = stats.TimedOutCount,
+            SkippedCount = stats.SkippedCount,
             AverageTimeMs = stats.AverageProcessingTimeMs
         };
     }

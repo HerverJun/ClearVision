@@ -457,7 +457,7 @@ test('project manager save flushes registered flow snapshot provider before pers
     '/projects/project-provider-flow',
     '/projects/project-provider-flow/flow'
   ]);
-  assert.deepEqual(puts[1].body, freshFlow);
+  assert.deepEqual(puts[1].body, { ...freshFlow, decisionConfiguration: null });
   assert.equal(getCurrentProject().flow, freshFlow);
   assert.equal(projectManager.unsavedChanges, false);
 });
@@ -515,7 +515,7 @@ test('project manager flow save omits unchanged global variables from aggregate 
     '/projects/project-flow-only-save/flow'
   ]);
   assert.equal(Object.hasOwn(puts[0].body, 'globalVariables'), false);
-  assert.deepEqual(puts[1].body, flow);
+  assert.deepEqual(puts[1].body, { ...flow, decisionConfiguration: null });
 });
 
 test('project manager sends persistence revision and flow name through legacy flow save', async (t) => {

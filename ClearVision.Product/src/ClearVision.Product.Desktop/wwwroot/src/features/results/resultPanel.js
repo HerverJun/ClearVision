@@ -10,6 +10,12 @@ import { buildSseHeaders, buildSseUrl, parseSseFrame } from '../inspection/inspe
 import debugLogger from '../../core/logging/debugLogger.js';
 import { t } from '../../core/i18n/resources.js';
 import {
+    calculateCanonicalStatistics,
+    matchesCanonicalOutcomeFilter,
+    normalizeCanonicalOutcome,
+    normalizeCanonicalStatistics
+} from '../inspection/canonicalOutcome.mjs';
+import {
     buildResultCardsFromOutputData,
     renderResultCardHtml,
     summarizeResultField
@@ -79,9 +85,20 @@ class ResultPanel {
         this.resultsSseMaxBufferChars = DEFAULT_RESULTS_SSE_MAX_BUFFER_CHARS;
         this.statistics = {
             total: 0,
+            executionSucceeded: 0,
+            validDecisions: 0,
             ok: 0,
             ng: 0,
-            error: 0,
+            executionFailures: 0,
+            undetermined: 0,
+            notApplicable: 0,
+            invalid: 0,
+            failed: 0,
+            cancelled: 0,
+            timedOut: 0,
+            skipped: 0,
+            yieldRate: 0,
+            decisionCoverageRate: 0,
             avgTime: 0
         };
         
@@ -127,6 +144,27 @@ class ResultPanel {
     /**
      * 绑定事件
      */
+    createEmptyStatistics() {
+        return {
+            total: 0,
+            executionSucceeded: 0,
+            validDecisions: 0,
+            ok: 0,
+            ng: 0,
+            executionFailures: 0,
+            undetermined: 0,
+            notApplicable: 0,
+            invalid: 0,
+            failed: 0,
+            cancelled: 0,
+            timedOut: 0,
+            skipped: 0,
+            yieldRate: 0,
+            decisionCoverageRate: 0,
+            avgTime: 0
+        };
+    }
+
     bindEvents() {
         this.ensureDataSourceFilter();
 
@@ -249,7 +287,7 @@ class ResultPanel {
         this.filteredResults = [];
         this.trendData = [];
         this.defectTypes = {};
-        this.statistics = { total: 0, ok: 0, ng: 0, error: 0, avgTime: 0 };
+        this.statistics = this.createEmptyStatistics();
         this.totalResultCount = 0;
         this.serverPageIndex = 0;
         this.serverPaged = true;
@@ -532,19 +570,7 @@ class ResultPanel {
         if (!statistics || typeof statistics !== 'object') {
             return null;
         }
-
-        return {
-            total: statistics.totalCount ?? statistics.TotalCount ?? statistics.total ?? statistics.Total ?? 0,
-            ok: statistics.okCount ?? statistics.OKCount ?? statistics.ok ?? statistics.Ok ?? 0,
-            ng: statistics.ngCount ?? statistics.NGCount ?? statistics.ng ?? statistics.Ng ?? 0,
-            error: statistics.errorCount ?? statistics.ErrorCount ?? statistics.error ?? statistics.Error ?? 0,
-            avgTime: Math.round(
-                statistics.averageProcessingTimeMs
-                ?? statistics.AverageProcessingTimeMs
-                ?? statistics.averageExecutionTimeMs
-                ?? statistics.AverageExecutionTimeMs
-                ?? 0)
-        };
+        return normalizeCanonicalStatistics(statistics);
     }
 
     normalizeDefectDistribution(defectDistribution) {
@@ -565,9 +591,13 @@ class ResultPanel {
             : (trend?.dataPoints || trend?.DataPoints || []);
         return points.map(point => ({
             time: new Date(point.timestamp || point.Timestamp || point.hourUtc || point.HourUtc || Date.now()),
-            status: (point.ngCount ?? point.NGCount ?? 0) > 0
-                ? 'NG'
-                : ((point.errorCount ?? point.ErrorCount ?? 0) > 0 ? 'Error' : 'OK'),
+            status: (point.executionFailureCount ?? point.ExecutionFailureCount ?? 0) > 0
+                ? 'failed'
+                : ((point.invalidCount ?? point.InvalidCount ?? 0) > 0
+                    ? 'invalid'
+                    : ((point.undeterminedCount ?? point.UndeterminedCount ?? 0) > 0
+                        ? 'undetermined'
+                        : ((point.ngCount ?? point.NGCount ?? 0) > 0 ? 'ng' : 'ok'))),
             defectCount: point.defectCount ?? point.DefectCount ?? 0,
             count: point.totalCount ?? point.TotalCount ?? point.total ?? point.Total ?? 1
         }));
@@ -669,13 +699,7 @@ class ResultPanel {
             this.serverReport = null;
             this.serverAnalysis = null;
             this.serverAnalysisSource = 'server-unavailable';
-            this.statistics = {
-                total: 0,
-                ok: 0,
-                ng: 0,
-                error: 0,
-                avgTime: 0
-            };
+            this.statistics = this.createEmptyStatistics();
             this.defectTypes = {};
             this.trendData = [];
             this.updateDefectTypeFilter();
@@ -686,13 +710,7 @@ class ResultPanel {
         this.serverAnalysisSource = 'local';
 
         if (statistics) {
-            this.statistics = {
-                total: statistics.totalCount ?? statistics.TotalCount ?? this.statistics.total,
-                ok: statistics.okCount ?? statistics.OKCount ?? this.statistics.ok,
-                ng: statistics.ngCount ?? statistics.NGCount ?? this.statistics.ng,
-                error: statistics.errorCount ?? statistics.ErrorCount ?? this.statistics.error,
-                avgTime: Math.round(statistics.averageProcessingTimeMs ?? statistics.AverageProcessingTimeMs ?? this.statistics.avgTime ?? 0)
-            };
+            this.statistics = normalizeCanonicalStatistics(statistics);
         }
 
         if (defectDistribution?.items || defectDistribution?.Items) {
@@ -709,9 +727,11 @@ class ResultPanel {
             const points = trend.dataPoints || trend.DataPoints || [];
             this.trendData = points.map(point => ({
                 time: new Date(point.timestamp || point.Timestamp || Date.now()),
-                status: (point.ngCount ?? point.NGCount ?? 0) > 0
-                    ? 'NG'
-                    : ((point.errorCount ?? point.ErrorCount ?? 0) > 0 ? 'Error' : 'OK'),
+                status: (point.executionFailureCount ?? point.ExecutionFailureCount ?? 0) > 0
+                    ? 'failed'
+                    : ((point.undeterminedCount ?? point.UndeterminedCount ?? 0) > 0
+                        ? 'undetermined'
+                        : ((point.ngCount ?? point.NGCount ?? 0) > 0 ? 'ng' : 'ok')),
                 defectCount: point.defectCount ?? point.DefectCount ?? 0
             }));
         }
@@ -835,6 +855,13 @@ class ResultPanel {
         }
 
         const normalized = { ...result };
+        const outcome = normalizeCanonicalOutcome(normalized);
+        normalized.executionOutcome = outcome.executionOutcome;
+        normalized.decisionOutcome = outcome.decisionOutcome;
+        normalized.outcomeCategory = outcome.category;
+        normalized.outcomeLabel = outcome.label;
+        normalized.outcomeTone = outcome.tone;
+        normalized.isLegacyOutcomeProjection = outcome.isLegacyProjection;
         this.compactInlineResultImage(normalized);
         this.compactStoredResultPayload(normalized);
         if (index >= LOCAL_RESULT_INLINE_IMAGE_RETAIN_LIMIT) {
@@ -1010,16 +1037,11 @@ class ResultPanel {
      * 计算统计
      */
     calculateStatistics() {
-        const total = this.results.length;
-        const ok = this.results.filter(r => r.status === 'OK').length;
-        const ng = this.results.filter(r => r.status === 'NG').length;
-        const error = this.results.filter(r => r.status === 'Error').length;
-        
-        const validResults = this.results.filter(r => r.processingTime);
-        const totalTime = validResults.reduce((sum, r) => sum + (r.processingTime || 0), 0);
+        const canonical = calculateCanonicalStatistics(this.results);
+        const validResults = this.results.filter(r => Number(r.processingTimeMs ?? r.processingTime ?? r.executionTimeMs) > 0);
+        const totalTime = validResults.reduce((sum, r) => sum + Number(r.processingTimeMs ?? r.processingTime ?? r.executionTimeMs ?? 0), 0);
         const avgTime = validResults.length > 0 ? Math.round(totalTime / validResults.length) : 0;
-        
-        this.statistics = { total, ok, ng, error, avgTime };
+        this.statistics = { ...canonical, avgTime };
         
         // 重新计算缺陷类型
         this.defectTypes = {};
@@ -1064,7 +1086,7 @@ class ResultPanel {
             .slice(0, 100)
             .map(r => ({
                 time: new Date(r.timestamp || Date.now()),
-                status: r.status,
+                status: normalizeCanonicalOutcome(r).category,
                 defectCount: r.defects?.length || 0
             }))
             .reverse();
@@ -1080,7 +1102,7 @@ class ResultPanel {
 
         this.filteredResults = this.results.filter(r => {
             // 状态筛选
-            if (this.filters.status !== 'all' && r.status?.toLowerCase() !== this.filters.status) {
+            if (!matchesCanonicalOutcomeFilter(r, this.filters.status)) {
                 return false;
             }
             
@@ -1162,7 +1184,7 @@ class ResultPanel {
         this.filteredResults = [];
         this.trendData = [];
         this.defectTypes = {};
-        this.statistics = { total: 0, ok: 0, ng: 0, error: 0, avgTime: 0 };
+        this.statistics = this.createEmptyStatistics();
         this.serverReport = null;
         this.serverAnalysis = null;
         this.serverAnalysisSource = 'local';
@@ -1235,9 +1257,10 @@ class ResultPanel {
      * 渲染KPI卡片 (V3 工业看板风格)
      */
     renderKPIs() {
-        const { total, ok, ng, error, avgTime } = this.statistics;
+        const { total, ok, ng, executionFailures, undetermined, yieldRate, decisionCoverageRate, avgTime } = this.statistics;
         const hasSamples = total > 0;
-        const yieldRate = hasSamples ? ((ok / total) * 100).toFixed(1) : '--';
+        const yieldText = this.statistics.validDecisions > 0 ? (yieldRate * 100).toFixed(1) : '--';
+        const coverageText = this.statistics.executionSucceeded > 0 ? (decisionCoverageRate * 100).toFixed(1) : '--';
         const timeSec = avgTime > 1000 ? (avgTime / 1000).toFixed(1) : avgTime;
         const timeUnit = avgTime > 1000 ? 's' : 'ms';
 
@@ -1249,11 +1272,13 @@ class ResultPanel {
         setKPI('kpi-total', total.toLocaleString());
         setKPI('kpi-ok', ok.toLocaleString());
         setKPI('kpi-ng', ng.toLocaleString());
-        setKPI('kpi-error', error.toLocaleString());
-        setKPI('kpi-yield', hasSamples ? `${yieldRate}%` : '--');
+        setKPI('kpi-error', executionFailures.toLocaleString());
+        setKPI('kpi-undetermined', undetermined.toLocaleString());
+        setKPI('kpi-yield', yieldText === '--' ? '--' : `${yieldText}%`);
+        setKPI('kpi-coverage', coverageText === '--' ? '--' : `${coverageText}%`);
         setKPI('kpi-avg-time', hasSamples && avgTime > 0 ? `${timeSec}${timeUnit}` : '--');
 
-        ['kpi-total-change', 'kpi-ok-change', 'kpi-ng-change', 'kpi-error-change', 'kpi-yield-change', 'kpi-time-change']
+        ['kpi-total-change', 'kpi-ok-change', 'kpi-ng-change', 'kpi-error-change', 'kpi-undetermined-change', 'kpi-yield-change', 'kpi-coverage-change', 'kpi-time-change']
             .forEach(id => this.renderUnavailableChange(id));
 
         // 更新时间戳
@@ -1299,18 +1324,17 @@ class ResultPanel {
      * 渲染良率仪表盘 — 半圆弧 SVG
      */
     renderYieldChart() {
-        const { total, ok } = this.statistics;
-        const yieldRate = total > 0 ? (ok / total) : 0;
+        const { validDecisions, yieldRate } = this.statistics;
         const percentage = (yieldRate * 100).toFixed(1);
 
         // 更新数值文字
         const gaugeValue = document.getElementById('gauge-percentage');
-        if (gaugeValue) gaugeValue.textContent = total > 0 ? percentage : '--';
+        if (gaugeValue) gaugeValue.textContent = validDecisions > 0 ? percentage : '--';
 
         // 状态评级
         const gaugeStatus = document.getElementById('gauge-status');
         if (gaugeStatus) {
-            if (total <= 0) {
+            if (validDecisions <= 0) {
                 gaugeStatus.textContent = '状态：暂无数据';
             } else {
                 let status = '严重';
@@ -1481,8 +1505,9 @@ class ResultPanel {
         }
 
         gridContainer.innerHTML = pageResults.map((result, index) => {
-            const statusClass = this.toCssToken(result.status || 'unknown');
-            const statusText = this.escapeHtml(result.status || 'Unknown');
+            const outcome = normalizeCanonicalOutcome(result);
+            const statusClass = this.toCssToken(outcome.category);
+            const statusText = this.escapeHtml(outcome.label);
             const time = result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : '--:--:--';
             const processingTime = result.processingTime || result.executionTimeMs || '--';
             const outputDataHtml = this.renderAnalysisDataPreview(result.analysisData);
@@ -1836,8 +1861,9 @@ class ResultPanel {
         const modal = document.createElement('div');
         modal.className = 'result-detail-modal';
         
-        const statusClass = this.toCssToken(result.status || 'unknown');
-        const statusText = this.escapeHtml(result.status || 'Unknown');
+        const outcome = normalizeCanonicalOutcome(result);
+        const statusClass = this.toCssToken(outcome.category);
+        const statusText = this.escapeHtml(outcome.label);
         const time = result.timestamp ? new Date(result.timestamp).toLocaleString() : '--';
         const processingTime = result.processingTime || result.executionTimeMs || '--';
         const imageSrc = this.getResultImageSrc(result);
@@ -1958,7 +1984,8 @@ class ResultPanel {
     }
 
     renderResultDetailBody(result, options = {}) {
-        const statusClass = options.statusClass || this.toCssToken(result?.status || 'unknown');
+        const outcome = normalizeCanonicalOutcome(result);
+        const statusClass = options.statusClass || this.toCssToken(outcome.category);
         const time = options.time || (result?.timestamp ? new Date(result.timestamp).toLocaleString() : '--');
         const processingTime = options.processingTime || result?.processingTime || result?.executionTimeMs || '--';
         const imageSrc = options.imageSrc !== undefined ? options.imageSrc : this.getResultImageSrc(result);
@@ -1983,7 +2010,9 @@ class ResultPanel {
             <div class="result-detail-data">
                 <div class="detail-section">
                     <div class="detail-section-title">运行摘要</div>
-                    <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${this.escapeHtml(result?.status || '--')}</span></div>
+                    <div class="detail-item"><span class="detail-label">结果</span><span class="detail-value status-${statusClass}">${this.escapeHtml(outcome.label)}</span></div>
+                    <div class="detail-item"><span class="detail-label">执行</span><span class="detail-value">${this.escapeHtml(outcome.executionOutcome)}</span></div>
+                    <div class="detail-item"><span class="detail-label">判定</span><span class="detail-value">${this.escapeHtml(outcome.decisionOutcome)}</span></div>
                     <div class="detail-item"><span class="detail-label">时间</span><span class="detail-value">${this.escapeHtml(time)}</span></div>
                     <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${this.escapeHtml(processingTime)}ms</span></div>
                 </div>
@@ -2459,7 +2488,7 @@ class ResultPanel {
                     <div class="history-comparison-summary">
                         <div class="history-comparison-meta-title">${this.escapeHtml(label)}</div>
                         <div>${this.escapeHtml(this.describeComparisonAnchor(summary))}</div>
-                        <div>${this.escapeHtml(summary?.status || summary?.Status || '--')} · ${this.escapeHtml(this.formatComparisonTime(summary?.timestamp || summary?.inspectionTime || summary?.InspectionTime))}</div>
+                        <div>${this.escapeHtml(summary?.executionOutcome || summary?.ExecutionOutcome || '--')} / ${this.escapeHtml(summary?.decisionOutcome || summary?.DecisionOutcome || '--')} · ${this.escapeHtml(this.formatComparisonTime(summary?.timestamp || summary?.inspectionTime || summary?.InspectionTime))}</div>
                         <div>FlowVersionHash: ${this.escapeHtml(summary?.flowVersionHash || summary?.FlowVersionHash || '旧数据未记录')}</div>
                         <div>CalibrationBundleId: ${this.escapeHtml(summary?.calibrationBundleId || summary?.CalibrationBundleId || '旧数据未记录')}</div>
                     </div>
@@ -2545,7 +2574,9 @@ class ResultPanel {
             id: this.getResultComparisonId(result),
             resultId: this.getResultComparisonId(result),
             projectId: result.projectId || result.ProjectId || this.projectId || null,
-            status: result.status || result.Status || '--',
+            status: normalizeCanonicalOutcome(result).label,
+            executionOutcome: result.executionOutcome || result.ExecutionOutcome || null,
+            decisionOutcome: result.decisionOutcome || result.DecisionOutcome || null,
             timestamp: result.timestamp || result.inspectionTime || result.InspectionTime || result.Timestamp || null,
             processingTimeMs: result.processingTimeMs || result.processingTime || result.ProcessingTimeMs || result.ExecutionTimeMs || null,
             flowVersionHash: result.flowVersionHash || result.FlowVersionHash || result.traceability?.flowVersionHash || null,
@@ -2564,7 +2595,7 @@ class ResultPanel {
             return '未选择结果';
         }
 
-        const status = result?.status || result?.Status || '--';
+        const status = normalizeCanonicalOutcome(result).label;
         const time = this.formatComparisonTime(result?.timestamp || result?.inspectionTime || result?.InspectionTime);
         return `${resultId} · ${status} · ${time}`;
     }
@@ -2579,8 +2610,7 @@ class ResultPanel {
     }
 
     isFailureLikeResult(result) {
-        const status = String(result?.status || result?.Status || '').toLowerCase();
-        return status === 'ng' || status === 'error' || status === 'failed' || status === 'fail';
+        return ['ng', 'invalid', 'failed', 'timedOut'].includes(normalizeCanonicalOutcome(result).category);
     }
 
     renderJsonPreviewNotice(title, preview) {

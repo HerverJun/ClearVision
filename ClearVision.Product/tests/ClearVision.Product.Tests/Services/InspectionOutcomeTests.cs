@@ -33,6 +33,36 @@ public class InspectionOutcomeTests
     }
 
     [Fact]
+    public void OutcomeStatistics_UsesOnlyOkAndNgAsYieldDenominator()
+    {
+        var statistics = InspectionOutcomeStatistics.Calculate(
+        [
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.Ok, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.Ng, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.Ng, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.Undetermined, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.NotApplicable, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Succeeded, DecisionOutcome.Invalid, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Failed, DecisionOutcome.Undetermined, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.TimedOut, DecisionOutcome.Undetermined, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Cancelled, DecisionOutcome.NotApplicable, null, null, null),
+            new InspectionOutcome(ExecutionOutcome.Skipped, DecisionOutcome.NotApplicable, null, null, null)
+        ]);
+
+        statistics.TotalAttemptCount.Should().Be(10);
+        statistics.ExecutionSucceededCount.Should().Be(6);
+        statistics.ValidDecisionCount.Should().Be(3);
+        statistics.YieldRate.Should().BeApproximately(1.0 / 3.0, 0.0001);
+        statistics.DecisionCoverageRate.Should().Be(0.5);
+        statistics.ExecutionFailureCount.Should().Be(2);
+        statistics.UndeterminedCount.Should().Be(1);
+        statistics.NotApplicableCount.Should().Be(1);
+        statistics.InvalidCount.Should().Be(1);
+        statistics.CancelledCount.Should().Be(1);
+        statistics.SkippedCount.Should().Be(1);
+    }
+
+    [Fact]
     public void OutcomeResolver_SuccessWithoutSignal_IsSucceededUndeterminedWithoutError()
     {
         var outcome = InspectionOutcomeResolver.Resolve(new FlowExecutionResult

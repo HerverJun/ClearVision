@@ -626,6 +626,13 @@
 .result-card.result-ok, .result-card.ok { border-top: 3px solid #00685b; }
 .result-card.result-ng, .result-card.ng { border-top: 3px solid var(--r-error); }
 .result-card.result-error, .result-card.error { border-top: 3px solid #c28a00; }
+.result-card.result-failed,
+.result-card.result-timedout,
+.result-card.result-invalid { border-top: 3px solid #c28a00; }
+.result-card.result-undetermined { border-top: 3px solid #d97706; }
+.result-card.result-notapplicable,
+.result-card.result-skipped,
+.result-card.result-cancelled { border-top: 3px solid #64748b; }
 
 .result-card-header {
     display: flex;
@@ -646,6 +653,13 @@
 .result-status-badge.ok    { color: #00685b; background: rgba(0, 104, 91, 0.1); }
 .result-status-badge.ng    { color: var(--r-error); background: rgba(186, 26, 26, 0.1); }
 .result-status-badge.error { color: #c28a00; background: rgba(194, 138, 0, 0.1); }
+.result-status-badge.failed,
+.result-status-badge.timedout,
+.result-status-badge.invalid { color: #c28a00; background: rgba(194, 138, 0, 0.1); }
+.result-status-badge.undetermined { color: #d97706; background: rgba(217, 119, 6, 0.1); }
+.result-status-badge.notapplicable,
+.result-status-badge.skipped,
+.result-status-badge.cancelled { color: #64748b; background: rgba(100, 116, 139, 0.12); }
 
 .result-time {
     font-size: 11px;
@@ -1022,6 +1036,13 @@
 .detail-value.status-ok { color: var(--r-up); }
 .detail-value.status-ng { color: var(--r-error); }
 .detail-value.status-error { color: #c28a00; }
+.detail-value.status-failed,
+.detail-value.status-timedout,
+.detail-value.status-invalid { color: #c28a00; }
+.detail-value.status-undetermined { color: #d97706; }
+.detail-value.status-notapplicable,
+.detail-value.status-skipped,
+.detail-value.status-cancelled { color: #64748b; }
 
 .ac-diagnostics-detail .ac-card {
     background: rgba(0, 0, 0, 0.02);

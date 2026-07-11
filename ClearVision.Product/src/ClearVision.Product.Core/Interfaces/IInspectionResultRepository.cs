@@ -91,6 +91,18 @@ public class InspectionStatistics
     public int NGCount { get; set; }
     public int ErrorCount { get; set; }
     public double OKRate { get; set; }
+    public double YieldRate { get; set; }
+    public int ExecutionSucceededCount { get; set; }
+    public int ValidDecisionCount { get; set; }
+    public double DecisionCoverageRate { get; set; }
+    public int ExecutionFailureCount { get; set; }
+    public int UndeterminedCount { get; set; }
+    public int NotApplicableCount { get; set; }
+    public int InvalidCount { get; set; }
+    public int FailedCount { get; set; }
+    public int CancelledCount { get; set; }
+    public int TimedOutCount { get; set; }
+    public int SkippedCount { get; set; }
     public double AverageProcessingTimeMs { get; set; }
 }
 

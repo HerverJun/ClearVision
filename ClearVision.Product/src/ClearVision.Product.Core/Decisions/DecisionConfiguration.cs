@@ -75,7 +75,7 @@ public enum MissingDecisionPolicy
 public static class DecisionValueTypeExtensions
 {
     public static bool MatchesPortType(this DecisionValueType valueType, PortDataType portType) =>
-        portType == PortDataType.Any || valueType switch
+        valueType switch
         {
             DecisionValueType.Boolean => portType == PortDataType.Boolean,
             DecisionValueType.String => portType == PortDataType.String,

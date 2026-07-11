@@ -7,6 +7,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 
 namespace ClearVision.Product.Application.Services;
 
@@ -96,7 +97,19 @@ public class ResultAnalysisService : IResultAnalysisService
             NGCount = statistics.NGCount,
             ErrorCount = statistics.ErrorCount,
             OKRate = statistics.OKRate,
-            NGRate = statistics.TotalCount > 0 ? (double)statistics.NGCount / statistics.TotalCount : 0,
+            YieldRate = statistics.YieldRate,
+            ExecutionSucceededCount = statistics.ExecutionSucceededCount,
+            ValidDecisionCount = statistics.ValidDecisionCount,
+            DecisionCoverageRate = statistics.DecisionCoverageRate,
+            ExecutionFailureCount = statistics.ExecutionFailureCount,
+            UndeterminedCount = statistics.UndeterminedCount,
+            NotApplicableCount = statistics.NotApplicableCount,
+            InvalidCount = statistics.InvalidCount,
+            FailedCount = statistics.FailedCount,
+            CancelledCount = statistics.CancelledCount,
+            TimedOutCount = statistics.TimedOutCount,
+            SkippedCount = statistics.SkippedCount,
+            NGRate = statistics.ValidDecisionCount > 0 ? (double)statistics.NGCount / statistics.ValidDecisionCount : 0,
             ErrorRate = statistics.TotalCount > 0 ? (double)statistics.ErrorCount / statistics.TotalCount : 0,
             AverageProcessingTimeMs = statistics.AverageProcessingTimeMs,
             TotalDefects = distribution.Values.Sum()
@@ -242,15 +255,21 @@ public class ResultAnalysisService : IResultAnalysisService
             };
 
             var periodResults = resultList.Where(r => r.InspectionTime >= current && r.InspectionTime < next).ToList();
+            var periodStatistics = InspectionOutcomeStatistics.Calculate(periodResults.Select(r => r.GetOutcome()));
 
             dataPoints.Add(new TrendDataPointDto
             {
                 Timestamp = current,
                 TotalCount = periodResults.Count,
-                OKCount = periodResults.Count(r => r.Status == InspectionStatus.OK),
-                NGCount = periodResults.Count(r => r.Status == InspectionStatus.NG),
-                ErrorCount = periodResults.Count(r => r.Status == InspectionStatus.Error),
-                OKRate = periodResults.Any() ? (double)periodResults.Count(r => r.Status == InspectionStatus.OK) / periodResults.Count : 0,
+                OKCount = periodStatistics.OkCount,
+                NGCount = periodStatistics.NgCount,
+                ErrorCount = periodStatistics.ExecutionFailureCount + periodStatistics.InvalidCount,
+                OKRate = periodStatistics.YieldRate,
+                YieldRate = periodStatistics.YieldRate,
+                ValidDecisionCount = periodStatistics.ValidDecisionCount,
+                ExecutionFailureCount = periodStatistics.ExecutionFailureCount,
+                UndeterminedCount = periodStatistics.UndeterminedCount,
+                InvalidCount = periodStatistics.InvalidCount,
                 DefectCount = periodResults.Sum(r => r.Defects.Count),
                 AverageProcessingTime = periodResults.Any() ? periodResults.Average(r => r.ProcessingTimeMs) : 0
             });
@@ -279,15 +298,20 @@ public class ResultAnalysisService : IResultAnalysisService
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
 
         var csv = new System.Text.StringBuilder();
-        csv.AppendLine(ToCsvRow("检测ID", "工程ID", "检测时间", "状态", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
+        csv.AppendLine(ToCsvRow("检测ID", "工程ID", "检测时间", "兼容状态", "执行结果", "判定结果", "CanonicalOutcome", "原因码", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
 
         foreach (var result in results)
         {
+            var outcome = result.GetOutcome();
             csv.AppendLine(ToCsvRow(
                 result.Id,
                 result.ProjectId,
                 result.InspectionTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 result.Status,
+                outcome.Execution,
+                outcome.Decision,
+                InspectionOutcomeClassifier.Classify(outcome),
+                outcome.ReasonCode,
                 result.ProcessingTimeMs,
                 result.ConfidenceScore?.ToString("F4", CultureInfo.InvariantCulture),
                 result.Defects.Count,
@@ -303,6 +327,10 @@ public class ResultAnalysisService : IResultAnalysisService
             foreach (var defect in result.Defects)
             {
                 csv.AppendLine(ToCsvRow(
+                    null,
+                    null,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -383,6 +411,10 @@ public class ResultAnalysisService : IResultAnalysisService
                 Id = r.Id,
                 InspectionTime = r.InspectionTime,
                 Status = r.Status.ToString(),
+                ExecutionOutcome = r.GetOutcome().Execution.ToString(),
+                DecisionOutcome = r.GetOutcome().Decision.ToString(),
+                CanonicalOutcome = InspectionOutcomeClassifier.Classify(r.GetOutcome()).ToString(),
+                ReasonCode = r.GetOutcome().ReasonCode,
                 ProcessingTimeMs = r.ProcessingTimeMs,
                 ConfidenceScore = r.ConfidenceScore,
                 ErrorMessage = r.ErrorMessage,

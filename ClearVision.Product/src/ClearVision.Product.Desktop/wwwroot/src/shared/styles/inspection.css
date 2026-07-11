@@ -689,6 +689,7 @@
 .recent-result-item.result-ok::before { background: var(--status-ok); }
 .recent-result-item.result-ng::before { background: var(--status-ng); }
 .recent-result-item.result-error::before { background: var(--status-error); }
+.recent-result-item.result-neutral::before { background: #64748b; }
 
 .recent-result-item:hover {
     border-color: #af262c;
@@ -720,6 +721,7 @@
 .result-ok .result-badge { background: var(--status-ok-soft); color: var(--status-ok); border: 1px solid var(--status-ok-border); }
 .result-ng .result-badge { background: var(--status-ng-soft); color: var(--status-ng); border: 1px solid var(--status-ng-border); }
 .result-error .result-badge { background: var(--status-error-soft); color: var(--status-error); border: 1px solid var(--status-error-border); }
+.result-neutral .result-badge { background: rgba(100, 116, 139, 0.12); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.28); }
 
 .result-time {
     font-size: 10px;

@@ -568,6 +568,43 @@ test('FlowCanvas persists disabled node state through serialize and deserialize'
   restored.destroy();
 });
 
+test('FlowCanvas persists canonical final decision configuration through serialize and deserialize', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+  const configuration = {
+    finalDecisionBinding: {
+      sourceOperatorId: 'op-decision',
+      sourceOutputPortId: 'port-decision',
+      sourceOutputName: 'JudgmentResult',
+      dataType: 'String',
+      rule: 'StringMap',
+      okValue: 'OK',
+      ngValue: 'NG'
+    },
+    missingDecisionPolicy: 'Invalid'
+  };
+
+  const fc = new FlowCanvas('canvas');
+  fc.deserialize({ operators: [], connections: [], decisionConfiguration: configuration });
+  const serialized = fc.serialize();
+  assert.deepEqual(serialized.decisionConfiguration, configuration);
+
+  serialized.decisionConfiguration.finalDecisionBinding.okValue = 'PASS';
+  assert.equal(fc.decisionConfiguration.finalDecisionBinding.okValue, 'OK', 'serialize should return an isolated DTO copy');
+
+  const restored = new FlowCanvas('canvas');
+  restored.deserialize(fc.serialize());
+  assert.deepEqual(restored.decisionConfiguration, configuration);
+
+  fc.destroy();
+  restored.destroy();
+});
+
 test('buildOperatorNodeConfig → addNode → serialize preserves explicit-empty input ports', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

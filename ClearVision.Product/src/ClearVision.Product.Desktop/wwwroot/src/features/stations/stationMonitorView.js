@@ -5,6 +5,11 @@ import {
     buildResultCardsFromOutputData,
     renderResultCardHtml
 } from '../results/portDataTypeRenderer.mjs';
+import {
+    calculateCanonicalStatistics,
+    normalizeCanonicalOutcome,
+    normalizeCanonicalStatistics
+} from '../inspection/canonicalOutcome.mjs';
 
 class StationMonitorView {
     constructor(containerId) {
@@ -1062,8 +1067,8 @@ class StationMonitorView {
         const totalError = this.summary?.totalErrorCount ?? snapshot.totalError;
         const avgExecutionTime = this.summary?.averageExecutionTimeMs ??
             snapshot.averageExecutionTimeMs;
-        const totalInspections = totalOk + totalNg + totalError;
-        const yieldRate = totalInspections === 0 ? '--' : `${Math.round((totalOk / totalInspections) * 1000) / 10}%`;
+        const validDecisions = totalOk + totalNg;
+        const yieldRate = validDecisions === 0 ? '--' : `${Math.round((totalOk / validDecisions) * 1000) / 10}%`;
 
         const cards = [
             { label: '在线', value: `${snapshot.onlineCount}/${snapshot.stations.length || 0}`, meta: `${snapshot.stations.length - snapshot.onlineCount} 个离线`, tone: 'success' },
@@ -1405,13 +1410,13 @@ class StationMonitorView {
                 <small>当前页 ${this.monitorResults.length}</small>
             </article>
             <article class="sm-result-kpi">
-                <span>OK / NG / ERR</span>
-                <strong>${stats.ok} / ${stats.ng} / ${stats.error}</strong>
-                <small>来自工站采集</small>
+                <span>有效判定 / 执行失败</span>
+                <strong>${stats.validDecisions} / ${stats.executionFailures}</strong>
+                <small>${stats.undetermined} 未判定</small>
             </article>
             <article class="sm-result-kpi">
                 <span>良率</span>
-                <strong>${stats.total === 0 ? '--' : `${Math.round((stats.ok / stats.total) * 1000) / 10}%`}</strong>
+                <strong>${stats.validDecisions === 0 ? '--' : `${Math.round(stats.yieldRate * 1000) / 10}%`}</strong>
                 <small>${this.monitorStatistics ? '按筛选范围计算' : '按当前加载结果计算'}</small>
             </article>
             <article class="sm-result-kpi">
@@ -1432,10 +1437,15 @@ class StationMonitorView {
                 <span>状态</span>
                 <select id="sm-result-status-filter">
                     ${this.renderOption('all', '全部', this.resultFilters.status)}
-                    ${this.renderOption('Ok', 'OK', this.resultFilters.status)}
-                    ${this.renderOption('Ng', 'NG', this.resultFilters.status)}
-                    ${this.renderOption('Error', '异常', this.resultFilters.status)}
-                    ${this.renderOption('Canceled', '已取消', this.resultFilters.status)}
+                    ${this.renderOption('ok', 'OK', this.resultFilters.status)}
+                    ${this.renderOption('ng', 'NG', this.resultFilters.status)}
+                    ${this.renderOption('undetermined', '未判定', this.resultFilters.status)}
+                    ${this.renderOption('notApplicable', '不适用', this.resultFilters.status)}
+                    ${this.renderOption('invalid', '判定无效', this.resultFilters.status)}
+                    ${this.renderOption('failed', '执行失败', this.resultFilters.status)}
+                    ${this.renderOption('timedOut', '执行超时', this.resultFilters.status)}
+                    ${this.renderOption('cancelled', '已取消', this.resultFilters.status)}
+                    ${this.renderOption('skipped', '未检测', this.resultFilters.status)}
                 </select>
             </label>
             <label class="sm-filter">
@@ -1481,12 +1491,12 @@ class StationMonitorView {
     }
 
     renderYieldChart(stats) {
-        const rate = stats.total === 0 ? 0 : Math.max(0, Math.min(100, (stats.ok / stats.total) * 100));
+        const rate = stats.validDecisions === 0 ? 0 : Math.max(0, Math.min(100, stats.yieldRate * 100));
         return `
             <article class="sm-chart sm-chart-yield">
                 <div class="sm-chart-head">
                     <span>良率仪表</span>
-                    <strong>${stats.total === 0 ? '--' : `${rate.toFixed(1)}%`}</strong>
+                    <strong>${stats.validDecisions === 0 ? '--' : `${rate.toFixed(1)}%`}</strong>
                 </div>
                 <div class="sm-yield-track">
                     <span style="width:${rate}%"></span>
@@ -1494,7 +1504,8 @@ class StationMonitorView {
                 <div class="sm-chart-foot">
                     <span>${stats.ok} OK</span>
                     <span>${stats.ng} NG</span>
-                    <span>${stats.error} ERR</span>
+                    <span>${stats.executionFailures} 执行失败</span>
+                    <span>${stats.undetermined} 未判定</span>
                 </div>
             </article>
         `;
@@ -1562,7 +1573,7 @@ class StationMonitorView {
             status: record.status
         });
         return `
-            <article class="sm-monitor-result sm-monitor-result--${this.toCssToken(record.status)}">
+            <article class="sm-monitor-result sm-monitor-result--${this.toCssToken(record.outcomeCategory)}">
                 <header>
                     <div>
                         <span class="sm-result-status">${this.escapeHtml(record.status)}</span>
@@ -1860,10 +1871,7 @@ class StationMonitorView {
             ?? [];
 
         return {
-            total: Number(statistics.totalCount ?? statistics.TotalCount ?? statistics.total ?? statistics.Total ?? 0),
-            ok: Number(statistics.okCount ?? statistics.OKCount ?? statistics.ok ?? statistics.Ok ?? 0),
-            ng: Number(statistics.ngCount ?? statistics.NGCount ?? statistics.ng ?? statistics.Ng ?? 0),
-            error: Number(statistics.errorCount ?? statistics.ErrorCount ?? statistics.error ?? statistics.Error ?? 0),
+            ...normalizeCanonicalStatistics(statistics),
             averageExecutionTimeMs: Number(
                 statistics.averageExecutionTimeMs
                 ?? statistics.AverageExecutionTimeMs
@@ -1894,10 +1902,13 @@ class StationMonitorView {
         const stationInfo = station && station.stationId && station.stationId !== '--'
             ? station
             : this.stations.get(normalized.stationId);
-        const status = this.normalizeResultStatus(normalized.outcome, normalized.inspectionStatus);
+        const outcome = normalizeCanonicalOutcome(normalized);
         return {
             ...normalized,
-            status,
+            status: outcome.label,
+            outcomeCategory: outcome.category,
+            executionOutcome: outcome.executionOutcome,
+            decisionOutcome: outcome.decisionOutcome,
             stationLabel: stationInfo?.stationName || stationInfo?.lineName || stationInfo?.machineName || normalized.stationId
         };
     }
@@ -1916,6 +1927,8 @@ class StationMonitorView {
             imageId: result?.imageId ?? result?.ImageId ?? '--',
             outcome: result?.outcome ?? result?.Outcome ?? 'Error',
             inspectionStatus: result?.inspectionStatus ?? result?.InspectionStatus ?? null,
+            executionOutcome: result?.executionOutcome ?? result?.ExecutionOutcome ?? null,
+            decisionOutcome: result?.decisionOutcome ?? result?.DecisionOutcome ?? null,
             executionTimeMs: Number(result?.executionTimeMs ?? result?.ExecutionTimeMs ?? 0),
             diagnosticCode: result?.diagnosticCode ?? result?.DiagnosticCode ?? null,
             diagnosticMessage: result?.diagnosticMessage ?? result?.DiagnosticMessage ?? null,
@@ -2015,16 +2028,13 @@ class StationMonitorView {
     }
 
     calculateResultStats(records) {
-        const total = records.length;
-        const ok = records.filter((record) => record.status === 'OK').length;
-        const ng = records.filter((record) => record.status === 'NG').length;
-        const error = records.filter((record) => record.status === 'Error' || record.status === 'Canceled').length;
+        const canonical = calculateCanonicalStatistics(records);
         const timed = records.filter((record) => Number(record.executionTimeMs) > 0);
         const averageExecutionTimeMs = timed.length === 0
             ? 0
             : timed.reduce((sum, record) => sum + Number(record.executionTimeMs || 0), 0) / timed.length;
 
-        return { total, ok, ng, error, averageExecutionTimeMs };
+        return { ...canonical, averageExecutionTimeMs };
     }
 
     getCurrentScopeLabel() {
@@ -2043,8 +2053,7 @@ class StationMonitorView {
 
     resultMatchesFilters(record) {
         const statusMatches = this.resultFilters.status === 'all' ||
-            String(record.outcome || '').toLowerCase() === this.resultFilters.status.toLowerCase() ||
-            String(record.status || '').toLowerCase() === this.normalizeResultStatus(this.resultFilters.status).toLowerCase();
+            String(record.outcomeCategory || '').toLowerCase() === this.resultFilters.status.toLowerCase();
         const diagnosticMatches = this.resultFilters.diagnosticCode === 'all' ||
             String(record.diagnosticCode || '').toLowerCase() === this.resultFilters.diagnosticCode.toLowerCase();
         return statusMatches && diagnosticMatches;
@@ -2081,13 +2090,21 @@ class StationMonitorView {
         }
 
         this.monitorStatistics.total += 1;
-        if (record.status === 'OK') {
-            this.monitorStatistics.ok += 1;
-        } else if (record.status === 'NG') {
-            this.monitorStatistics.ng += 1;
-        } else if (record.status === 'Error' || record.status === 'Canceled') {
-            this.monitorStatistics.error += 1;
+        const outcome = normalizeCanonicalOutcome(record);
+        if (Object.prototype.hasOwnProperty.call(this.monitorStatistics, outcome.category)) {
+            this.monitorStatistics[outcome.category] += 1;
         }
+        if (String(outcome.executionOutcome).toLowerCase() === 'succeeded') {
+            this.monitorStatistics.executionSucceeded += 1;
+        }
+        this.monitorStatistics.validDecisions = this.monitorStatistics.ok + this.monitorStatistics.ng;
+        this.monitorStatistics.executionFailures = this.monitorStatistics.failed + this.monitorStatistics.timedOut;
+        this.monitorStatistics.yieldRate = this.monitorStatistics.validDecisions > 0
+            ? this.monitorStatistics.ok / this.monitorStatistics.validDecisions
+            : 0;
+        this.monitorStatistics.decisionCoverageRate = this.monitorStatistics.executionSucceeded > 0
+            ? this.monitorStatistics.validDecisions / this.monitorStatistics.executionSucceeded
+            : 0;
 
         const executionTime = Number(record.executionTimeMs || 0);
         if (executionTime > 0) {
@@ -2323,19 +2340,7 @@ class StationMonitorView {
     }
 
     formatOutcome(outcome, inspectionStatus) {
-        const status = this.normalizeResultStatus(outcome, inspectionStatus);
-        switch (status) {
-            case 'OK':
-                return '良品';
-            case 'NG':
-                return '不良';
-            case 'Error':
-                return '异常';
-            case 'Canceled':
-                return '已取消';
-            default:
-                return '待定';
-        }
+        return normalizeCanonicalOutcome({ outcome, inspectionStatus }).label;
     }
 
     toCssToken(value) {

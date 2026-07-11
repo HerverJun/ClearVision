@@ -132,6 +132,39 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public void TrackConsensusJudge_ConflictingWindow_ShouldKeepStableEvidenceWithoutChangingUndetermined()
+    {
+        var judge = new TrackConsensusJudge(
+            minConsensusFrames: 3,
+            consensusThreshold: 0.75,
+            maxFramesPerTrack: 4);
+        TrackFrameJudgment Frame(long sequence, DecisionOutcome decision, double confidence) => new(
+            "track-conflict",
+            sequence,
+            new Dictionary<string, object> { ["Marker"] = $"frame-{sequence}" },
+            confidence,
+            new InspectionOutcome(ExecutionOutcome.Succeeded, decision, "Test", null, null, true),
+            CorrelationId: $"corr-{sequence}",
+            OutputImage: [(byte)sequence]);
+
+        judge.AddFrame(Frame(1, DecisionOutcome.Ok, 0.80)).Should().BeNull();
+        judge.AddFrame(Frame(2, DecisionOutcome.Ng, 0.95)).Should().BeNull();
+        judge.AddFrame(Frame(3, DecisionOutcome.Ok, 0.95)).Should().BeNull();
+        var decision = judge.AddFrame(Frame(4, DecisionOutcome.Ng, 0.70));
+
+        decision.Should().NotBeNull();
+        decision!.Outcome!.Value.Decision.Should().Be(DecisionOutcome.Undetermined);
+        decision.Outcome.Value.ReasonCode.Should().Be("CONTINUOUS_CONSENSUS_CONFLICT");
+        decision.OkVotes.Should().Be(2);
+        decision.NgVotes.Should().Be(2);
+        decision.BestSequence.Should().Be(2);
+        decision.ResultFrame.Should().NotBeNull();
+        decision.ResultFrame!.CorrelationId.Should().Be("corr-2");
+        decision.ResultFrame.OutputImage.Should().Equal((byte)2);
+        decision.ConsensusScore.Should().Be(0.5);
+    }
+
+    [Fact]
     public void TrackConsensusJudge_ShouldNotLetSingleInvalidVotePoisonSufficientComparableVotes()
     {
         var judge = new TrackConsensusJudge(minConsensusFrames: 2, consensusThreshold: 1);
