@@ -2729,6 +2729,24 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         Dictionary<string, object>? inputData = null,
         CancellationToken cancellationToken = default)
     {
+        var sideEffectViolations = ExecutionSideEffectPolicy.For(ExecutionRunMode.Debug).Validate(flow);
+        if (sideEffectViolations.Count > 0)
+        {
+            return new FlowDebugExecutionResult
+            {
+                DebugSessionId = options.DebugSessionId,
+                IsSuccess = false,
+                ErrorMessage = $"SIDE_EFFECT_POLICY_BLOCKED: {string.Join("; ", sideEffectViolations.Select(violation => violation.Message))}",
+                OperatorResults = sideEffectViolations.Select(violation => new OperatorExecutionResult
+                {
+                    OperatorId = violation.OperatorId,
+                    OperatorName = violation.OperatorName,
+                    IsSuccess = false,
+                    ErrorMessage = $"{violation.Code}: {violation.Message}"
+                }).ToList()
+            };
+        }
+
         var result = new FlowDebugExecutionResult
         {
             DebugSessionId = options.DebugSessionId

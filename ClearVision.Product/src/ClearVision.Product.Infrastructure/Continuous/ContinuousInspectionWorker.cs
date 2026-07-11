@@ -55,11 +55,26 @@ public sealed class ContinuousInspectionWorker
         IImageCacheRepository? imageCacheRepository = null,
         IProjectVariableSession? projectVariableSession = null,
         ProjectVariableBindingIndex? projectVariableBindingIndex = null,
-        ProjectVariableCommitHandler? projectVariableCommitHandler = null)
+        ProjectVariableCommitHandler? projectVariableCommitHandler = null,
+        long persistenceRevision = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
         config.Normalize();
+
+        var executionSnapshot = new ExecutionSnapshot(
+            projectId,
+            flow,
+            persistenceRevision,
+            mode == ContinuousInspectionMode.Shadow
+                ? ExecutionSnapshotSource.ShadowCandidate
+                : ExecutionSnapshotSource.PersistedProject,
+            mode == ContinuousInspectionMode.Shadow
+                ? ExecutionRunMode.ShadowCandidate
+                : ExecutionRunMode.FormalPrimary,
+            shadowRole: mode == ContinuousInspectionMode.Shadow
+                ? ShadowExecutionRole.Candidate
+                : ShadowExecutionRole.None);
 
         await using var scheduler = new InferenceScheduler(config.SchedulerQueueLength);
         using var detector = new FrameDifferenceArrivalDetector();
@@ -89,6 +104,7 @@ public sealed class ContinuousInspectionWorker
                     "CONTINUOUS_INFERENCE_EXCEPTION",
                     scheduled.Error.Message,
                     mode);
+                failure.SetExecutionTraceability(executionSnapshot, null, sessionId);
                 await PublishOrSuppressAsync(
                     failure,
                     mode,
@@ -111,6 +127,7 @@ public sealed class ContinuousInspectionWorker
                     "CONTINUOUS_EMPTY_INFERENCE_RESULT",
                     "Continuous inference returned no flow result.",
                     mode);
+                failure.SetExecutionTraceability(executionSnapshot, null, sessionId);
                 await PublishOrSuppressAsync(
                     failure,
                     mode,
@@ -131,6 +148,7 @@ public sealed class ContinuousInspectionWorker
             if (frameOutcome.Execution != ExecutionOutcome.Succeeded)
             {
                 var failure = BuildFrameResult(projectId, sessionId, scheduled, frameOutcome, mode);
+                failure.SetExecutionTraceability(executionSnapshot, null, sessionId);
                 await PublishOrSuppressAsync(
                     failure,
                     mode,
@@ -153,6 +171,7 @@ public sealed class ContinuousInspectionWorker
                     "CONTINUOUS_TRACK_ID_MISSING",
                     "Continuous inference completed without a track id.",
                     mode);
+                failure.SetExecutionTraceability(executionSnapshot, null, sessionId);
                 await PublishOrSuppressAsync(
                     failure,
                     mode,
@@ -184,6 +203,7 @@ public sealed class ContinuousInspectionWorker
             await PersistReplayIfNeededAsync(streamCoordinator, cameraId, config, replay, decision, cancellationToken);
 
             var result = BuildInspectionResult(projectId, sessionId, decision, mode);
+            result.SetExecutionTraceability(executionSnapshot, null, sessionId);
             AppendRuntimeMetrics(
                 result,
                 decision.ResultFrame?.OutputData ?? new Dictionary<string, object>(),
@@ -237,12 +257,19 @@ public sealed class ContinuousInspectionWorker
                                 var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
                                     candidate,
                                     item.TrackId,
-                                    (envelope, ct) =>
-                                    {
-                                        var inputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
-                                        if (projectVariableSession == null || projectVariableBindingIndex == null)
-                                        {
-                                            return flowExecution.ExecuteFlowAsync(flow, inputs, cancellationToken: ct);
+                                     (envelope, ct) =>
+                                     {
+                                         var inputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
+                                         var executionFlow = executionSnapshot.CreateExecutionFlow();
+                                         var policyViolations = executionSnapshot.SideEffectPolicy.Validate(executionFlow);
+                                         if (policyViolations.Count > 0)
+                                         {
+                                             return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(policyViolations));
+                                         }
+
+                                         if (projectVariableSession == null || projectVariableBindingIndex == null)
+                                         {
+                                            return flowExecution.ExecuteFlowAsync(executionFlow, inputs, cancellationToken: ct);
                                         }
 
                                         var isPreview = mode != ContinuousInspectionMode.Primary;
@@ -252,7 +279,7 @@ public sealed class ContinuousInspectionWorker
                                             Guid.NewGuid(),
                                             isPreview,
                                             isPreview ? null : projectVariableCommitHandler);
-                                        return flowExecution.ExecuteFlowAsync(flow, inputs, context, cancellationToken: ct);
+                                        return flowExecution.ExecuteFlowAsync(executionFlow, inputs, context, cancellationToken: ct);
                                     }));
                                 if (scheduled)
                                 {

@@ -121,10 +121,14 @@ public class InspectionServiceSingleRunTests
         executedInputs!.Should().ContainKey("Image");
         persistedResult.Should().NotBeNull();
         persistedResult!.FlowVersionHash.Should().NotBeNullOrWhiteSpace();
+        persistedResult.ExecutionSnapshotId.Should().NotBeNull();
+        persistedResult.ExecutionSource.Should().Be(ExecutionSnapshotSource.Draft.ToString());
+        persistedResult.ExecutionRunMode.Should().Be(ExecutionRunMode.FormalPrimary.ToString());
+        persistedResult.DecisionConfigurationHash.Should().NotBeNullOrWhiteSpace();
         persistedResult.CalibrationBundleId.Should().Be("bundle-single-run");
         persistedResult.SessionId.Should().NotBeNull();
         persistedResult.OutputDataJson.Should().Contain("Traceability");
-        await projectRepository.Received(1).GetByIdFreshAsync(projectId);
+        await projectRepository.Received(2).GetByIdFreshAsync(projectId);
         _ = projectRepository.DidNotReceive().GetWithFlowAsync(Arg.Any<Guid>());
         _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(Arg.Any<Guid>());
     }
@@ -355,7 +359,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenDatabaseFlowIsEmpty_ShouldFallbackToFileFlow()
+    public async Task ExecuteSingleAsync_WhenDatabaseFlowIsEmpty_ShouldRejectInsteadOfFallingBackToFileFlow()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -402,15 +406,16 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        await service.ExecuteSingleAsync(projectId, new byte[] { 9, 9, 9 }, flow: null);
+        var act = () => service.ExecuteSingleAsync(projectId, new byte[] { 9, 9, 9 }, flow: null);
 
-        executedFlow.Should().NotBeNull();
-        executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "file-flow");
-        _ = flowStorage.Received(1).LoadFlowJsonAsync(projectId);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*does not contain an executable flow*");
+        executedFlow.Should().BeNull();
+        _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(projectId);
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenStoredFlowExists_ShouldPreferFileFlowOverDatabaseSnapshot()
+    public async Task ExecuteSingleAsync_WhenStoredFlowExists_ShouldUseDatabaseSnapshotWithoutReadingFileFlow()
     {
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -462,10 +467,10 @@ public class InspectionServiceSingleRunTests
         await service.ExecuteSingleAsync(projectId, new byte[] { 5, 6, 7 }, flow: null);
 
         executedFlow.Should().NotBeNull();
-        executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "file-flow");
-        executedFlow.Operators.Should().NotContain(operatorEntity => operatorEntity.Name == "db-flow");
+        executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "db-flow");
+        executedFlow.Operators.Should().NotContain(operatorEntity => operatorEntity.Name == "file-flow");
         _ = projectRepository.Received(1).GetWithFlowAsync(projectId);
-        _ = flowStorage.Received(1).LoadFlowJsonAsync(projectId);
+        _ = flowStorage.DidNotReceive().LoadFlowJsonAsync(projectId);
     }
 
     [Fact]
@@ -1215,11 +1220,12 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
 
         result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().BeSameAs(storedFlow);
+        executedFlow.Should().NotBeSameAs(storedFlow);
+        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(storedFlow));
         executedInputs.Should().NotBeNull();
         executedInputs!.Should().ContainKey("Image");
         await flowExecution.Received(1).ExecuteFlowAsync(
-            storedFlow,
+            Arg.Is<OperatorFlow>(candidate => ExecutionFlowIdentity.ComputeFlowHash(candidate) == ExecutionFlowIdentity.ComputeFlowHash(storedFlow)),
             Arg.Any<Dictionary<string, object>?>(),
             false,
             Arg.Any<CancellationToken>());
@@ -1278,7 +1284,8 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
 
         result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().BeSameAs(storedFlow);
+        executedFlow.Should().NotBeSameAs(storedFlow);
+        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(storedFlow));
         await imageAcquisition.Received(1).AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>());
     }
 
@@ -1468,7 +1475,8 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
 
         result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().BeSameAs(explicitFlow);
+        executedFlow.Should().NotBeSameAs(explicitFlow);
+        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(explicitFlow));
         await flowExecution.Received(1).ExecuteFlowAsync(
             Arg.Any<OperatorFlow>(),
             Arg.Any<Dictionary<string, object>?>(),
@@ -1531,7 +1539,8 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, inlineFlow);
 
         result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().BeSameAs(inlineFlow);
+        executedFlow.Should().NotBeSameAs(inlineFlow);
+        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(inlineFlow));
         executedFlow!.Operators.Select(op => op.Type).Should().Contain(new[]
         {
             OperatorType.ImageAcquisition, OperatorType.ImageSave, OperatorType.ResultOutput
@@ -1590,7 +1599,8 @@ public class InspectionServiceSingleRunTests
         var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, inlineFlow);
 
         result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().BeSameAs(inlineFlow);
+        executedFlow.Should().NotBeSameAs(inlineFlow);
+        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(inlineFlow));
         await flowExecution.Received(1).ExecuteFlowAsync(
             Arg.Any<OperatorFlow>(),
             Arg.Any<Dictionary<string, object>?>(),

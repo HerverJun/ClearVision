@@ -378,6 +378,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             ProjectGlobalVariableSchema globalVariables;
             IProjectVariableSession? projectVariableSession;
             ProjectVariableBindingIndex? projectVariableBindingIndex;
+            long projectPersistenceRevision;
             var access = projectSaveCoordinator == null
                 ? null
                 : await projectSaveCoordinator.AcquireProjectAccessAsync(projectId, ct);
@@ -385,6 +386,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             {
                 var project = await projectRepository.GetByIdAsync(projectId);
                 globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
+                projectPersistenceRevision = project?.PersistenceRevision ?? 0;
                 if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
                 {
                     throw new InvalidOperationException(
@@ -422,6 +424,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     projectId,
                     sessionId,
                     flow,
+                    projectPersistenceRevision,
                     cameraId,
                     ResolveContinuousInspectionMode(scope.ServiceProvider, cameraId, flow),
                     streamCoordinator,
@@ -468,6 +471,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         Guid projectId,
         Guid sessionId,
         OperatorFlow flow,
+        long projectPersistenceRevision,
         string? cameraId,
         ContinuousInspectionMode continuousInspectionMode,
         ICameraFrameStreamCoordinator? streamCoordinator,
@@ -511,7 +515,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     _imageCacheRepository,
                     projectVariableSession,
                     projectVariableBindingIndex,
-                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions));
+                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions),
+                    projectPersistenceRevision);
                 return;
             }
         }
@@ -533,6 +538,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         projectId,
                         sessionId,
                         flow,
+                        projectPersistenceRevision,
                         cameraId,
                         currentContinuousInspectionMode,
                         streamCoordinator,
@@ -562,6 +568,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         projectId,
                         sessionId,
                         flow,
+                        projectPersistenceRevision,
                         cameraId,
                         currentContinuousInspectionMode,
                         streamCoordinator,
@@ -574,6 +581,19 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
                     // 保存结果(异步非阻塞)
                     var canonicalOutcome = result.GetOutcome();
+                    if (currentContinuousInspectionMode == ContinuousInspectionMode.Shadow)
+                    {
+                        // Candidate results are evidence only. They never enter
+                        // production history, yield counters, alarms or SSE.
+                        _logger.LogInformation(
+                            "[InspectionWorker] Shadow candidate suppressed. FlowHash={FlowHash}, Execution={Execution}, Decision={Decision}",
+                            result.FlowVersionHash,
+                            canonicalOutcome.Execution,
+                            canonicalOutcome.Decision);
+                        cycleSucceeded = true;
+                        continue;
+                    }
+
                     if (canonicalOutcome.Execution == ExecutionOutcome.Skipped)
                     {
                         var skippedPolicy = ContinuousInspectionOutcomePolicy.Evaluate(consecutiveNgCount, canonicalOutcome);
@@ -962,6 +982,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         Guid projectId,
         Guid sessionId,
         OperatorFlow flow,
+        long projectPersistenceRevision,
         string? cameraId,
         ContinuousInspectionMode continuousInspectionMode,
         ICameraFrameStreamCoordinator? streamCoordinator,
@@ -974,6 +995,19 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     {
         var result = new InspectionResult(projectId);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var executionSnapshot = new ExecutionSnapshot(
+            projectId,
+            flow,
+            projectPersistenceRevision,
+            continuousInspectionMode == ContinuousInspectionMode.Shadow
+                ? ExecutionSnapshotSource.ShadowCandidate
+                : ExecutionSnapshotSource.PersistedProject,
+            continuousInspectionMode == ContinuousInspectionMode.Shadow
+                ? ExecutionRunMode.ShadowCandidate
+                : ExecutionRunMode.FormalPrimary,
+            shadowRole: continuousInspectionMode == ContinuousInspectionMode.Shadow
+                ? ShadowExecutionRole.Candidate
+                : ShadowExecutionRole.None);
 
         try
         {
@@ -1030,16 +1064,23 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             // 执行流程
-            var flowResult = projectVariableSession == null || projectVariableBindingIndex == null
-                ? await flowExecution.ExecuteFlowAsync(flow, inputData, cancellationToken: ct)
+            var executionFlow = executionSnapshot.CreateExecutionFlow();
+            var policyViolations = executionSnapshot.SideEffectPolicy.Validate(executionFlow);
+            var flowResult = policyViolations.Count > 0
+                ? FlowExecutionResult.SideEffectPolicyRejected(policyViolations)
+                : projectVariableSession == null || projectVariableBindingIndex == null
+                ? await flowExecution.ExecuteFlowAsync(executionFlow, inputData, cancellationToken: ct)
                 : await flowExecution.ExecuteFlowAsync(
-                    flow,
+                    executionFlow,
                     inputData,
                     new ProjectVariableExecutionContext(
                         projectVariableSession,
                         projectVariableBindingIndex,
                         Guid.NewGuid(),
-                        commitHandler: CreateProjectVariableCommitHandler(projectId, projectVariableSessions)),
+                        isPreview: continuousInspectionMode == ContinuousInspectionMode.Shadow,
+                        commitHandler: continuousInspectionMode == ContinuousInspectionMode.Shadow
+                            ? null
+                            : CreateProjectVariableCommitHandler(projectId, projectVariableSessions)),
                     cancellationToken: ct);
 
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
@@ -1057,8 +1098,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 var skippedOutcome = InspectionOutcomeResolver.Resolve(flowResult, flow);
                 InspectionOutcomeResolver.SetDiagnostics(outputData, skippedOutcome);
                 result.SetOutcome(skippedOutcome, flowResult.ExecutionTimeMs);
-                result.SetTraceability(
-                    ComputeFlowVersionHash(flow),
+                result.SetExecutionTraceability(
+                    executionSnapshot,
                     TryResolveCalibrationBundleId(flowResult.OutputData),
                     sessionId);
 
@@ -1073,8 +1114,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var status = LegacyInspectionStatusProjection.Project(outcome);
 
             result.SetOutcome(outcome, flowResult.ExecutionTimeMs);
-            result.SetTraceability(
-                ComputeFlowVersionHash(flow),
+            result.SetExecutionTraceability(
+                executionSnapshot,
                 TryResolveCalibrationBundleId(flowResult.OutputData),
                 sessionId);
 
@@ -1127,8 +1168,11 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             TryAppendTraceabilityToAnalysisPayload(result);
-            await _imagePersistenceService.PersistAsync(result, ct);
-            await CacheResultImageAsync(result);
+            if (continuousInspectionMode != ContinuousInspectionMode.Shadow)
+            {
+                await _imagePersistenceService.PersistAsync(result, ct);
+                await CacheResultImageAsync(result);
+            }
             return result;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -1146,7 +1190,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     "CycleExecutionException",
                     ex.Message),
                 stopwatch.ElapsedMilliseconds);
-            result.SetTraceability(ComputeFlowVersionHash(flow), null, sessionId);
+            result.SetExecutionTraceability(executionSnapshot, null, sessionId);
 
             var outputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
@@ -1177,13 +1221,24 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 return;
             }
 
+            var candidateSnapshot = new ExecutionSnapshot(
+                baselineResult.ProjectId,
+                flow,
+                persistenceRevision: baselineResult.ProjectPersistenceRevision ?? 0,
+                ExecutionSnapshotSource.ShadowCandidate,
+                ExecutionRunMode.ShadowCandidate,
+                shadowRole: ShadowExecutionRole.Candidate);
             var started = DateTime.UtcNow;
             var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(resolvedCameraId, ct);
             var shadowInputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
-            var shadowResult = projectVariableSession == null || projectVariableBindingIndex == null
-                ? await flowExecution.ExecuteFlowAsync(flow, shadowInputs, cancellationToken: ct)
+            var candidateFlow = candidateSnapshot.CreateExecutionFlow();
+            var candidatePolicyViolations = candidateSnapshot.SideEffectPolicy.Validate(candidateFlow);
+            var shadowResult = candidatePolicyViolations.Count > 0
+                ? FlowExecutionResult.SideEffectPolicyRejected(candidatePolicyViolations)
+                : projectVariableSession == null || projectVariableBindingIndex == null
+                ? await flowExecution.ExecuteFlowAsync(candidateFlow, shadowInputs, cancellationToken: ct)
                 : await flowExecution.ExecuteFlowAsync(
-                    flow,
+                    candidateFlow,
                     shadowInputs,
                     new ProjectVariableExecutionContext(
                         projectVariableSession,
@@ -1193,7 +1248,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     cancellationToken: ct);
             var shadowOutput = shadowResult.OutputData ?? new Dictionary<string, object>();
             var candidateOutcome = InspectionOutcomeResolver.Resolve(shadowResult, flow);
-            var outcomeComparison = ShadowOutcomeComparison.Evaluate(baselineOutcome, candidateOutcome);
+            // Legacy continuous shadow can lack the primary frame correlation.
+            // Do not manufacture a match from a later camera frame.
+            var outcomeComparison = new ShadowOutcomeComparisonResult(
+                false,
+                "InputCorrelationUnavailable",
+                null);
             var latencyMs = Math.Max(0, (DateTime.UtcNow - started).TotalMilliseconds);
             var buffer = streamCoordinator.SnapshotFrameBufferStats(resolvedCameraId);
             var comparison = new Dictionary<string, object?>
@@ -1208,6 +1268,14 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 ["CandidateExecution"] = candidateOutcome.Execution.ToString(),
                 ["CandidateDecision"] = candidateOutcome.Decision.ToString(),
                 ["Matched"] = outcomeComparison.Matched,
+                ["BaselineFlowHash"] = baselineResult.FlowVersionHash,
+                ["BaselineRevision"] = baselineResult.ProjectPersistenceRevision,
+                ["BaselineSnapshotId"] = baselineResult.ExecutionSnapshotId?.ToString("D"),
+                ["CandidateFlowHash"] = candidateSnapshot.FlowHash,
+                ["CandidateRevision"] = candidateSnapshot.PersistenceRevision,
+                ["CandidateSnapshotId"] = candidateSnapshot.SnapshotId.ToString("D"),
+                ["CandidateDecisionConfigurationHash"] = candidateSnapshot.DecisionConfigurationHash,
+                ["CandidateShadowRole"] = candidateSnapshot.ShadowRole.ToString(),
                 ["Sequence"] = envelope.Sequence,
                 ["CorrelationId"] = envelope.EffectiveCorrelationId,
                 ["LatencyMs"] = latencyMs,
@@ -1305,9 +1373,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     {
         try
         {
-            var serialized = JsonSerializer.Serialize(flow, FlowHashJsonOptions);
-            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
-            return Convert.ToHexString(hashBytes);
+            return ExecutionFlowIdentity.ComputeFlowHash(flow);
         }
         catch (Exception ex)
         {

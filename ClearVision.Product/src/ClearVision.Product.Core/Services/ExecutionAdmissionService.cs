@@ -1,4 +1,3 @@
-using System.Text.Json;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -39,7 +38,11 @@ public enum ExecutionAdmissionSurface
     LegacyWebMessageExecution = 5,
 
     /// <summary>AutoTune 线序预览与指标分析：禁止真实外部 I/O（File 图源允许读图，与节点预览一致）。</summary>
-    AutoTunePreview = 6
+    AutoTunePreview = 6,
+
+    ShadowCandidate = 7,
+
+    Debug = 8
 }
 
 public sealed record ExecutionAdmissionViolation(
@@ -112,29 +115,6 @@ public interface IExecutionAdmissionService
 
 public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 {
-    private static readonly HashSet<OperatorType> AlwaysBlockedSideEffectTypes =
-    [
-        OperatorType.HttpRequest,
-        OperatorType.TextSave,
-        OperatorType.ImageSave,
-        OperatorType.DatabaseWrite,
-        OperatorType.TcpCommunication,
-        OperatorType.SerialCommunication,
-        OperatorType.ModbusCommunication,
-        OperatorType.ModbusRtuCommunication,
-        OperatorType.SiemensS7Communication,
-        OperatorType.MitsubishiMcCommunication,
-        OperatorType.OmronFinsCommunication,
-        OperatorType.MqttPublish,
-        OperatorType.CameraCalibration,
-        OperatorType.FisheyeCalibration,
-        OperatorType.StereoCalibration,
-        OperatorType.NPointCalibration,
-        OperatorType.TranslationRotationCalibration,
-        OperatorType.HandEyeCalibration,
-        OperatorType.CalibrationLoader
-    ];
-
     private readonly IProjectRepository _projectRepository;
     private readonly IInspectionRuntimeCoordinator? _runtimeCoordinator;
     private readonly IFlowExecutionService? _flowExecutionService;
@@ -156,14 +136,6 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         surface is ExecutionAdmissionSurface.StoredProjectExecution
             or ExecutionAdmissionSurface.StudioInspectionRun
             or ExecutionAdmissionSurface.StationRuntimeExecution;
-
-    /// <summary>
-    /// 预览 surface 中是否允许 ImageAcquisition 以 File 模式读取本地图像。
-    /// 节点预览与 AutoTune 线序预览需要读取样张生成预览图；单算子预览只接受显式输入图，故禁止。
-    /// </summary>
-    private static bool AllowsFileImageAcquisitionRead(ExecutionAdmissionSurface surface) =>
-        surface is ExecutionAdmissionSurface.NodePreview
-            or ExecutionAdmissionSurface.AutoTunePreview;
 
     public async Task<ExecutionAdmissionResult> ValidateProjectAsync(
         Guid projectId,
@@ -449,47 +421,27 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             return null;
         }
 
-        if (AlwaysBlockedSideEffectTypes.Contains(@operator.Type))
+        var policy = ExecutionSideEffectPolicy.For(surface switch
         {
-            return CreateViolation(
+            ExecutionAdmissionSurface.ShadowCandidate => ExecutionRunMode.ShadowCandidate,
+            ExecutionAdmissionSurface.Debug => ExecutionRunMode.Debug,
+            _ => ExecutionRunMode.Preview
+        });
+        var allowedCapabilities = policy.AllowedCapabilities;
+        if (surface == ExecutionAdmissionSurface.OperatorPreview)
+        {
+            // Single-operator preview has no bounded upstream sample context;
+            // retain its stricter no-file-read contract.
+            allowedCapabilities &= ~ExecutionSideEffect.FileRead;
+        }
+
+        var blockedCapabilities = ExecutionSideEffectCatalog.GetCapabilities(@operator) & ~allowedCapabilities;
+        return blockedCapabilities == ExecutionSideEffect.None
+            ? null
+            : CreateViolation(
                 @operator,
-                $"{@operator.Type} 可能访问外部设备、网络服务或执行文件系统写入。");
-        }
-
-        if (@operator.Type == OperatorType.ResultOutput &&
-            TryReadBoolParameter(@operator, "SaveToFile", out var saveToFile) &&
-            saveToFile)
-        {
-            return CreateViolation(
-                @operator,
-                "ResultOutput 启用 SaveToFile=true 时会写入本地文件。",
-                "SaveToFile");
-        }
-
-        if (@operator.Type == OperatorType.ImageAcquisition)
-        {
-            var sourceType = NormalizeAcquisitionSourceType(TryReadStringParameter(@operator, "SourceType", "sourceType"));
-            var filePath = TryReadStringParameter(@operator, "FilePath", "filePath");
-            if (sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
-            {
-                return CreateViolation(
-                    @operator,
-                    "ImageAcquisition 使用相机采集源时会访问本机相机硬件。",
-                    "SourceType");
-            }
-
-            if (!string.IsNullOrWhiteSpace(filePath) &&
-                !AllowsFileImageAcquisitionRead(surface))
-            {
-                // 节点预览 / AutoTune 线序预览允许读本地样张生成预览图；单算子预览等其它预览 surface 仍拦截。
-                return CreateViolation(
-                    @operator,
-                    "ImageAcquisition 配置 FilePath 时会读取本地文件。",
-                    "FilePath");
-            }
-        }
-
-        return null;
+                $"{@operator.Type} requires '{blockedCapabilities}', which is not allowed in {policy.RunMode}.",
+                ExecutionSideEffectCatalog.GetCapabilityParameterName(@operator, blockedCapabilities));
     }
 
     private static ExecutionAdmissionViolation CreateViolation(
@@ -524,102 +476,4 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会访问外部设备、网络服务或执行文件系统写入，正式运行流程时才会执行。";
     }
 
-    private static bool TryReadBoolParameter(Operator @operator, string name, out bool value)
-    {
-        value = false;
-        var raw = TryReadParameter(@operator, name);
-        switch (raw)
-        {
-            case bool boolValue:
-                value = boolValue;
-                return true;
-            case string text when bool.TryParse(text, out var parsed):
-                value = parsed;
-                return true;
-            case JsonElement element:
-                if (element.ValueKind == JsonValueKind.True || element.ValueKind == JsonValueKind.False)
-                {
-                    value = element.GetBoolean();
-                    return true;
-                }
-
-                if (element.ValueKind == JsonValueKind.String &&
-                    bool.TryParse(element.GetString(), out var jsonParsed))
-                {
-                    value = jsonParsed;
-                    return true;
-                }
-
-                break;
-        }
-
-        return false;
-    }
-
-    private static string TryReadStringParameter(Operator @operator, params string[] names)
-    {
-        foreach (var name in names)
-        {
-            var raw = TryReadParameter(@operator, name);
-            var value = raw switch
-            {
-                null => null,
-                string text => text,
-                JsonElement element when element.ValueKind == JsonValueKind.String => element.GetString(),
-                JsonElement element when element.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined => element.ToString(),
-                _ => raw.ToString()
-            };
-
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value.Trim();
-            }
-        }
-
-        return string.Empty;
-    }
-
-    private static object? TryReadParameter(Operator @operator, string name)
-    {
-        return @operator.Parameters
-            .FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            ?.GetValue();
-    }
-
-    private static string NormalizeAcquisitionSourceType(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        var normalized = value.Trim();
-        var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
-        if (separatorIndex >= 0)
-        {
-            normalized = normalized[..separatorIndex].Trim();
-        }
-
-        var token = normalized.ToLowerInvariant();
-        if (token == "camera" ||
-            token.Contains("cam", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Contains("相机", StringComparison.Ordinal) ||
-            normalized.Contains("摄像", StringComparison.Ordinal))
-        {
-            return "Camera";
-        }
-
-        if (token == "file" ||
-            token.Contains("image", StringComparison.OrdinalIgnoreCase) ||
-            token.Contains("path", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Contains("文件", StringComparison.Ordinal) ||
-            normalized.Contains("图像", StringComparison.Ordinal) ||
-            normalized.Contains("图片", StringComparison.Ordinal) ||
-            normalized.Contains("路径", StringComparison.Ordinal))
-        {
-            return "File";
-        }
-
-        return normalized;
-    }
 }

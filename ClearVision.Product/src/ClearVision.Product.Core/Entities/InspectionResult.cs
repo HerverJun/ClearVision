@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Outcomes;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Core.Entities;
 
@@ -87,6 +88,22 @@ public class InspectionResult : Entity
     public string? CalibrationBundleId { get; private set; }
 
     public Guid? SessionId { get; private set; }
+
+    // Snapshot identity is persisted with the canonical output payload and is
+    // also kept on the domain result for event/history projections.
+    public Guid? ExecutionSnapshotId { get; private set; }
+
+    public long? ProjectPersistenceRevision { get; private set; }
+
+    public string? DecisionConfigurationHash { get; private set; }
+
+    public string? RuntimePackageId { get; private set; }
+
+    public string? ExecutionSource { get; private set; }
+
+    public string? ExecutionRunMode { get; private set; }
+
+    public string? ShadowRole { get; private set; }
 
     private InspectionResult()
     {
@@ -229,6 +246,37 @@ public class InspectionResult : Entity
         FlowVersionHash = string.IsNullOrWhiteSpace(flowVersionHash) ? null : flowVersionHash.Trim();
         CalibrationBundleId = string.IsNullOrWhiteSpace(calibrationBundleId) ? null : calibrationBundleId.Trim();
         SessionId = sessionId;
+        MarkAsModified();
+    }
+
+    public void SetExecutionTraceability(
+        ExecutionSnapshot snapshot,
+        string? calibrationBundleId,
+        Guid? sessionId)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        SetTraceability(snapshot.FlowHash, calibrationBundleId, sessionId);
+        ExecutionSnapshotId = snapshot.SnapshotId;
+        ProjectPersistenceRevision = snapshot.PersistenceRevision;
+        DecisionConfigurationHash = snapshot.DecisionConfigurationHash;
+        RuntimePackageId = snapshot.RuntimePackageId;
+        ExecutionSource = snapshot.Source.ToString();
+        ExecutionRunMode = snapshot.RunMode.ToString();
+        ShadowRole = snapshot.ShadowRole.ToString();
+        MarkAsModified();
+    }
+
+    public void CopyTraceabilityFrom(InspectionResult source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        SetTraceability(source.FlowVersionHash, source.CalibrationBundleId, source.SessionId);
+        ExecutionSnapshotId = source.ExecutionSnapshotId;
+        ProjectPersistenceRevision = source.ProjectPersistenceRevision;
+        DecisionConfigurationHash = source.DecisionConfigurationHash;
+        RuntimePackageId = source.RuntimePackageId;
+        ExecutionSource = source.ExecutionSource;
+        ExecutionRunMode = source.ExecutionRunMode;
+        ShadowRole = source.ShadowRole;
         MarkAsModified();
     }
 

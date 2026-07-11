@@ -28,6 +28,10 @@ public static class StationResultMapper
             PackageName = result.PackageName,
             PackageVersion = identity.CurrentPackageVersion ?? string.Empty,
             FlowHash = result.FlowHash,
+            ProjectRevision = result.ProjectRevision,
+            DecisionConfigurationHash = result.DecisionConfigurationHash,
+            ExecutionSnapshotId = result.ExecutionSnapshotId,
+            ExecutionRunMode = result.ExecutionRunMode,
             ImageId = result.ImageId,
             // Retain legacy projections for old Studio consumers. v2 consumers use the
             // canonical fields below as the factual Station result.

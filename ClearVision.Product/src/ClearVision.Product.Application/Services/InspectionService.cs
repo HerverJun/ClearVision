@@ -187,7 +187,7 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
-        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+        var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             HasExecutableFlow(flow)
@@ -199,7 +199,7 @@ public class InspectionService : IInspectionService
             sessionId => ExecuteSingleResolvedCoreAsync(
                 projectId,
                 imageData,
-                actualFlow,
+                snapshot,
                 globalVariables,
                 sessionId,
                 cancellationToken),
@@ -325,7 +325,7 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
-        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+        var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             HasExecutableFlow(flow)
@@ -337,7 +337,7 @@ public class InspectionService : IInspectionService
             sessionId => ExecuteSingleFromCameraCoreAsync(
                 projectId,
                 cameraId,
-                actualFlow,
+                snapshot,
                 globalVariables,
                 sessionId,
                 cancellationToken),
@@ -357,12 +357,12 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
-        var (actualFlow, _) = await ResolveExecutionFlowAsync(
+        var (snapshot, _) = await ResolveExecutionFlowAsync(
             projectId,
             flow: null,
             ExecutionAdmissionSurface.StoredProjectExecution,
             cancellationToken);
-        await StartRealtimeInspectionFlowCoreAsync(projectId, actualFlow, cameraId, cancellationToken, onResultReady);
+        await StartRealtimeInspectionFlowCoreAsync(projectId, snapshot.CreateExecutionFlow(), cameraId, cancellationToken, onResultReady);
     }
 
     /// <summary>
@@ -379,14 +379,17 @@ public class InspectionService : IInspectionService
     {
         // 检测页“运行流程”（连续/实时）属于正式运行：允许流程声明的真实 I/O，
         // 仅保留项目存在/激活等非 I/O 安全校验（运行中防并发由 Coordinator 负责）。
-        var inlineAdmission = await _executionAdmissionService.ValidateFlowAsync(
+        var (snapshot, _) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             ExecutionAdmissionSurface.StudioInspectionRun,
             cancellationToken);
-        ThrowIfAdmissionRejected(inlineAdmission);
-
-        await StartRealtimeInspectionFlowCoreAsync(projectId, flow, cameraId, cancellationToken, onResultReady);
+        await StartRealtimeInspectionFlowCoreAsync(
+            projectId,
+            snapshot.CreateExecutionFlow(),
+            cameraId,
+            cancellationToken,
+            onResultReady);
     }
 
     private async Task StartRealtimeInspectionFlowCoreAsync(
@@ -746,7 +749,7 @@ public class InspectionService : IInspectionService
         Guid sessionId,
         CancellationToken cancellationToken)
     {
-        var (actualFlow, globalVariables) = await ResolveExecutionFlowAsync(
+        var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             HasExecutableFlow(flow)
@@ -757,7 +760,7 @@ public class InspectionService : IInspectionService
         return await ExecuteSingleResolvedCoreAsync(
             projectId,
             imageData,
-            actualFlow,
+            snapshot,
             globalVariables,
             sessionId,
             cancellationToken);
@@ -766,12 +769,13 @@ public class InspectionService : IInspectionService
     private async Task<InspectionResult> ExecuteSingleResolvedCoreAsync(
         Guid projectId,
         byte[]? imageData,
-        OperatorFlow actualFlow,
+        ExecutionSnapshot snapshot,
         ProjectGlobalVariableSchema? globalVariables,
         Guid sessionId,
         CancellationToken cancellationToken)
     {
         var result = new InspectionResult(projectId);
+        var actualFlow = snapshot.CreateExecutionFlow();
 
         try
         {
@@ -818,8 +822,8 @@ public class InspectionService : IInspectionService
             }
 
             result.SetOutcome(outcome, flowResult.ExecutionTimeMs);
-            result.SetTraceability(
-                ComputeFlowVersionHash(actualFlow),
+            result.SetExecutionTraceability(
+                snapshot,
                 TryResolveCalibrationBundleId(flowResult.OutputData),
                 sessionId);
 
@@ -869,7 +873,7 @@ public class InspectionService : IInspectionService
         {
             _logger.LogError(ex, "[InspectionService] 检测异常: {ErrorMessage}", ex.Message);
             result.MarkAsError(ex.Message);
-            result.SetTraceability(ComputeFlowVersionHash(actualFlow), null, sessionId);
+            result.SetExecutionTraceability(snapshot, null, sessionId);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
             await CaptureEvidenceManifestAsync(result, cancellationToken);
             return result;
@@ -879,7 +883,7 @@ public class InspectionService : IInspectionService
     private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(
         Guid projectId,
         string cameraId,
-        OperatorFlow actualFlow,
+        ExecutionSnapshot snapshot,
         ProjectGlobalVariableSchema? globalVariables,
         Guid sessionId,
         CancellationToken cancellationToken)
@@ -887,6 +891,7 @@ public class InspectionService : IInspectionService
         ImageDto? imageDto = null;
         try
         {
+            var actualFlow = snapshot.CreateExecutionFlow();
             if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))
             {
                 _logger.LogInformation(
@@ -896,7 +901,7 @@ public class InspectionService : IInspectionService
                 return await ExecuteSingleResolvedCoreAsync(
                     projectId,
                     null,
-                    actualFlow,
+                    snapshot,
                     globalVariables,
                     sessionId,
                     cancellationToken);
@@ -914,7 +919,7 @@ public class InspectionService : IInspectionService
             return await ExecuteSingleResolvedCoreAsync(
                 projectId,
                 imageData,
-                actualFlow,
+                snapshot,
                 globalVariables,
                 sessionId,
                 cancellationToken);
@@ -952,7 +957,7 @@ public class InspectionService : IInspectionService
         }
     }
 
-    private async Task<(OperatorFlow Flow, ProjectGlobalVariableSchema? GlobalVariables)> ResolveExecutionFlowAsync(
+    private async Task<(ExecutionSnapshot Snapshot, ProjectGlobalVariableSchema? GlobalVariables)> ResolveExecutionFlowAsync(
         Guid projectId,
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface,
@@ -975,7 +980,15 @@ public class InspectionService : IInspectionService
                 _logger.LogInformation(
                     "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
                     flow!.Operators.Count);
-                return (flow, null);
+                var draftProject = await _projectRepository.GetByIdFreshAsync(projectId)
+                    ?? throw new ProjectNotFoundException(projectId);
+                return (new ExecutionSnapshot(
+                    projectId,
+                    flow!,
+                    draftProject.PersistenceRevision,
+                    ExecutionSnapshotSource.Draft,
+                    ExecutionRunMode.FormalPrimary,
+                    new Dictionary<string, string> { ["ProjectRevision"] = draftProject.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) }), null);
             }
 
             var storedAdmission = await _executionAdmissionService.ValidateProjectAsync(
@@ -990,17 +1003,26 @@ public class InspectionService : IInspectionService
                 throw new ProjectNotFoundException(projectId);
             }
 
-            var fileFlow = await LoadFlowFromStorageAsync(projectId);
-            if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
+            // Persisted formal execution has one authority: Project.Flow from the
+            // database row captured under the project access lease.  The file is
+            // a save artifact and must never become an implicit fallback.
+            if (HasExecutableFlow(project.Flow))
             {
                 ThrowIfAdmissionRejected(await _executionAdmissionService.ValidateFlowAsync(
                     projectId,
                     project.Flow,
                     surface,
                     cancellationToken));
-                return (project.Flow, project.GlobalVariables);
+                return (new ExecutionSnapshot(
+                    projectId,
+                    project.Flow,
+                    project.PersistenceRevision,
+                    ExecutionSnapshotSource.PersistedProject,
+                    ExecutionRunMode.FormalPrimary,
+                    new Dictionary<string, string> { ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) }), project.GlobalVariables);
             }
 
+#if false // File storage is a save/recovery artifact, never a run authority.
             if (HasExecutableFlow(fileFlow))
             {
                 ThrowIfAdmissionRejected(await _executionAdmissionService.ValidateFlowAsync(
@@ -1012,8 +1034,9 @@ public class InspectionService : IInspectionService
                     "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
                     projectId,
                     fileFlow!.Operators.Count);
-                return (fileFlow!, project.GlobalVariables);
+                throw new InvalidOperationException("Project flow storage is not an execution authority.");
             }
+#endif
 
             throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
         }
@@ -1137,6 +1160,41 @@ public class InspectionService : IInspectionService
             payload["SessionId"] = result.SessionId.Value.ToString("D");
         }
 
+        if (result.ExecutionSnapshotId.HasValue)
+        {
+            payload["ExecutionSnapshotId"] = result.ExecutionSnapshotId.Value.ToString("D");
+        }
+
+        if (result.ProjectPersistenceRevision.HasValue)
+        {
+            payload["ProjectPersistenceRevision"] = result.ProjectPersistenceRevision.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.DecisionConfigurationHash))
+        {
+            payload["DecisionConfigurationHash"] = result.DecisionConfigurationHash;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.RuntimePackageId))
+        {
+            payload["RuntimePackageId"] = result.RuntimePackageId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ExecutionSource))
+        {
+            payload["ExecutionSource"] = result.ExecutionSource;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ExecutionRunMode))
+        {
+            payload["ExecutionRunMode"] = result.ExecutionRunMode;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ShadowRole))
+        {
+            payload["ShadowRole"] = result.ShadowRole;
+        }
+
         return payload;
     }
 
@@ -1144,9 +1202,7 @@ public class InspectionService : IInspectionService
     {
         try
         {
-            var serialized = JsonSerializer.Serialize(flow, FlowJsonOptions);
-            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
-            return Convert.ToHexString(hashBytes);
+            return ExecutionFlowIdentity.ComputeFlowHash(flow);
         }
         catch (Exception ex)
         {

@@ -14,6 +14,45 @@ namespace ClearVision.Product.Core.Services;
 public interface IFlowExecutionService
 {
     /// <summary>
+    /// Executes the immutable authority captured for one run.  The default
+    /// implementation keeps existing adapters compatible while ensuring the
+    /// capability policy is checked before any executor is selected.
+    /// </summary>
+    Task<FlowExecutionResult> ExecuteFlowAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData = null,
+        bool enableParallel = false,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var violations = snapshot.SideEffectPolicy.Validate(snapshot.CreateExecutionFlow());
+        if (violations.Count > 0)
+        {
+            return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations));
+        }
+
+        return ExecuteFlowAsync(snapshot.CreateExecutionFlow(), inputData, enableParallel, cancellationToken);
+    }
+
+    /// <summary>Snapshot overload for project-global-variable formal runs.</summary>
+    Task<FlowExecutionResult> ExecuteFlowAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var violations = snapshot.SideEffectPolicy.Validate(snapshot.CreateExecutionFlow());
+        if (violations.Count > 0)
+        {
+            return Task.FromResult(FlowExecutionResult.SideEffectPolicyRejected(violations));
+        }
+
+        return ExecuteFlowAsync(snapshot.CreateExecutionFlow(), inputData, projectVariables, enableParallel, cancellationToken);
+    }
+
+    /// <summary>
     /// 执行算子流程
     /// </summary>
     /// <param name="flow">算子流程</param>
@@ -156,6 +195,21 @@ public class FlowExecutionResult
     /// 错误信息
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    public static FlowExecutionResult SideEffectPolicyRejected(
+        IReadOnlyList<ExecutionSideEffectViolation> violations) =>
+        new()
+        {
+            IsSuccess = false,
+            ErrorMessage = $"SIDE_EFFECT_POLICY_BLOCKED: {string.Join("; ", violations.Select(violation => violation.Message))}",
+            OperatorResults = violations.Select(violation => new OperatorExecutionResult
+            {
+                OperatorId = violation.OperatorId,
+                OperatorName = violation.OperatorName,
+                IsSuccess = false,
+                ErrorMessage = $"{violation.Code}: {violation.Message}"
+            }).ToList()
+        };
 }
 
 /// <summary>

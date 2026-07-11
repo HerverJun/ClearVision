@@ -103,6 +103,21 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DecisionConfigurationHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ExecutionSnapshotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionRunMode")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("ImageId")
                         .HasColumnType("TEXT");
 
@@ -124,6 +139,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<long>("ProcessingTimeMs")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("ProjectPersistenceRevision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
@@ -131,7 +149,15 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RuntimePackageId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("SessionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShadowRole")
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")

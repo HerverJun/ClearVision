@@ -194,6 +194,13 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.HasJudgmentSignal);
             entity.Property(e => e.DecisionSource).HasMaxLength(500);
             entity.Property(e => e.ReasonCode).HasMaxLength(200);
+            entity.Property(e => e.ExecutionSnapshotId);
+            entity.Property(e => e.ProjectPersistenceRevision);
+            entity.Property(e => e.DecisionConfigurationHash).HasMaxLength(128);
+            entity.Property(e => e.RuntimePackageId).HasMaxLength(128);
+            entity.Property(e => e.ExecutionSource).HasMaxLength(64);
+            entity.Property(e => e.ExecutionRunMode).HasMaxLength(64);
+            entity.Property(e => e.ShadowRole).HasMaxLength(32);
             entity.Property(e => e.ProcessingTimeMs).IsRequired();
             entity.Property(e => e.InspectionTime).IsRequired();
             entity.HasIndex(e => e.ProjectId);

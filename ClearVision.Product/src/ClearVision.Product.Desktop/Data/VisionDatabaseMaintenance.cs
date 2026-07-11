@@ -729,8 +729,15 @@ internal static class VisionDatabaseMaintenance
                      (Name: "ExecutionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionOutcome\" INTEGER NULL;"),
                      (Name: "DecisionOutcome", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionOutcome\" INTEGER NULL;"),
                      (Name: "DecisionSource", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionSource\" TEXT NULL;"),
-                     (Name: "ReasonCode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ReasonCode\" TEXT NULL;"),
-                     (Name: "HasJudgmentSignal", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"HasJudgmentSignal\" INTEGER NULL;")
+                      (Name: "ReasonCode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ReasonCode\" TEXT NULL;"),
+                      (Name: "HasJudgmentSignal", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"HasJudgmentSignal\" INTEGER NULL;"),
+                      (Name: "ExecutionSnapshotId", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionSnapshotId\" TEXT NULL;"),
+                      (Name: "ProjectPersistenceRevision", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ProjectPersistenceRevision\" INTEGER NULL;"),
+                      (Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;"),
+                      (Name: "RuntimePackageId", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"RuntimePackageId\" TEXT NULL;"),
+                      (Name: "ExecutionSource", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionSource\" TEXT NULL;"),
+                      (Name: "ExecutionRunMode", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ExecutionRunMode\" TEXT NULL;"),
+                      (Name: "ShadowRole", Statement: "ALTER TABLE \"InspectionResults\" ADD COLUMN \"ShadowRole\" TEXT NULL;")
                  })
         {
             if (!await ColumnExistsAsync(
@@ -1196,6 +1203,13 @@ internal static class VisionDatabaseMaintenance
         "column:InspectionResults.DecisionSource",
         "column:InspectionResults.ReasonCode",
         "column:InspectionResults.HasJudgmentSignal",
+        "column:InspectionResults.ExecutionSnapshotId",
+        "column:InspectionResults.ProjectPersistenceRevision",
+        "column:InspectionResults.DecisionConfigurationHash",
+        "column:InspectionResults.RuntimePackageId",
+        "column:InspectionResults.ExecutionSource",
+        "column:InspectionResults.ExecutionRunMode",
+        "column:InspectionResults.ShadowRole",
         "column:Projects.Flow_DecisionConfiguration",
         "table:StationAlarmEvents",
         "table:StationAuditRecords",

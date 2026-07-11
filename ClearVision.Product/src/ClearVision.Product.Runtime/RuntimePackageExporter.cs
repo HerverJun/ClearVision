@@ -133,7 +133,10 @@ public sealed class RuntimePackageExporter
             var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
             await WriteProjectAssetFilesAsync(packageRoot, packagedProjectAssets.Files, cancellationToken);
             var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
-            var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
+            // Flow identity is semantic and shared with Studio execution. A
+            // formatting-only rewrite of flow.json must not create a second
+            // identity for the same executable definition.
+            var flowHash = ExecutionFlowIdentity.ComputeFlowHash(packagedFlow.ToEntity());
             var profile = new RuntimeProfile();
             var manifest = new RuntimePackageManifest
             {
@@ -144,6 +147,7 @@ public sealed class RuntimePackageExporter
                 CreatedAt = DateTimeOffset.UtcNow,
                 CreatedBy = request.CreatedBy,
                 SourceProjectId = project.Id,
+                SourceProjectRevision = project.PersistenceRevision,
                 EntryFlow = "flow.json",
                 FlowHash = flowHash,
                 OperatorCatalogVersion = BuildOperatorCatalogVersion(),

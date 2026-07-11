@@ -2067,7 +2067,10 @@ class StationMonitorView {
 
     calculateResultStats(records) {
         const canonical = calculateCanonicalStatistics(records);
-        const timed = records.filter((record) => Number(record.executionTimeMs) > 0);
+        const timed = records.filter((record) => {
+            const value = Number(record.executionTimeMs);
+            return Number.isFinite(value) && value >= 0;
+        });
         const averageExecutionTimeMs = timed.length === 0
             ? 0
             : timed.reduce((sum, record) => sum + Number(record.executionTimeMs || 0), 0) / timed.length;
@@ -2144,8 +2147,8 @@ class StationMonitorView {
             ? this.monitorStatistics.validDecisions / this.monitorStatistics.executionSucceeded
             : 0;
 
-        const executionTime = Number(record.executionTimeMs || 0);
-        if (executionTime > 0) {
+        const executionTime = Number(record.executionTimeMs);
+        if (Number.isFinite(executionTime) && executionTime >= 0) {
             const totalTime = Number(this.monitorStatistics.averageExecutionTimeMs || 0) * Math.max(0, this.monitorStatistics.total - 1);
             this.monitorStatistics.averageExecutionTimeMs = (totalTime + executionTime) / Math.max(1, this.monitorStatistics.total);
         }

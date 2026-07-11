@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 
 namespace ClearVision.Product.Runtime;
@@ -71,7 +72,7 @@ public sealed partial class RuntimePackageValidator
                 "The package manifest still contains missing resources.");
         }
 
-        var computedHash = RuntimePathGuard.ComputeSha256(package.FlowBytes);
+        var computedHash = ExecutionFlowIdentity.ComputeFlowHash(package.Flow.ToEntity());
         if (!string.Equals(manifest.FlowHash, computedHash, StringComparison.OrdinalIgnoreCase))
         {
             AddIssue(

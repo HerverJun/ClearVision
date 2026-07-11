@@ -189,6 +189,9 @@ public sealed class RuntimePackageManifest
 
     public Guid SourceProjectId { get; set; }
 
+    /// <summary>Persistence revision captured when the package was exported.</summary>
+    public long SourceProjectRevision { get; set; }
+
     public string EntryFlow { get; set; } = "flow.json";
 
     public string FlowHash { get; set; } = string.Empty;
@@ -305,6 +308,14 @@ public sealed class RuntimeNormalizedResult
     public string PackageName { get; set; } = string.Empty;
 
     public string FlowHash { get; set; } = string.Empty;
+
+    public long ProjectRevision { get; set; }
+
+    public string DecisionConfigurationHash { get; set; } = string.Empty;
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public string ExecutionRunMode { get; set; } = "StationRuntime";
 
     public string ImageId { get; set; } = string.Empty;
 

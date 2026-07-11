@@ -548,6 +548,18 @@ public sealed class StationResultSummaryDto
     /// <summary>Exported flow hash for the runtime package.</summary>
     public string FlowHash { get; set; } = string.Empty;
 
+    /// <summary>Project revision captured in the runtime execution snapshot.</summary>
+    public long ProjectRevision { get; set; }
+
+    /// <summary>Hash of the final-decision configuration used by this run.</summary>
+    public string? DecisionConfigurationHash { get; set; }
+
+    /// <summary>Immutable run-definition identity created by Station Runtime.</summary>
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    /// <summary>Runtime side-effect mode used by the executor.</summary>
+    public string? ExecutionRunMode { get; set; }
+
     /// <summary>Image identifier for the processed frame.</summary>
     public string ImageId { get; set; } = string.Empty;
 

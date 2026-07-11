@@ -21,7 +21,7 @@ public static class InspectionResultPersistenceSnapshot
             snapshot.SetAnalysisDataJson(source.AnalysisDataJson);
         }
 
-        snapshot.SetTraceability(source.FlowVersionHash, source.CalibrationBundleId, source.SessionId);
+        snapshot.CopyTraceabilityFrom(source);
 
         foreach (var defect in source.Defects)
         {

@@ -1038,7 +1038,12 @@ class ResultPanel {
      */
     calculateStatistics() {
         const canonical = calculateCanonicalStatistics(this.results);
-        const validResults = this.results.filter(r => Number(r.processingTimeMs ?? r.processingTime ?? r.executionTimeMs) > 0);
+        // A completed zero-duration record is still a timing sample. Keep the
+        // browser calculation aligned with repository averages and Station.
+        const validResults = this.results.filter(r => {
+            const value = Number(r.processingTimeMs ?? r.processingTime ?? r.executionTimeMs);
+            return Number.isFinite(value) && value >= 0;
+        });
         const totalTime = validResults.reduce((sum, r) => sum + Number(r.processingTimeMs ?? r.processingTime ?? r.executionTimeMs ?? 0), 0);
         const avgTime = validResults.length > 0 ? Math.round(totalTime / validResults.length) : 0;
         this.statistics = { ...canonical, avgTime };
@@ -1276,7 +1281,7 @@ class ResultPanel {
         setKPI('kpi-undetermined', undetermined.toLocaleString());
         setKPI('kpi-yield', yieldText === '--' ? '--' : `${yieldText}%`);
         setKPI('kpi-coverage', coverageText === '--' ? '--' : `${coverageText}%`);
-        setKPI('kpi-avg-time', hasSamples && avgTime > 0 ? `${timeSec}${timeUnit}` : '--');
+        setKPI('kpi-avg-time', hasSamples ? `${timeSec}${timeUnit}` : '--');
 
         ['kpi-total-change', 'kpi-ok-change', 'kpi-ng-change', 'kpi-error-change', 'kpi-undetermined-change', 'kpi-yield-change', 'kpi-coverage-change', 'kpi-time-change']
             .forEach(id => this.renderUnavailableChange(id));
