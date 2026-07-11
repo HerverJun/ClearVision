@@ -1,0 +1,41 @@
+/* AI responsive boundary. */
+@media (max-width: 1180px) {
+    .ai-agent-overview-card,
+    .ai-workspace-grid-2,
+    .ai-plan-missing-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-build-card,
+    .ai-build-card-wide {
+        grid-column: span 12;
+    }
+}
+
+@media (max-width: 720px) {
+    .ai-plan-question-options,
+    .ai-clarification-plan-grid,
+    .ai-agent-overview-metrics,
+    .ai-build-metric-row,
+    .ai-plan-raw-diagnostic-rows div {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-clarification-plan-header,
+    .ai-clarification-plan-actions,
+    .ai-plan-user-cta {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-cursor,
+    .ai-message,
+    .ai-scroll-bottom-btn,
+    .ai-example-tags,
+    .examples-header svg {
+        animation: none;
+        transition: none;
+    }
+}

@@ -7,7 +7,8 @@
     "test": "npx playwright test --reporter=list",
     "test:preview-smoke": "node tests/e2e/preview-regression.smoke.mjs",
     "test:unit": "node tests/unit/run-all-unit-tests.mjs",
-    "test:agent-ui-contract": "node tests/unit/run-agent-ui-contract-tests.mjs"
+    "test:agent-ui-contract": "node tests/unit/run-agent-ui-contract-tests.mjs",
+    "audit:ai-css": "node scripts/audit-ai-css.mjs --check"
   },
   "keywords": [],
   "author": "",

@@ -385,6 +385,10 @@ export class AiPanel {
         this.currentCanvasRevision = this.flowCanvas?.getFlowRevision?.() || this.currentCanvasRevision;
         this.appliedResultVersion = this.currentResultVersion;
         this.appliedCanvasRevision = this.currentCanvasRevision;
+        dispatchAgentWorkspaceEvent(this, {
+            type: AgentWorkspaceEventTypes.APPLY_COMPLETED,
+            payload: { resultVersion: this.currentResultVersion }
+        });
         this._updateApplyButtonState();
     }
 
@@ -401,8 +405,11 @@ export class AiPanel {
             this.currentResult?.Flow ||
             null;
         const hasFlow = Boolean(flow && this._extractOperators(flow).length > 0);
-        const canvasApplyAllowed = !this.currentResult ||
-            (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true);
+        const actionModel = this.agentWorkspaceState?.projection?.actionModel;
+        const primary = actionModel?.primary;
+        const canvasApplyAllowed = primary?.id === 'apply_canvas'
+            ? primary.enabled === true
+            : (!this.currentResult || (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true));
         const applied = this._isCurrentResultAppliedToCanvas();
         button.disabled = this.isGenerating || !hasFlow || !canvasApplyAllowed || applied;
         button.classList.toggle('is-disabled', button.disabled);
@@ -410,7 +417,7 @@ export class AiPanel {
         const label = applied
             ? '已应用到画布'
             : hasFlow
-                ? (canvasApplyAllowed ? '应用到画布' : '当前草稿暂不可应用')
+                ? (canvasApplyAllowed ? (primary?.label || '应用到画布') : '当前草稿暂不可应用')
                 : '暂无可应用方案';
         button.innerHTML = `
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">

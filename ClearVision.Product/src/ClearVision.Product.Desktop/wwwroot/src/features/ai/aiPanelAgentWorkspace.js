@@ -2987,6 +2987,20 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _getPlanBuildActionState(plan) {
+        const projected = this.agentWorkspaceState?.projection?.actionModel;
+        if (projected) {
+            const primary = projected.primary;
+            const canStart = primary?.id === 'start_build' && primary.enabled === true;
+            return {
+                canBuild: canStart,
+                canAcceptRecommended: false,
+                canStart,
+                acceptedRecommended: false,
+                label: canStart ? primary.label : (primary?.label || '开始构建'),
+                statusText: projected.statusMessage || '等待权威构建条件。',
+                stats: plan ? this._getPlanReadinessStats(plan) : undefined
+            };
+        }
         if (!plan) {
             return {
                 canBuild: false,
@@ -4429,8 +4443,13 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _getAgentWorkspacePhase() {
-        if (this.workbenchState === AiWorkbenchStates.APPLIED || this.agentWorkspaceMode === AgentWorkspaceModes.APPLIED) {
+        const businessPhase = this.agentWorkspaceState?.projection?.businessPhase;
+        if (businessPhase === 'applied') {
             return AgentWorkspaceModes.APPLIED;
+        }
+
+        if (businessPhase === 'build') {
+            return AgentWorkspaceModes.BUILD;
         }
 
         return this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
@@ -4444,12 +4463,13 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatWorkspaceModeLabel() {
-        if (this.workbenchState === AiWorkbenchStates.APPLIED) return '已应用';
-        if (this.workbenchState === AiWorkbenchStates.READY_TO_APPLY) return '可应用';
+        const projection = this.agentWorkspaceState?.projection;
+        if (projection?.businessPhase === 'applied') return '已应用';
+        if (projection?.buildSubphase === 'ready_to_apply') return '可应用';
         const phase = this._getAgentWorkspacePhase();
-        const view = this._getWorkspaceViewMode();
+        const view = projection?.activeView || this._getWorkspaceViewMode();
         const phaseLabel = phase === AgentWorkspaceModes.BUILD ? '构建运行' : '规划阶段';
-        const viewLabel = view === AgentWorkspaceModes.BUILD ? '查看 Build' : '查看 Plan';
+        const viewLabel = view === 'build_evidence' || view === AgentWorkspaceModes.BUILD ? '查看 Build' : '查看 Plan';
         return `${phaseLabel} / ${viewLabel}`;
     },
 

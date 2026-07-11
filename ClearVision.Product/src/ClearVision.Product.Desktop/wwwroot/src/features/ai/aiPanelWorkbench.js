@@ -14,6 +14,25 @@
     CANCELLED: 'cancelled'
 });
 
+export function mapBuildSubphaseToAiWorkbenchState(buildSubphase) {
+    const normalized = String(buildSubphase || '').trim().toLowerCase();
+    const mapping = {
+        not_started: AiWorkbenchStates.IDLE,
+        generating: AiWorkbenchStates.GENERATING,
+        parsing: AiWorkbenchStates.PARSING,
+        validating: AiWorkbenchStates.VALIDATING,
+        dry_running: AiWorkbenchStates.DRY_RUNNING,
+        reviewing_parameters: AiWorkbenchStates.REVIEWING_PARAMETERS,
+        ready_to_apply: AiWorkbenchStates.READY_TO_APPLY,
+        apply_blocked: AiWorkbenchStates.FAILED,
+        applying: AiWorkbenchStates.APPLYING,
+        applied: AiWorkbenchStates.APPLIED,
+        failed: AiWorkbenchStates.FAILED,
+        cancelled: AiWorkbenchStates.CANCELLED
+    };
+    return mapping[normalized] || AiWorkbenchStates.IDLE;
+}
+
 const WORKBENCH_STAGE_ORDER = [
     { key: 'scenario_match', label: '场景识别', states: [AiWorkbenchStates.MATCHING_TEMPLATE] },
     { key: 'template_match', label: '模板匹配', states: [AiWorkbenchStates.MATCHING_TEMPLATE] },
@@ -328,7 +347,10 @@ export const aiPanelWorkbenchMixin = {
         const bar = this.container?.querySelector('#ai-workbench-state-bar');
         if (!bar) return;
 
-        const state = this.workbenchState;
+        const projectedSubphase = this.agentWorkspaceState?.projection?.buildSubphase;
+        const state = projectedSubphase
+            ? mapBuildSubphaseToAiWorkbenchState(projectedSubphase)
+            : this.workbenchState;
         if (state === AiWorkbenchStates.IDLE) {
             bar.innerHTML = '';
             bar.classList.remove('is-active');

@@ -1,0 +1,15 @@
+{
+  "legacyLineCount": 6456,
+  "hexColorCount": 280,
+  "importantCount": 36,
+  "backdropFilterCount": 12,
+  "coreSelectorOccurrences": {
+    ".ai-view-container": 2,
+    ".ai-workspace": 10,
+    ".ai-pane-left": 10,
+    ".ai-pane-right": 11,
+    ".ai-chat-container": 2,
+    ".ai-results-scroll": 3,
+    ".ai-input-section": 3
+  }
+}

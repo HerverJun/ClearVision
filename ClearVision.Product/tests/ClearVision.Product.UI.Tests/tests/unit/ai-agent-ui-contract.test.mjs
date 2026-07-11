@@ -9797,8 +9797,10 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   const productRoot = path.resolve(testProjectRoot, '..', '..');
   const sourcePath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanel.js');
   const cssPath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'shared', 'styles', 'ai-panel.css');
+  const shellCssPath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'shared', 'styles', 'ai-panel', 'shell.css');
   const source = fs.readFileSync(sourcePath, 'utf8');
   const css = fs.readFileSync(cssPath, 'utf8');
+  const shellCss = fs.readFileSync(shellCssPath, 'utf8');
 
   assert.match(source, /data-ai-workbench-pane="true"/);
   assert.match(source, /data-ai-chat-pane="true"/);
@@ -9808,8 +9810,8 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.match(source, /aiPanelValidationPreviewMixin/);
   assert.ok(source.split(/\r?\n/).length < 2500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
-  assert.match(css, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#f3f6fa[^}]*background:\s*var\(--ai-surface-page\)/s);
-  assert.match(css, /\[data-theme="dark"\]\s+\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#14181d/s);
+  assert.match(shellCss, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*var\(--workspace-bg\)[^}]*background:\s*var\(--ai-surface-page\)/s);
+  assert.doesNotMatch(shellCss, /#[0-9a-f]{3,8}\b/i);
   assert.match(css, /\.ai-workspace\s*{[^}]*2\.05fr[^}]*clamp\(22rem,\s*26vw,\s*31rem\)/s);
   assert.match(css, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
   assert.match(css, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);

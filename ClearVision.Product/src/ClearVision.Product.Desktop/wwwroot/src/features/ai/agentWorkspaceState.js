@@ -57,6 +57,37 @@ const clean = value => String(value ?? '').trim();
 const lower = value => clean(value).toLowerCase();
 const unique = values => [...new Set(asArray(values).map(clean).filter(Boolean))];
 const cloneMap = value => ({ ...asObject(value) });
+const readBoolean = (value, camel, pascal = '') => {
+    const raw = read(value, camel, pascal);
+    return raw === true || lower(raw) === 'true';
+};
+
+function hasWorkflowDraft(value) {
+    const result = asObject(value);
+    const buildResult = asObject(read(result, 'buildResult'));
+    const flow = asObject(read(result, 'flow') || read(buildResult, 'flow'));
+    const operators = read(flow, 'operators') || read(flow, 'nodes');
+    return asArray(operators).length > 0;
+}
+
+export function normalizeWorkspaceApplyGate(value) {
+    const result = asObject(value);
+    const buildResult = asObject(read(result, 'buildResult'));
+    const gate = asObject(read(result, 'applyGate') || read(buildResult, 'applyGate'));
+    const present = Object.keys(gate).length > 0;
+    const legacyCanvasReady = !present && hasWorkflowDraft(result);
+    return {
+        present,
+        canvasApplyReady: present ? readBoolean(gate, 'canvasApplyReady') : legacyCanvasReady,
+        runtimeDraftReady: present ? readBoolean(gate, 'runtimeDraftReady') : false,
+        deploymentReady: present ? readBoolean(gate, 'deploymentReady') : false,
+        blocked: present ? readBoolean(gate, 'blocked') : false,
+        status: lower(read(gate, 'status')),
+        blockingReasons: unique(read(gate, 'blockingReasons') || read(gate, 'blockers')),
+        deploymentBlockers: unique(read(gate, 'deploymentBlockers')),
+        firstFixRecommendation: clean(read(gate, 'firstFixRecommendation'))
+    };
+}
 
 export function normalizeCanonicalField(value) {
     const normalized = lower(value).replace(/[\s.-]+/g, '_');
@@ -213,11 +244,149 @@ function derivePhase(state, plan, readiness, queue) {
     return readiness.canBuild ? 'ready_to_build' : 'plan_blocked';
 }
 
+function deriveBuildSubphase(state, applyGate) {
+    if (state.apply.status === 'applied') return 'applied';
+    const build = state.run.build;
+    if (build.status === 'failed') return 'failed';
+    if (build.status === 'cancelled') return 'cancelled';
+    if (build.status === 'running') {
+        const lastEvent = asObject(build.events[build.events.length - 1]);
+        const stage = lower(read(lastEvent, 'stage') || read(lastEvent, 'eventType'));
+        if (/parse/.test(stage)) return 'parsing';
+        if (/validat|apply_gate/.test(stage)) return 'validating';
+        if (/dry.?run/.test(stage)) return 'dry_running';
+        if (/parameter|review/.test(stage)) return 'reviewing_parameters';
+        if (/apply/.test(stage)) return 'applying';
+        return 'generating';
+    }
+    if (hasWorkflowDraft(state.result)) {
+        return applyGate.canvasApplyReady && !applyGate.blocked ? 'ready_to_apply' : 'apply_blocked';
+    }
+    return 'not_started';
+}
+
+function deriveBusinessPhase(state, plan, buildSubphase) {
+    if (buildSubphase === 'applied') return 'applied';
+    if (buildSubphase !== 'not_started') return 'build';
+    if (plan) return 'plan';
+    return state.intent ? 'planning' : 'idle';
+}
+
+function deriveActiveView(state, businessPhase) {
+    if (businessPhase === 'applied') return 'application_record';
+    return lower(state.ui.viewMode) === 'build' ? 'build_evidence' : 'plan';
+}
+
+function deriveSystemOverlays(state, applyGate) {
+    const overlays = [];
+    if (state.readinessStatus === 'validating') overlays.push({ id: 'readiness_validating', tone: 'info' });
+    if (state.readinessStatus === 'failed') overlays.push({ id: 'readiness_failed', tone: 'danger', message: state.readinessError });
+    if (state.run.plan.status === 'running') overlays.push({ id: 'plan_running', tone: 'info' });
+    if (state.run.build.status === 'running') overlays.push({ id: 'build_running', tone: 'info' });
+    if (state.run.build.status === 'failed') overlays.push({ id: 'build_failed', tone: 'danger' });
+    if (applyGate.present && !applyGate.deploymentReady) {
+        overlays.push({ id: 'deployment_blocked', tone: 'warning', message: applyGate.firstFixRecommendation });
+    }
+    return overlays;
+}
+
+const action = (id, label, enabled = true, reason = '') => ({ id, label, enabled, reason });
+
+function deriveActionModel(state, { plan, readiness, queue, buildSubphase, applyGate }) {
+    const unresolvedBlocking = queue.filter(item => item.blocksBuild && !item.answered && !item.deferred).length;
+    const hardBlockerCount = asArray(readiness.blockers)
+        .filter(item => item.blocksBuild === true && lower(item.category) !== 'resource_pending').length;
+    const resourceBlockerCount = asArray(readiness.blockers)
+        .filter(item => lower(item.category) === 'resource_pending').length;
+    const remainingCount = Math.max(asArray(readiness.remainingFields).length, unresolvedBlocking, hardBlockerCount + resourceBlockerCount);
+    const model = { primary: null, secondary: [], danger: [], statusMessage: '' };
+
+    if (!plan && buildSubphase === 'not_started') {
+        model.statusMessage = state.intent ? '正在整理需求。' : '描述检测目标后开始规划。';
+        return model;
+    }
+    if (state.readinessStatus === 'validating') {
+        model.statusMessage = '正在校验构建条件。';
+        return model;
+    }
+    if (state.readinessStatus === 'failed') {
+        model.secondary.push(action('retry_readiness', '重试条件校验', true, state.readinessError));
+        model.statusMessage = state.readinessError || '构建条件校验失败。';
+        return model;
+    }
+    if (buildSubphase === 'generating' || buildSubphase === 'parsing' || buildSubphase === 'validating' || buildSubphase === 'dry_running' || buildSubphase === 'reviewing_parameters' || buildSubphase === 'applying') {
+        model.danger.push(action('cancel_build', '取消构建'));
+        model.statusMessage = '构建正在进行，准入状态由后端事件更新。';
+        return model;
+    }
+    if (buildSubphase === 'failed' || buildSubphase === 'cancelled') {
+        if (readiness.canBuild === true) model.primary = action('start_build', '重新构建');
+        model.secondary.push(action('view_build_evidence', '查看构建证据'));
+        model.statusMessage = buildSubphase === 'failed' ? '构建失败，请先查看公开失败证据。' : '构建已取消。';
+        return model;
+    }
+    if (buildSubphase === 'ready_to_apply') {
+        model.primary = action('apply_canvas', '应用到画布', applyGate.canvasApplyReady && !applyGate.blocked);
+        model.secondary.push(action('view_build_evidence', '查看构建证据'));
+        model.statusMessage = applyGate.deploymentReady
+            ? '画布、运行草稿和部署门禁均已就绪。'
+            : applyGate.runtimeDraftReady
+                ? '可应用到画布；运行草稿已就绪，部署仍受门禁约束。'
+                : '可应用到画布继续编辑；运行草稿和部署仍受门禁约束。';
+        return model;
+    }
+    if (buildSubphase === 'apply_blocked') {
+        model.secondary.push(action('view_build_evidence', '查看构建证据'));
+        model.statusMessage = applyGate.firstFixRecommendation || '当前构建产物未通过画布应用门禁。';
+        return model;
+    }
+    if (buildSubphase === 'applied') {
+        model.secondary.push(action('view_application_record', '查看应用记录'));
+        model.statusMessage = applyGate.deploymentReady
+            ? '方案已应用，部署门禁已就绪。'
+            : '方案已应用到画布；部署门禁仍保持独立。';
+        return model;
+    }
+    if (readiness.canBuild !== true) {
+        const mustConfirmCount = Math.max(hardBlockerCount, unresolvedBlocking - resourceBlockerCount, 0);
+        const fillLaterCount = Math.max(remainingCount - mustConfirmCount, resourceBlockerCount, 0);
+        model.primary = action('answer_clarifications', remainingCount > 0 ? `还需补充 ${remainingCount} 项信息` : '补充信息', true);
+        model.secondary.push(action('view_plan', '查看方案'));
+        model.statusMessage = remainingCount > 0
+            ? `总计 ${remainingCount} 项；构建前必须确认 ${mustConfirmCount} 项；可构建后补齐 ${fillLaterCount} 项。${readiness.primaryMessage || ''}`
+            : (readiness.primaryMessage || '等待后端返回权威构建条件。');
+        return model;
+    }
+
+    model.primary = action('start_build', state.requirementMode === 'draft' ? '生成可编辑草稿' : '开始构建');
+    model.secondary.push(action('view_plan', '查看方案'));
+    model.statusMessage = state.requirementMode === 'draft'
+        ? '后端已允许生成可编辑草稿；这不代表部署就绪。'
+        : '后端已确认满足构建条件。';
+    return model;
+}
+
 export function deriveAgentWorkspaceProjection(state) {
     const plan = state.plan;
     if (!plan) {
+        const applyGate = normalizeWorkspaceApplyGate(state.result);
+        const buildSubphase = deriveBuildSubphase(state, applyGate);
+        const businessPhase = deriveBusinessPhase(state, null, buildSubphase);
+        const actionModel = deriveActionModel(state, {
+            plan: null,
+            readiness: state.readiness,
+            queue: [],
+            buildSubphase,
+            applyGate
+        });
         return {
             phase: derivePhase(state, null, state.readiness, []),
+            businessPhase,
+            buildSubphase,
+            systemOverlays: deriveSystemOverlays(state, applyGate),
+            activeView: deriveActiveView(state, businessPhase),
+            actionModel,
+            gates: applyGate,
             confirmedAnswers: [],
             optimisticAnswers: [],
             answersByField: {},
@@ -295,8 +464,18 @@ export function deriveAgentWorkspaceProjection(state) {
         ? requestedBatchKeys.map(key => queue.find(item => (item.field || item.id) === key)).filter(Boolean)
         : unresolved.filter(item => item.interactive).slice(0, 3);
     const phase = derivePhase(state, plan, readiness, queue);
+    const applyGate = normalizeWorkspaceApplyGate(state.result);
+    const buildSubphase = deriveBuildSubphase(state, applyGate);
+    const businessPhase = deriveBusinessPhase(state, plan, buildSubphase);
+    const actionModel = deriveActionModel(state, { plan, readiness, queue, buildSubphase, applyGate });
     return {
         phase,
+        businessPhase,
+        buildSubphase,
+        systemOverlays: deriveSystemOverlays(state, applyGate),
+        activeView: deriveActiveView(state, businessPhase),
+        actionModel,
+        gates: applyGate,
         confirmedAnswers: Object.values(confirmed),
         optimisticAnswers: Object.values(optimistic),
         answersByField,
@@ -306,7 +485,7 @@ export function deriveAgentWorkspaceProjection(state) {
         readiness,
         buildAction: {
             canBuild: readiness.canBuild === true,
-            canStart: readiness.canBuild === true && state.run.build.status !== 'running',
+            canStart: actionModel.primary?.id === 'start_build' && actionModel.primary.enabled === true,
             status: readiness.canBuild === true ? 'ready' : phase
         }
     };
@@ -334,8 +513,8 @@ export function createAgentWorkspaceState(seed = {}) {
         resources: { missingByKey: {}, decisionsByKey: {} },
         clarification: { batchKeys: [], batchRevision: 0 },
         run: {
-            plan: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null },
-            build: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null }
+            plan: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null, lastSequence: null },
+            build: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null, lastSequence: null }
         },
         apply: { status: 'idle', revision: 0 },
         ui: { workspaceMode: 'plan', viewMode: lower(seed.viewMode) === 'build' ? 'build' : 'plan' },
@@ -403,8 +582,8 @@ function reduceRunEvent(state, event) {
     const key = eventId || `${runId}:${Number.isFinite(sequence) ? sequence : 'na'}:${eventType}`;
     if (current.eventKeys[key]) return state;
     const isTerminal = TERMINAL_EVENT_TYPES.has(eventType);
-    if (current.status !== 'idle' && TERMINAL_EVENT_TYPES.has(`run.${current.status}`) && !isTerminal) return state;
-    if (isTerminal && current.terminalSequence !== null && Number.isFinite(sequence) && sequence <= current.terminalSequence) return state;
+    if (current.status !== 'idle' && TERMINAL_EVENT_TYPES.has(`run.${current.status}`)) return state;
+    if (Number.isFinite(sequence) && current.lastSequence !== null && sequence <= current.lastSequence) return state;
     const status = eventType === 'run.completed'
         ? 'completed'
         : eventType === 'run.failed'
@@ -418,7 +597,8 @@ function reduceRunEvent(state, event) {
         status,
         events: [...current.events, normalizedEvent],
         eventKeys: { ...current.eventKeys, [key]: true },
-        terminalSequence: isTerminal && Number.isFinite(sequence) ? sequence : current.terminalSequence
+        terminalSequence: isTerminal && Number.isFinite(sequence) ? sequence : current.terminalSequence,
+        lastSequence: Number.isFinite(sequence) ? sequence : current.lastSequence
     };
     return withProjection({
         ...state,
@@ -643,7 +823,7 @@ export function agentWorkspaceReducer(state, event) {
         }
         case AgentWorkspaceEventTypes.RUN_STARTED: {
             const kind = lower(payload.kind) === 'plan' ? 'plan' : 'build';
-            const run = { runId: clean(payload.runId), status: 'running', events: [], eventKeys: {}, terminalSequence: null };
+            const run = { runId: clean(payload.runId), status: 'running', events: [], eventKeys: {}, terminalSequence: null, lastSequence: null };
             return withProjection({
                 ...state,
                 run: { ...state.run, [kind]: run },
@@ -656,7 +836,7 @@ export function agentWorkspaceReducer(state, event) {
             const kind = lower(payload.kind) === 'plan' ? 'plan' : 'build';
             return withProjection({
                 ...state,
-                run: { ...state.run, [kind]: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null } }
+                run: { ...state.run, [kind]: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null, lastSequence: null } }
             }, event);
         }
         case AgentWorkspaceEventTypes.RUN_PATCHED: {

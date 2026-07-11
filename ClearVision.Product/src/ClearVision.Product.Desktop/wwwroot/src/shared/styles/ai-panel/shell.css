@@ -1,0 +1,24 @@
+/* AI shell boundary. --ai-* values are aliases of global semantic tokens only. */
+.ai-view-container {
+    --ai-surface-page: var(--workspace-bg);
+    --ai-surface-pane: var(--bg-surface);
+    --ai-surface-panel: var(--bg-subtle);
+    --ai-surface-panel-strong: var(--theme-surface-3);
+    --ai-border: var(--border-color);
+    --ai-border-strong: var(--theme-border-strong);
+    --ai-grid-line: var(--border-color);
+    --ai-text-main: var(--text-primary);
+    --ai-text-muted: var(--text-secondary);
+    --ai-text-soft: var(--text-muted);
+    --ai-accent: var(--cinnabar);
+    --ai-accent-strong: var(--cinnabar-dark);
+    --ai-success: var(--status-ok);
+    --ai-warning: var(--status-error);
+    --ai-danger: var(--status-ng);
+    --ai-info: var(--status-info);
+    background: var(--ai-surface-page);
+    color: var(--ai-text-main);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+}
