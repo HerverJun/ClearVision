@@ -5789,6 +5789,7 @@ export const aiPanelAgentWorkspaceMixin = {
             if (parameters) parameters.innerHTML = '<div class="ai-followup-empty">参数映射和资源审计任务会在构建结果返回后显示。</div>';
             if (checks) checks.innerHTML = '<div class="ai-followup-empty">ApplyGate 会在构建结果返回后显示。</div>';
             if (finalDraft) finalDraft.innerHTML = '<div class="ai-followup-empty">流程草稿完成后可应用到画布。</div>';
+            this._renderBuildPresentation?.();
             return;
         }
 
@@ -5798,6 +5799,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (parameters) parameters.innerHTML = this._renderBuildParameterSummary(events);
         if (checks) checks.innerHTML = this._renderBuildChecks(events);
         if (finalDraft) finalDraft.innerHTML = this._renderBuildFinalDraft(events);
+        this._renderBuildPresentation?.();
     },
 
     _renderBuildTimeline(events) {

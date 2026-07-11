@@ -175,6 +175,7 @@ export const aiPanelPendingParametersMixin = {
 
     _renderPendingDraftField(group, field, confirmationState = null) {
         const inputId = this._buildPendingDraftInputId(group.operatorId, field.parameterName);
+        const statusId = `${inputId}-status`;
         const labelText = getParameterDisplayName(field.parameterName, {
             fallback: field.displayName || field.parameterName
         });
@@ -224,6 +225,8 @@ export const aiPanelPendingParametersMixin = {
                     data-field-type="boolean"
                     data-draft-operator-id="${this._escapeHtml(group.operatorId)}"
                     data-draft-parameter-name="${this._escapeHtml(field.parameterName)}"
+                    aria-describedby="${this._escapeHtml(statusId)}"
+                    aria-invalid="${!hasConfirmedValue ? 'true' : 'false'}"
                 >
                     <option value="" ${normalizedBoolean === null ? 'selected' : ''}>待确认</option>
                     <option value="true" ${normalizedBoolean === true ? 'selected' : ''}>是</option>
@@ -245,6 +248,8 @@ export const aiPanelPendingParametersMixin = {
                     data-field-type="${this._escapeHtml(field.dataType)}"
                     data-draft-operator-id="${this._escapeHtml(group.operatorId)}"
                     data-draft-parameter-name="${this._escapeHtml(field.parameterName)}"
+                    aria-describedby="${this._escapeHtml(statusId)}"
+                    aria-invalid="${!hasConfirmedValue ? 'true' : 'false'}"
                 >
                     ${options}
                 </select>
@@ -263,6 +268,8 @@ export const aiPanelPendingParametersMixin = {
                         data-draft-parameter-name="${this._escapeHtml(field.parameterName)}"
                         value="${this._escapeHtml(currentValueText)}"
                         placeholder="请选择或输入文件路径"
+                        aria-describedby="${this._escapeHtml(statusId)}"
+                        aria-invalid="${!hasConfirmedValue ? 'true' : 'false'}"
                     />
                     <button
                         class="ai-draft-file-btn"
@@ -293,6 +300,8 @@ export const aiPanelPendingParametersMixin = {
                     ${minAttr}
                     ${maxAttr}
                     placeholder="请输入数值"
+                    aria-describedby="${this._escapeHtml(statusId)}"
+                    aria-invalid="${!hasConfirmedValue ? 'true' : 'false'}"
                 />
             `;
         } else {
@@ -307,6 +316,8 @@ export const aiPanelPendingParametersMixin = {
                     data-draft-parameter-name="${this._escapeHtml(field.parameterName)}"
                     value="${this._escapeHtml(currentValueText)}"
                     placeholder="请输入参数值"
+                    aria-describedby="${this._escapeHtml(statusId)}"
+                    aria-invalid="${!hasConfirmedValue ? 'true' : 'false'}"
                 />
             `;
         }
@@ -319,7 +330,7 @@ export const aiPanelPendingParametersMixin = {
                 </label>
                 ${controlHtml}
                 ${suggestionHtml}
-                ${isBatchConfirmed ? `<div class="ai-parameter-field-status">当前状态：已确认</div>` : '<div class="ai-parameter-field-status is-unconfirmed">当前状态：待确认</div>'}
+                ${isBatchConfirmed ? `<div class="ai-parameter-field-status" id="${this._escapeHtml(statusId)}">当前状态：已确认</div>` : `<div class="ai-parameter-field-status is-unconfirmed" id="${this._escapeHtml(statusId)}">当前状态：待确认</div>`}
                 ${sourceHint}
                 ${placeholderHint}
                 ${description}
@@ -444,6 +455,7 @@ export const aiPanelPendingParametersMixin = {
         if (reviewButton) {
             reviewButton.disabled = this.isGenerating || !confirmationState.canReview;
         }
+        this._renderBuildPresentation?.();
     },
 
     _syncPendingParameterDrafts(data, flow = null, options = {}) {

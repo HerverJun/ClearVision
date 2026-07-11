@@ -332,6 +332,7 @@ export const aiPanelWorkbenchMixin = {
         if (state === AiWorkbenchStates.IDLE) {
             bar.innerHTML = '';
             bar.classList.remove('is-active');
+            this._renderBuildPresentation?.();
             return;
         }
 
@@ -392,6 +393,7 @@ export const aiPanelWorkbenchMixin = {
             }
             return `<span class="${cls}">${stage.label}</span>`;
         }).join('');
+        this._renderBuildPresentation?.();
     },
 
     _renderStageTimeline(timeline) {

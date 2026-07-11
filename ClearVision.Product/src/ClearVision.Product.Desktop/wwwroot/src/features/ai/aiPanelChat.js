@@ -64,7 +64,7 @@ export const aiPanelChatMixin = {
                         <span class="ai-cursor reply-cursor" hidden></span>
                     </div>
                 </details>
-                <details class="ai-assistant-section ai-assistant-process-section" open hidden>
+                <details class="ai-assistant-section ai-assistant-process-section" hidden>
                     <summary>执行过程</summary>
                     <div class="ai-assistant-section-body ai-assistant-process-body"></div>
                 </details>

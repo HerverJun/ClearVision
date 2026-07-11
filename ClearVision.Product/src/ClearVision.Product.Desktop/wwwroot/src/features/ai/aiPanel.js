@@ -31,6 +31,10 @@ import {
 } from './aiPanelShellPresentation.js';
 import { installAiPanelPlanPresentation } from './aiPanelPlanPresentation.js';
 import {
+    installAiPanelBuildPresentation,
+    renderAiBuildWorkspaceScaffold
+} from './aiPanelBuildPresentation.js';
+import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
 } from './aiPanelAgentWorkspace.js';
@@ -554,110 +558,7 @@ export class AiPanel {
                     </div>
                     <div class="ai-agent-workspace-overview" id="ai-agent-workspace-overview"></div>
                     <div class="ai-plan-workspace" id="ai-plan-workspace"></div>
-                    <div class="ai-build-workspace" id="ai-build-workspace" hidden>
-                        <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
-                        <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
-                        <div class="ai-result-status-note" id="ai-result-status-note"></div>
-                        <div class="apply-container">
-                            <button class="btn-apply-flow" id="ai-btn-apply" disabled>
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
-                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                                </svg>
-                                应用到画布
-                            </button>
-                            <div class="ai-apply-gate-hint">确认人工参数后，可应用到画布继续编辑；部署仍受资源确认和 DeploymentReady 门禁约束。</div>
-                        </div>
-                        <div class="ai-build-dashboard">
-                            <section class="result-card ai-build-card">
-                                <div class="card-title">构建时间线</div>
-                                <div class="ai-build-event-timeline" id="ai-build-event-timeline"></div>
-                            </section>
-                            <section class="result-card ai-build-card">
-                                <div class="card-title">模板决策</div>
-                                <div class="ai-build-compact" id="ai-build-template-match"></div>
-                            </section>
-                            <section class="result-card ai-build-card">
-                                <div class="card-title">算子链</div>
-                                <div class="ai-build-compact" id="ai-build-operator-chain"></div>
-                            </section>
-                            <section class="result-card ai-build-card">
-                                <div class="card-title">参数映射</div>
-                                <div class="ai-build-compact" id="ai-build-parameters"></div>
-                            </section>
-                            <section class="result-card ai-build-card ai-build-card-wide">
-                                <div class="card-title">就绪 / 预演 / 工站</div>
-                                <div class="ai-build-checks" id="ai-build-checks"></div>
-                            </section>
-                            <section class="result-card ai-build-card">
-                                <div class="card-title">流程草稿</div>
-                                <div class="ai-build-compact" id="ai-build-final-draft"></div>
-                            </section>
-                        </div>
-                        <div class="ai-results-scroll" id="ai-results-scroll">
-                        <div class="ai-workspace-section-title">应用就绪证据</div>
-                        <div class="result-card requirement-brief-card" id="ai-result-requirement-brief-card" hidden>
-                            <div class="card-title requirement-brief-titlebar">
-                                <span>规划证据快照</span>
-                                <span class="card-badge ai-requirement-confidence" id="ai-requirement-confidence"></span>
-                            </div>
-                            <div class="ai-requirement-brief is-empty" id="ai-result-requirement-brief">
-                                <div class="ai-followup-empty">当前尚未提炼出需求摘要。</div>
-                            </div>
-                        </div>
-
-                        <div class="result-card overview">
-                            <div class="card-title">构建结果摘要</div>
-                            <div class="ai-explanation" id="ai-result-summary">--</div>
-                        </div>
-
-                        <div class="result-card stage-timeline-card" id="ai-result-stage-timeline-card" hidden>
-                            <div class="card-title stage-timeline-titlebar">
-                                <span>构建阶段证据</span>
-                                <span class="card-badge" id="ai-stage-timeline-summary"></span>
-                            </div>
-                            <div class="ai-stage-timeline" id="ai-result-stage-timeline"></div>
-                        </div>
-
-                        <div class="result-card ops-list">
-                            <div class="card-title">最终草稿算子</div>
-                            <div class="generated-ops-list" id="ai-result-ops"></div>
-                        </div>
-
-                        <div class="result-card validation-card" id="ai-result-validation-card" hidden>
-                            <div class="card-title">
-                                <span>校验 / 预演证据</span>
-                            </div>
-                            <div class="ai-validation-panel" id="ai-result-validation"></div>
-                        </div>
-
-                        <div class="result-card followup-card">
-                            <div class="card-title">缺失资源 / 后续动作</div>
-                            <div class="ai-followup-panel is-empty" id="ai-result-followups">
-                                <div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>
-                            </div>
-                        </div>
-
-                        <div class="result-card parameter-editor-card">
-                            <div class="card-title">待确认参数</div>
-                            <div class="ai-parameter-editor is-empty" id="ai-result-parameter-editor">
-                                <div class="ai-followup-empty">当前没有待确认参数，暂无需补录。</div>
-                            </div>
-                        </div>
-
-                        <div class="result-card attachment-card" id="ai-result-attachment-card" hidden>
-                            <div class="card-title">附件 / 能力元数据</div>
-                            <div class="ai-attachment-panel" id="ai-result-attachments"></div>
-                        </div>
-
-                        <div class="result-card prompt-trace-card" id="ai-result-prompt-trace-card" hidden>
-                            <div class="card-title prompt-trace-titlebar">
-                                <span>公开调试摘要</span>
-                                <button class="ai-trace-toggle-btn" id="ai-trace-toggle" type="button">切换视图</button>
-                            </div>
-                            <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
-                        </div>
-                    </div>
-                    </div>
+                    ${renderAiBuildWorkspaceScaffold()}
                 </aside>
                 </div>
             </div>
@@ -1322,6 +1223,7 @@ export class AiPanel {
         this._renderValidationConsole(data);
         this._renderAttachmentPanel();
         this._renderPromptTrace(data?.promptTrace ?? data?.PromptTrace ?? null);
+        this._renderBuildPresentation?.();
         if (appendChatMessage) {
             this._addMessage('ai', `工程方案已生成！包含 ${ops.length} 个算子、${connections.length} 条连线。${templateNotice}可继续输入修改指令。`);
         }
@@ -1512,7 +1414,19 @@ export class AiPanel {
         const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         const pendingGroups = this._collectPendingDraftGroups(pending, operators).map(group => ({ ...group, groupKey: this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey, label: this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label, operatorId: this._sanitizeResourceAuditDisplayText?.(group.operatorId, 120) || group.operatorId, fields: (group.fields || []).map(field => ({ ...field, parameterName: this._sanitizeResourceAuditDisplayText?.(field.parameterName, 120) || field.parameterName })) }));
-        const effectivePending = pendingGroups.map(group => ({
+        const displayPendingGroups = pendingGroups.map(group => ({
+            ...group,
+            fields: group.fields.filter(field => !missing.some(item => {
+                const resourceOperator = String(item.operatorId || item.actualOperatorId || '').trim().toLowerCase();
+                const resourceParameter = String(item.parameterName || this._inferPendingParameterNameFromMissingResource?.(item) || '').trim().toLowerCase();
+                const resourceKey = String(item.resourceKey || '').trim().toLowerCase();
+                const operatorId = String(group.operatorId || '').trim().toLowerCase();
+                const parameterName = String(field.parameterName || '').trim().toLowerCase();
+                return (resourceParameter === parameterName && (!resourceOperator || resourceOperator === operatorId)) ||
+                    resourceKey === `${operatorId}.${parameterName}`;
+            }))
+        })).filter(group => group.fields.length > 0);
+        const effectivePending = displayPendingGroups.map(group => ({
             operatorId: group.operatorId,
             parameterNames: group.fields.map(field => field.parameterName)
         }));
@@ -1582,31 +1496,22 @@ export class AiPanel {
             `
             : '';
 
-        const pendingHtml = pendingGroups.length > 0
+        const pendingHtml = displayPendingGroups.length > 0
             ? `
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
                         <div class="ai-followup-section-label">待确认参数</div>
-                        <div class="ai-followup-section-tip">人工填写并确认后即可应用到画布</div>
+                        <div class="ai-followup-section-tip">参数详情和确认操作位于上方参数工作区</div>
                     </div>
                     <div class="ai-followup-list">
-                        ${pendingGroups.map(group => {
+                        ${displayPendingGroups.map(group => {
                             return `
-                            <button class="ai-followup-item ai-followup-nav ai-resource-audit-card is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey)}">
-                                <div class="ai-resource-audit-card-head">
-                                    <div>
-                                        <div class="ai-followup-item-title">${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label)}</div>
-                                        <div class="ai-followup-item-body">资源类型：测量参数 / 业务参数；点击定位到下方人工确认输入区。</div>
-                                    </div>
-                                    <span class="ai-resource-audit-badge">人工确认</span>
-                                </div>
-                                <div class="ai-resource-audit-grid">
-                                    <span><small>影响算子</small><b>${this._escapeHtml(group.operatorId || '待识别')}</b></span>
-                                    <span><small>影响参数</small><b>${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</b></span>
-                                    <span><small>阻断原因</small><b>部署前参数需要人工确认</b></span>
-                                    <span><small>AI 建议</small><b>下方填写区提供建议值，仅供参考</b></span>
-                                </div>
-                                <div class="ai-resource-audit-manual-title">人工确认输入区在下方“待确认参数”编辑器</div>
+                            <button class="ai-followup-item ai-followup-nav is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey)}">
+                                <span>
+                                    <strong>${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label)}</strong>
+                                    <small>${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</small>
+                                </span>
+                                <b>定位参数</b>
                             </button>
                         `;
                         }).join('')}
@@ -1619,25 +1524,15 @@ export class AiPanel {
             ? `
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
-                        <div class="ai-followup-section-label">资源审计证据</div>
-                        <div class="ai-followup-section-tip">只读；请在 Plan 工作台唯一澄清线处理</div>
+                        <div class="ai-followup-section-label">待绑定资源</div>
+                        <div class="ai-followup-section-tip">复用现有资源绑定与门禁刷新链路</div>
                     </div>
                     <div class="ai-followup-list">
-                        ${missing.map((item, index) => {
-                            const type = this._escapeHtml(item?.resourceType || '资源');
-                            const key = this._escapeHtml(item?.resourceKey || item?.description || `resource-${index + 1}`);
-                            return `
-                                <article class="ai-followup-item ai-resource-audit-card is-readonly" data-resource-evidence="${index}">
-                                    <div class="ai-resource-audit-card-head">
-                                        <div>
-                                            <div class="ai-followup-item-title">${type}</div>
-                                            <div class="ai-followup-item-body">${key}</div>
-                                        </div>
-                                        <span class="ai-resource-audit-badge">resource_pending</span>
-                                    </div>
-                                    <div class="ai-followup-item-meta">“稍后绑定”不会把该资源标记为已就绪，部署门禁仍保留。</div>
-                                </article>`;
-                        }).join('')}
+                        ${missing.map((item, index) => this._renderResourceAuditTaskCard(
+                            item,
+                            this._getMissingResourceActionModel(item),
+                            index
+                        )).join('')}
                     </div>
                 </div>
             `
@@ -1664,8 +1559,8 @@ export class AiPanel {
         container.classList.remove('is-empty');
         container.innerHTML = `
             <div class="ai-resource-audit-intro">
-                <strong>资源补齐在此处集中完成，便于审计。</strong>
-                <span>人工确认后的参数可直接应用到画布；AI 复核仅用于二次检查或继续优化，不是应用到画布的必要步骤。应用后可在流程页点击算子微调，流程页修改会回流为审计记录且不会绕过部署门禁。</span>
+                <strong>具体资源在 Build 中完成绑定。</strong>
+                <span>绑定结果继续进入现有参数草稿、Readiness、验证与 Apply Gate 刷新机制，不在前端建立平行状态。</span>
             </div>
             ${recommendedHtml}
             ${pendingHtml}
@@ -1983,6 +1878,7 @@ export class AiPanel {
         if (!normalizedText) {
             note.textContent = '';
             note.hidden = true;
+            this._renderBuildPresentation?.();
             return;
         }
 
@@ -1995,6 +1891,7 @@ export class AiPanel {
         } else {
             note.textContent = normalizedText;
         }
+        this._renderBuildPresentation?.();
     }
 
     _renderManualRetryBanner() {
@@ -2421,4 +2318,5 @@ Object.assign(
 );
 
 installAiPanelPlanPresentation(AiPanel.prototype);
+installAiPanelBuildPresentation(AiPanel.prototype);
 installAiPanelShellPresentation(AiPanel.prototype);

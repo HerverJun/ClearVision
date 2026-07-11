@@ -6417,7 +6417,7 @@ test('parameter review copy makes AI review optional and removes submit audit wo
   assert.doesNotMatch(combined, /确认全部参数/);
 });
 
-test('Legacy followup evidence is read-only and redacts unsafe metadata', async () => {
+test('Build resource workspace exposes existing binding controls and redacts unsafe metadata', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
@@ -6430,17 +6430,18 @@ test('Legacy followup evidence is read-only and redacts unsafe metadata', async 
   const html = elements['#ai-result-followups'].innerHTML;
   assertNoSensitiveLeak(html);
   assert.doesNotMatch(html, /data-missing-resource-action/);
-  assert.match(html, /data-resource-evidence="0"/);
-  assert.match(html, /is-readonly/);
+  assert.match(html, /data-resource-action="bind_model_resource"/);
+  assert.match(html, /data-resource-input="true"/);
+  assert.match(html, /具体资源在 Build 中完成绑定/);
 });
 test('apply hint separates canvas apply from DeploymentReady gate', async () => {
-  const source = fs.readFileSync(
-    path.resolve(getRepoRoot(), 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'),
-    'utf8'
-  );
+  const source = [
+    'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelBuildPresentation.js',
+    'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  ].map(file => fs.readFileSync(path.resolve(getRepoRoot(), file), 'utf8')).join('\n');
 
-  assert.match(source, /确认人工参数后，可应用到画布继续编辑/);
-  assert.match(source, /部署仍受资源确认和 DeploymentReady 门禁约束/);
+  assert.match(source, /按钮继续服从现有 CanvasApplyReady、ApplyGate 与画布应用语义/);
+  assert.match(source, /不在前端建立平行状态/);
 });
 
 test('confirmed manual parameters are written when applying to canvas', async () => {
@@ -8965,7 +8966,7 @@ test('readyForDeployment=false disables deployment actions but not workflow edit
   assert.match(validation.innerHTML, /data-agent-workflow-edit-enabled="true"/);
 });
 
-test('Legacy result resource cards no longer expose an independent answer handler', async () => {
+test('Build result resource cards reuse the existing binding handler without automatic deployment', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { options: { getOperators: resourceBindingOperatorMetadata } });
   const followups = createFakeElement();
@@ -8973,8 +8974,9 @@ test('Legacy result resource cards no longer expose an independent answer handle
   const response = resourceBindingResponse();
   panel._renderFollowupChecklist(response, response.flow);
   assert.doesNotMatch(followups.innerHTML, /data-missing-resource-action/);
-  assert.match(followups.innerHTML, /资源审计证据/);
-  assert.match(followups.innerHTML, /is-readonly/);
+  assert.match(followups.innerHTML, /待绑定资源/);
+  assert.match(followups.innerHTML, /data-resource-action="bind_model_resource"/);
+  assert.match(followups.innerHTML, /data-resource-action="defer_resource"/);
   assert.doesNotMatch(followups.innerHTML, /自动绑定|自动选择|自动部署/);
 });
 test('Unified resource clarification redacts unsafe metadata while old evidence stays non-interactive', async () => {
