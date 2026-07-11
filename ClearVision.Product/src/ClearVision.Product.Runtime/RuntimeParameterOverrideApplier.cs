@@ -8,6 +8,8 @@ public sealed class RuntimeParameterOverrideApplyResult
 {
     public required OperatorFlowDto Flow { get; init; }
 
+    public required OperatorFlowDto IdentityFlow { get; init; }
+
     public int AppliedOverrideCount { get; init; }
 }
 
@@ -23,11 +25,13 @@ public static class RuntimeParameterOverrideApplier
         RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, activeProfile);
 
         var flowClone = CloneFlow(package.Flow);
+        var identityFlowClone = CloneFlow(package.PackageFlow ?? package.Flow);
         if (activeProfile.Overrides.Count == 0)
         {
             return new RuntimeParameterOverrideApplyResult
             {
                 Flow = flowClone,
+                IdentityFlow = identityFlowClone,
                 AppliedOverrideCount = 0
             };
         }
@@ -37,6 +41,7 @@ public static class RuntimeParameterOverrideApplier
             StringComparer.Ordinal);
 
         var operatorsById = flowClone.Operators.ToDictionary(op => op.Id);
+        var identityOperatorsById = identityFlowClone.Operators.ToDictionary(op => op.Id);
         var appliedCount = 0;
 
         foreach (var parameterOverride in activeProfile.Overrides)
@@ -60,12 +65,16 @@ public static class RuntimeParameterOverrideApplier
             }
 
             parameter.Value = number;
+            var identityParameter = identityOperatorsById[definition.OperatorId].Parameters.First(item =>
+                item.Name.Equals(definition.ParameterName, StringComparison.Ordinal));
+            identityParameter.Value = number;
             appliedCount += 1;
         }
 
         return new RuntimeParameterOverrideApplyResult
         {
             Flow = flowClone,
+            IdentityFlow = identityFlowClone,
             AppliedOverrideCount = appliedCount
         };
     }

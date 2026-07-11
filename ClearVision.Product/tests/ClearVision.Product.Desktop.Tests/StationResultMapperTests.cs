@@ -1,6 +1,7 @@
 using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station.Sync;
 using ClearVision.Product.Core.Outcomes;
+using ClearVision.Product.Core.Services;
 using FluentAssertions;
 
 namespace ClearVision.Product.Desktop.Tests;
@@ -15,7 +16,13 @@ public sealed class StationResultMapperTests
             RunId = "run-1",
             PackageId = "pkg-1",
             PackageName = "Package 1",
-            FlowHash = "sha256:flow",
+            PackageFlowHash = "sha256:package",
+            ExecutionFlowHash = "sha256:execution",
+            FlowHash = "sha256:execution",
+            ProjectRevision = 12,
+            DecisionConfigurationHash = "sha256:decision",
+            ExecutionSnapshotId = Guid.NewGuid(),
+            ExecutionRunMode = ExecutionRunMode.StationRuntime.ToString(),
             ImageId = "image-1",
             Outcome = RuntimeRunOutcome.Ok,
             ExecutionOutcome = ExecutionOutcome.Succeeded,
@@ -65,5 +72,12 @@ public sealed class StationResultMapperTests
         summary.HasJudgmentSignal.Should().BeTrue();
         summary.DecisionSource.Should().Be("FinalDecisionBinding:judge:Judgment");
         summary.ReasonCode.Should().Be("DecisionResolved");
+        summary.PackageFlowHash.Should().Be("sha256:package");
+        summary.ExecutionFlowHash.Should().Be("sha256:execution");
+        summary.FlowHash.Should().Be(summary.ExecutionFlowHash);
+        summary.ProjectRevision.Should().Be(result.ProjectRevision);
+        summary.DecisionConfigurationHash.Should().Be(result.DecisionConfigurationHash);
+        summary.ExecutionSnapshotId.Should().Be(result.ExecutionSnapshotId);
+        summary.ExecutionRunMode.Should().Be(result.ExecutionRunMode);
     }
 }

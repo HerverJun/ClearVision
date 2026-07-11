@@ -33,6 +33,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     private bool _stopTimeoutPending;
     private Guid? _currentFlowId;
     private string? _currentRunId;
+    private ExecutionSnapshot? _currentExecutionSnapshot;
     private int _sessionOkCount;
     private int _sessionNgCount;
     private int _sessionErrorCount;
@@ -114,7 +115,13 @@ public sealed class RuntimeHost : IAsyncDisposable
             State = _state,
             PackageId = _loadedPackage?.Manifest.PackageId,
             PackageName = _loadedPackage?.Manifest.PackageName,
-            FlowHash = _loadedPackage?.Manifest.FlowHash,
+            PackageFlowHash = _loadedPackage?.Manifest.FlowHash,
+            ExecutionFlowHash = _currentExecutionSnapshot?.FlowHash,
+            FlowHash = _currentExecutionSnapshot?.FlowHash,
+            ExecutionSnapshotId = _currentExecutionSnapshot?.SnapshotId,
+            ProjectRevision = _currentExecutionSnapshot?.PersistenceRevision,
+            DecisionConfigurationHash = _currentExecutionSnapshot?.DecisionConfigurationHash,
+            ExecutionRunMode = _currentExecutionSnapshot?.RunMode.ToString(),
             CurrentRunId = _currentRunId,
             SessionOkCount = _sessionOkCount,
             SessionNgCount = _sessionNgCount,
@@ -248,6 +255,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 oldImageWriter = _imageWriter;
 
                 _loadedPackage = package;
+                _currentExecutionSnapshot = package.ExecutionSnapshot;
                 _projectVariableSession = projectVariableSession;
                 _projectVariableStateScopeId = stateScopeId;
                 projectVariableSession = null;
@@ -636,15 +644,16 @@ public sealed class RuntimeHost : IAsyncDisposable
         var runId = Guid.NewGuid().ToString("N");
         var runtimeSnapshot = package.ExecutionSnapshot
             ?? throw new RuntimePackageException("The loaded package does not contain a runtime execution snapshot.");
-        _currentRunId = runId;
-        EmitSnapshot();
-
         try
         {
             var profile = GetActiveSiteProfileSnapshot(package);
             var applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
             var appliedFlow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
-            runtimeSnapshot = CreateRuntimeExecutionSnapshot(package, appliedFlow, runtimeSnapshot);
+            var appliedIdentityFlow = RuntimeFlowAdapter.ToEntity(applyResult.IdentityFlow);
+            runtimeSnapshot = CreateRuntimeExecutionSnapshot(package, appliedFlow, appliedIdentityFlow, runtimeSnapshot);
+            _currentExecutionSnapshot = runtimeSnapshot;
+            _currentRunId = runId;
+            EmitSnapshot();
             var flow = runtimeSnapshot.CreateExecutionFlow();
             _currentFlowId = flow.Id;
             var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
@@ -654,7 +663,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid(),
                 commitHandler: CommitLoadedProjectVariableSession);
 
-            var validation = _flowExecutionService.ValidateFlow(flow);
+            var validation = _flowExecutionService.ValidateSnapshot(runtimeSnapshot);
             if (!validation.IsValid)
             {
                 var invalidResult = _resultNormalizer.CreateValidationFailure(
@@ -739,11 +748,12 @@ public sealed class RuntimeHost : IAsyncDisposable
     private static ExecutionSnapshot CreateRuntimeExecutionSnapshot(
         RuntimePackage package,
         OperatorFlow appliedFlow,
+        OperatorFlow appliedIdentityFlow,
         ExecutionSnapshot loadedSnapshot)
     {
-        var appliedFlowHash = ExecutionFlowIdentity.ComputeFlowHash(appliedFlow);
+        var appliedFlowHash = ExecutionFlowIdentity.ComputeFlowHash(appliedIdentityFlow);
         var appliedDecisionHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
-            appliedFlow.DecisionConfiguration);
+            appliedIdentityFlow.DecisionConfiguration);
         if (string.Equals(appliedFlowHash, loadedSnapshot.FlowHash, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(appliedDecisionHash, loadedSnapshot.DecisionConfigurationHash, StringComparison.OrdinalIgnoreCase))
         {
@@ -756,8 +766,10 @@ public sealed class RuntimeHost : IAsyncDisposable
             package.Manifest.SourceProjectRevision,
             ExecutionSnapshotSource.RuntimePackage,
             ExecutionRunMode.StationRuntime,
+            loadedSnapshot.ResourceBindings,
             runtimePackageId: package.Manifest.PackageId,
-            globalVariables: package.GlobalVariables);
+            globalVariables: package.GlobalVariables,
+            executionIdentityFlow: appliedIdentityFlow);
     }
 
     private static void AttachPublicGlobalVariables(
@@ -1250,7 +1262,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             throw new RuntimePackageException($"{admission.Code}: {admission.Message}");
         }
 
-        var validation = _flowExecutionService.ValidateFlow(flow);
+        var snapshot = package.ExecutionSnapshot
+            ?? throw new RuntimePackageException("The loaded package does not contain an execution snapshot.");
+        var validation = _flowExecutionService.ValidateSnapshot(snapshot);
         if (!validation.IsValid)
         {
             throw new RuntimePackageException($"ADMISSION_FLOW_INVALID: {string.Join("; ", validation.Errors)}");
@@ -1312,6 +1326,8 @@ public sealed class RuntimeResultNormalizer
             RunId = runId,
             PackageId = package.Manifest.PackageId,
             PackageName = package.Manifest.PackageName,
+            PackageFlowHash = package.Manifest.FlowHash,
+            ExecutionFlowHash = snapshot.FlowHash,
             FlowHash = snapshot.FlowHash,
             ProjectRevision = snapshot.PersistenceRevision,
             DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
@@ -1433,6 +1449,8 @@ public sealed class RuntimeResultNormalizer
             RunId = runId,
             PackageId = package.Manifest.PackageId,
             PackageName = package.Manifest.PackageName,
+            PackageFlowHash = package.Manifest.FlowHash,
+            ExecutionFlowHash = snapshot.FlowHash,
             FlowHash = snapshot.FlowHash,
             ProjectRevision = snapshot.PersistenceRevision,
             DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
@@ -1643,6 +1661,8 @@ internal static class RuntimeResultSnapshot
             RunId = source.RunId,
             PackageId = source.PackageId,
             PackageName = source.PackageName,
+            PackageFlowHash = source.PackageFlowHash,
+            ExecutionFlowHash = source.ExecutionFlowHash,
             FlowHash = source.FlowHash,
             ProjectRevision = source.ProjectRevision,
             DecisionConfigurationHash = source.DecisionConfigurationHash,

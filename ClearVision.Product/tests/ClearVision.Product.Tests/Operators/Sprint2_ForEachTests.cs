@@ -21,7 +21,7 @@ namespace ClearVision.Product.Tests.Operators;
 public class Sprint2_ForEachTests
 {
     private readonly ILogger<ForEachOperator> _loggerMock;
-    private readonly IFlowExecutionService _flowExecutorMock;
+    private readonly IFlowExecutionEngine _flowExecutorMock;
     private readonly IServiceProvider _scopedServiceProviderMock;
     private readonly IServiceScope _serviceScopeMock;
     private readonly IServiceScopeFactory _serviceScopeFactoryMock;
@@ -30,11 +30,11 @@ public class Sprint2_ForEachTests
     public Sprint2_ForEachTests()
     {
         _loggerMock = Substitute.For<ILogger<ForEachOperator>>();
-        _flowExecutorMock = Substitute.For<IFlowExecutionService>();
+        _flowExecutorMock = Substitute.For<IFlowExecutionEngine>();
         _scopedServiceProviderMock = Substitute.For<IServiceProvider>();
         _serviceScopeMock = Substitute.For<IServiceScope>();
         _serviceScopeFactoryMock = Substitute.For<IServiceScopeFactory>();
-        _scopedServiceProviderMock.GetService(typeof(IFlowExecutionService)).Returns(_flowExecutorMock);
+        _scopedServiceProviderMock.GetService(typeof(IFlowExecutionEngine)).Returns(_flowExecutorMock);
         _serviceScopeMock.ServiceProvider.Returns(_scopedServiceProviderMock);
         _serviceScopeFactoryMock.CreateScope().Returns(_serviceScopeMock);
         _operator = new ForEachOperator(_loggerMock, _serviceScopeFactoryMock);

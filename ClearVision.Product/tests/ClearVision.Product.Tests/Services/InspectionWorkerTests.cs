@@ -31,8 +31,8 @@ public class InspectionWorkerTests
     public async Task StopAsync_CancelsRunningTask_AndPublishesStoppedState()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -96,8 +96,8 @@ public class InspectionWorkerTests
     public async Task StopAsync_WhenStoppedEventSubscriberThrows_ShouldStillReleaseRunState()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -167,8 +167,8 @@ public class InspectionWorkerTests
     public async Task TryStartRunAsync_ShouldRegisterRunBeforeBackgroundExecutionPublishesRunning()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -231,8 +231,8 @@ public class InspectionWorkerTests
     public async Task WaitForRunExitAsync_WhenProjectHasReplacementSession_TreatsOriginalSessionAsExited()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -319,8 +319,8 @@ public class InspectionWorkerTests
         project.UpdateGlobalVariables(schema);
 
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<ProjectVariableExecutionContext>(),
                 Arg.Any<bool>(),
@@ -475,8 +475,8 @@ public class InspectionWorkerTests
     public async Task ExecuteCycleAsync_WithCameraPreload_ShouldPassCancellationTokenToImageAcquisition()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -541,8 +541,8 @@ public class InspectionWorkerTests
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
         Dictionary<string, object>? executedInputs = null;
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -601,8 +601,8 @@ public class InspectionWorkerTests
     {
         var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 5, 6, 7, 8 };
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -662,8 +662,8 @@ public class InspectionWorkerTests
     public async Task RunRealtimeLoopAsync_WithDefaultRuntimeProtection_DoesNotStopAfterSixConsecutiveNg()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -737,8 +737,8 @@ public class InspectionWorkerTests
     public async Task RunRealtimeLoopAsync_WhenFrameDrivenExecutionStops_ShouldReleaseIdleCameraStream()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -818,14 +818,14 @@ public class InspectionWorkerTests
         sourceFlow.AddOperator(new Operator("late-mutation", OperatorType.TextSave, 0, 0));
         var observedOperatorCounts = new List<int>();
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                observedOperatorCounts.Add(call.ArgAt<OperatorFlow>(0).Operators.Count);
+                observedOperatorCounts.Add(call.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow().Operators.Count);
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -866,8 +866,8 @@ public class InspectionWorkerTests
         candidateSnapshot.FlowHash.Should().NotBe(primarySnapshot.FlowHash);
 
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -895,8 +895,8 @@ public class InspectionWorkerTests
 
         result.ExecutionSnapshotId.Should().Be(primarySnapshot.SnapshotId);
         result.Status.Should().Be(InspectionStatus.OK);
-        await flowExecution.Received(2).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(2).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Is<Dictionary<string, object>?>(inputs => inputs != null && inputs.ContainsKey("Image")),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -913,8 +913,8 @@ public class InspectionWorkerTests
         var flow = CreateDecisionFlow("shadow-disabled", "JudgmentResult");
         var snapshot = CreateExecutionSnapshot(Guid.NewGuid(), flow);
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -939,8 +939,8 @@ public class InspectionWorkerTests
             snapshot,
             mode: ContinuousInspectionMode.Shadow);
 
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());

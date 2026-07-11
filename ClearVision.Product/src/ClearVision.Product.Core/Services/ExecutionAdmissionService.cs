@@ -121,16 +121,16 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IInspectionRuntimeCoordinator? _runtimeCoordinator;
-    private readonly IFlowExecutionService? _flowExecutionService;
+    private readonly IFlowDefinitionValidator? _flowDefinitionValidator;
 
     public ExecutionAdmissionService(
         IProjectRepository projectRepository,
         IInspectionRuntimeCoordinator? runtimeCoordinator = null,
-        IFlowExecutionService? flowExecutionService = null)
+        IFlowDefinitionValidator? flowDefinitionValidator = null)
     {
         _projectRepository = projectRepository;
         _runtimeCoordinator = runtimeCoordinator;
-        _flowExecutionService = flowExecutionService;
+        _flowDefinitionValidator = flowDefinitionValidator;
     }
 
     /// <summary>
@@ -205,12 +205,12 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         ExecutionAdmissionSurface surface)
     {
         var admission = ValidateStandaloneFlow(flow, surface);
-        if (!admission.IsAllowed || flow == null || _flowExecutionService == null)
+        if (!admission.IsAllowed || flow == null || _flowDefinitionValidator == null)
         {
             return admission;
         }
 
-        var validation = _flowExecutionService.ValidateFlow(flow);
+        var validation = _flowDefinitionValidator.ValidateFlow(flow);
         if (validation == null)
         {
             return admission;

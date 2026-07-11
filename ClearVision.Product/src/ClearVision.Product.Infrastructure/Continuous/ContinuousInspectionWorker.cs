@@ -497,7 +497,6 @@ public sealed class ContinuousInspectionWorker
             consensusOutcome,
             Math.Max(0, (long)(resultFrame?.Latency.TotalMilliseconds ?? 0)),
             resultFrame?.Confidence);
-        result.SetTraceability(null, null, sessionId);
         if (resultFrame?.OutputImage is { Length: > 0 } outputImage)
         {
             result.SetOutputImage(outputImage);
@@ -524,7 +523,6 @@ public sealed class ContinuousInspectionWorker
         InspectionOutcomeResolver.SetDiagnostics(outputData, outcome);
         var result = new InspectionResult(projectId);
         result.SetOutcome(outcome, Math.Max(0, (long)scheduled.Latency.TotalMilliseconds));
-        result.SetTraceability(null, null, sessionId);
         if (outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes)
         {
             result.SetOutputImage(imageBytes);

@@ -93,7 +93,7 @@ public class InspectionService : IInspectionService
         _executionAdmissionService = executionAdmissionService ?? new ExecutionAdmissionService(
             projectRepository,
             coordinator,
-            flowExecutionService);
+            flowExecutionService as IFlowDefinitionValidator);
         _logger = logger;
     }
 
@@ -937,7 +937,7 @@ public class InspectionService : IInspectionService
         {
             var result = new InspectionResult(projectId);
             result.MarkAsError($"相机采集或检测失败: {ex.Message}");
-            result.SetTraceability(null, null, sessionId);
+            result.SetExecutionTraceability(snapshot, null, sessionId);
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
             await CaptureEvidenceManifestAsync(result, cancellationToken);
             return result;

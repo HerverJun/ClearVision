@@ -127,8 +127,17 @@ public class RuntimeMvpTests
             stationResult.ExecutionSnapshotId.Should().NotBeNull();
             stationResult.ExecutionSnapshotId.Should().NotBe(Guid.ParseExact(stationResult.RunId, "N"));
             stationResult.FlowHash.Should().Be(export.Manifest.FlowHash);
+            stationResult.PackageFlowHash.Should().Be(export.Manifest.FlowHash);
+            stationResult.ExecutionFlowHash.Should().Be(export.Manifest.FlowHash);
             stationResult.DecisionConfigurationHash.Should().Be(export.Manifest.DecisionConfigurationHash);
             stationResult.ProjectRevision.Should().Be(export.Manifest.SourceProjectRevision);
+            var runtimeSnapshot = runtimeHost.GetSnapshot();
+            runtimeSnapshot.PackageFlowHash.Should().Be(export.Manifest.FlowHash);
+            runtimeSnapshot.ExecutionFlowHash.Should().Be(stationResult.ExecutionFlowHash);
+            runtimeSnapshot.FlowHash.Should().Be(stationResult.ExecutionFlowHash);
+            runtimeSnapshot.ExecutionSnapshotId.Should().Be(stationResult.ExecutionSnapshotId);
+            runtimeSnapshot.ProjectRevision.Should().Be(stationResult.ProjectRevision);
+            runtimeSnapshot.DecisionConfigurationHash.Should().Be(stationResult.DecisionConfigurationHash);
         }
         finally
         {
@@ -993,10 +1002,94 @@ public class RuntimeMvpTests
 
     private static IFlowExecutionService CreateFlowExecutionService(params IOperatorExecutor[] executors)
     {
-        return new FlowExecutionService(
-            executors,
-            NullLogger<FlowExecutionService>.Instance,
-            new VariableContext());
+        return new GovernedFlowExecutionService(
+            new FlowExecutionService(
+                executors,
+                NullLogger<FlowExecutionService>.Instance,
+                new VariableContext()));
+    }
+
+    [Fact]
+    public async Task RuntimeHost_SiteProfileOverride_ShouldCreateNewExecutionIdentityAndKeepSnapshotAligned()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var modelPath = Path.Combine(root, "model.onnx");
+            await File.WriteAllBytesAsync(modelPath, [1, 2, 3, 4]);
+            var operatorId = Guid.NewGuid();
+            var decisionPortId = Guid.NewGuid();
+            var deepLearning = RuntimeParameterTestData.CreateDeepLearningOperator(
+                operatorId,
+                "Detection",
+                modelPath,
+                confidence: 0.62d);
+            deepLearning.OutputPorts = [CreateDecisionPort(decisionPortId)];
+            var project = new ProjectDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "runtime-override-identity",
+                PersistenceRevision = 17,
+                Flow = new OperatorFlowDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "main",
+                    DecisionConfiguration = CreateStringDecisionConfiguration(operatorId, decisionPortId),
+                    Operators =
+                    [
+                        deepLearning
+                    ]
+                }
+            };
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = project,
+                    TargetRootDirectory = root
+                });
+            var inputPath = Path.Combine(root, "input.bin");
+            await File.WriteAllBytesAsync(inputPath, [9, 8, 7]);
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new TunableDeepLearningExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            var package = await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var baseline = await runtimeHost.RunSingleAsync(inputPath);
+            baseline.PackageFlowHash.Should().Be(export.Manifest.FlowHash);
+            baseline.ExecutionFlowHash.Should().Be(export.Manifest.FlowHash);
+            baseline.FlowHash.Should().Be(baseline.ExecutionFlowHash);
+
+            var parameter = package.ParameterSchema.Parameters.Should().ContainSingle().Subject;
+            runtimeHost.SetActiveSiteProfile(RuntimeParameterTestData.CreateProfile(
+                package.Manifest.PackageId,
+                package.Manifest.FlowHash,
+                RuntimeParameterTestData.CreateOverride(parameter.Id, 0.81d)));
+
+            var overridden = await runtimeHost.RunSingleAsync(inputPath);
+            overridden.PackageFlowHash.Should().Be(export.Manifest.FlowHash);
+            overridden.ExecutionFlowHash.Should().NotBe(export.Manifest.FlowHash);
+            overridden.FlowHash.Should().Be(overridden.ExecutionFlowHash);
+            overridden.ExecutionSnapshotId.Should().NotBeNull();
+            baseline.ExecutionSnapshotId.Should().NotBeNull();
+            overridden.ExecutionSnapshotId!.Value.Should().NotBe(baseline.ExecutionSnapshotId!.Value);
+            overridden.ProjectRevision.Should().Be(export.Manifest.SourceProjectRevision);
+
+            var snapshot = runtimeHost.GetSnapshot();
+            snapshot.PackageFlowHash.Should().Be(overridden.PackageFlowHash);
+            snapshot.ExecutionFlowHash.Should().Be(overridden.ExecutionFlowHash);
+            snapshot.FlowHash.Should().Be(overridden.ExecutionFlowHash);
+            snapshot.ExecutionSnapshotId.Should().Be(overridden.ExecutionSnapshotId);
+            snapshot.ProjectRevision.Should().Be(overridden.ProjectRevision);
+            snapshot.DecisionConfigurationHash.Should().Be(overridden.DecisionConfigurationHash);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
     }
 
     private sealed class FailingRuntimeProjectVariableStateStore : IProjectVariableStateStore
@@ -1505,6 +1598,23 @@ public class RuntimeMvpTests
         {
             return ValidationResult.Valid();
         }
+    }
+
+    private sealed class TunableDeepLearningExecutor : IOperatorExecutor
+    {
+        public OperatorType OperatorType => OperatorType.DeepLearning;
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Confidence"] = @operator.Parameters.Single(parameter => parameter.Name == "Confidence").GetValue()!,
+                ["JudgmentResult"] = "OK"
+            }));
+
+        public ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
     }
 
     private sealed class PackageConfiguredImageAcquisitionExecutor : IOperatorExecutor

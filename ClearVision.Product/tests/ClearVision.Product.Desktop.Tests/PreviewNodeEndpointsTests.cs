@@ -45,14 +45,15 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
-                    capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                    capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                     capturedOptions = callInfo.ArgAt<DebugOptions>(1);
 
                     return Task.FromResult(new FlowDebugExecutionResult
@@ -141,10 +142,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -767,10 +769,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -843,10 +846,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -948,10 +952,11 @@ public class PreviewNodeEndpointsTests
         using var mat = new Mat(1, 1, MatType.CV_8UC1, Scalar.All(255));
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -1030,10 +1035,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -1111,10 +1117,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -1415,10 +1422,11 @@ public class PreviewNodeEndpointsTests
         await using var host = await PreviewNodeTestHost.CreateAsync(
             flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult(new FlowDebugExecutionResult
                     {
@@ -1452,10 +1460,11 @@ public class PreviewNodeEndpointsTests
             configuredFlowExecution =>
             {
                 flowExecution = configuredFlowExecution;
-                configuredFlowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                configuredFlowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
             },
@@ -1471,10 +1480,11 @@ public class PreviewNodeEndpointsTests
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var payload = await response.Content.ReadAsStringAsync();
         payload.Should().Contain("ADMISSION_PROJECT_NOT_ACTIVE");
-        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<DebugOptions>(),
             Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -1488,10 +1498,11 @@ public class PreviewNodeEndpointsTests
         await using var host = await PreviewNodeTestHost.CreateAsync(configuredFlowExecution =>
         {
             flowExecution = configuredFlowExecution;
-            configuredFlowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            configuredFlowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
         });
@@ -1506,10 +1517,11 @@ public class PreviewNodeEndpointsTests
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var payload = await response.Content.ReadAsStringAsync();
         payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
-        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<DebugOptions>(),
             Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -1531,14 +1543,15 @@ public class PreviewNodeEndpointsTests
         {
             await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(callInfo =>
                     {
-                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                         capturedOptions = callInfo.ArgAt<DebugOptions>(1);
 
                         return Task.FromResult(new FlowDebugExecutionResult
@@ -1681,10 +1694,11 @@ public class PreviewNodeEndpointsTests
             payload.Should().NotContain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
             Directory.Exists(outputDir).Should().BeFalse("缺输入图像的 ImageSave 预览也不能创建目录");
 
-            await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+            await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>());
         }
         finally
@@ -1711,10 +1725,11 @@ public class PreviewNodeEndpointsTests
         {
             await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(callInfo => Task.FromResult(new FlowDebugExecutionResult
                     {
@@ -1806,14 +1821,15 @@ public class PreviewNodeEndpointsTests
         {
             await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(callInfo =>
                     {
-                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                         capturedOptions = callInfo.ArgAt<DebugOptions>(1);
 
                         return Task.FromResult(new FlowDebugExecutionResult
@@ -1922,10 +1938,11 @@ public class PreviewNodeEndpointsTests
         {
             await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(_ => Task.FromResult(new FlowDebugExecutionResult
                     {
@@ -2018,14 +2035,15 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
-                    capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                    capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                     capturedOptions = callInfo.ArgAt<DebugOptions>(1);
 
                     return Task.FromResult(new FlowDebugExecutionResult
@@ -2119,10 +2137,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2179,14 +2198,15 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
-                    capturedToken = callInfo.ArgAt<CancellationToken>(3);
+                    capturedToken = callInfo.ArgAt<CancellationToken>(4);
                     enteredExecution.TrySetResult(null);
                     return CompleteWhenCanceledAsync(targetNodeId, capturedToken, cancellationObserved);
                 });
@@ -2228,14 +2248,15 @@ public class PreviewNodeEndpointsTests
         await using var host = await PreviewNodeTestHost.CreateAsync(
             configureFlowExecution: flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(callInfo =>
                     {
-                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                         return Task.FromResult(new FlowDebugExecutionResult
                         {
                             IsSuccess = true,
@@ -2294,14 +2315,15 @@ public class PreviewNodeEndpointsTests
         await using var host = await PreviewNodeTestHost.CreateAsync(
             configureFlowExecution: flowExecution =>
             {
-                flowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                flowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(callInfo =>
                     {
-                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                         return Task.FromResult(new FlowDebugExecutionResult
                         {
                             IsSuccess = true,
@@ -2387,10 +2409,11 @@ public class PreviewNodeEndpointsTests
             configureFlowExecution: configuredFlowExecution =>
             {
                 flowExecution = configuredFlowExecution;
-                configuredFlowExecution.ExecuteFlowDebugAsync(
-                        Arg.Any<OperatorFlow>(),
+                configuredFlowExecution.ExecuteDebugWithSnapshotAsync(
+                        Arg.Any<ExecutionSnapshot>(),
                         Arg.Any<DebugOptions>(),
                         Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                         Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult(new FlowDebugExecutionResult { IsSuccess = true }));
             },
@@ -2428,10 +2451,11 @@ public class PreviewNodeEndpointsTests
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
         payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
         payload.Should().Contain("外部设备、网络服务或执行文件系统写入");
-        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteFlowDebugAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<DebugOptions>(),
             Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -2444,10 +2468,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2495,10 +2520,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2566,10 +2592,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
@@ -2617,10 +2644,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
@@ -2665,10 +2693,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
@@ -2721,10 +2750,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2804,10 +2834,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2847,10 +2878,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2901,10 +2933,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -2971,14 +3004,15 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo =>
                 {
-                    capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                    capturedFlow = callInfo.ArgAt<ExecutionSnapshot>(0).CreateExecutionFlow();
                     return Task.FromResult(new FlowDebugExecutionResult
                     {
                         IsSuccess = true,
@@ -3053,10 +3087,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -3134,14 +3169,15 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(async callInfo =>
                 {
-                    var token = callInfo.ArgAt<CancellationToken>(3);
+                    var token = callInfo.ArgAt<CancellationToken>(4);
                     try
                     {
                         await Task.Delay(TimeSpan.FromSeconds(10), token);
@@ -3179,10 +3215,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -3227,10 +3264,11 @@ public class PreviewNodeEndpointsTests
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
         {
-            flowExecution.ExecuteFlowDebugAsync(
-                    Arg.Any<OperatorFlow>(),
+            flowExecution.ExecuteDebugWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
                     Arg.Any<DebugOptions>(),
                     Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                     Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new FlowDebugExecutionResult
                 {
@@ -3635,7 +3673,8 @@ public class PreviewNodeEndpointsTests
             projectRepository.GetByIdFreshAsync(project.Id).Returns(project);
             projectRepository.GetWithFlowAsync(project.Id).Returns(project);
 
-            builder.Services.AddSingleton<IFlowExecutionService>(flowExecution);
+            builder.Services.AddSingleton<IFlowExecutionEngine>(flowExecution);
+            builder.Services.AddSingleton<IFlowExecutionService>(new GovernedFlowExecutionService(flowExecution));
             builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services.AddSingleton(flowStorage);

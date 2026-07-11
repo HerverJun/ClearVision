@@ -262,7 +262,8 @@ public sealed class ExecutionSnapshot
         string? runtimePackageId = null,
         ShadowExecutionRole shadowRole = ShadowExecutionRole.None,
         Guid? snapshotId = null,
-        ProjectGlobalVariableSchema? globalVariables = null)
+        ProjectGlobalVariableSchema? globalVariables = null,
+        OperatorFlow? executionIdentityFlow = null)
     {
         if (projectId == Guid.Empty)
         {
@@ -270,6 +271,16 @@ public sealed class ExecutionSnapshot
         }
 
         ArgumentNullException.ThrowIfNull(flow);
+        if (executionIdentityFlow != null &&
+            (source != ExecutionSnapshotSource.RuntimePackage ||
+             resourceBindings == null ||
+             !resourceBindings.ContainsKey("PackageRoot")))
+        {
+            throw new ArgumentException(
+                "A distinct execution identity flow is only valid for a runtime package with an explicit PackageRoot deployment binding.",
+                nameof(executionIdentityFlow));
+        }
+
         ProjectId = projectId;
         PersistenceRevision = persistenceRevision;
         Source = source;
@@ -281,8 +292,11 @@ public sealed class ExecutionSnapshot
         RuntimePackageId = NormalizeOptional(runtimePackageId);
         _flow = ExecutionFlowIdentity.CloneFlow(flow);
         _globalVariables = CloneGlobalVariables(globalVariables);
-        FlowHash = ExecutionFlowIdentity.ComputeFlowHash(_flow);
-        DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(_flow.DecisionConfiguration);
+        var identityFlow = executionIdentityFlow == null
+            ? _flow
+            : ExecutionFlowIdentity.CloneFlow(executionIdentityFlow);
+        FlowHash = ExecutionFlowIdentity.ComputeFlowHash(identityFlow);
+        DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(identityFlow.DecisionConfiguration);
         ResourceBindings = new ReadOnlyDictionary<string, string>(
             (resourceBindings ?? new Dictionary<string, string>())
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))

@@ -33,10 +33,11 @@ public class AutoTuneServiceTests
         var seenOptions = new List<DebugOptions>();
         var metricsCallCount = 0;
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -99,10 +100,11 @@ public class AutoTuneServiceTests
             metricsAnalyzer,
             flowNodePreviewService);
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowDebugExecutionResult
             {

@@ -24,10 +24,11 @@ public class FlowNodePreviewServiceTests
         flow.AddOperator(target);
         flow.Connections.Add(new OperatorConnection(acquisition.Id, Guid.NewGuid(), target.Id, Guid.NewGuid()));
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -67,10 +68,11 @@ public class FlowNodePreviewServiceTests
         var flow = new OperatorFlow("preview-flow");
         flow.AddOperator(target);
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -116,10 +118,11 @@ public class FlowNodePreviewServiceTests
         flow.AddOperator(target);
         flow.Connections.Add(new OperatorConnection(acquisition.Id, Guid.NewGuid(), target.Id, Guid.NewGuid()));
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -165,10 +168,11 @@ public class FlowNodePreviewServiceTests
         var flow = new OperatorFlow("wire-sequence-flow");
         flow.AddOperator(target);
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowDebugExecutionResult
             {
@@ -218,10 +222,11 @@ public class FlowNodePreviewServiceTests
         var flow = new OperatorFlow("strict-label-contract-flow");
         flow.AddOperator(target);
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowDebugExecutionResult
             {
@@ -272,10 +277,11 @@ public class FlowNodePreviewServiceTests
         var flow = new OperatorFlow("catalog-preview-flow");
         flow.AddOperator(target);
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowDebugExecutionResult
             {
@@ -327,10 +333,11 @@ public class FlowNodePreviewServiceTests
         var previewImage = new byte[] { 1, 2, 3, 4 };
         var originalImage = new byte[] { 9, 8, 7, 6 };
 
-        flowExecution.ExecuteFlowDebugAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<DebugOptions>(),
                 Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowDebugExecutionResult
             {

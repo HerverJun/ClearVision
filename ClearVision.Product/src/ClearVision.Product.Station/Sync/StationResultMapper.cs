@@ -27,6 +27,8 @@ public static class StationResultMapper
             PackageId = result.PackageId,
             PackageName = result.PackageName,
             PackageVersion = identity.CurrentPackageVersion ?? string.Empty,
+            PackageFlowHash = result.PackageFlowHash,
+            ExecutionFlowHash = result.ExecutionFlowHash,
             FlowHash = result.FlowHash,
             ProjectRevision = result.ProjectRevision,
             DecisionConfigurationHash = result.DecisionConfigurationHash,

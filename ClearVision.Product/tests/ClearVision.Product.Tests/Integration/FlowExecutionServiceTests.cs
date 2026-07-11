@@ -22,7 +22,7 @@ namespace ClearVision.Product.Tests.Integration;
 /// </summary>
 public class FlowExecutionServiceIntegrationTests
 {
-    private readonly IFlowExecutionService _flowExecutionService;
+    private readonly IFlowExecutionEngine _flowExecutionService;
     private readonly ILogger<FlowExecutionService> _logger;
 
     public FlowExecutionServiceIntegrationTests()

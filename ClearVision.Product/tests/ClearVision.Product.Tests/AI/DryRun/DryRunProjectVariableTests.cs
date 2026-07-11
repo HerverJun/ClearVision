@@ -45,7 +45,7 @@ public sealed class DryRunProjectVariableTests
             NullLogger<FlowExecutionService>.Instance,
             new VariableContext(),
             accessor);
-        var service = new DryRunService(flowExecution);
+        var service = new DryRunService(new GovernedFlowExecutionService(flowExecution));
 
         var result = await service.RunAsync(
             flow,
@@ -67,8 +67,8 @@ public sealed class DryRunProjectVariableTests
     {
         var flow = new OperatorFlow("dryrun-legacy");
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                flow,
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -85,8 +85,8 @@ public sealed class DryRunProjectVariableTests
             new DryRunStubRegistry());
 
         result.IsSuccess.Should().BeTrue();
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            flow,
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Is<ExecutionSnapshot>(snapshot => snapshot.FlowHash == ExecutionFlowIdentity.ComputeFlowHash(flow)),
             Arg.Any<Dictionary<string, object>?>(),
             false,
             Arg.Any<CancellationToken>());

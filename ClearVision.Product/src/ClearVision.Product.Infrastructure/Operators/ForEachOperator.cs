@@ -343,7 +343,7 @@ public class ForEachOperator : OperatorBase
     {
         // 对于子图执行，禁用并行模式（子图内部已经是并行了）
         using var scope = _serviceScopeFactory.CreateScope();
-        var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
+        var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionEngine>();
 
         return await flowExecution.ExecuteFlowAsync(
             subGraph,

@@ -125,40 +125,51 @@ public sealed class RuntimeDependencyBoundaryTests
     }
 
     [Fact]
-    public void ProductExecutionEntrypoints_DoNotCallLegacyPolicylessFlowOverloads()
+    public void ProductionSource_ConfinesRawFlowExecutionToEngineBoundary()
     {
         var repoRoot = FindRepoRoot();
-        var relativeFiles = new[]
+        var sourceRoot = Path.Combine(repoRoot, "src");
+        var allowedRawBoundaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "src/ClearVision.Product.Application/Services/InspectionService.cs",
-            "src/ClearVision.Product.Application/Commands/Inspections/ExecuteInspectionCommand.cs",
-            "src/ClearVision.Product.Infrastructure/Services/InspectionWorker.cs",
-            "src/ClearVision.Product.Infrastructure/Continuous/ContinuousInspectionWorker.cs",
-            "src/ClearVision.Product.Infrastructure/Services/FlowNodePreviewService.cs",
-            "src/ClearVision.Product.Infrastructure/Services/AutoTuneService.cs",
-            "src/ClearVision.Product.Infrastructure/AI/DryRun/DryRunService.cs",
-            "src/ClearVision.Product.Infrastructure/Services/IntelligentDetectionService.cs",
-            "src/ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs",
-            "src/ClearVision.Product.Runtime/RuntimeHost.cs"
+            "src/ClearVision.Product.Core/Services/IFlowExecutionService.cs",
+            "src/ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs",
+            "src/ClearVision.Product.Infrastructure/Services/GovernedFlowExecutionService.cs",
+            "src/ClearVision.Product.Infrastructure/Operators/ForEachOperator.cs",
+            "src/ClearVision.Product.Infrastructure/DependencyInjection/VisionRuntimeServiceCollectionExtensions.cs"
         };
         var legacyCall = new Regex(@"\.ExecuteFlow(?:Debug)?Async\s*\(", RegexOptions.CultureInvariant);
+        var rawDependency = new Regex(@"\bIFlowExecutionEngine\b", RegexOptions.CultureInvariant);
         var disabledBlock = new Regex(@"#if\s+false[\s\S]*?#endif", RegexOptions.CultureInvariant);
 
-        var hits = relativeFiles
-            .Select(relative => new
+        var hits = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(file => new
             {
-                Relative = relative,
-                Text = disabledBlock.Replace(File.ReadAllText(Path.Combine(repoRoot, relative)), string.Empty)
+                Relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/'),
+                Text = disabledBlock.Replace(File.ReadAllText(file), string.Empty)
             })
+            .Where(item => !allowedRawBoundaryFiles.Contains(item.Relative))
             .SelectMany(item => item.Text.Split('\n')
                 .Select((line, index) => new { item.Relative, Line = line, Index = index + 1 }))
-            .Where(item => legacyCall.IsMatch(item.Line))
+            .Where(item => legacyCall.IsMatch(item.Line) || rawDependency.IsMatch(item.Line))
             .Select(item => $"{item.Relative}:{item.Index}:{item.Line.Trim()}")
             .ToList();
 
         Assert.True(
             hits.Count == 0,
-            "Policyless flow execution calls found in product entrypoints: " + string.Join("; ", hits));
+            "Raw flow engine usage escaped the governed boundary: " + string.Join("; ", hits));
+    }
+
+    [Fact]
+    public void ProductFacingFlowService_ExposesOnlySnapshotBasedFlowAndDebugExecution()
+    {
+        var methods = typeof(IFlowExecutionService).GetMethods();
+
+        Assert.DoesNotContain(methods, method =>
+            method.GetParameters().Any(parameter => parameter.ParameterType == typeof(ClearVision.Product.Core.Entities.OperatorFlow)));
+        Assert.All(
+            methods.Where(method => method.Name.Contains("Execute", StringComparison.Ordinal) &&
+                                    method.GetParameters().Any(parameter => parameter.ParameterType == typeof(DebugOptions))),
+            method => Assert.Equal(typeof(ExecutionSnapshot), method.GetParameters()[0].ParameterType));
     }
 
     [Fact]

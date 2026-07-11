@@ -14,6 +14,12 @@ public sealed class RuntimePackage
 
     public required OperatorFlowDto Flow { get; init; }
 
+    /// <summary>
+    /// Package-semantic flow before deployment paths are resolved. Its hash is
+    /// the manifest PackageFlowHash and is stable across Station directories.
+    /// </summary>
+    public OperatorFlowDto? PackageFlow { get; internal set; }
+
     public required byte[] FlowBytes { get; init; }
 
     public required RuntimeProfile RuntimeProfile { get; init; }

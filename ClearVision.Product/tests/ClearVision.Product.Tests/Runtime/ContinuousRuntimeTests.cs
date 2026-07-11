@@ -360,8 +360,8 @@ public class ContinuousRuntimeTests
         };
         var stream = new FakeStreamCoordinator(frames);
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
@@ -840,7 +840,12 @@ public class ContinuousRuntimeTests
             _resultFactory = resultFactory;
         }
 
-        public Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, CancellationToken cancellationToken = default)
+        public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(ExecutionSnapshot snapshot, Dictionary<string, object>? inputData = null, bool enableParallel = false, CancellationToken cancellationToken = default)
+        {
+            return ExecuteCoreAsync(inputData);
+        }
+
+        private Task<FlowExecutionResult> ExecuteCoreAsync(Dictionary<string, object>? inputData)
         {
             FrameEnvelope? providedFrame = null;
             if (inputData?.TryGetValue("ProvidedFrameEnvelope", out var frame) == true && frame is FrameEnvelope envelope)
@@ -868,8 +873,8 @@ public class ContinuousRuntimeTests
             });
         }
 
-        public Task<FlowExecutionResult> ExecuteFlowAsync(
-            OperatorFlow flow,
+        public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+            ExecutionSnapshot snapshot,
             Dictionary<string, object>? inputData,
             ProjectVariableExecutionContext projectVariables,
             bool enableParallel = false,
@@ -877,17 +882,17 @@ public class ContinuousRuntimeTests
         {
             ProjectVariableContexts.Add(projectVariables);
             _onProjectVariables?.Invoke(projectVariables);
-            return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+            return ExecuteCoreAsync(inputData);
         }
 
         public Task<OperatorExecutionResult> ExecuteOperatorAsync(
             Operator @operator,
             Dictionary<string, object>? inputs = null,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public FlowValidationResult ValidateFlow(OperatorFlow flow) => new() { IsValid = true };
+        public FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot) => new() { IsValid = true };
         public FlowExecutionStatus? GetExecutionStatus(Guid flowId) => null;
         public Task CancelExecutionAsync(Guid flowId) => Task.CompletedTask;
-        public Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(OperatorFlow flow, DebugOptions options, Dictionary<string, object>? inputData = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(ExecutionSnapshot snapshot, DebugOptions options, Dictionary<string, object>? inputData = null, ProjectVariableExecutionContext? projectVariables = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Dictionary<string, object>? GetDebugIntermediateResult(Guid debugSessionId, Guid operatorId) => null;
         public Task ClearDebugCacheAsync(Guid debugSessionId) => Task.CompletedTask;
     }

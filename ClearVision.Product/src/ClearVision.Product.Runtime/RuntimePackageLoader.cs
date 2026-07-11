@@ -92,17 +92,18 @@ public sealed class RuntimePackageLoader
             }
 
             package.AssetContext = await LoadAssetContextAsync(manifest, normalizedRoot, cancellationToken);
-
+            package.PackageFlow = CloneFlow(flow);
+            RebasePackageRelativeFileParameters(package.Flow, normalizedRoot);
             package.ExecutionSnapshot = new ExecutionSnapshot(
                 ResolveSnapshotProjectId(manifest),
-                flow.ToEntity(),
+                package.Flow.ToEntity(),
                 manifest.SourceProjectRevision,
                 ExecutionSnapshotSource.RuntimePackage,
                 ExecutionRunMode.StationRuntime,
+                new Dictionary<string, string> { ["PackageRoot"] = normalizedRoot },
                 runtimePackageId: manifest.PackageId,
-                globalVariables: globalVariables);
-
-            RebasePackageRelativeFileParameters(package.Flow, normalizedRoot);
+                globalVariables: globalVariables,
+                executionIdentityFlow: package.PackageFlow.ToEntity());
 
             _logger.LogInformation(
                 "Loaded runtime package {PackageId} from {PackageRoot}",
@@ -142,6 +143,13 @@ public sealed class RuntimePackageLoader
 
         await using var stream = File.OpenRead(path);
         return await JsonSerializer.DeserializeAsync<T>(stream, RuntimeJson.SerializerOptions, cancellationToken);
+    }
+
+    private static OperatorFlowDto CloneFlow(OperatorFlowDto flow)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(flow, RuntimeJson.SerializerOptions);
+        return JsonSerializer.Deserialize<OperatorFlowDto>(bytes, RuntimeJson.SerializerOptions)
+            ?? throw new RuntimePackageException("Unable to clone package semantic flow.");
     }
 
     private static async Task<IRuntimeAssetContext> LoadAssetContextAsync(

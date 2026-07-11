@@ -76,10 +76,10 @@ public class InspectionServiceSingleRunTests
         InspectionResult? persistedResult = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
                 return Task.FromResult(new FlowExecutionResult
                 {
@@ -163,8 +163,8 @@ public class InspectionServiceSingleRunTests
         var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
 
         await act.Should().ThrowAsync<ClearVision.Product.Core.Exceptions.ProjectNotFoundException>();
-        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -235,8 +235,8 @@ public class InspectionServiceSingleRunTests
         var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, CreateFlow("client-flow"));
 
         await act.Should().ThrowAsync<ClearVision.Product.Core.Exceptions.ProjectNotFoundException>();
-        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -260,10 +260,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -293,8 +293,8 @@ public class InspectionServiceSingleRunTests
         result.Status.Should().Be(InspectionStatus.OK);
         executedFlow.Should().NotBeNull();
         executedFlow!.Operators.Should().ContainSingle(op => op.Type == OperatorType.TextSave);
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -320,10 +320,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -376,10 +376,10 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         flowStorage.LoadFlowJsonAsync(projectId).Returns(fileFlowJson);
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -434,10 +434,10 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         flowStorage.LoadFlowJsonAsync(projectId).Returns(fileFlowJson);
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -487,7 +487,7 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -685,7 +685,7 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -731,7 +731,7 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -789,7 +789,7 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -853,7 +853,7 @@ public class InspectionServiceSingleRunTests
         InspectionResult? capturedEvidenceResult = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -946,7 +946,7 @@ public class InspectionServiceSingleRunTests
         InspectionResult? persistedResult = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -1020,7 +1020,7 @@ public class InspectionServiceSingleRunTests
             }
         });
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowExecutionResult
             {
                 IsSuccess = true,
@@ -1090,7 +1090,7 @@ public class InspectionServiceSingleRunTests
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<FlowExecutionResult>(new InvalidOperationException("flow exploded")));
         resultRepository
             .AddAsync(Arg.Any<InspectionResult>())
@@ -1131,7 +1131,8 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("camera-flow");
-        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
+        var project = new Project("active-inline-project");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
 
         imageAcquisition
             .AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
@@ -1157,8 +1158,23 @@ public class InspectionServiceSingleRunTests
 
         result.Status.Should().Be(InspectionStatus.Error);
         result.ErrorMessage.Should().Contain("camera offline");
+        result.ExecutionSnapshotId.Should().NotBeNull();
+        result.FlowVersionHash.Should().Be(ExecutionFlowIdentity.ComputeFlowHash(explicitFlow));
+        result.ProjectPersistenceRevision.Should().Be(project.PersistenceRevision);
+        result.DecisionConfigurationHash.Should().Be(
+            ExecutionFlowIdentity.ComputeDecisionConfigurationHash(explicitFlow.DecisionConfiguration));
+        result.ExecutionSource.Should().Be(ExecutionSnapshotSource.Draft.ToString());
+        result.ExecutionRunMode.Should().Be(ExecutionRunMode.FormalPrimary.ToString());
+        result.SessionId.Should().NotBeNull();
         await resultRepository.Received(1).AddAsync(Arg.Is<InspectionResult>(item =>
             item.Status == InspectionStatus.Error &&
+            item.ExecutionSnapshotId == result.ExecutionSnapshotId &&
+            item.FlowVersionHash == result.FlowVersionHash &&
+            item.ProjectPersistenceRevision == result.ProjectPersistenceRevision &&
+            item.DecisionConfigurationHash == result.DecisionConfigurationHash &&
+            item.ExecutionSource == result.ExecutionSource &&
+            item.ExecutionRunMode == result.ExecutionRunMode &&
+            item.SessionId == result.SessionId &&
             item.ErrorMessage != null &&
             item.ErrorMessage.Contains("camera offline", StringComparison.Ordinal)));
     }
@@ -1186,10 +1202,10 @@ public class InspectionServiceSingleRunTests
         Dictionary<string, object>? executedInputs = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
                 return Task.FromResult(new FlowExecutionResult
                 {
@@ -1222,8 +1238,8 @@ public class InspectionServiceSingleRunTests
         ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(storedFlow));
         executedInputs.Should().NotBeNull();
         executedInputs!.Should().ContainKey("Image");
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Is<OperatorFlow>(candidate => ExecutionFlowIdentity.ComputeFlowHash(candidate) == ExecutionFlowIdentity.ComputeFlowHash(storedFlow)),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Is<ExecutionSnapshot>(candidate => candidate.FlowHash == ExecutionFlowIdentity.ComputeFlowHash(storedFlow)),
             Arg.Any<Dictionary<string, object>?>(),
             false,
             Arg.Any<CancellationToken>());
@@ -1251,10 +1267,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -1306,10 +1322,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -1342,8 +1358,8 @@ public class InspectionServiceSingleRunTests
         result.Status.Should().Be(InspectionStatus.OK);
         executedFlow.Should().NotBeNull();
         executedFlow!.Operators.Should().ContainSingle(op => op.Type == OperatorType.TextSave);
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -1376,8 +1392,8 @@ public class InspectionServiceSingleRunTests
         ProjectVariableExecutionContext? capturedContext = null;
 
         flowExecution
-            .ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+            .ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<ProjectVariableExecutionContext>(),
                 Arg.Any<bool>(),
@@ -1415,8 +1431,8 @@ public class InspectionServiceSingleRunTests
         result.Status.Should().Be(InspectionStatus.OK);
         capturedContext.Should().NotBeNull();
         capturedContext!.Session.Schema.Variables.Should().ContainSingle(variable => variable.Id == variableId);
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            storedFlow,
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Is<ExecutionSnapshot>(snapshot => snapshot.FlowHash == ExecutionFlowIdentity.ComputeFlowHash(storedFlow)),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<ProjectVariableExecutionContext>(),
             false,
@@ -1442,10 +1458,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -1475,8 +1491,8 @@ public class InspectionServiceSingleRunTests
         result.Status.Should().Be(InspectionStatus.OK);
         executedFlow.Should().NotBeSameAs(explicitFlow);
         ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(explicitFlow));
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -1506,10 +1522,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -1566,10 +1582,10 @@ public class InspectionServiceSingleRunTests
         OperatorFlow? executedFlow = null;
 
         flowExecution
-            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                executedFlow = callInfo.Arg<OperatorFlow>();
+                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
                 return Task.FromResult(new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -1599,8 +1615,8 @@ public class InspectionServiceSingleRunTests
         result.Status.Should().Be(InspectionStatus.OK);
         executedFlow.Should().NotBeSameAs(inlineFlow);
         ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(inlineFlow));
-        await flowExecution.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
@@ -1676,7 +1692,7 @@ public class InspectionServiceSingleRunTests
         var service = new InspectionService(
             resultRepository,
             projectRepository,
-            flowExecution,
+            new GovernedFlowExecutionService(flowExecution),
             Substitute.For<IImageAcquisitionService>(),
             Substitute.For<IConfigurationService>(),
             coordinator,

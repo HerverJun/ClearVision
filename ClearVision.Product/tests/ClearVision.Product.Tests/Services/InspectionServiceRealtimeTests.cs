@@ -141,8 +141,8 @@ public class InspectionServiceRealtimeTests
     private static TestContext CreateContext()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
-        flowExecution.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())

@@ -299,8 +299,22 @@ public sealed class StationHeartbeatDto
     /// <summary>Currently loaded runtime package version.</summary>
     public string? CurrentPackageVersion { get; set; }
 
-    /// <summary>Flow hash for the loaded runtime package.</summary>
+    /// <summary>Package-semantic flow hash from the manifest.</summary>
+    public string? PackageFlowHash { get; set; }
+
+    /// <summary>Actual execution-definition hash for the current snapshot.</summary>
+    public string? ExecutionFlowHash { get; set; }
+
+    /// <summary>Compatibility alias for ExecutionFlowHash.</summary>
     public string? FlowHash { get; set; }
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public long? ProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
+    public string? ExecutionRunMode { get; set; }
 
     /// <summary>Current run identifier when the Station is actively processing.</summary>
     public string? CurrentRunId { get; set; }
@@ -394,8 +408,22 @@ public sealed class StationSnapshotDto
     /// <summary>Currently loaded runtime package version.</summary>
     public string? CurrentPackageVersion { get; set; }
 
-    /// <summary>Flow hash for the loaded runtime package.</summary>
+    /// <summary>Package-semantic flow hash from the manifest.</summary>
+    public string? PackageFlowHash { get; set; }
+
+    /// <summary>Actual execution-definition hash for the current snapshot.</summary>
+    public string? ExecutionFlowHash { get; set; }
+
+    /// <summary>Compatibility alias for ExecutionFlowHash.</summary>
     public string? FlowHash { get; set; }
+
+    public Guid? ExecutionSnapshotId { get; set; }
+
+    public long? ProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
+    public string? ExecutionRunMode { get; set; }
 
     /// <summary>Current run identifier when the Station is actively processing.</summary>
     public string? CurrentRunId { get; set; }
@@ -545,7 +573,13 @@ public sealed class StationResultSummaryDto
     /// <summary>Runtime package semantic version when available.</summary>
     public string PackageVersion { get; set; } = string.Empty;
 
-    /// <summary>Exported flow hash for the runtime package.</summary>
+    /// <summary>Package-semantic flow hash from the manifest.</summary>
+    public string PackageFlowHash { get; set; } = string.Empty;
+
+    /// <summary>Actual execution-definition hash used by this result.</summary>
+    public string ExecutionFlowHash { get; set; } = string.Empty;
+
+    /// <summary>Compatibility alias for ExecutionFlowHash.</summary>
     public string FlowHash { get; set; } = string.Empty;
 
     /// <summary>Project revision captured in the runtime execution snapshot.</summary>

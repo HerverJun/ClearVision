@@ -13,6 +13,48 @@ namespace ClearVision.Product.Core.Services;
 /// </summary>
 public interface IFlowExecutionService
 {
+    Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData = null,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default);
+
+    Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default);
+
+    Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        DebugOptions options,
+        Dictionary<string, object>? inputData = null,
+        ProjectVariableExecutionContext? projectVariables = null,
+        CancellationToken cancellationToken = default);
+
+    Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default);
+
+    FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot);
+
+    FlowExecutionStatus? GetExecutionStatus(Guid flowId);
+
+    Task CancelExecutionAsync(Guid flowId);
+
+    Dictionary<string, object>? GetDebugIntermediateResult(Guid debugSessionId, Guid operatorId);
+
+    Task ClearDebugCacheAsync(Guid debugSessionId);
+}
+
+/// <summary>
+/// Raw flow engine contract. Production entrypoints must depend on
+/// <see cref="IFlowExecutionService"/> instead.
+/// </summary>
+public interface IFlowExecutionEngine
+{
     /// <summary>
     /// Executes the immutable authority captured for one run.  The default
     /// implementation keeps existing adapters compatible while ensuring the
@@ -144,6 +186,11 @@ public interface IFlowExecutionService
     Task ClearDebugCacheAsync(Guid debugSessionId);
 }
 
+public interface IFlowDefinitionValidator
+{
+    FlowValidationResult ValidateFlow(OperatorFlow flow);
+}
+
 /// <summary>
 /// The compatibility boundary between governed execution and the legacy flow
 /// engine overloads. Product entrypoints call these methods with an explicit
@@ -152,7 +199,7 @@ public interface IFlowExecutionService
 public static class GovernedFlowExecution
 {
     public static Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
-        this IFlowExecutionService service,
+        this IFlowExecutionEngine service,
         ExecutionSnapshot snapshot,
         Dictionary<string, object>? inputData = null,
         bool enableParallel = false,
@@ -168,7 +215,7 @@ public static class GovernedFlowExecution
     }
 
     public static Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
-        this IFlowExecutionService service,
+        this IFlowExecutionEngine service,
         ExecutionSnapshot snapshot,
         Dictionary<string, object>? inputData,
         ProjectVariableExecutionContext projectVariables,
@@ -186,7 +233,7 @@ public static class GovernedFlowExecution
     }
 
     public static Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(
-        this IFlowExecutionService service,
+        this IFlowExecutionEngine service,
         ExecutionSnapshot snapshot,
         DebugOptions options,
         Dictionary<string, object>? inputData = null,

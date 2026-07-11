@@ -236,7 +236,7 @@ public class RuntimePackageExporterValidationTests
     }
 
     [Fact]
-    public async Task ExportAsync_ShouldBundleModelResourcesAndLoaderShouldRebaseThemToPackageRoot()
+    public async Task ExportAsync_ShouldBundleModelResourcesAndPreservePackageHashAcrossDeploymentRoots()
     {
         var root = CreateTempDirectory();
         try
@@ -311,6 +311,24 @@ public class RuntimePackageExporterValidationTests
             Path.IsPathFullyQualified(loadedLabelsPath).Should().BeTrue();
             loadedLabelsPath.Should().StartWith(export.PackageRootPath);
             File.Exists(loadedLabelsPath).Should().BeTrue();
+
+            var deploymentA = Path.Combine(root, "station-a", "package");
+            var deploymentB = Path.Combine(root, "station-b", "package");
+            CopyDirectory(export.PackageRootPath, deploymentA);
+            CopyDirectory(export.PackageRootPath, deploymentB);
+
+            var packageA = await loader.LoadAsync(deploymentA);
+            var packageB = await loader.LoadAsync(deploymentB);
+            packageA.Manifest.FlowHash.Should().Be(export.Manifest.FlowHash);
+            packageB.Manifest.FlowHash.Should().Be(export.Manifest.FlowHash);
+            packageA.ExecutionSnapshot!.FlowHash.Should().Be(export.Manifest.FlowHash);
+            packageB.ExecutionSnapshot!.FlowHash.Should().Be(export.Manifest.FlowHash);
+            ReadParameter(packageA.Flow.Operators.Single(), "ModelPath").Should().StartWith(deploymentA);
+            ReadParameter(packageB.Flow.Operators.Single(), "ModelPath").Should().StartWith(deploymentB);
+            packageA.ExecutionSnapshot.CreateExecutionFlow().Operators.Single().Parameters
+                .Single(parameter => parameter.Name == "ModelPath").GetValue()?.ToString().Should().StartWith(deploymentA);
+            packageB.ExecutionSnapshot.CreateExecutionFlow().Operators.Single().Parameters
+                .Single(parameter => parameter.Name == "ModelPath").GetValue()?.ToString().Should().StartWith(deploymentB);
         }
         finally
         {
@@ -1009,6 +1027,22 @@ public class RuntimePackageExporterValidationTests
         if (Directory.Exists(path))
         {
             Directory.Delete(path, recursive: true);
+        }
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, overwrite: true);
         }
     }
 }

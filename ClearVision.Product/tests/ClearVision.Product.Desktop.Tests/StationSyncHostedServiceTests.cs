@@ -22,6 +22,42 @@ namespace ClearVision.Product.Desktop.Tests;
 public sealed class StationSyncHostedServiceTests
 {
     [Fact]
+    public void HeartbeatProjection_ShouldPreserveCurrentRuntimeExecutionIdentity()
+    {
+        var identity = new StationIdentityContext
+        {
+            StationId = "station-identity",
+            LineName = "line-a",
+            CurrentPackageVersion = "1.2.3"
+        };
+        var snapshotId = Guid.NewGuid();
+        var snapshot = new RuntimeHostSnapshot
+        {
+            State = RuntimeHostState.Running,
+            PackageId = "pkg-1",
+            PackageName = "package",
+            PackageFlowHash = "package-hash",
+            ExecutionFlowHash = "execution-hash",
+            FlowHash = "execution-hash",
+            ExecutionSnapshotId = snapshotId,
+            ProjectRevision = 42,
+            DecisionConfigurationHash = "decision-hash",
+            ExecutionRunMode = ExecutionRunMode.StationRuntime.ToString(),
+            CurrentRunId = "run-1"
+        };
+
+        var heartbeat = InvokeBuildHeartbeat(identity, snapshot);
+
+        heartbeat.PackageFlowHash.Should().Be(snapshot.PackageFlowHash);
+        heartbeat.ExecutionFlowHash.Should().Be(snapshot.ExecutionFlowHash);
+        heartbeat.FlowHash.Should().Be(snapshot.ExecutionFlowHash);
+        heartbeat.ExecutionSnapshotId.Should().Be(snapshotId);
+        heartbeat.ProjectRevision.Should().Be(42);
+        heartbeat.DecisionConfigurationHash.Should().Be("decision-hash");
+        heartbeat.ExecutionRunMode.Should().Be(ExecutionRunMode.StationRuntime.ToString());
+    }
+
+    [Fact]
     public async Task ResultIngress_ShouldDropTelemetryInsteadOfBlocking_WhenOutboundQueueIsFull()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationSyncHostedServiceTests", Guid.NewGuid().ToString("N"));
@@ -426,6 +462,17 @@ public sealed class StationSyncHostedServiceTests
         return (StationHealthSnapshotDto)method!.Invoke(
             fixture.Service,
             [fixture.IdentityResolver.GetOrCreate(), fixture.RuntimeHost.GetSnapshot(), fixture.SpoolStore])!;
+    }
+
+    private static StationHeartbeatDto InvokeBuildHeartbeat(
+        StationIdentityContext identity,
+        RuntimeHostSnapshot snapshot)
+    {
+        var method = typeof(StationSyncHostedService).GetMethod(
+            "BuildHeartbeatDto",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+        return (StationHeartbeatDto)method!.Invoke(null, [identity, snapshot])!;
     }
 
     private static string InvokeBuildPlcStatusSummaryCore(

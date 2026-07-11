@@ -28,7 +28,7 @@ namespace ClearVision.Product.Infrastructure.Services;
 /// <summary>
 /// 流程执行服务实现
 /// </summary>
-public class FlowExecutionService : IFlowExecutionService, IDisposable
+public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidator, IDisposable
 {
     private static readonly TimeSpan DebugCleanupInterval = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);

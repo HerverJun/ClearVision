@@ -289,7 +289,7 @@ public class FlowConnectionScenariosTests
         inputImage.RefCount.Should().Be(0);
     }
 
-    private static IFlowExecutionService CreateFlowService(params IOperatorExecutor[] executors)
+    private static IFlowExecutionEngine CreateFlowService(params IOperatorExecutor[] executors)
     {
         return new FlowExecutionService(
             executors,

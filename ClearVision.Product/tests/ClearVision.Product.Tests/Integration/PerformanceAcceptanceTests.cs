@@ -22,7 +22,7 @@ namespace ClearVision.Product.Tests.Integration
     [Trait("Category", "PerformanceBudget")]
     public class PerformanceAcceptanceTests
     {
-        private readonly IFlowExecutionService _flowExecutionService;
+        private readonly IFlowExecutionEngine _flowExecutionService;
         private readonly OperatorFlow _testFlow;
 
         public PerformanceAcceptanceTests()
@@ -259,7 +259,7 @@ namespace ClearVision.Product.Tests.Integration
             var mockScopedProvider = Substitute.For<IServiceProvider>();
             var mockScope = Substitute.For<IServiceScope>();
             var mockScopeFactory = Substitute.For<IServiceScopeFactory>();
-            var mockSubFlowService = Substitute.For<IFlowExecutionService>();
+            var mockSubFlowService = Substitute.For<IFlowExecutionEngine>();
             mockSubFlowService.ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
                 .Returns(async _ =>
                 {
@@ -271,7 +271,7 @@ namespace ClearVision.Product.Tests.Integration
                     };
                 });
 
-            mockScopedProvider.GetService(typeof(IFlowExecutionService)).Returns(mockSubFlowService);
+            mockScopedProvider.GetService(typeof(IFlowExecutionEngine)).Returns(mockSubFlowService);
             mockScope.ServiceProvider.Returns(mockScopedProvider);
             mockScopeFactory.CreateScope().Returns(mockScope);
 
