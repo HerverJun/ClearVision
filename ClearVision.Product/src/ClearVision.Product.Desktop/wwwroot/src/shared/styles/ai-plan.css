@@ -23,7 +23,8 @@
 
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-workspace-overview {
     display: block;
-    padding: 10px 16px 0;
+    padding: 12px 26px 0;
+    background: var(--ai-workbench-surface);
 }
 
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-overview-card {
@@ -43,17 +44,20 @@
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-stage-strip {
     display: inline-grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: min(100%, 360px);
-    padding: 3px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--bg-subtle);
+    width: min(100%, 320px);
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--ai-border-subtle);
+    border-radius: 0;
+    background: transparent;
 }
 
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-stage-strip button {
     min-height: 34px;
     padding: 5px 10px;
     border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     background: transparent;
 }
 
@@ -63,7 +67,8 @@
 
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-stage-strip button.is-selected {
     color: var(--primary-color);
-    background: var(--bg-surface);
+    border-bottom-color: var(--primary-color);
+    background: transparent;
 }
 
 .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-stage-strip button small {
@@ -71,9 +76,9 @@
 }
 
 .ai-plan-v2 {
-    --ai-plan-surface: var(--bg-surface);
-    --ai-plan-surface-muted: var(--bg-subtle);
-    --ai-plan-border: var(--border-color);
+    --ai-plan-surface: var(--ai-workbench-surface);
+    --ai-plan-surface-muted: var(--ai-soft-surface);
+    --ai-plan-border: var(--ai-border-subtle);
     --ai-plan-border-strong: var(--theme-border-strong);
     --ai-plan-text: var(--text-primary);
     --ai-plan-text-secondary: var(--text-secondary);
@@ -82,20 +87,24 @@
     --ai-plan-success: var(--status-ok);
     --ai-plan-warning: var(--status-error);
     display: grid;
-    gap: 20px;
+    gap: 16px;
+    width: min(100%, 1120px);
+    margin: 0 auto;
     min-width: 0;
     color: var(--ai-plan-text);
 }
 
 .ai-plan-v2-section {
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--ai-plan-border);
+    padding: 20px 22px;
+    border: 1px solid var(--ai-plan-border);
+    border-radius: var(--radius-lg);
+    background: var(--ai-plan-surface);
 }
 
 .ai-plan-v2-section-heading {
     display: grid;
-    gap: 4px;
-    margin-bottom: 14px;
+    gap: 5px;
+    margin-bottom: 16px;
 }
 
 .ai-plan-v2-section-heading > span,
@@ -110,29 +119,35 @@
 .ai-plan-v2-section-heading > strong,
 .ai-plan-v2-empty > strong {
     color: var(--ai-plan-text);
-    font-size: var(--font-size-xl);
+    font-size: clamp(20px, 1.65vw, 25px);
+    font-weight: 680;
     line-height: 1.35;
 }
 
 .ai-plan-v2-definition-list {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px 18px;
+    padding: 4px 14px;
     margin: 0;
-    border-top: 1px solid var(--ai-plan-border);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--ai-plan-surface-muted);
 }
 
 .ai-plan-v2-definition-list > div {
     display: grid;
-    grid-template-columns: minmax(96px, 0.45fr) minmax(0, 1fr) auto;
-    gap: 12px;
-    align-items: baseline;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 8px;
+    align-content: center;
     min-width: 0;
-    padding: 11px 12px;
-    border-bottom: 1px solid var(--ai-plan-border);
+    min-height: 66px;
+    padding: 10px 4px;
+    border: 0;
 }
 
 .ai-plan-v2-definition-list > div:nth-child(odd) {
-    border-right: 1px solid var(--ai-plan-border);
+    border-right: 0;
 }
 
 .ai-plan-v2-definition-list dt,
@@ -141,19 +156,30 @@
 }
 
 .ai-plan-v2-definition-list dt {
+    grid-column: 1 / -1;
     color: var(--ai-plan-text-secondary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
 }
 
 .ai-plan-v2-definition-list dd {
     min-width: 0;
     color: var(--ai-plan-text);
+    font-size: var(--font-size-md);
+    font-weight: 620;
+    line-height: 1.45;
     overflow-wrap: anywhere;
 }
 
 .ai-plan-v2-definition-list small {
+    align-self: center;
     color: var(--ai-plan-text-muted);
+    font-size: var(--font-size-xs);
     white-space: nowrap;
+}
+
+.ai-plan-v2-definition-list .is-inferred small,
+.ai-plan-v2-definition-list .is-confirmed small {
+    display: none;
 }
 
 .ai-plan-v2-definition-list .is-confirmed small {
@@ -166,52 +192,80 @@
 }
 
 .ai-plan-v2-summary {
-    max-width: 760px;
-    margin: 0 0 16px;
+    max-width: 820px;
+    margin: 0 0 18px;
     color: var(--ai-plan-text-secondary);
+    font-size: var(--font-size-md);
     line-height: 1.7;
 }
 
 .ai-plan-v2-sequence {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 22px;
     padding: 0;
     margin: 0;
     list-style: none;
 }
 
 .ai-plan-v2-sequence li {
-    display: inline-flex;
-    gap: 8px;
-    align-items: center;
-    min-height: 38px;
-    padding: 7px 10px;
+    position: relative;
+    display: grid;
+    gap: 6px;
+    align-content: center;
+    min-height: 66px;
+    padding: 12px 14px;
     border: 1px solid var(--ai-plan-border);
     border-radius: var(--radius-md);
-    background: var(--ai-plan-surface-muted);
+    background: var(--ai-plan-surface);
+}
+
+.ai-plan-v2-sequence li:not(:last-child)::after {
+    position: absolute;
+    top: 50%;
+    right: -17px;
+    width: 11px;
+    border-top: 1px solid color-mix(in srgb, var(--ai-plan-text-muted) 52%, var(--ai-plan-border));
+    content: '';
+}
+
+.ai-plan-v2-sequence li:not(:last-child)::before {
+    position: absolute;
+    z-index: 1;
+    top: calc(50% - 3px);
+    right: -18px;
+    width: 6px;
+    height: 6px;
+    border-top: 1px solid color-mix(in srgb, var(--ai-plan-text-muted) 52%, var(--ai-plan-border));
+    border-right: 1px solid color-mix(in srgb, var(--ai-plan-text-muted) 52%, var(--ai-plan-border));
+    content: '';
+    transform: rotate(45deg);
 }
 
 .ai-plan-v2-sequence li span {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: var(--radius-full);
-    background: var(--ai-plan-surface);
+    display: block;
+    width: auto;
+    height: auto;
     color: var(--ai-plan-text-muted);
     font-size: var(--font-size-xs);
 }
 
+.ai-plan-v2-sequence li span::before {
+    content: '步骤 ';
+}
+
 .ai-plan-v2-sequence li strong {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: var(--font-size-md);
+    font-weight: 650;
 }
 
 .ai-plan-v2-decision-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
+    gap: 24px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ai-plan-border);
 }
 
 .ai-plan-v2-decision-grid section {
@@ -270,10 +324,11 @@
     justify-content: space-between;
     gap: 18px;
     align-items: center;
-    padding: 14px;
-    border: 1px solid var(--ai-plan-border);
-    border-radius: var(--radius-md);
-    background: var(--ai-plan-surface-muted);
+    padding: 12px 2px;
+    border: 0;
+    border-top: 1px solid var(--ai-plan-border);
+    border-radius: 0;
+    background: transparent;
 }
 
 .ai-plan-v2-mode > div:first-child {
@@ -307,8 +362,8 @@
 }
 
 .ai-plan-v2-mode button[aria-pressed="true"] {
-    background: var(--ai-plan-accent);
-    color: var(--paper-white);
+    background: var(--ai-accent-soft);
+    color: var(--ai-plan-accent);
 }
 
 .ai-plan-v2-mode button:focus-visible,
@@ -319,7 +374,7 @@
 }
 
 .ai-plan-v2-details {
-    padding-top: 14px;
+    padding: 14px 2px 0;
 }
 
 .ai-plan-v2-details-body {
@@ -382,6 +437,34 @@
     padding: 24px 8px;
 }
 
+.ai-plan-v2-ready {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 1px solid color-mix(in srgb, var(--ai-plan-success) 16%, var(--ai-plan-border));
+    border-radius: var(--radius-md);
+    background: var(--ai-success-soft);
+    color: var(--ai-plan-text-secondary);
+}
+
+.ai-plan-v2-ready::before {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background: var(--ai-plan-success);
+    color: var(--ai-plan-surface);
+    content: '✓';
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.ai-plan-v2-ready strong {
+    color: var(--ai-plan-text);
+}
+
 .ai-plan-v2-empty p {
     margin: 0;
     color: var(--ai-plan-text-secondary);
@@ -389,13 +472,25 @@
 }
 
 @media (max-width: 1179px) {
-    .ai-plan-v2-definition-list,
-    .ai-plan-v2-decision-grid {
-        grid-template-columns: 1fr;
+    .ai-plan-v2-definition-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .ai-plan-v2-definition-list > div:nth-child(odd) {
         border-right: 0;
+    }
+
+    .ai-plan-v2-decision-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-plan-v2-sequence {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-plan-v2-sequence li::before,
+    .ai-plan-v2-sequence li::after {
+        display: none;
     }
 }
 
@@ -421,7 +516,7 @@
     }
 
     .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-workspace-overview {
-        padding: 8px 10px 0;
+        padding: 8px 14px 0;
     }
 
     .ai-shell[data-ai-shell-state="active"]:has(.ai-plan-workspace[data-ai-plan-presentation="v2"]) .ai-agent-stage-strip {
@@ -433,12 +528,12 @@
     }
 
     .ai-plan-v2-definition-list > div {
-        grid-template-columns: minmax(88px, 0.45fr) minmax(0, 1fr);
-        gap: 6px 10px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 5px 8px;
     }
 
     .ai-plan-v2-definition-list small {
-        grid-column: 2;
+        grid-column: auto;
     }
 
     .ai-plan-v2-sequence {
@@ -459,6 +554,22 @@
     .ai-plan-v2-mode button,
     .ai-plan-v2-view-draft {
         min-height: 40px;
+    }
+}
+
+@media (max-width: 640px) {
+    .ai-plan-v2-definition-list {
+        grid-template-columns: 1fr;
+        padding-inline: 12px;
+    }
+
+    .ai-plan-v2-section {
+        padding: 16px 14px;
+    }
+
+    .ai-plan-v2-ready {
+        align-items: flex-start;
+        flex-wrap: wrap;
     }
 }
 

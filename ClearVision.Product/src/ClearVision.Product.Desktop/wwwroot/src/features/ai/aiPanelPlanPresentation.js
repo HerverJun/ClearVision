@@ -169,7 +169,7 @@ function renderUnderstanding(panel, items) {
     `;
 }
 
-function renderRoute(panel, route) {
+function renderRoute(panel, route, presentation) {
     const sequence = route.operators.length ? route.operators.map(item => item.label) : route.steps;
     return `
         <section class="ai-plan-v2-section ai-plan-v2-recommendation" data-ai-hook="plan-recommendation">
@@ -183,6 +183,7 @@ function renderRoute(panel, route) {
                     ${sequence.map((item, index) => `<li><span>${index + 1}</span><strong>${escapeHtml(panel, item)}</strong></li>`).join('')}
                 </ol>
             ` : '<p class="ai-plan-v2-muted">当前方案尚未提供可靠的处理步骤。</p>'}
+            ${renderDecisionDetails(panel, presentation)}
         </section>
     `;
 }
@@ -284,8 +285,7 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
     root.innerHTML = `
         <div class="ai-plan-v2" data-ai-hook="plan-workspace-v2">
             ${renderUnderstanding(panel, presentation.understanding)}
-            ${renderRoute(panel, presentation.route)}
-            ${renderDecisionDetails(panel, presentation)}
+            ${renderRoute(panel, presentation.route, presentation)}
             ${renderAiClarification(panel, plan)}
             ${renderModeControl(panel, presentation)}
             ${renderEngineeringDetails(panel, plan, presentation)}

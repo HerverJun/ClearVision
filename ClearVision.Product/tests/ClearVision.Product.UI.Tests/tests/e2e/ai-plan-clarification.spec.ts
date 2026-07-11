@@ -273,6 +273,7 @@ test('Plan-ready workspace shows understanding and recommendation while preservi
   await expect(page.locator('[data-ai-hook="plan-recommendation"]')).toContainText('包装箱外观检测流程');
   await expect(page.locator('.ai-plan-v2-sequence li')).toHaveCount(4);
   await expect(page.locator('[data-ai-hook="clarification-workspace"]')).toHaveCount(0);
+  await expect(page.locator('[data-ai-hook="clarification-ready"]')).toContainText('方案已就绪');
   await expect(page.locator('#ai-btn-start-build')).toHaveCount(1);
   await expect(page.locator('#ai-btn-start-build')).toBeEnabled();
 });
@@ -641,6 +642,52 @@ test('clarification confirming dark visual baseline at 1366', async ({ page }) =
   await seedPlan(page, { questions: 'multiple', confirming: true });
   await focusClarificationViewport(page);
   await expect(page.locator('#ai-view')).toHaveScreenshot('clarification-confirming-dark-1366.png');
+});
+
+test('confirmed clarification collapses into a low-emphasis light summary', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768, theme: 'light' });
+  await seedPlan(page, { questions: 'single' });
+  await page.evaluate(question => {
+    const panel = (window as any).aiPanel;
+    panel._dispatchAgentWorkspaceEvent({
+      type: 'workspace/answers-confirmed',
+      payload: {
+        answers: [{
+          questionId: question.id,
+          field: question.field,
+          value: 'industrial_camera',
+          origin: 'explicit_user_selection',
+        }],
+      },
+    });
+    panel._dispatchAgentWorkspaceEvent({
+      type: 'workspace/readiness-received',
+      payload: {
+        buildReadiness: {
+          canBuild: true,
+          blockers: [],
+          resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'output_target'],
+          remainingFields: [],
+          primaryMessage: '方案信息完整，可以开始构建。',
+          contractVersion: 'v2',
+        },
+      },
+    });
+    panel.pendingVisionPlan.buildReadiness = {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'output_target'],
+      remainingFields: [],
+      primaryMessage: '方案信息完整，可以开始构建。',
+      contractVersion: 'v2',
+    };
+    panel.pendingVisionPlan.canBuild = true;
+    panel._renderAgentWorkspaceOverview();
+    panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  }, imageSourceQuestion);
+  await focusClarificationViewport(page);
+  await expect(page.locator('[data-ai-hook="clarification-confirmed"]')).toContainText('工业相机');
+  await expect(page.locator('#ai-view')).toHaveScreenshot('clarification-confirmed-light-1366.png');
 });
 
 test('clarification light visual baseline at 1366', async ({ page }) => {

@@ -5,12 +5,12 @@
     flex-direction: column;
     gap: 14px;
     min-height: 0;
-    padding: 18px;
+    padding: 18px 16px 22px;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
-    background: var(--ai-pane-surface);
+    background: var(--ai-conversation-surface);
     background-image: none;
     scroll-behavior: smooth;
 }
@@ -21,7 +21,7 @@
 
 .ai-message {
     display: flex;
-    max-width: 94%;
+    max-width: 90%;
     animation: none;
 }
 
@@ -50,14 +50,14 @@
 .user-bubble {
     padding: 10px 12px;
     border: 1px solid var(--ai-border-strong);
-    background: var(--ai-subtle-surface);
+    background: var(--ai-soft-surface);
     color: var(--ai-text-primary);
 }
 
 .ai-bubble {
-    padding: 10px 0;
-    border: 0;
-    background: transparent;
+    padding: 10px 12px;
+    border: 1px solid var(--ai-border-subtle);
+    background: var(--ai-workbench-surface);
     color: var(--ai-text-primary);
 }
 
@@ -94,10 +94,12 @@
     flex: 0 0 auto;
     padding: 12px;
     border-top: 1px solid var(--ai-border-subtle);
-    background: var(--ai-pane-surface);
+    background: var(--ai-conversation-surface);
 }
 
 .ai-input-box {
+    --focus-ring-color: var(--ai-border-strong);
+    --focus-ring: 0 0 0 2px color-mix(in srgb, var(--ai-border-strong) 42%, transparent);
     display: flex;
     align-items: flex-end;
     gap: 8px;
@@ -105,12 +107,12 @@
     padding: 8px;
     border: 1px solid var(--ai-border-strong);
     border-radius: var(--radius-lg);
-    background: var(--ai-pane-surface);
+    background: var(--ai-workbench-surface);
     box-shadow: none;
 }
 
 .ai-input-box:focus-within {
-    border-color: var(--ai-accent);
+    border-color: var(--ai-border-strong);
     box-shadow: none;
 }
 
@@ -154,7 +156,7 @@
 .ai-btn-send {
     border: 1px solid var(--ai-accent);
     background: var(--ai-accent);
-    color: var(--theme-text-primary);
+    color: var(--paper-white);
 }
 
 .ai-btn-send:hover {

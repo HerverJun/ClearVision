@@ -289,7 +289,7 @@ function renderResources(panel, items) {
 export function renderAiClarification(panel, plan) {
     const presentation = deriveAiClarificationPresentation(panel, plan);
     if (!presentation.activeQuestion && !presentation.confirmedItems.length && !presentation.resourceItems.length) {
-        return '<div class="ai-clarification-v2-empty">当前没有需要确认的关键问题。</div>';
+        return '<div class="ai-plan-v2-ready" data-ai-hook="clarification-ready"><strong>方案已就绪</strong><span>关键问题已确认，可复核后开始构建。</span></div>';
     }
     return `
         <section class="ai-clarification-v2" data-ai-hook="clarification-workspace">
