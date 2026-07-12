@@ -8,10 +8,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($Password)) {
-    throw "Provide -Password or set CV_SMOKE_PASSWORD. The credential is never written to evidence."
-}
-
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $project = Join-Path $repoRoot "ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj"
@@ -22,6 +18,22 @@ $evidence = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $EvidenceDirector
 $hostLogs = Join-Path $repoRoot ".tmp/ai-webview2-release-host-logs"
 $runtime = "net8.0-windows/win-x64"
 $exe = Join-Path $repoRoot "ClearVision.Product/src/ClearVision.Product.Desktop/bin/$Configuration/$runtime/ClearVision.Product.Desktop.exe"
+$useIsolatedAuth = [string]::IsNullOrWhiteSpace($Password)
+$isolatedAuthDirectory = Join-Path $repoRoot ".tmp/ai-webview2-release-auth"
+$isolatedDatabase = Join-Path $isolatedAuthDirectory "vision.db"
+$previousDatabasePath = $env:Database__Path
+
+if ($useIsolatedAuth) {
+    New-Item -ItemType Directory -Force -Path $isolatedAuthDirectory | Out-Null
+    Get-ChildItem -LiteralPath $isolatedAuthDirectory -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('vision.db', 'vision.db-shm', 'vision.db-wal') } |
+        Remove-Item -Force
+    $randomBytes = New-Object byte[] 18
+    $random = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $random.GetBytes($randomBytes) } finally { $random.Dispose() }
+    $Password = ([Convert]::ToBase64String($randomBytes) + "Aa1!")
+    $env:Database__Path = $isolatedDatabase
+}
 
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 New-Item -ItemType Directory -Force -Path $hostLogs | Out-Null
@@ -119,7 +131,17 @@ function Stop-DesktopHost {
 
 function Get-AuthSession {
     $body = @{ username = $Username; password = $Password } | ConvertTo-Json -Compress
-    return Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/auth/login" -ContentType "application/json" -Body $body
+    try {
+        return Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/auth/login" -ContentType "application/json" -Body $body
+    } catch {
+        if (-not $useIsolatedAuth) { throw }
+        $setupBody = @{
+            username = $Username
+            password = $Password
+            confirmPassword = $Password
+        } | ConvertTo-Json -Compress
+        return Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/auth/setup-admin" -ContentType "application/json" -Body $setupBody
+    }
 }
 
 function Invoke-WebViewSmoke {
@@ -149,13 +171,22 @@ $runs = @(
     @{ Scale = 1.5; Port = 9326; Phase = "layout"; Name = "dpi-150-layout" }
 )
 
-foreach ($run in $runs) {
-    $process = $null
-    try {
-        $process = Start-DesktopHost -CdpPort $run.Port -Scale $run.Scale -RunName $run.Name
-        Invoke-WebViewSmoke -CdpPort $run.Port -Scale $run.Scale -Phase $run.Phase
-    } finally {
-        if ($process) { Stop-DesktopHost -Process $process }
+try {
+    foreach ($run in $runs) {
+        $process = $null
+        try {
+            $process = Start-DesktopHost -CdpPort $run.Port -Scale $run.Scale -RunName $run.Name
+            Invoke-WebViewSmoke -CdpPort $run.Port -Scale $run.Scale -Phase $run.Phase
+        } finally {
+            if ($process) { Stop-DesktopHost -Process $process }
+        }
+    }
+} finally {
+    $env:Database__Path = $previousDatabasePath
+    if ($useIsolatedAuth) {
+        Get-ChildItem -LiteralPath $isolatedAuthDirectory -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in @('vision.db', 'vision.db-shm', 'vision.db-wal') } |
+            Remove-Item -Force
     }
 }
 

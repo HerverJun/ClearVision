@@ -10,7 +10,7 @@
     "chromeWebview": true,
     "activeView": "ai"
   },
-  "timestampUtc": "2026-07-12T09:23:25.120Z",
+  "timestampUtc": "2026-07-12T10:26:41.109Z",
   "layouts": [
     {
       "label": "dpi-1-light",
@@ -66,9 +66,9 @@
       "called": true,
       "completed": true,
       "reason": "host_close",
-      "startedAt": 1783848191355,
+      "startedAt": 1783851984601,
       "succeeded": true,
-      "completedAt": 1783848191355
+      "completedAt": 1783851984601
     },
     "safe": {
       "disposed": false,
@@ -81,18 +81,42 @@
       "reason": "apply_rollback_failed",
       "sessionId": "webview2-release-smoke-session",
       "fingerprintLength": 19,
-      "recordedAtUtc": "2026-07-12T09:23:11.308Z"
+      "recordedAtUtc": "2026-07-12T10:26:24.538Z"
     },
     "restored": {
-      "reason": "",
+      "identity": {
+        "sessionId": "webview2-release-smoke-session",
+        "requestId": "webview2-reopen-1783852001552",
+        "epoch": 2
+      },
+      "pendingSessionLoad": false,
+      "reason": "apply_rollback_failed",
       "applyDisabled": true,
+      "applyButtonText": "需安全恢复后才能应用",
+      "statusNote": "检测到该结果上次应用后的画布未能安全恢复；请先完成明确的安全恢复或生成新结果。",
       "marker": {
         "version": 1,
         "sessionId": "webview2-release-smoke-session",
-        "fingerprint": "fnv1a:6a5c996e:2060",
+        "fingerprint": "fnv1a:d1e2666b:2060",
         "reason": "apply_rollback_failed",
-        "recordedAtUtc": "2026-07-12T09:23:11.308Z"
-      }
+        "recordedAtUtc": "2026-07-12T10:26:24.538Z"
+      },
+      "canvasBeforeSessionRestore": {
+        "operators": [],
+        "connections": [],
+        "decisionConfiguration": null
+      },
+      "canvasAfterSessionRestore": {
+        "operators": [],
+        "connections": [],
+        "decisionConfiguration": null
+      },
+      "workspaceLifecycle": "build",
+      "workbenchState": "failed"
+    },
+    "canvasRecovery": {
+      "safeBaselineRestored": true,
+      "partialCanvasWasDifferent": true
     }
   }
 }

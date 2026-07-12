@@ -350,7 +350,7 @@ export const aiPanelSessionHistoryMixin = {
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
         this._resetPendingDraftState();
-        this._resetCurrentResultSyncState();
+        this._resetCurrentResultSyncState({ clearPersistedApplySafetyBlock: false });
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
         this.activeAssistantTurn = null;
@@ -482,6 +482,8 @@ export const aiPanelSessionHistoryMixin = {
 
         this._restoreWorkspaceSnapshotFromSession(workspaceSnapshot, sessionId, restoredResult);
         if (canvasFlow) {
+            this._applySafetyBlockReason = this._restorePersistedApplySafetyBlock?.(restoredResult) || '';
+            this._updateApplyButtonState?.();
             this._rebuildPendingOperatorBindings({
                 pending: this._resolvePendingParametersForDraft(restoredResult),
                 flow: restoredResult?.flow,
@@ -489,13 +491,17 @@ export const aiPanelSessionHistoryMixin = {
                 preferIndexFallback: true
             });
         } else {
-            this._resetCurrentResultSyncState();
+            this._resetCurrentResultSyncState({ clearPersistedApplySafetyBlock: false });
         }
         this._displayResult(restoredResult, { appendChatMessage: false });
         if (workspaceSnapshot?.appliedDowngraded) {
             this._applySafetyBlockReason = 'restored_applied_requires_revalidation';
             this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
             this._setResultStatusNote?.('历史 Applied 状态已降级为待重新验证的 Build；完成新的验证或生成新结果前不可再次应用。', 'warning');
+            this._updateApplyButtonState?.();
+        } else if (this._applySafetyBlockReason) {
+            this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+            this._setResultStatusNote?.('检测到该结果上次应用后的画布未能安全恢复；请先完成明确的安全恢复或生成新结果。', 'warning');
             this._updateApplyButtonState?.();
         }
 

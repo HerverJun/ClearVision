@@ -9,6 +9,7 @@ const token = String(process.env.CV_SMOKE_TOKEN || '');
 const user = String(process.env.CV_SMOKE_USER || '');
 const evidenceDir = path.resolve(process.env.CV_EVIDENCE_DIR || '.tmp/ai-webview2-release-evidence');
 const closeFlushMarker = 'cv_ai_webview2_close_flush_probe_v1';
+const rollbackRecoveryFixtureKey = 'cv_ai_webview2_rollback_recovery_fixture_v1';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -98,7 +99,7 @@ async function connect() {
 async function authenticateAndOpenAi(page) {
   assert(token, 'CV_SMOKE_TOKEN is required.');
   assert(user, 'CV_SMOKE_USER is required.');
-  const preNavigationSafetyMarker = await page.evaluate(({ authToken, authUser, markerKeyPrefix }) => {
+  const preNavigationState = await page.evaluate(({ authToken, authUser, markerKeyPrefix, recoveryKey }) => {
     sessionStorage.setItem('cv_auth_token', authToken);
     sessionStorage.setItem('cv_current_user', authUser);
     localStorage.setItem('cv_welcome_shown', 'true');
@@ -108,15 +109,23 @@ async function authenticateAndOpenAi(page) {
         const candidate = localStorage.key(index) || '';
         if (candidate.startsWith(`${markerKeyPrefix}:`)) { key = candidate; break; }
       }
-      return key ? JSON.parse(localStorage.getItem(key) || 'null') : null;
-    } catch { return null; }
-  }, { authToken: token, authUser: user, markerKeyPrefix: 'cv_ai_apply_safety_block_v1' });
+      return {
+        safetyMarker: key ? JSON.parse(localStorage.getItem(key) || 'null') : null,
+        recoveryFixture: JSON.parse(localStorage.getItem(recoveryKey) || 'null'),
+      };
+    } catch { return { safetyMarker: null, recoveryFixture: null }; }
+  }, {
+    authToken: token,
+    authUser: user,
+    markerKeyPrefix: 'cv_ai_apply_safety_block_v1',
+    recoveryKey: rollbackRecoveryFixtureKey,
+  });
   await page.goto('http://localhost:5000/index.html');
   await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 45_000 });
   await page.locator('.nav-btn[data-view="ai"]').click();
   await page.waitForFunction(() => Boolean(window.aiPanel && !window.aiPanel._disposed));
   await page.waitForSelector('#ai-view .ai-shell', { timeout: 30_000 });
-  return preNavigationSafetyMarker;
+  return preNavigationState;
 }
 
 async function resetSmokeConversation(page, { clearSafety = false } = {}) {
@@ -304,7 +313,7 @@ async function verifyRealCanvasApplyAndRollback(page) {
 }
 
 async function armRollbackFailurePersistence(page) {
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(recoveryKey => {
     const panel = window.aiPanel;
     const canvas = window.flowCanvasAdapter || window.flowCanvas;
     const originalDeserialize = canvas.deserialize.bind(canvas);
@@ -321,12 +330,33 @@ async function armRollbackFailurePersistence(page) {
       throw new Error('webview2 injected rollback failure');
     };
     const applied = panel._executeApplyFlow(panel.currentResult.flow);
+    const failedCanvas = canvas.serialize();
     const blocked = panel._applySafetyBlockReason === 'apply_rollback_failed';
     const applyDisabled = panel.container.querySelector('#ai-btn-apply')?.disabled === true;
     const marker = panel._readPersistedApplySafetyBlock?.();
     canvas.deserialize = originalDeserialize;
-    originalDeserialize(before);
     panel.options.onApplied = originalOnApplied;
+    const recoveryFixture = {
+      version: 1,
+      sessionId: panel.sessionId,
+      result: panel.currentResult,
+      beforeCanvas: before,
+      failedCanvas,
+      session: {
+        sessionId: panel.sessionId,
+        currentCanvasFlowJson: JSON.stringify(panel.currentResult.flow),
+        history: [{ role: 'assistant', message: 'WebView2 rollback recovery fixture', payload: panel.currentResult }],
+        workspaceSnapshot: {
+          schemaVersion: 2,
+          revision: Math.max(1, Number(panel.workspaceSnapshotRevision || 0)),
+          lifecycleState: 'build',
+          pendingPlanSnapshot: panel.pendingVisionPlan,
+          workspaceViewMode: 'build',
+        },
+      },
+    };
+    localStorage.setItem(recoveryKey, JSON.stringify(recoveryFixture));
+    panel._saveSessionId?.(panel.sessionId);
     return {
       applied,
       blocked,
@@ -335,12 +365,19 @@ async function armRollbackFailurePersistence(page) {
       markerSessionId: marker?.sessionId || '',
       currentSessionId: String(panel.sessionId || '').toLowerCase(),
       workbenchState: panel.workbenchState,
+      baselineCanvas: before,
+      failedCanvas,
+      partialWriteRetained: JSON.stringify(failedCanvas) !== JSON.stringify(before),
+      workspaceLifecycle: panel._buildWorkspaceSnapshotDelta().lifecycleState,
+      statusNote: panel.container.querySelector('#ai-result-status-note')?.textContent?.trim() || '',
     };
-  });
+  }, rollbackRecoveryFixtureKey);
   assert(result.applied === false && result.blocked && result.applyDisabled, 'Rollback failure did not establish the safety block.');
   assert(result.markerReason === 'apply_rollback_failed' && result.markerSessionId === result.currentSessionId,
     'Rollback failure safety marker was not persisted for the active session.');
   assert(result.workbenchState === 'failed', 'Rollback failure was not exposed as failed.');
+  assert(result.partialWriteRetained, 'Rollback failure stage did not retain the partial canvas before Desktop close.');
+  assert(result.workspaceLifecycle !== 'applied', 'Rollback failure was projected as Applied before close.');
   return result;
 }
 
@@ -448,17 +485,46 @@ async function verifyLifecycleRepetition(page) {
 }
 
 async function verifyHostWebMessage(page) {
-  const before = await page.evaluate(() => window.aiPanel.history.length);
-  await page.evaluate(() => window.aiPanel._loadHistory());
-  await page.waitForTimeout(500);
-  const after = await page.evaluate(() => ({
-    historyCount: window.aiPanel.history.length,
-    bridgeAvailable: typeof window.chrome?.webview?.postMessage === 'function',
-    pendingSessionLoad: Boolean(window.aiPanel.pendingSessionLoad),
-  }));
-  assert(after.bridgeAvailable, 'WebView2 postMessage bridge is unavailable.');
-  assert(after.historyCount >= 0, 'Session history Host response was not consumable.');
-  return { before, ...after };
+  const requested = await page.evaluate(() => {
+    const panel = window.aiPanel;
+    const probeSessionId = `webview2-identity-probe-${Date.now()}`;
+    const original = panel._handleGetAiSessionResult;
+    window.__cvWebMessageIdentityProbe = { response: null, original };
+    panel._handleGetAiSessionResult = function probeHandler(data) {
+      const payload = data?.payload || data || {};
+      window.__cvWebMessageIdentityProbe.response = {
+        sessionId: String(payload.sessionId ?? payload.SessionId ?? ''),
+        requestId: String(payload.requestId ?? payload.RequestId ?? ''),
+        navigationEpoch: Number(payload.navigationEpoch ?? payload.NavigationEpoch ?? -1),
+        success: payload.success === true,
+      };
+      return original.call(this, data);
+    };
+    panel.sessionNavigationEpoch = Number(panel.sessionNavigationEpoch || 0) + 1;
+    panel._requestSessionLoad(probeSessionId, 'webview2_identity_probe');
+    return {
+      sessionId: probeSessionId,
+      requestId: panel.pendingSessionLoad?.requestId || '',
+      navigationEpoch: Number(panel.pendingSessionLoad?.epoch ?? -1),
+      bridgeAvailable: typeof window.chrome?.webview?.postMessage === 'function',
+    };
+  });
+  await page.waitForFunction(() => Boolean(window.__cvWebMessageIdentityProbe?.response));
+  const completed = await page.evaluate(() => {
+    const panel = window.aiPanel;
+    const probe = window.__cvWebMessageIdentityProbe;
+    const response = probe.response;
+    panel._handleGetAiSessionResult = probe.original;
+    delete window.__cvWebMessageIdentityProbe;
+    return { response, pendingSessionLoad: Boolean(panel.pendingSessionLoad) };
+  });
+  assert(requested.bridgeAvailable, 'WebView2 postMessage bridge is unavailable.');
+  assert(requested.requestId, 'Host identity probe did not allocate a requestId.');
+  assert(completed.response.sessionId === requested.sessionId, 'Host response sessionId did not match the request.');
+  assert(completed.response.requestId === requested.requestId, 'Host response requestId did not match the request.');
+  assert(completed.response.navigationEpoch === requested.navigationEpoch, 'Host response navigation identity did not match the request.');
+  assert(!completed.pendingSessionLoad, 'Host response did not finish the pending session load.');
+  return { requested, ...completed };
 }
 
 async function installCloseFlushProbe(page) {
@@ -479,7 +545,7 @@ async function installCloseFlushProbe(page) {
   }, closeFlushMarker);
 }
 
-async function verifyReopen(page, preNavigationSafetyMarker) {
+async function verifyReopen(page, preNavigationState) {
   const marker = await page.evaluate(key => {
     try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
   }, closeFlushMarker);
@@ -491,16 +557,62 @@ async function verifyReopen(page, preNavigationSafetyMarker) {
     overlays: document.querySelectorAll('.ai-apply-preview-overlay').length,
   }));
   assert(marker?.called && marker?.completed && marker?.reason === 'host_close', 'Host close did not complete the workspace flush handshake.');
+  const preNavigationSafetyMarker = preNavigationState?.safetyMarker;
+  const recoveryFixture = preNavigationState?.recoveryFixture;
   assert(preNavigationSafetyMarker?.reason === 'apply_rollback_failed',
     'Rollback safety marker did not survive the real process restart.');
+  assert(recoveryFixture?.version === 1 && recoveryFixture?.sessionId,
+    'Rollback recovery fixture did not survive the real process restart.');
   assert(!safe.disposed && !safe.applyInFlight && !safe.activePreview && !safe.activeTransport && safe.overlays === 0,
     'Reopened AI page restored a temporary in-flight resource.');
-  const restored = await page.evaluate(() => ({
-    reason: window.aiPanel._applySafetyBlockReason,
-    applyDisabled: window.aiPanel.container.querySelector('#ai-btn-apply')?.disabled === true,
-    marker: window.aiPanel._readPersistedApplySafetyBlock?.() || null,
-  }));
-  await page.evaluate(() => window.aiPanel._clearApplySafetyBlock?.({ clearPersisted: true }));
+  const restored = await page.evaluate(({ fixture, recoveryKey }) => {
+    const panel = window.aiPanel;
+    const canvas = window.flowCanvasAdapter || window.flowCanvas;
+    const canvasBeforeSessionRestore = canvas.serialize();
+    panel.sessionNavigationEpoch = Number(panel.sessionNavigationEpoch || 0) + 1;
+    const identity = {
+      sessionId: fixture.sessionId,
+      requestId: `webview2-reopen-${Date.now()}`,
+      epoch: panel.sessionNavigationEpoch,
+    };
+    panel.pendingSessionLoad = { ...identity, source: 'webview2_reopen_probe', timeoutId: null };
+    panel._handleGetAiSessionResult({
+      success: true,
+      sessionId: identity.sessionId,
+      requestId: identity.requestId,
+      navigationEpoch: identity.epoch,
+      session: fixture.session,
+    });
+    const value = {
+      identity,
+      pendingSessionLoad: Boolean(panel.pendingSessionLoad),
+      reason: panel._applySafetyBlockReason,
+      applyDisabled: panel.container.querySelector('#ai-btn-apply')?.disabled === true,
+      applyButtonText: panel.container.querySelector('#ai-btn-apply')?.textContent?.trim() || '',
+      statusNote: panel.container.querySelector('#ai-result-status-note')?.textContent?.trim() || '',
+      marker: panel._readPersistedApplySafetyBlock?.() || null,
+      canvasBeforeSessionRestore,
+      canvasAfterSessionRestore: canvas.serialize(),
+      workspaceLifecycle: panel._buildWorkspaceSnapshotDelta().lifecycleState,
+      workbenchState: panel.workbenchState,
+    };
+    canvas.deserialize(fixture.beforeCanvas);
+    panel._clearApplySafetyBlock?.({ clearPersisted: true });
+    localStorage.removeItem(recoveryKey);
+    panel._saveSessionId?.(null);
+    return value;
+  }, { fixture: recoveryFixture, recoveryKey: rollbackRecoveryFixtureKey });
+  const signature = value => JSON.stringify(value || null);
+  assert(!restored.pendingSessionLoad, 'Production session restore did not finish its pending identity.');
+  assert(restored.reason === 'apply_rollback_failed' && restored.applyDisabled,
+    'Same-session same-result restore did not re-establish the safety block.');
+  assert(restored.marker?.reason === 'apply_rollback_failed', 'Reopened session lost its persisted safety marker.');
+  assert(restored.workspaceLifecycle !== 'applied' && restored.workbenchState === 'failed',
+    'Rollback failure was restored as a successful Applied state.');
+  assert(/安全恢复/.test(`${restored.applyButtonText} ${restored.statusNote}`),
+    'Reopened UI did not explain that explicit safety recovery is required.');
+  assert(signature(restored.canvasBeforeSessionRestore) === signature(recoveryFixture.beforeCanvas),
+    'Desktop restart preserved the temporary partial-write canvas instead of the safe baseline.');
   return {
     marker,
     safe,
@@ -511,6 +623,10 @@ async function verifyReopen(page, preNavigationSafetyMarker) {
       recordedAtUtc: preNavigationSafetyMarker.recordedAtUtc,
     },
     restored,
+    canvasRecovery: {
+      safeBaselineRestored: signature(restored.canvasBeforeSessionRestore) === signature(recoveryFixture.beforeCanvas),
+      partialCanvasWasDifferent: signature(recoveryFixture.failedCanvas) !== signature(recoveryFixture.beforeCanvas),
+    },
   };
 }
 
@@ -520,8 +636,10 @@ async function main() {
   try {
     const context = browser.contexts()[0];
     const page = context.pages()[0];
-    const preNavigationSafetyMarker = await authenticateAndOpenAi(page);
-    await resetSmokeConversation(page, { clearSafety: phase === 'full' });
+    const preNavigationState = await authenticateAndOpenAi(page);
+    if (phase !== 'reopen') {
+      await resetSmokeConversation(page, { clearSafety: phase === 'full' });
+    }
     const base = await page.evaluate(() => ({
       url: location.href,
       title: document.title,
@@ -562,7 +680,7 @@ async function main() {
       result.rollbackFailurePersistence = await armRollbackFailurePersistence(page);
       await installCloseFlushProbe(page);
     } else if (phase === 'reopen') {
-      result.reopen = await verifyReopen(page, preNavigationSafetyMarker);
+      result.reopen = await verifyReopen(page, preNavigationState);
     }
     const output = path.join(evidenceDir, `webview2-${safeFileName(phase)}-dpi-${scale}.json`);
     fs.writeFileSync(output, `${JSON.stringify(result, null, 2)}\n`, 'utf8');

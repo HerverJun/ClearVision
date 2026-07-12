@@ -10,7 +10,7 @@
     "chromeWebview": true,
     "activeView": "ai"
   },
-  "timestampUtc": "2026-07-12T09:23:08.533Z",
+  "timestampUtc": "2026-07-12T10:26:22.164Z",
   "layouts": [
     {
       "label": "dpi-1-light",
@@ -69,9 +69,18 @@
     "protocol": "CDP Input.imeSetComposition"
   },
   "hostWebMessage": {
-    "before": 35,
-    "historyCount": 35,
-    "bridgeAvailable": true,
+    "requested": {
+      "sessionId": "webview2-identity-probe-1783851982644",
+      "requestId": "04de6ae4-ad7b-402a-8f4d-b15c0cf9767c",
+      "navigationEpoch": 2,
+      "bridgeAvailable": true
+    },
+    "response": {
+      "sessionId": "webview2-identity-probe-1783851982644",
+      "requestId": "04de6ae4-ad7b-402a-8f4d-b15c0cf9767c",
+      "navigationEpoch": 2,
+      "success": false
+    },
     "pendingSessionLoad": false
   },
   "dialog": {
@@ -150,6 +159,55 @@
     "markerReason": "apply_rollback_failed",
     "markerSessionId": "webview2-release-smoke-session",
     "currentSessionId": "webview2-release-smoke-session",
-    "workbenchState": "failed"
+    "workbenchState": "failed",
+    "baselineCanvas": {
+      "operators": [],
+      "connections": [],
+      "decisionConfiguration": null
+    },
+    "failedCanvas": {
+      "operators": [
+        {
+          "id": "smoke-acq",
+          "name": "图像采集",
+          "type": "ImageAcquisition",
+          "x": 80,
+          "y": 96,
+          "inputPorts": [],
+          "outputPorts": [
+            {
+              "id": "smoke-acq-out",
+              "name": "Image",
+              "displayName": "Image",
+              "description": "",
+              "dataType": "Image",
+              "direction": 1,
+              "isRequired": false
+            }
+          ],
+          "parameters": [
+            {
+              "id": "c428573a-8746-4305-94ee-27151e086e42",
+              "name": "CameraId",
+              "displayName": "CameraId",
+              "description": null,
+              "value": "camera-smoke",
+              "defaultValue": "camera-smoke",
+              "minValue": null,
+              "maxValue": null,
+              "dataType": "string",
+              "isRequired": false,
+              "options": null
+            }
+          ],
+          "isEnabled": true
+        }
+      ],
+      "connections": [],
+      "decisionConfiguration": null
+    },
+    "partialWriteRetained": true,
+    "workspaceLifecycle": "build",
+    "statusNote": "应用流程失败；自动回滚也失败，请先检查或恢复画布后再继续。 webview2 injected apply failure"
   }
 }

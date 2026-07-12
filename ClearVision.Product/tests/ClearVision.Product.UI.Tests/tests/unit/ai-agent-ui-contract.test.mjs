@@ -11998,6 +11998,104 @@ test('restored Applied snapshot strips Ready authority and blocks direct reapply
   assert.equal(applyButton.disabled, true);
 });
 
+test('full session restore preserves rollback safety only for the same session and result', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const applyButton = createFakeElement('button');
+  panel.container = createContainer({
+    '#ai-chat-container': createFakeElement(),
+    '#ai-btn-apply': applyButton,
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._displayResult = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._updatePlanBuildActionState = () => {};
+  panel._restoreWorkspaceRunReplays = () => Promise.resolve(true);
+  panel._disposed = false;
+  panel._lifecycleEpoch = 1;
+
+  const readyGate = { canvasApplyReady: true, blocked: false, status: 'ready' };
+  const flowA = { operators: [{ id: 'op-a', type: 'ImageAcquisition' }], connections: [] };
+  const resultA = {
+    success: true,
+    completionStatus: 'completed',
+    interactionState: 'completed',
+    flow: flowA,
+    applyGate: readyGate,
+    buildResult: { buildId: 'build-a', applyGate: readyGate }
+  };
+  const flowB = { operators: [{ id: 'op-b', type: 'ResultOutput' }], connections: [] };
+  const resultB = {
+    ...resultA,
+    flow: flowB,
+    buildResult: { buildId: 'build-b', applyGate: readyGate }
+  };
+  let epoch = 0;
+  const restore = (sessionId, result) => {
+    epoch += 1;
+    panel.sessionNavigationEpoch = epoch;
+    panel.pendingSessionLoad = { sessionId, requestId: `restore-${epoch}`, epoch };
+    panel._handleGetAiSessionResult({
+      success: true,
+      sessionId,
+      requestId: `restore-${epoch}`,
+      navigationEpoch: epoch,
+      session: {
+        sessionId,
+        currentCanvasFlowJson: JSON.stringify(result.flow),
+        history: [{ role: 'assistant', message: 'ready', payload: result }],
+        workspaceSnapshot: {
+          schemaVersion: 2,
+          revision: epoch,
+          lifecycleState: 'build',
+          pendingPlanSnapshot: { planId: `plan-${sessionId}`, planHash: `sha256:${sessionId}`, canBuild: true },
+          workspaceViewMode: 'build'
+        }
+      }
+    });
+  };
+
+  panel.sessionId = 'session-a';
+  panel._setCurrentResult(resultA);
+  assert.equal(panel._persistApplySafetyBlock('apply_rollback_failed', resultA), true);
+
+  restore('session-b', resultB);
+  assert.equal(panel._applySafetyBlockReason, '');
+  assert.equal(panel._getApplySafetyStorageKey(), 'cv_ai_apply_safety_block_v1:session-b');
+
+  restore('session-a', resultA);
+  assert.equal(panel._applySafetyBlockReason, 'apply_rollback_failed');
+  assert.equal(panel.workbenchState, 'failed');
+  assert.equal(applyButton.disabled, true);
+  assert.match(applyButton.innerHTML, /需安全恢复后才能应用/);
+
+  const replacementA = {
+    ...resultA,
+    flow: { operators: [{ id: 'op-a-new', type: 'ImageAcquisition' }], connections: [] },
+    buildResult: { buildId: 'build-a-new', applyGate: readyGate }
+  };
+  panel._setCurrentResult(replacementA);
+  assert.equal(panel._applySafetyBlockReason, '');
+  assert.equal(panel._readPersistedApplySafetyBlock(), null);
+
+  panel._setCurrentResult(resultA);
+  panel._persistApplySafetyBlock('apply_rollback_failed', resultA);
+  restore('session-a', replacementA);
+  assert.equal(panel._applySafetyBlockReason, '');
+  assert.equal(panel._readPersistedApplySafetyBlock(), null);
+
+  panel.sessionId = 'session-a';
+  panel._setCurrentResult(resultA);
+  panel._persistApplySafetyBlock('apply_rollback_failed', resultA);
+  restore('session-b', resultA);
+  assert.equal(panel._applySafetyBlockReason, '');
+  panel.sessionId = 'session-a';
+  assert.equal(panel._restorePersistedApplySafetyBlock(resultA), 'apply_rollback_failed');
+});
+
 test('AI session restore resets workspace fields and clears stale build readonly state', async () => {
   installDom();
   const { AiPanel } = await loadAiPanel();

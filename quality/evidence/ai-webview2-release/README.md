@@ -14,8 +14,8 @@ The evidence in this directory was produced by `scripts/run-ai-webview2-release-
 | Snapshot restore | Missing/future version, invalid lifecycle, damaged Plan, Applied + Ready authority | Dangerous Build/Readiness/Apply authority is removed | `ai-panel-resilience.test.mjs` snapshot cases |
 | Apply partial write | First real canvas deserialize writes one node and throws | Pre-Apply snapshot restores the exact canvas | `canvas.rollbackRestored` |
 | Apply success | Apply a two-node/one-connection result through the real FlowCanvas adapter | Complete shape is applied and Undo restores the baseline | `canvas.applied*`, `canvas.undo*` |
-| Apply rollback failure | Apply and rollback both throw | Workbench becomes Failed, Apply is disabled, session/result-scoped safety marker is persisted | `rollbackFailurePersistence` |
-| Process restart | Close through the WinForms shutdown path and reopen | Flush handshake completes; no Preview, Transport or Applying state is restored | `webview2-reopen-dpi-1.json` |
+| Apply rollback failure | Apply writes one real node and throws; automatic rollback also throws; the partial canvas is left untouched until process close | Workbench becomes Failed, Apply is disabled, session/result-scoped safety marker is persisted, lifecycle is not Applied | `rollbackFailurePersistence` |
+| Process restart | Close immediately through WinForms `WM_CLOSE`, then reopen and restore the same session/result through `_handleGetAiSessionResult()` | Flush handshake completes, the safe old canvas returns, the Marker is restored, Apply stays disabled and lifecycle remains Build/Failed | `webview2-reopen-dpi-1.json` |
 | Preview drift | Gate/Result/canvas identity changes while Preview is open | Old Preview cannot confirm | `ai-build-workspace.spec.ts` and resilience unit tests |
 
 ## State consistency matrix
@@ -45,14 +45,16 @@ The real WebView2 ready-state sample also records the same state in the workbenc
 ## Real Host and lifecycle results
 
 - Formal resource loaded: `/src/features/ai/aiPanel.js`; runtime instance: `AiPanel`; host: `desktop-webview2`.
-- Real `window.chrome.webview.postMessage` path returned the session history response.
+- A fresh `GetAiSession` WebMessage probe recorded its generated `requestId`, `sessionId` and `navigationEpoch`; the real Host response returned the same identity and completed `pendingSessionLoad`.
 - CDP `Input.imeSetComposition` preserved Chinese composing text and focus across an AiPanel rerender.
 - Dialog role, modal semantics, background `inert`, Escape and focus return passed.
 - Twelve Flow/AI view switches retained the same panel and ten Preview cycles left zero overlays.
 - WebMessage subscriptions stayed `10 → 10`; owned Timer and RAF counts stayed `0 → 0`.
 - DPI scale factors 1.0, 1.25 and 1.5 were applied to the real WebView2 process. Light/dark layouts have zero document, body and AI overflow after the 150% toolbar fix.
 - WinForms close completed the real `host_close` workspace-flush handshake before exit.
-- The rollback marker survived the real process boundary before navigation. The smoke result itself is intentionally not written to the user's session store, so the reopened real session had a different fingerprint and safely discarded that marker while keeping Apply disabled. Exact same-session/same-result restoration and new-result clearing are covered by the focused resilience test.
+- The rollback failure stage retained a one-node partial canvas and did not repair it in test code before `WM_CLOSE`. After restart, the canvas was the safe empty baseline rather than the temporary partial write; Workspace lifecycle was `build`, not `applied`.
+- The reopened WebView2 then exercised the complete production session handler with the same session/result fixture. `_applySafetyBlockReason` returned as `apply_rollback_failed`, Apply stayed disabled, and the UI exposed the explicit safety-recovery warning. The matching and mismatch cases are also covered by the Agent UI contract test.
+- When no release credential is supplied, the runner uses an isolated SQLite database under `.tmp` and creates a one-time test administrator through the formal setup endpoint. It does not read or modify the user's authentication database.
 
 ## Evidence files
 

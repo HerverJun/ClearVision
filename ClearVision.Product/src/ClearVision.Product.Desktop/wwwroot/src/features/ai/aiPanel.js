@@ -379,9 +379,9 @@ export class AiPanel {
         this.pendingParameterConfirmedValueSignature = '';
     }
 
-    _resetCurrentResultSyncState() {
+    _resetCurrentResultSyncState({ clearPersistedApplySafetyBlock = true } = {}) {
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
-        this._clearApplySafetyBlock?.({ clearPersisted: true });
+        this._clearApplySafetyBlock?.({ clearPersisted: clearPersistedApplySafetyBlock });
         this.currentResult = null;
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
