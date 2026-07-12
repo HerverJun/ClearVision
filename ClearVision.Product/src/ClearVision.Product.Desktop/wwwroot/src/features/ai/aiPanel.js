@@ -381,7 +381,7 @@ export class AiPanel {
 
     _resetCurrentResultSyncState() {
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
-        this._applySafetyBlockReason = '';
+        this._clearApplySafetyBlock?.({ clearPersisted: true });
         this.currentResult = null;
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
@@ -394,7 +394,8 @@ export class AiPanel {
 
     _setCurrentResult(payload) {
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
-        this._applySafetyBlockReason = '';
+        const restoredSafetyBlock = this._restorePersistedApplySafetyBlock?.(payload) || '';
+        this._applySafetyBlockReason = restoredSafetyBlock;
         this.currentResult = payload;
         this.currentResultVersion += 1;
         this.appliedResultVersion = 0;

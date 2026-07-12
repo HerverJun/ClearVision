@@ -1,0 +1,98 @@
+{
+  "phase": "reopen",
+  "scale": 1,
+  "base": {
+    "url": "http://localhost:5000/index.html",
+    "title": "ClearVision - 工业视觉检测软件",
+    "hostKind": "desktop-webview2",
+    "aiPanelClass": "AiPanel",
+    "aiPanelScript": "http://localhost:5000/src/features/ai/aiPanel.js",
+    "chromeWebview": true,
+    "activeView": "ai"
+  },
+  "timestampUtc": "2026-07-12T09:23:25.120Z",
+  "layouts": [
+    {
+      "label": "dpi-1-light",
+      "theme": "light",
+      "devicePixelRatio": 1,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546,
+        "height": 52,
+        "left": 365,
+        "right": 911
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 923,
+        "right": 959
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 695
+      }
+    },
+    {
+      "label": "dpi-1-dark",
+      "theme": "dark",
+      "devicePixelRatio": 1,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546,
+        "height": 52,
+        "left": 365,
+        "right": 911
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 923,
+        "right": 959
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 695
+      }
+    }
+  ],
+  "reopen": {
+    "marker": {
+      "called": true,
+      "completed": true,
+      "reason": "host_close",
+      "startedAt": 1783848191355,
+      "succeeded": true,
+      "completedAt": 1783848191355
+    },
+    "safe": {
+      "disposed": false,
+      "applyInFlight": false,
+      "activePreview": false,
+      "activeTransport": false,
+      "overlays": 0
+    },
+    "preNavigationSafetyMarker": {
+      "reason": "apply_rollback_failed",
+      "sessionId": "webview2-release-smoke-session",
+      "fingerprintLength": 19,
+      "recordedAtUtc": "2026-07-12T09:23:11.308Z"
+    },
+    "restored": {
+      "reason": "",
+      "applyDisabled": true,
+      "marker": {
+        "version": 1,
+        "sessionId": "webview2-release-smoke-session",
+        "fingerprint": "fnv1a:6a5c996e:2060",
+        "reason": "apply_rollback_failed",
+        "recordedAtUtc": "2026-07-12T09:23:11.308Z"
+      }
+    }
+  }
+}

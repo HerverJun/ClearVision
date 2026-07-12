@@ -1,0 +1,64 @@
+{
+  "phase": "layout",
+  "scale": 1.25,
+  "base": {
+    "url": "http://localhost:5000/index.html",
+    "title": "ClearVision - 工业视觉检测软件",
+    "hostKind": "desktop-webview2",
+    "aiPanelClass": "AiPanel",
+    "aiPanelScript": "http://localhost:5000/src/features/ai/aiPanel.js",
+    "chromeWebview": true,
+    "activeView": "ai"
+  },
+  "timestampUtc": "2026-07-12T09:23:39.326Z",
+  "layouts": [
+    {
+      "label": "dpi-1.25-light",
+      "theme": "light",
+      "devicePixelRatio": 1.25,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546.4000244140625,
+        "height": 52,
+        "left": 236.8000030517578,
+        "right": 783.2000274658203
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 795.2000122070312,
+        "right": 831.2000122070312
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 556
+      }
+    },
+    {
+      "label": "dpi-1.25-dark",
+      "theme": "dark",
+      "devicePixelRatio": 1.25,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546.4000244140625,
+        "height": 52,
+        "left": 236.8000030517578,
+        "right": 783.2000274658203
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 795.2000122070312,
+        "right": 831.2000122070312
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 556
+      }
+    }
+  ]
+}

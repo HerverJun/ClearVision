@@ -1,0 +1,155 @@
+{
+  "phase": "full",
+  "scale": 1,
+  "base": {
+    "url": "http://localhost:5000/index.html",
+    "title": "ClearVision - 工业视觉检测软件",
+    "hostKind": "desktop-webview2",
+    "aiPanelClass": "AiPanel",
+    "aiPanelScript": "http://localhost:5000/src/features/ai/aiPanel.js",
+    "chromeWebview": true,
+    "activeView": "ai"
+  },
+  "timestampUtc": "2026-07-12T09:23:08.533Z",
+  "layouts": [
+    {
+      "label": "dpi-1-light",
+      "theme": "light",
+      "devicePixelRatio": 1,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546,
+        "height": 52,
+        "left": 365,
+        "right": 911
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 923,
+        "right": 959
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 695
+      }
+    },
+    {
+      "label": "dpi-1-dark",
+      "theme": "dark",
+      "devicePixelRatio": 1,
+      "documentOverflow": 0,
+      "bodyOverflow": 0,
+      "aiOverflow": 0,
+      "composer": {
+        "width": 546,
+        "height": 52,
+        "left": 365,
+        "right": 911
+      },
+      "send": {
+        "width": 36,
+        "height": 36,
+        "left": 923,
+        "right": 959
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 695
+      }
+    }
+  ],
+  "ime": {
+    "during": "中文组合输入",
+    "committed": "中文组合输入",
+    "focusedDuring": true,
+    "focusedAfter": true,
+    "protocol": "CDP Input.imeSetComposition"
+  },
+  "hostWebMessage": {
+    "before": 35,
+    "historyCount": 35,
+    "bridgeAvailable": true,
+    "pendingSessionLoad": false
+  },
+  "dialog": {
+    "opened": {
+      "role": "dialog",
+      "modal": "true",
+      "backgroundInert": true,
+      "focusedClass": "ai-apply-preview-confirm"
+    },
+    "closed": {
+      "backgroundInert": false,
+      "focusReturned": true
+    }
+  },
+  "lifecycle": {
+    "before": {
+      "messageSubscriptions": 10,
+      "ownedTimeouts": 0,
+      "ownedRafs": 0
+    },
+    "after": {
+      "samePanel": true,
+      "messageSubscriptions": 10,
+      "ownedTimeouts": 0,
+      "ownedRafs": 0,
+      "activeTransport": false,
+      "activePreview": false,
+      "overlays": 0
+    }
+  },
+  "canvas": {
+    "failedResult": false,
+    "failedState": "ready_to_apply",
+    "rollbackRestored": true,
+    "succeeded": true,
+    "applied": true,
+    "appliedOperators": 2,
+    "appliedConnections": 1,
+    "undoSucceeded": true,
+    "undoRestored": true
+  },
+  "stateConsistency": {
+    "workbenchState": "ready_to_apply",
+    "buildState": "ready_to_apply",
+    "status": "构建状态\n            \n                可以应用\n                验证已通过\n            \n            构建、工程补齐与当前门禁检查已完成，草稿包含 2 个节点。\n        \n        \n            \n        \n            阻断\n            0\n            当前无阻断\n        \n    \n            \n        \n            待补参数\n            0\n            已确认\n        \n    \n            \n        \n            待补资源\n            0\n            当前完整\n        \n    \n            \n        \n            应用状态\n            可应用\n            已就绪\n        \n    \n        \n        \n            下一步\n            复核 Workflow Diff 与应用预览后，应用到画布。\n            前往处理区域",
+    "actionQueue": "当前没有需要处理的阻断\n                可以复核应用预览并应用到画布。",
+    "applyDisabled": false,
+    "snapshotLifecycle": "build"
+  },
+  "transport": {
+    "replayCalls": 1,
+    "replay": {
+      "closed": true,
+      "sequences": [
+        1,
+        2
+      ],
+      "uniqueSequences": [
+        1,
+        2
+      ],
+      "terminalCount": 1
+    },
+    "replacement": {
+      "firstClosed": true,
+      "secondClosed": true,
+      "activeTransport": null,
+      "firstPendingDelay": false,
+      "secondPendingDelay": false
+    }
+  },
+  "rollbackFailurePersistence": {
+    "applied": false,
+    "blocked": true,
+    "applyDisabled": true,
+    "markerReason": "apply_rollback_failed",
+    "markerSessionId": "webview2-release-smoke-session",
+    "currentSessionId": "webview2-release-smoke-session",
+    "workbenchState": "failed"
+  }
+}

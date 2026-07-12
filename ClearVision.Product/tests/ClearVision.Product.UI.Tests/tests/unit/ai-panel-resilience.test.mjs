@@ -4,13 +4,20 @@ import httpClient from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/
 import { AgentRunEventTransport } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelAgentRun.js';
 import { normalizeWorkspaceSnapshotForRestore } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelSnapshotRecovery.js';
 import { aiPanelLifecycleMixin } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelLifecycle.js';
+import { deriveAiBuildPresentation } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelBuildPresentation.js';
 
 function installWindow() {
+  const storage = new Map();
   global.window = {
     location: { protocol: 'http:', hostname: '127.0.0.1', port: '5000', origin: 'http://127.0.0.1:5000' },
     setTimeout,
     clearTimeout,
     requestAnimationFrame(callback) { callback(); return 1; },
+    localStorage: {
+      getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+      setItem(key, value) { storage.set(key, String(value)); },
+      removeItem(key) { storage.delete(key); },
+    },
   };
 }
 
@@ -382,4 +389,92 @@ test('local Apply safety block keeps a legacy Ready gate disabled until a new re
   });
   assert.equal(panel._applySafetyBlockReason, '');
   assert.equal(button.disabled, false);
+});
+
+test('Apply rollback safety block survives panel recreation only for the same session and result', async () => {
+  installWindow();
+  const { AiPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
+  const result = {
+    flow: { operators: [{ id: 'a' }], connections: [] },
+    applyGate: { canvasApplyReady: true, blocked: false },
+    buildResult: { buildId: 'build-a' },
+  };
+  const failedPanel = Object.create(AiPanel.prototype);
+  Object.assign(failedPanel, { sessionId: 'session-a', currentResult: result, _applySafetyBlockReason: '' });
+  assert.equal(failedPanel._persistApplySafetyBlock('apply_rollback_failed', result), true);
+
+  const reopenedPanel = Object.create(AiPanel.prototype);
+  Object.assign(reopenedPanel, { sessionId: 'session-a', _applySafetyBlockReason: '' });
+  assert.equal(reopenedPanel._restorePersistedApplySafetyBlock(result), 'apply_rollback_failed');
+
+  const replacement = {
+    ...result,
+    flow: { operators: [{ id: 'b' }], connections: [] },
+    buildResult: { buildId: 'build-b' },
+  };
+  assert.equal(reopenedPanel._restorePersistedApplySafetyBlock(replacement), '');
+  assert.equal(reopenedPanel._readPersistedApplySafetyBlock(), null);
+
+  failedPanel._persistApplySafetyBlock('apply_rollback_failed', result);
+  const otherSession = Object.create(AiPanel.prototype);
+  Object.assign(otherSession, { sessionId: 'session-b', _applySafetyBlockReason: '' });
+  assert.equal(otherSession._restorePersistedApplySafetyBlock(replacement), '');
+  assert.equal(failedPanel._restorePersistedApplySafetyBlock(result), 'apply_rollback_failed');
+});
+
+test('Build release state matrix keeps canonical presentation, blockers, and Apply eligibility aligned', () => {
+  const flow = { operators: [{ id: 'a', type: 'ImageAcquisition' }], connections: [] };
+  const passedValidation = {
+    structuralValidation: { passed: true, status: 'passed' },
+    dryRun: { succeeded: true, status: 'completed' },
+  };
+  const readyGate = { canvasApplyReady: true, blocked: false, status: 'ready' };
+  const baseResult = { flow, pendingParameters: [], missingResources: [], validationPreview: passedValidation, applyGate: readyGate };
+  const cases = [
+    { name: 'build running', workbenchState: 'generating', activeAgentRunId: 'run-a', currentResult: baseResult, expected: 'building' },
+    { name: 'validation running', workbenchState: 'validating', activeAgentRunId: 'run-a', currentResult: baseResult, expected: 'validating' },
+    { name: 'parameter blocked', workbenchState: 'reviewing_parameters', currentResult: { ...baseResult, pendingParameters: [{ operatorId: 'a', parameterNames: ['Threshold'] }] }, expected: 'needs_input', parameterGroups: true },
+    { name: 'resource blocked', workbenchState: 'reviewing_resources', currentResult: { ...baseResult, missingResources: [{ operatorId: 'a', parameterName: 'ModelPath', resourceKey: 'a.ModelPath' }] }, expected: 'needs_input' },
+    { name: 'static validation failed', workbenchState: 'failed', currentResult: { ...baseResult, validationPreview: { ...passedValidation, structuralValidation: { passed: false, status: 'failed' } }, applyGate: { canvasApplyReady: false, blocked: true } }, expected: 'validation_failed' },
+    { name: 'dry run failed', workbenchState: 'failed', currentResult: { ...baseResult, validationPreview: { ...passedValidation, dryRun: { succeeded: false, status: 'failed' } }, applyGate: { canvasApplyReady: false, blocked: true } }, expected: 'validation_failed' },
+    { name: 'gate blocked', workbenchState: 'ready_to_apply', currentResult: { ...baseResult, applyGate: { canvasApplyReady: false, blocked: true, status: 'blocked' } }, expected: 'gate_blocked' },
+    { name: 'apply ready', workbenchState: 'ready_to_apply', currentResult: baseResult, expected: 'ready_to_apply', canApply: true },
+    { name: 'applying', workbenchState: 'applying', currentResult: baseResult, expected: 'applying' },
+    { name: 'failed without result', workbenchState: 'failed', currentResult: {}, expected: 'failed' },
+    { name: 'applied', workbenchState: 'applied', currentResult: baseResult, expected: 'applied', applied: true },
+  ];
+
+  for (const item of cases) {
+    const panel = {
+      workbenchState: item.workbenchState,
+      activeAgentRunId: item.activeAgentRunId || '',
+      activeAgentRunEvents: [],
+      currentResult: item.currentResult,
+      pendingVisionPlan: {},
+      _getAgentRunResultPayload() { return null; },
+      _getPayloadBuildResult(result) { return result?.buildResult || null; },
+      _getPayloadApplyGate(result) { return result?.applyGate || null; },
+      _getResultFlowForCanvas(result) { return result?.flow || null; },
+      _extractOperators(value) { return value?.operators || []; },
+      _extractConnections(value) { return value?.connections || []; },
+      _normalizeMissingResources(value) { return Array.isArray(value) ? value : []; },
+      _resolvePendingParametersForDraft(result) { return result?.pendingParameters || []; },
+      _getPendingOperatorSourceOperators() { return flow.operators; },
+      _collectPendingDraftGroups(pending) {
+        if (!item.parameterGroups || pending.length === 0) return [];
+        return [{ operatorId: 'a', fields: [{ parameterName: 'Threshold', confirmedValue: '', dataType: 'number' }] }];
+      },
+      _getPendingParameterConfirmationState() { return { isConfirmed: false }; },
+      _hasPendingDraftValue(value) { return String(value || '').trim().length > 0; },
+      _getPendingResourceDraft() { return null; },
+      _isCurrentResultAppliedToCanvas() { return item.applied === true; },
+      _sanitizeAssistantFailureText(value) { return String(value || ''); },
+      _formatGateStatus(value) { return String(value || ''); },
+    };
+    const presentation = deriveAiBuildPresentation(panel);
+    assert.equal(presentation.overall.key, item.expected, item.name);
+    const hasBlockingAction = presentation.actionItems.some(action => action.priority === 'blocking');
+    const canApply = presentation.overall.key === 'ready_to_apply' && presentation.gate.canvasReady && !presentation.gate.blocked && !hasBlockingAction;
+    assert.equal(canApply, item.canApply === true, `${item.name} apply eligibility`);
+  }
 });

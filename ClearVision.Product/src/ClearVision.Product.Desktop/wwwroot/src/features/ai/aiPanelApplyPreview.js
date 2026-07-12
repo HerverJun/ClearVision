@@ -4,7 +4,92 @@ import {
     getParameterDisplayName
 } from '../../shared/operatorDisplayNames.js';
 
+const APPLY_SAFETY_STORAGE_KEY = 'cv_ai_apply_safety_block_v1';
+
 export const aiPanelApplyPreviewMixin = {
+    _hashApplySafetyFingerprint(value) {
+        const text = String(value || '');
+        if (!text) return '';
+        let hash = 0x811c9dc5;
+        for (let index = 0; index < text.length; index += 1) {
+            hash ^= text.charCodeAt(index);
+            hash = Math.imul(hash, 0x01000193);
+        }
+        return `fnv1a:${(hash >>> 0).toString(16).padStart(8, '0')}:${text.length}`;
+    },
+
+    _createApplySafetyIdentity(result = this.currentResult) {
+        const sessionId = String(this.sessionId || '').trim().toLowerCase();
+        if (!sessionId || !result) return null;
+        const flow = this._getResultFlowForCanvas?.(result) || result?.flow || result?.Flow || null;
+        const gate = this._getPayloadApplyGate?.(result) || result?.applyGate || result?.ApplyGate || null;
+        const buildResult = this._getPayloadBuildResult?.(result) || result?.buildResult || result?.BuildResult || null;
+        const buildId = String(buildResult?.buildId || buildResult?.BuildId || '').trim();
+        const serialized = this._fingerprintApplyFlow?.({ flow, gate, buildId }) || '';
+        const fingerprint = this._hashApplySafetyFingerprint?.(serialized) || '';
+        return fingerprint ? { sessionId, fingerprint } : null;
+    },
+
+    _getApplySafetyStorageKey(sessionId = this.sessionId) {
+        const normalized = String(sessionId || '').trim().toLowerCase();
+        return normalized ? `${APPLY_SAFETY_STORAGE_KEY}:${encodeURIComponent(normalized)}` : '';
+    },
+
+    _readPersistedApplySafetyBlock() {
+        try {
+            const storageKey = this._getApplySafetyStorageKey?.();
+            if (!storageKey) return null;
+            const raw = window.localStorage?.getItem?.(storageKey);
+            const marker = raw ? JSON.parse(raw) : null;
+            return marker && marker.version === 1 ? marker : null;
+        } catch {
+            return null;
+        }
+    },
+
+    _persistApplySafetyBlock(reason = this._applySafetyBlockReason, result = this.currentResult) {
+        const normalizedReason = String(reason || '').trim();
+        if (!normalizedReason) return false;
+        this._applySafetyBlockReason = normalizedReason;
+        const identity = this._createApplySafetyIdentity?.(result);
+        if (!identity) return false;
+        try {
+            const storageKey = this._getApplySafetyStorageKey?.(identity.sessionId);
+            if (!storageKey) return false;
+            window.localStorage?.setItem?.(storageKey, JSON.stringify({
+                version: 1,
+                ...identity,
+                reason: normalizedReason,
+                recordedAtUtc: new Date().toISOString()
+            }));
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    _clearApplySafetyBlock({ clearPersisted = true } = {}) {
+        this._applySafetyBlockReason = '';
+        if (!clearPersisted) return;
+        try {
+            const storageKey = this._getApplySafetyStorageKey?.();
+            if (storageKey) window.localStorage?.removeItem?.(storageKey);
+        } catch {
+            // The in-memory recovery path remains authoritative when storage is unavailable.
+        }
+    },
+
+    _restorePersistedApplySafetyBlock(result) {
+        const marker = this._readPersistedApplySafetyBlock?.();
+        if (!marker) return '';
+        const identity = this._createApplySafetyIdentity?.(result);
+        if (!identity || marker.sessionId !== identity.sessionId) return '';
+        const matches = marker.fingerprint === identity.fingerprint;
+        if (matches) return String(marker.reason || 'apply_rollback_failed');
+        this._clearApplySafetyBlock?.({ clearPersisted: true });
+        return '';
+    },
+
     _handleApplyFlow() {
         if (!this.flowCanvas || this._disposed) return;
         if (this._applySafetyBlockReason) {
@@ -578,7 +663,7 @@ export const aiPanelApplyPreviewMixin = {
             this._renderParameterDraftEditor(this.currentResult, appliedFlow);
             this.options.onApplied?.(appliedFlow);
             this.options.showToast?.('已应用到画布', 'success');
-            this._applySafetyBlockReason = '';
+            this._clearApplySafetyBlock?.({ clearPersisted: true });
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
             this.agentWorkspaceMode = this.agentWorkspaceMode || 'build';
             this._renderAgentWorkspaceOverview?.();
@@ -625,12 +710,12 @@ export const aiPanelApplyPreviewMixin = {
                 }
             }
             if (rollbackAttempted && rollbackSucceeded) {
-                this._applySafetyBlockReason = '';
+                this._clearApplySafetyBlock?.({ clearPersisted: true });
                 this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
                 this._setResultStatusNote(`应用流程失败，画布已恢复到应用前状态：${message}`, 'warning');
                 this._addMessage('system', `应用流程失败，已恢复应用前画布：${message}`);
             } else {
-                this._applySafetyBlockReason = 'apply_rollback_failed';
+                this._persistApplySafetyBlock?.('apply_rollback_failed', this.currentResult);
                 this._setWorkbenchState(AiWorkbenchStates.FAILED);
                 const suffix = rollbackAttempted ? '；自动回滚也失败，请先检查或恢复画布后再继续。' : '；未取得可用的应用前快照。';
                 this._setResultStatusNote(`应用流程失败${suffix} ${message}`, 'warning');
@@ -664,7 +749,7 @@ export const aiPanelApplyPreviewMixin = {
             this.appliedCanvasBaselineFlow = null;
             this.canvasManualEditRecords = [];
             this.canvasManualEditSignature = '';
-            this._applySafetyBlockReason = '';
+            this._clearApplySafetyBlock?.({ clearPersisted: true });
             this._preApplySnapshot = null;
             this._preApplySnapshotVersion = 0;
             this._preApplyCanvasRevision = 0;
