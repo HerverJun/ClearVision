@@ -754,6 +754,8 @@ export const aiPanelPendingParametersMixin = {
     },
 
     async _ensureOperatorMetadata(type) {
+        if (this._disposed) return null;
+        const lifecycleEpoch = Number(this._lifecycleEpoch || 0);
         const normalizedType = String(type || '').trim();
         const cacheKey = normalizedType.toLowerCase();
         if (!normalizedType) return null;
@@ -768,6 +770,7 @@ export const aiPanelPendingParametersMixin = {
         const loadingPromise = httpClient
             .get(`/operators/${encodeURIComponent(normalizedType)}/metadata`)
             .then(metadata => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0)) return null;
                 if (metadata && typeof metadata === 'object') {
                     this.operatorMetadataCache.set(cacheKey, metadata);
                     return metadata;
@@ -776,6 +779,7 @@ export const aiPanelPendingParametersMixin = {
                 return null;
             })
             .catch(error => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0)) return null;
                 console.warn('[AiPanel] 获取算子元数据失败:', normalizedType, error);
                 this.operatorMetadataCache.set(cacheKey, null);
                 return null;
@@ -800,7 +804,7 @@ export const aiPanelPendingParametersMixin = {
 
         missingTypes.forEach(type => {
             this._ensureOperatorMetadata(type).then(() => {
-                if (this.pendingParameterDraftSignature !== signature || !this.currentResult?.flow) {
+                if (this._disposed || this.pendingParameterDraftSignature !== signature || !this.currentResult?.flow) {
                     return;
                 }
                 this._renderParameterDraftEditor(this.currentResult, this.currentResult.flow);
@@ -809,6 +813,8 @@ export const aiPanelPendingParametersMixin = {
     },
 
     async _ensureCameraBindings(signature) {
+        if (this._disposed) return [];
+        const lifecycleEpoch = Number(this._lifecycleEpoch || 0);
         if (this.cameraBindingsCache.length > 0) {
             return this.cameraBindingsCache;
         }
@@ -820,6 +826,7 @@ export const aiPanelPendingParametersMixin = {
         this.cameraBindingsLoadingPromise = httpClient
             .get('/cameras/bindings')
             .then(result => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0)) return [];
                 this.cameraBindingsCache = Array.isArray(result) ? result : [];
                 if (this.pendingParameterDraftSignature === signature && this.currentResult?.flow) {
                     this._renderParameterDraftEditor(this.currentResult, this.currentResult.flow);
@@ -827,6 +834,7 @@ export const aiPanelPendingParametersMixin = {
                 return this.cameraBindingsCache;
             })
             .catch(error => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0)) return [];
                 console.warn('[AiPanel] 获取相机绑定失败。', error);
                 return [];
             })
@@ -1536,12 +1544,12 @@ export const aiPanelPendingParametersMixin = {
 
         scrollContainer.scrollTo({
             top: Math.max(0, group.offsetTop - 12),
-            behavior: 'smooth'
+            behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth'
         });
 
         const firstInput = group.querySelector('[data-draft-input="true"]');
         if (firstInput && typeof firstInput.focus === 'function') {
-            setTimeout(() => firstInput.focus(), 180);
+            this._setOwnedTimeout?.(() => firstInput.isConnected !== false && firstInput.focus(), 180);
         }
 
         this._highlightPendingDraftGroup(group);

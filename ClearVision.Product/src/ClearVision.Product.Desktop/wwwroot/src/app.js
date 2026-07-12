@@ -2513,6 +2513,11 @@ async function ensureAiPanel() {
     return aiPanel;
 }
 
+window.addEventListener('pagehide', () => {
+    aiPanel?.dispose?.();
+    aiPanel = null;
+}, { once: true });
+
 async function switchView(view) {
     return getViewManager().switchView(view);
 }

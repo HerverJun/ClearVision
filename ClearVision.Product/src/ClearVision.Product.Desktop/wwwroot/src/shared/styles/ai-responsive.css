@@ -199,10 +199,34 @@ body:has(#ai-view:not(.hidden)) .main-content {
     }
 }
 
+@media (max-width: 390px) {
+    .ai-task-context {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .ai-task-context-actions {
+        width: 100%;
+    }
+    .ai-task-primary-action,
+    .ai-task-primary-action > button {
+        width: 100%;
+        max-width: none;
+    }
+    .ai-agent-stage-strip {
+        grid-template-columns: 1fr;
+    }
+    .ai-input-box,
+    .ai-input-box .ai-textarea {
+        min-width: 0;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ai-view-container *,
     .ai-view-container *::before,
     .ai-view-container *::after {
         scroll-behavior: auto;
+        animation-duration: 0.01ms;
+        animation-iteration-count: 1;
+        transition-duration: 0.01ms;
     }
 }

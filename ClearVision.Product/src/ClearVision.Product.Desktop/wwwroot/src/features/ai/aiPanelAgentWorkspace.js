@@ -545,7 +545,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _isCurrentWorkspaceSaveTask(task) {
-        if (!task) return false;
+        if (!task || this._disposed) return false;
         const currentPlanIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
         return String(task.sessionId || '').trim().toLowerCase() === String(this.sessionId || '').trim().toLowerCase() &&
             Number(task.sessionNavigationEpoch || 0) === Number(this.sessionNavigationEpoch || 0) &&
@@ -673,6 +673,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     async _flushWorkspaceSnapshotBeforeBoundary(reason = 'boundary') {
+        if (this._disposed) return false;
         if (!this.sessionId || !this.pendingVisionPlan || this._isPlanSnapshotReadOnly()) {
             return true;
         }
@@ -4324,7 +4325,10 @@ export const aiPanelAgentWorkspaceMixin = {
                             <button type="button"
                                 role="tab"
                                 data-workspace-view-mode="${key}"
+                                data-ai-focus-key="workspace-${key}"
+                                aria-controls="${key === AgentWorkspaceModes.PLAN ? 'ai-plan-workspace' : 'ai-build-workspace'}"
                                 aria-selected="${key === viewMode ? 'true' : 'false'}"
+                                tabindex="${key === viewMode && !disabled ? '0' : '-1'}"
                                 ${disabled ? 'disabled aria-disabled="true"' : ''}
                                 class="${key === phase ? 'is-active' : ''} ${key === viewMode ? 'is-selected' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
                                 <span>${key === AgentWorkspaceModes.PLAN ? '方案' : '构建与验证'}</span>
@@ -4335,6 +4339,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <button type="button"
                         role="tab"
                         aria-selected="${phase === 'applied' ? 'true' : 'false'}"
+                        tabindex="-1"
                         disabled aria-disabled="true"
                         class="${phase === 'applied' ? 'is-active is-selected' : ''} ${terminal || phase === 'applied' ? 'is-completed' : ''}">
                         <span>Applied 复核</span>
@@ -4348,6 +4353,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._setWorkspaceViewMode(button.getAttribute('data-workspace-view-mode'));
             });
         });
+        this._syncAccessibilitySemantics?.();
     },
 
     _getPlanViewStatusLabel(events = []) {

@@ -1,5 +1,49 @@
 export const aiPanelLifecycleMixin = {
+    _setOwnedTimeout(callback, delay = 0) {
+        this._ownedTimeouts = this._ownedTimeouts instanceof Set ? this._ownedTimeouts : new Set();
+        let id = null;
+        let completed = false;
+        id = window.setTimeout?.(() => {
+            completed = true;
+            this._ownedTimeouts?.delete?.(id);
+            if (!this._disposed) callback?.();
+        }, delay);
+        if (!completed && id !== undefined && id !== null) this._ownedTimeouts.add(id);
+        return id;
+    },
+
+    _requestOwnedAnimationFrame(callback) {
+        this._ownedAnimationFrames = this._ownedAnimationFrames instanceof Set ? this._ownedAnimationFrames : new Set();
+        const schedule = window.requestAnimationFrame || (fn => window.setTimeout(fn, 0));
+        let id = null;
+        let completed = false;
+        id = schedule(() => {
+            completed = true;
+            this._ownedAnimationFrames?.delete?.(id);
+            if (!this._disposed) callback?.();
+        });
+        if (!completed && id !== undefined && id !== null) this._ownedAnimationFrames.add(id);
+        return id;
+    },
+
     dispose() {
+        if (this._disposed) return;
+        this._disposed = true;
+        this._lifecycleEpoch = Number(this._lifecycleEpoch || 0) + 1;
+        this.sessionNavigationEpoch = Number(this.sessionNavigationEpoch || 0) + 1;
+        if (this.pendingSessionLoad?.timeoutId) {
+            window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
+        }
+        this.pendingSessionLoad = null;
+        this._ownedTimeouts?.forEach?.(id => window.clearTimeout?.(id));
+        this._ownedTimeouts?.clear?.();
+        this._ownedAnimationFrames?.forEach?.(id => {
+            window.cancelAnimationFrame?.(id);
+            window.clearTimeout?.(id);
+        });
+        this._ownedAnimationFrames?.clear?.();
+        this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
+        this._disposeAccessibility?.();
         this._messageUnsubscribes.forEach(unsubscribe => {
             try {
                 unsubscribe?.();
@@ -37,10 +81,14 @@ export const aiPanelLifecycleMixin = {
         }
         this._inputResizeObserver?.disconnect?.();
         this._inputResizeObserver = null;
-        if (globalThis.__clearVisionFlushAiPanelWorkspace) {
+        this.operatorMetadataLoading?.clear?.();
+        this.cameraBindingsLoadingPromise = null;
+        if (globalThis.__clearVisionFlushAiPanelWorkspace === this._workspaceFlushHandler) {
             delete globalThis.__clearVisionFlushAiPanelWorkspace;
         }
-        this.container.innerHTML = '';
+        this._workspaceFlushHandler = null;
+        this._initialized = false;
+        if (this.container) this.container.innerHTML = '';
     },
 
     destroy() {

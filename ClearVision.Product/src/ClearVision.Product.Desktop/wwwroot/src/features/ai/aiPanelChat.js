@@ -5,10 +5,11 @@ export const aiPanelChatMixin = {
         el.textContent = '';
         let idx = 0;
         const write = () => {
+            if (this._disposed || !el.isConnected) return;
             if (idx < text.length) {
                 el.textContent += text.slice(idx, idx + chunkSize);
                 idx += chunkSize;
-                requestAnimationFrame(write);
+                this._requestOwnedAnimationFrame?.(write);
             }
         };
         write();
@@ -188,7 +189,7 @@ export const aiPanelChatMixin = {
             [turn.reasoningCursor, turn.replyCursor].forEach(cursor => {
                 if (!cursor) return;
                 cursor.classList.add('fading');
-                window.setTimeout(() => cursor.setAttribute('hidden', 'true'), 180);
+                this._setOwnedTimeout?.(() => cursor.isConnected && cursor.setAttribute('hidden', 'true'), 180);
             });
             this.unreadStreamCount = 0;
             this.userHasScrolledUp = false;

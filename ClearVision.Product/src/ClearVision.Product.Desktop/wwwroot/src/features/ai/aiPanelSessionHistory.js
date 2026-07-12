@@ -1,5 +1,8 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { AgentWorkspaceModes } from './aiPanelAgentWorkspace.js';
+import { normalizeWorkspaceSnapshotForRestore } from './aiPanelSnapshotRecovery.js';
+
+const SESSION_LOAD_TIMEOUT_MS = 15000;
 export const aiPanelSessionHistoryMixin = {
     _toggleHistoryPanel() {
         const panel = this.container.querySelector('#ai-history-panel');
@@ -186,13 +189,23 @@ export const aiPanelSessionHistoryMixin = {
     _requestSessionLoad(sessionId, source = 'manual') {
         const normalizedSessionId = String(sessionId || '').trim();
         if (!normalizedSessionId) return;
-        this.pendingSessionLoad = {
+        if (this.pendingSessionLoad?.timeoutId) {
+            window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
+        }
+        const request = {
             sessionId: normalizedSessionId,
             source,
             epoch: this.sessionNavigationEpoch || 0,
             requestId: this._createSessionLoadRequestId?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
         };
-        this._sendGetAiSession(normalizedSessionId, this.pendingSessionLoad);
+        request.timeoutId = window.setTimeout?.(() => {
+            if (this.pendingSessionLoad !== request || this._disposed) return;
+            this.pendingSessionLoad = null;
+            this._setResultStatusNote?.('会话恢复超时，当前安全状态已保留，可重新选择该会话重试。', 'warning');
+            this._announceAccessibilityStatus?.('会话恢复超时，可重试。', 'assertive');
+        }, SESSION_LOAD_TIMEOUT_MS) || null;
+        this.pendingSessionLoad = request;
+        this._sendGetAiSession(normalizedSessionId, request);
     },
 
     _sendGetAiSession(sessionId, request = {}) {
@@ -218,6 +231,7 @@ export const aiPanelSessionHistoryMixin = {
         if (!isMatchingLoad) {
             return;
         }
+        if (pendingLoad.timeoutId) window.clearTimeout?.(pendingLoad.timeoutId);
         if (!payload.success) {
             if (pendingLoad?.source === 'auto_restore') {
                 this.pendingSessionLoad = null;
@@ -370,6 +384,22 @@ export const aiPanelSessionHistoryMixin = {
             ),
             sessionId
         };
+        if (!workspaceSnapshot || workspaceSnapshot.trusted !== true) {
+            restoredResult.flow = null;
+            restoredResult.buildResult = null;
+            restoredResult.workflowDiff = null;
+            restoredResult.applyGate = null;
+            restoredResult.toolEvidenceTimeline = [];
+            restoredResult.success = false;
+            restoredResult.status = 'degraded_restore';
+            restoredResult.completionStatus = 'degraded_restore';
+        } else if (workspaceSnapshot.appliedDowngraded) {
+            restoredResult.status = 'completed';
+            restoredResult.completionStatus = 'completed';
+            restoredResult.interactionState = 'completed';
+            this.appliedResultVersion = 0;
+            this.appliedCanvasRevision = 0;
+        }
 
         this._restoreWorkspaceSnapshotFromSession(workspaceSnapshot, sessionId, restoredResult);
         if (canvasFlow) {
@@ -397,34 +427,13 @@ export const aiPanelSessionHistoryMixin = {
     },
 
     _normalizeSessionWorkspaceSnapshot(raw) {
-        if (!raw || typeof raw !== 'object') return null;
-        const snapshot = raw;
-        const read = (camel, pascal = '') => snapshot?.[camel] ?? snapshot?.[pascal || `${camel[0].toUpperCase()}${camel.slice(1)}`];
-        return {
-            schemaVersion: Number(read('schemaVersion')) || 0,
-            revision: Number(read('revision')) || 0,
-            lifecycleState: String(read('lifecycleState') || 'idle').trim(),
-            pendingPlanSnapshot: read('pendingPlanSnapshot'),
-            planQuestionSelections: read('planQuestionSelections') || {},
-            confirmedPlanAnswers: Array.isArray(read('confirmedPlanAnswers')) ? read('confirmedPlanAnswers') : [],
-            optimisticPlanAnswers: Array.isArray(read('optimisticPlanAnswers')) ? read('optimisticPlanAnswers') : [],
-            answerRevision: Number(read('answerRevision')) || 0,
-            readinessPreview: read('readinessPreview') || null,
-            resourceDecisions: read('resourceDecisions') || {},
-            requirementMode: String(read('requirementMode') || 'strict').trim().toLowerCase(),
-            workspaceViewMode: String(read('workspaceViewMode') || 'plan').trim().toLowerCase(),
-            planAcceptedRecommendedDefaults: read('planAcceptedRecommendedDefaults') === true,
-            planRunId: String(read('planRunId') || '').trim(),
-            planRunStatus: String(read('planRunStatus') || '').trim().toLowerCase(),
-            planTerminalSequence: Number(read('planTerminalSequence')) || null,
-            buildRunId: String(read('buildRunId') || '').trim(),
-            buildRunStatus: String(read('buildRunStatus') || '').trim().toLowerCase(),
-            buildTerminalSequence: Number(read('buildTerminalSequence')) || null,
-            submittedBuildFingerprint: String(read('submittedBuildFingerprint') || '').trim()
-        };
+        return normalizeWorkspaceSnapshotForRestore(raw).snapshot;
     },
 
     _restoreWorkspaceSnapshotFromSession(snapshot, sessionId, result = null) {
+        if (snapshot && snapshot.trusted === undefined) {
+            snapshot = normalizeWorkspaceSnapshotForRestore(snapshot).snapshot;
+        }
         if (!snapshot) {
             this._dispatchAgentWorkspaceEvent?.({
                 type: 'workspace/session-restored',
@@ -438,6 +447,38 @@ export const aiPanelSessionHistoryMixin = {
             });
             this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._addMessage('system', '该历史版本不包含完整工作台状态，已仅恢复对话和可用结果。');
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+            return false;
+        }
+
+        if (snapshot.degraded || snapshot.trusted !== true) {
+            this._dispatchAgentWorkspaceEvent?.({
+                type: 'workspace/session-restored',
+                payload: {
+                    sessionId,
+                    result: null,
+                    plan: snapshot.pendingPlanSnapshot || null,
+                    readiness: null,
+                    readinessPreview: null,
+                    readinessStatus: 'idle',
+                    run: {
+                        plan: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null },
+                        build: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null }
+                    },
+                    persistence: { snapshotRevision: 0, buildRunId: '', submittedBuildFingerprint: '' },
+                    requirementMode: 'strict',
+                    ui: { workspaceMode: AgentWorkspaceModes.PLAN, viewMode: AgentWorkspaceModes.PLAN }
+                }
+            });
+            this.workspaceSnapshotRevision = 0;
+            this.workspaceBuildRunId = '';
+            this.workspaceSubmittedBuildFingerprint = '';
+            this.activeAgentRunId = null;
+            this.activePlanRunId = null;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
+            this._addMessage?.('system', '工作台快照版本缺失、过新或内容损坏，已仅保留安全的对话摘要；Build、Apply Ready 与 Applied 状态未恢复。');
             this._renderAgentWorkspaceOverview?.();
             this._renderPlanWorkspace?.(this.pendingVisionPlan);
             this._renderBuildWorkspaceFromAgentRun?.();
@@ -504,31 +545,54 @@ export const aiPanelSessionHistoryMixin = {
         this._renderBuildWorkspaceFromAgentRun?.();
         this._updatePlanBuildActionState?.();
 
-        this._restoreWorkspaceRunReplays(snapshot, sessionId);
+        const identity = this._captureSessionNavigationIdentity?.();
+        this._restoreWorkspaceRunReplays(snapshot, sessionId, identity);
         return true;
     },
 
-    async _restoreWorkspaceRunReplays(snapshot, sessionId) {
+    async _restoreWorkspaceRunReplays(snapshot, sessionId, identity = null) {
         try {
+            if (identity && !this._isSessionNavigationIdentityCurrent?.(identity)) return false;
             if (snapshot?.planRunId) {
                 await this._replayAgentRunPublicEventsById?.(snapshot.planRunId, {
                     kind: 'plan',
-                    statusText: '回放历史 Plan 事件'
+                    statusText: '回放历史 Plan 事件',
+                    identity
                 });
             }
+            if (identity && !this._isSessionNavigationIdentityCurrent?.(identity)) return false;
             if (snapshot?.buildRunId) {
                 await this._replayAgentRunPublicEventsById?.(snapshot.buildRunId, {
                     kind: 'build',
-                    statusText: '回放历史 Build 事件'
+                    statusText: '回放历史 Build 事件',
+                    identity
                 });
             }
+            return true;
         } catch (error) {
+            if (identity && !this._isSessionNavigationIdentityCurrent?.(identity)) return false;
             console.warn('[AiPanel] 恢复工作台 Run 回放失败。', {
                 sessionId,
                 error: error?.message || String(error)
             });
             this._addMessage?.('system', '历史工作台已从会话快照恢复，但部分事件回放失败。');
+            return false;
         }
+    },
+
+    _captureSessionNavigationIdentity() {
+        return Object.freeze({
+            sessionId: String(this.sessionId || '').trim().toLowerCase(),
+            navigationEpoch: Number(this.sessionNavigationEpoch || 0),
+            lifecycleEpoch: Number(this._lifecycleEpoch || 0)
+        });
+    },
+
+    _isSessionNavigationIdentityCurrent(identity) {
+        return Boolean(identity) && !this._disposed &&
+            identity.sessionId === String(this.sessionId || '').trim().toLowerCase() &&
+            Number(identity.navigationEpoch) === Number(this.sessionNavigationEpoch || 0) &&
+            Number(identity.lifecycleEpoch) === Number(this._lifecycleEpoch || 0);
     },
 
     _parseFlowJson(raw) {
@@ -608,6 +672,7 @@ export const aiPanelSessionHistoryMixin = {
         if (!sessionId) return;
         if (String(this.pendingSessionLoad?.sessionId || '').trim().toLowerCase() === String(sessionId).trim().toLowerCase()) {
             this.sessionNavigationEpoch += 1;
+            if (this.pendingSessionLoad?.timeoutId) window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
             this.pendingSessionLoad = null;
         }
         webMessageBridge.sendMessage('DeleteAiSession', {
@@ -674,6 +739,7 @@ export const aiPanelSessionHistoryMixin = {
         }
 
         this.sessionNavigationEpoch = (Number(this.sessionNavigationEpoch) || 0) + 1;
+        if (this.pendingSessionLoad?.timeoutId) window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
         this.pendingSessionLoad = null;
         this.sessionId = normalized || null;
         this._dispatchAgentWorkspaceEvent?.({

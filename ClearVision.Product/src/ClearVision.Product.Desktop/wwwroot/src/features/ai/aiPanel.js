@@ -24,6 +24,7 @@ import { aiPanelTopologySummaryMixin } from './aiPanelTopologySummary.js';
 import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
 import { aiPanelLiveEventsMixin } from './aiPanelLiveEvents.js';
 import { aiPanelLifecycleMixin } from './aiPanelLifecycle.js';
+import { aiPanelAccessibilityMixin } from './aiPanelAccessibility.js';
 import {
     initializeAiPanelShell,
     installAiPanelShellPresentation
@@ -181,6 +182,11 @@ export class AiPanel {
         this._messageUnsubscribes = [];
         this._chatScrollHandler = null;
         this._composerResizeHandler = null;
+        this._disposed = false;
+        this._lifecycleEpoch = 1;
+        this._accessibilityInitialized = false;
+        this._activeApplyPreview = null;
+        this._applyInFlight = false;
         this.userHasScrolledUp = false;
         this.unreadStreamCount = 0;
 
@@ -199,8 +205,9 @@ export class AiPanel {
         // 初始化
         this._init();
         if (typeof window !== 'undefined') {
-            window.__clearVisionFlushAiPanelWorkspace = async (reason = 'host_close') =>
+            this._workspaceFlushHandler = async (reason = 'host_close') =>
                 (await this._flushWorkspaceSnapshotBeforeBoundary?.(reason)) ?? true;
+            window.__clearVisionFlushAiPanelWorkspace = this._workspaceFlushHandler;
         }
     }
 
@@ -223,10 +230,12 @@ export class AiPanel {
     }
 
     _init() {
+        if (this._disposed || this._initialized) return;
         if (!this.container) {
             console.error('[AiPanel] 容器未找到:', this.containerId);
             return;
         }
+        this._initialized = true;
 
         this.render();
         this._setupMessageListeners();
@@ -235,6 +244,7 @@ export class AiPanel {
         this._setupScrollListener();
         this._setupComposerLayoutSync();
         this._setupExamplesFolding();
+        this._setupAccessibility?.();
     }
 
     activate() {
@@ -265,6 +275,7 @@ export class AiPanel {
         }
 
         this.sessionNavigationEpoch += 1;
+        if (this.pendingSessionLoad?.timeoutId) window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
         this.pendingSessionLoad = null;
         this.sessionId = null;
         this._saveSessionId(null);
@@ -367,6 +378,7 @@ export class AiPanel {
     }
 
     _resetCurrentResultSyncState() {
+        this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
         this.currentResult = null;
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
@@ -378,6 +390,7 @@ export class AiPanel {
     }
 
     _setCurrentResult(payload) {
+        this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
         this.currentResult = payload;
         this.currentResultVersion += 1;
         this.appliedResultVersion = 0;
@@ -412,7 +425,7 @@ export class AiPanel {
         const canvasApplyAllowed = !this.currentResult ||
             (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true);
         const applied = this._isCurrentResultAppliedToCanvas();
-        button.disabled = this.isGenerating || !hasFlow || !canvasApplyAllowed || applied;
+        button.disabled = this.isGenerating || this._applyInFlight || Boolean(this._activeApplyPreview) || !hasFlow || !canvasApplyAllowed || applied;
         button.classList.toggle('is-disabled', button.disabled);
         button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
         const label = applied
@@ -450,13 +463,13 @@ export class AiPanel {
                     </div>
                 </header>
 
-                <nav class="ai-shell-tabs" data-ai-hook="compact-tabs" aria-label="AI 页面区域">
-                    <button type="button" data-ai-hook="compact-tab" data-ai-shell-pane="workbench" aria-selected="true">工作台</button>
-                    <button type="button" data-ai-hook="compact-tab" data-ai-shell-pane="conversation" aria-selected="false">会话</button>
+                <nav class="ai-shell-tabs" data-ai-hook="compact-tabs" role="tablist" aria-label="AI 页面区域">
+                    <button type="button" role="tab" data-ai-hook="compact-tab" data-ai-shell-pane="workbench" aria-controls="ai-result-pane" aria-selected="true" tabindex="0">工作台</button>
+                    <button type="button" role="tab" data-ai-hook="compact-tab" data-ai-shell-pane="conversation" aria-controls="ai-conversation-pane" aria-selected="false" tabindex="-1">会话</button>
                 </nav>
 
                 <div class="ai-workspace" data-ai-hook="workspace">
-                <aside class="ai-pane-left" data-ai-chat-pane="true" data-ai-hook="conversation-pane">
+                <aside class="ai-pane-left" id="ai-conversation-pane" role="tabpanel" tabindex="0" data-ai-chat-pane="true" data-ai-hook="conversation-pane">
                     <div class="ai-pane-header">
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
@@ -526,12 +539,13 @@ export class AiPanel {
                             <button class="icon-btn" id="ai-btn-attach" type="button" title="添加附件" aria-label="添加附件">
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                             </button>
-                            <textarea class="ai-textarea" id="ai-input" placeholder="描述检测目标、缺陷或流程修改..."></textarea>
+                            <textarea class="ai-textarea" id="ai-input" aria-label="视觉任务需求" aria-describedby="ai-input-help" placeholder="描述检测目标、缺陷或流程修改..."></textarea>
                             <button class="ai-btn-cancel" id="ai-btn-cancel" type="button" title="取消生成">取消</button>
                             <button class="ai-btn-send" id="ai-btn-gen" type="button" title="发送" aria-label="发送">
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="white" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                             </button>
                         </div>
+                        <p class="sr-only" id="ai-input-help">输入需求后按 Ctrl+Enter 发送。生成完成后可切换 Plan 与 Build 并继续验证和应用。</p>
                         <div class="ai-attachments" id="ai-attachments"></div>
                         <div class="ai-manual-retry-banner" id="ai-manual-retry-banner"></div>
                         <div class="ai-followup-hint-banner" id="ai-followup-hint-banner"></div>
@@ -550,7 +564,7 @@ export class AiPanel {
                     </div>
                 </aside>
 
-                <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true" data-ai-hook="workbench-pane">
+                <aside class="ai-pane-right" id="ai-result-pane" role="tabpanel" tabindex="0" data-ai-workbench-pane="true" data-ai-hook="workbench-pane">
                     <div class="ai-pane-header">
                         <span class="pane-icon ai-badge">AI</span>
                         <span class="pane-title">视觉智能体工作台</span>
@@ -560,6 +574,7 @@ export class AiPanel {
                     ${renderAiBuildWorkspaceScaffold()}
                 </aside>
                 </div>
+                <div class="sr-only" id="ai-accessibility-status" role="status" aria-live="polite" aria-atomic="true"></div>
             </div>
         `;
 
@@ -614,6 +629,7 @@ export class AiPanel {
         });
 
         initializeAiPanelShell(this);
+        this._syncAccessibilitySemantics?.();
 
         this._renderAttachments();
         this._updateRequirementModeUI();
@@ -635,15 +651,19 @@ export class AiPanel {
     }
 
     _checkConnection() {
+        if (this._disposed) return;
+        const lifecycleEpoch = Number(this._lifecycleEpoch || 0);
         const indicator = this.container.querySelector('#ai-conn-status');
         const dot = indicator?.querySelector('.status-dot');
         if (!dot) return;
 
         httpClient.get('/health')
             .then(() => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0) || dot.isConnected === false) return;
                 dot.className = 'status-dot connected';
             })
             .catch(() => {
+                if (this._disposed || lifecycleEpoch !== Number(this._lifecycleEpoch || 0) || dot.isConnected === false) return;
                 dot.className = 'status-dot disconnected';
             });
     }
@@ -765,7 +785,7 @@ export class AiPanel {
 
         if (!this._streamFlushPending) {
             this._streamFlushPending = true;
-            requestAnimationFrame(() => this._flushStreamBuffer());
+            this._requestOwnedAnimationFrame?.(() => this._flushStreamBuffer());
         }
     }
 
@@ -782,7 +802,7 @@ export class AiPanel {
 
         if ((this._streamBuffer.thinking || this._streamBuffer.content) && !this._streamFlushPending) {
             this._streamFlushPending = true;
-            requestAnimationFrame(() => this._flushStreamBuffer());
+            this._requestOwnedAnimationFrame?.(() => this._flushStreamBuffer());
         }
     }
 
@@ -1207,7 +1227,7 @@ export class AiPanel {
                     ${statusBadges.length > 0 ? `<div class="op-badges">${statusBadges.join('')}</div>` : ''}
                 `;
                 opsContainer.appendChild(item);
-                setTimeout(() => {
+                this._setOwnedTimeout?.(() => {
                     item.style.transition = 'all 0.3s var(--ease-ink-smooth)';
                     item.style.opacity = '1';
                     item.style.transform = 'translateX(0)';
@@ -2254,8 +2274,8 @@ export class AiPanel {
                 // ignore localStorage failures
             }
 
-            window.requestAnimationFrame(() => this._syncComposerOffset());
-            window.setTimeout(() => this._syncComposerOffset(), 260);
+            this._requestOwnedAnimationFrame?.(() => this._syncComposerOffset());
+            this._setOwnedTimeout?.(() => this._syncComposerOffset(), 260);
         };
 
         toggle.addEventListener('click', toggleExamples);
@@ -2274,6 +2294,7 @@ Object.assign(
     aiPanelAgentWorkspaceMixin,
     aiPanelLiveEventsMixin,
     aiPanelLifecycleMixin,
+    aiPanelAccessibilityMixin,
     aiPanelAgentRunMixin,
     aiPanelRequirementBriefMixin,
     aiPanelAttachmentsMixin,

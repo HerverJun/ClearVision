@@ -242,6 +242,10 @@ export function syncAiPanelShell(panel) {
     }
 
     setText(panel.container.querySelector('[data-ai-hook="task-next-step"]'), presentation.nextStep, { hideWhenEmpty: true });
+    const announcement = [presentation.phaseText, presentation.blockerCount > 0 ? `${presentation.blockerCount} 项阻断` : '', presentation.nextStep]
+        .filter(Boolean)
+        .join('。');
+    if (announcement) panel._announceAccessibilityStatus?.(announcement);
     moveConversationActions(panel, active);
     movePrimaryAction(panel, active);
     renderRecentTasks(panel);
@@ -275,7 +279,9 @@ export function initializeAiPanelShell(panel) {
             const pane = button.dataset.aiShellPane === 'conversation' ? 'conversation' : 'workbench';
             root.dataset.aiActivePane = pane;
             panel.container.querySelectorAll('[data-ai-shell-pane]').forEach(candidate => {
-                candidate.setAttribute('aria-selected', candidate.dataset.aiShellPane === pane ? 'true' : 'false');
+                const selected = candidate.dataset.aiShellPane === pane;
+                candidate.setAttribute('aria-selected', selected ? 'true' : 'false');
+                candidate.tabIndex = selected ? 0 : -1;
             });
             if (pane === 'conversation') {
                 panel.container.querySelector('#ai-input')?.focus?.({ preventScroll: true });

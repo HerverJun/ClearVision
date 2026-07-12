@@ -400,9 +400,55 @@ test('Apply Preview remains the existing modal and can be reached by keyboard', 
   await apply.focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.ai-apply-preview-overlay')).toBeVisible();
-  await expect(page.locator('.ai-apply-preview-dialog')).toContainText('应用预览');
-  await page.locator('.ai-apply-preview-cancel').click();
+  const dialog = page.locator('.ai-apply-preview-dialog');
+  await expect(dialog).toContainText('应用预览');
+  await expect(dialog).toHaveAttribute('role', 'dialog');
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(page.locator('.ai-apply-preview-confirm')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.ai-apply-preview-close')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('.ai-apply-preview-confirm')).toBeFocused();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.ai-apply-preview-overlay')).toHaveCount(0);
+  await expect(apply).toBeFocused();
+});
+
+test('keyboard tabs switch conversation and Plan Build workspaces without pointer input', async ({ page }) => {
+  await openAi(page, { width: 1024, height: 768, theme: 'dark' });
+  await seedBuild(page, 'ready');
+
+  const workbenchTab = page.locator('[data-ai-shell-pane="workbench"]');
+  const conversationTab = page.locator('[data-ai-shell-pane="conversation"]');
+  await workbenchTab.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(conversationTab).toHaveAttribute('aria-selected', 'true');
+  await expect(conversationTab).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(workbenchTab).toHaveAttribute('aria-selected', 'true');
+
+  const planTab = page.locator('[data-workspace-view-mode="plan"]');
+  const buildTab = page.locator('[data-workspace-view-mode="build"]');
+  await planTab.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(buildTab).toHaveAttribute('aria-selected', 'true');
+  await expect(buildTab).toBeFocused();
+});
+
+test('Apply dialog remains usable with reduced motion and 200 percent zoom', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openAi(page, { width: 1366, height: 768, theme: 'dark' });
+  await seedBuild(page, 'ready');
+  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  const apply = page.locator('#ai-btn-apply');
+  await apply.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.locator('.ai-apply-preview-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ai-apply-preview-confirm')).toBeFocused();
+  await expect(page.locator('.ai-apply-preview-overlay')).toHaveCSS('animation-name', 'none');
+  await page.keyboard.press('Escape');
+  await expect(apply).toBeFocused();
 });
 
 test('DryRun failure stays distinct from static validation and keeps Apply blocked', async ({ page }) => {

@@ -11873,6 +11873,7 @@ test('AI session restore keeps manual B pending when auto A failure arrives late
       sessionId: 'session-b',
       history: [],
       workspaceSnapshot: {
+        schemaVersion: 2,
         revision: 7,
         lifecycleState: 'plan_ready',
         buildRunId: '',
@@ -11899,6 +11900,7 @@ test('AI session restore resets workspace fields and clears stale build readonly
   panel.pendingVisionPlan = testPlan({ planId: 'old-plan', planHash: 'sha256:old' });
 
   panel._restoreWorkspaceSnapshotFromSession({
+    schemaVersion: 2,
     revision: 5,
     lifecycleState: 'plan_ready',
     pendingPlanSnapshot: { planId: 'plan-a', planHash: 'sha256:plan-a', goal: '检测表面缺陷', canBuild: true },

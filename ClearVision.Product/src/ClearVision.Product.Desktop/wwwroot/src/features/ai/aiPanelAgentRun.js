@@ -122,6 +122,8 @@ export class AgentRunEventTransport {
         this.firstEventTimer = null;
         this.receivedStreamEvent = false;
         this.replayFailureCount = 0;
+        this.pendingDelayResolve = null;
+        this.eventSourceFinish = null;
     }
 
     async start() {
@@ -135,6 +137,7 @@ export class AgentRunEventTransport {
     }
 
     close() {
+        if (this.closed) return;
         this.closed = true;
         this._clearFirstEventTimer();
 
@@ -142,6 +145,10 @@ export class AgentRunEventTransport {
             window.clearTimeout(this.replayTimer);
             this.replayTimer = null;
         }
+        this.pendingDelayResolve?.();
+        this.pendingDelayResolve = null;
+        this.eventSourceFinish?.(false);
+        this.eventSourceFinish = null;
 
         try {
             this.reader?.cancel?.();
@@ -182,6 +189,7 @@ export class AgentRunEventTransport {
                 headers: httpClient.defaultHeaders,
                 signal: this.abortController.signal
             });
+            if (this.closed) return true;
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -229,7 +237,7 @@ export class AgentRunEventTransport {
         }
 
         const token = await this._ensureStreamToken();
-        if (!token) {
+        if (!token || this.closed) {
             return false;
         }
 
@@ -261,8 +269,12 @@ export class AgentRunEventTransport {
                 if (this.eventSource === source) {
                     this.eventSource = null;
                 }
+                if (this.eventSourceFinish === finish) {
+                    this.eventSourceFinish = null;
+                }
                 resolve(value);
             };
+            this.eventSourceFinish = finish;
 
             this.panel._setAgentRunTransportStatus('已切换备用事件流', 'warning');
             this._armFirstEventTimeout('eventSource', () => finish(false));
@@ -315,6 +327,9 @@ export class AgentRunEventTransport {
 
         try {
             const replay = await httpClient.get(`/ai/agent-runs/${encodeURIComponent(this.runId)}`);
+            if (this.closed || this.panel?._disposed || this.panel?.activeAgentRunTransport !== this) {
+                return true;
+            }
             const events = replay?.events || replay?.Events || [];
             const summary = replay?.summary || replay?.Summary || null;
             if (statusText) {
@@ -349,6 +364,7 @@ export class AgentRunEventTransport {
 
         try {
             const result = await httpClient.post(`/ai/agent-runs/${encodeURIComponent(this.runId)}/stream-token`);
+            if (this.closed || this.panel?._disposed || this.panel?.activeAgentRunTransport !== this) return null;
             const token = String(result?.streamToken || result?.StreamToken || '').trim();
             return token || null;
         } catch {
@@ -391,8 +407,10 @@ export class AgentRunEventTransport {
     }
 
     _handleEvent(rawEvent) {
+        if (this.closed || this.panel?._disposed || this.panel?.activeAgentRunTransport !== this) return;
         const evt = this.panel._normalizeAgentRunEvent(rawEvent);
         if (!evt || evt.runId !== this.runId) return;
+        if (Number(evt.sequence || 0) > 0 && Number(evt.sequence || 0) <= Number(this.lastSequence || 0)) return;
 
         this.receivedStreamEvent = true;
         this._clearFirstEventTimer();
@@ -440,10 +458,19 @@ export class AgentRunEventTransport {
 
     _delay(ms) {
         return new Promise(resolve => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                if (this.pendingDelayResolve === finish) this.pendingDelayResolve = null;
+                resolve();
+            };
+            this.pendingDelayResolve = finish;
             this.replayTimer = window.setTimeout(() => {
                 this.replayTimer = null;
-                resolve();
+                finish();
             }, ms);
+            if (this.closed) finish();
         });
     }
 }
@@ -1287,7 +1314,9 @@ export const aiPanelAgentRunMixin = {
     },
 
     async _replayLatestAgentRunPublicEvents({ statusText = '回放最近一次 AgentRun' } = {}) {
+        const replayIdentity = this._captureSessionNavigationIdentity?.();
         const replay = await httpClient.get('/ai/agent-runs/latest');
+        if (this._disposed || (replayIdentity && !this._isSessionNavigationIdentityCurrent?.(replayIdentity))) return false;
         const snapshotEvents = Array.isArray(replay?.snapshot?.events)
             ? replay.snapshot.events
             : [];
@@ -1357,11 +1386,12 @@ export const aiPanelAgentRunMixin = {
         return true;
     },
 
-    async _replayAgentRunPublicEventsById(runId, { kind = '', statusText = '回放 AgentRun' } = {}) {
+    async _replayAgentRunPublicEventsById(runId, { kind = '', statusText = '回放 AgentRun', identity = null } = {}) {
         const normalizedRunId = String(runId || '').trim();
         if (!normalizedRunId) return false;
 
         const replay = await httpClient.get(`/ai/agent-runs/${encodeURIComponent(normalizedRunId)}`);
+        if (this._disposed || (identity && !this._isSessionNavigationIdentityCurrent?.(identity))) return false;
         const events = (Array.isArray(replay?.events) ? replay.events : replay?.Events) || [];
         const normalizedEvents = events
             .map(evt => this._normalizeAgentRunEvent(evt))
