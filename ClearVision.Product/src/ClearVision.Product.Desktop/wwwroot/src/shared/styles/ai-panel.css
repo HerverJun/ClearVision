@@ -1911,7 +1911,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     height: 8px;
     background: var(--cinnabar);
     border-radius: 50%;
-    animation: neonPulse 1.5s infinite;
+    animation: none;
 }
 
 .stepper-content { flex: 1; }
@@ -4238,7 +4238,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-shell textarea:focus-visible,
 .ai-shell select:focus-visible,
 .ai-shell button:focus-visible {
-    outline: 2px solid var(--accent-primary, #60a5fa);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
 }
 .ai-apply-preview-header {

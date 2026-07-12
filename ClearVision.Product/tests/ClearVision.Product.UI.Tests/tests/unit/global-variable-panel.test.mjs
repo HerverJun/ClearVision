@@ -14,8 +14,6 @@ const PRODUCTION_CSS_FILES = [
   'src/shared/styles/global-variables.css',
   'src/shared/styles/property-panel-enhancements.css',
   'src/shared/styles/project-view.css',
-  'src/shared/styles/global-enhancements.css',
-  'src/shared/styles/settings-view-override.css',
   'src/shared/styles/operator-library.css',
   'src/features/settings/userManagement.css',
   'src/shared/styles/ai-panel.css',
@@ -24,7 +22,6 @@ const PRODUCTION_CSS_FILES = [
   'src/shared/styles/inspection.css',
   'src/shared/styles/results.css',
   'src/shared/styles/stations.css',
-  'src/shared/styles/visual-upgrade.css',
   'css/planarScaleOffsetCalibWizard.css'
 ];
 

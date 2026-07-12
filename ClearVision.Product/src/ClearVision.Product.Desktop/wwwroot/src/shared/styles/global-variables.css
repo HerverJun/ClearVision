@@ -17,10 +17,10 @@
     align-items: center;
     gap: 8px;
     padding: 3px 5px 3px 10px;
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--glass-card) 82%, transparent);
-    box-shadow: var(--shadow-sm), var(--glass-inner-glow);
+    background: var(--bg-surface);
+    box-shadow: none;
     color: var(--text-primary);
     overflow: hidden;
 }
@@ -96,7 +96,7 @@
     align-items: center;
     justify-content: center;
     padding: clamp(10px, 2vh, 24px);
-    background: color-mix(in srgb, var(--theme-backdrop) 86%, rgba(2, 6, 23, 0.92));
+    background: var(--theme-backdrop);
 }
 
 .gv-choice-overlay {
@@ -109,13 +109,13 @@
     border: 1px solid var(--theme-border-strong);
     border-radius: var(--radius-lg);
     background: var(--bg-surface);
-    box-shadow: var(--shadow-float), 0 0 0 1px var(--theme-border);
+    box-shadow: var(--shadow-float);
 }
 
 .gv-manager {
-    width: min(1180px, calc(100vw - 48px));
+    width: min(1160px, calc(100vw - 48px));
     max-width: calc(100vw - 20px);
-    height: min(780px, calc(100vh - 48px));
+    height: min(760px, calc(100vh - 48px));
     max-height: calc(100vh - 20px);
     display: flex;
     flex-direction: column;
@@ -129,7 +129,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    padding: 18px 20px 14px;
+    padding: 16px 18px 13px;
     border-bottom: 1px solid var(--theme-border);
     background: var(--bg-surface);
     flex: 0 0 auto;
@@ -137,7 +137,7 @@
 
 .gv-manager-header h2 {
     margin: 0;
-    font-size: var(--font-size-2xl);
+    font-size: var(--font-size-xl);
     line-height: 1.25;
 }
 
@@ -168,7 +168,7 @@
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(120px, 130px) minmax(120px, 130px) auto auto auto;
     gap: 10px;
-    padding: 14px 20px;
+    padding: 12px 18px;
     border-bottom: 1px solid var(--theme-border);
     background: var(--bg-surface);
     flex: 0 0 auto;
@@ -185,7 +185,7 @@
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
     line-height: 1.35;
-    background: var(--bg-surface);
+    background: var(--bg-subtle);
 }
 
 .gv-manager .form-input,
@@ -195,7 +195,7 @@
     padding: 9px 12px;
     border: 1px solid var(--theme-border);
     border-radius: var(--radius-sm);
-    background: var(--bg-subtle);
+    background: var(--bg-surface);
     color: var(--text-primary);
     font: inherit;
     line-height: 1.45;
@@ -264,9 +264,9 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    padding: 12px;
+    padding: 8px 10px;
     border-right: 1px solid var(--theme-border);
-    background: var(--bg-subtle);
+    background: var(--bg-surface);
 }
 
 .gv-variable-row {
@@ -274,19 +274,21 @@
     min-width: 0;
     display: grid;
     gap: 4px;
-    margin-bottom: 8px;
-    padding: 10px;
+    margin: 0;
+    padding: 10px 10px 10px 12px;
     text-align: left;
-    border: 1px solid var(--theme-border);
-    border-radius: var(--radius-md);
-    background: var(--bg-surface);
+    border: 0;
+    border-bottom: 1px solid var(--theme-border);
+    border-radius: 0;
+    background: transparent;
     color: var(--text-primary);
     cursor: pointer;
 }
 
 .gv-variable-row.selected {
-    border-color: var(--primary-color);
-    background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-surface));
+    border-bottom-color: var(--theme-border);
+    box-shadow: inset 3px 0 0 var(--brand-red);
+    background: var(--brand-red-soft);
 }
 
 .gv-variable-name {
@@ -308,7 +310,7 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    padding: 16px;
+    padding: 18px;
     background: var(--bg-surface);
 }
 
@@ -329,9 +331,9 @@
     min-width: 0;
     padding: 14px;
     border: 1px solid var(--theme-border);
-    border-radius: var(--radius-lg);
-    background: var(--bg-subtle);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    box-shadow: none;
 }
 
 .gv-editor-card {

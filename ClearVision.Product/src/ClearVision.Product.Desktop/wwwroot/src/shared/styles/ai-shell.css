@@ -538,3 +538,166 @@
         min-width: 0;
     }
 }
+
+/* Quiet Precision convergence: preserve the AI lifecycle and DOM, while the
+   page consumes the same surfaces, borders, type scale, and interaction rules
+   as the rest of ClearVision. */
+.ai-view-container {
+    border: 0;
+    border-radius: 0;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+.ai-shell,
+.ai-workspace {
+    background: var(--bg-surface);
+}
+
+.ai-workspace {
+    gap: 8px;
+    padding: 8px;
+}
+
+.ai-pane-left,
+.ai-pane-right {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: none;
+    transition: border-color var(--duration-fast), background-color var(--duration-fast);
+}
+
+.ai-pane-left:hover,
+.ai-pane-right:hover {
+    border-color: var(--theme-border-strong);
+    box-shadow: none;
+    transform: none;
+}
+
+.ai-pane-header {
+    height: 44px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-surface);
+}
+
+.ai-pane-header::after {
+    display: none;
+}
+
+.pane-title {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.pane-icon,
+.pane-icon.ai-badge {
+    border-color: var(--border-color);
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    letter-spacing: 0;
+}
+
+.status-badge.online {
+    border-color: var(--status-ok-border);
+    background: var(--status-ok-soft);
+    color: var(--status-ok-strong);
+}
+
+.ai-input-section,
+.ai-composer-dock {
+    border-color: var(--border-color);
+    background: var(--bg-surface);
+    backdrop-filter: none;
+}
+
+.ai-input-box,
+.ai-textarea,
+.ai-chat-input {
+    border-color: var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: none;
+}
+
+.ai-input-box:focus-within,
+.ai-textarea:focus,
+.ai-chat-input:focus {
+    border-color: var(--brand-red);
+    box-shadow: var(--focus-ring);
+    transform: none;
+}
+
+.ai-send-btn,
+.ai-primary-btn,
+.ai-agent-mode-build-btn {
+    border-color: var(--brand-red);
+    background: var(--brand-red);
+    color: var(--brand-on-red);
+    box-shadow: none;
+    animation: none;
+}
+
+.ai-send-btn:hover,
+.ai-primary-btn:hover,
+.ai-agent-mode-build-btn:hover {
+    border-color: var(--brand-red-hover);
+    background: var(--brand-red-hover);
+    box-shadow: none;
+    transform: none;
+}
+
+.ai-quick-example,
+.quick-example,
+.ai-action-btn,
+.ai-secondary-btn {
+    border-color: var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+.ai-quick-example:hover,
+.quick-example:hover,
+.ai-action-btn:hover,
+.ai-secondary-btn:hover {
+    border-color: var(--theme-border-strong);
+    background: var(--hover-color);
+    color: var(--text-primary);
+    transform: none;
+}
+
+.ai-shell[data-ai-shell-state="idle"] .ai-workspace {
+    padding: 24px;
+    background: var(--bg-surface);
+}
+
+.ai-shell[data-ai-shell-state="idle"] .ai-pane-left {
+    width: min(760px, 100%);
+    border-color: var(--border-color);
+    background: var(--bg-surface);
+    box-shadow: none;
+}
+
+.ai-shell[data-ai-shell-state="idle"] .ai-idle-intro {
+    gap: 18px;
+    padding: 36px 36px 10px;
+}
+
+.ai-idle-copy h2 {
+    font-size: clamp(24px, 2.6vw, 32px);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.ai-idle-copy p {
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+}
+
+.ai-idle-recent-item {
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+}
