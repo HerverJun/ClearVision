@@ -3,6 +3,7 @@ import {
     getParameterDisplayName,
     getResourceDisplayName
 } from '../../shared/operatorDisplayNames.js';
+import { partitionPendingParameters } from './aiPendingParameterPartition.js';
 
 const BUILD_RUNNING_STATES = new Set([
     'matching_template',
@@ -12,6 +13,37 @@ const BUILD_RUNNING_STATES = new Set([
     'dry_running',
     'applying'
 ]);
+
+const DIAGNOSTIC_SCOPE_BY_SOURCE = Object.freeze({
+    validate_schema: 'structural',
+    schema: 'structural',
+    validator: 'structural',
+    topology: 'structural',
+    operator_contract: 'structural',
+    validate_flow: 'structural',
+    operator_contract_checker: 'structural',
+    structure: 'structural',
+    operator: 'structural',
+    connection: 'structural',
+    cycle: 'structural',
+    contract: 'structural',
+    metadata_dry_run: 'dryRun',
+    manifest_dry_run: 'dryRun',
+    dryrun: 'dryRun',
+    preview: 'dryRun',
+    dryrun_flow: 'dryRun',
+    readiness: 'gate',
+    package_readiness: 'gate',
+    station_compatibility: 'gate',
+    release_review: 'gate',
+    apply_gate: 'gate',
+    deployment: 'gate',
+    runtime_package_precheck: 'gate',
+    station_compatibility_checker: 'gate',
+    release_review_gate: 'gate',
+    apply_gate_resolver: 'gate',
+    release: 'gate'
+});
 
 function clean(value) {
     return String(value ?? '').trim();
@@ -109,17 +141,45 @@ function getDiagnosticSeverity(item) {
     return 'info';
 }
 
-function getDiagnosticScope(item) {
-    const source = clean(read(item,
-        'stage', 'Stage',
-        'source', 'Source',
-        'origin', 'Origin',
-        'category', 'Category',
-        'diagnosticSource', 'DiagnosticSource')).toLowerCase();
-    if (['schema', 'validator', 'topology'].includes(source)) return 'structural';
-    if (['dryrun', 'preview'].includes(source)) return 'dryRun';
-    if (['apply_gate', 'deployment', 'release'].includes(source)) return 'gate';
+function getDiagnosticScope(item, inheritedSource = '') {
+    const candidates = [
+        read(item, 'stage', 'Stage'),
+        read(item, 'source', 'Source'),
+        inheritedSource,
+        read(item, 'category', 'Category'),
+        read(item, 'origin', 'Origin'),
+        read(item, 'diagnosticSource', 'DiagnosticSource')
+    ].map(value => clean(value).toLowerCase()).filter(Boolean);
+    for (const source of candidates) {
+        if (DIAGNOSTIC_SCOPE_BY_SOURCE[source]) return DIAGNOSTIC_SCOPE_BY_SOURCE[source];
+    }
     return 'other';
+}
+
+function flattenDiagnostics(source) {
+    const diagnostics = [];
+    toArray(read(source, 'lastAttemptDiagnostics', 'LastAttemptDiagnostics')).forEach(attempt => {
+        const inheritedSource = clean(read(attempt, 'stage', 'Stage', 'source', 'Source', 'category', 'Category'));
+        const issues = toArray(read(attempt, 'issues', 'Issues'));
+        if (issues.length > 0) {
+            issues.forEach(issue => diagnostics.push({
+                ...issue,
+                diagnosticStage: inheritedSource,
+                diagnosticScope: getDiagnosticScope(issue, inheritedSource)
+            }));
+            return;
+        }
+        diagnostics.push({
+            ...attempt,
+            diagnosticStage: inheritedSource,
+            diagnosticScope: getDiagnosticScope(attempt, inheritedSource)
+        });
+    });
+    toArray(read(source, 'knowledgeDiagnostics', 'KnowledgeDiagnostics')).forEach(item => diagnostics.push({
+        ...item,
+        diagnosticScope: getDiagnosticScope(item)
+    }));
+    return diagnostics;
 }
 
 function formatGateStatus(panel, value) {
@@ -186,26 +246,10 @@ function getResolvedResourceCount(panel, missingResources) {
 function deriveParameterState(panel, source, flow, missingResources = []) {
     const rawPending = panel?._resolvePendingParametersForDraft?.(source) ||
         toArray(read(source, 'pendingParameters', 'PendingParameters'));
-    const pending = rawPending;
+    const partition = partitionPendingParameters(rawPending, missingResources);
+    const pending = partition.ordinaryPendingParameters;
     const operators = panel?._getPendingOperatorSourceOperators?.(flow) || [];
-    const rawGroups = panel?._collectPendingDraftGroups?.(rawPending, operators) || [];
-    const resourceRefs = toArray(missingResources).map(item => {
-        const operatorId = clean(read(item, 'operatorId', 'OperatorId', 'actualOperatorId', 'ActualOperatorId')).toLowerCase();
-        const parameterName = clean(read(item, 'parameterName', 'ParameterName') || panel?._inferPendingParameterNameFromMissingResource?.(item)).toLowerCase();
-        const resourceKey = clean(read(item, 'resourceKey', 'ResourceKey')).toLowerCase();
-        return { operatorId, parameterName, resourceKey };
-    });
-    const isResourceBacked = (operatorId, parameterName) => {
-        const op = clean(operatorId).toLowerCase();
-        const name = clean(parameterName).toLowerCase();
-        return resourceRefs.some(ref =>
-            (ref.parameterName === name && (!ref.operatorId || ref.operatorId === op)) ||
-            (ref.resourceKey && ref.resourceKey === `${op}.${name}`));
-    };
-    const groups = rawGroups.map(group => ({
-        ...group,
-        fields: toArray(group.fields).filter(field => !isResourceBacked(group.operatorId, field.parameterName))
-    })).filter(group => group.fields.length > 0);
+    const groups = panel?._collectPendingDraftGroups?.(pending, operators) || [];
     const confirmation = panel?._getPendingParameterConfirmationState?.(pending, operators, groups) || null;
     const total = groups.reduce((sum, group) => sum + group.fields.length, 0);
     const filled = groups.reduce((sum, group) => sum + group.fields.filter(field =>
@@ -223,24 +267,34 @@ function deriveParameterState(panel, source, flow, missingResources = []) {
         awaitingConfirmation,
         confirmed,
         unresolved: confirmed ? 0 : remainingToFill,
-        resourceBackedCount: Math.max(countPendingFields(rawPending) - total, 0)
+        resourceBackedCount: partition.resourceBackedFieldCount
     };
+}
+
+function isConfirmedParameterBlocker(panel, item, parameters) {
+    if (!parameters?.confirmed) return false;
+    const text = getDiagnosticMessage(panel, item).toLowerCase();
+    if (!text || !text.includes('pending_parameter')) return false;
+    return parameters.groups.some(group => toArray(group.fields).some(field => {
+        const operatorId = clean(group.operatorId).toLowerCase();
+        const parameterName = clean(field.parameterName).toLowerCase();
+        if (!parameterName) return false;
+        const reference = operatorId ? `${operatorId}.${parameterName}` : parameterName;
+        return text.includes(reference);
+    }));
 }
 
 function deriveValidation(panel, source, gate) {
     const preview = asObject(read(source, 'validationPreview', 'ValidationPreview'));
     const structural = asObject(read(preview, 'structuralValidation', 'StructuralValidation'));
     const dryRun = asObject(read(preview, 'dryRun', 'DryRun') || read(source, 'dryRunResult', 'DryRunResult'));
-    const diagnostics = [
-        ...toArray(read(source, 'lastAttemptDiagnostics', 'LastAttemptDiagnostics')),
-        ...toArray(read(source, 'knowledgeDiagnostics', 'KnowledgeDiagnostics'))
-    ];
+    const diagnostics = flattenDiagnostics(source);
     const errors = diagnostics.filter(item => getDiagnosticSeverity(item) === 'error');
     const warnings = diagnostics.filter(item => getDiagnosticSeverity(item) === 'warning');
-    const structuralErrors = errors.filter(item => getDiagnosticScope(item) === 'structural');
-    const dryRunErrors = errors.filter(item => getDiagnosticScope(item) === 'dryRun');
-    const gateErrors = errors.filter(item => getDiagnosticScope(item) === 'gate');
-    const otherErrors = errors.filter(item => getDiagnosticScope(item) === 'other');
+    const structuralErrors = errors.filter(item => item.diagnosticScope === 'structural');
+    const dryRunErrors = errors.filter(item => item.diagnosticScope === 'dryRun');
+    const gateErrors = errors.filter(item => item.diagnosticScope === 'gate');
+    const otherErrors = errors.filter(item => item.diagnosticScope === 'other');
     const structuralState = structuralErrors.length
         ? { status: 'failed', label: '未通过' }
         : classifyCheck(structural);
@@ -254,6 +308,9 @@ function deriveValidation(panel, source, gate) {
         : canvasReady === true
             ? { status: 'passed', label: '可应用' }
             : { status: 'pending', label: '待确认' };
+    const otherState = otherErrors.length
+        ? { status: 'failed', label: '未通过' }
+        : { status: 'passed', label: '无其他失败' };
     const overall = errors.length || structuralState.status === 'failed' || dryRunState.status === 'failed' || gateState.status === 'failed'
         ? 'failed'
         : structuralState.status === 'passed' && dryRunState.status === 'passed'
@@ -265,6 +322,7 @@ function deriveValidation(panel, source, gate) {
         structural: structuralState,
         dryRun: dryRunState,
         gate: gateState,
+        other: otherState,
         overall,
         errors,
         structuralErrors,
@@ -573,12 +631,17 @@ export function deriveAiBuildPresentation(panel) {
     const gateBlocked = readBoolean(gate, 'blocked', 'Blocked') === true;
     const canvasReady = readBoolean(gate, 'canvasApplyReady', 'CanvasApplyReady') === true;
     const validation = deriveValidation(panel, sourceForPending, gate);
-    const diff = deriveDiff(getWorkflowDiff(buildResult, sourceForPending));
+    const rawDiff = deriveDiff(getWorkflowDiff(buildResult, sourceForPending));
+    const diff = {
+        ...rawDiff,
+        blockers: rawDiff.blockers.filter(item => !isConfirmedParameterBlocker(panel, item, parameters))
+    };
     const gateBlockers = [
         ...toArray(read(gate, 'blockers', 'Blockers', 'deploymentBlockers', 'DeploymentBlockers')),
         ...toArray(read(buildResult, 'unresolvedStrategyBlockers', 'UnresolvedStrategyBlockers')),
         ...diff.blockers
-    ].map(item => getDiagnosticMessage(panel, item)).filter(Boolean);
+    ].filter(item => !isConfirmedParameterBlocker(panel, item, parameters))
+        .map(item => getDiagnosticMessage(panel, item)).filter(Boolean);
     const pipeline = getPipeline(panel, buildResult, flow);
     const applied = !activeRunPendingResult && (workbenchState === 'applied' || panel?._isCurrentResultAppliedToCanvas?.() === true);
     const applying = workbenchState === 'applying';
@@ -758,6 +821,9 @@ function renderValidationSummary(panel, presentation) {
         { title: 'DryRun', state: presentation.validation.dryRun },
         { title: '应用门禁', state: presentation.validation.gate }
     ];
+    if (presentation.validation.other.status === 'failed') {
+        checks.push({ title: '其他工程检查', state: presentation.validation.other });
+    }
     const coreValidationFailed = presentation.validation.structural.status === 'failed' ||
         presentation.validation.dryRun.status === 'failed' ||
         presentation.validation.otherErrors.length > 0;
@@ -1044,5 +1110,8 @@ export const aiPanelBuildPresentationTestApi = {
     deriveValidation,
     deriveParameterState,
     getDiagnosticScope,
-    formatGateStatus
+    flattenDiagnostics,
+    diagnosticScopeBySource: DIAGNOSTIC_SCOPE_BY_SOURCE,
+    formatGateStatus,
+    renderValidationSummary
 };

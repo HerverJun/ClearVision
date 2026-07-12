@@ -10,6 +10,10 @@ const moduleUrl = pathToFileURL(path.join(
 )).href;
 
 const { deriveAiBuildPresentation, aiPanelBuildPresentationTestApi } = await import(moduleUrl);
+const { partitionPendingParameters } = await import(pathToFileURL(path.join(
+  repoRoot,
+  'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPendingParameterPartition.js'
+)).href);
 
 function createPanel(result, overrides = {}) {
   const panel = {
@@ -185,71 +189,59 @@ test('Build presentation helpers classify canonical check states without DOM ins
   assert.equal(aiPanelBuildPresentationTestApi.formatGateStatus(null, 'unknown'), '未设置');
 });
 
-test('validation matrix keeps structural, DryRun, and gate diagnostics in their own levels', () => {
+test('canonical Build stages keep structural, DryRun, and gate diagnostics in their own levels', () => {
   const panel = createPanel(readyResult());
   const derive = aiPanelBuildPresentationTestApi.deriveValidation;
-  const cases = [
-    {
-      name: 'structural passed + DryRun failed',
-      source: {
-        validationPreview: {
-          structuralValidation: { passed: true, status: 'passed' },
-          dryRun: { succeeded: false, status: 'failed' }
-        },
-        lastAttemptDiagnostics: [{ severity: 'error', stage: 'dryrun', message: '预演失败' }]
-      },
-      gate: { canvasApplyReady: false, blocked: false },
-      expected: ['passed', 'failed', 'pending', 'failed']
-    },
-    {
-      name: 'structural failed + DryRun pending',
-      source: {
-        validationPreview: {
-          structuralValidation: { passed: false, status: 'failed' },
-          dryRun: { status: 'pending' }
-        },
-        lastAttemptDiagnostics: [{ severity: 'error', stage: 'validator', message: '结构失败' }]
-      },
-      gate: { canvasApplyReady: false, blocked: false },
-      expected: ['failed', 'running', 'pending', 'failed']
-    },
-    {
-      name: 'structural failed + DryRun failed',
-      source: {
-        validationPreview: {
-          structuralValidation: { passed: false, status: 'failed' },
-          dryRun: { succeeded: false, status: 'failed' }
-        },
-        lastAttemptDiagnostics: [
-          { severity: 'error', stage: 'topology', message: '拓扑失败' },
-          { severity: 'error', stage: 'preview', message: '预演失败' }
-        ]
-      },
-      gate: { canvasApplyReady: false, blocked: false },
-      expected: ['failed', 'failed', 'pending', 'failed']
-    },
-    {
-      name: 'structural passed + gate blocked',
-      source: {
+  const stageGroups = {
+    structural: ['validate_schema', 'schema', 'validator', 'topology', 'operator_contract'],
+    dryRun: ['metadata_dry_run', 'manifest_dry_run', 'dryrun', 'preview'],
+    gate: ['readiness', 'package_readiness', 'station_compatibility', 'release_review', 'apply_gate', 'deployment']
+  };
+  for (const [scope, stages] of Object.entries(stageGroups)) {
+    for (const stage of stages) {
+      const conflictingCategory = scope === 'structural'
+        ? 'release'
+        : scope === 'dryRun'
+          ? 'contract'
+          : 'connection';
+      const actual = derive(panel, {
         validationPreview: {
           structuralValidation: { passed: true, status: 'passed' },
           dryRun: { succeeded: true, status: 'completed' }
         },
-        lastAttemptDiagnostics: [{ severity: 'error', stage: 'deployment', message: '部署门禁阻断' }]
-      },
-      gate: { canvasApplyReady: false, blocked: true },
-      expected: ['passed', 'passed', 'failed', 'failed']
+        lastAttemptDiagnostics: [{
+          stage,
+          issues: [{ severity: 'error', category: conflictingCategory, message: `${stage} failed` }]
+        }]
+      }, { canvasApplyReady: true, blocked: false });
+      assert.equal(actual[scope].status, 'failed', stage);
+      assert.equal(actual.overall, 'failed', `${stage} overall`);
+      assert.equal(actual.errors[0].diagnosticStage, stage, `${stage} inherited stage`);
     }
-  ];
-
-  for (const item of cases) {
-    const actual = derive(panel, item.source, item.gate);
-    assert.deepEqual(
-      [actual.structural.status, actual.dryRun.status, actual.gate.status, actual.overall],
-      item.expected,
-      item.name
-    );
   }
+});
+
+test('unknown canonical diagnostic remains a visible other engineering failure', () => {
+  const panel = createPanel(readyResult());
+  const validation = aiPanelBuildPresentationTestApi.deriveValidation(panel, {
+    validationPreview: {
+      structuralValidation: { passed: true, status: 'passed' },
+      dryRun: { succeeded: true, status: 'completed' }
+    },
+    lastAttemptDiagnostics: [{
+      stage: 'future_engineering_check',
+      issues: [{ severity: 'error', category: 'future_category', message: '未来检查失败' }]
+    }]
+  }, { canvasApplyReady: true, blocked: false });
+
+  assert.equal(validation.structural.status, 'passed');
+  assert.equal(validation.dryRun.status, 'passed');
+  assert.equal(validation.gate.status, 'passed');
+  assert.equal(validation.other.status, 'failed');
+  assert.equal(validation.overall, 'failed');
+  const html = aiPanelBuildPresentationTestApi.renderValidationSummary(panel, { validation });
+  assert.match(html, /其他工程检查/);
+  assert.match(html, /未通过/);
 });
 
 test('parameter projection separates fill progress, confirmation, and resource-backed fields', () => {
@@ -326,6 +318,22 @@ test('parameter projection separates fill progress, confirmation, and resource-b
   assert.equal(resourceOnly.total, 0);
   assert.equal(resourceOnly.remainingToFill, 0);
   assert.equal(resourceOnly.resourceBackedCount, 1);
+});
+
+test('pure pending parameter partition assigns overlapping fields only to resources', () => {
+  const partition = partitionPendingParameters([{
+    operatorId: 'op_threshold',
+    parameterNames: ['Threshold', 'ModelPath']
+  }], [{
+    operatorId: 'op_threshold',
+    parameterName: 'ModelPath',
+    resourceKey: 'op_threshold.ModelPath'
+  }]);
+
+  assert.deepEqual(partition.ordinaryPendingParameters[0].parameterNames, ['Threshold']);
+  assert.deepEqual(partition.resourceBackedPendingParameters[0].parameterNames, ['ModelPath']);
+  assert.equal(partition.resourceBackedFieldCount, 1);
+  assert.equal(partition.resources.length, 1);
 });
 
 test('a new running Build Run does not project the previous Apply-ready result as current', () => {

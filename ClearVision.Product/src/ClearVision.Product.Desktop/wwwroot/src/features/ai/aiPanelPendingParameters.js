@@ -5,13 +5,14 @@ import {
     isPendingParameterSentinel,
     shouldIncludePendingParameter
 } from '../../shared/parameterDependencyRules.js';
+import { partitionPendingParameters } from './aiPendingParameterPartition.js';
 
 export const aiPanelPendingParametersMixin = {
     _renderParameterDraftEditor(data, flow = null) {
         const container = this.container?.querySelector('#ai-result-parameter-editor');
         if (!container) return;
 
-        const pending = this._resolvePendingParametersForDraft(data);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         this._syncPendingParameterDrafts(data, flow);
 
@@ -420,7 +421,7 @@ export const aiPanelPendingParametersMixin = {
         const container = this.container?.querySelector('#ai-result-parameter-editor');
         if (!container || container.classList.contains('is-empty')) return;
 
-        const pending = this._resolvePendingParametersForDraft(data);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(data);
         if (pending.length === 0) return;
 
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
@@ -460,7 +461,7 @@ export const aiPanelPendingParametersMixin = {
 
     _syncPendingParameterDrafts(data, flow = null, options = {}) {
         const force = Boolean(options?.force);
-        const pending = this._resolvePendingParametersForDraft(data);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(data);
         const operators = this._extractOperators(flow || data?.flow || data?.Flow || null);
         const signature = `${this.currentResultVersion || 0}::${this._computePendingDraftSignature(pending, operators)}`;
         const canvasOperators = this._isCurrentResultAppliedToCanvas()
@@ -982,7 +983,9 @@ export const aiPanelPendingParametersMixin = {
             source: hasValue ? source : (this._hasPendingDraftValue(entry.suggestedValue, fieldType) ? 'ai_suggestion' : source)
         });
 
-        if (this._hasPendingParameterConfirmation() && !this._arePendingDraftValuesEquivalent(previousValue, hasValue ? nextValue : null, fieldType)) {
+        if (source !== 'resource_binding' &&
+            this._hasPendingParameterConfirmation() &&
+            !this._arePendingDraftValuesEquivalent(previousValue, hasValue ? nextValue : null, fieldType)) {
             this._clearPendingParameterConfirmation();
         }
     },
@@ -1312,7 +1315,7 @@ export const aiPanelPendingParametersMixin = {
     },
 
     _isCanvasManualEditPendingParameter(operatorId, parameterName) {
-        const pending = this._resolvePendingParametersForDraft(this.currentResult);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(this.currentResult);
         const normalizedOperator = String(operatorId || '').trim().toLowerCase();
         const normalizedParameter = String(parameterName || '').trim().toLowerCase();
         return pending.some(item => {
@@ -1420,7 +1423,7 @@ export const aiPanelPendingParametersMixin = {
             ? structuredClone(flow)
             : JSON.parse(JSON.stringify(flow));
         const operators = this._extractOperators(clonedFlow);
-        const pending = this._resolvePendingParametersForDraft(this.currentResult);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(this.currentResult);
         const confirmationState = this._getPendingParameterConfirmationState(pending, operators);
 
         pending.forEach(item => {
@@ -1570,7 +1573,7 @@ export const aiPanelPendingParametersMixin = {
 
     _buildPendingParameterReviewRequest() {
         const flow = this._getCurrentFlowJson();
-        const pending = this._resolvePendingParametersForDraft(this.currentResult);
+        const pending = this._resolveOrdinaryPendingParametersForDraft(this.currentResult);
         const operators = this._getPendingOperatorSourceOperators(flow || null);
         const groups = this._collectPendingDraftGroups(pending, operators);
         const input = this.container?.querySelector('#ai-input');
@@ -1685,6 +1688,20 @@ export const aiPanelPendingParametersMixin = {
             data?.missingResources ?? data?.MissingResources
         );
         return this._mergePendingParameterGroups([...explicitPending, ...missingResourcePending]);
+    },
+
+    _getPendingParameterPartition(data) {
+        const pending = this._resolvePendingParametersForDraft(data);
+        const buildResult = this._getPayloadBuildResult?.(data) || data?.buildResult || data?.BuildResult || null;
+        const missing = this._normalizeMissingResources(
+            data?.missingResources ?? data?.MissingResources ??
+            buildResult?.missingResources ?? buildResult?.MissingResources
+        );
+        return partitionPendingParameters(pending, missing);
+    },
+
+    _resolveOrdinaryPendingParametersForDraft(data) {
+        return this._getPendingParameterPartition(data).ordinaryPendingParameters;
     },
 
     _buildPendingParametersFromMissingResources(items) {

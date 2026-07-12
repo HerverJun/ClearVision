@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
 type Theme = 'dark' | 'light';
-type BuildScenario = 'ready' | 'parameters' | 'resources' | 'validation-failed' | 'dryrun-failed' | 'applied';
+type BuildScenario = 'ready' | 'parameters' | 'resources' | 'mixed' | 'validation-failed' | 'dryrun-failed' | 'applied';
 
 const buildFlow = {
   operators: [
@@ -37,10 +37,10 @@ const buildFlow = {
 };
 
 function createBuildPayload(scenario: BuildScenario) {
-  const pendingParameters = scenario === 'parameters'
-    ? [{ operatorId: 'op_threshold', parameterNames: ['Threshold'] }]
+  const pendingParameters = scenario === 'parameters' || scenario === 'mixed'
+    ? [{ operatorId: 'op_threshold', parameterNames: scenario === 'mixed' ? ['Threshold', 'ModelPath'] : ['Threshold'] }]
     : [];
-  const missingResources = scenario === 'resources'
+  const missingResources = scenario === 'resources' || scenario === 'mixed'
     ? [{
         resourceType: 'model_resource',
         resourceKey: 'op_threshold.ModelPath',
@@ -69,14 +69,16 @@ function createBuildPayload(scenario: BuildScenario) {
           deploymentPrecheck: { readyForDeployment: gateReady, deploymentBlocked: !gateReady },
         };
   const applyGate = {
-    canvasApplyReady: scenario === 'resources' ? true : gateReady,
+    canvasApplyReady: scenario === 'resources' || scenario === 'mixed' ? true : gateReady,
     runtimeDraftReady: true,
     deploymentReady: gateReady,
     blocked: !gateReady,
     status: gateReady ? 'ready' : 'blocked',
-    deploymentBlockers: pendingParameters.length
-      ? ['pending_parameter:op_threshold.Threshold']
-      : missingResources.length
+    deploymentBlockers: scenario === 'mixed'
+      ? ['pending_parameter:op_threshold.Threshold', 'missing_model_resource:op_threshold.ModelPath']
+      : pendingParameters.length
+        ? ['pending_parameter:op_threshold.Threshold']
+        : missingResources.length
         ? ['missing_model_resource:op_threshold.ModelPath']
         : validationFailed
           ? ['validation_failed']
@@ -94,9 +96,12 @@ function createBuildPayload(scenario: BuildScenario) {
     missingResources,
     validationPreview,
     lastAttemptDiagnostics: scenario === 'validation-failed'
-      ? [{ severity: 'error', message: '输出端口类型不兼容。', stage: 'validator', repairHint: '检查结果输出算子的输入类型。' }]
+      ? [{ severity: 'error', stage: 'validate_schema', category: 'connection', message: '输出端口类型不兼容。', repairHint: '检查结果输出算子的输入类型。' }]
       : scenario === 'dryrun-failed'
-        ? [{ severity: 'error', message: 'DryRun 未产生有效判定结果。', stage: 'dryrun', repairHint: '检查输入样本与阈值。' }]
+        ? [{
+            stage: 'metadata_dry_run',
+            issues: [{ severity: 'error', category: 'validation', message: 'DryRun 未产生有效判定结果。', repairHint: '检查输入样本与阈值。' }],
+          }]
         : [],
     buildResult: {
       buildId: `build-${scenario}`,
@@ -112,16 +117,16 @@ function createBuildPayload(scenario: BuildScenario) {
         tempId: 'op_threshold',
         operatorType: 'Threshold',
         parameterName: 'Threshold',
-        valueSummary: scenario === 'parameters' ? '<pending>' : '128',
-        source: scenario === 'parameters' ? 'pending' : 'default',
-        pending: scenario === 'parameters',
+        valueSummary: scenario === 'parameters' || scenario === 'mixed' ? '<pending>' : '128',
+        source: scenario === 'parameters' || scenario === 'mixed' ? 'pending' : 'default',
+        pending: scenario === 'parameters' || scenario === 'mixed',
       }],
       workflowDiff: {
         addedNodes: buildFlow.operators.map(operator => operator.name),
-        modifiedNodes: scenario === 'parameters' ? ['二值化'] : [],
+        modifiedNodes: scenario === 'parameters' || scenario === 'mixed' ? ['二值化'] : [],
         removedNodes: [],
         connectionChanges: buildFlow.connections,
-        parameterChanges: scenario === 'parameters' ? ['二值化阈值'] : ['采集源', '输出格式'],
+        parameterChanges: scenario === 'parameters' || scenario === 'mixed' ? ['二值化阈值'] : ['采集源', '输出格式'],
         pendingParameters,
         deploymentBlockers: applyGate.deploymentBlockers,
       },
@@ -231,7 +236,7 @@ async function seedBuild(page: Page, scenario: BuildScenario): Promise<void> {
     panel._setWorkspaceViewMode('build', { persist: false, render: false });
     panel.workbenchState = scenario === 'applied'
       ? 'applied'
-      : scenario === 'parameters'
+      : scenario === 'parameters' || scenario === 'mixed'
         ? 'reviewing_parameters'
         : scenario === 'validation-failed' || scenario === 'dryrun-failed'
           ? 'failed'
@@ -311,7 +316,7 @@ test('parameter workspace preserves the real fill and confirmation interaction',
   await expect(parameterMetric.locator('dd')).toHaveText('0');
   await expect(parameterMetric.locator('small')).toContainText('已确认');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('参数已填写，等待确认');
-  await expect(page.locator('#ai-build-action-queue')).toContainText('拓扑或部署阻断');
+  await expect(page.locator('#ai-build-action-queue')).toContainText('应用门禁尚未开放');
   await expect(nextStep).toContainText('查看应用门禁');
   await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 尚未准备完成');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
@@ -338,6 +343,53 @@ test('resource workspace reuses the existing binding action and updates canonica
   await expect(page.locator('#ai-btn-apply')).toBeEnabled();
   const remaining = await page.evaluate(() => (window as any).aiPanel.currentResult.missingResources.length);
   expect(remaining).toBe(0);
+});
+
+test('mixed ordinary and resource parameters stay partitioned through confirmation and binding', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768, theme: 'light' });
+  await seedBuild(page, 'mixed');
+
+  const parameterSection = page.locator('#ai-build-parameters-section');
+  const resourceSection = page.locator('#ai-build-resources-section');
+  const thresholdInput = parameterSection.locator('[data-draft-input="true"][data-draft-parameter-name="Threshold"]');
+  const modelParameterInput = parameterSection.locator('[data-draft-input="true"][data-draft-parameter-name="ModelPath"]');
+  const modelResourceInput = resourceSection.locator('[data-resource-input="true"]');
+  const parameterMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '待补参数' });
+  const resourceMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '待补资源' });
+  const nextStep = page.locator('#ai-build-status-summary .ai-build-v2-next strong');
+
+  await expect(parameterSection).toContainText('Threshold');
+  await expect(parameterSection).not.toContainText('ModelPath');
+  await expect(resourceSection).toContainText('ModelPath');
+  await expect(resourceSection).not.toContainText('Threshold');
+  await expect(thresholdInput).toHaveCount(1);
+  await expect(modelParameterInput).toHaveCount(0);
+  await expect(modelResourceInput).toHaveCount(1);
+  await expect(parameterMetric.locator('dd')).toHaveText('1');
+  await expect(resourceMetric.locator('dd')).toHaveText('1');
+
+  await thresholdInput.fill('146');
+  await expect(parameterMetric.locator('dd')).toHaveText('0');
+  await expect(parameterMetric.locator('small')).toContainText('已填写，等待确认');
+  await expect(page.locator('#ai-btn-confirm-parameters')).toBeEnabled();
+  await page.locator('#ai-btn-confirm-parameters').click();
+
+  await expect(parameterMetric.locator('small')).toContainText('已确认');
+  await expect(page.locator('#ai-build-action-queue')).not.toContainText('参数待填写');
+  await expect(page.locator('#ai-build-action-queue')).toContainText('1 项资源待绑定');
+  await expect(nextStep).toContainText('先绑定 1 项具体资源');
+
+  await modelResourceInput.fill('model-resource:mixed-v1');
+  await resourceSection.locator('[data-resource-action="bind_model_resource"]').click();
+
+  await expect(resourceMetric.locator('dd')).toHaveText('0');
+  await expect(page.locator('#ai-build-action-queue')).not.toContainText('资源待绑定');
+  await expect(page.locator('#ai-build-action-queue')).toContainText('当前没有需要处理的阻断');
+  await expect(nextStep).toContainText('复核 Workflow Diff');
+  await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 已准备完成');
+  await expect(page.locator('#ai-btn-apply')).toBeEnabled();
+  await expect(parameterSection.locator('[data-draft-input="true"]')).toHaveCount(1);
+  await expect(resourceSection.locator('[data-resource-action="bind_model_resource"]')).toHaveCount(0);
 });
 
 test('Apply Preview remains the existing modal and can be reached by keyboard', async ({ page }) => {

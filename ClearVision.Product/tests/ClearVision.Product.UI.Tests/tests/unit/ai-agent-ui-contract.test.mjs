@@ -1232,7 +1232,8 @@ function resourceBindingOperatorMetadata() {
     {
       type: 'DeepLearning',
       parameters: [
-        { name: 'ModelPath', dataType: 'text', displayName: '模型资源' }
+        { name: 'ModelPath', dataType: 'text', displayName: '模型资源' },
+        { name: 'Threshold', dataType: 'number', displayName: '阈值' }
       ]
     },
     {
@@ -1722,6 +1723,16 @@ function pendingParameterReviewResult() {
     },
     metadataOnly: true
   };
+}
+
+function mixedPendingParameterReviewResult() {
+  const result = pendingParameterReviewResult();
+  result.pendingParameters = [{
+    operatorId: 'op_detect',
+    actualOperatorId: 'op_detect',
+    parameterNames: ['Threshold', 'ModelPath']
+  }];
+  return result;
 }
 
 function assertNoSensitiveLeak(text) {
@@ -6394,7 +6405,7 @@ test('parameter review copy makes AI review optional and removes submit audit wo
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
   panel._rebuildPendingOperatorBindings({
     pending: panel._resolvePendingParametersForDraft(panel.currentResult),
@@ -6449,7 +6460,7 @@ test('confirmed manual parameters are written when applying to canvas', async ()
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.currentResultVersion = 7;
   panel.flowCanvas = createFakeFlowCanvas();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
@@ -6465,13 +6476,13 @@ test('confirmed manual parameters are written when applying to canvas', async ()
     preferIndexFallback: true
   });
   panel._syncPendingParameterDrafts(panel.currentResult, panel.currentResult.flow, { force: true });
-  panel._setPendingDraftConfirmedValue('op_detect', 'ModelPath', 'model-resource-approved', 'text', 'user_input');
+  panel._setPendingDraftConfirmedValue('op_detect', 'Threshold', 0.91, 'number', 'user_input');
   panel._handleConfirmPendingParameters(panel.currentResult, panel.currentResult.flow);
 
   panel._handleApplyFlow();
 
   const detect = panel._extractOperators(panel.appliedFlow).find(op => op.id === 'op_detect');
-  assert.equal(panel._readOperatorParameterValue(detect, 'ModelPath'), 'model-resource-approved');
+  assert.equal(panel._readOperatorParameterValue(detect, 'Threshold'), 0.91);
   assert.match(panel.lastResultStatusNote.text, /已应用到画布/);
   assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
 });
@@ -6481,7 +6492,7 @@ test('unconfirmed pending parameters are not silently written during canvas appl
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.currentResultVersion = 8;
   panel.flowCanvas = createFakeFlowCanvas();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
@@ -6546,7 +6557,7 @@ test('canvas edits to pending parameters sync back to review fields', async () =
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.currentResultVersion = 10;
   panel.flowCanvas = createFakeFlowCanvas();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
@@ -6557,11 +6568,11 @@ test('canvas edits to pending parameters sync back to review fields', async () =
 
   panel._handleApplyFlow();
   const editedFlow = panel.flowCanvas.serialize();
-  panel._writeOperatorParameterValue(editedFlow.operators[0], 'ModelPath', 'model-resource-from-canvas');
+  panel._writeOperatorParameterValue(editedFlow.operators[0], 'Threshold', 0.92);
   panel.flowCanvas.replaceFlow(editedFlow, 'parameter-change');
 
-  const entry = panel._getPendingDraftEntry('op_detect', 'ModelPath');
-  assert.equal(entry.confirmedValue, 'model-resource-from-canvas');
+  const entry = panel._getPendingDraftEntry('op_detect', 'Threshold');
+  assert.equal(entry.confirmedValue, '0.92');
   assert.equal(entry.source, 'canvas_override');
   assert.match(elements['#ai-result-parameter-editor'].innerHTML, /当前值已从画布同步/);
   assert.match(elements['#ai-result-followups'].innerHTML, /pendingParameter=true/);
@@ -6573,7 +6584,7 @@ test('canvas manual edit audit redacts sensitive values', async () => {
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.currentResultVersion = 11;
   panel.flowCanvas = createFakeFlowCanvas();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
@@ -6608,7 +6619,7 @@ test('canvas manual edit replay records redact unsafe metadata', async () => {
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResult = mixedPendingParameterReviewResult();
   panel.options.getOperators = () => resourceBindingOperatorMetadata();
   panel.currentResult.CanvasManualEditRecords = [
     {
@@ -8919,7 +8930,7 @@ test('tool evidence status contract maps completed warning skipped denied and un
   assert.doesNotMatch(validation.innerHTML, /流程校验工具 失败 3ms/);
 });
 
-test('pendingParameters can locate operator parameter from missingResources', async () => {
+test('missingResources partition generated pending parameters into the resource side only', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, {
     options: {
@@ -8935,14 +8946,13 @@ test('pendingParameters can locate operator parameter from missingResources', as
   });
   const response = agentResponse();
   const pending = panel._resolvePendingParametersForDraft(response);
+  const partition = panel._getPendingParameterPartition(response);
 
-  panel._rebuildPendingOperatorBindings({ pending, flow: response.flow, preferIndexFallback: true });
-  panel._syncPendingParameterDrafts(response, response.flow, { force: true });
-  const groups = panel._collectPendingDraftGroups(pending, response.flow.operators);
-
-  assert.equal(groups[0].operatorId, 'op_detect');
-  assert.equal(groups[0].fields[0].parameterName, 'ModelPath');
-  assert.equal(groups[0].fields[0].isPendingPlaceholder, true);
+  assert.equal(pending[0].operatorId, 'op_detect');
+  assert.equal(pending[0].parameterNames[0], 'ModelPath');
+  assert.equal(partition.ordinaryPendingParameters.length, 0);
+  assert.equal(partition.resourceBackedPendingParameters[0].parameterNames[0], 'ModelPath');
+  assert.equal(partition.resourceBackedFieldCount, 1);
 });
 
 test('missing resource workflow remains editable as draft', async () => {

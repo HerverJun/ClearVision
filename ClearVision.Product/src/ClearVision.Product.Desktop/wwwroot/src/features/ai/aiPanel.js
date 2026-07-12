@@ -4,7 +4,6 @@ import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
 import {
     getOperatorTypeDisplayName,
-    getParameterDisplayName,
     getResourceDisplayName
 } from '../../shared/operatorDisplayNames.js';
 import {
@@ -686,7 +685,8 @@ export class AiPanel {
             return;
         }
 
-        const pending = this._resolvePendingParametersForDraft(data);
+        const pending = this._resolveOrdinaryPendingParametersForDraft?.(data) ||
+            this._resolvePendingParametersForDraft(data);
         if (pending.length === 0) {
             this._addMessage('system', '当前没有待确认参数，无需执行确认。');
             return;
@@ -1404,8 +1404,9 @@ export class AiPanel {
         const container = this.container?.querySelector('#ai-result-followups');
         if (!container) return;
 
-        const pending = this._resolvePendingParametersForDraft(data);
-        const missing = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
+        const partition = this._getPendingParameterPartition(data);
+        const pending = partition.ordinaryPendingParameters;
+        const missing = partition.resources;
         const recommended = this._normalizeRecommendedTemplate(data?.recommendedTemplate ?? data?.RecommendedTemplate);
         const candidates = this._normalizeTemplateCandidates(data?.templateCandidates ?? data?.TemplateCandidates);
         const requirementBrief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
@@ -1414,18 +1415,7 @@ export class AiPanel {
         const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         const pendingGroups = this._collectPendingDraftGroups(pending, operators).map(group => ({ ...group, groupKey: this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey, label: this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label, operatorId: this._sanitizeResourceAuditDisplayText?.(group.operatorId, 120) || group.operatorId, fields: (group.fields || []).map(field => ({ ...field, parameterName: this._sanitizeResourceAuditDisplayText?.(field.parameterName, 120) || field.parameterName })) }));
-        const displayPendingGroups = pendingGroups.map(group => ({
-            ...group,
-            fields: group.fields.filter(field => !missing.some(item => {
-                const resourceOperator = String(item.operatorId || item.actualOperatorId || '').trim().toLowerCase();
-                const resourceParameter = String(item.parameterName || this._inferPendingParameterNameFromMissingResource?.(item) || '').trim().toLowerCase();
-                const resourceKey = String(item.resourceKey || '').trim().toLowerCase();
-                const operatorId = String(group.operatorId || '').trim().toLowerCase();
-                const parameterName = String(field.parameterName || '').trim().toLowerCase();
-                return (resourceParameter === parameterName && (!resourceOperator || resourceOperator === operatorId)) ||
-                    resourceKey === `${operatorId}.${parameterName}`;
-            }))
-        })).filter(group => group.fields.length > 0);
+        const displayPendingGroups = pendingGroups;
         const effectivePending = displayPendingGroups.map(group => ({
             operatorId: group.operatorId,
             parameterNames: group.fields.map(field => field.parameterName)
@@ -1496,30 +1486,6 @@ export class AiPanel {
             `
             : '';
 
-        const pendingHtml = displayPendingGroups.length > 0
-            ? `
-                <div class="ai-followup-section">
-                    <div class="ai-followup-section-header">
-                        <div class="ai-followup-section-label">待确认参数</div>
-                        <div class="ai-followup-section-tip">参数详情和确认操作位于上方参数工作区</div>
-                    </div>
-                    <div class="ai-followup-list">
-                        ${displayPendingGroups.map(group => {
-                            return `
-                            <button class="ai-followup-item ai-followup-nav is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.groupKey, 160) || group.groupKey)}">
-                                <span>
-                                    <strong>${this._escapeHtml(this._sanitizeResourceAuditDisplayText?.(group.label, 180) || group.label)}</strong>
-                                    <small>${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</small>
-                                </span>
-                                <b>定位参数</b>
-                            </button>
-                        `;
-                        }).join('')}
-                    </div>
-                </div>
-            `
-            : '';
-
         const missingHtml = missing.length > 0
             ? `
                 <div class="ai-followup-section">
@@ -1563,7 +1529,6 @@ export class AiPanel {
                 <span>绑定结果继续进入现有参数草稿、Readiness、验证与 Apply Gate 刷新机制，不在前端建立平行状态。</span>
             </div>
             ${recommendedHtml}
-            ${pendingHtml}
             ${missingHtml}
             ${nonBlockingHtml}
             ${this._renderCanvasManualEditRecords?.(data) || ''}
