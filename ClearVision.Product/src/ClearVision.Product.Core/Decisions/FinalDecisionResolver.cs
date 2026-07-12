@@ -69,7 +69,9 @@ public static class FinalDecisionResolver
                 binding.SourceOutputName));
         }
 
-        if (!binding.DataType.MatchesPortType(outputPort.DataType))
+        var isEligible = FinalDecisionConfigurationCatalog.TryGetEligibleOutput(sourceOperator, outputPort, out var candidate);
+        if (!binding.DataType.MatchesPortType(outputPort.DataType) ||
+            (candidate != null && binding.DataType != candidate.DataType))
         {
             issues.Add(new(
                 "DECISION_SOURCE_TYPE_MISMATCH",
@@ -78,7 +80,7 @@ public static class FinalDecisionResolver
                 outputPort.Name));
         }
 
-        if (!FinalDecisionConfigurationCatalog.TryGetEligibleOutput(sourceOperator, outputPort, out _))
+        if (!isEligible || candidate == null)
         {
             issues.Add(new(
                 "DECISION_SOURCE_OUTPUT_INELIGIBLE",
@@ -87,7 +89,7 @@ public static class FinalDecisionResolver
                 outputPort.Name));
         }
 
-        ValidateRule(binding, sourceOperator.Id, outputPort.Name, issues);
+        ValidateRule(binding, candidate, sourceOperator.Id, outputPort.Name, issues);
         return issues;
     }
 
@@ -142,10 +144,20 @@ public static class FinalDecisionResolver
 
     private static void ValidateRule(
         FinalDecisionBinding binding,
+        FinalDecisionOutputCandidate? candidate,
         Guid operatorId,
         string outputName,
         List<DecisionConfigurationIssue> issues)
     {
+        if (candidate != null && binding.Rule != candidate.Rule)
+        {
+            issues.Add(new(
+                "DECISION_RULE_CONTRACT_MISMATCH",
+                $"Rule '{binding.Rule}' is not allowed for decision source '{outputName}'; expected '{candidate.Rule}'.",
+                operatorId,
+                outputName));
+        }
+
         switch (binding.Rule)
         {
             case DecisionInterpretationRule.Boolean when binding.DataType != DecisionValueType.Boolean:
@@ -163,6 +175,18 @@ public static class FinalDecisionResolver
                 else if (binding.OkValue.Trim().Equals(binding.NgValue.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
                     issues.Add(new("DECISION_STRING_MAP_VALUES_CONFLICT", "OkValue and NgValue must be different.", operatorId, outputName));
+                }
+                else if (candidate != null &&
+                         ((!string.IsNullOrWhiteSpace(candidate.RequiredOkValue) &&
+                           !binding.OkValue.Trim().Equals(candidate.RequiredOkValue, StringComparison.OrdinalIgnoreCase)) ||
+                          (!string.IsNullOrWhiteSpace(candidate.RequiredNgValue) &&
+                           !binding.NgValue.Trim().Equals(candidate.RequiredNgValue, StringComparison.OrdinalIgnoreCase))))
+                {
+                    issues.Add(new(
+                        "DECISION_STRING_MAP_CONSTRAINT_MISMATCH",
+                        $"StringMap for '{outputName}' must map OK to '{candidate.RequiredOkValue}' and NG to '{candidate.RequiredNgValue}'.",
+                        operatorId,
+                        outputName));
                 }
                 break;
             case DecisionInterpretationRule.NumericComparison:

@@ -10,8 +10,8 @@ internal static class DecisionBindingTestSupport
         this OperatorFlow flow,
         Operator sourceOperator,
         string outputName = "JudgmentResult",
-        string okValue = "OK",
-        string ngValue = "NG")
+        string? okValue = null,
+        string? ngValue = null)
     {
         if (!FinalDecisionConfigurationCatalog.IsEligibleContract(sourceOperator.Type, outputName))
         {
@@ -26,6 +26,9 @@ internal static class DecisionBindingTestSupport
             sourceOperator.AddOutputPort(outputName, PortDataType.String);
             port = sourceOperator.OutputPorts.Last();
         }
+        FinalDecisionConfigurationCatalog.TryGetEligibleOutput(sourceOperator, port, out var candidate);
+        okValue ??= candidate?.DefaultOkValue;
+        ngValue ??= candidate?.DefaultNgValue;
 
         flow.DecisionConfiguration = new DecisionConfiguration
         {

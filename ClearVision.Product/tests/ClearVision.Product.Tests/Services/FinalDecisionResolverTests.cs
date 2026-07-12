@@ -120,6 +120,7 @@ public sealed class FinalDecisionResolverTests
         resultOutput.AddOutputPort("FilePath", PortDataType.String);
         var judgment = new Operator(Guid.NewGuid(), "Judgment", OperatorType.ResultJudgment, 0, 0);
         judgment.AddOutputPort("JudgmentResult", PortDataType.String);
+        judgment.AddOutputPort("JudgmentValue", PortDataType.String);
         judgment.AddOutputPort("IsOk", PortDataType.Boolean);
         judgment.AddOutputPort("Details", PortDataType.String);
         var blob = new Operator(Guid.NewGuid(), "Blob", OperatorType.BlobAnalysis, 0, 0);
@@ -138,7 +139,27 @@ public sealed class FinalDecisionResolverTests
         var candidates = FinalDecisionConfigurationCatalog.GetEligibleOutputs(flow);
 
         candidates.Select(candidate => candidate.OutputName)
-            .Should().BeEquivalentTo("JudgmentResult", "IsOk", "BlobCount");
+            .Should().BeEquivalentTo("JudgmentResult", "JudgmentValue", "IsOk", "BlobCount");
+        candidates.Single(candidate => candidate.OutputName == "JudgmentResult")
+            .Should().Match<FinalDecisionOutputCandidate>(candidate =>
+                candidate.Rule == DecisionInterpretationRule.StringMap &&
+                candidate.DefaultOkValue == "OK" &&
+                candidate.DefaultNgValue == "NG" &&
+                candidate.RequiredOkValue == "OK" &&
+                candidate.RequiredNgValue == "NG");
+        candidates.Single(candidate => candidate.OutputName == "JudgmentValue")
+            .Should().Match<FinalDecisionOutputCandidate>(candidate =>
+                candidate.Rule == DecisionInterpretationRule.StringMap &&
+                candidate.DefaultOkValue == "1" &&
+                candidate.DefaultNgValue == "0" &&
+                candidate.RequiredOkValue == "1" &&
+                candidate.RequiredNgValue == "0");
+        candidates.Single(candidate => candidate.OutputName == "BlobCount")
+            .Should().Match<FinalDecisionOutputCandidate>(candidate =>
+                candidate.Rule == DecisionInterpretationRule.NumericComparison &&
+                candidate.DefaultOkValue == null &&
+                candidate.DefaultNgValue == null &&
+                candidate.DefaultTrueMeansOk == null);
         candidates.Should().NotContain(candidate => candidate.OperatorId == resultOutput.Id);
         candidates.Should().NotContain(candidate => candidate.OperatorId == forgedBlob.Id);
         candidates.Should().NotContain(candidate => candidate.OperatorId == disabled.Id);
@@ -205,6 +226,77 @@ public sealed class FinalDecisionResolverTests
 
         evaluation.Decision.Should().Be(expected);
         evaluation.ReasonCode.Should().Be(reasonCode);
+    }
+
+    [Fact]
+    public void Validate_JudgmentValueRejectsImpossibleOkNgDefaults_AndUsesRealOneZeroDomain()
+    {
+        var flow = new OperatorFlow("judgment-value");
+        var judgment = new Operator(Guid.NewGuid(), "Judgment", OperatorType.ResultJudgment, 0, 0);
+        judgment.AddOutputPort("JudgmentValue", PortDataType.String);
+        flow.AddOperator(judgment);
+        flow.BindStringDecision(judgment, "JudgmentValue", "OK", "NG");
+
+        FinalDecisionResolver.Validate(flow)
+            .Should().ContainSingle(issue => issue.Code == "DECISION_STRING_MAP_CONSTRAINT_MISMATCH");
+
+        flow.DecisionConfiguration!.FinalDecisionBinding!.OkValue = "1";
+        flow.DecisionConfiguration.FinalDecisionBinding.NgValue = "0";
+
+        FinalDecisionResolver.Validate(flow).Should().BeEmpty();
+        FinalDecisionResolver.Resolve(flow, ResultFor(judgment, "JudgmentValue", "1"))
+            .Decision.Should().Be(DecisionOutcome.Ok);
+        FinalDecisionResolver.Resolve(flow, ResultFor(judgment, "JudgmentValue", "0"))
+            .Decision.Should().Be(DecisionOutcome.Ng);
+    }
+
+    [Fact]
+    public void Validate_BlobCountRequiresExplicitComparatorAndThreshold()
+    {
+        var flow = new OperatorFlow("blob-incomplete");
+        var blob = new Operator(Guid.NewGuid(), "Blob", OperatorType.BlobAnalysis, 0, 0);
+        blob.AddOutputPort("BlobCount", PortDataType.Integer);
+        flow.AddOperator(blob);
+        var port = blob.OutputPorts.Single();
+        flow.DecisionConfiguration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = blob.Id,
+                SourceOutputPortId = port.Id,
+                SourceOutputName = port.Name,
+                DataType = DecisionValueType.Integer,
+                Rule = DecisionInterpretationRule.NumericComparison
+            }
+        };
+
+        FinalDecisionResolver.Validate(flow)
+            .Should().ContainSingle(issue => issue.Code == "DECISION_NUMERIC_COMPARISON_REQUIRED");
+    }
+
+    [Fact]
+    public void Validate_RejectsRuleThatDiffersFromBackendCandidateContract()
+    {
+        var flow = new OperatorFlow("rule-contract");
+        var judgment = new Operator(Guid.NewGuid(), "Judgment", OperatorType.ResultJudgment, 0, 0);
+        judgment.AddOutputPort("JudgmentResult", PortDataType.String);
+        flow.AddOperator(judgment);
+        var port = judgment.OutputPorts.Single();
+        flow.DecisionConfiguration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = judgment.Id,
+                SourceOutputPortId = port.Id,
+                SourceOutputName = port.Name,
+                DataType = DecisionValueType.String,
+                Rule = DecisionInterpretationRule.Boolean,
+                TrueMeansOk = true
+            }
+        };
+
+        FinalDecisionResolver.Validate(flow)
+            .Should().Contain(issue => issue.Code == "DECISION_RULE_CONTRACT_MISMATCH");
     }
 
     [Fact]

@@ -70,7 +70,7 @@ function createProject(flow: FlowPayload, persistenceRevision: number) {
   };
 }
 
-async function openProject(page: Page) {
+async function openProject(page: Page, expectedNodeCount = 1) {
   await page.evaluate(async projectId => {
     const { default: projectManager } = await import('/src/features/project/projectManager.js');
     await projectManager.openProject(projectId);
@@ -79,7 +79,7 @@ async function openProject(page: Page) {
   await expect.poll(() => page.evaluate(() => {
     const canvas = (window as typeof window & { flowCanvas?: { nodes?: Map<string, unknown> } }).flowCanvas;
     return canvas?.nodes?.size ?? 0;
-  })).toBe(1);
+  })).toBe(expectedNodeCount);
 }
 
 test('最终判定配置可保存重开，并在来源算子禁用后显示稳定问题码', async ({ page }) => {
@@ -192,11 +192,8 @@ test('最终判定配置可保存重开，并在来源算子禁用后显示稳�
       sourceOutputName: 'Judgment',
       dataType: 'String',
       rule: 'StringMap',
-      trueMeansOk: true,
       okValue: 'PASS',
       ngValue: 'REJECT',
-      comparator: null,
-      threshold: null,
     },
     missingDecisionPolicy: 'Invalid',
   });
@@ -323,4 +320,129 @@ test('ResultOutput.Text 旧绑定显示为无效且候选仅保留 BlobCount', a
   await expect(options).toHaveCount(2);
   await expect(options.nth(1)).toContainText('BlobCount');
   await expect(sourceSelect).not.toContainText('结果输出 → Text');
+});
+
+test('候选 Rule 与安全默认值完全来自后端，BlobCount 在显式阈值前保持无效', async ({ page }) => {
+  const judgmentValuePortId = '66666666-6666-6666-6666-666666666666';
+  const blobId = '77777777-7777-7777-7777-777777777777';
+  const blobCountPortId = '88888888-8888-8888-8888-888888888888';
+  const flow = createFlow();
+  flow.operators[0].name = '结果判定';
+  flow.operators[0].type = 'ResultJudgment';
+  flow.operators[0].outputPorts[0].name = 'JudgmentResult';
+  flow.operators[0].outputPorts[0].displayName = '判定结果';
+  flow.operators[0].outputPorts.push({
+    id: judgmentValuePortId,
+    name: 'JudgmentValue',
+    displayName: '判定值',
+    dataType: 'String',
+    direction: 1,
+    isRequired: false,
+  });
+  flow.operators.push({
+    id: blobId,
+    name: 'Blob 分析',
+    type: 'BlobAnalysis',
+    x: 120,
+    y: 120,
+    inputPorts: [],
+    outputPorts: [{
+      id: blobCountPortId,
+      name: 'BlobCount',
+      displayName: 'Blob 数量',
+      dataType: 'Integer',
+      direction: 1,
+      isRequired: false,
+    }],
+    parameters: [],
+    isEnabled: true,
+  });
+
+  const eligibleOutputs = [{
+    operatorId: OPERATOR_ID,
+    operatorName: '结果判定',
+    outputPortId: OUTPUT_PORT_ID,
+    outputName: 'JudgmentResult',
+    dataType: 'String',
+    rule: 'StringMap',
+    defaultOkValue: 'OK',
+    defaultNgValue: 'NG',
+    requiredOkValue: 'OK',
+    requiredNgValue: 'NG',
+  }, {
+    operatorId: OPERATOR_ID,
+    operatorName: '结果判定',
+    outputPortId: judgmentValuePortId,
+    outputName: 'JudgmentValue',
+    dataType: 'String',
+    rule: 'StringMap',
+    defaultOkValue: '1',
+    defaultNgValue: '0',
+    requiredOkValue: '1',
+    requiredNgValue: '0',
+  }, {
+    operatorId: blobId,
+    operatorName: 'Blob 分析',
+    outputPortId: blobCountPortId,
+    outputName: 'BlobCount',
+    dataType: 'Integer',
+    rule: 'NumericComparison',
+  }];
+
+  await page.route(`**/api/projects/${PROJECT_ID}`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createProject(flow, 11)),
+    });
+  });
+  await page.route('**/api/inspection/decision-configuration/validate', async route => {
+    const postedFlow = route.request().postDataJSON() as FlowPayload;
+    const binding = postedFlow.decisionConfiguration?.finalDecisionBinding as Record<string, unknown> | undefined;
+    const issues = !binding
+      ? [{ code: 'DECISION_BINDING_REQUIRED', message: 'Binding required.' }]
+      : binding.rule === 'NumericComparison' && (!binding.comparator || binding.threshold === null || binding.threshold === undefined)
+        ? [{ code: 'DECISION_NUMERIC_COMPARISON_REQUIRED', message: 'Comparator and threshold required.' }]
+        : [];
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ isValid: issues.length === 0, issues, eligibleOutputs }),
+    });
+  });
+
+  await bootAuthenticatedApp(page);
+  await openProject(page, 2);
+  const entry = page.locator('#btn-final-decision');
+  await entry.click();
+  const dialog = page.locator('.final-decision-dialog');
+  const source = dialog.locator('[data-decision-source]');
+
+  await source.selectOption(`${OPERATOR_ID}:${judgmentValuePortId}`);
+  await expect(dialog.locator('[data-decision-input="okValue"]')).toHaveValue('1');
+  await expect(dialog.locator('[data-decision-input="ngValue"]')).toHaveValue('0');
+  await expect(entry).toHaveAttribute('data-decision-state', 'valid');
+
+  await source.selectOption(`${OPERATOR_ID}:${OUTPUT_PORT_ID}`);
+  await expect(dialog.locator('[data-decision-input="okValue"]')).toHaveValue('OK');
+  await expect(dialog.locator('[data-decision-input="ngValue"]')).toHaveValue('NG');
+
+  await source.selectOption(`${blobId}:${blobCountPortId}`);
+  await expect(dialog.locator('[data-decision-input="comparator"]')).toHaveValue('');
+  await expect(dialog.locator('[data-decision-input="threshold"]')).toHaveValue('');
+  await expect(entry).toHaveAttribute('data-decision-state', 'invalid');
+  await expect(dialog).toContainText('DECISION_NUMERIC_COMPARISON_REQUIRED');
+
+  await dialog.locator('[data-decision-input="comparator"]').selectOption('GreaterThanOrEqual');
+  await dialog.locator('[data-decision-input="threshold"]').fill('2');
+  await expect(entry).toHaveAttribute('data-decision-state', 'valid');
+  await expect.poll(() => page.evaluate(() => {
+    const canvas = (window as typeof window & { flowCanvas?: { serialize?: () => FlowPayload } }).flowCanvas;
+    return canvas?.serialize?.().decisionConfiguration?.finalDecisionBinding;
+  })).toMatchObject({
+    sourceOutputName: 'BlobCount',
+    rule: 'NumericComparison',
+    comparator: 'GreaterThanOrEqual',
+    threshold: 2,
+  });
 });

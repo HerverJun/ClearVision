@@ -20,7 +20,9 @@ test('final decision UI builds the backend canonical string mapping DTO', () => 
     outputPortId: 'port-1',
     outputName: 'JudgmentResult',
     dataType: 'String',
-    rule: 'StringMap'
+    rule: 'StringMap',
+    defaultOkValue: 'OK',
+    defaultNgValue: 'NG'
   };
   const panel = createPanel(candidate);
 
@@ -33,11 +35,8 @@ test('final decision UI builds the backend canonical string mapping DTO', () => 
       sourceOutputName: 'JudgmentResult',
       dataType: 'String',
       rule: 'StringMap',
-      trueMeansOk: true,
       okValue: 'OK',
-      ngValue: 'NG',
-      comparator: null,
-      threshold: null
+      ngValue: 'NG'
     },
     missingDecisionPolicy: 'Undetermined'
   });
@@ -56,9 +55,62 @@ test('final decision UI builds numeric comparison rules without a parallel front
   panel.applySource(panel.candidateKey(candidate));
 
   assert.equal(panel.appliedConfiguration.finalDecisionBinding.rule, 'NumericComparison');
-  assert.equal(panel.appliedConfiguration.finalDecisionBinding.comparator, 'GreaterThanOrEqual');
-  assert.equal(panel.appliedConfiguration.finalDecisionBinding.threshold, 0);
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.comparator, null);
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.threshold, null);
   assert.equal(panel.appliedConfiguration.missingDecisionPolicy, 'Invalid');
+});
+
+test('final decision UI uses the backend 1/0 semantics for JudgmentValue', () => {
+  const candidate = {
+    operatorId: 'operator-3',
+    outputPortId: 'port-3',
+    outputName: 'JudgmentValue',
+    dataType: 'String',
+    rule: 'StringMap',
+    defaultOkValue: '1',
+    defaultNgValue: '0'
+  };
+  const panel = createPanel(candidate);
+
+  panel.applySource(panel.candidateKey(candidate));
+
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.rule, 'StringMap');
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.okValue, '1');
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.ngValue, '0');
+});
+
+test('final decision UI leaves open string mappings incomplete without backend defaults', () => {
+  const candidate = {
+    operatorId: 'operator-4',
+    outputPortId: 'port-4',
+    outputName: 'Text',
+    dataType: 'String',
+    rule: 'StringMap'
+  };
+  const panel = createPanel(candidate);
+
+  panel.applySource(panel.candidateKey(candidate));
+
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.okValue, null);
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.ngValue, null);
+});
+
+test('final decision UI takes Rule and boolean polarity only from the backend candidate', () => {
+  const candidate = {
+    operatorId: 'operator-5',
+    outputPortId: 'port-5',
+    outputName: 'IsAnomaly',
+    dataType: 'Boolean',
+    rule: 'Boolean',
+    defaultTrueMeansOk: false
+  };
+  const panel = createPanel(candidate);
+
+  panel.applySource(panel.candidateKey(candidate));
+
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.rule, 'Boolean');
+  assert.equal(panel.appliedConfiguration.finalDecisionBinding.trueMeansOk, false);
+  assert.equal(typeof panel.defaultRule, 'undefined');
 });
 
 test('final decision UI clears unresolved selections instead of inventing a binding', () => {

@@ -11,8 +11,10 @@ const ISSUE_TEXT = Object.freeze({
     DECISION_SOURCE_TYPE_MISMATCH: '绑定输出类型已变化，当前规则不再兼容。',
     DECISION_SOURCE_OUTPUT_INELIGIBLE: '该输出未被后端算子契约声明为正式判定事实源，请重新选择。',
     DECISION_RULE_TYPE_MISMATCH: '判定规则与输出类型不兼容。',
+    DECISION_RULE_CONTRACT_MISMATCH: '判定规则与后端候选契约不一致，请重新选择来源。',
     DECISION_STRING_MAP_VALUES_REQUIRED: '请同时填写代表 OK 和 NG 的字符串值。',
     DECISION_STRING_MAP_VALUES_CONFLICT: 'OK 与 NG 字符串值不能相同。',
+    DECISION_STRING_MAP_CONSTRAINT_MISMATCH: '字符串映射与该输出的已知有限值域不一致。',
     DECISION_NUMERIC_COMPARISON_REQUIRED: '请配置数值比较符和有效阈值。'
 });
 
@@ -175,7 +177,7 @@ export class FinalDecisionPanel {
              String(read(candidate, 'outputName', 'OutputName') || '').toLowerCase() === sourceOutputName)) || null;
         const selectedKey = selectedCandidate ? this.candidateKey(selectedCandidate) : '';
         const dataType = String(read(binding, 'dataType', 'DataType') || read(selectedCandidate, 'dataType', 'DataType') || 'Boolean');
-        const rule = String(read(binding, 'rule', 'Rule') || this.defaultRule(dataType));
+        const rule = String(read(selectedCandidate, 'rule', 'Rule') || read(binding, 'rule', 'Rule') || '');
         const missingPolicy = String(read(configuration, 'missingDecisionPolicy', 'MissingDecisionPolicy') || 'Undetermined');
 
         dialog.innerHTML = `
@@ -199,7 +201,7 @@ export class FinalDecisionPanel {
                     </select>
                     <small>仅显示后端算子契约明确认可的判定信号或可比较测量值。</small>
                 </label>
-                ${selectedCandidate ? this.renderRuleFields(dataType, rule, binding) : '<div class="final-decision-empty">选择来源后配置 OK/NG 规则。</div>'}
+                ${selectedCandidate ? this.renderRuleFields(rule, binding) : '<div class="final-decision-empty">选择来源后配置 OK/NG 规则。</div>'}
                 <label class="final-decision-field">
                     <span>缺失信号策略</span>
                     <select data-decision-missing-policy>
@@ -209,7 +211,7 @@ export class FinalDecisionPanel {
                     </select>
                     <small>算子未输出绑定值时采用的 canonical outcome。</small>
                 </label>
-                <div class="final-decision-rule-summary">${this.renderRuleSummary(dataType, rule, binding, missingPolicy)}</div>
+                <div class="final-decision-rule-summary">${this.renderRuleSummary(rule, binding, missingPolicy)}</div>
             </div>
             <footer>
                 <button type="button" class="btn btn-secondary" data-decision-clear>清除绑定</button>
@@ -244,8 +246,8 @@ export class FinalDecisionPanel {
         return `<div class="final-decision-status invalid"><strong>配置需要修复</strong><ul>${issues}</ul></div>`;
     }
 
-    renderRuleFields(dataType, rule, binding) {
-        if (dataType === 'Boolean') {
+    renderRuleFields(rule, binding) {
+        if (rule === 'Boolean') {
             const trueMeansOk = read(binding, 'trueMeansOk', 'TrueMeansOk') !== false;
             return `
                 <label class="final-decision-field"><span>布尔规则</span>
@@ -255,33 +257,36 @@ export class FinalDecisionPanel {
                     </select>
                 </label>`;
         }
-        if (dataType === 'String') {
+        if (rule === 'StringMap') {
             return `
                 <div class="final-decision-grid">
-                    <label class="final-decision-field"><span>OK 值</span><input data-decision-input="okValue" value="${escapeHtml(read(binding, 'okValue', 'OkValue') || 'OK')}" /></label>
-                    <label class="final-decision-field"><span>NG 值</span><input data-decision-input="ngValue" value="${escapeHtml(read(binding, 'ngValue', 'NgValue') || 'NG')}" /></label>
+                    <label class="final-decision-field"><span>OK 值</span><input data-decision-input="okValue" value="${escapeHtml(read(binding, 'okValue', 'OkValue') || '')}" /></label>
+                    <label class="final-decision-field"><span>NG 值</span><input data-decision-input="ngValue" value="${escapeHtml(read(binding, 'ngValue', 'NgValue') || '')}" /></label>
                 </div>`;
         }
-        const comparator = String(read(binding, 'comparator', 'Comparator') || 'GreaterThanOrEqual');
-        const threshold = read(binding, 'threshold', 'Threshold') ?? 0;
+        const comparator = String(read(binding, 'comparator', 'Comparator') || '');
+        const threshold = read(binding, 'threshold', 'Threshold') ?? '';
         return `
             <div class="final-decision-grid">
-                <label class="final-decision-field"><span>OK 比较</span><select data-decision-input="comparator">${COMPARATOR_OPTIONS.map(([value, label]) => this.option(value, label, comparator)).join('')}</select></label>
+                <label class="final-decision-field"><span>OK 比较</span><select data-decision-input="comparator"><option value="">请选择</option>${COMPARATOR_OPTIONS.map(([value, label]) => this.option(value, label, comparator)).join('')}</select></label>
                 <label class="final-decision-field"><span>阈值</span><input type="number" step="any" data-decision-input="threshold" value="${escapeHtml(threshold)}" /></label>
             </div>`;
     }
 
-    renderRuleSummary(dataType, rule, binding, missingPolicy) {
+    renderRuleSummary(rule, binding, missingPolicy) {
         let ruleText = '尚未选择判定来源。';
-        if (dataType === 'Boolean') {
+        if (rule === 'Boolean') {
             ruleText = read(binding, 'trueMeansOk', 'TrueMeansOk') !== false
                 ? 'OK：true；NG：false'
                 : 'OK：false；NG：true';
-        } else if (dataType === 'String') {
-            ruleText = `OK：“${read(binding, 'okValue', 'OkValue') || 'OK'}”；NG：“${read(binding, 'ngValue', 'NgValue') || 'NG'}”`;
+        } else if (rule === 'StringMap') {
+            ruleText = `OK：“${read(binding, 'okValue', 'OkValue') || '未设置'}”；NG：“${read(binding, 'ngValue', 'NgValue') || '未设置'}”`;
         } else if (rule === 'NumericComparison') {
-            const comparator = COMPARATOR_OPTIONS.find(([value]) => value === read(binding, 'comparator', 'Comparator'))?.[1] || '≥';
-            ruleText = `OK：值 ${comparator} ${read(binding, 'threshold', 'Threshold') ?? 0}；NG：不满足该条件`;
+            const comparator = COMPARATOR_OPTIONS.find(([value]) => value === read(binding, 'comparator', 'Comparator'))?.[1];
+            const threshold = read(binding, 'threshold', 'Threshold');
+            ruleText = comparator && threshold !== null
+                ? `OK：值 ${comparator} ${threshold}；NG：不满足该条件`
+                : '请设置比较符和阈值。';
         }
         const missingText = { Undetermined: '未判定', NotApplicable: '不适用', Invalid: '判定无效' }[missingPolicy] || missingPolicy;
         return `<strong>规则摘要</strong><span>${escapeHtml(ruleText)}</span><span>缺失信号：${escapeHtml(missingText)}</span>`;
@@ -289,12 +294,6 @@ export class FinalDecisionPanel {
 
     candidateKey(candidate) {
         return `${String(read(candidate, 'operatorId', 'OperatorId') || '').toLowerCase()}:${String(read(candidate, 'outputPortId', 'OutputPortId') || '').toLowerCase()}`;
-    }
-
-    defaultRule(dataType) {
-        if (dataType === 'String') return 'StringMap';
-        if (dataType === 'Integer' || dataType === 'Float') return 'NumericComparison';
-        return 'Boolean';
     }
 
     option(value, label, selected) {
@@ -310,18 +309,24 @@ export class FinalDecisionPanel {
             return;
         }
         const dataType = String(read(candidate, 'dataType', 'DataType'));
-        current.finalDecisionBinding = {
+        const rule = String(read(candidate, 'rule', 'Rule'));
+        const binding = {
             sourceOperatorId: read(candidate, 'operatorId', 'OperatorId'),
             sourceOutputPortId: read(candidate, 'outputPortId', 'OutputPortId'),
             sourceOutputName: read(candidate, 'outputName', 'OutputName'),
             dataType,
-            rule: this.defaultRule(dataType),
-            trueMeansOk: true,
-            okValue: dataType === 'String' ? 'OK' : null,
-            ngValue: dataType === 'String' ? 'NG' : null,
-            comparator: dataType === 'Integer' || dataType === 'Float' ? 'GreaterThanOrEqual' : null,
-            threshold: dataType === 'Integer' || dataType === 'Float' ? 0 : null
+            rule
         };
+        if (rule === 'Boolean') {
+            binding.trueMeansOk = read(candidate, 'defaultTrueMeansOk', 'DefaultTrueMeansOk');
+        } else if (rule === 'StringMap') {
+            binding.okValue = read(candidate, 'defaultOkValue', 'DefaultOkValue');
+            binding.ngValue = read(candidate, 'defaultNgValue', 'DefaultNgValue');
+        } else if (rule === 'NumericComparison') {
+            binding.comparator = null;
+            binding.threshold = null;
+        }
+        current.finalDecisionBinding = binding;
         current.missingDecisionPolicy = current.missingDecisionPolicy || 'Undetermined';
         this.setConfiguration(current);
     }
@@ -337,7 +342,8 @@ export class FinalDecisionPanel {
         if (value('ngValue') !== undefined) binding.ngValue = value('ngValue');
         if (value('comparator') !== undefined) binding.comparator = value('comparator');
         if (value('threshold') !== undefined) {
-            const parsed = Number(value('threshold'));
+            const rawThreshold = value('threshold').trim();
+            const parsed = rawThreshold === '' ? Number.NaN : Number(rawThreshold);
             binding.threshold = Number.isFinite(parsed) ? parsed : null;
         }
         configuration.finalDecisionBinding = binding;

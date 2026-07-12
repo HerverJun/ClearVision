@@ -10,16 +10,38 @@ public sealed record FinalDecisionOutputCandidate(
     Guid OutputPortId,
     string OutputName,
     DecisionValueType DataType,
-    DecisionInterpretationRule Rule);
+    DecisionInterpretationRule Rule,
+    bool? DefaultTrueMeansOk,
+    string? DefaultOkValue,
+    string? DefaultNgValue,
+    string? RequiredOkValue,
+    string? RequiredNgValue);
 
 public sealed record FinalDecisionSourceCapability(
     OperatorType OperatorType,
     string OutputName,
-    PortDataType PortType);
+    PortDataType PortType,
+    DecisionInterpretationRule Rule,
+    bool? DefaultTrueMeansOk,
+    string? DefaultOkValue,
+    string? DefaultNgValue,
+    string? RequiredOkValue,
+    string? RequiredNgValue);
+
+internal sealed record FinalDecisionSourceContract(
+    OperatorType OperatorType,
+    string OutputName,
+    PortDataType PortType,
+    DecisionInterpretationRule Rule,
+    bool? DefaultTrueMeansOk = null,
+    string? DefaultOkValue = null,
+    string? DefaultNgValue = null,
+    string? RequiredOkValue = null,
+    string? RequiredNgValue = null);
 
 public static class FinalDecisionConfigurationCatalog
 {
-    private static readonly IReadOnlyDictionary<string, PortDataType> EligibleOutputContracts = CreateEligibleOutputContracts();
+    private static readonly IReadOnlyDictionary<string, FinalDecisionSourceContract> EligibleOutputContracts = CreateEligibleOutputContracts();
 
     public static IReadOnlyList<FinalDecisionOutputCandidate> GetEligibleOutputs(OperatorFlow? flow)
     {
@@ -44,29 +66,34 @@ public static class FinalDecisionConfigurationCatalog
         Guid portId,
         string portName)
     {
-        if (!EligibleOutputContracts.TryGetValue(ContractKey(source.Type, portName), out var contractType) ||
-            contractType != portType)
+        if (!EligibleOutputContracts.TryGetValue(ContractKey(source.Type, portName), out var contract) ||
+            contract.PortType != portType)
         {
             return null;
         }
 
-        var mapping = portType switch
+        var dataType = portType switch
         {
-            PortDataType.Boolean => (DecisionValueType.Boolean, DecisionInterpretationRule.Boolean),
-            PortDataType.String => (DecisionValueType.String, DecisionInterpretationRule.StringMap),
-            PortDataType.Integer => (DecisionValueType.Integer, DecisionInterpretationRule.NumericComparison),
-            PortDataType.Float => (DecisionValueType.Float, DecisionInterpretationRule.NumericComparison),
-            _ => ((DecisionValueType DataType, DecisionInterpretationRule Rule)?)null
+            PortDataType.Boolean => DecisionValueType.Boolean,
+            PortDataType.String => DecisionValueType.String,
+            PortDataType.Integer => DecisionValueType.Integer,
+            PortDataType.Float => DecisionValueType.Float,
+            _ => (DecisionValueType?)null
         };
 
-        return mapping.HasValue
+        return dataType.HasValue
             ? new FinalDecisionOutputCandidate(
                 source.Id,
                 source.Name,
                 portId,
                 portName,
-                mapping.Value.DataType,
-                mapping.Value.Rule)
+                dataType.Value,
+                contract.Rule,
+                contract.DefaultTrueMeansOk,
+                contract.DefaultOkValue,
+                contract.DefaultNgValue,
+                contract.RequiredOkValue,
+                contract.RequiredNgValue)
             : null;
     }
 
@@ -87,35 +114,38 @@ public static class FinalDecisionConfigurationCatalog
         EligibleOutputContracts.ContainsKey(ContractKey(operatorType, outputName));
 
     public static IReadOnlyList<FinalDecisionSourceCapability> GetDeclaredCapabilities() =>
-        EligibleOutputContracts.Select(pair =>
-        {
-            var separator = pair.Key.IndexOf(':');
-            return new FinalDecisionSourceCapability(
-                Enum.Parse<OperatorType>(pair.Key[..separator]),
-                pair.Key[(separator + 1)..],
-                pair.Value);
-        }).ToList();
+        EligibleOutputContracts.Values.Select(contract => new FinalDecisionSourceCapability(
+            contract.OperatorType,
+            contract.OutputName,
+            contract.PortType,
+            contract.Rule,
+            contract.DefaultTrueMeansOk,
+            contract.DefaultOkValue,
+            contract.DefaultNgValue,
+            contract.RequiredOkValue,
+            contract.RequiredNgValue)).ToList();
 
-    private static IReadOnlyDictionary<string, PortDataType> CreateEligibleOutputContracts()
+    private static IReadOnlyDictionary<string, FinalDecisionSourceContract> CreateEligibleOutputContracts()
     {
-        var contracts = new Dictionary<string, PortDataType>(StringComparer.OrdinalIgnoreCase);
+        var contracts = new Dictionary<string, FinalDecisionSourceContract>(StringComparer.OrdinalIgnoreCase);
 
-        Add(contracts, OperatorType.ResultJudgment, PortDataType.String, "JudgmentResult", "JudgmentValue");
-        Add(contracts, OperatorType.ResultJudgment, PortDataType.Boolean, "IsOk", "ConditionResult");
-        Add(contracts, OperatorType.Comparator, PortDataType.Boolean, "Result");
-        Add(contracts, OperatorType.DetectionSequenceJudge, PortDataType.Boolean, "IsMatch");
+        AddFixedStringMap(contracts, OperatorType.ResultJudgment, "JudgmentResult", "OK", "NG");
+        AddFixedStringMap(contracts, OperatorType.ResultJudgment, "JudgmentValue", "1", "0");
+        AddBoolean(contracts, OperatorType.ResultJudgment, true, "IsOk", "ConditionResult");
+        AddBoolean(contracts, OperatorType.Comparator, true, "Result");
+        AddBoolean(contracts, OperatorType.DetectionSequenceJudge, true, "IsMatch");
         Add(contracts, OperatorType.DetectionSequenceJudge, PortDataType.Integer, "Count", "RowCount");
-        Add(contracts, OperatorType.DualModalVoting, PortDataType.Boolean, "IsOk");
+        AddBoolean(contracts, OperatorType.DualModalVoting, true, "IsOk");
         Add(contracts, OperatorType.DualModalVoting, PortDataType.Float, "Confidence");
-        Add(contracts, OperatorType.DualModalVoting, PortDataType.String, "JudgmentValue");
-        Add(contracts, OperatorType.AnomalyDetection, PortDataType.Boolean, "IsAnomaly");
+        AddFixedStringMap(contracts, OperatorType.DualModalVoting, "JudgmentValue", "1", "0");
+        AddBoolean(contracts, OperatorType.AnomalyDetection, false, "IsAnomaly");
         Add(contracts, OperatorType.AnomalyDetection, PortDataType.Float, "AnomalyScore");
         Add(contracts, OperatorType.AnomalyDetection, PortDataType.Integer, "PatchCount");
-        Add(contracts, OperatorType.GeometricTolerance, PortDataType.Boolean, "Accepted");
+        AddBoolean(contracts, OperatorType.GeometricTolerance, true, "Accepted");
         Add(contracts, OperatorType.GeometricTolerance, PortDataType.Float, "Tolerance", "ZoneDeviation", "AngularDeviationDeg", "LinearBand");
-        Add(contracts, OperatorType.SharpnessEvaluation, PortDataType.Boolean, "IsSharp");
+        AddBoolean(contracts, OperatorType.SharpnessEvaluation, true, "IsSharp");
         Add(contracts, OperatorType.SharpnessEvaluation, PortDataType.Float, "Score");
-        Add(contracts, OperatorType.Statistics, PortDataType.Boolean, "IsCapable");
+        AddBoolean(contracts, OperatorType.Statistics, true, "IsCapable");
         Add(contracts, OperatorType.Statistics, PortDataType.Integer, "Count");
         Add(contracts, OperatorType.Statistics, PortDataType.Float, "Mean", "StdDev", "Min", "Max", "Cpk");
 
@@ -132,7 +162,7 @@ public static class FinalDecisionConfigurationCatalog
         Add(contracts, OperatorType.CaliperTool, PortDataType.Integer, "PairCount");
         Add(contracts, OperatorType.CaliperTool, PortDataType.Float, "Width", "AverageDistance", "DistanceStdDev");
         Add(contracts, OperatorType.CircleMeasurement, PortDataType.Float, "Radius", "Circularity");
-        Add(contracts, OperatorType.ColorMeasurement, PortDataType.Boolean, "HueValid");
+        AddBoolean(contracts, OperatorType.ColorMeasurement, true, "HueValid");
         Add(contracts, OperatorType.ColorMeasurement, PortDataType.Float, "DeltaE", "HueMean", "SaturationMean", "ValueMean");
         Add(contracts, OperatorType.ContourMeasurement, PortDataType.Integer, "ContourCount");
         Add(contracts, OperatorType.ContourMeasurement, PortDataType.Float, "Area", "Perimeter");
@@ -146,22 +176,22 @@ public static class FinalDecisionConfigurationCatalog
         Add(contracts, OperatorType.PixelStatistics, PortDataType.Float, "Mean", "StdDev");
         Add(contracts, OperatorType.WidthMeasurement, PortDataType.Float, "Width", "MeanWidth", "MinWidth", "MaxWidth", "P95Width", "StdDev", "ValidSampleRate");
 
-        Add(contracts, OperatorType.TemplateMatching, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.TemplateMatching, true, "IsMatch");
         Add(contracts, OperatorType.TemplateMatching, PortDataType.Integer, "MatchCount");
         Add(contracts, OperatorType.TemplateMatching, PortDataType.Float, "Score");
-        Add(contracts, OperatorType.PlanarMatching, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.PlanarMatching, true, "IsMatch");
         Add(contracts, OperatorType.PlanarMatching, PortDataType.Integer, "MatchCount", "InlierCount");
         Add(contracts, OperatorType.PlanarMatching, PortDataType.Float, "Score", "InlierRatio", "MeanReprojectionError", "MaxReprojectionError");
-        Add(contracts, OperatorType.PPFMatch, PortDataType.Boolean, "IsMatch", "IsMatched");
+        AddBoolean(contracts, OperatorType.PPFMatch, true, "IsMatch", "IsMatched");
         Add(contracts, OperatorType.PPFMatch, PortDataType.Integer, "MatchCount", "InlierCount");
         Add(contracts, OperatorType.PPFMatch, PortDataType.Float, "Score", "InlierRatio", "RmsError");
-        Add(contracts, OperatorType.AkazeFeatureMatch, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.AkazeFeatureMatch, true, "IsMatch");
         Add(contracts, OperatorType.AkazeFeatureMatch, PortDataType.Float, "Score", "InlierRatio", "MeanReprojectionError", "MaxReprojectionError");
-        Add(contracts, OperatorType.OrbFeatureMatch, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.OrbFeatureMatch, true, "IsMatch");
         Add(contracts, OperatorType.OrbFeatureMatch, PortDataType.Float, "Score", "InlierRatio", "MeanReprojectionError", "MaxReprojectionError");
-        Add(contracts, OperatorType.GradientShapeMatch, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.GradientShapeMatch, true, "IsMatch");
         Add(contracts, OperatorType.GradientShapeMatch, PortDataType.Float, "Score", "Angle");
-        Add(contracts, OperatorType.PyramidShapeMatch, PortDataType.Boolean, "IsMatch");
+        AddBoolean(contracts, OperatorType.PyramidShapeMatch, true, "IsMatch");
         Add(contracts, OperatorType.PyramidShapeMatch, PortDataType.Float, "Score", "Angle");
 
         Add(contracts, OperatorType.CodeRecognition, PortDataType.String, "Text");
@@ -172,16 +202,61 @@ public static class FinalDecisionConfigurationCatalog
     }
 
     private static void Add(
-        Dictionary<string, PortDataType> contracts,
+        Dictionary<string, FinalDecisionSourceContract> contracts,
         OperatorType operatorType,
         PortDataType dataType,
         params string[] outputNames)
     {
+        var rule = dataType switch
+        {
+            PortDataType.String => DecisionInterpretationRule.StringMap,
+            PortDataType.Integer or PortDataType.Float => DecisionInterpretationRule.NumericComparison,
+            _ => throw new ArgumentOutOfRangeException(nameof(dataType), dataType, "Use AddBoolean for Boolean decision sources.")
+        };
+
         foreach (var outputName in outputNames)
         {
-            contracts.Add(ContractKey(operatorType, outputName), dataType);
+            AddContract(contracts, new FinalDecisionSourceContract(operatorType, outputName, dataType, rule));
         }
     }
+
+    private static void AddBoolean(
+        Dictionary<string, FinalDecisionSourceContract> contracts,
+        OperatorType operatorType,
+        bool defaultTrueMeansOk,
+        params string[] outputNames)
+    {
+        foreach (var outputName in outputNames)
+        {
+            AddContract(contracts, new FinalDecisionSourceContract(
+                operatorType,
+                outputName,
+                PortDataType.Boolean,
+                DecisionInterpretationRule.Boolean,
+                DefaultTrueMeansOk: defaultTrueMeansOk));
+        }
+    }
+
+    private static void AddFixedStringMap(
+        Dictionary<string, FinalDecisionSourceContract> contracts,
+        OperatorType operatorType,
+        string outputName,
+        string okValue,
+        string ngValue) =>
+        AddContract(contracts, new FinalDecisionSourceContract(
+            operatorType,
+            outputName,
+            PortDataType.String,
+            DecisionInterpretationRule.StringMap,
+            DefaultOkValue: okValue,
+            DefaultNgValue: ngValue,
+            RequiredOkValue: okValue,
+            RequiredNgValue: ngValue));
+
+    private static void AddContract(
+        Dictionary<string, FinalDecisionSourceContract> contracts,
+        FinalDecisionSourceContract contract) =>
+        contracts.Add(ContractKey(contract.OperatorType, contract.OutputName), contract);
 
     private static string ContractKey(OperatorType operatorType, string outputName) =>
         $"{OperatorTypeAliasResolver.Resolve(operatorType)}:{outputName.Trim()}";
