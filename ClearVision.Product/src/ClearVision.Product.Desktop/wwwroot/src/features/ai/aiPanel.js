@@ -74,6 +74,7 @@ export class AiPanel {
         this.initialAutoRestoreSessionId = this.sessionId;
         this.sessionNavigationEpoch = 0;
         this.pendingSessionLoad = null;
+        this.sessionSelectionGeneration = 0;
         this.autoRestoreAttempted = false;
         this.autoRestoreNoticeShown = false;
         this.currentResult = null;
@@ -187,6 +188,7 @@ export class AiPanel {
         this._accessibilityInitialized = false;
         this._activeApplyPreview = null;
         this._applyInFlight = false;
+        this._applySafetyBlockReason = '';
         this.userHasScrolledUp = false;
         this.unreadStreamCount = 0;
 
@@ -379,6 +381,7 @@ export class AiPanel {
 
     _resetCurrentResultSyncState() {
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
+        this._applySafetyBlockReason = '';
         this.currentResult = null;
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
@@ -391,6 +394,7 @@ export class AiPanel {
 
     _setCurrentResult(payload) {
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
+        this._applySafetyBlockReason = '';
         this.currentResult = payload;
         this.currentResultVersion += 1;
         this.appliedResultVersion = 0;
@@ -425,10 +429,13 @@ export class AiPanel {
         const canvasApplyAllowed = !this.currentResult ||
             (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true);
         const applied = this._isCurrentResultAppliedToCanvas();
-        button.disabled = this.isGenerating || this._applyInFlight || Boolean(this._activeApplyPreview) || !hasFlow || !canvasApplyAllowed || applied;
+        const safetyBlocked = Boolean(this._applySafetyBlockReason);
+        button.disabled = this.isGenerating || this._applyInFlight || Boolean(this._activeApplyPreview) || safetyBlocked || !hasFlow || !canvasApplyAllowed || applied;
         button.classList.toggle('is-disabled', button.disabled);
         button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
-        const label = applied
+        const label = safetyBlocked
+            ? '需安全恢复后才能应用'
+            : applied
             ? '已应用到画布'
             : hasFlow
                 ? (canvasApplyAllowed ? '应用到画布' : '当前草稿暂不可应用')
@@ -516,7 +523,7 @@ export class AiPanel {
                                 id="ai-history-search"
                                 placeholder="搜索历史会话..."
                             />
-                            <div class="ai-history-list" id="ai-history-list"></div>
+                            <div class="ai-history-list" id="ai-history-list" role="list" aria-label="历史会话"></div>
                         </div>
                     </div>
 

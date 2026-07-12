@@ -142,6 +142,10 @@ test('supported Applied snapshot is restored as Build pending revalidation', () 
   assert.equal(result.trusted, true);
   assert.equal(result.snapshot.appliedDowngraded, true);
   assert.equal(result.snapshot.lifecycleState, 'build');
+  assert.equal(result.snapshot.readinessPreview, null);
+  assert.equal(result.snapshot.buildRunId, '');
+  assert.equal(result.snapshot.buildRunStatus, 'idle');
+  assert.equal(result.snapshot.submittedBuildFingerprint, '');
 });
 
 test('session navigation identity rejects disposal, session changes, and epoch changes', async () => {
@@ -210,7 +214,8 @@ test('Apply preview identity blocks canvas and Result drift', async () => {
   panel._disposed = false;
   panel.currentResultVersion = 2;
   panel.currentCanvasRevision = 5;
-  panel.currentResult = { flow };
+  panel._applySafetyBlockReason = '';
+  panel.currentResult = { flow, applyGate: { canvasApplyReady: true, blocked: false } };
   panel.flowCanvas = { getFlowRevision() { return 5; } };
   panel._buildFlowWithPendingDrafts = value => value;
   panel._getResultFlowForCanvas = value => value.flow;
@@ -220,6 +225,9 @@ test('Apply preview identity blocks canvas and Result drift', async () => {
   assert.equal(panel._isApplyPreviewIdentityCurrent(identity, flow), false);
   panel.currentResultVersion = 2;
   panel.flowCanvas.getFlowRevision = () => 6;
+  assert.equal(panel._isApplyPreviewIdentityCurrent(identity, flow), false);
+  panel.flowCanvas.getFlowRevision = () => 5;
+  panel.currentResult.applyGate.blocked = true;
   assert.equal(panel._isApplyPreviewIdentityCurrent(identity, flow), false);
 });
 
@@ -299,6 +307,7 @@ test('Apply rollback failure is exposed as failed instead of Ready', async () =>
   panel._executeApplyFlow({ operators: [{ id: 'after' }] });
   assert.equal(states.at(-1), 'failed');
   assert.notEqual(states.at(-1), 'ready_to_apply');
+  assert.equal(panel._applySafetyBlockReason, 'apply_rollback_failed');
 });
 
 test('Apply detects partial canvas writes and restores the original snapshot', async () => {
@@ -337,4 +346,40 @@ test('Apply detects partial canvas writes and restores the original snapshot', a
   assert.equal(panel._executeApplyFlow(incoming), false);
   assert.equal(current, before);
   assert.equal(states.at(-1), 'ready_to_apply');
+});
+
+test('local Apply safety block keeps a legacy Ready gate disabled until a new result arrives', async () => {
+  installWindow();
+  const { AiPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
+  const button = {
+    disabled: false,
+    innerHTML: '',
+    classList: { toggle() {} },
+    setAttribute() {},
+  };
+  const panel = Object.create(AiPanel.prototype);
+  Object.assign(panel, {
+    container: { querySelector(selector) { return selector === '#ai-btn-apply' ? button : null; } },
+    currentResult: {
+      flow: { operators: [{ id: 'a' }], connections: [] },
+      applyGate: { canvasApplyReady: true, blocked: false }
+    },
+    currentResultVersion: 2,
+    appliedResultVersion: 0,
+    isGenerating: false,
+    _applyInFlight: false,
+    _activeApplyPreview: null,
+    _applySafetyBlockReason: 'apply_rollback_failed',
+    _escapeHtml: value => String(value),
+  });
+  panel._updateApplyButtonState();
+  assert.equal(button.disabled, true);
+  assert.match(button.innerHTML, /需安全恢复后才能应用/);
+
+  panel._setCurrentResult({
+    flow: { operators: [{ id: 'b' }], connections: [] },
+    applyGate: { canvasApplyReady: true, blocked: false }
+  });
+  assert.equal(panel._applySafetyBlockReason, '');
+  assert.equal(button.disabled, false);
 });

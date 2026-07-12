@@ -404,6 +404,8 @@ test('Apply Preview remains the existing modal and can be reached by keyboard', 
   await expect(dialog).toContainText('应用预览');
   await expect(dialog).toHaveAttribute('role', 'dialog');
   await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(page.locator('.ai-shell')).toHaveAttribute('inert', '');
+  await expect(page.locator('.ai-shell')).toHaveAttribute('aria-hidden', 'true');
   await expect(page.locator('.ai-apply-preview-confirm')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.locator('.ai-apply-preview-close')).toBeFocused();
@@ -411,6 +413,8 @@ test('Apply Preview remains the existing modal and can be reached by keyboard', 
   await expect(page.locator('.ai-apply-preview-confirm')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('.ai-apply-preview-overlay')).toHaveCount(0);
+  await expect(page.locator('.ai-shell')).not.toHaveAttribute('inert', '');
+  await expect(page.locator('.ai-shell')).not.toHaveAttribute('aria-hidden', 'true');
   await expect(apply).toBeFocused();
 });
 
@@ -435,6 +439,36 @@ test('keyboard tabs switch conversation and Plan Build workspaces without pointe
   await expect(buildTab).toBeFocused();
 });
 
+test('history session rows expose native keyboard selection and delete actions', async ({ page }) => {
+  await openAi(page, { width: 1024, height: 768, theme: 'dark' });
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.__keyboardSelectedSession = '';
+    panel._switchToSession = (sessionId: string) => { panel.__keyboardSelectedSession = sessionId; };
+    panel.history = [{
+      sessionId: 'history-keyboard',
+      lastMessage: '键盘恢复测试',
+      updatedAtUtc: '2026-07-12T00:00:00Z',
+      turnCount: 2,
+      applied: false,
+    }];
+    panel.filteredHistory = [...panel.history];
+    panel.isHistoryPanelOpen = true;
+    panel.container.querySelector('#ai-history-panel')?.classList.add('expanded');
+    panel._renderHistoryList();
+  });
+
+  const select = page.locator('.ai-history-select');
+  const remove = page.locator('.ai-history-delete');
+  await select.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => (window as any).aiPanel.__keyboardSelectedSession)).toBe('history-keyboard');
+  await select.focus();
+  await page.keyboard.press('Tab');
+  await expect(remove).toBeFocused();
+  await expect(remove).toHaveAttribute('aria-label', /键盘恢复测试/);
+});
+
 test('Apply dialog remains usable with reduced motion and 200 percent zoom', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openAi(page, { width: 1366, height: 768, theme: 'dark' });
@@ -449,6 +483,28 @@ test('Apply dialog remains usable with reduced motion and 200 percent zoom', asy
   await expect(page.locator('.ai-apply-preview-overlay')).toHaveCSS('animation-name', 'none');
   await page.keyboard.press('Escape');
   await expect(apply).toBeFocused();
+});
+
+test('Apply Preview expires immediately when the authoritative gate changes', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768, theme: 'dark' });
+  await seedBuild(page, 'ready');
+  await page.locator('#ai-btn-apply').click();
+  await expect(page.locator('.ai-apply-preview-dialog')).toBeVisible();
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.currentResult.applyGate.blocked = true;
+    panel.currentResult.applyGate.canvasApplyReady = false;
+    panel.currentResult.buildResult.applyGate.blocked = true;
+    panel.currentResult.buildResult.applyGate.canvasApplyReady = false;
+  });
+  await page.locator('.ai-apply-preview-confirm').click();
+  await expect(page.locator('.ai-apply-preview-overlay')).toHaveCount(0);
+  await expect(page.locator('#ai-result-status-note')).toContainText('Apply 门禁已变化');
+  const state = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    return { workbenchState: panel.workbenchState, applied: panel.appliedResultVersion === panel.currentResultVersion };
+  });
+  expect(state).toEqual({ workbenchState: 'failed', applied: false });
 });
 
 test('DryRun failure stays distinct from static validation and keeps Apply blocked', async ({ page }) => {

@@ -1,8 +1,61 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { AgentWorkspaceModes } from './aiPanelAgentWorkspace.js';
 import { normalizeWorkspaceSnapshotForRestore } from './aiPanelSnapshotRecovery.js';
+import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 const SESSION_LOAD_TIMEOUT_MS = 15000;
+
+function downgradeRestoredAppliedPlan(plan) {
+    if (!plan || typeof plan !== 'object') return plan;
+    const maturity = plan.requirementMaturity && typeof plan.requirementMaturity === 'object'
+        ? { ...plan.requirementMaturity, canBuild: false, CanBuild: false }
+        : plan.requirementMaturity;
+    const rawPlanSnapshot = plan.rawPlanSnapshot && typeof plan.rawPlanSnapshot === 'object'
+        ? {
+            ...plan.rawPlanSnapshot,
+            canBuild: false,
+            CanBuild: false,
+            buildReadiness: null,
+            BuildReadiness: null,
+            effectiveReadiness: null,
+            EffectiveReadiness: null
+        }
+        : plan.rawPlanSnapshot;
+    return {
+        ...plan,
+        canBuild: false,
+        CanBuild: false,
+        executable: false,
+        buildReadiness: null,
+        effectiveReadiness: null,
+        requirementMaturity: maturity,
+        rawPlanSnapshot
+    };
+}
+
+function stripRestoredApplyAuthority(result) {
+    if (!result || typeof result !== 'object') return result;
+    const buildResult = result.buildResult && typeof result.buildResult === 'object'
+        ? {
+            ...result.buildResult,
+            applyGate: null,
+            ApplyGate: null,
+            buildReadiness: null,
+            BuildReadiness: null,
+            readiness: null,
+            Readiness: null
+        }
+        : null;
+    result.applyGate = null;
+    result.ApplyGate = null;
+    result.buildReadiness = null;
+    result.BuildReadiness = null;
+    result.readiness = null;
+    result.Readiness = null;
+    result.buildResult = buildResult;
+    result.BuildResult = buildResult;
+    return result;
+}
 export const aiPanelSessionHistoryMixin = {
     _toggleHistoryPanel() {
         const panel = this.container.querySelector('#ai-history-panel');
@@ -94,22 +147,22 @@ export const aiPanelSessionHistoryMixin = {
                 : '';
             const appliedIcon = item.applied ? '<span class="history-applied-icon" title="已应用">&#10003;</span>' : '';
             return `
-            <div class="ai-history-item ${item.sessionId === this.sessionId ? 'active' : ''}" data-session-id="${this._escapeHtml(item.sessionId)}">
-                <div class="history-desc">${this._escapeHtml(lastMessage)}</div>
-                <div class="history-badges">${templateBadge}${modeChip}${appliedIcon}</div>
-                <div class="history-meta">
-                    <span>${this._escapeHtml(this._formatHistoryTime(item.updatedAtUtc))}</span>
-                    <span>${this._escapeHtml(String(item.turnCount))} 轮</span>
-                </div>
-                <button class="ai-history-delete" type="button" data-session-id="${this._escapeHtml(item.sessionId)}" title="删除会话">删除</button>
+            <div class="ai-history-item ${item.sessionId === this.sessionId ? 'active' : ''}" role="listitem" data-session-id="${this._escapeHtml(item.sessionId)}">
+                <button class="ai-history-select" type="button" data-session-id="${this._escapeHtml(item.sessionId)}" ${item.sessionId === this.sessionId ? 'aria-current="true"' : ''}>
+                    <span class="history-desc">${this._escapeHtml(lastMessage)}</span>
+                    <span class="history-badges">${templateBadge}${modeChip}${appliedIcon}</span>
+                    <span class="history-meta">
+                        <span>${this._escapeHtml(this._formatHistoryTime(item.updatedAtUtc))}</span>
+                        <span>${this._escapeHtml(String(item.turnCount))} 轮</span>
+                    </span>
+                </button>
+                <button class="ai-history-delete" type="button" data-session-id="${this._escapeHtml(item.sessionId)}" aria-label="删除会话：${this._escapeHtml(lastMessage)}" title="删除会话">删除</button>
             </div>
         `}).join('');
 
-        list.querySelectorAll('.ai-history-item').forEach(itemEl => {
-            itemEl.addEventListener('click', (event) => {
-                if (event.target.closest('.ai-history-delete')) return;
-                const sessionId = itemEl.dataset.sessionId || '';
-                this._switchToSession(sessionId);
+        list.querySelectorAll('.ai-history-select').forEach(button => {
+            button.addEventListener('click', () => {
+                this._switchToSession(button.dataset.sessionId || '');
             });
         });
 
@@ -170,28 +223,51 @@ export const aiPanelSessionHistoryMixin = {
     },
 
     async _switchToSession(sessionId) {
-        if (!sessionId) return;
+        const normalizedSessionId = String(sessionId || '').trim();
+        if (!normalizedSessionId) return;
         if (this.isGenerating) {
             this._addMessage('system', '正在生成中，暂时无法切换历史会话。');
             return;
         }
 
-        const flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('history_switch')) ?? true;
+        const selectionGeneration = Number(this.sessionSelectionGeneration || 0) + 1;
+        this.sessionSelectionGeneration = selectionGeneration;
+        this.sessionNavigationEpoch = Number(this.sessionNavigationEpoch || 0) + 1;
+        this._cancelPendingSessionLoad?.();
+
+        let flushed = false;
+        try {
+            flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('history_switch')) ?? true;
+        } catch {
+            flushed = false;
+        }
+        if (selectionGeneration !== Number(this.sessionSelectionGeneration || 0) || this._disposed) {
+            return;
+        }
         if (!flushed) {
             this._setResultStatusNote?.('Plan 修改尚未成功保存，已阻止切换历史。', 'warning');
             return;
         }
 
-        this.sessionNavigationEpoch += 1;
-        this._requestSessionLoad(sessionId, 'history_switch');
+        this._requestSessionLoad(normalizedSessionId, 'history_switch');
+    },
+
+    _cancelPendingSessionLoad(request = this.pendingSessionLoad) {
+        if (!request) return false;
+        if (request.timeoutId) window.clearTimeout?.(request.timeoutId);
+        if (this.pendingSessionLoad === request) this.pendingSessionLoad = null;
+        return true;
+    },
+
+    _finishPendingSessionLoad(request) {
+        if (!request || this.pendingSessionLoad !== request) return false;
+        return this._cancelPendingSessionLoad(request);
     },
 
     _requestSessionLoad(sessionId, source = 'manual') {
         const normalizedSessionId = String(sessionId || '').trim();
         if (!normalizedSessionId) return;
-        if (this.pendingSessionLoad?.timeoutId) {
-            window.clearTimeout?.(this.pendingSessionLoad.timeoutId);
-        }
+        this._cancelPendingSessionLoad?.();
         const request = {
             sessionId: normalizedSessionId,
             source,
@@ -205,7 +281,13 @@ export const aiPanelSessionHistoryMixin = {
             this._announceAccessibilityStatus?.('会话恢复超时，可重试。', 'assertive');
         }, SESSION_LOAD_TIMEOUT_MS) || null;
         this.pendingSessionLoad = request;
-        this._sendGetAiSession(normalizedSessionId, request);
+        try {
+            this._sendGetAiSession(normalizedSessionId, request);
+        } catch (error) {
+            this._finishPendingSessionLoad(request);
+            this._setResultStatusNote?.('会话恢复请求发送失败，当前安全状态已保留，可重试。', 'warning');
+            console.warn('[AiPanel] 会话恢复请求发送失败。', error);
+        }
     },
 
     _sendGetAiSession(sessionId, request = {}) {
@@ -231,10 +313,9 @@ export const aiPanelSessionHistoryMixin = {
         if (!isMatchingLoad) {
             return;
         }
-        if (pendingLoad.timeoutId) window.clearTimeout?.(pendingLoad.timeoutId);
+        this._finishPendingSessionLoad(pendingLoad);
         if (!payload.success) {
             if (pendingLoad?.source === 'auto_restore') {
-                this.pendingSessionLoad = null;
                 this._saveSessionId?.(null);
                 if (!this.autoRestoreNoticeShown) {
                     this.autoRestoreNoticeShown = true;
@@ -243,29 +324,26 @@ export const aiPanelSessionHistoryMixin = {
                 return;
             }
 
-            this.pendingSessionLoad = null;
             this._addMessage('system', `会话恢复失败: ${this._sanitizeSessionHistoryText(payload.errorMessage, 260) || '未知错误'}`);
             return;
         }
 
         const session = payload.session;
         if (!session) {
-            this.pendingSessionLoad = null;
             this._addMessage('system', '会话恢复失败: 会话数据为空');
             return;
         }
 
         const sessionId = String(session.sessionId ?? session.SessionId ?? '').trim();
         if (!sessionId) {
-            this.pendingSessionLoad = null;
             this._addMessage('system', '会话恢复失败: 会话 ID 无效');
             return;
         }
 
         if (responseSessionId.toLowerCase() !== sessionId.toLowerCase()) {
+            this._addMessage('system', '会话恢复失败: 返回的会话 ID 与请求不一致，当前安全状态已保留。');
             return;
         }
-        this.pendingSessionLoad = null;
 
         this._adoptCanonicalSessionId?.(sessionId, { reason: 'session_restore' });
         const workspaceSnapshot = this._normalizeSessionWorkspaceSnapshot(session.workspaceSnapshot ?? session.WorkspaceSnapshot);
@@ -394,6 +472,7 @@ export const aiPanelSessionHistoryMixin = {
             restoredResult.status = 'degraded_restore';
             restoredResult.completionStatus = 'degraded_restore';
         } else if (workspaceSnapshot.appliedDowngraded) {
+            stripRestoredApplyAuthority(restoredResult);
             restoredResult.status = 'completed';
             restoredResult.completionStatus = 'completed';
             restoredResult.interactionState = 'completed';
@@ -413,6 +492,12 @@ export const aiPanelSessionHistoryMixin = {
             this._resetCurrentResultSyncState();
         }
         this._displayResult(restoredResult, { appendChatMessage: false });
+        if (workspaceSnapshot?.appliedDowngraded) {
+            this._applySafetyBlockReason = 'restored_applied_requires_revalidation';
+            this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+            this._setResultStatusNote?.('历史 Applied 状态已降级为待重新验证的 Build；完成新的验证或生成新结果前不可再次应用。', 'warning');
+            this._updateApplyButtonState?.();
+        }
 
         const updatedAtUtc = session.updatedAtUtc ?? session.UpdatedAtUtc ?? new Date().toISOString();
         const latestMessage = normalizedHistory.length > 0
@@ -492,6 +577,9 @@ export const aiPanelSessionHistoryMixin = {
             const fallback = planSnapshot.originalUserPrompt || planSnapshot.OriginalUserPrompt || this.lastUserPrompt || '';
             normalizedPlan = this._normalizeBackendPlanResult(planSnapshot, fallback);
         }
+        if (snapshot.appliedDowngraded) {
+            normalizedPlan = downgradeRestoredAppliedPlan(normalizedPlan);
+        }
         this.planAcceptedRecommendedDefaults = snapshot.planAcceptedRecommendedDefaults === true;
         this.activePlanRunRequestId = snapshot.planRunId ? `session-restore-plan-${snapshot.planRunId}` : null;
         this.activePlanRunCompletion = null;
@@ -513,9 +601,9 @@ export const aiPanelSessionHistoryMixin = {
                 optimisticAnswers: snapshot.optimisticPlanAnswers,
                 answerRevision: snapshot.answerRevision,
                 selections: snapshot.planQuestionSelections,
-                readiness: normalizedPlan?.buildReadiness,
-                readinessPreview: snapshot.readinessPreview || normalizedPlan?.effectiveReadiness,
-                readinessStatus: snapshot.readinessPreview || normalizedPlan ? 'ready' : 'idle',
+                readiness: snapshot.appliedDowngraded ? null : normalizedPlan?.buildReadiness,
+                readinessPreview: snapshot.appliedDowngraded ? null : (snapshot.readinessPreview || normalizedPlan?.effectiveReadiness),
+                readinessStatus: snapshot.appliedDowngraded ? 'idle' : (snapshot.readinessPreview || normalizedPlan ? 'ready' : 'idle'),
                 resourceDecisions: snapshot.resourceDecisions,
                 run: {
                     plan: { runId: snapshot.planRunId || '', status: snapshot.planRunStatus || 'idle', events: [], eventKeys: {}, terminalSequence: snapshot.planTerminalSequence },

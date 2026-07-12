@@ -7,6 +7,11 @@ import {
 export const aiPanelApplyPreviewMixin = {
     _handleApplyFlow() {
         if (!this.flowCanvas || this._disposed) return;
+        if (this._applySafetyBlockReason) {
+            this._setResultStatusNote?.('当前画布处于本地安全阻断状态，请先生成新结果或完成明确的安全恢复。', 'warning');
+            this._announceAccessibilityStatus?.('当前无法应用，请先完成安全恢复。', 'assertive');
+            return;
+        }
         if (this._applyInFlight || this._activeApplyPreview) {
             this._announceAccessibilityStatus?.('应用操作正在处理中，请勿重复提交。');
             return;
@@ -405,6 +410,7 @@ export const aiPanelApplyPreviewMixin = {
         this.container.appendChild(overlay);
         const dialog = overlay.querySelector('.ai-apply-preview-dialog');
         const confirmButton = overlay.querySelector('.ai-apply-preview-confirm');
+        const backgroundIsolation = this._isolateApplyDialogBackground(overlay);
 
         const cancelPreview = () => this._closeApplyPreview({ restoreFocus: true, setReady: true });
         const keyHandler = event => {
@@ -431,14 +437,15 @@ export const aiPanelApplyPreviewMixin = {
             }
         };
         overlay.addEventListener('keydown', keyHandler);
-        this._activeApplyPreview = { overlay, dialog, returnFocus, keyHandler, identity: previewIdentity, flow: newFlow };
+        this._activeApplyPreview = { overlay, dialog, returnFocus, keyHandler, identity: previewIdentity, flow: newFlow, backgroundIsolation };
         overlay.querySelector('.ai-apply-preview-close').addEventListener('click', cancelPreview);
         overlay.querySelector('.ai-apply-preview-cancel').addEventListener('click', cancelPreview);
         confirmButton.addEventListener('click', () => {
             if (this._applyInFlight) return;
             if (!this._isApplyPreviewIdentityCurrent(previewIdentity, newFlow)) {
-                this._closeApplyPreview({ restoreFocus: true, setReady: true });
-                this._setResultStatusNote('预览打开后画布或 AI 结果已变化，旧预览已失效。请重新打开应用预览。', 'warning');
+                this._closeApplyPreview({ restoreFocus: true, setReady: false });
+                this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+                this._setResultStatusNote('预览打开后画布、AI 结果或 Apply 门禁已变化，旧预览已失效。请重新打开应用预览。', 'warning');
                 this._announceAccessibilityStatus?.('应用预览已失效，请重新预览。', 'assertive');
                 return;
             }
@@ -452,7 +459,8 @@ export const aiPanelApplyPreviewMixin = {
         return Object.freeze({
             resultVersion: Number(this.currentResultVersion || 0),
             canvasRevision: Number(this.flowCanvas?.getFlowRevision?.() || this.currentCanvasRevision || 0),
-            flowFingerprint: this._fingerprintApplyFlow(flow)
+            flowFingerprint: this._fingerprintApplyFlow(flow),
+            applyGateFingerprint: this._fingerprintApplyFlow(this._getPayloadApplyGate?.(this.currentResult) || null)
         });
     },
 
@@ -472,7 +480,44 @@ export const aiPanelApplyPreviewMixin = {
         ) || flow;
         return Number(identity.resultVersion) === Number(this.currentResultVersion || 0) &&
             Number(identity.canvasRevision) === currentRevision &&
-            identity.flowFingerprint === this._fingerprintApplyFlow(currentFlow);
+            identity.flowFingerprint === this._fingerprintApplyFlow(currentFlow) &&
+            identity.applyGateFingerprint === this._fingerprintApplyFlow(this._getPayloadApplyGate?.(this.currentResult) || null) &&
+            !this._applySafetyBlockReason &&
+            (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true);
+    },
+
+    _isolateApplyDialogBackground(overlay) {
+        const records = [];
+        let current = overlay;
+        while (current?.parentElement) {
+            const parent = current.parentElement;
+            Array.from(parent.children || []).forEach(sibling => {
+                if (sibling === current) return;
+                records.push({
+                    element: sibling,
+                    inert: sibling.inert === true,
+                    ariaHidden: sibling.getAttribute?.('aria-hidden')
+                });
+                sibling.inert = true;
+                sibling.setAttribute?.('aria-hidden', 'true');
+            });
+            current = parent;
+            if (parent === document.body) break;
+        }
+        return records;
+    },
+
+    _restoreApplyDialogBackground(records = []) {
+        records.forEach(record => {
+            const element = record?.element;
+            if (!element) return;
+            element.inert = record.inert === true;
+            if (record.ariaHidden === null || record.ariaHidden === undefined) {
+                element.removeAttribute?.('aria-hidden');
+            } else {
+                element.setAttribute?.('aria-hidden', record.ariaHidden);
+            }
+        });
     },
 
     _closeApplyPreview({ restoreFocus = true, setReady = true } = {}) {
@@ -484,8 +529,10 @@ export const aiPanelApplyPreviewMixin = {
         }
         overlay.removeEventListener?.('keydown', preview?.keyHandler);
         overlay.remove?.();
+        this._restoreApplyDialogBackground?.(preview?.backgroundIsolation || []);
         this._activeApplyPreview = null;
-        if (setReady && !this._applyInFlight && !this._disposed) {
+        if (setReady && !this._applyInFlight && !this._disposed && !this._applySafetyBlockReason &&
+            (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true)) {
             this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
         }
         if (restoreFocus && !this._disposed) {
@@ -495,7 +542,7 @@ export const aiPanelApplyPreviewMixin = {
     },
 
     _executeApplyFlow(flow) {
-        if (!this.flowCanvas || this._disposed || this._applyInFlight) return false;
+        if (!this.flowCanvas || this._disposed || this._applyInFlight || this._applySafetyBlockReason) return false;
         this._applyInFlight = true;
         this._updateApplyButtonState?.();
         const previousResultFlow = this.currentResult?.flow;
@@ -531,6 +578,7 @@ export const aiPanelApplyPreviewMixin = {
             this._renderParameterDraftEditor(this.currentResult, appliedFlow);
             this.options.onApplied?.(appliedFlow);
             this.options.showToast?.('已应用到画布', 'success');
+            this._applySafetyBlockReason = '';
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
             this.agentWorkspaceMode = this.agentWorkspaceMode || 'build';
             this._renderAgentWorkspaceOverview?.();
@@ -577,10 +625,12 @@ export const aiPanelApplyPreviewMixin = {
                 }
             }
             if (rollbackAttempted && rollbackSucceeded) {
+                this._applySafetyBlockReason = '';
                 this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
                 this._setResultStatusNote(`应用流程失败，画布已恢复到应用前状态：${message}`, 'warning');
                 this._addMessage('system', `应用流程失败，已恢复应用前画布：${message}`);
             } else {
+                this._applySafetyBlockReason = 'apply_rollback_failed';
                 this._setWorkbenchState(AiWorkbenchStates.FAILED);
                 const suffix = rollbackAttempted ? '；自动回滚也失败，请先检查或恢复画布后再继续。' : '；未取得可用的应用前快照。';
                 this._setResultStatusNote(`应用流程失败${suffix} ${message}`, 'warning');
@@ -614,6 +664,7 @@ export const aiPanelApplyPreviewMixin = {
             this.appliedCanvasBaselineFlow = null;
             this.canvasManualEditRecords = [];
             this.canvasManualEditSignature = '';
+            this._applySafetyBlockReason = '';
             this._preApplySnapshot = null;
             this._preApplySnapshotVersion = 0;
             this._preApplyCanvasRevision = 0;

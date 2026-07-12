@@ -1383,7 +1383,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     background: rgba(45, 74, 94, 0.35);
     color: var(--paper-white);
     font-size: var(--font-size-xs);
-    padding: 8px 10px;
+    padding: 0;
 }
 
 .ai-history-search:focus {
@@ -1420,14 +1420,33 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     box-shadow: 0 0 0 1px rgba(231, 76, 60, 0.25);
 }
 
+.ai-history-select {
+    display: block;
+    width: 100%;
+    padding: 8px 58px 8px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: inherit;
+}
+
+.ai-history-select:focus-visible,
+.ai-history-delete:focus-visible {
+    outline: 2px solid var(--cinnabar);
+    outline-offset: 2px;
+}
+
 .history-desc {
+    display: block;
     font-size: var(--font-size-xs);
     color: var(--paper-white);
     line-height: 1.35;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right: 48px;
+    padding-right: 0;
 }
 
 .history-meta {
@@ -1438,7 +1457,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding-right: 48px;
+    padding-right: 0;
 }
 
 .ai-history-delete {

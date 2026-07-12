@@ -11702,6 +11702,8 @@ test('AI session history list redacts unsafe persisted summaries', async () => {
   });
 
   assert.match(list.innerHTML, /redacted/);
+  assert.match(list.innerHTML, /class="ai-history-select"[^>]*type="button"/);
+  assert.match(list.innerHTML, /class="ai-history-delete"[^>]*type="button"[^>]*aria-label=/);
   assertNoSensitiveLeak(`${list.innerHTML}\n${panel.history[0].lastMessage}\n${panel.history[0].templateName}\n${panel.history[0].generationMode}`);
   assert.doesNotMatch(list.innerHTML, /super-secret-value|raw-key|rawPrompt=|systemPrompt=|baseUrl=|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i);
 
@@ -11887,6 +11889,113 @@ test('AI session restore keeps manual B pending when auto A failure arrives late
   assert.equal(panel.sessionId, 'session-b');
   assert.equal(global.localStorage.getItem('cv_ai_session_id'), 'session-b');
   assert.equal(panel.workspaceSnapshotRevision, 7);
+});
+
+test('AI history switch always lets the last user selection win despite reversed flush completion', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel._disposed = false;
+  panel.sessionSelectionGeneration = 0;
+  const pendingFlushes = [];
+  panel._flushWorkspaceSnapshotBeforeBoundary = () => new Promise(resolve => pendingFlushes.push(resolve));
+  const requests = [];
+  panel._requestSessionLoad = sessionId => requests.push(sessionId);
+
+  const selectA = panel._switchToSession('session-a');
+  const selectB = panel._switchToSession('session-b');
+  pendingFlushes[1](true);
+  await selectB;
+  pendingFlushes[0](true);
+  await selectA;
+
+  assert.deepEqual(requests, ['session-b']);
+  assert.equal(panel.sessionNavigationEpoch, 2);
+});
+
+test('AI session mismatch and send exceptions always finish pending load and timeout ownership', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel._disposed = false;
+  panel.container = createContainer({ '#ai-chat-container': createFakeElement() });
+  panel.pendingSessionLoad = { sessionId: 'session-a', requestId: 'req-a', epoch: 3, timeoutId: setTimeout(() => {}, 60_000) };
+  panel._handleGetAiSessionResult({
+    success: true,
+    sessionId: 'session-a',
+    requestId: 'req-a',
+    navigationEpoch: 3,
+    session: { sessionId: 'session-other', history: [] }
+  });
+  assert.equal(panel.pendingSessionLoad, null);
+  assert.match(panel.messages.at(-1).text, /会话 ID 与请求不一致/);
+
+  panel._sendGetAiSession = () => { throw new Error('bridge unavailable'); };
+  panel._requestSessionLoad('session-b', 'history_switch');
+  assert.equal(panel.pendingSessionLoad, null);
+  assert.match(panel.lastResultStatusNote.text, /请求发送失败/);
+});
+
+test('restored Applied snapshot strips Ready authority and blocks direct reapply', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const chat = createFakeElement();
+  const applyButton = createFakeElement('button');
+  panel.container = createContainer({ '#ai-chat-container': chat, '#ai-btn-apply': applyButton });
+  panel._displayResult = result => { panel.currentResult = result; };
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._updatePlanBuildActionState = () => {};
+  panel._restoreWorkspaceRunReplays = () => Promise.resolve(true);
+  panel._disposed = false;
+  panel._lifecycleEpoch = 1;
+  panel.sessionNavigationEpoch = 4;
+  panel.pendingSessionLoad = { sessionId: 'session-applied', requestId: 'req-applied', epoch: 4 };
+  const readyGate = { canvasApplyReady: true, blocked: false, status: 'ready' };
+  const flow = { operators: [{ id: 'op-1', type: 'ImageAcquisition' }], connections: [] };
+
+  panel._handleGetAiSessionResult({
+    success: true,
+    sessionId: 'session-applied',
+    requestId: 'req-applied',
+    navigationEpoch: 4,
+    session: {
+      sessionId: 'session-applied',
+      currentCanvasFlowJson: JSON.stringify(flow),
+      history: [{
+        role: 'assistant',
+        message: '已应用',
+        payload: { status: 'applied', success: true, flow, applyGate: readyGate, buildResult: { applyGate: readyGate } }
+      }],
+      workspaceSnapshot: {
+        schemaVersion: 2,
+        revision: 9,
+        lifecycleState: 'applied',
+        pendingPlanSnapshot: {
+          planId: 'plan-applied',
+          planHash: 'sha256:applied',
+          canBuild: true,
+          buildReadiness: { canBuild: true, contractVersion: 'v2', blockers: [] }
+        },
+        readinessPreview: { canBuild: true },
+        buildRunId: 'build-applied',
+        buildRunStatus: 'completed',
+        submittedBuildFingerprint: 'sha256:build-applied',
+        workspaceViewMode: 'build'
+      }
+    }
+  });
+
+  assert.equal(panel.pendingSessionLoad, null);
+  assert.equal(panel.currentResult.applyGate, null);
+  assert.equal(panel.currentResult.buildResult.applyGate, null);
+  assert.equal(panel.agentWorkspaceState.readiness.canBuild, false);
+  assert.equal(panel.agentWorkspaceState.readinessPreview, null);
+  assert.equal(panel.agentWorkspaceState.run.build.runId, '');
+  assert.equal(panel.workspaceBuildRunId, '');
+  assert.equal(panel.workspaceSubmittedBuildFingerprint, '');
+  assert.equal(panel._applySafetyBlockReason, 'restored_applied_requires_revalidation');
+  assert.equal(panel.workbenchState, 'failed');
+  assert.equal(applyButton.disabled, true);
 });
 
 test('AI session restore resets workspace fields and clears stale build readonly state', async () => {
