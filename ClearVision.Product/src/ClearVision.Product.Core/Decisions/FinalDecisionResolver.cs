@@ -78,6 +78,15 @@ public static class FinalDecisionResolver
                 outputPort.Name));
         }
 
+        if (!FinalDecisionConfigurationCatalog.TryGetEligibleOutput(sourceOperator, outputPort, out _))
+        {
+            issues.Add(new(
+                "DECISION_SOURCE_OUTPUT_INELIGIBLE",
+                $"Output '{sourceOperator.Name}.{outputPort.Name}' is not declared by the backend operator contract as an official decision source.",
+                sourceOperator.Id,
+                outputPort.Name));
+        }
+
         ValidateRule(binding, sourceOperator.Id, outputPort.Name, issues);
         return issues;
     }
@@ -197,7 +206,10 @@ public static class FinalDecisionResolver
             return Decided(DecisionOutcome.Ng, source);
         }
 
-        return InvalidValue(source, "DECISION_STRING_VALUE_UNMAPPED", $"Bound value '{normalized}' is not mapped to OK or NG.");
+        return InvalidValue(
+            source,
+            "DECISION_STRING_VALUE_UNMAPPED",
+            $"Bound value {SummarizeValue(normalized)} is not mapped to OK or NG.");
     }
 
     private static InspectionDecisionEvaluation ResolveNumber(FinalDecisionBinding binding, object value, string source)
@@ -244,6 +256,20 @@ public static class FinalDecisionResolver
 
     private static InspectionDecisionEvaluation InvalidValue(string source, string code, string message) =>
         new(DecisionOutcome.Invalid, source, code, message, true);
+
+    private static string SummarizeValue(string value)
+    {
+        const int maxLength = 160;
+        var sanitized = value
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
+        if (sanitized.Length <= maxLength)
+        {
+            return $"'{sanitized}'";
+        }
+
+        return $"'{sanitized[..maxLength]}…' (length {sanitized.Length})";
+    }
 
     private static Port? ResolveOutputPort(Operator sourceOperator, FinalDecisionBinding binding)
     {

@@ -3,10 +3,12 @@ using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Runtime;
@@ -19,6 +21,46 @@ namespace ClearVision.Product.Tests.Runtime;
 
 public class RuntimePackageExporterValidationTests
 {
+    [Fact]
+    public async Task ExportAsync_ResultOutputTextDecision_ShouldBeRejectedBeforePackageCreation()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateMinimalProject("invalid-result-output-decision");
+            var output = project.Flow!.Operators.Single();
+            var port = CreatePort(Guid.NewGuid(), "Text", PortDirection.Output, PortDataType.String);
+            output.OutputPorts.Add(port);
+            project.Flow.DecisionConfiguration = new DecisionConfiguration
+            {
+                FinalDecisionBinding = new FinalDecisionBinding
+                {
+                    SourceOperatorId = output.Id,
+                    SourceOutputPortId = port.Id,
+                    SourceOutputName = port.Name,
+                    DataType = DecisionValueType.String,
+                    Rule = DecisionInterpretationRule.StringMap,
+                    OkValue = "OK",
+                    NgValue = "NG"
+                }
+            };
+
+            var act = () => CreateRawExporter().ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*DECISION_SOURCE_OUTPUT_INELIGIBLE*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     [Fact]
     public async Task RuntimePackage_ShouldCarryDecisionIdentityAndCreateLoadedSnapshot()
     {
@@ -281,7 +323,7 @@ public class RuntimePackageExporterValidationTests
             flowText.Should().NotContain(modelPath);
 
             var exportedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(flowText, CreateJsonOptions())!;
-            var exportedDeepLearning = exportedFlow.Operators.Single();
+            var exportedDeepLearning = exportedFlow.Operators.Single(op => op.Type == OperatorType.DeepLearning);
             var modelRelativePath = ReadParameter(exportedDeepLearning, "ModelPath");
             var labelsRelativePath = ReadParameter(exportedDeepLearning, "LabelsPath");
 
@@ -300,7 +342,7 @@ public class RuntimePackageExporterValidationTests
 
             var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
             var package = await loader.LoadAsync(export.PackageRootPath);
-            var loadedDeepLearning = package.Flow.Operators.Single();
+            var loadedDeepLearning = package.Flow.Operators.Single(op => op.Type == OperatorType.DeepLearning);
             var loadedModelPath = ReadParameter(loadedDeepLearning, "ModelPath");
             var loadedLabelsPath = ReadParameter(loadedDeepLearning, "LabelsPath");
 
@@ -323,11 +365,11 @@ public class RuntimePackageExporterValidationTests
             packageB.Manifest.FlowHash.Should().Be(export.Manifest.FlowHash);
             packageA.ExecutionSnapshot!.FlowHash.Should().Be(export.Manifest.FlowHash);
             packageB.ExecutionSnapshot!.FlowHash.Should().Be(export.Manifest.FlowHash);
-            ReadParameter(packageA.Flow.Operators.Single(), "ModelPath").Should().StartWith(deploymentA);
-            ReadParameter(packageB.Flow.Operators.Single(), "ModelPath").Should().StartWith(deploymentB);
-            packageA.ExecutionSnapshot.CreateExecutionFlow().Operators.Single().Parameters
+            ReadParameter(packageA.Flow.Operators.Single(op => op.Type == OperatorType.DeepLearning), "ModelPath").Should().StartWith(deploymentA);
+            ReadParameter(packageB.Flow.Operators.Single(op => op.Type == OperatorType.DeepLearning), "ModelPath").Should().StartWith(deploymentB);
+            packageA.ExecutionSnapshot.CreateExecutionFlow().Operators.Single(op => op.Type == OperatorType.DeepLearning).Parameters
                 .Single(parameter => parameter.Name == "ModelPath").GetValue()?.ToString().Should().StartWith(deploymentA);
-            packageB.ExecutionSnapshot.CreateExecutionFlow().Operators.Single().Parameters
+            packageB.ExecutionSnapshot.CreateExecutionFlow().Operators.Single(op => op.Type == OperatorType.DeepLearning).Parameters
                 .Single(parameter => parameter.Name == "ModelPath").GetValue()?.ToString().Should().StartWith(deploymentB);
         }
         finally
@@ -748,7 +790,10 @@ public class RuntimePackageExporterValidationTests
         }
     }
 
-    private static RuntimePackageExporter CreateExporter()
+    private static TestRuntimePackageExporter CreateExporter() =>
+        new(CreateRawExporter());
+
+    private static RuntimePackageExporter CreateRawExporter()
     {
         var cameraManager = Substitute.For<ICameraManager>();
         var executors = new IOperatorExecutor[]
@@ -764,6 +809,113 @@ public class RuntimePackageExporterValidationTests
             new OperatorFactory(),
             NullLogger<RuntimePackageExporter>.Instance,
             executors);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenFlowDecisionSourceIsIneligibleButHashesMatch_ShouldRejectPackage()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateMinimalProject("ineligible-package-decision");
+            project.Flow!.Operators.Single().OutputPorts.Add(
+                CreatePort(Guid.NewGuid(), "Text", PortDirection.Output, PortDataType.String));
+            var export = await CreateExporter().ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var flowPath = Path.Combine(export.PackageRootPath, "flow.json");
+            var packagedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(
+                await File.ReadAllTextAsync(flowPath),
+                CreateJsonOptions())!;
+            var output = packagedFlow.Operators.Single(op => op.Type == OperatorType.ResultOutput);
+            var port = output.OutputPorts.Single(candidate => candidate.Name == "Text");
+            packagedFlow.DecisionConfiguration = new DecisionConfiguration
+            {
+                FinalDecisionBinding = new FinalDecisionBinding
+                {
+                    SourceOperatorId = output.Id,
+                    SourceOutputPortId = port.Id,
+                    SourceOutputName = port.Name,
+                    DataType = DecisionValueType.String,
+                    Rule = DecisionInterpretationRule.StringMap,
+                    OkValue = "OK",
+                    NgValue = "NG"
+                }
+            };
+            await File.WriteAllTextAsync(
+                flowPath,
+                JsonSerializer.Serialize(packagedFlow, RuntimeJson.StableSerializerOptions));
+
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = await ReadManifestAsync(manifestPath);
+            var entityFlow = packagedFlow.ToEntity();
+            manifest.FlowHash = ExecutionFlowIdentity.ComputeFlowHash(entityFlow);
+            manifest.DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                entityFlow.DecisionConfiguration);
+            await WriteManifestAsync(manifestPath, manifest);
+
+            var act = () => new RuntimePackageLoader(
+                new RuntimePackageValidator(),
+                NullLogger<RuntimePackageLoader>.Instance).LoadAsync(export.PackageRootPath);
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*DECISION_SOURCE_OUTPUT_INELIGIBLE*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    private sealed class TestRuntimePackageExporter(RuntimePackageExporter inner)
+    {
+        public Task<RuntimePackageExportResult> ExportAsync(
+            RuntimePackageExportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureValidDecisionConfiguration(request.Project.Flow);
+            return inner.ExportAsync(request, cancellationToken);
+        }
+    }
+
+    private static void EnsureValidDecisionConfiguration(OperatorFlowDto? flow)
+    {
+        if (flow == null || flow.DecisionConfiguration != null)
+        {
+            return;
+        }
+
+        var judgment = flow.Operators.FirstOrDefault(op => op.Type == OperatorType.ResultJudgment);
+        if (judgment == null)
+        {
+            judgment = CreateOperatorDto("Test final decision", OperatorType.ResultJudgment);
+            flow.Operators.Add(judgment);
+        }
+
+        var port = judgment.OutputPorts.FirstOrDefault(candidate =>
+            candidate.Name.Equals("JudgmentResult", StringComparison.OrdinalIgnoreCase));
+        if (port == null)
+        {
+            port = CreatePort(Guid.NewGuid(), "JudgmentResult", PortDirection.Output, PortDataType.String);
+            judgment.OutputPorts.Add(port);
+        }
+
+        flow.DecisionConfiguration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = judgment.Id,
+                SourceOutputPortId = port.Id,
+                SourceOutputName = port.Name,
+                DataType = DecisionValueType.String,
+                Rule = DecisionInterpretationRule.StringMap,
+                OkValue = "OK",
+                NgValue = "NG"
+            }
+        };
     }
 
     private static ProjectDto CreateMinimalProject(string name)

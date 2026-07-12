@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Runtime;
@@ -693,6 +694,8 @@ internal static class RuntimeParameterTestData
 
     public static ProjectDto CreateResultOnlyProject()
     {
+        var operatorId = Guid.NewGuid();
+        var portId = Guid.NewGuid();
         return new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -701,15 +704,38 @@ internal static class RuntimeParameterTestData
             {
                 Id = Guid.NewGuid(),
                 Name = "main",
+                DecisionConfiguration = new DecisionConfiguration
+                {
+                    FinalDecisionBinding = new FinalDecisionBinding
+                    {
+                        SourceOperatorId = operatorId,
+                        SourceOutputPortId = portId,
+                        SourceOutputName = "JudgmentResult",
+                        DataType = DecisionValueType.String,
+                        Rule = DecisionInterpretationRule.StringMap,
+                        OkValue = "OK",
+                        NgValue = "NG"
+                    }
+                },
                 Operators =
                 [
                     new OperatorDto
                     {
-                        Id = Guid.NewGuid(),
-                        Name = "ResultOutput",
-                        Type = OperatorType.ResultOutput,
+                        Id = operatorId,
+                        Name = "ResultJudgment",
+                        Type = OperatorType.ResultJudgment,
                         X = 0,
-                        Y = 0
+                        Y = 0,
+                        OutputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = portId,
+                                Name = "JudgmentResult",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.String
+                            }
+                        ]
                     }
                 ]
             }
@@ -739,7 +765,8 @@ internal static class RuntimeParameterTestData
 
     public static double ReadConfidence(OperatorFlowDto flow)
     {
-        var value = flow.Operators.Single().Parameters.Single(parameter => parameter.Name == "Confidence").Value;
+        var value = flow.Operators.Single(op => op.Type == OperatorType.DeepLearning)
+            .Parameters.Single(parameter => parameter.Name == "Confidence").Value;
         return value switch
         {
             double number => number,

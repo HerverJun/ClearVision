@@ -524,7 +524,7 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenBoundResultOutputIsMissing_ShouldNotFallbackToResultJudgmentOk()
+    public async Task ExecuteSingleAsync_WhenBoundDecisionSourceIsMissing_ShouldNotFallbackToOtherJudgmentOk()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -542,14 +542,13 @@ public class InspectionServiceSingleRunTests
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
         doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
         doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_SIGNAL_MISSING");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenBoundResultOutputIsMissing_ShouldNotFallbackToResultJudgmentNg()
+    public async Task ExecuteSingleAsync_WhenBoundDecisionSourceIsMissing_ShouldNotFallbackToOtherJudgmentNg()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -567,13 +566,12 @@ public class InspectionServiceSingleRunTests
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
         doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenResultOutputHasValidJudgment_ShouldPreferResultOutput()
+    public async Task ExecuteSingleAsync_WhenBoundDecisionSourceHasValidJudgment_ShouldPreferBoundSource()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -584,21 +582,20 @@ public class InspectionServiceSingleRunTests
             new Dictionary<string, object>
             {
                 ["SelectedSource"] = "result-output",
-                ["Result"] = true
+                ["IsOk"] = true
             });
 
         result.Status.Should().Be(InspectionStatus.OK);
         result.ErrorMessage.Should().BeNull();
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
         doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
         doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_BOUND_VALUE_RESOLVED");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WhenResultOutputHasInvalidJudgment_ShouldNotFallbackToResultJudgment()
+    public async Task ExecuteSingleAsync_WhenBoundDecisionSourceHasInvalidJudgment_ShouldNotFallback()
     {
         var result = await ExecuteResultSelectionInspectionAsync(
             new Dictionary<string, object>
@@ -616,7 +613,6 @@ public class InspectionServiceSingleRunTests
         result.ErrorMessage.Should().Contain("not Boolean");
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
         doc.RootElement.GetProperty("JudgmentSource").GetString().Should().StartWith("FinalDecisionBinding:");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeFalse();
     }
@@ -662,7 +658,6 @@ public class InspectionServiceSingleRunTests
         result.GetOutcome().Decision.Should().Be(DecisionOutcome.Undetermined);
 
         using var doc = JsonDocument.Parse(result.OutputDataJson ?? "{}");
-        doc.RootElement.GetProperty("SelectedSource").GetString().Should().Be("result-output");
         doc.RootElement.GetProperty("JudgmentSource").GetString().Should().Be("FinalDecisionBinding");
         doc.RootElement.GetProperty("StatusReason").GetString().Should().Be("DECISION_SIGNAL_MISSING");
         doc.RootElement.GetProperty("MissingJudgmentSignal").GetBoolean().Should().BeTrue();
@@ -785,7 +780,7 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateFlow("client-flow");
-        explicitFlow.BindStringDecision(explicitFlow.Operators.Single(), "Result");
+        explicitFlow.BindStringDecision(explicitFlow.Operators.Single(), "JudgmentResult");
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
 
         flowExecution
@@ -796,7 +791,7 @@ public class InspectionServiceSingleRunTests
                 ExecutionTimeMs = 16,
                 OutputData = new Dictionary<string, object>
                 {
-                    ["Result"] = "informational-text",
+                    ["JudgmentResult"] = "informational-text",
                     ["Data"] = new Dictionary<string, object>
                     {
                         ["IsAnomaly"] = true
@@ -1673,7 +1668,7 @@ public class InspectionServiceSingleRunTests
 
         if (resultOutputData != null)
         {
-            executors.Add(CreateStaticOutputExecutor(OperatorType.ResultOutput, resultOutputData));
+            executors.Add(CreateStaticOutputExecutor(OperatorType.DualModalVoting, resultOutputData));
         }
 
         using var flowExecution = new FlowExecutionService(
@@ -1738,22 +1733,18 @@ public class InspectionServiceSingleRunTests
             return flow.BindStringDecision(judgment, "JudgmentResult");
         }
 
-        var output = CreateResultSelectionOperator("Output", OperatorType.ResultOutput);
+        var output = CreateResultSelectionOperator("Bound decision", OperatorType.DualModalVoting);
         flow.AddOperator(output);
         flow.AddConnection(new OperatorConnection(
             judgment.Id,
             judgment.OutputPorts.Single().Id,
             output.Id,
             output.InputPorts.Single().Id));
-        if (resultOutputData?.TryGetValue("Result", out var resultValue) == true && resultValue is bool)
-        {
-            return flow.BindBooleanDecision(output, "Result");
-        }
         if (resultOutputData?.ContainsKey("IsOk") == true)
         {
             return flow.BindBooleanDecision(output, "IsOk");
         }
-        return flow.BindStringDecision(output, "JudgmentResult");
+        return flow.BindStringDecision(output, "JudgmentValue");
     }
 
     private static Operator CreateResultSelectionOperator(string name, OperatorType operatorType)
@@ -1767,7 +1758,7 @@ public class InspectionServiceSingleRunTests
     private static OperatorFlow CreateFlow(string operatorName)
     {
         var flow = new OperatorFlow("test-flow");
-        var op = new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultOutput, 0, 0);
+        var op = new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultJudgment, 0, 0);
         flow.AddOperator(op);
         return flow.BindStringDecision(op);
     }
@@ -1853,7 +1844,7 @@ public class InspectionServiceSingleRunTests
                 {
                     Id = operatorId,
                     Name = operatorName,
-                    Type = OperatorType.ResultOutput,
+                    Type = OperatorType.ResultJudgment,
                     X = 0,
                     Y = 0,
                     OutputPorts =

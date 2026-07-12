@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 
@@ -72,7 +73,14 @@ public sealed partial class RuntimePackageValidator
                 "The package manifest still contains missing resources.");
         }
 
-        var computedHash = ExecutionFlowIdentity.ComputeFlowHash(package.Flow.ToEntity());
+        var packageFlow = package.Flow.ToEntity();
+        var decisionIssues = FinalDecisionResolver.Validate(packageFlow);
+        foreach (var issue in decisionIssues)
+        {
+            AddIssue(result, RuntimeIssueSeverity.Error, issue.Code, issue.Message, manifest.EntryFlow);
+        }
+
+        var computedHash = ExecutionFlowIdentity.ComputeFlowHash(packageFlow);
         if (!string.Equals(manifest.FlowHash, computedHash, StringComparison.OrdinalIgnoreCase))
         {
             AddIssue(
@@ -83,7 +91,7 @@ public sealed partial class RuntimePackageValidator
         }
 
         var computedDecisionHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
-            package.Flow.ToEntity().DecisionConfiguration);
+            packageFlow.DecisionConfiguration);
         if (string.IsNullOrWhiteSpace(manifest.DecisionConfigurationHash) ||
             !string.Equals(manifest.DecisionConfigurationHash, computedDecisionHash, StringComparison.OrdinalIgnoreCase))
         {

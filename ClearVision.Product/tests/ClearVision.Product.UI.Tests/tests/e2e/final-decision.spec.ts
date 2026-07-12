@@ -231,3 +231,96 @@ test('最终判定配置可保存重开，并在来源算子禁用后显示稳�
   await expect(dialog).toContainText('DECISION_SOURCE_OPERATOR_DISABLED');
   await expect(dialog).toContainText('绑定的来源算子已禁用，请启用算子或重新选择。');
 });
+
+test('ResultOutput.Text 旧绑定显示为无效且候选仅保留 BlobCount', async ({ page }) => {
+  const resultOutputId = OPERATOR_ID;
+  const resultTextPortId = OUTPUT_PORT_ID;
+  const blobId = '44444444-4444-4444-4444-444444444444';
+  const blobCountPortId = '55555555-5555-5555-5555-555555555555';
+  const flow = createFlow();
+  flow.operators[0].name = '结果输出';
+  flow.operators[0].outputPorts[0].name = 'Text';
+  flow.operators[0].outputPorts[0].displayName = '文本';
+  flow.operators.push({
+    id: blobId,
+    name: 'Blob 分析',
+    type: 'BlobAnalysis',
+    x: 120,
+    y: 120,
+    inputPorts: [],
+    outputPorts: [{
+      id: blobCountPortId,
+      name: 'BlobCount',
+      displayName: 'Blob 数量',
+      dataType: 'Integer',
+      direction: 1,
+      isRequired: false,
+    }],
+    parameters: [],
+    isEnabled: true,
+  });
+  flow.decisionConfiguration = {
+    finalDecisionBinding: {
+      sourceOperatorId: resultOutputId,
+      sourceOutputPortId: resultTextPortId,
+      sourceOutputName: 'Text',
+      dataType: 'String',
+      rule: 'StringMap',
+      okValue: 'OK',
+      ngValue: 'NG',
+    },
+    missingDecisionPolicy: 'Undetermined',
+  };
+
+  await page.route(`**/api/projects/${PROJECT_ID}`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createProject(flow, 7)),
+    });
+  });
+  await page.route('**/api/inspection/decision-configuration/validate', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        isValid: false,
+        issues: [{
+          code: 'DECISION_SOURCE_OUTPUT_INELIGIBLE',
+          message: 'Result Output.Text is not an official decision source.',
+          operatorId: resultOutputId,
+          outputName: 'Text',
+        }],
+        eligibleOutputs: [{
+          operatorId: blobId,
+          operatorName: 'Blob 分析',
+          outputPortId: blobCountPortId,
+          outputName: 'BlobCount',
+          dataType: 'Integer',
+          rule: 'NumericComparison',
+        }],
+      }),
+    });
+  });
+
+  await bootAuthenticatedApp(page);
+  await page.evaluate(async projectId => {
+    const { default: projectManager } = await import('/src/features/project/projectManager.js');
+    await projectManager.openProject(projectId);
+  }, PROJECT_ID);
+  await expect.poll(() => page.evaluate(() => {
+    const canvas = (window as typeof window & { flowCanvas?: { nodes?: Map<string, unknown> } }).flowCanvas;
+    return canvas?.nodes?.size ?? 0;
+  })).toBe(2);
+  const entry = page.locator('#btn-final-decision');
+  await expect(entry).toHaveAttribute('data-decision-state', 'invalid');
+  await entry.click();
+
+  const dialog = page.locator('.final-decision-dialog');
+  await expect(dialog).toContainText('DECISION_SOURCE_OUTPUT_INELIGIBLE');
+  const sourceSelect = dialog.locator('[data-decision-source]');
+  const options = sourceSelect.locator('option');
+  await expect(options).toHaveCount(2);
+  await expect(options.nth(1)).toContainText('BlobCount');
+  await expect(sourceSelect).not.toContainText('结果输出 → Text');
+});

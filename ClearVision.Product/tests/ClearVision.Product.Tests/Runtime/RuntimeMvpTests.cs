@@ -254,7 +254,9 @@ public class RuntimeMvpTests
             });
 
             await using var runtimeHost = new RuntimeHost(
-                CreateFlowExecutionService(new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance)),
+                CreateFlowExecutionService(
+                    new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance),
+                    new FixedOkJudgmentExecutor()),
                 new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance);
@@ -302,7 +304,9 @@ public class RuntimeMvpTests
             });
 
             await using var runtimeHost = new RuntimeHost(
-                CreateFlowExecutionService(new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance)),
+                CreateFlowExecutionService(
+                    new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance),
+                    new FixedOkJudgmentExecutor()),
                 new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance);
@@ -1127,7 +1131,8 @@ public class RuntimeMvpTests
                 "Detection",
                 modelPath,
                 confidence: 0.62d);
-            deepLearning.OutputPorts = [CreateDecisionPort(decisionPortId)];
+            var judgmentId = Guid.NewGuid();
+            deepLearning.OutputPorts = [];
             var project = new ProjectDto
             {
                 Id = Guid.NewGuid(),
@@ -1137,10 +1142,17 @@ public class RuntimeMvpTests
                 {
                     Id = Guid.NewGuid(),
                     Name = "main",
-                    DecisionConfiguration = CreateStringDecisionConfiguration(operatorId, decisionPortId),
+                    DecisionConfiguration = CreateStringDecisionConfiguration(judgmentId, decisionPortId),
                     Operators =
                     [
-                        deepLearning
+                        deepLearning,
+                        new OperatorDto
+                        {
+                            Id = judgmentId,
+                            Name = "Final judgment",
+                            Type = OperatorType.ResultJudgment,
+                            OutputPorts = [CreateDecisionPort(decisionPortId)]
+                        }
                     ]
                 }
             };
@@ -1155,7 +1167,7 @@ public class RuntimeMvpTests
             await File.WriteAllBytesAsync(inputPath, ValidImageBytes);
 
             await using var runtimeHost = new RuntimeHost(
-                CreateFlowExecutionService(new TunableDeepLearningExecutor()),
+                CreateFlowExecutionService(new TunableDeepLearningExecutor(), new FixedOkJudgmentExecutor()),
                 new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance);
@@ -1317,8 +1329,8 @@ public class RuntimeMvpTests
                     new OperatorDto
                     {
                         Id = operatorId,
-                        Name = "ResultOutput",
-                        Type = OperatorType.ResultOutput,
+                        Name = "ResultJudgment",
+                        Type = OperatorType.ResultJudgment,
                         X = 0,
                         Y = 0,
                         OutputPorts = [CreateDecisionPort(decisionPortId)]
@@ -1365,8 +1377,8 @@ public class RuntimeMvpTests
                     new OperatorDto
                     {
                         Id = resultId,
-                        Name = "ResultOutput",
-                        Type = OperatorType.ResultOutput,
+                        Name = "ResultJudgment",
+                        Type = OperatorType.ResultJudgment,
                         InputPorts =
                         [
                             new PortDto
@@ -1403,7 +1415,12 @@ public class RuntimeMvpTests
     {
         var projectRevision = includeAsset ? 22 : 0;
         var operatorId = Guid.NewGuid();
+        var judgmentId = Guid.NewGuid();
         var decisionPortId = Guid.NewGuid();
+        var transformedPointsPortId = Guid.NewGuid();
+        var transformResultPortId = Guid.NewGuid();
+        var judgmentPointsInputPortId = Guid.NewGuid();
+        var judgmentResultInputPortId = Guid.NewGuid();
         var project = new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -1413,7 +1430,7 @@ public class RuntimeMvpTests
             {
                 Id = Guid.NewGuid(),
                 Name = "pixel-to-world-flow",
-                DecisionConfiguration = CreateStringDecisionConfiguration(operatorId, decisionPortId),
+                DecisionConfiguration = CreateStringDecisionConfiguration(judgmentId, decisionPortId),
                 Operators =
                 [
                     new OperatorDto
@@ -1439,23 +1456,66 @@ public class RuntimeMvpTests
                             },
                             new PortDto
                             {
-                                Id = Guid.NewGuid(),
+                                Id = transformedPointsPortId,
                                 Name = "TransformedPoints",
                                 Direction = PortDirection.Output,
                                 DataType = PortDataType.PointList
                             },
                             new PortDto
                             {
-                                Id = Guid.NewGuid(),
+                                Id = transformResultPortId,
                                 Name = "TransformResult",
                                 Direction = PortDirection.Output,
                                 DataType = PortDataType.Any
                             },
-                            CreateDecisionPort(decisionPortId)
                         ]
+                    },
+                    new OperatorDto
+                    {
+                        Id = judgmentId,
+                        Name = "Final judgment",
+                        Type = OperatorType.ResultJudgment,
+                        InputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = judgmentPointsInputPortId,
+                                Name = "TransformedPoints",
+                                Direction = PortDirection.Input,
+                                DataType = PortDataType.PointList,
+                                IsRequired = false
+                            },
+                            new PortDto
+                            {
+                                Id = judgmentResultInputPortId,
+                                Name = "TransformResult",
+                                Direction = PortDirection.Input,
+                                DataType = PortDataType.Any,
+                                IsRequired = false
+                            }
+                        ],
+                        OutputPorts = [CreateDecisionPort(decisionPortId)]
                     }
                 ],
-                Connections = []
+                Connections =
+                [
+                    new OperatorConnectionDto
+                    {
+                        Id = Guid.NewGuid(),
+                        SourceOperatorId = operatorId,
+                        SourcePortId = transformedPointsPortId,
+                        TargetOperatorId = judgmentId,
+                        TargetPortId = judgmentPointsInputPortId
+                    },
+                    new OperatorConnectionDto
+                    {
+                        Id = Guid.NewGuid(),
+                        SourceOperatorId = operatorId,
+                        SourcePortId = transformResultPortId,
+                        TargetOperatorId = judgmentId,
+                        TargetPortId = judgmentResultInputPortId
+                    }
+                ]
             }
         };
 
@@ -1491,34 +1551,23 @@ public class RuntimeMvpTests
     }
 
     [Fact]
-    public async Task RuntimeHost_LegacyPackageWithoutDecisionBinding_ShouldLoadButRejectBeforeRunStarts()
+    public async Task RuntimePackageExporter_WithoutDecisionBinding_ShouldRejectBeforePackageCreation()
     {
         var root = CreateTempDirectory();
         try
         {
             var project = CreateProjectDto("legacy-runtime-package");
             project.Flow!.DecisionConfiguration = null;
-            var export = await new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance)
+            var act = () => new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance)
                 .ExportAsync(new RuntimePackageExportRequest
                 {
                     Project = project,
                     TargetRootDirectory = root
                 });
-            var resultCount = 0;
-            await using var runtimeHost = new RuntimeHost(
-                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
-                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
-                new RuntimeResultNormalizer(),
-                NullLogger<RuntimeHost>.Instance);
-            runtimeHost.ResultAvailable += _ => resultCount++;
-
-            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
-            var act = async () => await runtimeHost.RunPackageConfiguredSingleAsync();
 
             await act.Should().ThrowAsync<RuntimePackageException>()
-                .WithMessage("ADMISSION_DECISION_BINDING_REQUIRED:*");
-            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
-            resultCount.Should().Be(0);
+                .WithMessage("*DECISION_BINDING_REQUIRED*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
         }
         finally
         {
@@ -1673,7 +1722,7 @@ public class RuntimeMvpTests
             _delayMs = delayMs;
         }
 
-        public OperatorType OperatorType => OperatorType.ResultOutput;
+        public OperatorType OperatorType => OperatorType.ResultJudgment;
 
         public async Task<OperatorExecutionOutput> ExecuteAsync(
             Operator @operator,
@@ -1701,6 +1750,25 @@ public class RuntimeMvpTests
         {
             return ValidationResult.Valid();
         }
+    }
+
+    private sealed class FixedOkJudgmentExecutor : IOperatorExecutor
+    {
+        public OperatorType OperatorType => OperatorType.ResultJudgment;
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            var output = inputs == null
+                ? new Dictionary<string, object>()
+                : new Dictionary<string, object>(inputs, StringComparer.OrdinalIgnoreCase);
+            output["JudgmentResult"] = "OK";
+            return Task.FromResult(OperatorExecutionOutput.Success(output));
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
     }
 
     private sealed class TunableDeepLearningExecutor : IOperatorExecutor
@@ -1755,7 +1823,7 @@ public class RuntimeMvpTests
 
     private sealed class NoImageNgExecutor : IOperatorExecutor
     {
-        public OperatorType OperatorType => OperatorType.ResultOutput;
+        public OperatorType OperatorType => OperatorType.ResultJudgment;
 
         public Task<OperatorExecutionOutput> ExecuteAsync(
             Operator @operator,
@@ -1786,7 +1854,7 @@ public class RuntimeMvpTests
             _release = release;
         }
 
-        public OperatorType OperatorType => OperatorType.ResultOutput;
+        public OperatorType OperatorType => OperatorType.ResultJudgment;
 
         public async Task<OperatorExecutionOutput> ExecuteAsync(
             Operator @operator,

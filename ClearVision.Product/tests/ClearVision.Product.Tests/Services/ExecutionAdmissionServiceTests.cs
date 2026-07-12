@@ -217,6 +217,41 @@ public sealed class ExecutionAdmissionServiceTests
     }
 
     [Fact]
+    public async Task ValidateFlowAsync_ResultOutputTextBinding_ShouldRejectBeforeOfficialExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(new Project("active-project"));
+        var flow = new OperatorFlow("formatted-result-binding");
+        var output = new Operator(Guid.NewGuid(), "Result Output", OperatorType.ResultOutput, 0, 0);
+        output.AddOutputPort("Text", PortDataType.String);
+        flow.AddOperator(output);
+        var port = output.OutputPorts.Single();
+        flow.DecisionConfiguration = new ClearVision.Product.Core.Decisions.DecisionConfiguration
+        {
+            FinalDecisionBinding = new ClearVision.Product.Core.Decisions.FinalDecisionBinding
+            {
+                SourceOperatorId = output.Id,
+                SourceOutputPortId = port.Id,
+                SourceOutputName = port.Name,
+                DataType = ClearVision.Product.Core.Decisions.DecisionValueType.String,
+                Rule = ClearVision.Product.Core.Decisions.DecisionInterpretationRule.StringMap,
+                OkValue = "OK",
+                NgValue = "NG"
+            }
+        };
+
+        var result = await new ExecutionAdmissionService(repository).ValidateFlowAsync(
+            projectId,
+            flow,
+            ExecutionAdmissionSurface.StudioInspectionRun);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_DECISION_SOURCE_OUTPUT_INELIGIBLE");
+        result.Message.Should().NotContain("{\"detections\"");
+    }
+
+    [Fact]
     public async Task ValidateFlowAsync_PreviewSurfaceWithoutDecisionBinding_ShouldRemainAllowed()
     {
         var projectId = Guid.NewGuid();

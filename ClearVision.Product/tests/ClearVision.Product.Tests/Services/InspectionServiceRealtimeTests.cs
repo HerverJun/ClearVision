@@ -138,6 +138,38 @@ public class InspectionServiceRealtimeTests
             Arg.Any<ExecutionSnapshot?>());
     }
 
+    [Fact]
+    public async Task StartRealtimeInspectionFlowAsync_ShouldUseSameDecisionConfigurationInExecutionSnapshot()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = Substitute.For<IInspectionWorker>();
+        ExecutionSnapshot? captured = null;
+        worker.TryStartRunAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<string?>(),
+                Arg.Any<ExecutionSnapshot?>())
+            .Returns(callInfo =>
+            {
+                captured = callInfo.ArgAt<ExecutionSnapshot>(1);
+                return Task.FromResult(true);
+            });
+        var service = CreateService(coordinator, worker);
+        var projectId = Guid.NewGuid();
+        var flow = CreateDecisionFlow("Realtime-Decision-Identity");
+
+        await service.StartRealtimeInspectionFlowAsync(
+            projectId,
+            flow,
+            cameraId: null,
+            CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.DecisionConfigurationHash.Should().Be(
+            ExecutionFlowIdentity.ComputeDecisionConfigurationHash(flow.DecisionConfiguration));
+        captured.CreateExecutionFlow().DecisionConfiguration.Should().BeEquivalentTo(flow.DecisionConfiguration);
+    }
+
     private static TestContext CreateContext()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -249,7 +281,7 @@ public class InspectionServiceRealtimeTests
     private static OperatorFlow CreateDecisionFlow(string name)
     {
         var flow = new OperatorFlow(name);
-        var op = new Operator(Guid.NewGuid(), "ResultOutput", OperatorType.ResultOutput, 0, 0);
+        var op = new Operator(Guid.NewGuid(), "ResultJudgment", OperatorType.ResultJudgment, 0, 0);
         flow.AddOperator(op);
         return flow.BindStringDecision(op);
     }

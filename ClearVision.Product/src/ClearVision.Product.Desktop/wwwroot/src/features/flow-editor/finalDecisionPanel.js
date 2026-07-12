@@ -9,6 +9,7 @@ const ISSUE_TEXT = Object.freeze({
     DECISION_SOURCE_OUTPUT_NOT_FOUND: '绑定的输出端口已不存在，请重新选择。',
     DECISION_SOURCE_OUTPUT_MISMATCH: '绑定端口标识与名称不一致，请重新选择输出。',
     DECISION_SOURCE_TYPE_MISMATCH: '绑定输出类型已变化，当前规则不再兼容。',
+    DECISION_SOURCE_OUTPUT_INELIGIBLE: '该输出未被后端算子契约声明为正式判定事实源，请重新选择。',
     DECISION_RULE_TYPE_MISMATCH: '判定规则与输出类型不兼容。',
     DECISION_STRING_MAP_VALUES_REQUIRED: '请同时填写代表 OK 和 NG 的字符串值。',
     DECISION_STRING_MAP_VALUES_CONFLICT: 'OK 与 NG 字符串值不能相同。',
@@ -196,7 +197,7 @@ export class FinalDecisionPanel {
                             return `<option value="${escapeHtml(key)}" ${key === selectedKey ? 'selected' : ''}>${escapeHtml(operatorName)} · ${escapeHtml(outputName)} (${escapeHtml(candidateType)})</option>`;
                         }).join('')}
                     </select>
-                    <small>仅显示后端认可的布尔、字符串、整数和浮点输出。</small>
+                    <small>仅显示后端算子契约明确认可的判定信号或可比较测量值。</small>
                 </label>
                 ${selectedCandidate ? this.renderRuleFields(dataType, rule, binding) : '<div class="final-decision-empty">选择来源后配置 OK/NG 规则。</div>'}
                 <label class="final-decision-field">

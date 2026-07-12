@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
@@ -74,6 +75,13 @@ public sealed class RuntimePackageExporter
         if (flow.Operators.Count == 0)
         {
             throw new RuntimePackageException("The selected project does not contain any operators.");
+        }
+
+        var decisionIssues = FinalDecisionResolver.Validate(flow.ToEntity());
+        if (decisionIssues.Count > 0)
+        {
+            throw new RuntimePackageException(
+                $"Export blocked: {decisionIssues[0].Code}: {decisionIssues[0].Message}");
         }
 
         var parameterValidationErrors = FindParameterValidationErrors(flow).ToList();
