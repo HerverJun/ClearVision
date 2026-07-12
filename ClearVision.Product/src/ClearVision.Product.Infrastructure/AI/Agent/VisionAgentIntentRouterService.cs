@@ -231,7 +231,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             RemainingPlanFields = remainingPlanFields
         };
         var maturity = EvaluateMaturity(effectiveRequest);
-        resolvedPlanFields = MergeMaturityResolvedFields(resolvedPlanFields, maturity);
+        resolvedPlanFields = NormalizePlanFields(resolvedPlanFields);
         remainingPlanFields = BuildRemainingPlanFields(remainingPlanFields, maturity, resolvedPlanFields);
         effectiveRequest = effectiveRequest with
         {
@@ -334,7 +334,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             RemainingPlanFields = remainingPlanFields
         };
         var maturity = EvaluateMaturity(effectiveRequest);
-        resolvedPlanFields = MergeMaturityResolvedFields(resolvedPlanFields, maturity);
+        resolvedPlanFields = NormalizePlanFields(resolvedPlanFields);
         remainingPlanFields = BuildRemainingPlanFields(remainingPlanFields, maturity, resolvedPlanFields);
         effectiveRequest = effectiveRequest with
         {
@@ -567,78 +567,22 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         VisionAgentIntentRouterRequest request,
         IReadOnlyList<VisionAgentPlanAnswer>? updates = null)
     {
+        var explicitPromptAnswers = VisionAgentRequirementMaturityGate.ExtractExplicitPlanAnswers(
+            ToMaturityRequest(request),
+            request.SemanticExtraction);
         return NormalizePlanFields(ResolvedFieldsFromAnswers(request.ConfirmedPlanAnswers)
                 .Concat(ResolvedFieldsFromAnswers(updates ?? []))
-                .Concat(ResolvedFieldsFromSemantic(request.SemanticExtraction)))
+                .Concat(ResolvedFieldsFromAnswers(explicitPromptAnswers)))
             .ToList();
     }
 
     private static IEnumerable<string> ResolvedFieldsFromAnswers(IEnumerable<VisionAgentPlanAnswer>? answers)
     {
         return (answers ?? [])
-            .Where(answer => !string.IsNullOrWhiteSpace(answer.Value) &&
+            .Where(answer => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(answer.Origin) &&
+                             !string.IsNullOrWhiteSpace(answer.Value) &&
                              !VisionAgentPlanFieldPolicy.IsPlaceholderValue(answer.Value))
             .Select(answer => answer.Field);
-    }
-
-    private static IEnumerable<string> ResolvedFieldsFromSemantic(VisionAgentSemanticExtractionResult? semantic)
-    {
-        if (semantic == null)
-        {
-            yield break;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.InspectionObject) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.InspectionObject))
-        {
-            yield return VisionAgentPlanAnswerFields.InspectionObject;
-        }
-
-        var taskType = Clean(semantic.TaskType);
-        if (!string.IsNullOrWhiteSpace(taskType) &&
-            !taskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
-            !taskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(taskType))
-        {
-            yield return VisionAgentPlanAnswerFields.TaskType;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.ImageSource) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.ImageSource))
-        {
-            yield return VisionAgentPlanAnswerFields.ImageSource;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.OutputTarget) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.OutputTarget))
-        {
-            yield return VisionAgentPlanAnswerFields.OutputTarget;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.TargetAttribute))
-        {
-            yield return VisionAgentPlanAnswerFields.TargetAttribute;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.DefectType) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.DefectType))
-        {
-            yield return VisionAgentPlanAnswerFields.DefectType;
-        }
-
-        if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(semantic.MeasurementTarget))
-        {
-            yield return VisionAgentPlanAnswerFields.MeasurementTarget;
-        }
-
-        var acceptance = VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic.OkCondition, semantic.NgCondition);
-        if (!string.IsNullOrWhiteSpace(acceptance) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(acceptance))
-        {
-            yield return VisionAgentPlanAnswerFields.AcceptanceCriteria;
-        }
     }
 
     private static List<string> MergeRemainingPlanFields(
@@ -663,32 +607,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             .Where(field => !resolved.Contains(field))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-    }
-
-    private static List<string> MergeMaturityResolvedFields(
-        IEnumerable<string> existingResolved,
-        AiRequirementMaturityResult maturity)
-    {
-        var fields = NormalizePlanFields(existingResolved).ToList();
-        var missing = maturity.MissingFields
-            .Select(NormalizePlanField)
-            .Where(field => !string.IsNullOrWhiteSpace(field))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!missing.Contains(VisionAgentPlanAnswerFields.InspectionObject) &&
-            maturity.ObjectSignals.Any(signal => !string.IsNullOrWhiteSpace(signal)))
-        {
-            fields.Add(VisionAgentPlanAnswerFields.InspectionObject);
-        }
-
-        if (!missing.Contains(VisionAgentPlanAnswerFields.TaskType) &&
-            !string.IsNullOrWhiteSpace(maturity.TaskType) &&
-            !maturity.TaskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
-            !maturity.TaskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
-        {
-            fields.Add(VisionAgentPlanAnswerFields.TaskType);
-        }
-
-        return NormalizePlanFields(fields);
     }
 
     private static bool HasBlockingRemainingPlanFields(

@@ -388,6 +388,9 @@ public static class VisionAgentPlanFieldPolicy
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var confirmedSet = (confirmedPlanAnswers ?? Array.Empty<VisionAgentPlanAnswer>())
+            .Where(answer => IsAuthoritativeConfirmationOrigin(answer.Origin) &&
+                             !string.IsNullOrWhiteSpace(answer.Value) &&
+                             !IsPlaceholderValue(answer.Value))
             .Select(a => NormalizeField(a.Field))
             .Where(f => !string.IsNullOrWhiteSpace(f))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -687,5 +690,14 @@ public static class VisionAgentPlanFieldPolicy
         }
 
         return normalized.EndsWith("_pending", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsAuthoritativeConfirmationOrigin(string? origin)
+    {
+        var normalized = Clean(origin).ToLowerInvariant();
+        return normalized is VisionAgentPlanAnswerOrigins.ExplicitUserSelection or
+                   VisionAgentPlanAnswerOrigins.ExplicitUserText or
+                   VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault or
+                   VisionAgentPlanAnswerOrigins.ResourceBound;
     }
 }

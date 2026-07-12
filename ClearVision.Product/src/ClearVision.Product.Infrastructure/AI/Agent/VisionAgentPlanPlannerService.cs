@@ -843,8 +843,21 @@ PlannerCandidateParsed:
                                question.Options.Count > 0)
             .Take(5)
             .ToList();
-        if (repairedPlannerQuestions.Count > 0)
+        var filteredPlannerQuestions = VisionAgentPlanFieldPolicy.NormalizeQuestions(
+            repairedPlannerQuestions,
+            remainingFields,
+            resolvedFields,
+            confirmedAnswers);
+        if (filteredPlannerQuestions.Count > 0)
         {
+            return filteredPlannerQuestions.Take(3).ToList();
+        }
+        if (remainingFields.Count == 0 &&
+            baselinePlan.ClarificationQuestions.Count > 0 &&
+            repairedPlannerQuestions.Count > 0)
+        {
+            // Legacy standalone baselines can carry questions without v2 remaining fields.
+            // Real v2 plans use RemainingPlanFields as authority and take the filtered path above.
             return repairedPlannerQuestions.Take(3).ToList();
         }
 

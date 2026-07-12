@@ -66,12 +66,21 @@ function reduce(state, type, payload = {}, identity = {}) {
   return agentWorkspaceReducer(state, { type, payload, ...identity });
 }
 
-test('workspace projection deduplicates questions, blockers, and resources into one three-item batch', () => {
-  const state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, { plan: plan() }, { sessionId: 's1' });
+test('workspace projection keeps answerable questions separate from pending resources', () => {
+  const state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, { plan: plan({
+    buildReadiness: {
+      ...plan().buildReadiness,
+      blockers: [
+        ...plan().buildReadiness.blockers,
+        { id: 'resource_pending:model:detector', category: 'resource_pending', field: 'model', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '妯″瀷寰呯粦瀹?' }
+      ]
+    }
+  }) }, { sessionId: 's1' });
 
   assert.equal(state.projection.clarificationQueue.filter(item => item.field === 'inspection_object').length, 1);
   assert.equal(state.projection.clarificationQueue.filter(item => item.field === 'image_source').length, 1);
   assert.equal(state.projection.missingResources.length, 1);
+  assert.equal(state.projection.clarificationQueue.some(item => item.kind === 'resource'), false);
   assert.equal(state.projection.clarificationBatch.length, 3);
   assert.deepEqual(state.clarification.batchKeys, ['inspection_object', 'task_type', 'image_source']);
 });
@@ -84,6 +93,8 @@ test('canonical answers layer confirmed server values under optimistic explicit 
       ]
     })
   }, { sessionId: 's1' });
+  assert.equal(state.projection.answersByField.inspection_object.resolved, false);
+  assert.equal(state.projection.clarificationQueue.find(item => item.field === 'inspection_object').answered, false);
   state = reduce(state, AgentWorkspaceEventTypes.ANSWER_OPTIMISTIC_SET, {
     answer: { questionId: 'q-object', field: 'inspection_object', value: '用户自定义对象', origin: 'explicit_user_text' }
   }, { planId: 'plan-1', planHash: 'hash-1' });
@@ -91,6 +102,7 @@ test('canonical answers layer confirmed server values under optimistic explicit 
   assert.equal(state.projection.answersByField.inspection_object.value, '用户自定义对象');
   assert.equal(state.projection.answersByField.inspection_object.origin, 'explicit_user_text');
   assert.equal(state.projection.clarificationQueue.find(item => item.field === 'inspection_object').answered, true);
+  assert.equal(state.projection.answersByField.inspection_object.resolved, true);
 });
 
 test('custom and other controls are never accepted as business answers', () => {
@@ -108,6 +120,11 @@ test('custom and other controls are never accepted as business answers', () => {
       resolved: true
     }
   );
+  assert.equal(
+    normalizeWorkspaceAnswer({ field: 'task_type', value: 'classification' }).resolved,
+    false,
+    'origin-less legacy values must not masquerade as explicit user confirmation'
+  );
 });
 
 test('clarification batch advances only after the whole current batch is submitted', () => {
@@ -122,7 +139,7 @@ test('clarification batch advances only after the whole current batch is submitt
   state = reduce(state, AgentWorkspaceEventTypes.CLARIFICATION_BATCH_SUBMITTED, {
     answers: state.projection.clarificationBatch.map(item => item.answer)
   }, { planId: 'plan-1', planHash: 'hash-1' });
-  assert.deepEqual(state.clarification.batchKeys, ['acceptance_criteria', 'model']);
+  assert.deepEqual(state.clarification.batchKeys, ['acceptance_criteria']);
 });
 
 test('deferred resources remain resource_pending and never make readiness buildable', () => {
@@ -138,7 +155,7 @@ test('deferred resources remain resource_pending and never make readiness builda
   assert.equal(state.projection.readiness.canBuild, false);
 });
 
-test('Build result MissingResources enter the same clarification projection', () => {
+test('Build result MissingResources enter only the resource projection', () => {
   let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
     plan: plan({ missingResources: [] })
   }, { sessionId: 's1' });
@@ -158,7 +175,7 @@ test('Build result MissingResources enter the same clarification projection', ()
   const resource = state.projection.missingResources.find(item => item.resourceKey === 'camera:line-1');
   assert.ok(resource);
   assert.equal(resource.kind, 'resource');
-  assert.equal(state.projection.clarificationQueue.some(item => item.resourceKey === 'camera:line-1'), true);
+  assert.equal(state.projection.clarificationQueue.some(item => item.resourceKey === 'camera:line-1'), false);
 });
 
 test('run reducer drops duplicate events and ignores nonterminal events after a terminal event', () => {

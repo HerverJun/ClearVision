@@ -184,6 +184,11 @@ public sealed class VisionAgentPlanAnswerValidator
             invalidValues.Add($"{Clean(answer.QuestionId)}:invalid_origin");
             return false;
         }
+        if (!VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(origin))
+        {
+            warnings.Add($"non_authoritative_answer_ignored:{Clean(answer.Field)}:{origin}");
+            return false;
+        }
 
         var questionId = Clean(answer.QuestionId);
         var knownQuestion = !string.IsNullOrWhiteSpace(questionId) &&

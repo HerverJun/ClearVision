@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveAiPlanPresentation } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelPlanPresentation.js';
+import {
+  aiPanelPlanPresentationTestApi,
+  deriveAiPlanPresentation
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelPlanPresentation.js';
 import {
   deriveAiClarificationPresentation,
   renderAiClarification,
@@ -68,7 +71,7 @@ function createPlan(overrides = {}) {
   };
 }
 
-function createPanel({ queue = [], batch = queue, confirmed = {}, optimistic = {}, readinessStatus = 'ready', readinessError = '' } = {}) {
+function createPanel({ queue = [], batch = queue, missingResources = [], confirmed = {}, optimistic = {}, readinessStatus = 'ready', readinessError = '' } = {}) {
   return {
     requirementMode: 'strict',
     agentWorkspaceState: {
@@ -82,6 +85,7 @@ function createPanel({ queue = [], batch = queue, confirmed = {}, optimistic = {
       projection: {
         clarificationQueue: queue,
         clarificationBatch: batch,
+        missingResources,
         readiness: { canBuild: false, blockers: [] },
       },
     },
@@ -278,8 +282,58 @@ test('resource pending remains a lightweight boundary notice without binding con
     blocksBuild: true,
     interactive: true,
   };
-  const panel = createPanel({ queue: [resource], batch: [resource] });
+  const panel = createPanel({ queue: [], batch: [], missingResources: [resource] });
   const html = renderAiClarification(panel, createPlan({ questions: [] }));
+  assert.match(html, /当前没有待确认问题/);
+  assert.match(html, /待补资源 · 1 项/);
+  assert.doesNotMatch(html, /还需确认 1 项/);
   assert.match(html, /完整资源补齐将在后续阶段处理/);
   assert.doesNotMatch(html, /type="file"|data-resource-action|路径/);
+});
+
+test('first planning wait renders four honest phases with cancel feedback', () => {
+  const panel = createPanel();
+  panel._getPlanRunProgressState = () => ({
+    status: 'running',
+    slow: true,
+    canCancel: true,
+    canRetry: false,
+    currentLabel: '响应较慢，系统仍在理解需求；当前阶段尚未标记完成。',
+    phases: {
+      understand: { status: 'running', summary: '等待 Intent Router 返回。' },
+      context: { status: 'waiting', summary: '' },
+      generate: { status: 'waiting', summary: '' },
+      validate: { status: 'waiting', summary: '' },
+    },
+  });
+
+  const html = aiPanelPlanPresentationTestApi.renderEmptyPlan(panel);
+  assert.match(html, /理解需求/);
+  assert.match(html, /整理工程上下文/);
+  assert.match(html, /生成方案/);
+  assert.match(html, /校验方案/);
+  assert.match(html, /尚未标记完成/);
+  assert.match(html, /取消规划/);
+  assert.doesNotMatch(html, /data-planning-phase="context"[^]*已完成/);
+});
+
+test('failed or cancelled planning wait exposes retry from the same lifecycle', () => {
+  const panel = createPanel();
+  panel._getPlanRunProgressState = () => ({
+    status: 'failed',
+    canCancel: false,
+    canRetry: true,
+    currentLabel: '规划失败，可重试本次需求。',
+    phases: {
+      understand: { status: 'completed', summary: '需求理解已返回。' },
+      context: { status: 'failed', summary: '上下文服务失败。' },
+      generate: { status: 'waiting', summary: '' },
+      validate: { status: 'waiting', summary: '' },
+    },
+  });
+
+  const html = aiPanelPlanPresentationTestApi.renderEmptyPlan(panel);
+  assert.match(html, /规划失败，可重试本次需求/);
+  assert.match(html, /data-ai-action="planning-retry"/);
+  assert.doesNotMatch(html, /data-ai-action="planning-cancel"/);
 });

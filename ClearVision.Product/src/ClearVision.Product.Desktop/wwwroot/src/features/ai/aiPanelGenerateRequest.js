@@ -706,9 +706,16 @@ export const aiPanelGenerateRequestMixin = {
 
         const requestId = this.activeGenerateRequestId;
         const sessionId = this.activeGenerateSessionId || this.sessionId;
-        if (!requestId && !this.activeAgentRunId && !this.activePlanRunId) return;
+        if (!requestId && !this.activeAgentRunId && !this.activePlanRunId &&
+            !this.activeIntentRouterRequestId && !this.activePlanRequestId) return;
 
         this.isCancellingGenerate = true;
+
+        if ((this.activeIntentRouterRequestId || this.activePlanRequestId) &&
+            !this.activePlanRunId && this._cancelPendingPlanningRequest) {
+            this._cancelPendingPlanningRequest();
+            return;
+        }
 
         if (this.activePlanRunId && this._cancelActivePlanRun) {
             this._cancelActivePlanRun();

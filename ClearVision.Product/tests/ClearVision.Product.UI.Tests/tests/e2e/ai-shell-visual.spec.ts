@@ -1,7 +1,26 @@
 import { test, expect, Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 import { bootAuthenticatedApp } from './authHelper';
 
 type Theme = 'dark' | 'light';
+const planningEvidenceDir = path.resolve(process.cwd(), 'test-results', 'ai-planning-evidence');
+
+async function capturePlanningEvidence(page: Page, filename: string): Promise<void> {
+  await mkdir(planningEvidenceDir, { recursive: true });
+  await page.screenshot({ path: path.join(planningEvidenceDir, filename), fullPage: false });
+}
+
+async function focusPlanningClarification(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const pane = document.querySelector('#ai-plan-workspace') as HTMLElement | null;
+    const clarification = document.querySelector('[data-ai-hook="clarification-workspace"]') as HTMLElement | null;
+    if (!pane || !clarification) return;
+    const paneRect = pane.getBoundingClientRect();
+    const clarificationRect = clarification.getBoundingClientRect();
+    pane.scrollTop += clarificationRect.top - paneRect.top - 18;
+  });
+}
 
 async function mockShellApis(page: Page, theme: Theme): Promise<void> {
   await page.route('**/api/settings', async route => {
@@ -305,7 +324,16 @@ test('Router pending activates the shell before the first canonical result witho
   await routerRequested;
   await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-shell-state', 'active');
   await expect(page.locator('.ai-message.user')).toContainText('帮我创建一个检测任务');
-  await expect(page.locator('#ai-chat-container')).toContainText('正在判断请求类型');
+  await expect(page.locator('#ai-chat-container')).toContainText('正在理解需求');
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('进行中');
+  await expect(page.locator('[data-planning-phase="context"]')).toContainText('等待中');
+  await expect(page.locator('[data-planning-phase="generate"]')).toContainText('等待中');
+  await expect(page.locator('[data-planning-phase="validate"]')).toContainText('等待中');
+  await expect(page.locator('[data-ai-action="planning-cancel"]')).toBeVisible();
+  await page.waitForTimeout(6200);
+  await expect(page.locator('[data-ai-hook="planning-wait"]')).toContainText('响应较慢，但仍在工作');
+  await expect(page.locator('#ai-chat-container')).toContainText('仍在工作，可取消');
+  await capturePlanningEvidence(page, 'waiting-dark-1366.png');
   await expect(page.locator('#ai-input')).toBeVisible();
   await expect(page.locator('#ai-btn-start-build')).toHaveCount(0);
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
@@ -320,6 +348,445 @@ test('Router pending activates the shell before the first canonical result witho
   await expect(page.locator('[data-ai-hook="task-phase"]')).toHaveText('正在判断请求类型');
   await expect.poll(() => page.evaluate(() => (window as any).aiPanel.agentWorkspaceState.projection.phase)).toBe('routing');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
+});
+
+test('real Plan Run events take over the same first-round planning lifecycle', async ({ page }) => {
+  let releaseRouter!: () => void;
+  let releasePlanStream!: () => void;
+  let markRouterRequested!: () => void;
+  let markPlanRunRequested!: () => void;
+  const routerRequested = new Promise<void>(resolve => { markRouterRequested = resolve; });
+  const routerReleased = new Promise<void>(resolve => { releaseRouter = resolve; });
+  const planRunRequested = new Promise<void>(resolve => { markPlanRunRequested = resolve; });
+  const planStreamReleased = new Promise<void>(resolve => { releasePlanStream = resolve; });
+  const prompt = '读取产品上的DataMatrix二维码';
+  const planResult = {
+    planId: 'plan_datamatrix_waiting',
+    planHash: 'sha256:datamatrix-waiting',
+    originalUserPrompt: prompt,
+    goal: '读取产品上的 DataMatrix 二维码',
+    intent: 'code_recognition',
+    confidence: 'high',
+    requirementMode: 'strict',
+    planSource: 'model_router',
+    requirementUnderstanding: ['检测对象是产品上的 DataMatrix 码', '任务是读取码内容'],
+    recommendedRoute: {
+      routeId: 'datamatrix_reader',
+      title: 'DataMatrix 读取流程',
+      summary: '采集产品图像，定位并解码 DataMatrix，再输出结构化结果。',
+      operators: ['ImageAcquisition', 'CodeRecognition', 'ResultOutput'],
+    },
+    clarificationQuestions: [{
+      id: 'question-image-source',
+      field: 'image_source',
+      title: '图像从哪里获取？',
+      why: '输入方式会影响采集算子和离线验证方式。',
+      options: [
+        { value: 'industrial_camera', label: '工业相机', recommended: true, answerEffect: 'resolve_field' },
+        { value: 'image_folder', label: '图片目录', recommended: false, answerEffect: 'resolve_field' },
+      ],
+    }],
+    missingResources: [{
+      resourceKey: 'camera:primary',
+      resourceType: 'camera',
+      parameterName: 'CameraId',
+      description: '相机资源待绑定',
+    }],
+    recommendedDefaults: [],
+    risks: ['低对比度或污损码需要样本验证。'],
+    acceptanceCriteria: ['可读码输出解码内容，不可读码按确认策略处理。'],
+    executablePlan: ['采集图像', '定位并解码 DataMatrix', '输出读取结果'],
+    canPlan: true,
+    canBuild: false,
+    nextAction: '确认图像输入方式后继续。',
+    confirmedPlanAnswers: [
+      { questionId: 'prompt-inspection-object', field: 'inspection_object', value: '产品上的 DataMatrix 码', origin: 'explicit_user_text', resolved: true },
+      { questionId: 'prompt-task-type', field: 'task_type', value: 'code_recognition', origin: 'explicit_user_text', resolved: true },
+    ],
+    resolvedPlanFields: ['inspection_object', 'task_type'],
+    remainingPlanFields: ['image_source'],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        { id: 'hard_requirement:image_source', category: 'hard_requirement', field: 'image_source', questionId: 'question-image-source', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '图像输入方式待确认' },
+        { id: 'resource_pending:camera:primary', category: 'resource_pending', field: 'camera', questionId: '', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '相机资源待绑定' },
+      ],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: ['image_source', 'camera'],
+      primaryMessage: '请先确认图像输入方式，并在后续补齐相机资源。',
+      contractVersion: 'v2',
+    },
+    requirementMaturity: {
+      maturity: 'needs_clarification',
+      taskType: 'code_recognition',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['产品', 'DataMatrix'],
+      taskSignals: ['读取'],
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source'],
+      publicReason: '任务与对象已明确，输入方式仍需确认。',
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model_router',
+      taskType: 'code_recognition',
+      confidence: 0.95,
+      inspectionObject: '产品上的 DataMatrix 码',
+      imageSource: 'industrial_camera',
+      outputTarget: 'decoded_text',
+      missingFields: ['image_source'],
+    },
+    publicEvents: [],
+    metadataOnly: true,
+  };
+
+  await page.route('**/api/ai/agent-intent-router-runs', async route => {
+    markRouterRequested();
+    await routerReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        intent: 'actionable_vision_plan',
+        confidence: 'high',
+        shouldOpenPlan: true,
+        shouldBuildDirectly: false,
+        canPlan: true,
+        canBuild: false,
+        needsClarification: true,
+        publicReason: '任务与对象已明确，进入 Plan 核对输入方式。',
+        assistantReply: '正在整理工程上下文并生成方案。',
+        semanticExtraction: planResult.semanticExtraction,
+        metadataOnly: true,
+      }),
+    });
+  });
+  await page.route('**/api/ai/agent-plan-runs', async route => {
+    markPlanRunRequested();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        runId: 'plan_datamatrix_waiting_run',
+        events: [{
+          runId: 'plan_datamatrix_waiting_run',
+          sequence: 1,
+          eventType: 'plan.context.started',
+          stage: 'collecting_context',
+          status: 'running',
+          summary: '正在整理工程上下文。',
+          payload: { metadataOnly: true },
+        }],
+      }),
+    });
+  });
+  await page.route('**/api/ai/agent-runs/plan_datamatrix_waiting_run/events**', async route => {
+    await planStreamReleased;
+    const events = [
+      { sequence: 2, eventType: 'plan.context.completed', stage: 'collecting_context', status: 'completed', summary: '工程上下文已整理。' },
+      { sequence: 3, eventType: 'plan.model.started', stage: 'planning_with_model', status: 'running', summary: '正在生成方案。' },
+      { sequence: 4, eventType: 'plan.model.completed', stage: 'planning_with_model', status: 'completed', summary: '方案候选已生成。' },
+      { sequence: 5, eventType: 'plan.contract.started', stage: 'validating_plan_contract', status: 'running', summary: '正在校验方案。' },
+      { sequence: 6, eventType: 'plan.safety.completed', stage: 'validating_plan_contract', status: 'completed', summary: '方案校验完成。' },
+      { sequence: 7, eventType: 'run.completed', stage: 'run', status: 'completed', summary: '规划已完成。', payload: { planResult, metadataOnly: true } },
+    ];
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: events.map(event => [
+        `event: ${event.eventType}`,
+        `data: ${JSON.stringify({ runId: 'plan_datamatrix_waiting_run', ...event, payload: event.payload || { metadataOnly: true } })}`,
+        '',
+      ].join('\n')).join('\n') + '\n',
+    });
+  });
+
+  await openAi(page, { width: 1366, height: 768 });
+  await page.locator('#ai-input').fill(prompt);
+  await page.locator('#ai-btn-gen').click();
+  await routerRequested;
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('进行中');
+
+  releaseRouter();
+  await planRunRequested;
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('已完成');
+  await expect(page.locator('[data-planning-phase="context"]')).toContainText('进行中');
+  await expect(page.locator('.ai-agent-run-step[data-stage="plan:context"]')).toContainText('整理工程上下文');
+  await expect(page.locator('[data-planning-phase="generate"]')).not.toContainText('已完成');
+  await expect(page.locator('[data-planning-phase="validate"]')).not.toContainText('已完成');
+
+  releasePlanStream();
+  await expect(page.locator('[data-ai-hook="plan-recommendation"]')).toContainText('DataMatrix 读取流程');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('图像从哪里获取');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待补资源');
+  await expect(page.locator('[data-ai-hook="clarification-workspace"] .ai-clarification-v2-header')).toContainText('还需确认 1 项');
+  const confirmationFields = await page.evaluate(() =>
+    (window as any).aiPanel.agentWorkspaceState.projection.confirmedAnswers.map((answer: any) => answer.field));
+  expect(confirmationFields).toEqual(expect.arrayContaining(['inspection_object', 'task_type']));
+  expect(confirmationFields).not.toContain('image_source');
+  await focusPlanningClarification(page);
+  await capturePlanningEvidence(page, 'datamatrix-plan-dark-1366.png');
+});
+
+test('fruit classification scene shows only route and judgment questions while model resource stays separate', async ({ page }) => {
+  const prompt = '帮我构建一个超市水果标签识别的视觉流程，实现相机输入水果并输出水果类型';
+  await openAi(page, { width: 1366, height: 768, theme: 'light' });
+  await page.evaluate(({ prompt }) => {
+    const panel = (window as any).aiPanel;
+    const plan = panel._normalizeBackendPlanResult({
+      planId: 'plan_fruit_label_evidence',
+      planHash: 'sha256:fruit-label-evidence',
+      originalUserPrompt: prompt,
+      goal: '识别超市水果标签并输出水果类型',
+      intent: 'classification',
+      confidence: 'high',
+      requirementMode: 'strict',
+      planSource: 'model_router',
+      requirementUnderstanding: ['检测对象是水果', '相机输入', '输出水果类型'],
+      recommendedRoute: {
+        routeId: 'fruit_label_classification',
+        title: '水果标签分类流程',
+        summary: '采集水果图像，按确认的分类路线输出水果类型与置信度。',
+        operators: ['ImageAcquisition', 'Classification', 'ResultOutput'],
+      },
+      clarificationQuestions: [
+        {
+          id: 'classification_strategy',
+          field: 'algorithm_strategy',
+          title: '类型识别采用哪条实现路线？',
+          why: '分类模型与传统特征规则会改变算子链、样本要求和资源契约。',
+          options: [
+            { value: 'model_strategy', label: '分类模型', recommended: true, answerEffect: 'resolve_field' },
+            { value: 'traditional_rule', label: '颜色 / 纹理规则', recommended: false, answerEffect: 'resolve_field' },
+          ],
+        },
+        {
+          id: 'ok_ng_rule',
+          field: 'acceptance_criteria',
+          title: '低置信度或无法分类时如何判定？',
+          why: '判定口径会影响有效输出与异常分支。',
+          options: [
+            { value: 'reject_low_confidence', label: '低置信度标记未知', recommended: true, answerEffect: 'resolve_field' },
+            { value: 'always_top1', label: '始终输出 Top-1', recommended: false, answerEffect: 'resolve_field' },
+          ],
+        },
+      ],
+      missingResources: [{
+        resourceKey: 'model:fruit-classifier',
+        resourceType: 'model_resource',
+        parameterName: 'ModelPath',
+        description: '水果分类模型待绑定',
+      }],
+      confirmedPlanAnswers: [
+        { questionId: 'prompt-object', field: 'inspection_object', value: '水果', origin: 'explicit_user_text', resolved: true },
+        { questionId: 'prompt-task', field: 'task_type', value: 'classification', origin: 'explicit_user_text', resolved: true },
+        { questionId: 'prompt-source', field: 'image_source', value: 'station_camera', origin: 'explicit_user_text', resolved: true },
+        { questionId: 'prompt-output', field: 'output_target', value: '水果类型', origin: 'explicit_user_text', resolved: true },
+      ],
+      resolvedPlanFields: ['inspection_object', 'task_type', 'image_source', 'output_target'],
+      remainingPlanFields: ['algorithm_strategy', 'acceptance_criteria'],
+      recommendedDefaults: [],
+      risks: ['类别样本覆盖与光照变化需要在验证阶段复核。'],
+      acceptanceCriteria: ['输出水果类型与置信度。'],
+      executablePlan: ['采集图像', '执行分类', '输出水果类型'],
+      canPlan: true,
+      canBuild: false,
+      nextAction: '确认分类路线和低置信度判定口径。',
+      buildReadiness: {
+        canBuild: false,
+        blockers: [
+          { id: 'hard_requirement:algorithm_strategy', category: 'hard_requirement', field: 'algorithm_strategy', questionId: 'classification_strategy', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '分类实现路线待确认' },
+          { id: 'hard_requirement:acceptance_criteria', category: 'hard_requirement', field: 'acceptance_criteria', questionId: 'ok_ng_rule', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '判定口径待确认' },
+          { id: 'resource_pending:model:fruit-classifier', category: 'resource_pending', field: 'model_resource', questionId: '', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '水果分类模型待绑定' },
+        ],
+        resolvedFields: ['inspection_object', 'task_type', 'image_source', 'output_target'],
+        remainingFields: ['algorithm_strategy', 'acceptance_criteria', 'model_resource'],
+        primaryMessage: '请确认两项关键决策，模型资源在后续单独绑定。',
+        contractVersion: 'v2',
+      },
+      requirementMaturity: {
+        maturity: 'needs_clarification',
+        taskType: 'classification',
+        canPlan: true,
+        canBuild: false,
+        objectSignals: ['水果'],
+        taskSignals: ['识别', '水果类型'],
+        missingFields: ['algorithm_strategy', 'acceptance_criteria'],
+        blockingReasons: ['algorithm_strategy', 'acceptance_criteria'],
+        publicReason: '对象、输入和输出已明确，只需确认路线与判定口径。',
+      },
+      semanticExtraction: {
+        isVisionRequest: true,
+        source: 'model_router',
+        taskType: 'classification',
+        confidence: 0.96,
+        inspectionObject: '水果',
+        imageSource: '相机',
+        outputTarget: '水果类型',
+        okCondition: '最高置信类别有效',
+        ngCondition: '低置信度无效',
+        missingFields: ['algorithm_strategy', 'acceptance_criteria'],
+      },
+      publicEvents: [],
+      metadataOnly: true,
+    }, prompt);
+    panel.pendingVisionPlan = plan;
+    panel.agentWorkspaceMode = 'plan';
+    panel._setWorkspaceViewMode('plan', { render: false });
+    panel._addMessage('user', prompt);
+    panel._addMessage('ai', '对象、相机输入和水果类型输出已明确，只核对会改变方案路线的关键决策。');
+    panel._renderAgentWorkspaceOverview();
+    panel._renderPlanWorkspace(plan);
+  }, { prompt });
+
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 2 项');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('类型识别采用哪条实现路线');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待补资源 · 1 项');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('水果分类模型待绑定');
+  await focusPlanningClarification(page);
+  await capturePlanningEvidence(page, 'fruit-plan-light-1366.png');
+});
+
+test('planning cancellation, request failure, timeout and retry stay in one recoverable lifecycle', async ({ page }) => {
+  let requestCount = 0;
+  let releaseFirstRouter!: () => void;
+  let markFirstRouterRequested!: () => void;
+  let markSecondRouterRequested!: () => void;
+  const firstRouterRequested = new Promise<void>(resolve => { markFirstRouterRequested = resolve; });
+  const secondRouterRequested = new Promise<void>(resolve => { markSecondRouterRequested = resolve; });
+  const firstRouterReleased = new Promise<void>(resolve => { releaseFirstRouter = resolve; });
+
+  await page.route('**/api/ai/agent-intent-router-runs', async route => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      markFirstRouterRequested();
+      await firstRouterReleased;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          intent: 'ambiguous_vision_requirement',
+          confidence: 'medium',
+          shouldOpenPlan: false,
+          shouldBuildDirectly: false,
+          canPlan: true,
+          canBuild: false,
+          needsClarification: true,
+          publicReason: '请求已由用户取消。',
+          assistantReply: '请求已由用户取消。',
+          metadataOnly: true,
+        }),
+      });
+      return;
+    }
+
+    markSecondRouterRequested();
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'router temporarily unavailable' }),
+    });
+  });
+
+  await openAi(page, { width: 1366, height: 768 });
+  await page.locator('#ai-input').fill('帮我创建一个水果识别流程');
+  await page.locator('#ai-btn-gen').click();
+  await firstRouterRequested;
+  await page.locator('[data-ai-action="planning-cancel"]').click();
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('已取消');
+  await expect(page.locator('[data-ai-action="planning-retry"]')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).aiPanel.isCancellingGenerate)).toBe(false);
+
+  releaseFirstRouter();
+  await page.locator('[data-ai-action="planning-retry"]').click();
+  await secondRouterRequested;
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('失败');
+  await expect(page.locator('[data-ai-action="planning-retry"]')).toBeVisible();
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel._beginPlanningLifecycle({
+      requestId: 'timeout-visual-check',
+      requestContext: panel.lastPlanningRequestContext,
+      turn: panel.activeAssistantTurn,
+      phase: 'understand',
+    });
+    panel._markPlanningLifecycleTerminal('timeout', '规划等待超时，可重试本次需求。');
+    panel._renderAgentWorkspaceOverview();
+    panel._renderPlanWorkspace(null);
+  });
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('超时');
+  await expect(page.locator('[data-ai-action="planning-retry"]')).toBeVisible();
+});
+
+test('first-round planning stays readable at 390px with reduced motion and both themes', async ({ page }) => {
+  let releaseRouter!: () => void;
+  let markRouterRequested!: () => void;
+  const routerRequested = new Promise<void>(resolve => { markRouterRequested = resolve; });
+  const routerReleased = new Promise<void>(resolve => { releaseRouter = resolve; });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/api/ai/agent-intent-router-runs', async route => {
+    markRouterRequested();
+    await routerReleased;
+    await route.fulfill({ status: 499, contentType: 'application/json', body: '{}' });
+  });
+
+  await openAi(page, { width: 390, height: 844, theme: 'dark' });
+  await page.locator('#ai-input').fill('读取产品上的DataMatrix二维码');
+  await page.locator('#ai-btn-gen').click();
+  await routerRequested;
+  await expect(page.locator('.ai-planning-stages li')).toHaveCount(4);
+  await expect(page.locator('[data-ai-action="planning-cancel"]')).toBeVisible();
+  const reducedMotionState = await page.locator('[data-ai-hook="planning-wait"]').evaluate(element => {
+    const style = getComputedStyle(element.querySelector('.ai-planning-stages li')!);
+    return {
+      transitionDuration: style.transitionDuration,
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      bodyOverflow: document.body.scrollWidth - document.body.clientWidth,
+    };
+  });
+  expect(reducedMotionState.transitionDuration).toBe('0s');
+  expect(reducedMotionState.documentOverflow).toBeLessThanOrEqual(1);
+  expect(reducedMotionState.bodyOverflow).toBeLessThanOrEqual(1);
+
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
+  await expect(page.locator('[data-ai-hook="planning-wait"]')).toBeVisible();
+  await expect(page.locator('[data-planning-phase="understand"]')).toContainText('进行中');
+  await capturePlanningEvidence(page, 'waiting-light-reduced-390.png');
+  releaseRouter();
+});
+
+test.describe('150% DPI planning evidence', () => {
+  test.use({ deviceScaleFactor: 1.5 });
+
+  test('first-round planning has no clipping at 150% device scale', async ({ page }) => {
+    let releaseRouter!: () => void;
+    let markRouterRequested!: () => void;
+    const routerRequested = new Promise<void>(resolve => { markRouterRequested = resolve; });
+    const routerReleased = new Promise<void>(resolve => { releaseRouter = resolve; });
+    await page.route('**/api/ai/agent-intent-router-runs', async route => {
+      markRouterRequested();
+      await routerReleased;
+      await route.fulfill({ status: 499, contentType: 'application/json', body: '{}' });
+    });
+
+    await openAi(page, { width: 1024, height: 768, theme: 'dark' });
+    await page.locator('#ai-input').fill('读取产品上的DataMatrix二维码');
+    await page.locator('#ai-btn-gen').click();
+    await routerRequested;
+    const dpiState = await page.evaluate(() => ({
+      devicePixelRatio: window.devicePixelRatio,
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      bodyOverflow: document.body.scrollWidth - document.body.clientWidth,
+    }));
+    expect(dpiState.devicePixelRatio).toBe(1.5);
+    expect(dpiState.documentOverflow).toBeLessThanOrEqual(1);
+    expect(dpiState.bodyOverflow).toBeLessThanOrEqual(1);
+    await expect(page.locator('.ai-planning-stages li')).toHaveCount(4);
+    await capturePlanningEvidence(page, 'waiting-dark-1024-dpi150.png');
+    releaseRouter();
+  });
 });
 
 test('legacy Result-only restore stays active while Apply remains governed by the existing gate', async ({ page }) => {

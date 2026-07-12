@@ -110,8 +110,11 @@ export function deriveAiClarificationPresentation(panel, plan) {
     const state = panel?.agentWorkspaceState || null;
     const projection = state?.projection || null;
     const runtime = getRuntime(panel);
-    const queue = asArray(projection?.clarificationQueue);
-    const batch = asArray(projection?.clarificationBatch);
+    const projectedQueue = asArray(projection?.clarificationQueue);
+    const queue = projectedQueue.length ? projectedQueue : asArray(plan?.questions);
+    const projectedBatch = asArray(projection?.clarificationBatch);
+    const batch = projectedBatch.length ? projectedBatch : queue.slice(0, 3);
+    const projectedResources = asArray(projection?.missingResources);
     const batchKeys = new Set(batch.map(readField).filter(Boolean));
     const ordered = [
         ...batch,
@@ -163,9 +166,17 @@ export function deriveAiClarificationPresentation(panel, plan) {
     ) || items.find(item =>
         !item.resource && !item.deferred && !item.confirmed
     ) || null;
-    const unresolved = items.filter(item => !item.confirmed && !item.deferred);
+    const unresolved = items.filter(item => !item.confirmed && !item.deferred && !item.resource);
     const confirmedItems = items.filter(item => item.confirmed && item !== activeQuestion);
-    const resourceItems = items.filter(item => item.resource && !item.confirmed);
+    const deferredItems = items.filter(item => item.deferred && !item.resource);
+    const resourceItems = projectedResources
+        .filter(item => item?.answered !== true)
+        .map(item => ({
+            ...item,
+            resource: true,
+            title: clean(item?.title) || clean(item?.description) || '资源待补齐',
+            blocksBuild: item?.blocksBuild === true
+        }));
     const recommendable = unresolved.filter(isSafeRecommendedItem);
     const unsafeRecommended = unresolved.some(item =>
         asArray(item.options).some(option => option?.recommended === true) && !isSafeRecommendedItem(item)
@@ -181,8 +192,16 @@ export function deriveAiClarificationPresentation(panel, plan) {
     return {
         activeQuestion,
         confirmedItems,
+        deferredItems,
         resourceItems,
         unresolvedCount: unresolved.length,
+        unanswerableBlockerCount: asArray(
+            asArray(projection?.readiness?.blockers).length
+                ? projection.readiness.blockers
+                : plan?.buildReadiness?.blockers
+        ).filter(item =>
+            item?.blocksBuild === true && !isResourceItem(item)
+        ).length,
         currentPosition: activeQuestion ? 1 : 0,
         canAcceptAllRecommended,
         readinessStatus: clean(state?.readinessStatus).toLowerCase(),
@@ -270,10 +289,26 @@ function renderConfirmedSummary(panel, items) {
     `;
 }
 
+function renderDeferredSummary(panel, items) {
+    if (!items.length) return '';
+    return `
+        <div class="ai-clarification-v2-confirmed is-deferred" data-ai-hook="clarification-deferred">
+            <div class="ai-clarification-v2-subtitle">已暂缓</div>
+            ${items.map(item => `
+                <div class="ai-clarification-v2-confirmed-row">
+                    <span><strong>${escapeHtml(panel, item.title || item.field)}：</strong>稍后确认，当前不会作为业务答案</span>
+                    <button type="button" data-ai-action="clarification-edit" data-field="${escapeHtml(panel, item.field)}">重新选择</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 function renderResources(panel, items) {
     if (!items.length) return '';
     return `
         <div class="ai-clarification-v2-resources" data-ai-hook="clarification-resources">
+            <div class="ai-clarification-v2-subtitle">待补资源 · ${items.length} 项</div>
             ${items.map(item => `
                 <div>
                     <strong>${escapeHtml(panel, item.title || '资源待补齐')}</strong>
@@ -288,7 +323,16 @@ function renderResources(panel, items) {
 
 export function renderAiClarification(panel, plan) {
     const presentation = deriveAiClarificationPresentation(panel, plan);
-    if (!presentation.activeQuestion && !presentation.confirmedItems.length && !presentation.resourceItems.length) {
+    if (!presentation.activeQuestion && !presentation.confirmedItems.length && !presentation.deferredItems.length && !presentation.resourceItems.length) {
+        if (presentation.unanswerableBlockerCount > 0) {
+            return `
+                <div class="ai-plan-v2-clarification-gap" data-ai-hook="clarification-contract-gap" role="alert">
+                    <strong>暂无可回答的关键问题</strong>
+                    <span>当前 Readiness 仍有需求阻断，但 Plan 没有提供可选问题；系统不会用资源项或前端临时问卷代替。</span>
+                    <button type="button" data-ai-action="planning-retry">重试规划</button>
+                </div>
+            `;
+        }
         return '<div class="ai-plan-v2-ready" data-ai-hook="clarification-ready"><strong>方案已就绪</strong><span>关键问题已确认，可复核后开始构建。</span></div>';
     }
     return `
@@ -298,7 +342,7 @@ export function renderAiClarification(panel, plan) {
                     <span>关键问题</span>
                     <strong>${presentation.unresolvedCount > 0
                         ? `还需确认 ${presentation.unresolvedCount} 项${presentation.activeQuestion ? ' · 当前第 1 项' : ''}`
-                        : '关键问题已确认'}</strong>
+                        : '当前没有待确认问题'}</strong>
                 </div>
                 ${presentation.canAcceptAllRecommended
                     ? '<button type="button" data-ai-action="clarification-accept-recommended">采用全部推荐项</button>'
@@ -306,6 +350,7 @@ export function renderAiClarification(panel, plan) {
             </div>
             ${renderActiveQuestion(panel, presentation.activeQuestion, presentation)}
             ${renderConfirmedSummary(panel, presentation.confirmedItems)}
+            ${renderDeferredSummary(panel, presentation.deferredItems)}
             ${renderResources(panel, presentation.resourceItems)}
         </section>
     `;
@@ -375,6 +420,9 @@ export function bindAiClarificationInteractions(panel, root, plan) {
     });
     root.querySelector('[data-ai-action="clarification-accept-recommended"]')?.addEventListener('click', () => {
         panel._handlePlanUseRecommendedDefaultsClick?.(plan);
+    });
+    root.querySelector('[data-ai-action="planning-retry"]')?.addEventListener('click', () => {
+        panel._retryPlanningLifecycle?.();
     });
 
     const runtime = getRuntime(panel);

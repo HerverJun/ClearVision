@@ -553,6 +553,7 @@ test('Router text does not create a second question and resource pending stays l
 
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(1);
   await expect(page.locator('#ai-plan-workspace')).not.toContainText('旧 Router 澄清问题');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 1 项');
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('完整资源补齐将在后续阶段处理');
   await expect(page.locator('#ai-plan-workspace input[type="file"]')).toHaveCount(0);
   await expect(page.locator('#ai-plan-workspace [data-resource-action]')).toHaveCount(0);

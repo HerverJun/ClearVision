@@ -871,7 +871,13 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
 
         // 1. ConfirmedPlanAnswers: Normalized, and deduped by canonical field
-        var rawConfirmed = request.ConfirmedPlanAnswers ?? [];
+        var explicitPromptAnswers = VisionAgentRequirementMaturityGate.ExtractExplicitPlanAnswers(
+            maturityRequest,
+            semantic);
+        var rawConfirmed = (request.ConfirmedPlanAnswers ?? [])
+            .Where(answer => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(answer.Origin))
+            .Concat(explicitPromptAnswers)
+            .ToList();
         var normalizedConfirmed = new List<VisionAgentPlanAnswer>();
         var groupedAnswers = rawConfirmed
             .Select(a =>
@@ -892,20 +898,16 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var confirmedSet = normalizedConfirmed.Select(a => a.Field).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // 2. ResolvedPlanFields: only concrete answers and SemanticExtraction confirmed slots.
-        var semanticConfirmedFields = GetSemanticConfirmedFields(semantic)
-            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
-            .Where(f => !string.IsNullOrWhiteSpace(f));
-
-        var resolvedSet = confirmedSet
-            .Concat(semanticConfirmedFields)
-            .Concat(GetMaturityConfirmedFields(maturity))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // 2. ResolvedPlanFields: only authoritative, concrete answers. Semantic and maturity
+        // evidence remain visible as inference, but never masquerade as user confirmation.
+        var resolvedSet = confirmedSet.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var resolvedPlanFields = resolvedSet.ToList();
 
         // 3. RemainingPlanFields：RequirementMaturity.MissingFields 减去 ResolvedPlanFields
+        var inferredReviewFields = BuildUnconfirmedHighImpactFields(maturity, semantic);
         var remainingPlanFields = maturity.MissingFields
+            .Concat(inferredReviewFields)
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(f => !string.IsNullOrWhiteSpace(f) && !resolvedSet.Contains(f))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -930,9 +932,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var route = updatedMaturity.CanPlan
             ? BuildRoute(scenario, templateSelection)
             : BuildClarificationRoute(updatedMaturity);
-        var questions = updatedMaturity.CanBuild
-            ? BuildQuestions(scenario)
-            : BuildMaturityQuestions(updatedMaturity);
+        var questions = BuildMaturityQuestions(updatedMaturity, scenario);
         var defaults = BuildDefaults(scenario, request);
         var toolNames = _toolRegistry.ListTools()
             .Select(tool => tool.Name)
@@ -1702,6 +1702,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ],
             "code_recognition" =>
             [
+                Question("image_source", "DataMatrix / 码图像从哪里进入流程？", "输入方式会改变采集算子、验证节奏和后续资源绑定。", "file_sample", "先用离线样张验证解码链，量产相机作为独立待补资源绑定。", "选择输入方式不会自动声明具体相机已经就绪。", [
+                    Option("file_sample", "先用离线样张", true, "用代表性码图完成解码与失败策略验证。", "适合先验证方案，不需要伪造相机绑定。"),
+                    Option("station_camera", "工站相机输入", false, "按在线采集规划输入，具体 Camera 资源继续单独待补。", "更贴近量产，但需要后续绑定相机。"),
+                    Option("video_stream", "视频流输入", false, "从视频流逐帧读取码。", "需要额外考虑帧率、重复码和节拍。")
+                ]),
                 Question("code_type", "需要解码哪种码制？", "解码器设置和分级逻辑取决于码制。", "auto_code", "先尝试 QR/DataMatrix/条码的元数据解码设置。", "自动模式灵活，但后续可能要收紧。", [
                     Option("auto_code", "自动码制", true, "保持解码码制灵活。", "适合作为第一版草稿。"),
                     Option("qr", "QR 码", false, "使用 QR 专用解码参数。", "更快且更严格。"),
@@ -1711,6 +1716,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     Option("ng_on_unreadable", "不可读判 NG", true, "不可读码直接判为 NG。", "安全默认值。"),
                     Option("retry", "重试待确认", false, "规划重试或二次曝光。", "需要确认工站节拍。"),
                     Option("manual_review", "人工复核", false, "标记复核而不是立即 NG。", "需要操作员流程。")
+                ]),
+                Question("result_output", "解码结果按什么契约交付？", "输出字段会影响 ResultOutput 的结构和下游接入方式。", "local_result", "输出码值、是否可读和失败原因等本地结构化字段。", "先保持本地结构化输出可避免提前假设 PLC 或业务系统。", [
+                    Option("local_result", "本地结构化结果", true, "返回码值、读取状态和失败原因。", "适合方案验证，也便于后续接入。"),
+                    Option("business_system", "发送业务系统", false, "规划外部系统接入字段，但地址与凭据仍不进入公开计划。", "需要后续确认接口契约。"),
+                    Option("plc_pending", "PLC 输出待确认", false, "保留 PLC 输出为待补工程项。", "不会猜测地址、握手或失效保护。")
                 ])
             ],
             "plc_output" =>
@@ -1741,6 +1751,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ],
             "classification" or "attribute_classification" =>
             [
+                Question("classification_strategy", "类型识别采用哪条实现路线？", "分类模型与传统特征规则会显著改变算子链、样本要求和资源契约。", "model_strategy", "优先规划分类模型，模型文件作为独立待补资源。", "适合类别边界和外观变化较大的对象。", [
+                    Option("model_strategy", "分类模型", true, "使用分类模型输出类别与置信度。", "需要后续绑定模型资源和标签表。"),
+                    Option("traditional_rule", "传统颜色 / 纹理规则", false, "用颜色、纹理或几何特征进行规则分类。", "样本变化小时更轻量，但泛化能力有限。"),
+                    Option("strategy_pending", "先保留路线待确认", false, "只形成可评审方案，不提前选择实现路线。", "不会解除严格模式的策略阻断。")
+                ]),
                 Question("attribute_target", "要判别哪个属性？", "属性会影响特征、模型标签和 OK/NG 语义。", "semantic_attribute", "按用户描述的属性进行分类或 OK/NG 判别。", "属性定义不清会导致误判。", [
                     Option("semantic_attribute", "语义属性", true, "例如成熟度、颜色、类别或状态。", "保留语义槽位并进入分类路线。"),
                     Option("color_texture", "颜色/纹理", false, "基于颜色、纹理或外观特征判别。", "需要稳定光照。"),
@@ -1768,14 +1783,31 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         };
     }
 
-    private static List<VisionAgentClarificationQuestion> BuildMaturityQuestions(AiRequirementMaturityResult maturity)
+    private static List<VisionAgentClarificationQuestion> BuildMaturityQuestions(
+        AiRequirementMaturityResult maturity,
+        string scenario)
     {
         var missing = maturity.MissingFields
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(f => !string.IsNullOrWhiteSpace(f))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        return VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(missing).Take(5).ToList();
+        if (missing.Count == 0)
+        {
+            return [];
+        }
+
+        var contextual = VisionAgentPlanFieldPolicy.NormalizeQuestions(
+            BuildQuestions(scenario),
+            missing,
+            [],
+            []);
+        var covered = contextual
+            .Select(question => question.Field)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var fallback = VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(
+            missing.Where(field => !covered.Contains(field)));
+        return contextual.Concat(fallback).Take(3).ToList();
     }
 
     private static List<VisionAgentDefaultAssumption> BuildDefaults(
@@ -2043,52 +2075,53 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return 5;
     }
 
-    private static IEnumerable<string> GetSemanticConfirmedFields(VisionAgentSemanticExtractionResult? semantic)
+    private static IEnumerable<string> BuildUnconfirmedHighImpactFields(
+        AiRequirementMaturityResult maturity,
+        VisionAgentSemanticExtractionResult? semantic)
     {
-        if (semantic == null)
-            yield break;
-        if (!string.IsNullOrWhiteSpace(semantic.InspectionObject))
-            yield return VisionAgentPlanAnswerFields.InspectionObject;
-        if (!string.IsNullOrWhiteSpace(semantic.TaskType) &&
-            !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        if (semantic != null)
         {
-            yield return VisionAgentPlanAnswerFields.TaskType;
+            if (!string.IsNullOrWhiteSpace(semantic.InspectionObject))
+            {
+                yield return VisionAgentPlanAnswerFields.InspectionObject;
+            }
+            if (!string.IsNullOrWhiteSpace(semantic.TaskType) &&
+                !semantic.TaskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+                !semantic.TaskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return VisionAgentPlanAnswerFields.TaskType;
+            }
+            if (!string.IsNullOrWhiteSpace(semantic.ImageSource))
+            {
+                yield return VisionAgentPlanAnswerFields.ImageSource;
+            }
+            if (!string.IsNullOrWhiteSpace(semantic.OkCondition) ||
+                !string.IsNullOrWhiteSpace(semantic.NgCondition))
+            {
+                yield return VisionAgentPlanAnswerFields.AcceptanceCriteria;
+            }
+            if (!string.IsNullOrWhiteSpace(semantic.OutputTarget))
+            {
+                yield return VisionAgentPlanAnswerFields.OutputTarget;
+            }
         }
-        if (!string.IsNullOrWhiteSpace(semantic.ImageSource))
-            yield return VisionAgentPlanAnswerFields.ImageSource;
-        if (!string.IsNullOrWhiteSpace(semantic.OkCondition) || !string.IsNullOrWhiteSpace(semantic.NgCondition))
+
+        if (maturity.TaskType is AiVisionTaskTypes.CodeRecognition or
+            AiVisionTaskTypes.BarcodeQr or
+            AiVisionTaskTypes.Classification or
+            AiVisionTaskTypes.AttributeClassification or
+            AiVisionTaskTypes.PlcOutput)
         {
-            yield return VisionAgentPlanAnswerFields.AcceptanceCriteria;
-        }
-        if (!string.IsNullOrWhiteSpace(semantic.OutputTarget))
             yield return VisionAgentPlanAnswerFields.OutputTarget;
-        if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute))
-            yield return VisionAgentPlanAnswerFields.TargetAttribute;
-        if (!string.IsNullOrWhiteSpace(semantic.DefectType))
-            yield return VisionAgentPlanAnswerFields.DefectType;
-        if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget))
-            yield return VisionAgentPlanAnswerFields.MeasurementTarget;
-    }
-
-    private static IEnumerable<string> GetMaturityConfirmedFields(AiRequirementMaturityResult maturity)
-    {
-        var missing = maturity.MissingFields
-            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
-            .Where(field => !string.IsNullOrWhiteSpace(field))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!missing.Contains(VisionAgentPlanAnswerFields.InspectionObject) &&
-            maturity.ObjectSignals.Any(signal => !string.IsNullOrWhiteSpace(signal)))
-        {
-            yield return VisionAgentPlanAnswerFields.InspectionObject;
         }
 
-        if (!missing.Contains(VisionAgentPlanAnswerFields.TaskType) &&
-            !string.IsNullOrWhiteSpace(maturity.TaskType) &&
-            !maturity.TaskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
-            !maturity.TaskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        if (maturity.TaskType is AiVisionTaskTypes.Classification or
+            AiVisionTaskTypes.AttributeClassification or
+            AiVisionTaskTypes.SurfaceDefect or
+            AiVisionTaskTypes.SurfaceOrPoseDefect)
         {
-            yield return VisionAgentPlanAnswerFields.TaskType;
+            yield return VisionAgentPlanAnswerFields.AlgorithmStrategy;
         }
     }
+
 }

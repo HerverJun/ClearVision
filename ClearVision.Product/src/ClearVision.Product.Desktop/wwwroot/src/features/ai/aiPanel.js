@@ -88,6 +88,8 @@ export class AiPanel {
         this.activePlanRunEvents = [];
         this.activePlanRunEventKeys = new Set();
         this.activePlanRunCompletion = null;
+        this.planningLifecycle = null;
+        this.lastPlanningRequestContext = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
         this.attachments = [];
@@ -283,6 +285,9 @@ export class AiPanel {
         this._saveSessionId(null);
         this.currentResult = null;
         this.lastUserPrompt = '';
+        this._clearPlanningLifecycleTimers?.();
+        this.planningLifecycle = null;
+        this.lastPlanningRequestContext = null;
         this.unreadStreamCount = 0;
         this.userHasScrolledUp = false;
         this._updateScrollBottomBtn();
@@ -1818,7 +1823,7 @@ export class AiPanel {
         if(btn) {
             btn.disabled = busy;
             if(busy) {
-                btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></path></svg>`;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="white" aria-hidden="true"><path d="M6 4h12v3.5c0 2.2-1.2 3.5-3.2 4.5 2 1 3.2 2.3 3.2 4.5V20H6v-3.5c0-2.2 1.2-3.5 3.2-4.5-2-1-3.2-2.3-3.2-4.5V4zm2 2v1.5c0 1.5.9 2.3 4 3.6 3.1-1.3 4-2.1 4-3.6V6H8zm4 7.1c-3.1 1.3-4 2.1-4 3.4V18h8v-1.5c0-1.3-.9-2.1-4-3.4z"/></svg>`;
             } else {
                 btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`;
             }

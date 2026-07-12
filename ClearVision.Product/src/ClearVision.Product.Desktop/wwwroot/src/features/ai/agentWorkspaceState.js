@@ -49,6 +49,12 @@ const PLACEHOLDER_VALUES = new Set([
     'metadata_only',
     'pending'
 ]);
+const AUTHORITATIVE_ANSWER_ORIGINS = new Set([
+    'explicit_user_selection',
+    'explicit_user_text',
+    'accepted_recommended_default',
+    'resource_bound'
+]);
 
 const asArray = value => Array.isArray(value) ? value : [];
 const asObject = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -85,14 +91,15 @@ export function normalizeWorkspaceAnswer(value, fallback = {}) {
     const field = normalizeCanonicalField(read(item, 'field') || read(fallback, 'field'));
     const answerValue = clean(read(item, 'value'));
     if (!field || !answerValue || isPlaceholderAnswer(answerValue)) return null;
-    const origin = lower(read(item, 'origin')) || 'explicit_user_selection';
+    const origin = lower(read(item, 'origin'));
+    const normalizedOrigin = ANSWER_ORIGIN_PRIORITY[origin] === undefined ? 'legacy_inferred' : origin;
     return {
         field,
         questionId: clean(read(item, 'questionId') || read(fallback, 'questionId')),
         value: answerValue,
-        origin: ANSWER_ORIGIN_PRIORITY[origin] === undefined ? 'explicit_user_selection' : origin,
+        origin: normalizedOrigin,
         confidence: Number(read(item, 'confidence') ?? 1) || 1,
-        resolved: read(item, 'resolved') !== false
+        resolved: read(item, 'resolved') !== false && AUTHORITATIVE_ANSWER_ORIGINS.has(normalizedOrigin)
     };
 }
 
@@ -147,11 +154,16 @@ function normalizeQuestion(value) {
 function normalizeBlocker(value) {
     const item = asObject(value);
     const id = clean(read(item, 'id'));
+    const category = lower(read(item, 'category'));
+    const resourceKey = category === 'resource_pending'
+        ? clean(read(item, 'resourceKey')) || id.replace(/^resource_pending:/i, '').replace(/^resource:/i, '')
+        : '';
     const field = normalizeCanonicalField(read(item, 'field') || read(item, 'questionId') || id);
     if (!id && !field) return null;
     return {
-        kind: lower(read(item, 'category')) === 'resource_pending' ? 'resource' : 'blocker',
+        kind: category === 'resource_pending' ? 'resource' : 'blocker',
         id: id || `blocker:${field}`,
+        resourceKey,
         questionId: clean(read(item, 'questionId')),
         field,
         title: clean(read(item, 'publicLabel')) || field || id,
@@ -160,7 +172,7 @@ function normalizeBlocker(value) {
         options: [],
         interactive: false,
         blocksBuild: read(item, 'blocksBuild') === true,
-        category: lower(read(item, 'category')),
+        category,
         resolutionMode: lower(read(item, 'resolutionMode')),
         source: 'build_readiness'
     };
@@ -254,38 +266,36 @@ export function deriveAgentWorkspaceProjection(state) {
     ].map(normalizeMissingResource);
     const questions = asArray(read(plan, 'clarificationQuestions') || read(plan, 'questions')).map(normalizeQuestion).filter(Boolean);
     const blockers = asArray(readiness.blockers).map(item => item?.source ? item : normalizeBlocker(item)).filter(Boolean);
+    const blockersByField = new Map();
+    blockers.filter(item => item.kind !== 'resource').forEach(item => {
+        const field = normalizeCanonicalField(item.field);
+        if (field) blockersByField.set(field, item);
+    });
     const queueByKey = new Map();
-    [...questions, ...blockers, ...resources].forEach(item => {
+    questions.forEach(item => {
         const field = normalizeCanonicalField(item.field);
         const key = field || item.questionId || item.resourceKey || item.id;
         if (!key) return;
         const answer = field ? answersByField[field] : null;
-        const resourceDecision = state.resources.decisionsByKey[item.resourceKey || item.id] || null;
         const selectedValue = item.questionId ? state.answers.selectionByQuestion[item.questionId] : '';
         const selectedOption = asArray(item.options).find(option => option.value === selectedValue);
+        const blocker = field ? blockersByField.get(field) : null;
         const normalized = {
             ...item,
+            ...(blocker ? {
+                blocksBuild: item.blocksBuild || blocker.blocksBuild,
+                category: blocker.category || item.category,
+                resolutionMode: blocker.resolutionMode || item.resolutionMode,
+                sources: unique([item.source, blocker.source])
+            } : {}),
             field,
             answer: answer || null,
             answered: Boolean(answer?.resolved),
-            deferred: resourceDecision?.status === 'deferred' || selectedOption?.answerEffect === 'defer',
+            deferred: selectedOption?.answerEffect === 'defer',
             selectedValue,
-            resourceDecision
+            resourceDecision: null
         };
-        const existing = queueByKey.get(key);
-        if (!existing) {
-            queueByKey.set(key, normalized);
-            return;
-        }
-        queueByKey.set(key, {
-            ...existing,
-            ...normalized,
-            kind: existing.kind === 'question' ? existing.kind : normalized.kind,
-            options: existing.options?.length ? existing.options : normalized.options,
-            interactive: existing.interactive || normalized.interactive,
-            blocksBuild: existing.blocksBuild || normalized.blocksBuild,
-            sources: unique([existing.source, normalized.source, ...(existing.sources || [])])
-        });
+        queueByKey.set(key, normalized);
     });
 
     const queue = [...queueByKey.values()];
@@ -293,7 +303,22 @@ export function deriveAgentWorkspaceProjection(state) {
     const requestedBatchKeys = asArray(state.clarification?.batchKeys);
     const clarificationBatch = requestedBatchKeys.length
         ? requestedBatchKeys.map(key => queue.find(item => (item.field || item.id) === key)).filter(Boolean)
-        : unresolved.filter(item => item.interactive).slice(0, 3);
+        : unresolved.filter(item => item.interactive && asArray(item.options).length >= 2).slice(0, 3);
+    const resourceByKey = new Map();
+    [...resources, ...blockers.filter(item => item.kind === 'resource')].forEach((item, index) => {
+        const resourceKey = item.resourceKey || item.id || `resource:${index}`;
+        const decision = state.resources.decisionsByKey[resourceKey] || null;
+        const existing = resourceByKey.get(resourceKey);
+        resourceByKey.set(resourceKey, {
+            ...(existing || {}),
+            ...item,
+            kind: 'resource',
+            resourceDecision: decision,
+            deferred: decision?.status === 'deferred',
+            answered: decision?.status === 'bound'
+        });
+    });
+    const missingResources = [...resourceByKey.values()];
     const phase = derivePhase(state, plan, readiness, queue);
     return {
         phase,
@@ -302,7 +327,7 @@ export function deriveAgentWorkspaceProjection(state) {
         answersByField,
         clarificationQueue: queue,
         clarificationBatch,
-        missingResources: queue.filter(item => item.kind === 'resource'),
+        missingResources,
         readiness,
         buildAction: {
             canBuild: readiness.canBuild === true,

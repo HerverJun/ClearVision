@@ -221,6 +221,60 @@ public sealed class VisionAgentConsolidationTests
 
     // 6. Planner 越权过滤
     [Fact]
+    public void ModelInferredAnswer_ShouldRemainInferenceAndNeverResolveReadiness()
+    {
+        var plan = new VisionAgentPlanModeResult
+        {
+            PlanContractVersion = "v2",
+            PlanId = "model_inference_plan",
+            ClarificationQuestions =
+            [
+                new()
+                {
+                    Id = "q_image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Title = "image source",
+                    Options =
+                    [
+                        new() { Value = "station_camera", Label = "camera" },
+                        new() { Value = "file_sample", Label = "file" }
+                    ]
+                }
+            ],
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+            BlockingReasons = ["hard_requirement:image_source_missing"]
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [
+                new()
+                {
+                    QuestionId = "q_image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "station_camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ModelInferred
+                }
+            ],
+            null,
+            acceptedRecommendedDefaults: false);
+
+        validation.AcceptedAnswers.Should().BeEmpty();
+        validation.ResolvedFields.Should().BeEmpty();
+        validation.Warnings.Should().Contain(item => item.Contains("non_authoritative_answer_ignored"));
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            acceptedRecommendedDefaults: false,
+            validatedAnswers: validation);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.ResolvedFields.Should().NotContain(VisionAgentPlanAnswerFields.ImageSource);
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.ImageSource && blocker.BlocksBuild);
+    }
+
+    [Fact]
     public void FallbackPendingRecommendedOptions_ShouldStayVisibleButNotUnblockBuild()
     {
         var questions = VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(

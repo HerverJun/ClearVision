@@ -2429,8 +2429,8 @@ test('ordinary send runs Intent Router before Plan planner', async () => {
   assert.equal(calls[1].request.description, '为我构建一个包装箱外观视觉检测流程');
   assert.equal(panel.pendingVisionPlan.goal, 'router then plan');
   assert.equal(panel.isGenerating, false);
-  assert.match(collectProcessText(turn), /正在判断请求类型/);
-  assert.match(collectProcessText(turn), /已理解请求/);
+  assert.match(collectProcessText(turn), /理解需求：完成/);
+  assert.match(collectProcessText(turn), /整理工程上下文/);
   assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
@@ -2600,7 +2600,8 @@ test('Plan workspace shows rule fallback as recoverable confirmation state', asy
   const actionState = panel._getPlanBuildActionState(panel.pendingVisionPlan);
 
   assert.match(planWorkspace.innerHTML, /AI 理解成了什么/);
-  assert.match(planWorkspace.innerHTML, /还需确认 1 项/);
+  assert.match(planWorkspace.innerHTML, /暂无可回答的关键问题/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /还需确认 1 项/);
   assert.match(planWorkspace.innerHTML, /规则兜底/);
   assert.match(actionState.statusText, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
   assert.equal(actionState.label, '还需补充 1 项信息');
@@ -2760,7 +2761,8 @@ test('Plan workspace missing fields render user-facing missing information count
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, '检测产品表面');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /还需确认 2 项/);
+  assert.match(planWorkspace.innerHTML, /暂无可回答的关键问题/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /还需确认 2 项/);
   assert.match(planWorkspace.innerHTML, /图像来源/);
   assert.match(planWorkspace.innerHTML, /OK \/ NG 判定/);
   assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"|id="ai-plan-use-recommended-defaults"/);
@@ -2876,7 +2878,7 @@ test('Plan workspace does not fall back to the Composer when canonical options a
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
   assert.equal(input.focused, false);
-  assert.match(planWorkspace.innerHTML, /前端不会创建替代答案入口/);
+  assert.match(planWorkspace.innerHTML, /不会用资源项或前端临时问卷代替/);
   assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"/);
 });
 
@@ -3770,16 +3772,15 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
 
   assert.equal(accepted, true);
   assert.ok(turn);
-  assert.match(turn.replyBody.textContent, /正在判断请求类型/);
+  assert.match(turn.replyBody.textContent, /正在理解需求/);
   await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_backend_1', 'streamed plan result');
 
   assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');
   assert.equal(panel.isGenerating, false);
   assert.match(turn.replyBody.textContent, /规划已完成，请确认推荐项或手动回答后开始构建/);
-  assert.match(collectProcessText(turn), /收集上下文：完成/);
-  assert.match(collectProcessText(turn), /模型规划：进行中|模型规划：完成/);
-  assert.match(collectProcessText(turn), /契约校验：完成/);
-  assert.match(collectProcessText(turn), /安全约束：完成/);
+  assert.match(collectProcessText(turn), /整理工程上下文：完成/);
+  assert.match(collectProcessText(turn), /生成方案：进行中|生成方案：完成/);
+  assert.match(collectProcessText(turn), /校验方案：进行中|校验方案：完成/);
   assert.match(overview.innerHTML, /streamed plan ready/);
   assert.match(plan.innerHTML, /风险与工程详情/);
   assert.doesNotMatch(turn.replyBody.textContent, /collecting_context|planning_with_model|rawPrompt|chain/i);
@@ -4268,7 +4269,7 @@ test('Plan Mode timeout stream shows rule fallback copy', async () => {
 
   assert.match(turn.replyBody.textContent, /模型规划超时，已使用规则兜底方案/);
   assert.match(turn.replyBody.textContent, /稍后重试深度规划/);
-  assert.match(collectProcessText(turn), /模型规划：超时|规则兜底：完成/);
+  assert.match(collectProcessText(turn), /生成方案：超时|规则兜底：完成/);
   assert.equal(panel.pendingVisionPlan.planSource, 'rule_fallback');
   assert.match(panel.pendingVisionPlan.fallbackReason, /模型规划超时/);
 });
@@ -4510,6 +4511,10 @@ test('Contract-invalid empty-option questions fail closed instead of creating a 
     }
   });
   panel.pendingVisionPlan = plan;
+  panel._dispatchAgentWorkspaceEvent({
+    type: 'workspace/plan-received',
+    payload: { plan }
+  });
   panel._renderPlanWorkspace(plan);
   assert.equal(panel.agentWorkspaceState.projection.buildAction.canStart, false);
   assert.doesNotMatch(planWorkspace.innerHTML, /ai-plan-custom-input-field|data-ai-plan-option=/);
@@ -4893,6 +4898,10 @@ test('Pending recommendation is a defer control and never becomes a business ans
     concreteAnswerEffect: 'resolve_field'
   });
   panel.pendingVisionPlan = plan;
+  panel._dispatchAgentWorkspaceEvent({
+    type: 'workspace/plan-received',
+    payload: { plan }
+  });
   panel._renderPlanWorkspace(plan);
   panel._selectPlanQuestionOption('image_source', 'camera_pending');
   assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');

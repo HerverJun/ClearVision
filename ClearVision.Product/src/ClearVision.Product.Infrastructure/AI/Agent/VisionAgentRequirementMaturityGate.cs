@@ -268,7 +268,6 @@ public static class VisionAgentRequirementMaturityGate
             missingFields = CanonicalMissingFields(missingFields);
             canBuild = CanBuildFromMissingFields(missingFields, taskType);
         }
-
         if (!canBuild)
         {
             return Result(
@@ -479,6 +478,240 @@ public static class VisionAgentRequirementMaturityGate
             _ when maturity.CanPlan => VisionAgentIntentRouterService.IntentActionableVisionPlan,
             _ => VisionAgentIntentRouterService.IntentAmbiguousVisionRequirement
         };
+    }
+
+    public static List<VisionAgentPlanAnswer> ExtractExplicitPlanAnswers(
+        VisionAgentRequirementMaturityRequest request,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        var text = NormalizeText(request.Description, request.AdditionalContext);
+        var answers = new Dictionary<string, VisionAgentPlanAnswer>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        var explicitObject = FirstRegexValue(text,
+            @"(?:检测目标|检测对象)\s*(?:是|为|:|：)?\s*(?<value>[^，。；;,.!?！？]+)",
+            @"读取\s*(?<value>[^，。；;,.!?！？]{1,32}?)\s*上的",
+            @"(?:相机|图像|图片|视频|文件)?\s*输入\s*(?<value>[^，。；;,.!?！？\s]{1,32})(?:并|后|，|,)");
+        if (string.IsNullOrWhiteSpace(explicitObject) &&
+            ContainsLiteralEvidence(text, semantic?.InspectionObject))
+        {
+            explicitObject = semantic!.InspectionObject;
+        }
+        if (string.IsNullOrWhiteSpace(explicitObject))
+        {
+            explicitObject = ExtractSemanticSlots(text).ObjectSignals.FirstOrDefault() ??
+                             HitTerms(text, ObjectSignals).FirstOrDefault();
+        }
+        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.InspectionObject, explicitObject);
+
+        var explicitTaskType = ResolveExplicitTaskType(text, semantic);
+        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.TaskType, explicitTaskType);
+
+        if (ContainsAny(text, ["相机", "工业相机", "采集", "camera"]))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "station_camera");
+        }
+        else if (ContainsAny(text, ["图片", "图像文件", "照片", "样张", "文件夹", "image", "photo", "file"]))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "file_sample");
+        }
+        else if (ContainsAny(text, ["视频", "video"]))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "video_stream");
+        }
+
+        if (HasAcceptanceCriteriaText(text))
+        {
+            var acceptance = VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(
+                semantic?.OkCondition,
+                semantic?.NgCondition);
+            AddExplicitAnswer(
+                answers,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                string.IsNullOrWhiteSpace(acceptance) ? BoundedText(text) : acceptance);
+        }
+
+        var outputTarget = FirstRegexValue(text,
+            @"(?:输出|返回)\s*(?<value>[^，。；;,.!?！？]+)",
+            @"(?:写入|发送到|保存到)\s*(?<value>[^，。；;,.!?！？]+)");
+        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.OutputTarget, outputTarget);
+
+        if (ContainsLiteralEvidence(text, semantic?.TargetAttribute))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.TargetAttribute, semantic!.TargetAttribute);
+        }
+        if (ContainsLiteralEvidence(text, semantic?.DefectType))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.DefectType, semantic!.DefectType);
+        }
+        if (ContainsLiteralEvidence(text, semantic?.MeasurementTarget))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.MeasurementTarget, semantic!.MeasurementTarget);
+        }
+
+        if (ContainsAny(text, ["深度学习", "分类模型", "检测模型", "AI 模型", "neural", "deep learning"]))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy");
+        }
+        else if (ContainsAny(text, ["传统算法", "规则算法", "几何算法", "阈值规则", "traditional rule", "rule based"]))
+        {
+            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "traditional_rule");
+        }
+
+        return answers.Values.ToList();
+    }
+
+    private static string ResolveExplicitTaskType(
+        string text,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (ContainsAny(text, ["DataMatrix", "二维码", "条码", "读码", "扫码", "barcode", "QR code"]))
+        {
+            return AiVisionTaskTypes.CodeRecognition;
+        }
+        if (Regex.IsMatch(text, @"(?:输出|识别|判别)[^，。；;,.!?！？]{0,24}(?:类型|类别|品类)", RegexOptions.IgnoreCase) ||
+            ContainsAny(text, ["分类", "classification", "classify"]))
+        {
+            return AiVisionTaskTypes.Classification;
+        }
+        if (Regex.IsMatch(text, @"识别内容\s*(?:是|为|:|：)", RegexOptions.IgnoreCase))
+        {
+            return AiVisionTaskTypes.Classification;
+        }
+        if (Regex.IsMatch(text, @"检测\s*[^，。；;,.!?！？]+?上的[^，。；;,.!?！？]+", RegexOptions.IgnoreCase))
+        {
+            return AiVisionTaskTypes.PresenceAbsence;
+        }
+        if (semantic != null &&
+            NormalizeSemanticTaskType(semantic.TaskType) == AiVisionTaskTypes.AttributeClassification &&
+            ContainsAnyLiteralEvidence(text, semantic.TargetAttribute))
+        {
+            return AiVisionTaskTypes.AttributeClassification;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.GeometryMeasurement]))
+        {
+            return AiVisionTaskTypes.GeometryMeasurement;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.WireSequence]))
+        {
+            return AiVisionTaskTypes.WireSequence;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.PresenceAbsence]))
+        {
+            return AiVisionTaskTypes.PresenceAbsence;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.TemplateLocation]))
+        {
+            return AiVisionTaskTypes.TemplateLocation;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceOrPoseDefect]))
+        {
+            return AiVisionTaskTypes.SurfaceOrPoseDefect;
+        }
+
+        var semanticTaskType = NormalizeSemanticTaskType(semantic?.TaskType);
+        return HasExplicitTaskEvidence(text, semanticTaskType) ? semanticTaskType : string.Empty;
+    }
+
+    private static bool HasExplicitTaskEvidence(string text, string taskType)
+    {
+        return taskType switch
+        {
+            AiVisionTaskTypes.CodeRecognition => ContainsAny(text, ["DataMatrix", "二维码", "条码", "读码", "扫码", "code", "ocr"]),
+            AiVisionTaskTypes.Classification or AiVisionTaskTypes.AttributeClassification =>
+                ContainsAny(text, ["分类", "类型", "类别", "品类", "classification", "classify"]),
+            AiVisionTaskTypes.GeometryMeasurement => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.GeometryMeasurement]),
+            AiVisionTaskTypes.WireSequence => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.WireSequence]),
+            AiVisionTaskTypes.PresenceAbsence => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.PresenceAbsence]),
+            AiVisionTaskTypes.TemplateLocation => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.TemplateLocation]),
+            AiVisionTaskTypes.SurfaceDefect or AiVisionTaskTypes.SurfaceOrPoseDefect =>
+                ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceOrPoseDefect]),
+            AiVisionTaskTypes.PlcOutput => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.PlcOutput]),
+            _ => false
+        };
+    }
+
+    private static bool RequiresAlgorithmStrategyDecision(string taskType)
+    {
+        return taskType is AiVisionTaskTypes.Classification or
+            AiVisionTaskTypes.AttributeClassification or
+            AiVisionTaskTypes.SurfaceDefect or
+            AiVisionTaskTypes.SurfaceOrPoseDefect;
+    }
+
+    private static bool RequiresOutputContract(string taskType)
+    {
+        return taskType is AiVisionTaskTypes.CodeRecognition or
+            AiVisionTaskTypes.Classification or
+            AiVisionTaskTypes.AttributeClassification or
+            AiVisionTaskTypes.PlcOutput;
+    }
+
+    private static void AddExplicitAnswer(
+        IDictionary<string, VisionAgentPlanAnswer> answers,
+        string field,
+        string? value)
+    {
+        var normalizedField = VisionAgentPlanFieldPolicy.NormalizeField(field);
+        var normalizedValue = BoundedText(value);
+        if (string.IsNullOrWhiteSpace(normalizedField) ||
+            string.IsNullOrWhiteSpace(normalizedValue) ||
+            VisionAgentPlanFieldPolicy.IsPlaceholderValue(normalizedValue))
+        {
+            return;
+        }
+
+        answers[normalizedField] = new VisionAgentPlanAnswer
+        {
+            Field = normalizedField,
+            Value = normalizedValue,
+            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+        };
+    }
+
+    private static string FirstRegexValue(string text, params string[] patterns)
+    {
+        foreach (var pattern in patterns)
+        {
+            var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            var value = CleanSlot(match.Groups["value"].Value);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static bool ContainsLiteralEvidence(string text, string? value)
+    {
+        var evidence = Clean(value);
+        return !string.IsNullOrWhiteSpace(evidence) &&
+               text.Contains(evidence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsAnyLiteralEvidence(string text, string? value)
+    {
+        return Clean(value)
+            .Split(['/', '／', '|', '、', ',', '，'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(part => part.Length >= 2 && text.Contains(part, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BoundedText(string? value)
+    {
+        var text = Clean(value)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+        return text.Length > 256 ? text[..256] : text;
     }
 
     private static AiRequirementMaturityResult Result(

@@ -259,11 +259,57 @@ function renderModeControl(panel, presentation) {
 
 function renderEmptyPlan(panel) {
     const progress = panel?._getPlanRunProgressState?.();
+    const phases = [
+        ['understand', '理解需求'],
+        ['context', '整理工程上下文'],
+        ['generate', '生成方案'],
+        ['validate', '校验方案']
+    ].map(([key, label]) => ({
+        key,
+        label,
+        status: clean(progress?.phases?.[key]?.status || 'waiting').toLowerCase(),
+        summary: clean(progress?.phases?.[key]?.summary)
+    }));
+    const statusLabel = status => ({
+        running: '进行中',
+        completed: '已完成',
+        failed: '失败',
+        timeout: '超时',
+        cancelled: '已取消',
+        canceled: '已取消',
+        warning: '需注意',
+        waiting: '等待中',
+        pending: '等待中'
+    }[status] || '等待中');
+    const current = clean(progress?.currentLabel) || '发送需求后，这里会立即显示可信的规划阶段。';
     return `
-        <div class="ai-plan-v2-empty">
-            <span>规划模式</span>
-            <strong>${escapeHtml(panel, progress?.currentLabel || '正在整理工程上下文')}</strong>
-            <p>请描述检测目标，AI 会先形成可评审的视觉方案，再进入构建。</p>
+        <div class="ai-plan-v2-empty ai-planning-wait" data-ai-hook="planning-wait" data-planning-status="${escapeHtml(panel, progress?.status || 'idle')}" role="status" aria-live="polite">
+            <div class="ai-planning-wait-heading">
+                <div>
+                    <span>规划模式</span>
+                    <strong>${escapeHtml(panel, current)}</strong>
+                </div>
+                ${progress?.slow ? '<small>响应较慢，但仍在工作</small>' : ''}
+            </div>
+            <ol class="ai-planning-stages" aria-label="规划阶段">
+                ${phases.map((phase, index) => `
+                    <li class="is-${escapeHtml(panel, phase.status)}" data-planning-phase="${phase.key}">
+                        <span class="ai-planning-stage-index">${index + 1}</span>
+                        <div>
+                            <strong>${escapeHtml(panel, phase.label)}</strong>
+                            <small>${escapeHtml(panel, phase.summary || statusLabel(phase.status))}</small>
+                        </div>
+                        <b>${escapeHtml(panel, statusLabel(phase.status))}</b>
+                    </li>
+                `).join('')}
+            </ol>
+            <p>真实 Plan Run 事件到达后会直接接管这条进度；等待期间不会把尚未完成的阶段标成完成。</p>
+            ${(progress?.canCancel || progress?.canRetry) ? `
+                <div class="ai-planning-actions">
+                    ${progress?.canCancel ? '<button type="button" data-ai-action="planning-cancel">取消规划</button>' : ''}
+                    ${progress?.canRetry ? '<button type="button" class="is-primary" data-ai-action="planning-retry">重试</button>' : ''}
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -277,6 +323,10 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
 
     if (!plan) {
         root.innerHTML = renderEmptyPlan(panel);
+        root.querySelector('[data-ai-action="planning-cancel"]')?.addEventListener('click', () =>
+            panel?._handleCancelGenerate?.());
+        root.querySelector('[data-ai-action="planning-retry"]')?.addEventListener('click', () =>
+            panel?._retryPlanningLifecycle?.());
         panel?._updatePlanBuildActionState?.();
         return;
     }
@@ -321,5 +371,6 @@ export function installAiPanelPlanPresentation(prototype) {
 export const aiPanelPlanPresentationTestApi = {
     UNDERSTANDING_FIELDS,
     readAnswer,
-    readUnderstandingItem
+    readUnderstandingItem,
+    renderEmptyPlan
 };

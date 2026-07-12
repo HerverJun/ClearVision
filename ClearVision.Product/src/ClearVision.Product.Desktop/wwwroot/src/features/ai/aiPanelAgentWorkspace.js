@@ -73,13 +73,16 @@ const BUILD_STAGE_LABELS = {
 };
 
 const PLAN_PHASES = [
-    { key: 'context', label: '收集上下文' },
-    { key: 'model', label: '模型规划' },
-    { key: 'contract', label: '契约校验' },
-    { key: 'safety', label: '安全约束' }
+    { key: 'understand', label: '理解需求' },
+    { key: 'context', label: '整理工程上下文' },
+    { key: 'generate', label: '生成方案' },
+    { key: 'validate', label: '校验方案' }
 ];
 
 const PLAN_PENDING_STATUS = 'waiting';
+const PLANNING_SLOW_FEEDBACK_MS = 6000;
+const PLANNING_ROUTER_TIMEOUT_MS = 45000;
+const PLANNING_RUN_TIMEOUT_MS = 180000;
 const LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE = 'legacy_build_artifact_missing_canonical_flow';
 const LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE = '该构建结果不包含可验证的画布流程产物，无法直接应用。\n请基于原计划重新构建。';
 
@@ -423,7 +426,138 @@ const AI_PARAMETER_LABELS = {
 };
 
 export const aiPanelAgentWorkspaceMixin = {
+    _clearPlanningLifecycleTimers() {
+        const lifecycle = this.planningLifecycle;
+        if (!lifecycle) return;
+        if (lifecycle.slowTimer) window.clearTimeout?.(lifecycle.slowTimer);
+        if (lifecycle.timeoutTimer) window.clearTimeout?.(lifecycle.timeoutTimer);
+        lifecycle.slowTimer = null;
+        lifecycle.timeoutTimer = null;
+    },
+
+    _beginPlanningLifecycle({ requestId, requestContext, turn, phase = 'understand' } = {}) {
+        this._clearPlanningLifecycleTimers?.();
+        this.lastPlanningRequestContext = requestContext || this.lastPlanningRequestContext || null;
+        this.planningLifecycle = {
+            requestId: String(requestId || '').trim(),
+            timelineId: String(requestId || '').trim() || `planning-${Date.now()}`,
+            status: 'running',
+            phase,
+            routerStatus: phase === 'understand' ? 'running' : 'waiting',
+            routerSummary: phase === 'understand' ? '正在理解需求，尚未标记完成。' : '',
+            currentSummary: phase === 'understand'
+                ? '正在理解需求，等待 Intent Router 返回。'
+                : '正在整理工程上下文。',
+            slow: false,
+            startedAt: Date.now(),
+            turn: turn || this.activeAssistantTurn || null,
+            slowTimer: null,
+            timeoutTimer: null
+        };
+        this._armPlanningLifecycleTimers?.(
+            this.planningLifecycle.requestId,
+            phase === 'understand' ? PLANNING_ROUTER_TIMEOUT_MS : PLANNING_RUN_TIMEOUT_MS);
+        this._renderPlanningProgress?.(turn);
+        return this.planningLifecycle;
+    },
+
+    _armPlanningLifecycleTimers(requestId, timeoutMs) {
+        const lifecycle = this.planningLifecycle;
+        if (!lifecycle || lifecycle.status !== 'running') return;
+        this._clearPlanningLifecycleTimers?.();
+        lifecycle.slowTimer = window.setTimeout?.(() => {
+            const current = this.planningLifecycle;
+            if (!current || current.status !== 'running' || current.requestId !== requestId) return;
+            current.slow = true;
+            current.currentSummary = current.phase === 'understand'
+                ? '响应较慢，系统仍在理解需求；当前阶段尚未标记完成。'
+                : '规划仍在进行，正在等待下一条公开事件。';
+            this._renderPlanningProgress?.(current.turn);
+        }, PLANNING_SLOW_FEEDBACK_MS);
+        lifecycle.timeoutTimer = window.setTimeout?.(() => {
+            const current = this.planningLifecycle;
+            if (!current || current.status !== 'running' || current.requestId !== requestId) return;
+            this._markPlanningLifecycleTerminal?.('timeout', '规划等待超时，未将未完成阶段标记为完成。可重试本次需求。');
+            this.activeIntentRouterRequestId = null;
+            this._clearActivePlanRequest?.();
+            this._closeAgentRunEventSource?.();
+            this._setGeneratingState?.(false);
+            this.isCancellingGenerate = false;
+            this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        }, timeoutMs);
+    },
+
+    _advancePlanningLifecycle(phase, summary, { routerStatus, routerSummary, requestId } = {}) {
+        const lifecycle = this.planningLifecycle;
+        if (!lifecycle || lifecycle.status !== 'running') return;
+        this._clearPlanningLifecycleTimers?.();
+        lifecycle.phase = phase || lifecycle.phase;
+        lifecycle.currentSummary = String(summary || lifecycle.currentSummary || '').trim();
+        lifecycle.slow = false;
+        if (routerStatus) lifecycle.routerStatus = routerStatus;
+        if (routerSummary) lifecycle.routerSummary = routerSummary;
+        if (requestId) lifecycle.requestId = String(requestId).trim();
+        this._armPlanningLifecycleTimers?.(
+            lifecycle.requestId,
+            lifecycle.phase === 'understand' ? PLANNING_ROUTER_TIMEOUT_MS : PLANNING_RUN_TIMEOUT_MS);
+        this._renderPlanningProgress?.(lifecycle.turn);
+    },
+
+    _markPlanningLifecycleTerminal(status, message, { preserveReply = false } = {}) {
+        const lifecycle = this.planningLifecycle || {};
+        this._clearPlanningLifecycleTimers?.();
+        lifecycle.status = status;
+        lifecycle.currentSummary = String(message || '').trim();
+        lifecycle.slow = false;
+        lifecycle.turn = lifecycle.turn || this.activeAssistantTurn || null;
+        this.planningLifecycle = lifecycle;
+        const tone = status === 'completed' ? 'success' : status === 'cancelled' ? 'cancelled' : 'failed';
+        const label = status === 'completed' ? '规划完成' : status === 'cancelled' ? '已取消' : status === 'timeout' ? '规划超时' : '规划失败';
+        this._setAssistantTurnStatus?.(lifecycle.turn, label, tone);
+        if (lifecycle.currentSummary && !preserveReply) {
+            this._setAssistantSectionText?.(lifecycle.turn, 'reply', lifecycle.currentSummary);
+        }
+        this._renderPlanningProgress?.(lifecycle.turn);
+    },
+
+    _renderPlanningProgress(turn = this.planningLifecycle?.turn || this.activeAssistantTurn) {
+        this._renderPlanRunTimeline?.(turn);
+        if (this.pendingVisionPlan) return;
+        this._renderPlanWorkspace?.(null);
+    },
+
+    _retryPlanningLifecycle() {
+        const context = this.lastPlanningRequestContext;
+        if (!context?.description) return false;
+        this._enterIntentRouterFromPrompt?.({
+            ...context,
+            clearInput: false,
+            input: null,
+            addUserMessage: false
+        });
+        return true;
+    },
+
+    _cancelPendingPlanningRequest() {
+        const lifecycle = this.planningLifecycle;
+        if (!lifecycle || lifecycle.status !== 'running') return false;
+        this.activeIntentRouterRequestId = null;
+        this._clearActivePlanRequest?.();
+        this._closeAgentRunEventSource?.();
+        this._setGeneratingState?.(false);
+        this.isCancellingGenerate = false;
+        this._setWorkbenchState?.(AiWorkbenchStates.CANCELLED);
+        this._markPlanningLifecycleTerminal?.('cancelled', '规划已取消，未完成阶段保持未完成。可随时重试本次需求。');
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        return true;
+    },
+
     _resetAgentWorkspace({ preservePlan = false } = {}) {
+        this._clearPlanningLifecycleTimers?.();
+        this.planningLifecycle = null;
         this.activeIntentRouterRequestId = null;
         this.activePlanRequestId = null;
         this.activePlanRunId = null;
@@ -1195,7 +1329,8 @@ export const aiPanelAgentWorkspaceMixin = {
         clearInput = true,
         input = null,
         explicitMode = '',
-        hasCurrentFlowContext = false
+        hasCurrentFlowContext = false,
+        addUserMessage = true
     }) {
         const normalizedDescription = String(description || '').trim();
         if (!normalizedDescription) {
@@ -1219,16 +1354,32 @@ export const aiPanelAgentWorkspaceMixin = {
         this._closeAgentRunEventSource?.();
         this._setGeneratingState?.(true);
         this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
-        this._addMessage('user', userMessage || normalizedDescription);
+        if (addUserMessage) {
+            this._addMessage('user', userMessage || normalizedDescription);
+        }
         const turn = this._startAssistantTurn({
             activate: true,
             statusText: '正在判断请求类型',
             statusTone: 'streaming',
             openReply: true
         });
-        this._setAssistantSectionText(turn, 'reply', '正在判断请求类型。');
-        this._updateIntentRouterTimeline(routerRequestId, 'intent-router-run', '正在判断请求类型', 'running');
-        this._setResultStatusNote('正在判断请求类型。', 'info');
+        const requestContext = {
+            description: normalizedDescription,
+            hint,
+            userMessage,
+            attachmentPaths,
+            templateSelection,
+            explicitMode,
+            hasCurrentFlowContext
+        };
+        this._beginPlanningLifecycle?.({
+            requestId: routerRequestId,
+            requestContext,
+            turn,
+            phase: 'understand'
+        });
+        this._setAssistantSectionText(turn, 'reply', '正在理解需求，后续阶段会在同一条规划进度中接续。');
+        this._setResultStatusNote('正在理解需求。', 'info');
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
@@ -1254,6 +1405,13 @@ export const aiPanelAgentWorkspaceMixin = {
             .then(result => {
                 if (!this._isActiveIntentRouterRequest(routerRequestId)) return;
                 this._clearActiveIntentRouterRequest(routerRequestId);
+                this._advancePlanningLifecycle?.(
+                    'context',
+                    '需求理解已返回，正在整理工程上下文。',
+                    {
+                        routerStatus: 'completed',
+                        routerSummary: 'Intent Router 已返回真实结果。'
+                    });
                 this._handleIntentRouterResult(result, {
                     routerRequestId,
                     turn,
@@ -1270,13 +1428,13 @@ export const aiPanelAgentWorkspaceMixin = {
             .catch(error => {
                 if (!this._isActiveIntentRouterRequest(routerRequestId)) return;
                 this._clearActiveIntentRouterRequest(routerRequestId);
-                this._updateIntentRouterTimeline(
-                    routerRequestId,
-                    'intent-router-failed',
-                    '路由服务失败，交由后端 Planner 重新判定',
-                    'completed',
-                    this._sanitizePlanDiagnosticText(error?.message || 'intent_router_failed', 180)
-                );
+                this._advancePlanningLifecycle?.(
+                    'context',
+                    '路由服务未完成，已交由 Planner 继续整理工程上下文。',
+                    {
+                        routerStatus: 'failed',
+                        routerSummary: this._sanitizePlanDiagnosticText(error?.message || 'intent_router_failed', 180)
+                    });
                 this._enterPlanModeFromPrompt({
                     description: normalizedDescription,
                     hint,
@@ -1370,6 +1528,10 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const route = this._normalizeIntentRouterResult(result);
+        if (this.planningLifecycle) {
+            this.planningLifecycle.routerPublicReason = route.publicReason || '';
+        }
+        this._renderPlanRunTimeline?.(context.turn);
         this._dispatchAgentWorkspaceEvent?.({
             type: AgentWorkspaceEventTypes.INTENT_RESOLVED,
             payload: route,
@@ -1385,15 +1547,6 @@ export const aiPanelAgentWorkspaceMixin = {
             : '已理解请求';
         this._setAssistantTurnStatus(context.turn, visibleStatus, tone);
         this._setAssistantSectionText(context.turn, 'reply', this._formatIntentRouterReply(route));
-        this._updateIntentRouterTimeline(
-            context.routerRequestId,
-            'intent-router-result',
-            visibleStatus,
-            'completed',
-            isRuleFallback
-                ? (route.publicReason || '模型路由不可用，当前为规则降级解析。')
-                : route.publicReason);
-
         if (route.shouldMergeIntoPendingPlan && this.pendingVisionPlan) {
             this._mergePlanAnswerUpdates(this.pendingVisionPlan, route.planAnswerUpdates);
             const nextPlan = {
@@ -1430,6 +1583,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this._renderBuildWorkspaceFromAgentRun();
             this._updatePlanBuildActionState();
             this.activeAssistantTurn = null;
+            this._markPlanningLifecycleTerminal?.('completed', route.publicReason || '需求更新已完成。', { preserveReply: true });
             return true;
         }
 
@@ -1498,6 +1652,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._renderBuildWorkspaceFromAgentRun();
                 this._updatePlanBuildActionState();
                 this.activeAssistantTurn = null;
+                this._markPlanningLifecycleTerminal?.('completed', route.publicReason || '当前计划仍需确认关键问题。', { preserveReply: true });
                 return true;
             }
 
@@ -1518,6 +1673,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderBuildWorkspaceFromAgentRun();
         this._updatePlanBuildActionState();
         this.activeAssistantTurn = null;
+        this._markPlanningLifecycleTerminal?.('completed', route.publicReason || '请求已处理。', { preserveReply: true });
         return true;
     },
 
@@ -1729,6 +1885,30 @@ export const aiPanelAgentWorkspaceMixin = {
             openReply: true
         });
         this.activeAssistantTurn = turn;
+        const requestContext = {
+            description: normalizedDescription,
+            hint,
+            userMessage,
+            attachmentPaths,
+            templateSelection,
+            explicitMode: '',
+            hasCurrentFlowContext: this._hasCurrentFlowContext?.() === true
+        };
+        if (this.planningLifecycle?.status === 'running') {
+            this.planningLifecycle.turn = turn;
+            this.lastPlanningRequestContext = requestContext;
+            this._advancePlanningLifecycle?.(
+                'context',
+                '正在整理当前流程、模板、附件、算子目录和工站边界。',
+                { requestId: planRequestId });
+        } else {
+            this._beginPlanningLifecycle?.({
+                requestId: planRequestId,
+                requestContext,
+                turn,
+                phase: 'context'
+            });
+        }
         this._setAssistantTurnStatus(turn, '规划中', 'warning');
         this._setAssistantSectionText(
             turn,
@@ -1795,6 +1975,12 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
                 this._updatePlanBuildActionState();
+                this._markPlanningLifecycleTerminal?.(
+                    'completed',
+                    timeoutFallback
+                        ? '模型规划超时，规则兜底方案已通过校验并接管工作台。'
+                        : '规划与校验已完成，请确认关键问题后进入构建。',
+                    { preserveReply: true });
                 this.activeAssistantTurn = null;
             })
             .catch(error => {
@@ -1805,17 +1991,21 @@ export const aiPanelAgentWorkspaceMixin = {
                     input.value = userMessage || normalizedDescription;
                     input.style.height = 'auto';
                 }
-                this._setAssistantTurnStatus(turn, '规划失败', 'failed');
+                const cancelled = this.planningLifecycle?.status === 'cancelled';
+                this._setAssistantTurnStatus(turn, cancelled ? '已取消' : '规划失败', cancelled ? 'cancelled' : 'failed');
                 const message = this._sanitizePlanDiagnosticText(error?.message || String(error || '未知错误'), 260) || '未知错误';
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    `规划模式失败：${message}`
+                    cancelled ? '规划已取消。' : `规划模式失败：${message}`
                 );
-                this._setResultStatusNote(message || '规划模式失败，请检查后端连接后重试。', 'warning');
+                this._setResultStatusNote(cancelled ? '规划已取消。' : (message || '规划模式失败，请检查后端连接后重试。'), 'warning');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
                 this._updatePlanBuildActionState();
+                if (!cancelled) {
+                    this._markPlanningLifecycleTerminal?.('failed', `规划失败：${message}。可重试本次需求。`);
+                }
                 this.activeAssistantTurn = null;
             });
 
@@ -1998,6 +2188,10 @@ export const aiPanelAgentWorkspaceMixin = {
             sessionId: this.sessionId,
             runId
         });
+        this._advancePlanningLifecycle?.(
+            'context',
+            'Plan Run 已创建，等待公开阶段事件接管进度。',
+            { requestId: runId });
         this.activePlanRunRequestId = planRequestId;
         this._resetPublicLiveEventState?.();
         this.activeAssistantTurn = turn;
@@ -2261,6 +2455,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
             this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
             this._setAssistantSectionText(this.activeAssistantTurn, 'reply', '规划已取消。');
+            this._markPlanningLifecycleTerminal?.('cancelled', '规划已取消，未完成阶段保持未完成。可重试本次需求。');
         }
 
         completion?.reject(error);
@@ -2280,7 +2475,7 @@ export const aiPanelAgentWorkspaceMixin = {
             const statusLabel = this._formatPlanTimelineStatus(item.status);
             const summary = item.summary ? `\n${item.summary}` : '';
             const node = this._updateThinkingStep(
-                this.activePlanRunId || 'plan-run',
+                this.planningLifecycle?.timelineId || this.planningLifecycle?.requestId || this.activePlanRunId || 'plan-run',
                 `plan:${phase.key}`,
                 `${item.label}：${statusLabel}${summary}`
             );
@@ -2289,10 +2484,21 @@ export const aiPanelAgentWorkspaceMixin = {
             node.dataset.stage = `plan:${phase.key}`;
             node.dataset.eventType = item.eventType || '';
             node.title = item.eventType || item.stage || '';
+            if (item.publicReason) {
+                node.dataset.publicReason = item.publicReason;
+                node.title = item.publicReason;
+            }
         });
 
-        if (progress.currentLabel) {
+        if (progress.currentLabel && progress.status === 'running') {
             this._setResultStatusNote(progress.currentLabel, progress.warning ? 'warning' : 'info');
+            this._setAssistantTurnStatus?.(turn, '规划中', 'streaming');
+            this._setAssistantSectionText?.(
+                turn,
+                'reply',
+                progress.slow
+                    ? `${progress.currentLabel}\n仍在工作，可取消；未收到真实事件的阶段不会显示为完成。`
+                    : progress.currentLabel);
         }
     },
 
@@ -2306,9 +2512,27 @@ export const aiPanelAgentWorkspaceMixin = {
                 eventType: ''
             }
         ]));
+        const lifecycle = this.planningLifecycle || null;
         const events = Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [];
-        let currentLabel = this.activePlanRunId ? '正在收集工程上下文。' : '';
+        let currentLabel = String(lifecycle?.currentSummary || '').trim();
         let warning = false;
+
+        if (lifecycle) {
+            phases.understand.status = lifecycle.routerStatus || (lifecycle.phase === 'understand' ? 'running' : PLAN_PENDING_STATUS);
+            phases.understand.summary = lifecycle.routerSummary || '';
+            phases.understand.eventType = lifecycle.routerStatus === 'completed' ? 'intent-router-result' : 'intent-router-run';
+            phases.understand.publicReason = lifecycle.routerPublicReason || '';
+            if (lifecycle.status === 'running' && lifecycle.phase !== 'understand') {
+                phases.context.status = 'running';
+                phases.context.summary = lifecycle.currentSummary || '正在整理工程上下文。';
+            }
+            if (lifecycle.status !== 'running' && lifecycle.status !== 'completed') {
+                const terminalPhase = phases[lifecycle.phase] || phases.validate;
+                terminalPhase.status = lifecycle.status;
+                terminalPhase.summary = lifecycle.currentSummary || '';
+                warning = lifecycle.status === 'failed' || lifecycle.status === 'timeout';
+            }
+        }
 
         events
             .slice()
@@ -2324,11 +2548,21 @@ export const aiPanelAgentWorkspaceMixin = {
                 warning = update.status === 'failed' || update.status === 'timeout';
             });
 
+        if (lifecycle?.status === 'completed') {
+            phases.validate.status = 'completed';
+            phases.validate.summary = lifecycle.currentSummary || phases.validate.summary;
+        }
+
         return {
             phases,
             currentLabel,
             warning,
-            eventCount: events.length
+            eventCount: events.length,
+            status: lifecycle?.status || (this.activePlanRunId ? 'running' : 'idle'),
+            slow: lifecycle?.slow === true,
+            canCancel: lifecycle?.status === 'running',
+            canRetry: ['failed', 'timeout', 'cancelled'].includes(String(lifecycle?.status || '').toLowerCase()) &&
+                Boolean(this.lastPlanningRequestContext?.description)
         };
     },
 
@@ -2343,46 +2577,46 @@ export const aiPanelAgentWorkspaceMixin = {
         };
 
         if (eventType === 'plan.context.started') {
-            return { ...base, key: 'context', label: '收集上下文', status: 'running' };
+            return { ...base, key: 'context', label: '整理工程上下文', status: 'running' };
         }
         if (eventType === 'plan.context.completed') {
-            return { ...base, key: 'context', label: '收集上下文', status: 'completed' };
+            return { ...base, key: 'context', label: '整理工程上下文', status: 'completed' };
         }
         if (eventType === 'plan.model.started') {
-            return { ...base, key: 'model', label: '模型规划', status: 'running' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'running' };
         }
         if (eventType === 'plan.model.completed') {
-            return { ...base, key: 'model', label: '模型规划', status: 'completed' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'completed' };
         }
         if (eventType === 'plan.model.timeout') {
-            return { ...base, key: 'model', label: '模型规划', status: 'timeout', summary: '模型规划超时，已使用规则兜底方案。' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'timeout', summary: '模型规划超时，规则兜底正在接管。' };
         }
         if (eventType === 'plan.model.failed') {
-            return { ...base, key: 'model', label: '模型规划', status: 'failed', summary: summary || '模型规划失败，已使用规则兜底方案。' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'failed', summary: summary || '模型规划失败，规则兜底正在接管。' };
         }
         if (eventType === 'plan.contract.started') {
-            return { ...base, key: 'contract', label: '契约校验', status: 'running' };
+            return { ...base, key: 'validate', label: '校验方案', status: 'running' };
         }
         if (eventType === 'plan.contract.completed') {
             if (String(evt?.status || '').trim().toLowerCase() === 'failed') {
-                return { ...base, key: 'contract', label: '契约校验', status: 'failed', summary: summary || '契约校验失败，已使用规则兜底方案。' };
+                return { ...base, key: 'validate', label: '校验方案', status: 'failed', summary: summary || '契约校验失败，规则兜底正在接管。' };
             }
-            return { ...base, key: 'contract', label: '契约校验', status: 'completed' };
+            return { ...base, key: 'validate', label: '校验方案', status: 'running', summary: summary || '规划契约已校验，正在应用安全约束。' };
         }
         if (eventType === 'plan.safety.completed') {
-            return { ...base, key: 'safety', label: '安全约束', status: 'completed' };
+            return { ...base, key: 'validate', label: '校验方案', status: 'completed' };
         }
         if (eventType === 'plan.fallback.used') {
-            return { ...base, key: 'model', label: '规则兜底', status: 'completed', summary: summary || '已使用规则兜底方案。' };
+            return { ...base, key: 'generate', label: '规则兜底', status: 'completed', summary: summary || '规则兜底方案已生成。' };
         }
         if (eventType === 'plan.completed' || eventType === 'run.completed') {
-            return { ...base, key: 'safety', label: '安全约束', status: 'completed', summary: '规划已就绪。' };
+            return { ...base, key: 'validate', label: '校验方案', status: 'completed', summary: '规划已就绪。' };
         }
         if (eventType === 'plan.cancelled' || eventType === 'run.cancelled') {
-            return { ...base, key: 'model', label: '规划', status: 'cancelled', summary: '规划已取消。' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'cancelled', summary: '规划已取消。' };
         }
         if (eventType === 'plan.failed' || eventType === 'run.failed') {
-            return { ...base, key: 'model', label: '规划', status: 'failed', summary: summary || '规划失败。' };
+            return { ...base, key: 'generate', label: '生成方案', status: 'failed', summary: summary || '规划失败。' };
         }
 
         return null;

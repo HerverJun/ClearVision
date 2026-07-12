@@ -75,7 +75,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.RecommendedRoute.Operators.Should().NotBeEmpty();
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
-            .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria", "q_fallback_algorithm_strategy"]);
+            .Contain(["q_fallback_image_source", "ok_ng_rule", "classification_strategy"]);
         plan.ClarificationQuestions.Should().OnlyContain(question =>
             question.Options.Count > 0 &&
             question.Options.Count(option => option.Recommended) == 1);
@@ -272,10 +272,13 @@ public sealed class VisionAgentRequirementMaturityGateTests
         var completeReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(completePlan);
 
         completeMaturity.CanBuild.Should().BeTrue();
-        completePlan.CanBuild.Should().BeTrue();
-        completeReadiness.CanBuild.Should().BeTrue();
+        completePlan.CanBuild.Should().BeFalse("the implementation route is inferred, not explicitly confirmed");
+        completeReadiness.CanBuild.Should().BeFalse();
         completeMaturity.MissingFields.Should().BeEmpty();
-        completePlan.RemainingPlanFields.Should().BeEmpty();
+        completePlan.RemainingPlanFields.Should().ContainSingle()
+            .Which.Should().Be(VisionAgentPlanAnswerFields.AlgorithmStrategy);
+        completePlan.ClarificationQuestions.Should().ContainSingle(question =>
+            question.Field == VisionAgentPlanAnswerFields.AlgorithmStrategy);
     }
 
     [Fact(DisplayName = "Maturity gate should use model semantic task type without rule term hit")]
@@ -799,6 +802,122 @@ public sealed class VisionAgentRequirementMaturityGateTests
         result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
         result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.BuildOrchestratorNotRegistered);
         generationCalls.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "Fruit label classification should ask only route and judgment gaps")]
+    public async Task CreatePlanAsync_FruitClassification_ShouldKeepExplicitFactsAndAskHighValueGaps()
+    {
+        const string prompt = "帮我构建一个超市水果标签识别的视觉流程，实现相机输入水果并输出水果类型";
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.Classification,
+            InspectionObject = "水果",
+            ImageSource = "相机",
+            OutputTarget = "水果类型",
+            OkCondition = "最高置信类别有效",
+            NgCondition = "低置信度无效",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            Source = VisionAgentSemanticSources.Model
+        };
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt,
+                SemanticExtraction = semantic
+            },
+            CancellationToken.None);
+
+        plan.ConfirmedPlanAnswers.Select(answer => answer.Field).Should().Contain([
+            VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.OutputTarget
+        ]);
+        plan.ConfirmedPlanAnswers.Should().OnlyContain(answer =>
+            answer.Origin == VisionAgentPlanAnswerOrigins.ExplicitUserText);
+        plan.RemainingPlanFields.Should().BeEquivalentTo([
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.AlgorithmStrategy
+        ]);
+        plan.ClarificationQuestions.Select(question => question.Field).Should().BeEquivalentTo([
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.AlgorithmStrategy
+        ]);
+        plan.ClarificationQuestions.Should().HaveCount(2);
+        plan.ClarificationQuestions.Should().AllSatisfy(question =>
+        {
+            question.Options.Count.Should().BeInRange(2, 5);
+            question.Options.Count(option => option.Recommended).Should().Be(1);
+        });
+    }
+
+    [Fact(DisplayName = "DataMatrix request should not treat model-inferred source, judgment, or output as confirmed")]
+    public async Task CreatePlanAsync_DataMatrix_ShouldAskThreeScenarioSpecificQuestions()
+    {
+        const string prompt = "读取产品上的DataMatrix二维码";
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.CodeRecognition,
+            InspectionObject = "产品",
+            ImageSource = "工站相机",
+            OkCondition = "解码成功",
+            NgCondition = "不可读",
+            OutputTarget = "解码文本",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            Source = VisionAgentSemanticSources.Model
+        };
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt,
+                SemanticExtraction = semantic,
+                ConfirmedPlanAnswers =
+                [
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.ImageSource,
+                        Value = "station_camera",
+                        Origin = VisionAgentPlanAnswerOrigins.ModelInferred
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        plan.ConfirmedPlanAnswers.Should().NotContain(answer =>
+            answer.Origin == VisionAgentPlanAnswerOrigins.ModelInferred);
+        plan.ResolvedPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType
+        ]);
+        plan.ResolvedPlanFields.Should().NotContain([
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.OutputTarget
+        ]);
+        plan.RemainingPlanFields.Should().BeEquivalentTo([
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.OutputTarget
+        ]);
+        plan.ClarificationQuestions.Select(question => question.Field).Should().BeEquivalentTo(
+            plan.RemainingPlanFields);
+        plan.ClarificationQuestions.Should().HaveCount(3);
+        plan.ClarificationQuestions.Single(question => question.Field == VisionAgentPlanAnswerFields.AcceptanceCriteria)
+            .Title.Should().Contain("不可读");
+        plan.ClarificationQuestions.Single(question => question.Field == VisionAgentPlanAnswerFields.OutputTarget)
+            .Title.Should().Contain("交付");
     }
 
     [Fact(DisplayName = "GenerateFlow WebMessage adapter should delegate low maturity input to generation service")]

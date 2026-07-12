@@ -60,6 +60,11 @@ function hasCanonicalActivity(state, projection = state?.projection) {
 
 function hasPendingSubmittedRequest(panel) {
     if (clean(panel?.activeIntentRouterRequestId) || clean(panel?.activeGenerateRequestId)) return true;
+    const lifecycleStatus = clean(panel?.planningLifecycle?.status).toLowerCase();
+    if (['running', 'failed', 'timeout', 'cancelled'].includes(lifecycleStatus) &&
+        Boolean(clean(panel?.lastPlanningRequestContext?.description || panel?.lastUserPrompt))) {
+        return true;
+    }
     return panel?.isGenerating === true && Boolean(clean(panel?.lastUserPrompt));
 }
 
@@ -79,7 +84,20 @@ function readTaskTitle(panel, state, runtime = readRuntime(panel)) {
     return value ? clean(value) : '';
 }
 
-function readStageLabel(projection) {
+function readStageLabel(projection, panel) {
+    const lifecycle = panel?.planningLifecycle;
+    const lifecycleStatus = clean(lifecycle?.status).toLowerCase();
+    if (lifecycleStatus === 'cancelled') return '规划已取消';
+    if (lifecycleStatus === 'timeout') return '规划超时';
+    if (lifecycleStatus === 'failed') return '规划失败';
+    if (lifecycleStatus === 'running') {
+        return {
+            understand: '正在理解需求',
+            context: '正在整理工程上下文',
+            generate: '正在生成方案',
+            validate: '正在校验方案'
+        }[clean(lifecycle?.phase).toLowerCase()] || '正在规划';
+    }
     return AI_SHELL_PHASE_TEXT[clean(projection?.phase).toLowerCase()] || '';
 }
 
@@ -110,7 +128,7 @@ export function deriveAiShellPresentation(panel) {
 
     return {
         shellState: canonicalActive || requestPending || restoreActive ? 'active' : 'idle',
-        phaseText: readStageLabel(projection),
+        phaseText: readStageLabel(projection, panel),
         taskTitle: readTaskTitle(panel, state, runtime),
         blockerCount: countReliableBlockers(projection),
         nextStep: readNextStep(state, projection),

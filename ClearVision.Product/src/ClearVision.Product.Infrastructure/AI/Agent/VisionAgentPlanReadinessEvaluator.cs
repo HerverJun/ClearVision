@@ -68,7 +68,7 @@ public static class VisionAgentPlanReadinessEvaluator
             resolvedFields.RemoveAll(field => field.Equals(VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase));
         }
 
-        var remainingFields = BuildRemainingFields(maturity, resolvedFields, effectiveForReadiness);
+        var remainingFields = BuildRemainingFields(planSnapshot, maturity, resolvedFields, effectiveForReadiness);
         var answers = validatedAnswers?.AcceptedAnswers ?? [];
         var blockers = new List<VisionAgentBuildBlocker>();
         var questionIndex = BuildQuestionIndex(planSnapshot);
@@ -182,18 +182,12 @@ public static class VisionAgentPlanReadinessEvaluator
         if (plan.ConfirmedPlanAnswers != null)
         {
             fields.AddRange(plan.ConfirmedPlanAnswers
-                .Where(a => !string.IsNullOrWhiteSpace(a.Value) &&
+                .Where(a => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(a.Origin) &&
+                            !string.IsNullOrWhiteSpace(a.Value) &&
                             !VisionAgentPlanFieldPolicy.IsPlaceholderValue(a.Value))
                 .Select(a => a.Field));
         }
-        if (effectiveRequirement != null)
-        {
-            fields.AddRange(effectiveRequirement.ResolvedFields);
-        }
-        else
-        {
-            fields.AddRange(ReadSemanticResolvedFields(plan.SemanticExtraction));
-        }
+        fields.AddRange(plan.ResolvedPlanFields ?? []);
 
         if (validatedAnswers != null)
         {
@@ -274,42 +268,14 @@ public static class VisionAgentPlanReadinessEvaluator
                (plan.RequirementMaturity?.TaskSignals.Any(signal => !string.IsNullOrWhiteSpace(signal)) == true);
     }
 
-    private static List<string> ReadSemanticResolvedFields(VisionAgentSemanticExtractionResult? semantic)
-    {
-        var fields = new List<string>();
-        AddIfValue(fields, VisionAgentPlanAnswerFields.InspectionObject, semantic?.InspectionObject);
-        var taskType = semantic?.TaskType ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(taskType) &&
-            !taskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
-            !taskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
-        {
-            fields.Add(VisionAgentPlanAnswerFields.TaskType);
-        }
-
-        AddIfValue(fields, VisionAgentPlanAnswerFields.ImageSource, semantic?.ImageSource);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition));
-        return fields;
-    }
-
-    private static void AddIfValue(List<string> fields, string field, string? value)
-    {
-        if (!string.IsNullOrWhiteSpace(value) &&
-            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(value))
-        {
-            fields.Add(field);
-        }
-    }
-
     private static List<string> BuildRemainingFields(
+        VisionAgentPlanModeResult plan,
         AiRequirementMaturityResult? maturity,
         IReadOnlyList<string> resolvedFields,
         VisionAgentEffectiveRequirement? effectiveRequirement)
     {
-        var fields = effectiveRequirement?.RemainingFields ?? maturity?.MissingFields ?? [];
+        var fields = (plan.RemainingPlanFields ?? [])
+            .Concat(effectiveRequirement?.RemainingFields ?? maturity?.MissingFields ?? []);
         return fields
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(field => !string.IsNullOrWhiteSpace(field) &&
