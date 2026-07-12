@@ -109,6 +109,34 @@ function getDiagnosticSeverity(item) {
     return 'info';
 }
 
+function getDiagnosticScope(item) {
+    const source = clean(read(item,
+        'stage', 'Stage',
+        'source', 'Source',
+        'origin', 'Origin',
+        'category', 'Category',
+        'diagnosticSource', 'DiagnosticSource')).toLowerCase();
+    if (['schema', 'validator', 'topology'].includes(source)) return 'structural';
+    if (['dryrun', 'preview'].includes(source)) return 'dryRun';
+    if (['apply_gate', 'deployment', 'release'].includes(source)) return 'gate';
+    return 'other';
+}
+
+function formatGateStatus(panel, value) {
+    const status = clean(value).toLowerCase();
+    const labels = {
+        ready: '已就绪',
+        blocked: '已阻断',
+        unknown: '未设置',
+        pending: '等待中',
+        canvas_apply_ready: '画布可应用',
+        runtime_draft_ready: '运行草稿就绪',
+        deployment_ready: '部署就绪',
+        deployment_metadata_ready: '部署元数据就绪'
+    };
+    return labels[status] || sanitize(panel, panel?._formatGateStatus?.(status), 80) || '未设置';
+}
+
 function getPipeline(panel, buildResult, flow) {
     const pipeline = toArray(read(buildResult, 'operatorPipeline', 'OperatorPipeline'));
     const source = pipeline.length ? pipeline : (panel?._extractOperators?.(flow) || []);
@@ -156,10 +184,11 @@ function getResolvedResourceCount(panel, missingResources) {
 }
 
 function deriveParameterState(panel, source, flow, missingResources = []) {
-    const pending = panel?._resolvePendingParametersForDraft?.(source) ||
+    const rawPending = panel?._resolvePendingParametersForDraft?.(source) ||
         toArray(read(source, 'pendingParameters', 'PendingParameters'));
+    const pending = rawPending;
     const operators = panel?._getPendingOperatorSourceOperators?.(flow) || [];
-    const rawGroups = panel?._collectPendingDraftGroups?.(pending, operators) || [];
+    const rawGroups = panel?._collectPendingDraftGroups?.(rawPending, operators) || [];
     const resourceRefs = toArray(missingResources).map(item => {
         const operatorId = clean(read(item, 'operatorId', 'OperatorId', 'actualOperatorId', 'ActualOperatorId')).toLowerCase();
         const parameterName = clean(read(item, 'parameterName', 'ParameterName') || panel?._inferPendingParameterNameFromMissingResource?.(item)).toLowerCase();
@@ -177,20 +206,24 @@ function deriveParameterState(panel, source, flow, missingResources = []) {
         ...group,
         fields: toArray(group.fields).filter(field => !isResourceBacked(group.operatorId, field.parameterName))
     })).filter(group => group.fields.length > 0);
-    const confirmation = panel?._getPendingParameterConfirmationState?.(pending, operators, rawGroups) || null;
+    const confirmation = panel?._getPendingParameterConfirmationState?.(pending, operators, groups) || null;
     const total = groups.reduce((sum, group) => sum + group.fields.length, 0);
     const filled = groups.reduce((sum, group) => sum + group.fields.filter(field =>
         panel?._hasPendingDraftValue?.(field.confirmedValue, field.dataType) === true
     ).length, 0);
     const confirmed = total === 0 || confirmation?.isConfirmed === true;
+    const remainingToFill = Math.max(total - filled, 0);
+    const awaitingConfirmation = total > 0 && remainingToFill === 0 && !confirmed;
     return {
         items: pending,
         groups,
         total,
         filled,
+        remainingToFill,
+        awaitingConfirmation,
         confirmed,
-        unresolved: confirmed ? 0 : total,
-        resourceBackedCount: Math.max((confirmation?.totals?.total ?? countPendingFields(pending)) - total, 0)
+        unresolved: confirmed ? 0 : remainingToFill,
+        resourceBackedCount: Math.max(countPendingFields(rawPending) - total, 0)
     };
 }
 
@@ -204,18 +237,24 @@ function deriveValidation(panel, source, gate) {
     ];
     const errors = diagnostics.filter(item => getDiagnosticSeverity(item) === 'error');
     const warnings = diagnostics.filter(item => getDiagnosticSeverity(item) === 'warning');
-    const structuralState = errors.length
+    const structuralErrors = errors.filter(item => getDiagnosticScope(item) === 'structural');
+    const dryRunErrors = errors.filter(item => getDiagnosticScope(item) === 'dryRun');
+    const gateErrors = errors.filter(item => getDiagnosticScope(item) === 'gate');
+    const otherErrors = errors.filter(item => getDiagnosticScope(item) === 'other');
+    const structuralState = structuralErrors.length
         ? { status: 'failed', label: '未通过' }
         : classifyCheck(structural);
-    const dryRunState = classifyCheck(dryRun);
+    const dryRunState = dryRunErrors.length
+        ? { status: 'failed', label: '未通过' }
+        : classifyCheck(dryRun);
     const gateBlocked = readBoolean(gate, 'blocked', 'Blocked') === true;
     const canvasReady = readBoolean(gate, 'canvasApplyReady', 'CanvasApplyReady');
-    const gateState = gateBlocked
+    const gateState = gateBlocked || gateErrors.length
         ? { status: 'failed', label: '已阻断' }
         : canvasReady === true
             ? { status: 'passed', label: '可应用' }
             : { status: 'pending', label: '待确认' };
-    const overall = errors.length || structuralState.status === 'failed' || dryRunState.status === 'failed'
+    const overall = errors.length || structuralState.status === 'failed' || dryRunState.status === 'failed' || gateState.status === 'failed'
         ? 'failed'
         : structuralState.status === 'passed' && dryRunState.status === 'passed'
             ? 'passed'
@@ -228,6 +267,10 @@ function deriveValidation(panel, source, gate) {
         gate: gateState,
         overall,
         errors,
+        structuralErrors,
+        dryRunErrors,
+        gateErrors,
+        otherErrors,
         warnings,
         diagnostics
     };
@@ -245,7 +288,7 @@ function deriveActionItems(panel, context) {
         diff
     } = context;
 
-    if (parameters.unresolved > 0) {
+    if (parameters.remainingToFill > 0 || parameters.awaitingConfirmation) {
         const firstGroup = parameters.groups[0];
         const names = toArray(firstGroup?.fields)
             .slice(0, 2)
@@ -254,8 +297,14 @@ function deriveActionItems(panel, context) {
         items.push({
             key: 'parameters',
             priority: 'blocking',
-            title: `${parameters.unresolved} 项参数待确认`,
-            summary: names.length ? `优先补齐 ${names.join('、')}。` : '必填参数尚未完成工程确认。',
+            title: parameters.remainingToFill > 0
+                ? `${parameters.remainingToFill} 项参数待填写`
+                : '参数已填写，等待确认',
+            summary: parameters.remainingToFill > 0 && names.length
+                ? `优先补齐 ${names.join('、')}。`
+                : parameters.awaitingConfirmation
+                    ? '全部普通参数均已填写，请执行人工确认。'
+                    : '必填参数尚未完成工程确认。',
             impact: '影响参数确认、验证或后续应用准备。',
             status: `已填写 ${parameters.filled}/${parameters.total}`,
             target: 'ai-build-parameters-section',
@@ -279,12 +328,20 @@ function deriveActionItems(panel, context) {
         });
     }
 
-    if (validation.overall === 'failed') {
-        const firstError = validation.errors.map(item => getDiagnosticMessage(panel, item)).find(Boolean);
+    const validationErrors = [
+        ...validation.structuralErrors,
+        ...validation.dryRunErrors,
+        ...validation.otherErrors
+    ];
+    const hasValidationFailure = validation.structural.status === 'failed' ||
+        validation.dryRun.status === 'failed' ||
+        validation.otherErrors.length > 0;
+    if (hasValidationFailure) {
+        const firstError = validationErrors.map(item => getDiagnosticMessage(panel, item)).find(Boolean);
         items.push({
             key: 'validation',
             priority: 'blocking',
-            title: `${Math.max(validation.errors.length, 1)} 项验证问题`,
+            title: `${Math.max(validationErrors.length, 1)} 项验证问题`,
             summary: firstError || '静态验证或 DryRun 未通过。',
             impact: '需要修复后重新进入现有验证链路。',
             status: '验证未通过',
@@ -313,7 +370,7 @@ function deriveActionItems(panel, context) {
             title: '应用门禁尚未开放',
             summary: gateBlockers[0] || '当前草稿仍受现有 Apply Gate 约束。',
             impact: '阻断应用到画布。',
-            status: 'ApplyGate blocked',
+            status: '应用门禁已阻断',
             target: 'ai-build-apply-section',
             action: '查看门禁'
         });
@@ -349,6 +406,32 @@ function deriveOverallState(context) {
         nodeCount,
         connectionCount
     } = context;
+    const coreValidationFailed = validation.structural.status === 'failed' ||
+        validation.dryRun.status === 'failed' ||
+        validation.otherErrors.length > 0;
+
+    if (applying) {
+        return {
+            key: 'applying',
+            tone: 'info',
+            label: '正在应用',
+            result: '正在按现有 Apply Preview 和画布应用语义更新流程。',
+            next: '等待画布应用完成。',
+            target: 'ai-build-apply-section'
+        };
+    }
+
+    if (BUILD_RUNNING_STATES.has(workbenchState)) {
+        const validating = workbenchState === 'validating' || workbenchState === 'dry_running';
+        return {
+            key: validating ? 'validating' : 'building',
+            tone: 'info',
+            label: validating ? '正在验证' : '正在构建',
+            result: validating ? '正在执行现有静态检查或 DryRun 链路。' : '正在生成并整理可编辑流程草稿。',
+            next: '等待当前阶段完成，期间不会开放未满足条件的应用操作。',
+            target: 'ai-build-validation-section'
+        };
+    }
 
     if (applied) {
         return {
@@ -360,17 +443,7 @@ function deriveOverallState(context) {
             target: 'ai-build-apply-section'
         };
     }
-    if (applying) {
-        return {
-            key: 'applying',
-            tone: 'info',
-            label: '正在应用',
-            result: '正在按现有 Apply Preview 和画布应用语义更新流程。',
-            next: '等待画布应用完成。',
-            target: 'ai-build-apply-section'
-        };
-    }
-    if (workbenchState === 'failed' && validation.overall !== 'failed') {
+    if (workbenchState === 'failed' && !coreValidationFailed && !gateBlocked) {
         return {
             key: 'failed',
             tone: 'danger',
@@ -380,7 +453,7 @@ function deriveOverallState(context) {
             target: 'ai-build-validation-section'
         };
     }
-    if (validation.overall === 'failed') {
+    if (coreValidationFailed) {
         return {
             key: 'validation_failed',
             tone: 'danger',
@@ -390,7 +463,7 @@ function deriveOverallState(context) {
             target: 'ai-build-validation-section'
         };
     }
-    if (parameters.unresolved > 0 || unresolvedResources > 0) {
+    if (parameters.remainingToFill > 0 || parameters.awaitingConfirmation || unresolvedResources > 0) {
         return {
             key: 'needs_input',
             tone: 'warning',
@@ -398,10 +471,24 @@ function deriveOverallState(context) {
             result: hasFlow
                 ? `已生成 ${nodeCount} 个节点、${connectionCount} 条连线的流程草稿。`
                 : '构建结果已返回，但工程补齐尚未完成。',
-            next: parameters.unresolved > 0
-                ? `先补齐并确认 ${parameters.unresolved} 项参数。`
+            next: parameters.remainingToFill > 0
+                ? `先补齐 ${parameters.remainingToFill} 项参数。`
+                : parameters.awaitingConfirmation
+                    ? '普通参数已填写，请执行人工确认。'
                 : `先绑定 ${unresolvedResources} 项具体资源。`,
-            target: parameters.unresolved > 0 ? 'ai-build-parameters-section' : 'ai-build-resources-section'
+            target: parameters.remainingToFill > 0 || parameters.awaitingConfirmation
+                ? 'ai-build-parameters-section'
+                : 'ai-build-resources-section'
+        };
+    }
+    if (gateBlocked || validation.gate.status === 'failed') {
+        return {
+            key: 'gate_blocked',
+            tone: 'warning',
+            label: '应用门禁已阻断',
+            result: hasFlow ? '流程草稿已生成，但当前应用门禁尚未开放。' : '当前构建结果仍受应用门禁约束。',
+            next: '查看应用门禁与部署检查，处理当前阻断项。',
+            target: 'ai-build-apply-section'
         };
     }
     if (canvasReady && !gateBlocked) {
@@ -434,17 +521,6 @@ function deriveOverallState(context) {
             target: 'ai-build-validation-section'
         };
     }
-    if (BUILD_RUNNING_STATES.has(workbenchState)) {
-        const validating = workbenchState === 'validating' || workbenchState === 'dry_running';
-        return {
-            key: validating ? 'validating' : 'building',
-            tone: 'info',
-            label: validating ? '正在验证' : '正在构建',
-            result: validating ? '正在执行现有静态检查或 DryRun 链路。' : '正在生成并整理可编辑流程草稿。',
-            next: '等待当前阶段完成，期间不会开放未满足条件的应用操作。',
-            target: 'ai-build-validation-section'
-        };
-    }
     return {
         key: 'waiting',
         tone: 'neutral',
@@ -459,20 +535,28 @@ export function deriveAiBuildPresentation(panel) {
     const events = Array.isArray(panel?.activeAgentRunEvents) ? panel.activeAgentRunEvents : [];
     const eventPayload = asObject(panel?._getAgentRunResultPayload?.(events));
     const currentResult = asObject(panel?.currentResult);
-    const result = Object.keys(currentResult).length ? currentResult : eventPayload;
+    const workbenchState = clean(panel?.workbenchState || read(eventPayload, 'interactionState', 'InteractionState', 'status', 'Status')).toLowerCase();
+    const activeRunPendingResult = BUILD_RUNNING_STATES.has(workbenchState) &&
+        Boolean(clean(panel?.activeAgentRunId)) &&
+        Object.keys(eventPayload).length === 0;
+    const result = activeRunPendingResult
+        ? eventPayload
+        : Object.keys(currentResult).length ? currentResult : eventPayload;
     const buildResult = asObject(
-        panel?._getPayloadBuildResult?.(currentResult) ||
+        (!activeRunPendingResult && panel?._getPayloadBuildResult?.(currentResult)) ||
         panel?._getPayloadBuildResult?.(eventPayload) ||
         read(result, 'buildResult', 'BuildResult')
     );
-    const flow = panel?._getResultFlowForCanvas?.(currentResult) ||
+    const flow = (!activeRunPendingResult && panel?._getResultFlowForCanvas?.(currentResult)) ||
         panel?._getResultFlowForCanvas?.(eventPayload) ||
         read(result, 'flow', 'Flow') ||
-        read(currentResult, 'flow', 'Flow') ||
+        (!activeRunPendingResult && read(currentResult, 'flow', 'Flow')) ||
         null;
     const operators = flow ? (panel?._extractOperators?.(flow) || []) : [];
     const connections = flow ? (panel?._extractConnections?.(flow) || []) : [];
-    const sourceForPending = Object.keys(result).length ? result : currentResult;
+    const sourceForPending = activeRunPendingResult
+        ? result
+        : Object.keys(result).length ? result : currentResult;
     const missingResources = panel?._normalizeMissingResources?.(
         read(sourceForPending, 'missingResources', 'MissingResources') ||
         read(buildResult, 'missingResources', 'MissingResources') ||
@@ -484,7 +568,7 @@ export function deriveAiBuildPresentation(panel) {
     const gate = asObject(
         panel?._getPayloadApplyGate?.(sourceForPending) ||
         read(buildResult, 'applyGate', 'ApplyGate') ||
-        read(currentResult, 'applyGate', 'ApplyGate')
+        (!activeRunPendingResult && read(currentResult, 'applyGate', 'ApplyGate'))
     );
     const gateBlocked = readBoolean(gate, 'blocked', 'Blocked') === true;
     const canvasReady = readBoolean(gate, 'canvasApplyReady', 'CanvasApplyReady') === true;
@@ -496,8 +580,7 @@ export function deriveAiBuildPresentation(panel) {
         ...diff.blockers
     ].map(item => getDiagnosticMessage(panel, item)).filter(Boolean);
     const pipeline = getPipeline(panel, buildResult, flow);
-    const workbenchState = clean(panel?.workbenchState || read(sourceForPending, 'interactionState', 'InteractionState', 'status', 'Status')).toLowerCase();
-    const applied = workbenchState === 'applied' || panel?._isCurrentResultAppliedToCanvas?.() === true;
+    const applied = !activeRunPendingResult && (workbenchState === 'applied' || panel?._isCurrentResultAppliedToCanvas?.() === true);
     const applying = workbenchState === 'applying';
     const plan = asObject(panel?.pendingVisionPlan);
     const semantic = asObject(read(plan, 'semanticExtraction', 'SemanticExtraction') || read(sourceForPending, 'semanticExtraction', 'SemanticExtraction'));
@@ -549,7 +632,7 @@ export function deriveAiBuildPresentation(panel) {
             canvasReady,
             runtimeReady: readBoolean(gate, 'runtimeDraftReady', 'RuntimeDraftReady'),
             deploymentReady: readBoolean(gate, 'deploymentReady', 'DeploymentReady'),
-            status: sanitize(panel, read(gate, 'status', 'Status'), 80) || 'unknown',
+            status: formatGateStatus(panel, read(gate, 'status', 'Status')),
             blockers: gateBlockers
         },
         diff,
@@ -576,9 +659,12 @@ function renderMetric(panel, label, value, hint = '') {
 function renderStatusSummary(panel, presentation) {
     const { overall, parameters, resources, validation, gate } = presentation;
     const blockerCount = presentation.actionItems.filter(item => item.priority === 'blocking').length;
-    const validationLabel = validation.overall === 'failed'
+    const coreValidationFailed = validation.structural.status === 'failed' ||
+        validation.dryRun.status === 'failed' ||
+        validation.otherErrors.length > 0;
+    const validationLabel = coreValidationFailed
         ? '验证未通过'
-        : validation.overall === 'passed'
+        : validation.structural.status === 'passed' && validation.dryRun.status === 'passed'
             ? '验证已通过'
             : validation.overall === 'running'
                 ? '验证进行中'
@@ -596,7 +682,11 @@ function renderStatusSummary(panel, presentation) {
         </div>
         <dl class="ai-build-v2-metrics">
             ${renderMetric(panel, '阻断', blockerCount, blockerCount ? '需要处理' : '当前无阻断')}
-            ${renderMetric(panel, '待补参数', parameters.unresolved, parameters.confirmed ? '已确认' : `${parameters.filled}/${parameters.total} 已填写`)}
+            ${renderMetric(panel, '待补参数', parameters.remainingToFill, parameters.confirmed
+                ? '已确认'
+                : parameters.awaitingConfirmation
+                    ? '已填写，等待确认'
+                    : `${parameters.filled}/${parameters.total} 已填写`)}
             ${renderMetric(panel, '待补资源', resources.unresolved, resources.unresolved ? '等待绑定' : '当前完整')}
             ${renderMetric(panel, '应用状态', presentation.applied ? '已应用' : gate.canvasReady && !gate.blocked ? '可应用' : '未就绪', gate.status)}
         </dl>
@@ -668,11 +758,21 @@ function renderValidationSummary(panel, presentation) {
         { title: 'DryRun', state: presentation.validation.dryRun },
         { title: '应用门禁', state: presentation.validation.gate }
     ];
-    const summary = presentation.validation.overall === 'failed'
-        ? `最重要的 ${Math.max(presentation.validation.errors.length, 1)} 项问题需要先处理。`
-        : presentation.validation.overall === 'passed'
-            ? '当前验证证据已通过，继续复核应用预览。'
-            : '验证结果将直接消费现有静态检查、DryRun 与 Gate 状态。';
+    const coreValidationFailed = presentation.validation.structural.status === 'failed' ||
+        presentation.validation.dryRun.status === 'failed' ||
+        presentation.validation.otherErrors.length > 0;
+    const summary = coreValidationFailed
+        ? `最重要的 ${Math.max(
+            presentation.validation.structuralErrors.length +
+            presentation.validation.dryRunErrors.length +
+            presentation.validation.otherErrors.length,
+            1
+        )} 项问题需要先处理。`
+        : presentation.validation.gate.status === 'failed'
+            ? '静态检查与 DryRun 保持各自结果，当前由应用门禁阻断。'
+            : presentation.validation.overall === 'passed'
+                ? '当前验证证据已通过，继续复核应用预览。'
+                : '验证结果将直接消费现有静态检查、DryRun 与 Gate 状态。';
     return `
         <div class="ai-build-v2-validation-copy">
             <strong>${escapeHtml(panel, summary)}</strong>
@@ -940,5 +1040,9 @@ export function installAiPanelBuildPresentation(prototype) {
 export const aiPanelBuildPresentationTestApi = {
     classifyCheck,
     deriveDiff,
-    countPendingFields
+    countPendingFields,
+    deriveValidation,
+    deriveParameterState,
+    getDiagnosticScope,
+    formatGateStatus
 };

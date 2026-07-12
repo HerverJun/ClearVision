@@ -4483,6 +4483,8 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _formatGateStatus(status) {
         switch (String(status || '').trim().toLowerCase()) {
+            case 'ready':
+                return '已就绪';
             case 'canvas_apply_ready':
                 return '画布可应用';
             case 'runtime_draft_ready':
@@ -4493,6 +4495,10 @@ export const aiPanelAgentWorkspaceMixin = {
                 return '部署元数据就绪';
             case 'blocked':
                 return '已阻断';
+            case 'pending':
+                return '等待中';
+            case 'unknown':
+                return '未设置';
             default:
                 return this._localizeDisplayText(status) || '未设置';
         }
