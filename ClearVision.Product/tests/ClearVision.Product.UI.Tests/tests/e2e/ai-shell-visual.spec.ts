@@ -376,16 +376,40 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
       summary: '采集产品图像，定位并解码 DataMatrix，再输出结构化结果。',
       operators: ['ImageAcquisition', 'CodeRecognition', 'ResultOutput'],
     },
-    clarificationQuestions: [{
-      id: 'question-image-source',
-      field: 'image_source',
-      title: '图像从哪里获取？',
-      why: '输入方式会影响采集算子和离线验证方式。',
-      options: [
-        { value: 'industrial_camera', label: '工业相机', recommended: true, answerEffect: 'resolve_field' },
-        { value: 'image_folder', label: '图片目录', recommended: false, answerEffect: 'resolve_field' },
-      ],
-    }],
+    clarificationQuestions: [
+      {
+        id: 'question-image-source',
+        field: 'image_source',
+        title: '图像从哪里获取？',
+        why: '输入方式会影响采集算子和离线验证方式。',
+        options: [
+          { value: 'industrial_camera', label: '工业相机', recommended: true, answerEffect: 'resolve_field' },
+          { value: 'image_folder', label: '图片目录', recommended: false, answerEffect: 'resolve_field' },
+        ],
+      },
+      {
+        id: 'question-unreadable-policy',
+        field: 'acceptance_criteria',
+        title: 'DataMatrix 不可读时如何处理？',
+        why: '不可读策略会改变判定分支与工站节拍。',
+        options: [
+          { value: 'ng_on_unreadable', label: '不可读判 NG', recommended: true, answerEffect: 'resolve_field' },
+          { value: 'retry_then_ng', label: '重试后再判 NG', recommended: false, answerEffect: 'resolve_field' },
+          { value: 'manual_review', label: '转人工复核', recommended: false, answerEffect: 'resolve_field' },
+        ],
+      },
+      {
+        id: 'question-output-contract',
+        field: 'output_target',
+        title: '解码结果按什么契约交付？',
+        why: '输出字段会影响结果结构和下游接入方式。',
+        options: [
+          { value: 'local_result', label: '本地结构化结果', recommended: true, answerEffect: 'resolve_field' },
+          { value: 'business_system', label: '发送业务系统', recommended: false, answerEffect: 'resolve_field' },
+          { value: 'plc_pending', label: 'PLC 输出待确认', recommended: false, answerEffect: 'defer' },
+        ],
+      },
+    ],
     missingResources: [{
       resourceKey: 'camera:primary',
       resourceType: 'camera',
@@ -404,16 +428,18 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
       { questionId: 'prompt-task-type', field: 'task_type', value: 'code_recognition', origin: 'explicit_user_text', resolved: true },
     ],
     resolvedPlanFields: ['inspection_object', 'task_type'],
-    remainingPlanFields: ['image_source'],
+    remainingPlanFields: ['image_source', 'acceptance_criteria', 'output_target'],
     buildReadiness: {
       canBuild: false,
       blockers: [
         { id: 'hard_requirement:image_source', category: 'hard_requirement', field: 'image_source', questionId: 'question-image-source', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '图像输入方式待确认' },
+        { id: 'hard_requirement:acceptance_criteria', category: 'hard_requirement', field: 'acceptance_criteria', questionId: 'question-unreadable-policy', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '不可读处理待确认' },
+        { id: 'hard_requirement:output_target', category: 'hard_requirement', field: 'output_target', questionId: 'question-output-contract', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: '输出契约待确认' },
         { id: 'resource_pending:camera:primary', category: 'resource_pending', field: 'camera', questionId: '', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '相机资源待绑定' },
       ],
       resolvedFields: ['inspection_object', 'task_type'],
-      remainingFields: ['image_source', 'camera'],
-      primaryMessage: '请先确认图像输入方式，并在后续补齐相机资源。',
+      remainingFields: ['image_source', 'acceptance_criteria', 'output_target', 'camera'],
+      primaryMessage: '请确认图像输入、不可读处理和输出契约，并在后续补齐相机资源。',
       contractVersion: 'v2',
     },
     requirementMaturity: {
@@ -423,9 +449,9 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
       canBuild: false,
       objectSignals: ['产品', 'DataMatrix'],
       taskSignals: ['读取'],
-      missingFields: ['image_source'],
-      blockingReasons: ['image_source'],
-      publicReason: '任务与对象已明确，输入方式仍需确认。',
+      missingFields: ['image_source', 'acceptance_criteria', 'output_target'],
+      blockingReasons: ['image_source', 'acceptance_criteria', 'output_target'],
+      publicReason: '任务与对象已明确，输入、判定和输出契约仍需确认。',
     },
     semanticExtraction: {
       isVisionRequest: true,
@@ -435,7 +461,7 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
       inspectionObject: '产品上的 DataMatrix 码',
       imageSource: 'industrial_camera',
       outputTarget: 'decoded_text',
-      missingFields: ['image_source'],
+      missingFields: ['image_source', 'acceptance_criteria', 'output_target'],
     },
     publicEvents: [],
     metadataOnly: true,
@@ -520,7 +546,7 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
   await expect(page.locator('[data-ai-hook="plan-recommendation"]')).toContainText('DataMatrix 读取流程');
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('图像从哪里获取');
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待补资源');
-  await expect(page.locator('[data-ai-hook="clarification-workspace"] .ai-clarification-v2-header')).toContainText('还需确认 1 项');
+  await expect(page.locator('[data-ai-hook="clarification-workspace"] .ai-clarification-v2-header')).toContainText('还需确认 3 项');
   const confirmationFields = await page.evaluate(() =>
     (window as any).aiPanel.agentWorkspaceState.projection.confirmedAnswers.map((answer: any) => answer.field));
   expect(confirmationFields).toEqual(expect.arrayContaining(['inspection_object', 'task_type']));
