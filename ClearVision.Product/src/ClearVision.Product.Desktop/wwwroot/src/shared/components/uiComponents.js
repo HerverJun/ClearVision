@@ -437,6 +437,8 @@ export function hideLoading(loading) {
  * @param {Array<HTMLElement>} options.footer - 底部按钮数组
  * @param {Function} options.onClose - 关闭回调
  * @param {string} options.width - 宽度样式 (如 "600px")
+ * @param {'small'|'medium'|'large'|'workbench'} options.size - 内容语义尺寸
+ * @param {string} options.modalClassName - 额外对话框类名
  * @returns {HTMLDivElement}
  */
 export function createModal(options = {}) {
@@ -446,6 +448,8 @@ export function createModal(options = {}) {
         footer = null,
         onClose = null,
         width = null,
+        size = null,
+        modalClassName = '',
         onBeforeClose = null,
         onDispose = null,
         closeOnOverlayClick = true,
@@ -457,7 +461,21 @@ export function createModal(options = {}) {
     overlay.setAttribute('role', 'presentation');
 
     const modal = document.createElement('div');
-    modal.className = 'cv-modal';
+    const numericWidth = Number.parseFloat(String(width || ''));
+    const inferredSize = Number.isFinite(numericWidth)
+        ? numericWidth >= 1100
+            ? 'workbench'
+            : numericWidth >= 760
+                ? 'large'
+                : numericWidth >= 500
+                    ? 'medium'
+                    : 'small'
+        : 'small';
+    const modalSize = ['small', 'medium', 'large', 'workbench'].includes(size)
+        ? size
+        : inferredSize;
+    modal.className = `cv-modal cv-modal--${modalSize} ${modalClassName}`.trim();
+    modal.dataset.modalSize = modalSize;
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     if (width) modal.style.width = width;

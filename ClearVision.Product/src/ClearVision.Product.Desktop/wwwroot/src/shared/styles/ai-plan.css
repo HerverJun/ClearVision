@@ -88,7 +88,7 @@
     --ai-plan-warning: var(--status-error);
     display: grid;
     gap: 16px;
-    width: min(100%, 1120px);
+    width: min(100%, 1280px);
     margin: 0 auto;
     min-width: 0;
     color: var(--ai-plan-text);
@@ -432,46 +432,135 @@
 
 .ai-plan-v2-empty {
     display: grid;
-    gap: 18px;
-    width: min(100%, 920px);
-    min-height: min(520px, calc(100vh - 220px));
+    grid-template-rows: auto;
+    gap: 20px;
+    width: min(100%, 1280px);
+    min-height: 0;
     align-content: start;
-    margin: 0 auto;
-    padding: 28px 30px;
+    margin: 0;
+    padding: 24px 26px;
     border: 1px solid var(--ai-plan-border);
     border-radius: var(--radius-lg);
-    background:
-        linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 7%, transparent), transparent 46%),
-        var(--ai-plan-surface);
+    background: var(--ai-plan-surface);
+    animation: ai-planning-enter 180ms ease-out both;
 }
 
 .ai-planning-wait-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 18px;
-    padding-bottom: 18px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+    padding-bottom: 20px;
     border-bottom: 1px solid var(--ai-plan-border);
 }
 
-.ai-planning-wait-heading > div {
+.ai-planning-task-summary {
     display: grid;
-    gap: 7px;
+    gap: 6px;
+    min-width: 0;
 }
 
-.ai-planning-wait-heading small {
-    padding: 5px 8px;
-    border: 1px solid color-mix(in srgb, var(--status-warning, #d99a32) 32%, var(--ai-plan-border));
-    border-radius: var(--radius-full);
+.ai-planning-task-summary > span,
+.ai-planning-current-work > span,
+.ai-planning-truth-panel > span {
+    color: var(--ai-plan-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 650;
+    letter-spacing: 0.04em;
+}
+
+.ai-planning-task-summary > strong {
+    max-width: 920px;
+    color: var(--ai-plan-text);
+    font-size: clamp(20px, 1.55vw, 26px);
+    font-weight: 680;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.ai-planning-task-summary > p {
+    margin: 0;
     color: var(--ai-plan-text-secondary);
-    background: color-mix(in srgb, var(--status-warning, #d99a32) 9%, transparent);
+    line-height: 1.55;
+}
+
+.ai-planning-status-block {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-width: 156px;
+    padding: 9px 11px;
+    border: 1px solid var(--ai-plan-border);
+    border-radius: var(--radius-md);
+    background: var(--ai-plan-surface-muted);
+}
+
+.ai-planning-status-block > div {
+    display: grid;
+    gap: 2px;
+}
+
+.ai-planning-status-block strong {
+    color: var(--ai-plan-text);
+    font-size: var(--font-size-sm);
+}
+
+.ai-planning-status-block small {
+    color: var(--ai-plan-text-muted);
+    font-size: var(--font-size-xs);
     white-space: nowrap;
 }
 
+.ai-planning-status-indicator {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--radius-full);
+    background: var(--ai-plan-text-muted);
+}
+
+.ai-planning-wait.is-running .ai-planning-status-indicator,
+.ai-planning-stages li.is-running .ai-planning-stage-index {
+    animation: ai-planning-breathe 1.8s ease-in-out infinite;
+}
+
+.ai-planning-wait.is-running .ai-planning-status-indicator {
+    background: var(--ai-plan-accent);
+}
+
+.ai-planning-wait.is-completed .ai-planning-status-indicator {
+    background: var(--ai-plan-success);
+}
+
+.ai-planning-wait.is-failed .ai-planning-status-indicator,
+.ai-planning-wait.is-timeout .ai-planning-status-indicator {
+    background: var(--status-ng);
+}
+
+.ai-planning-wait.is-cancelled .ai-planning-status-indicator {
+    background: var(--ai-plan-text-muted);
+}
+
+.ai-planning-progress {
+    position: relative;
+    min-width: 0;
+    padding-top: 2px;
+}
+
+.ai-planning-progress-line {
+    position: absolute;
+    top: 31px;
+    right: 12.5%;
+    left: 12.5%;
+    height: 1px;
+    background: var(--ai-plan-border-strong);
+}
+
 .ai-planning-stages {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    gap: 14px;
     padding: 0;
     margin: 0;
     list-style: none;
@@ -479,15 +568,15 @@
 
 .ai-planning-stages li {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 10px;
-    align-content: start;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px 10px;
+    align-content: center;
     min-width: 0;
-    min-height: 112px;
-    padding: 14px;
+    min-height: 100px;
+    padding: 13px 14px;
     border: 1px solid var(--ai-plan-border);
     border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--ai-plan-surface-muted) 68%, transparent);
+    background: var(--ai-plan-surface);
 }
 
 .ai-planning-stage-index {
@@ -520,13 +609,13 @@
 }
 
 .ai-planning-stages li > b {
-    grid-column: 1 / -1;
+    grid-column: 2;
     font-weight: 600;
 }
 
 .ai-planning-stages li.is-running {
     border-color: color-mix(in srgb, var(--ai-plan-accent) 42%, var(--ai-plan-border));
-    background: color-mix(in srgb, var(--ai-plan-accent) 9%, var(--ai-plan-surface));
+    background: color-mix(in srgb, var(--ai-plan-accent) 6%, var(--ai-plan-surface));
 }
 
 .ai-planning-stages li.is-running .ai-planning-stage-index {
@@ -539,17 +628,89 @@
     color: var(--ai-plan-success);
 }
 
+.ai-planning-stages li.is-completed {
+    border-color: color-mix(in srgb, var(--ai-plan-success) 24%, var(--ai-plan-border));
+}
+
 .ai-planning-stages li.is-failed,
 .ai-planning-stages li.is-timeout,
 .ai-planning-stages li.is-cancelled {
     border-color: color-mix(in srgb, var(--ai-plan-warning) 34%, var(--ai-plan-border));
 }
 
+.ai-planning-work-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+    gap: 14px;
+}
+
+.ai-planning-current-work,
+.ai-planning-truth-panel {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+    min-height: 100%;
+    padding: 16px 18px;
+    border: 1px solid var(--ai-plan-border);
+    border-radius: var(--radius-md);
+    background: var(--ai-plan-surface-muted);
+}
+
+.ai-planning-current-work > strong,
+.ai-planning-truth-panel > strong {
+    color: var(--ai-plan-text);
+    font-size: var(--font-size-md);
+}
+
+.ai-planning-current-work > p,
+.ai-planning-truth-panel > p {
+    margin: 0;
+    color: var(--ai-plan-text-secondary);
+    line-height: 1.6;
+}
+
+.ai-planning-processing-dots {
+    display: flex;
+    gap: 5px;
+    min-height: 8px;
+    padding-top: 4px;
+}
+
+.ai-planning-processing-dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: var(--radius-full);
+    background: var(--ai-plan-accent);
+    animation: ai-planning-dot 1.35s ease-in-out infinite;
+}
+
+.ai-planning-processing-dots i:nth-child(2) {
+    animation-delay: 140ms;
+}
+
+.ai-planning-processing-dots i:nth-child(3) {
+    animation-delay: 280ms;
+}
+
+.ai-planning-wait:not(.is-running) .ai-planning-processing-dots {
+    display: none;
+}
+
+.ai-plan-v2-empty .ai-planning-integrity-note {
+    padding-top: 2px;
+    border: 0;
+    color: var(--ai-plan-text-muted);
+    font-size: var(--font-size-xs);
+}
+
 .ai-planning-actions {
     display: flex;
+    justify-content: flex-end;
     gap: 8px;
-    margin-top: auto;
-    padding-top: 10px;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ai-plan-border);
 }
 
 .ai-planning-actions button {
@@ -571,6 +732,21 @@
 .ai-planning-actions button:focus-visible {
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
+}
+
+@keyframes ai-planning-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ai-planning-breathe {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.56; transform: scale(0.9); }
+}
+
+@keyframes ai-planning-dot {
+    0%, 70%, 100% { opacity: 0.28; transform: translateY(0); }
+    35% { opacity: 1; transform: translateY(-2px); }
 }
 
 .ai-plan-v2-ready {
@@ -755,13 +931,14 @@
     }
 
     .ai-plan-v2-empty {
+        grid-template-rows: auto;
         min-height: 0;
         padding: 18px 14px;
     }
 
     .ai-planning-wait-heading {
+        grid-template-columns: 1fr;
         align-items: stretch;
-        flex-direction: column;
     }
 
     .ai-planning-wait-heading small {
@@ -769,6 +946,14 @@
     }
 
     .ai-planning-stages {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-planning-progress-line {
+        display: none;
+    }
+
+    .ai-planning-work-grid {
         grid-template-columns: 1fr;
     }
 
@@ -785,8 +970,13 @@
 @media (prefers-reduced-motion: reduce) {
     .ai-plan-v2 *,
     .ai-plan-v2 *::before,
-    .ai-plan-v2 *::after {
+    .ai-plan-v2 *::after,
+    .ai-plan-v2-empty,
+    .ai-plan-v2-empty *,
+    .ai-plan-v2-empty *::before,
+    .ai-plan-v2-empty *::after {
         scroll-behavior: auto;
         transition-duration: 0s;
+        animation: none;
     }
 }

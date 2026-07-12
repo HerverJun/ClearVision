@@ -10,7 +10,7 @@
     "chromeWebview": true,
     "activeView": "ai"
   },
-  "timestampUtc": "2026-07-12T10:26:41.109Z",
+  "timestampUtc": "2026-07-12T17:41:22.390Z",
   "layouts": [
     {
       "label": "dpi-1-light",
@@ -22,18 +22,18 @@
       "composer": {
         "width": 546,
         "height": 52,
-        "left": 365,
-        "right": 911
+        "left": 677,
+        "right": 1223
       },
       "send": {
         "width": 36,
         "height": 36,
-        "left": 923,
-        "right": 959
+        "left": 1235,
+        "right": 1271
       },
       "viewport": {
-        "width": 1280,
-        "height": 695
+        "width": 1904,
+        "height": 1016
       }
     },
     {
@@ -46,29 +46,117 @@
       "composer": {
         "width": 546,
         "height": 52,
-        "left": 365,
-        "right": 911
+        "left": 677,
+        "right": 1223
       },
       "send": {
         "width": 36,
         "height": 36,
-        "left": 923,
-        "right": 959
+        "left": 1235,
+        "right": 1271
       },
       "viewport": {
-        "width": 1280,
-        "height": 695
+        "width": 1904,
+        "height": 1016
       }
     }
   ],
+  "flowCanvasThemes": {
+    "light": {
+      "theme": "light",
+      "canvas": {
+        "background": "rgb(231, 234, 238)",
+        "border": "rgb(32, 34, 38)"
+      },
+      "workspace": {
+        "background": "rgb(231, 234, 238)",
+        "border": "rgb(199, 205, 212)"
+      },
+      "minimap": {
+        "background": "rgba(247, 248, 250, 0.96)",
+        "border": "rgba(75, 87, 101, 0.28)"
+      },
+      "imageViewer": {
+        "background": "rgb(17, 19, 23)",
+        "border": "rgb(32, 34, 38)"
+      },
+      "palette": {
+        "grid": "rgba(75, 87, 101, 0.24)",
+        "nodeBackgroundStart": "#ffffff",
+        "nodeBackgroundEnd": "#edf0f3",
+        "nodeSelectedStart": "#f7fbfd",
+        "nodeSelectedEnd": "#e2edf2",
+        "nodeBorder": "rgba(63, 72, 83, 0.34)",
+        "nodeText": "#252b32",
+        "nodeMutedText": "#5f6975",
+        "nodeShadow": "rgba(37, 43, 50, 0.18)",
+        "nodeBadgeBackground": "rgba(247, 248, 250, 0.94)",
+        "portOutline": "#f8f9fa",
+        "connection": "#3f718e",
+        "connectionSelected": "#20262d",
+        "guide": "#47738f",
+        "minimapViewport": "rgba(182, 69, 60, 0.9)",
+        "minimapSelected": "#20262d",
+        "minimapDisabled": "#8b929a"
+      },
+      "overflow": {
+        "document": 0,
+        "body": 0,
+        "shell": 0
+      }
+    },
+    "dark": {
+      "theme": "dark",
+      "canvas": {
+        "background": "rgb(11, 13, 16)",
+        "border": "rgb(243, 243, 241)"
+      },
+      "workspace": {
+        "background": "rgb(11, 13, 16)",
+        "border": "rgb(36, 39, 44)"
+      },
+      "minimap": {
+        "background": "rgba(17, 21, 26, 0.94)",
+        "border": "rgba(255, 255, 255, 0.14)"
+      },
+      "imageViewer": {
+        "background": "rgb(9, 10, 12)",
+        "border": "rgb(243, 243, 241)"
+      },
+      "palette": {
+        "grid": "rgba(143, 158, 174, 0.2)",
+        "nodeBackgroundStart": "rgba(26, 58, 82, 0.86)",
+        "nodeBackgroundEnd": "rgba(13, 27, 42, 0.94)",
+        "nodeSelectedStart": "rgba(45, 74, 94, 0.94)",
+        "nodeSelectedEnd": "rgba(26, 58, 82, 0.98)",
+        "nodeBorder": "rgba(255, 255, 255, 0.14)",
+        "nodeText": "#ffffff",
+        "nodeMutedText": "rgba(255, 255, 255, 0.58)",
+        "nodeShadow": "rgba(0, 0, 0, 0.34)",
+        "nodeBadgeBackground": "rgba(13, 27, 42, 0.88)",
+        "portOutline": "#ffffff",
+        "connection": "#5ac8fa",
+        "connectionSelected": "#ffffff",
+        "guide": "#75a4bf",
+        "minimapViewport": "rgba(224, 106, 95, 0.9)",
+        "minimapSelected": "#ffffff",
+        "minimapDisabled": "#666b72"
+      },
+      "overflow": {
+        "document": 0,
+        "body": 0,
+        "shell": 0
+      }
+    }
+  },
   "reopen": {
     "marker": {
       "called": true,
       "completed": true,
       "reason": "host_close",
-      "startedAt": 1783851984601,
+      "startedAt": 1783878068410,
       "succeeded": true,
-      "completedAt": 1783851984601
+      "completedAt": 1783878068410
     },
     "safe": {
       "disposed": false,
@@ -81,12 +169,12 @@
       "reason": "apply_rollback_failed",
       "sessionId": "webview2-release-smoke-session",
       "fingerprintLength": 19,
-      "recordedAtUtc": "2026-07-12T10:26:24.538Z"
+      "recordedAtUtc": "2026-07-12T17:41:08.365Z"
     },
     "restored": {
       "identity": {
         "sessionId": "webview2-release-smoke-session",
-        "requestId": "webview2-reopen-1783852001552",
+        "requestId": "webview2-reopen-1783878083331",
         "epoch": 2
       },
       "pendingSessionLoad": false,
@@ -97,9 +185,9 @@
       "marker": {
         "version": 1,
         "sessionId": "webview2-release-smoke-session",
-        "fingerprint": "fnv1a:d1e2666b:2060",
+        "fingerprint": "fnv1a:9146e5c3:2060",
         "reason": "apply_rollback_failed",
-        "recordedAtUtc": "2026-07-12T10:26:24.538Z"
+        "recordedAtUtc": "2026-07-12T17:41:08.365Z"
       },
       "canvasBeforeSessionRestore": {
         "operators": [],

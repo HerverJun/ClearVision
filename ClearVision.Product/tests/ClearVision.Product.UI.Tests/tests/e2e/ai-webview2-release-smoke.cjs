@@ -182,6 +182,142 @@ async function captureLayout(page, label, theme) {
   return { label, theme, ...layout };
 }
 
+async function captureFormalProductLayouts(page) {
+  const formalViews = {
+    project: '#project-view',
+    flow: '#flow-editor',
+    inspection: '#inspection-view',
+    results: '#results-view',
+    stations: '#stations-view',
+    ai: '#ai-view',
+    settings: '#settings-view',
+  };
+  const settingsTabs = [
+    'general', 'communication', 'tcp', 'station', 'storage',
+    'database', 'runtime', 'cameras', 'ai', 'users',
+  ];
+  const standardSettingsTabs = new Set(['general', 'storage', 'runtime']);
+  const wideSettingsTabs = new Set(['communication', 'tcp', 'station', 'cameras', 'users']);
+  const result = {};
+
+  const collect = async (view, ownerSelector) => page.evaluate(({ currentView, selector }) => {
+    const rect = element => {
+      const value = element?.getBoundingClientRect?.();
+      return value ? {
+        x: Math.round(value.x), y: Math.round(value.y),
+        width: Math.round(value.width), height: Math.round(value.height),
+        clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight, scrollHeight: element.scrollHeight,
+      } : null;
+    };
+    const visible = element => {
+      if (!element) return false;
+      const value = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && value.width > 0 && value.height > 0
+        && value.bottom > 0 && value.top < innerHeight;
+    };
+    const hit = element => {
+      if (!visible(element)) return false;
+      const value = element.getBoundingClientRect();
+      const target = document.elementFromPoint(value.left + value.width / 2, value.top + value.height / 2);
+      return target === element || Boolean(target && element.contains(target));
+    };
+    const owner = document.querySelector(selector);
+    const settingsPanel = document.querySelector('.settings-panel.active');
+    const formRows = new Map();
+    document.querySelectorAll('.settings-panel.active .settings-fieldset').forEach(element => {
+      const value = element.getBoundingClientRect();
+      if (value.width <= 0 || value.height <= 0) return;
+      const key = Math.round(value.top);
+      formRows.set(key, (formRows.get(key) || 0) + 1);
+    });
+    return {
+      view: currentView,
+      viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
+      document: {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      },
+      body: {
+        clientWidth: document.body.clientWidth,
+        scrollWidth: document.body.scrollWidth,
+        overflow: document.body.scrollWidth - document.body.clientWidth,
+      },
+      toolbar: rect(document.querySelector('.toolbar')),
+      toolbarLeft: rect(document.querySelector('.toolbar-left')),
+      toolbarRight: rect(document.querySelector('.toolbar-right')),
+      main: rect(document.querySelector('#main-content')),
+      owner: rect(owner),
+      ownerOverflow: owner ? owner.scrollWidth - owner.clientWidth : null,
+      settingsContent: rect(document.querySelector('.settings-content-area')),
+      settingsPanel: rect(settingsPanel),
+      settingsPanelOverflow: settingsPanel ? settingsPanel.scrollWidth - settingsPanel.clientWidth : null,
+      maxFormColumns: Math.max(0, ...formRows.values()),
+      actions: {
+        settingsNavigation: hit(document.querySelector('.nav-btn[data-view="settings"]')),
+        finalDecision: hit(document.querySelector('#btn-final-decision')),
+        save: hit(document.querySelector('#btn-save')),
+        run: hit(document.querySelector('#btn-run')),
+        settingsSaveVisible: visible(document.querySelector('#btn-save-settings')),
+      },
+    };
+  }, { currentView: view, selector: ownerSelector });
+
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(selectedTheme => { document.documentElement.dataset.theme = selectedTheme; }, theme);
+    await page.waitForTimeout(100);
+    const themeResult = {};
+    for (const [view, selector] of Object.entries(formalViews)) {
+      await activateView(page, view);
+      await page.waitForSelector(`${selector}:not(.hidden)`, { state: 'visible', timeout: 30_000 });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const metrics = await collect(view, selector);
+      themeResult[view] = metrics;
+      await page.screenshot({ path: path.join(evidenceDir, `formal-dpi-${safeFileName(scale)}-${theme}-${view}.png`) });
+      assert(metrics.document.overflow <= 1 && metrics.body.overflow <= 1,
+        `${view} root overflow at DPI ${scale} ${theme}: ${JSON.stringify(metrics)}`);
+      assert(metrics.actions.settingsNavigation && metrics.actions.finalDecision
+        && metrics.actions.save && metrics.actions.run,
+      `${view} toolbar action unreachable at DPI ${scale} ${theme}: ${JSON.stringify(metrics.actions)}`);
+      assert((metrics.toolbarLeft?.x || 0) + (metrics.toolbarLeft?.width || 0)
+        <= (metrics.toolbarRight?.x || 0) + 1,
+      `${view} toolbar regions overlap at DPI ${scale} ${theme}.`);
+
+      if (view === 'settings') {
+        const tabResult = {};
+        for (const tabName of settingsTabs) {
+          const tab = page.locator(`.settings-menu-item[data-tab="${tabName}"]`);
+          await tab.click();
+          await page.waitForSelector(`.settings-panel[data-section="${tabName}"].active`, { state: 'visible' });
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          const tabMetrics = await collect('settings', '#settings-view');
+          tabResult[tabName] = tabMetrics;
+          await page.screenshot({ path: path.join(evidenceDir, `formal-dpi-${safeFileName(scale)}-${theme}-settings-${tabName}.png`) });
+          assert(tabMetrics.document.overflow <= 1 && tabMetrics.body.overflow <= 1,
+            `settings/${tabName} root overflow at DPI ${scale} ${theme}.`);
+          assert(tabMetrics.actions.settingsSaveVisible,
+            `settings/${tabName} save action unreachable at DPI ${scale} ${theme}.`);
+          const availableWidth = Math.max(0, (tabMetrics.settingsContent?.width || 0) - 64);
+          const expectedWidth = standardSettingsTabs.has(tabName)
+            ? Math.min(availableWidth, 1160)
+            : wideSettingsTabs.has(tabName)
+              ? Math.min(availableWidth, 1440)
+              : availableWidth;
+          assert((tabMetrics.settingsPanel?.width || 0) >= expectedWidth,
+            `settings/${tabName} remains artificially narrow at DPI ${scale} ${theme}: ${JSON.stringify(tabMetrics)}`);
+        }
+        themeResult.settingsTabs = tabResult;
+      }
+    }
+    result[theme] = themeResult;
+  }
+  await activateView(page, 'ai');
+  return result;
+}
+
 async function verifyImeComposition(page) {
   const input = page.locator('#ai-input');
   await input.fill('');
@@ -474,7 +610,8 @@ async function verifyLifecycleRepetition(page) {
   }
   for (let index = 0; index < 10; index += 1) {
     await page.locator('#ai-btn-apply').click();
-    await page.keyboard.press('Escape');
+    await page.locator('.ai-apply-preview-cancel').click();
+    await page.waitForSelector('.ai-apply-preview-overlay', { state: 'detached' });
   }
   const after = await page.evaluate(() => ({
     samePanel: window.aiPanel === window.__cvSmokePanelIdentity,
@@ -767,6 +904,9 @@ async function main() {
       await captureLayout(page, `dpi-${scale}-dark`, 'dark'),
     ];
     result.flowCanvasThemes = await captureFlowCanvasThemes(page);
+    if (phase !== 'reopen') {
+      result.formalProductLayouts = await captureFormalProductLayouts(page);
+    }
     if (phase === 'full') {
       result.ime = await verifyImeComposition(page);
       result.hostWebMessage = await verifyHostWebMessage(page);

@@ -536,11 +536,11 @@ export function installStationTab(SettingsView) {
                     </div>
                     <div class="settings-card-body">
                         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:18px;">
-                            <div style="border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
+                            <div style="border:1px solid var(--border-color); border-radius:8px; padding:14px;">
                                 <div style="font-size:13px; font-weight:600; margin-bottom:8px;">本机 Station</div>
                                 <pre class="font-mono" style="white-space:pre-wrap; word-break:break-all; margin:0; font-size:12px; line-height:1.5;">${this.escapeHtml(localSnippet)}</pre>
                             </div>
-                            <div style="border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
+                            <div style="border:1px solid var(--border-color); border-radius:8px; padding:14px;">
                                 <div style="font-size:13px; font-weight:600; margin-bottom:8px;">远端 Station</div>
                                 <pre class="font-mono" style="white-space:pre-wrap; word-break:break-all; margin:0; font-size:12px; line-height:1.5;">${this.escapeHtml(remoteSnippet)}</pre>
                             </div>
@@ -560,7 +560,7 @@ export function installStationTab(SettingsView) {
                                 </ul>
                             </div>
                         </div>
-                        <div style="margin-top:18px; padding:12px 14px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;">
+                        <div style="margin-top:18px; padding:12px 14px; border-radius:8px; background:var(--bg-subtle); border:1px solid var(--border-color);">
                             <ul style="margin:0; padding-left:18px; color:var(--text-muted); font-size:12px; line-height:1.6;">
                                 ${diagnosticsHtml}
                             </ul>

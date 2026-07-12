@@ -3,6 +3,8 @@ param(
     [string]$Password = $env:CV_SMOKE_PASSWORD,
     [string]$Configuration = "Debug",
     [string]$EvidenceDirectory = "quality/evidence/ai-webview2-release",
+    [int]$WindowWidth = 1920,
+    [int]$WindowHeight = 1080,
     [switch]$NoBuild
 )
 
@@ -66,8 +68,9 @@ namespace ClearVisionReleaseSmoke {
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
         [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
 
-        public static bool RequestClose(uint processId) {
+        private static IntPtr Find(uint processId) {
             IntPtr target = IntPtr.Zero;
             EnumWindows((hWnd, _) => {
                 uint pid;
@@ -81,6 +84,17 @@ namespace ClearVisionReleaseSmoke {
                 }
                 return true;
             }, IntPtr.Zero);
+            return target;
+        }
+
+        public static bool Resize(uint processId, int width, int height) {
+            var target = Find(processId);
+            const uint flags = 0x0002 | 0x0004 | 0x0010;
+            return target != IntPtr.Zero && SetWindowPos(target, IntPtr.Zero, 0, 0, width, height, flags);
+        }
+
+        public static bool RequestClose(uint processId) {
+            var target = Find(processId);
             return target != IntPtr.Zero && PostMessage(target, 0x0010, IntPtr.Zero, IntPtr.Zero);
         }
     }
@@ -115,6 +129,9 @@ function Start-DesktopHost {
         -PassThru
     Wait-HttpEndpoint -Uri "http://127.0.0.1:5000/api/auth/setup-status"
     Wait-HttpEndpoint -Uri "http://127.0.0.1:$CdpPort/json/version"
+    if (-not [ClearVisionReleaseSmoke.NativeWindow]::Resize([uint32]$process.Id, $WindowWidth, $WindowHeight)) {
+        throw "Could not resize the hidden WinForms window for PID $($process.Id)."
+    }
     return $process
 }
 

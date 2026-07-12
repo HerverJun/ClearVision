@@ -165,7 +165,7 @@ export function installSystemTabs(SettingsView) {
                         <div class="settings-card-body" style="padding: 32px 24px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
                                 <span id="disk-drive-label" style="font-size:13px; font-weight:600; color:#475569;">-- 磁盘空间</span>
-                                <span id="disk-used-percent" style="font-size:13px; font-weight:700; color:#0f172a;">--% 已用</span>
+                                <span id="disk-used-percent" style="font-size:13px; font-weight:700; color:var(--text-primary);">--% 已用</span>
                             </div>
                             <div style="background:#e2e8f0; height:8px; border-radius:4px; overflow:hidden; margin-bottom:24px;">
                                 <div id="disk-used-bar" style="background:var(--cinnabar); width:0%; height:100%;"></div>
@@ -287,9 +287,9 @@ export function installSystemTabs(SettingsView) {
         ,
         renderDatabaseMetric(label, value) {
             return `
-                <div style="border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; background:#fff;">
+                <div style="border:1px solid var(--border-color); border-radius:8px; padding:10px 12px; background:var(--bg-subtle);">
                     <div class="text-muted" style="font-size:12px; margin-bottom:4px;">${this.escapeHtml(label)}</div>
-                    <div style="font-weight:700; color:#0f172a; overflow-wrap:anywhere;">${this.escapeHtml(value)}</div>
+                    <div style="font-weight:700; color:var(--text-primary); overflow-wrap:anywhere;">${this.escapeHtml(value)}</div>
                 </div>
             `;
         }
@@ -353,7 +353,7 @@ export function installSystemTabs(SettingsView) {
                             </div>
                         </div>
                     </div>
-                    <div class="settings-card-body" style="border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; padding:16px 24px;">
+                    <div class="settings-card-body" style="border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; padding:16px 24px;">
                         <button class="cv-btn settings-btn-danger" id="btn-apply-protection-rules">
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; margin-right:6px; fill:currentColor;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
                             保存运行保护配置
@@ -420,7 +420,7 @@ export function installSystemTabs(SettingsView) {
                             <input type="number" class="cv-input" id="cfg-loginFailureLockoutCount" value="${security.loginFailureLockoutCount || 5}">
                         </div>
                     </div>
-                    <div class="settings-card-body" style="border-top:1px solid #e2e8f0; padding-top:16px;">
+                    <div class="settings-card-body" style="border-top:1px solid var(--border-color); padding-top:16px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; width:100%;">
                             <span class="settings-field-hint">密码最小长度会立即应用到修改密码、创建用户和重置密码；其他策略会随认证链路逐步接入。</span>
                             <button class="cv-btn settings-btn-danger" id="btn-save-security-policy">保存安全策略</button>

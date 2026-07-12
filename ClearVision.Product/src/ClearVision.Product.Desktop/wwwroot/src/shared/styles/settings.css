@@ -150,10 +150,22 @@
 
 .settings-panel {
     display: none;
-    width: min(1080px, 100%);
+    width: min(1160px, 100%);
     margin: 0 auto;
     padding: 28px clamp(20px, 3vw, 40px) 72px;
     animation: none;
+}
+
+.settings-panel--standard {
+    width: min(1160px, 100%);
+}
+
+.settings-panel--wide {
+    width: min(1440px, 100%);
+}
+
+.settings-panel--full {
+    width: 100%;
 }
 
 .settings-panel.active {
@@ -539,6 +551,30 @@ details.settings-modern-card > summary.settings-card-header {
 
 .settings-modern-table tbody tr:hover td {
     background: var(--hover-color);
+}
+
+.settings-modern-table tbody tr.is-editing td {
+    background: var(--bg-subtle);
+}
+
+.settings-ai-provider-badge {
+    color: var(--text-secondary);
+}
+
+.settings-ai-model-state.is-enabled {
+    border-color: var(--status-ok-border);
+    background: var(--status-ok-soft);
+    color: var(--status-ok-strong);
+}
+
+.settings-ai-model-state.is-disabled {
+    border-color: var(--status-error-border);
+    background: var(--status-error-soft);
+    color: var(--status-error-strong);
+}
+
+.settings-ai-active-badge {
+    padding-inline: 8px;
 }
 
 .settings-modern-table .cv-input {

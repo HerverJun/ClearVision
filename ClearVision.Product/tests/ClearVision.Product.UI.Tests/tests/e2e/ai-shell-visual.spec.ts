@@ -4,7 +4,13 @@ import path from 'node:path';
 import { bootAuthenticatedApp } from './authHelper';
 
 type Theme = 'dark' | 'light';
-const planningEvidenceDir = path.resolve(process.cwd(), 'test-results', 'ai-planning-evidence');
+const planningEvidencePhase = process.env.QP_EVIDENCE_PHASE === 'initial' ? 'initial' : 'final';
+const planningEvidenceDir = path.resolve(
+  process.cwd(),
+  '../../../artifacts/desktop-layout-governance',
+  planningEvidencePhase,
+  'ai-planning',
+);
 
 async function capturePlanningEvidence(page: Page, filename: string): Promise<void> {
   await mkdir(planningEvidenceDir, { recursive: true });
@@ -332,8 +338,29 @@ test('Router pending activates the shell before the first canonical result witho
   await expect(page.locator('[data-ai-action="planning-cancel"]')).toBeVisible();
   await page.waitForTimeout(6200);
   await expect(page.locator('[data-ai-hook="planning-wait"]')).toContainText('响应较慢，但仍在工作');
-  await expect(page.locator('#ai-chat-container')).toContainText('仍在工作，可取消');
+  await expect(page.locator('#ai-chat-container')).toContainText('规划响应较慢，但仍在处理');
+  await expect(page.locator('#ai-chat-container')).not.toContainText('真实 Plan Run 事件到达后会接管同一条进度');
   await capturePlanningEvidence(page, 'waiting-dark-1366.png');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const desktopLayout = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    return {
+      workbench: bounds('[data-ai-hook="planning-wait"]'),
+      conversation: bounds('.ai-pane-left'),
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      bodyOverflow: document.body.scrollWidth - document.body.clientWidth,
+    };
+  });
+  expect(desktopLayout.workbench?.width || 0).toBeGreaterThanOrEqual(1150);
+  expect(desktopLayout.conversation?.width || 0).toBeLessThanOrEqual(410);
+  expect(desktopLayout.documentOverflow).toBeLessThanOrEqual(1);
+  expect(desktopLayout.bodyOverflow).toBeLessThanOrEqual(1);
+  await capturePlanningEvidence(page, 'waiting-dark-1920.png');
   await expect(page.locator('#ai-input')).toBeVisible();
   await expect(page.locator('#ai-btn-start-build')).toHaveCount(0);
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();

@@ -293,6 +293,7 @@ test('resource pending remains a lightweight boundary notice without binding con
 
 test('first planning wait renders four honest phases with cancel feedback', () => {
   const panel = createPanel();
+  panel.lastPlanningRequestContext = { description: '检测连接器端子是否缺针' };
   panel._getPlanRunProgressState = () => ({
     status: 'running',
     slow: true,
@@ -308,6 +309,12 @@ test('first planning wait renders four honest phases with cancel feedback', () =
   });
 
   const html = aiPanelPlanPresentationTestApi.renderEmptyPlan(panel);
+  assert.match(html, /规划进行中工作台/);
+  assert.match(html, /检测连接器端子是否缺针/);
+  assert.match(html, /当前工作/);
+  assert.match(html, /进度依据/);
+  assert.match(html, /尚未收到 Plan Run 流式事件/);
+  assert.match(html, /data-planning-status="running"/);
   assert.match(html, /理解需求/);
   assert.match(html, /整理工程上下文/);
   assert.match(html, /生成方案/);
@@ -315,6 +322,41 @@ test('first planning wait renders four honest phases with cancel feedback', () =
   assert.match(html, /尚未标记完成/);
   assert.match(html, /取消规划/);
   assert.doesNotMatch(html, /data-planning-phase="context"[^]*已完成/);
+});
+
+test('planning wait exposes terminal states without inventing completed phases', () => {
+  for (const [status, label] of [
+    ['failed', '规划失败'],
+    ['timeout', '等待超时'],
+    ['cancelled', '已取消'],
+  ]) {
+    const panel = createPanel();
+    panel.lastPlanningRequestContext = { description: '检测玻璃划痕' };
+    panel._getPlanRunProgressState = () => ({
+      status,
+      canCancel: false,
+      canRetry: true,
+      currentLabel: `${label}，可重试。`,
+      eventCount: 0,
+      phases: {
+        understand: { status: 'completed', summary: '需求理解已返回。' },
+        context: { status, summary: `${label}。` },
+        generate: { status: 'waiting', summary: '' },
+        validate: { status: 'waiting', summary: '' },
+      },
+    });
+
+    const html = aiPanelPlanPresentationTestApi.renderEmptyPlan(panel);
+    assert.match(html, new RegExp(`data-planning-status="${status}"`));
+    assert.match(html, new RegExp(label));
+    assert.match(html, /data-ai-action="planning-retry"/);
+    const generatePhase = html.match(/<li[^>]*data-planning-phase="generate"[^>]*>[\s\S]*?<\/li>/)?.[0] || '';
+    const validatePhase = html.match(/<li[^>]*data-planning-phase="validate"[^>]*>[\s\S]*?<\/li>/)?.[0] || '';
+    assert.match(generatePhase, /等待中/);
+    assert.match(validatePhase, /等待中/);
+    assert.doesNotMatch(generatePhase, /已完成/);
+    assert.doesNotMatch(validatePhase, /已完成/);
+  }
 });
 
 test('failed or cancelled planning wait exposes retry from the same lifecycle', () => {

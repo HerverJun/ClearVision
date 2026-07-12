@@ -63,12 +63,18 @@
 
 @media (max-width: 1120px) {
     .toolbar-global-variable-host .global-variable-entry {
-        max-width: 196px;
-        padding-left: 8px;
+        max-width: 104px;
+        gap: 4px;
+        padding-inline: 6px 4px;
     }
 
     .toolbar-global-variable-host .global-variable-entry-summary span {
-        max-width: 72px;
+        display: none;
+    }
+
+    .toolbar-global-variable-host #gv-open-manager,
+    .toolbar-global-variable-host .global-variable-entry > .btn {
+        padding-inline: 5px;
     }
 }
 

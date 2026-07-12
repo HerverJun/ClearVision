@@ -267,7 +267,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 : '<div data-rp-agent-explanation="true" style="font-size:12px; color:#64748b;">Agent explanation benchmark has not been loaded.</div>';
 
             return `
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-scenario-corpus-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-scenario-corpus-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 style="margin:0 0 8px;">Scenario Corpus</h4>
                                 <div style="display:flex; gap:8px; align-items:center;">
@@ -281,7 +281,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                                 <tbody>${corpusRows}</tbody>
                             </table>
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-redacted-flow-corpus-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-redacted-flow-corpus-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 style="margin:0 0 8px;">Redacted Flow Corpus</h4>
                                 <div style="display:flex; gap:8px; align-items:center;">
@@ -301,34 +301,34 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                             ${operatorRegistryHtml}
                             ${operatorCoverageHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-pre-release-review-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-pre-release-review-panel="true">
                             <h4 style="margin:0 0 8px;">Release review decision</h4>
                             ${releaseDecisionSummaryHtml}
                             ${preReleaseHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-package-readiness-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-package-readiness-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 style="margin:0 0 8px;">Package readiness bridge</h4>
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-package-readiness">Package readiness report</button>
                             </div>
                             ${packageHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-manifest-dry-run-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-manifest-dry-run-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 style="margin:0 0 8px;">RuntimePackage manifest dry-run</h4>
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-manifest-dry-run">Manifest dry-run</button>
                             </div>
                             ${manifestHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-station-compatibility-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-station-compatibility-panel="true">
                             <h4 style="margin:0 0 8px;">Station compatibility dry-run</h4>
                             ${stationHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-operator-contract-validation-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-operator-contract-validation-panel="true">
                             <h4 style="margin:0 0 8px;">Operator contract validation</h4>
                             ${operatorHtml}
                         </div>
-                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-governance-panel="true">
+                        <div style="margin-top:14px; border-top:1px solid var(--border-color); padding-top:12px;" data-rp-governance-panel="true">
                             <h4 style="margin:0 0 8px;">Governance index, lookup, and export</h4>
                             <div style="display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px;">
                                 <input class="cv-input" id="cfg-rp-lookup-session-id" placeholder="sessionId">

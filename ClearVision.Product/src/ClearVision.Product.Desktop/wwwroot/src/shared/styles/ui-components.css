@@ -887,22 +887,38 @@
 }
 
 .cv-modal {
+    --cv-modal-max-width: 440px;
     position: relative !important;
-    max-width: 95vw;
     background: var(--bg-surface);
     backdrop-filter: none;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-float);
-    width: 90%;
-    max-width: 440px;
-    max-height: 85vh;
+    width: min(90%, calc(100vw - 32px));
+    max-width: min(var(--cv-modal-max-width), calc(100vw - 32px));
+    max-height: 88vh;
     transform: translateY(-6px);
     transition: opacity var(--duration-normal), transform var(--duration-normal);
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
     margin: auto !important;
+}
+
+.cv-modal--small {
+    --cv-modal-max-width: 440px;
+}
+
+.cv-modal--medium {
+    --cv-modal-max-width: 680px;
+}
+
+.cv-modal--large {
+    --cv-modal-max-width: 960px;
+}
+
+.cv-modal--workbench {
+    --cv-modal-max-width: 1280px;
 }
 
 .cv-modal-overlay.show .cv-modal {
@@ -932,7 +948,32 @@
 }
 
 .cv-modal-close {
-    display: none;
+    width: 30px;
+    height: 30px;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.cv-modal-close:hover {
+    border-color: var(--border-color);
+    background: var(--hover-color);
+    color: var(--text-primary);
+}
+
+.cv-modal-close:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+
+.cv-modal-close svg {
+    width: 16px;
+    height: 16px;
 }
 
 .cv-modal-body {

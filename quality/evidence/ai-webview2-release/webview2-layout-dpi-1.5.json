@@ -10,7 +10,7 @@
     "chromeWebview": true,
     "activeView": "ai"
   },
-  "timestampUtc": "2026-07-12T10:27:15.525Z",
+  "timestampUtc": "2026-07-12T17:41:58.447Z",
   "layouts": [
     {
       "label": "dpi-1.5-light",
@@ -20,20 +20,20 @@
       "bodyOverflow": 0,
       "aiOverflow": 0,
       "composer": {
-        "width": 672.6666870117188,
+        "width": 546.6666870117188,
         "height": 52,
-        "left": 88.66667175292969,
-        "right": 761.3333587646484
+        "left": 359.66668701171875,
+        "right": 906.3333740234375
       },
       "send": {
         "width": 36,
         "height": 36,
-        "left": 773.3333740234375,
-        "right": 809.3333740234375
+        "left": 918.3333740234375,
+        "right": 954.3333740234375
       },
       "viewport": {
-        "width": 854,
-        "height": 464
+        "width": 1270,
+        "height": 678
       }
     },
     {
@@ -44,21 +44,3325 @@
       "bodyOverflow": 0,
       "aiOverflow": 0,
       "composer": {
-        "width": 672.6666870117188,
+        "width": 546.6666870117188,
         "height": 52,
-        "left": 88.66667175292969,
-        "right": 761.3333587646484
+        "left": 359.66668701171875,
+        "right": 906.3333740234375
       },
       "send": {
         "width": 36,
         "height": 36,
-        "left": 773.3333740234375,
-        "right": 809.3333740234375
+        "left": 918.3333740234375,
+        "right": 954.3333740234375
       },
       "viewport": {
-        "width": 854,
-        "height": 464
+        "width": 1270,
+        "height": 678
       }
     }
-  ]
+  ],
+  "flowCanvasThemes": {
+    "light": {
+      "theme": "light",
+      "canvas": {
+        "background": "rgb(231, 234, 238)",
+        "border": "rgb(32, 34, 38)"
+      },
+      "workspace": {
+        "background": "rgb(231, 234, 238)",
+        "border": "rgb(199, 205, 212)"
+      },
+      "minimap": {
+        "background": "rgba(247, 248, 250, 0.96)",
+        "border": "rgba(75, 87, 101, 0.28)"
+      },
+      "imageViewer": {
+        "background": "rgb(17, 19, 23)",
+        "border": "rgb(32, 34, 38)"
+      },
+      "palette": {
+        "grid": "rgba(75, 87, 101, 0.24)",
+        "nodeBackgroundStart": "#ffffff",
+        "nodeBackgroundEnd": "#edf0f3",
+        "nodeSelectedStart": "#f7fbfd",
+        "nodeSelectedEnd": "#e2edf2",
+        "nodeBorder": "rgba(63, 72, 83, 0.34)",
+        "nodeText": "#252b32",
+        "nodeMutedText": "#5f6975",
+        "nodeShadow": "rgba(37, 43, 50, 0.18)",
+        "nodeBadgeBackground": "rgba(247, 248, 250, 0.94)",
+        "portOutline": "#f8f9fa",
+        "connection": "#3f718e",
+        "connectionSelected": "#20262d",
+        "guide": "#47738f",
+        "minimapViewport": "rgba(182, 69, 60, 0.9)",
+        "minimapSelected": "#20262d",
+        "minimapDisabled": "#8b929a"
+      },
+      "overflow": {
+        "document": 0,
+        "body": 0,
+        "shell": 0
+      }
+    },
+    "dark": {
+      "theme": "dark",
+      "canvas": {
+        "background": "rgb(11, 13, 16)",
+        "border": "rgb(243, 243, 241)"
+      },
+      "workspace": {
+        "background": "rgb(11, 13, 16)",
+        "border": "rgb(36, 39, 44)"
+      },
+      "minimap": {
+        "background": "rgba(17, 21, 26, 0.94)",
+        "border": "rgba(255, 255, 255, 0.14)"
+      },
+      "imageViewer": {
+        "background": "rgb(9, 10, 12)",
+        "border": "rgb(243, 243, 241)"
+      },
+      "palette": {
+        "grid": "rgba(143, 158, 174, 0.2)",
+        "nodeBackgroundStart": "rgba(26, 58, 82, 0.86)",
+        "nodeBackgroundEnd": "rgba(13, 27, 42, 0.94)",
+        "nodeSelectedStart": "rgba(45, 74, 94, 0.94)",
+        "nodeSelectedEnd": "rgba(26, 58, 82, 0.98)",
+        "nodeBorder": "rgba(255, 255, 255, 0.14)",
+        "nodeText": "#ffffff",
+        "nodeMutedText": "rgba(255, 255, 255, 0.58)",
+        "nodeShadow": "rgba(0, 0, 0, 0.34)",
+        "nodeBadgeBackground": "rgba(13, 27, 42, 0.88)",
+        "portOutline": "#ffffff",
+        "connection": "#5ac8fa",
+        "connectionSelected": "#ffffff",
+        "guide": "#75a4bf",
+        "minimapViewport": "rgba(224, 106, 95, 0.9)",
+        "minimapSelected": "#ffffff",
+        "minimapDisabled": "#666b72"
+      },
+      "overflow": {
+        "document": 0,
+        "body": 0,
+        "shell": 0
+      }
+    }
+  },
+  "formalProductLayouts": {
+    "light": {
+      "project": {
+        "view": "project",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "flow": {
+        "view": "flow",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 349,
+          "y": 65,
+          "width": 395,
+          "height": 575,
+          "clientWidth": 395,
+          "scrollWidth": 395,
+          "clientHeight": 575,
+          "scrollHeight": 580
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "inspection": {
+        "view": "inspection",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "results": {
+        "view": "results",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1241,
+          "scrollWidth": 1241,
+          "clientHeight": 575,
+          "scrollHeight": 1021
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "stations": {
+        "view": "stations",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 1185,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 1185,
+          "scrollHeight": 1185
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "ai": {
+        "view": "ai",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "settings": {
+        "view": "settings",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": null,
+        "settingsPanel": null,
+        "settingsPanelOverflow": null,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "settingsTabs": {
+        "general": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 661,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 661,
+            "scrollHeight": 661
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "communication": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 750,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 750,
+            "scrollHeight": 750
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "tcp": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1263,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1263,
+            "scrollHeight": 1263
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 5,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "station": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1150,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1150,
+            "scrollHeight": 1150
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "storage": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 746,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 746,
+            "scrollHeight": 746
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 2,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "database": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 989,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 989,
+            "scrollHeight": 989
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 1,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "runtime": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 607,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 607,
+            "scrollHeight": 607
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 2,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "cameras": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1309,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1309,
+            "scrollHeight": 1309
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 4,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "ai": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1448,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1448,
+            "scrollHeight": 1448
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 7,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "users": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 590,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 590,
+            "scrollHeight": 590
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        }
+      }
+    },
+    "dark": {
+      "project": {
+        "view": "project",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "flow": {
+        "view": "flow",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 349,
+          "y": 65,
+          "width": 395,
+          "height": 575,
+          "clientWidth": 395,
+          "scrollWidth": 395,
+          "clientHeight": 575,
+          "scrollHeight": 580
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "inspection": {
+        "view": "inspection",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "results": {
+        "view": "results",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1241,
+          "scrollWidth": 1241,
+          "clientHeight": 575,
+          "scrollHeight": 1021
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "stations": {
+        "view": "stations",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 1185,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 1185,
+          "scrollHeight": 1185
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "ai": {
+        "view": "ai",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanel": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "clientWidth": 0,
+          "scrollWidth": 0,
+          "clientHeight": 0,
+          "scrollHeight": 0
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 0,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": false
+        }
+      },
+      "settings": {
+        "view": "settings",
+        "viewport": {
+          "width": 1270,
+          "height": 678,
+          "devicePixelRatio": 1.5
+        },
+        "document": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "body": {
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "overflow": 0
+        },
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1270,
+          "height": 52,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarLeft": {
+          "x": 16,
+          "y": 0,
+          "width": 616,
+          "height": 51,
+          "clientWidth": 616,
+          "scrollWidth": 616,
+          "clientHeight": 51,
+          "scrollHeight": 51
+        },
+        "toolbarRight": {
+          "x": 632,
+          "y": 10,
+          "width": 622,
+          "height": 32,
+          "clientWidth": 622,
+          "scrollWidth": 622,
+          "clientHeight": 32,
+          "scrollHeight": 32
+        },
+        "main": {
+          "x": 0,
+          "y": 52,
+          "width": 1270,
+          "height": 600,
+          "clientWidth": 1270,
+          "scrollWidth": 1270,
+          "clientHeight": 600,
+          "scrollHeight": 600
+        },
+        "owner": {
+          "x": 13,
+          "y": 65,
+          "width": 1245,
+          "height": 575,
+          "clientWidth": 1245,
+          "scrollWidth": 1245,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "ownerOverflow": 0,
+        "settingsContent": {
+          "x": 241,
+          "y": 65,
+          "width": 1016,
+          "height": 575,
+          "clientWidth": 1016,
+          "scrollWidth": 1016,
+          "clientHeight": 575,
+          "scrollHeight": 575
+        },
+        "settingsPanel": {
+          "x": 241,
+          "y": 133,
+          "width": 1012,
+          "height": 661,
+          "clientWidth": 1012,
+          "scrollWidth": 1012,
+          "clientHeight": 661,
+          "scrollHeight": 661
+        },
+        "settingsPanelOverflow": 0,
+        "maxFormColumns": 3,
+        "actions": {
+          "settingsNavigation": true,
+          "finalDecision": true,
+          "save": true,
+          "run": true,
+          "settingsSaveVisible": true
+        }
+      },
+      "settingsTabs": {
+        "general": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 661,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 661,
+            "scrollHeight": 661
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "communication": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 750,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 750,
+            "scrollHeight": 750
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "tcp": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1263,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1263,
+            "scrollHeight": 1263
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 5,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "station": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1150,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1150,
+            "scrollHeight": 1150
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "storage": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 746,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 746,
+            "scrollHeight": 746
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 2,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "database": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 989,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 989,
+            "scrollHeight": 989
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 1,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "runtime": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 607,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 607,
+            "scrollHeight": 607
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 2,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "cameras": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1309,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1309,
+            "scrollHeight": 1309
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 4,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "ai": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 1448,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 1448,
+            "scrollHeight": 1448
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 7,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        },
+        "users": {
+          "view": "settings",
+          "viewport": {
+            "width": 1270,
+            "height": 678,
+            "devicePixelRatio": 1.5
+          },
+          "document": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "body": {
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "overflow": 0
+          },
+          "toolbar": {
+            "x": 0,
+            "y": 0,
+            "width": 1270,
+            "height": 52,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarLeft": {
+            "x": 16,
+            "y": 0,
+            "width": 616,
+            "height": 51,
+            "clientWidth": 616,
+            "scrollWidth": 616,
+            "clientHeight": 51,
+            "scrollHeight": 51
+          },
+          "toolbarRight": {
+            "x": 632,
+            "y": 10,
+            "width": 622,
+            "height": 32,
+            "clientWidth": 622,
+            "scrollWidth": 622,
+            "clientHeight": 32,
+            "scrollHeight": 32
+          },
+          "main": {
+            "x": 0,
+            "y": 52,
+            "width": 1270,
+            "height": 600,
+            "clientWidth": 1270,
+            "scrollWidth": 1270,
+            "clientHeight": 600,
+            "scrollHeight": 600
+          },
+          "owner": {
+            "x": 13,
+            "y": 65,
+            "width": 1245,
+            "height": 575,
+            "clientWidth": 1245,
+            "scrollWidth": 1245,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "ownerOverflow": 0,
+          "settingsContent": {
+            "x": 241,
+            "y": 65,
+            "width": 1016,
+            "height": 575,
+            "clientWidth": 1016,
+            "scrollWidth": 1016,
+            "clientHeight": 575,
+            "scrollHeight": 575
+          },
+          "settingsPanel": {
+            "x": 241,
+            "y": 133,
+            "width": 1012,
+            "height": 590,
+            "clientWidth": 1012,
+            "scrollWidth": 1012,
+            "clientHeight": 590,
+            "scrollHeight": 590
+          },
+          "settingsPanelOverflow": 0,
+          "maxFormColumns": 3,
+          "actions": {
+            "settingsNavigation": true,
+            "finalDecision": true,
+            "save": true,
+            "run": true,
+            "settingsSaveVisible": true
+          }
+        }
+      }
+    }
+  }
 }

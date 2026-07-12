@@ -1378,7 +1378,7 @@ export const aiPanelAgentWorkspaceMixin = {
             turn,
             phase: 'understand'
         });
-        this._setAssistantSectionText(turn, 'reply', '正在理解需求，后续阶段会在同一条规划进度中接续。');
+        this._setAssistantSectionText(turn, 'reply', '正在规划，详细阶段和当前工作见左侧工作台。');
         this._setResultStatusNote('正在理解需求。', 'info');
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
@@ -1913,7 +1913,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this._setAssistantSectionText(
             turn,
             'reply',
-            '规划中。公开进度会实时更新在下方时间线。'
+            '规划进行中，实时状态和当前工作见左侧工作台。'
         );
 
         this._setResultStatusNote('正在收集工程上下文。', 'info');
@@ -2497,8 +2497,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 turn,
                 'reply',
                 progress.slow
-                    ? `${progress.currentLabel}\n仍在工作，可取消；未收到真实事件的阶段不会显示为完成。`
-                    : progress.currentLabel);
+                    ? '规划响应较慢，但仍在处理。可继续等待或取消，详细阶段见左侧工作台。'
+                    : '规划进行中，详细阶段和当前工作见左侧工作台。');
         }
     },
 
@@ -2549,6 +2549,14 @@ export const aiPanelAgentWorkspaceMixin = {
             });
 
         if (lifecycle?.status === 'completed') {
+            if (this.pendingVisionPlan) {
+                Object.values(phases).forEach(phase => {
+                    if (phase.status === PLAN_PENDING_STATUS || phase.status === 'waiting' || phase.status === 'running') {
+                        phase.status = 'completed';
+                        phase.summary = phase.summary || '已由正式规划结果确认。';
+                    }
+                });
+            }
             phases.validate.status = 'completed';
             phases.validate.summary = lifecycle.currentSummary || phases.validate.summary;
         }

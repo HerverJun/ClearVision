@@ -3772,7 +3772,9 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
 
   assert.equal(accepted, true);
   assert.ok(turn);
-  assert.match(turn.replyBody.textContent, /正在理解需求/);
+  assert.match(turn.replyBody.textContent, /详细阶段和当前工作见左侧工作台/);
+  assert.match(plan.innerHTML, /规划进行中工作台/);
+  assert.doesNotMatch(plan.innerHTML, /data-planning-phase="context"[^]*已完成/);
   await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_backend_1', 'streamed plan result');
 
   assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');
@@ -9798,7 +9800,7 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.ok(source.split(/\r?\n/).length < 2500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(shellCss, /--ai-surface-page:\s*var\(--theme-surface-0\)/);
-  assert.match(shellCss, /\.ai-workspace\s*{[^}]*clamp\(380px,\s*23vw,\s*440px\)/s);
+  assert.match(shellCss, /\.ai-workspace\s*{[^}]*clamp\(360px,\s*21vw,\s*400px\)/s);
   assert.match(shellCss, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
   assert.match(shellCss, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);
   assert.match(conversationCss, /\.ai-view-container\s+\.ai-chat-container\s*{[^}]*background-image:\s*none/s);

@@ -414,8 +414,6 @@ export function installCameraTab(SettingsView) {
                 width: '920px',
                 onClose: cleanupModalEvents
             });
-            modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
-
             const bindBtns = contentDiv.querySelectorAll('.btn-bind-camera');
             bindBtns.forEach(btn => {
                 eventCleanups.push(this.lifecycle.trackEvent(btn, 'click', async () => {
@@ -1074,8 +1072,6 @@ export function installCameraTab(SettingsView) {
                     cleanupPreviewUrl();
                 }
             });
-            modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
-
             const toggleBtn = content.querySelector('#btn-toggle-camera-preview');
             const imageEl = content.querySelector('#camera-preview-image');
             const placeholderEl = content.querySelector('#camera-preview-placeholder');
@@ -1270,8 +1266,6 @@ export function installCameraTab(SettingsView) {
                     cleanupPreviewUrl();
                 }
             });
-            modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
-
             const refreshBtn = content.querySelector('#btn-refresh-camera-preview');
             const previewSurfaceEl = content.querySelector('#camera-preview-surface');
             const imageEl = content.querySelector('#camera-preview-image');
@@ -1583,7 +1577,7 @@ export function installCameraTab(SettingsView) {
 
                 <!-- Parameters Card -->
                 <div class="settings-modern-card" style="margin-top:24px; background:#fafbfc;">
-                    <div class="settings-card-header" style="background:#ffffff; display:flex; justify-content:space-between;">
+                    <div class="settings-card-header" style="background:var(--bg-surface); display:flex; justify-content:space-between;">
                         <div class="settings-header-left">
                             <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#94a3b8;"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
                             <span>参数配置: <span id="current-cam-name">未选择相机</span></span>
@@ -1643,7 +1637,7 @@ export function installCameraTab(SettingsView) {
                                 <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">帧驱动模式（Continuous / External）下可编辑；默认 30 fps，范围 1 - 120。</span>
                             </div>
                         </div>
-                        <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-bottom:24px;">
+                        <div style="border-top:1px solid var(--border-color); padding-top:20px; margin-bottom:24px;">
                             <div class="settings-header-left" style="margin-bottom:14px;">
                                 <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#64748b;"><path d="M7 2v11h3v9l7-12h-4l4-8H7z"/></svg>
                                 <span>触发来源 / 触发方式</span>
@@ -1761,7 +1755,7 @@ export function installCameraTab(SettingsView) {
                             </div>
                         </div>
                     </div>
-                    <div class="settings-card-body" style="border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:12px; padding:16px 24px;">
+                    <div class="settings-card-body" style="border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px; padding:16px 24px;">
                         <button class="cv-btn settings-btn-light" id="btn-reset-camera-params">重置当前值</button>
                         <button class="cv-btn settings-btn-danger" id="btn-save-camera-params">
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; margin-right:6px; fill:currentColor;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>

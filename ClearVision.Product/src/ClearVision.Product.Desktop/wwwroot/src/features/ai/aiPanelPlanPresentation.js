@@ -281,35 +281,90 @@ function renderEmptyPlan(panel) {
         waiting: '等待中',
         pending: '等待中'
     }[status] || '等待中');
+    const lifecycleStatus = clean(progress?.status || 'idle').toLowerCase();
+    const statusPresentation = ({
+        running: { label: '处理中', tone: 'running' },
+        completed: { label: '规划完成', tone: 'completed' },
+        failed: { label: '规划失败', tone: 'failed' },
+        timeout: { label: '等待超时', tone: 'timeout' },
+        cancelled: { label: '已取消', tone: 'cancelled' },
+        canceled: { label: '已取消', tone: 'cancelled' },
+        idle: { label: '等待需求', tone: 'waiting' }
+    }[lifecycleStatus] || { label: '等待中', tone: 'waiting' });
     const current = clean(progress?.currentLabel) || '发送需求后，这里会立即显示可信的规划阶段。';
+    const taskSummary = clean(
+        panel?.lastPlanningRequestContext?.userMessage ||
+        panel?.lastPlanningRequestContext?.description ||
+        panel?.lastUserPrompt
+    ) || '等待新的视觉任务';
+    const activePhase = phases.find(phase => phase.status === 'running')
+        || phases.find(phase => ['failed', 'timeout', 'cancelled', 'canceled'].includes(phase.status))
+        || phases.find(phase => phase.status === 'waiting' || phase.status === 'pending')
+        || phases[phases.length - 1];
+    const eventCount = Number(progress?.eventCount || 0);
+    const sourceText = eventCount > 0
+        ? `已接收 ${eventCount} 条 Plan Run 公开事件，阶段状态由真实事件更新。`
+        : lifecycleStatus === 'running'
+            ? '尚未收到 Plan Run 流式事件；当前只显示真实的处理中状态。'
+            : '未收到流式事件，不会补写或推断已完成进度。';
+    const detailText = progress?.slow
+        ? '响应时间较长，请求仍在运行。你可以继续等待，也可以取消后重试。'
+        : lifecycleStatus === 'running'
+            ? `当前聚焦“${activePhase.label}”。未收到真实完成信号的阶段保持等待。`
+            : current;
     return `
-        <div class="ai-plan-v2-empty ai-planning-wait" data-ai-hook="planning-wait" data-planning-status="${escapeHtml(panel, progress?.status || 'idle')}" role="status" aria-live="polite">
+        <div class="ai-plan-v2-empty ai-planning-wait is-${escapeHtml(panel, statusPresentation.tone)}" data-ai-hook="planning-wait" data-planning-status="${escapeHtml(panel, lifecycleStatus)}" data-planning-event-count="${eventCount}" role="status" aria-live="polite">
             <div class="ai-planning-wait-heading">
-                <div>
-                    <span>规划模式</span>
-                    <strong>${escapeHtml(panel, current)}</strong>
+                <div class="ai-planning-task-summary">
+                    <span>规划进行中工作台</span>
+                    <strong>${escapeHtml(panel, taskSummary)}</strong>
+                    <p>${escapeHtml(panel, current)}</p>
                 </div>
-                ${progress?.slow ? '<small>响应较慢，但仍在工作</small>' : ''}
+                <div class="ai-planning-status-block">
+                    <span class="ai-planning-status-indicator" aria-hidden="true"></span>
+                    <div>
+                        <strong>${escapeHtml(panel, statusPresentation.label)}</strong>
+                        <small>${progress?.slow ? '响应较慢，但仍在工作' : (eventCount ? `实时事件 ${eventCount}` : '等待真实事件')}</small>
+                    </div>
+                </div>
             </div>
-            <ol class="ai-planning-stages" aria-label="规划阶段">
-                ${phases.map((phase, index) => `
-                    <li class="is-${escapeHtml(panel, phase.status)}" data-planning-phase="${phase.key}">
-                        <span class="ai-planning-stage-index">${index + 1}</span>
-                        <div>
-                            <strong>${escapeHtml(panel, phase.label)}</strong>
-                            <small>${escapeHtml(panel, phase.summary || statusLabel(phase.status))}</small>
+            <div class="ai-planning-progress" aria-label="规划阶段进度">
+                <div class="ai-planning-progress-line" aria-hidden="true"></div>
+                <ol class="ai-planning-stages">
+                    ${phases.map((phase, index) => `
+                        <li class="is-${escapeHtml(panel, phase.status)}" data-planning-phase="${phase.key}">
+                            <span class="ai-planning-stage-index">${index + 1}</span>
+                            <div>
+                                <strong>${escapeHtml(panel, phase.label)}</strong>
+                                <small>${escapeHtml(panel, phase.summary || statusLabel(phase.status))}</small>
+                            </div>
+                            <b>${escapeHtml(panel, statusLabel(phase.status))}</b>
+                        </li>
+                    `).join('')}
+                </ol>
+            </div>
+            <div class="ai-planning-work-grid">
+                <section class="ai-planning-current-work" aria-label="当前工作详情">
+                    <span>当前工作</span>
+                    <strong>${escapeHtml(panel, activePhase.label)}</strong>
+                    <p>${escapeHtml(panel, detailText)}</p>
+                    <div class="ai-planning-processing-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+                </section>
+                <aside class="ai-planning-truth-panel" aria-label="进度依据">
+                    <span>进度依据</span>
+                    <strong>${eventCount ? 'Plan Run 实时事件' : 'Router 请求状态'}</strong>
+                    <p>${escapeHtml(panel, sourceText)}</p>
+                    ${(progress?.canCancel || progress?.canRetry) ? `
+                        <div class="ai-planning-actions">
+                            ${progress?.canCancel ? '<button type="button" data-ai-action="planning-cancel">取消规划</button>' : ''}
+                            ${progress?.canRetry ? '<button type="button" class="is-primary" data-ai-action="planning-retry">重试</button>' : ''}
                         </div>
-                        <b>${escapeHtml(panel, statusLabel(phase.status))}</b>
-                    </li>
-                `).join('')}
-            </ol>
-            <p>真实 Plan Run 事件到达后会直接接管这条进度；等待期间不会把尚未完成的阶段标成完成。</p>
-            ${(progress?.canCancel || progress?.canRetry) ? `
-                <div class="ai-planning-actions">
-                    ${progress?.canCancel ? '<button type="button" data-ai-action="planning-cancel">取消规划</button>' : ''}
-                    ${progress?.canRetry ? '<button type="button" class="is-primary" data-ai-action="planning-retry">重试</button>' : ''}
-                </div>
-            ` : ''}
+                    ` : ''}
+                </aside>
+            </div>
+            <p class="ai-planning-integrity-note">
+                真实 Plan Run 事件到达后会接管同一条进度；等待、失败、超时和取消不会被显示为完成。
+            </p>
         </div>
     `;
 }

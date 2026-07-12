@@ -367,17 +367,17 @@ export class SettingsView {
                         </div>
                     </div>
                     <div class="settings-tab-panels">
-                        <div class="settings-panel active" data-section="general">${this.renderGeneralTab()}</div>
-                        <div class="settings-panel" data-section="communication">${this.renderCommunicationTab()}</div>
-                        <div class="settings-panel" data-section="tcp">${this.renderTcpTab()}</div>
-                        <div class="settings-panel" data-section="station">${this.renderStationCommunicationTab()}</div>
-                        <div class="settings-panel" data-section="storage">${this.renderStorageTab()}</div>
-                        <div class="settings-panel" data-section="database">${this.renderDatabaseTab()}</div>
-                        <div class="settings-panel" data-section="runtime">${this.renderRuntimeTab()}</div>
-                        <div class="settings-panel" data-section="cameras">${this.renderCameraTab()}</div>
-                        <div class="settings-panel" data-section="ai">${this.renderAiTab()}</div>
-                        ${this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-panel" data-section="runtime-preview-pilot">${this.renderRuntimePreviewPilotConsoleTab()}</div>` : ''}
-                        ${this.isAdmin ? `<div class="settings-panel" data-section="users">${this.renderUserManagementTab()}</div>` : ''}
+                        <div class="settings-panel settings-panel--standard active" data-section="general">${this.renderGeneralTab()}</div>
+                        <div class="settings-panel settings-panel--wide" data-section="communication">${this.renderCommunicationTab()}</div>
+                        <div class="settings-panel settings-panel--wide" data-section="tcp">${this.renderTcpTab()}</div>
+                        <div class="settings-panel settings-panel--wide" data-section="station">${this.renderStationCommunicationTab()}</div>
+                        <div class="settings-panel settings-panel--standard" data-section="storage">${this.renderStorageTab()}</div>
+                        <div class="settings-panel settings-panel--full" data-section="database">${this.renderDatabaseTab()}</div>
+                        <div class="settings-panel settings-panel--standard" data-section="runtime">${this.renderRuntimeTab()}</div>
+                        <div class="settings-panel settings-panel--wide" data-section="cameras">${this.renderCameraTab()}</div>
+                        <div class="settings-panel settings-panel--full" data-section="ai">${this.renderAiTab()}</div>
+                        ${this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-panel settings-panel--full" data-section="runtime-preview-pilot">${this.renderRuntimePreviewPilotConsoleTab()}</div>` : ''}
+                        ${this.isAdmin ? `<div class="settings-panel settings-panel--wide" data-section="users">${this.renderUserManagementTab()}</div>` : ''}
                     </div>
                 </div>
             </div>
