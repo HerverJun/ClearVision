@@ -143,8 +143,26 @@
 
 .flow-editor-shell .workspace {
     min-width: 360px;
-    border-color: #24272c;
-    background: #0e1013;
+    border-color: var(--flow-canvas-border);
+    background: var(--flow-canvas-background);
+    transition: none;
+}
+
+.flow-editor-shell .flow-selection-box {
+    border: 2px dashed var(--flow-canvas-selection-border);
+    background: var(--flow-canvas-selection-background);
+}
+
+.flow-editor-shell .flow-minimap {
+    background: var(--flow-canvas-minimap-background);
+    border: 1px solid var(--flow-canvas-minimap-border);
+    box-shadow: var(--shadow-md);
+}
+
+.flow-editor-shell .flow-minimap-toggle {
+    border: 1px solid var(--flow-canvas-minimap-border);
+    background: var(--flow-canvas-minimap-background);
+    color: var(--flow-canvas-node-text);
 }
 
 .flow-editor-shell .preview-workbench-pane {
@@ -405,6 +423,27 @@
     .flow-editor-shell { --inspector-pane-width: 232px; }
     .flow-editor-shell .workspace { min-width: 280px; }
     .flow-editor-shell .preview-workbench-pane { width: 300px; flex-basis: 300px; min-width: 288px; }
+}
+
+@media (min-width: 769px) and (max-width: 900px) {
+    .flow-editor-shell {
+        --operator-rail-width: 56px;
+        --inspector-pane-width: 216px;
+        gap: 6px;
+    }
+
+    .flow-editor-shell .inspector-pane {
+        min-width: 216px;
+        max-width: 216px;
+    }
+
+    .flow-editor-shell .workspace { min-width: 240px; }
+
+    .flow-editor-shell .preview-workbench-pane {
+        width: 250px;
+        min-width: 240px;
+        flex-basis: 250px;
+    }
 }
 
 @media (max-height: 700px) {

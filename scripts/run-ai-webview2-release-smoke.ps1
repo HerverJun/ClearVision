@@ -113,7 +113,7 @@ function Start-DesktopHost {
         -RedirectStandardError $stderr `
         -WindowStyle Hidden `
         -PassThru
-    Wait-HttpEndpoint -Uri "http://127.0.0.1:5000/api/health"
+    Wait-HttpEndpoint -Uri "http://127.0.0.1:5000/api/auth/setup-status"
     Wait-HttpEndpoint -Uri "http://127.0.0.1:$CdpPort/json/version"
     return $process
 }

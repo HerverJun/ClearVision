@@ -96,6 +96,15 @@ async function connect() {
   return chromium.connectOverCDP(version.webSocketDebuggerUrl);
 }
 
+async function activateView(page, view) {
+  const navigation = page.locator(`.nav-btn[data-view="${view}"]`);
+  await navigation.focus();
+  await navigation.press('Enter');
+  await page.waitForFunction(expectedView =>
+    document.querySelector('.nav-btn.active')?.dataset.view === expectedView,
+  view);
+}
+
 async function authenticateAndOpenAi(page) {
   assert(token, 'CV_SMOKE_TOKEN is required.');
   assert(user, 'CV_SMOKE_USER is required.');
@@ -122,7 +131,7 @@ async function authenticateAndOpenAi(page) {
   });
   await page.goto('http://localhost:5000/index.html');
   await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 45_000 });
-  await page.locator('.nav-btn[data-view="ai"]').click();
+  await activateView(page, 'ai');
   await page.waitForFunction(() => Boolean(window.aiPanel && !window.aiPanel._disposed));
   await page.waitForSelector('#ai-view .ai-shell', { timeout: 30_000 });
   return preNavigationState;
@@ -630,6 +639,102 @@ async function verifyReopen(page, preNavigationState) {
   };
 }
 
+function colorMaxChannel(value) {
+  const match = String(value || '').match(/rgba?\(([^)]+)\)/);
+  assert(match, `Expected RGB color, received '${value}'.`);
+  return Math.max(...match[1].split(',').slice(0, 3).map(part => Number.parseFloat(part.trim())));
+}
+
+async function captureFlowCanvasThemes(page) {
+  const preserved = await page.evaluate(() => {
+    const flow = window.flowCanvas;
+    return {
+      theme: document.documentElement.dataset.theme || 'dark',
+      flow: flow.serialize(),
+      selectedNode: flow.selectedNode,
+      selectedConnectionId: flow.selectedConnection?.id || null,
+    };
+  });
+
+  await activateView(page, 'flow');
+  await page.waitForSelector('#flow-canvas', { state: 'visible' });
+  await page.evaluate(flowFixture => {
+    const flow = window.flowCanvas;
+    flow.deserialize(flowFixture);
+    flow.selectedNode = 'smoke-output';
+    flow.selectedConnection = null;
+    flow.markSelectionChanged?.('webview2-flow-theme');
+    flow.render();
+  }, buildFlow);
+
+  const capture = async theme => {
+    await page.evaluate(selectedTheme => {
+      document.documentElement.dataset.theme = selectedTheme;
+    }, theme);
+    await page.waitForFunction(() => {
+      const token = getComputedStyle(document.documentElement).getPropertyValue('--flow-canvas-grid').trim();
+      return window.flowCanvas?.themePalette?.grid === token;
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+    const layout = await page.evaluate(() => {
+      const styles = selector => {
+        const element = document.querySelector(selector);
+        const computed = getComputedStyle(element);
+        return { background: computed.backgroundColor, border: computed.borderColor };
+      };
+      const html = document.documentElement;
+      const shell = document.querySelector('.flow-editor-shell');
+      return {
+        theme: html.dataset.theme,
+        canvas: styles('#flow-canvas'),
+        workspace: styles('.flow-editor-shell .workspace'),
+        minimap: styles('.flow-minimap'),
+        imageViewer: styles('.image-viewer-container'),
+        palette: { ...window.flowCanvas.themePalette },
+        overflow: {
+          document: html.scrollWidth - html.clientWidth,
+          body: document.body.scrollWidth - document.body.clientWidth,
+          shell: shell.scrollWidth - shell.clientWidth,
+        },
+      };
+    });
+    await page.locator('.flow-editor-shell').screenshot({
+      path: path.join(evidenceDir, `flow-canvas-dpi-${safeFileName(scale)}-${theme}.png`),
+    });
+    assert(layout.overflow.document <= 1 && layout.overflow.body <= 1,
+      `Flow canvas overflow at DPI ${scale} ${theme}: ${JSON.stringify(layout.overflow)}`);
+    assert(colorMaxChannel(layout.imageViewer.background) < 50,
+      `Image viewer lost its dark inspection surface at DPI ${scale} ${theme}.`);
+    return layout;
+  };
+
+  const light = await capture('light');
+  const dark = await capture('dark');
+  assert(colorMaxChannel(light.canvas.background) > 180 && colorMaxChannel(light.canvas.background) < 250,
+    `Light FlowCanvas is not a restrained light engineering surface: ${light.canvas.background}`);
+  assert(colorMaxChannel(dark.canvas.background) < 60,
+    `Dark FlowCanvas is no longer dark: ${dark.canvas.background}`);
+  assert(light.canvas.background !== dark.canvas.background,
+    'Light and dark FlowCanvas backgrounds unexpectedly match.');
+  assert(light.palette.grid !== dark.palette.grid && light.palette.nodeBackgroundStart !== dark.palette.nodeBackgroundStart,
+    'FlowCanvas drawing palette did not refresh across the theme switch.');
+
+  await page.evaluate(saved => {
+    const flow = window.flowCanvas;
+    document.documentElement.dataset.theme = saved.theme;
+    flow.deserialize(saved.flow);
+    flow.selectedNode = saved.selectedNode;
+    flow.selectedConnection = saved.selectedConnectionId
+      ? flow.connections.find(item => item.id === saved.selectedConnectionId) || null
+      : null;
+    flow.markSelectionChanged?.('webview2-flow-theme-restore');
+    flow.render();
+  }, preserved);
+  await activateView(page, 'ai');
+  return { light, dark };
+}
+
 async function main() {
   fs.mkdirSync(evidenceDir, { recursive: true });
   const browser = await connect();
@@ -661,6 +766,7 @@ async function main() {
       await captureLayout(page, `dpi-${scale}-light`, 'light'),
       await captureLayout(page, `dpi-${scale}-dark`, 'dark'),
     ];
+    result.flowCanvasThemes = await captureFlowCanvasThemes(page);
     if (phase === 'full') {
       result.ime = await verifyImeComposition(page);
       result.hostWebMessage = await verifyHostWebMessage(page);

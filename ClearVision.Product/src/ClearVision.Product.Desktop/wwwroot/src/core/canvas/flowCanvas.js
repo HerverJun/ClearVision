@@ -43,6 +43,46 @@ const NODE_PORT_TOP_PADDING = 10;
 const NODE_PORT_BOTTOM_PADDING = 10;
 const NODE_PORT_ROW_HEIGHT = 18;
 
+const FLOW_CANVAS_THEME_DEFAULTS = Object.freeze({
+    grid: 'rgba(143, 158, 174, 0.2)',
+    nodeBackgroundStart: 'rgba(26, 58, 82, 0.86)',
+    nodeBackgroundEnd: 'rgba(13, 27, 42, 0.94)',
+    nodeSelectedStart: 'rgba(45, 74, 94, 0.94)',
+    nodeSelectedEnd: 'rgba(26, 58, 82, 0.98)',
+    nodeBorder: 'rgba(255, 255, 255, 0.14)',
+    nodeText: '#ffffff',
+    nodeMutedText: 'rgba(255, 255, 255, 0.58)',
+    nodeShadow: 'rgba(0, 0, 0, 0.34)',
+    nodeBadgeBackground: 'rgba(13, 27, 42, 0.88)',
+    portOutline: '#ffffff',
+    connection: '#5ac8fa',
+    connectionSelected: '#ffffff',
+    guide: '#75a4bf',
+    minimapViewport: 'rgba(224, 106, 95, 0.9)',
+    minimapSelected: '#ffffff',
+    minimapDisabled: '#666b72'
+});
+
+const FLOW_CANVAS_THEME_TOKENS = Object.freeze({
+    grid: '--flow-canvas-grid',
+    nodeBackgroundStart: '--flow-canvas-node-background-start',
+    nodeBackgroundEnd: '--flow-canvas-node-background-end',
+    nodeSelectedStart: '--flow-canvas-node-selected-start',
+    nodeSelectedEnd: '--flow-canvas-node-selected-end',
+    nodeBorder: '--flow-canvas-node-border',
+    nodeText: '--flow-canvas-node-text',
+    nodeMutedText: '--flow-canvas-node-muted-text',
+    nodeShadow: '--flow-canvas-node-shadow',
+    nodeBadgeBackground: '--flow-canvas-node-badge-background',
+    portOutline: '--flow-canvas-port-outline',
+    connection: '--flow-canvas-connection',
+    connectionSelected: '--flow-canvas-connection-selected',
+    guide: '--flow-canvas-guide',
+    minimapViewport: '--flow-canvas-minimap-viewport',
+    minimapSelected: '--flow-canvas-minimap-selected',
+    minimapDisabled: '--flow-canvas-minimap-disabled'
+});
+
 function portKey(nodeId, portIndex) {
     return `${nodeId}:${portIndex}`;
 }
@@ -74,9 +114,13 @@ class FlowCanvas {
         this._logicalWidth = 0;
         this._logicalHeight = 0;
 
+        this.themePalette = { ...FLOW_CANVAS_THEME_DEFAULTS };
+        this._themePaletteSignature = '';
+        this._themeObserver = null;
+
         // 背景网格样式。
         this.gridSize = 20;
-        this.gridColor = 'rgba(48, 71, 62, 0.16)';
+        this.gridColor = this.themePalette.grid;
         this.gridDotRadius = 1.05;
 
         // 事件回调
@@ -153,6 +197,8 @@ class FlowCanvas {
      * Encoding cleanup: previous comment text was unreadable.
      */
     initialize() {
+        this.refreshThemePalette({ invalidate: false });
+        this.observeThemeChanges();
         this.resize();
         this.canvas.setAttribute?.('aria-label', this._baseCanvasAriaLabel);
         this.canvas.setAttribute?.('aria-describedby', this._portTooltipId);
@@ -214,6 +260,55 @@ class FlowCanvas {
         }
     }
 
+    readThemePalette() {
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        const readComputedStyle = typeof getComputedStyle === 'function' ? getComputedStyle : null;
+        if (!root || !readComputedStyle) {
+            return { ...FLOW_CANVAS_THEME_DEFAULTS };
+        }
+
+        const styles = readComputedStyle(root);
+        return Object.fromEntries(Object.entries(FLOW_CANVAS_THEME_TOKENS).map(([key, token]) => {
+            const value = styles.getPropertyValue(token).trim();
+            return [key, value || FLOW_CANVAS_THEME_DEFAULTS[key]];
+        }));
+    }
+
+    refreshThemePalette({ invalidate = true } = {}) {
+        const nextPalette = this.readThemePalette();
+        const signature = Object.values(nextPalette).join('|');
+        if (signature === this._themePaletteSignature) {
+            return false;
+        }
+
+        this.themePalette = nextPalette;
+        this.gridColor = nextPalette.grid;
+        this._themePaletteSignature = signature;
+        this._minimapStaticCache = null;
+        this._minimapStructureDirty = true;
+        this._minimapViewportDirty = true;
+
+        if (invalidate) {
+            this.invalidate();
+        }
+        return true;
+    }
+
+    observeThemeChanges() {
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        const Observer = typeof MutationObserver === 'function' ? MutationObserver : null;
+        if (!root || !Observer || this._themeObserver) {
+            return;
+        }
+
+        this._themeObserver = new Observer(records => {
+            if (records.some(record => record.attributeName === 'data-theme')) {
+                this.refreshThemePalette();
+            }
+        });
+        this._themeObserver.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+
     /**
      * Encoding cleanup: previous comment text was unreadable.
      */
@@ -236,6 +331,8 @@ class FlowCanvas {
 
         window.removeEventListener('keydown', this._keyDownHandler);
         document.removeEventListener('visibilitychange', this._visibilityHandler);
+        this._themeObserver?.disconnect?.();
+        this._themeObserver = null;
 
         this.canvas.removeEventListener('mousedown', this._mouseDownHandler);
         this.canvas.removeEventListener('mousemove', this._mouseMoveHandler);
@@ -857,6 +954,12 @@ class FlowCanvas {
         const w = node.width * this.scale;
         const h = node.height * this.scale;
         const isSelected = this.selectedNode === node.id;
+        const palette = this.themePalette || FLOW_CANVAS_THEME_DEFAULTS;
+
+        this.ctx.save();
+        if (node.disabled) {
+            this.ctx.globalAlpha = 0.52;
+        }
 
         // 识别 ForEach 运行模式。
         const isForEach = node.type === 'ForEach';
@@ -864,7 +967,7 @@ class FlowCanvas {
         const isSequential = ioMode === 'Sequential';
 
         // 默认边框样式。
-        let borderColor = isSelected ? node.color : 'rgba(255, 255, 255, 0.1)';
+        let borderColor = isSelected ? node.color : palette.nodeBorder;
         let borderWidth = isSelected ? 3 : 1;
         let glowColor = null;
 
@@ -915,7 +1018,7 @@ class FlowCanvas {
             this.ctx.shadowOffsetX = 0;
             this.ctx.shadowOffsetY = 0;
         } else {
-            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.shadowColor = palette.nodeShadow;
             this.ctx.shadowBlur = 8;
             this.ctx.shadowOffsetX = 2;
             this.ctx.shadowOffsetY = 2;
@@ -923,8 +1026,8 @@ class FlowCanvas {
 
         // 节点背景 - 渐变填充
         const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
-        gradient.addColorStop(0, isSelected ? 'rgba(45, 74, 94, 0.9)' : 'rgba(26, 58, 82, 0.8)');
-        gradient.addColorStop(1, isSelected ? 'rgba(26, 58, 82, 0.95)' : 'rgba(13, 27, 42, 0.9)');
+        gradient.addColorStop(0, isSelected ? palette.nodeSelectedStart : palette.nodeBackgroundStart);
+        gradient.addColorStop(1, isSelected ? palette.nodeSelectedEnd : palette.nodeBackgroundEnd);
 
         this.ctx.fillStyle = gradient;
         this.ctx.strokeStyle = borderColor;
@@ -1010,7 +1113,7 @@ class FlowCanvas {
                 }
                 this._subGraphNodeCountCache.set(node, subNodeCount);
             }
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            this.ctx.fillStyle = palette.nodeMutedText;
             this.ctx.font = `${10 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'bottom';
@@ -1035,6 +1138,8 @@ class FlowCanvas {
             this.ctx.textBaseline = 'top';
             this.ctx.fillText('COM', x + w - 4 * this.scale, y + 2 * this.scale);
         }
+
+        this.ctx.restore();
     }
 
     /**
@@ -1074,7 +1179,7 @@ class FlowCanvas {
             const badgeWidth = Math.max(26 * this.scale, this.ctx.measureText(badge.text).width + 10 * this.scale);
             const badgeHeight = 16 * this.scale;
             const left = right - badgeWidth;
-            this.ctx.fillStyle = 'rgba(13, 27, 42, 0.86)';
+            this.ctx.fillStyle = this.themePalette?.nodeBadgeBackground || FLOW_CANVAS_THEME_DEFAULTS.nodeBadgeBackground;
             this.roundRect(left, top, badgeWidth, badgeHeight, 6 * this.scale);
             this.ctx.fill();
             this.ctx.strokeStyle = badge.color;
@@ -1162,13 +1267,13 @@ class FlowCanvas {
             this.ctx.arc(x, portY, portRadius, 0, Math.PI * 2);
             this.ctx.fillStyle = color;
             this.ctx.fill();
-            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.strokeStyle = this.themePalette?.portOutline || FLOW_CANVAS_THEME_DEFAULTS.portOutline;
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
             // 绘制输入端口标签。
             if (this.scale > 0.8) {
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.fillStyle = this.themePalette?.nodeMutedText || FLOW_CANVAS_THEME_DEFAULTS.nodeMutedText;
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
                 this.ctx.textAlign = 'left';
                 const typeName = typeof input.type === 'string' ? input.type : 'Any';
@@ -1185,13 +1290,13 @@ class FlowCanvas {
             this.ctx.arc(x + w, portY, portRadius, 0, Math.PI * 2);
             this.ctx.fillStyle = color;
             this.ctx.fill();
-            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.strokeStyle = this.themePalette?.portOutline || FLOW_CANVAS_THEME_DEFAULTS.portOutline;
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
             // 绘制输出端口标签。
             if (this.scale > 0.8) {
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.fillStyle = this.themePalette?.nodeMutedText || FLOW_CANVAS_THEME_DEFAULTS.nodeMutedText;
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
                 this.ctx.textAlign = 'right';
                 const typeName = typeof output.type === 'string' ? output.type : 'Any';
@@ -1542,7 +1647,9 @@ class FlowCanvas {
             endX, endY
         );
 
-        this.ctx.strokeStyle = this.hoveredPort?.compatibility === 'incompatible' ? '#ef4444' : '#1890ff';
+        this.ctx.strokeStyle = this.hoveredPort?.compatibility === 'incompatible'
+            ? '#ef4444'
+            : (this.themePalette?.guide || FLOW_CANVAS_THEME_DEFAULTS.guide);
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.setLineDash([5 * this.scale, 5 * this.scale]);
         this.ctx.stroke();
@@ -1590,7 +1697,9 @@ class FlowCanvas {
             this.ctx.shadowColor = 'rgba(231, 76, 60, 0.5)';
             this.ctx.shadowBlur = 10;
         } else {
-            this.ctx.strokeStyle = isSelected ? '#ffffff' : '#5ac8fa';
+            this.ctx.strokeStyle = isSelected
+                ? (this.themePalette?.connectionSelected || FLOW_CANVAS_THEME_DEFAULTS.connectionSelected)
+                : (this.themePalette?.connection || FLOW_CANVAS_THEME_DEFAULTS.connection);
             this.ctx.shadowColor = isSelected ? 'rgba(255, 255, 255, 0.4)' : 'transparent';
             this.ctx.shadowBlur = isSelected ? 8 : 0;
         }
@@ -2862,14 +2971,12 @@ class FlowCanvas {
         this.minimap.style.bottom = '20px';
         this.minimap.style.width = '200px';
         this.minimap.style.height = '150px';
-        this.minimap.style.background = 'rgba(15, 36, 53, 0.9)';
-        this.minimap.style.border = '1px solid rgba(255, 255, 255, 0.1)';
         this.minimap.style.borderRadius = '8px';
         this.minimap.style.overflow = 'hidden';
         this.minimap.style.zIndex = '100';
-        this.minimap.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
 
         this.minimapToggle = document.createElement('button');
+        this.minimapToggle.className = 'flow-minimap-toggle';
         this.minimapToggle.type = 'button';
         this.minimapToggle.title = '折叠/展开小地图';
         this.minimapToggle.textContent = '-';
@@ -2879,10 +2986,7 @@ class FlowCanvas {
         this.minimapToggle.style.zIndex = '2';
         this.minimapToggle.style.width = '22px';
         this.minimapToggle.style.height = '22px';
-        this.minimapToggle.style.border = '1px solid rgba(255,255,255,0.16)';
         this.minimapToggle.style.borderRadius = '4px';
-        this.minimapToggle.style.background = 'rgba(15, 36, 53, 0.82)';
-        this.minimapToggle.style.color = '#fff';
         this.minimapToggle.style.cursor = 'pointer';
         this.minimap.appendChild(this.minimapToggle);
 
@@ -3013,11 +3117,13 @@ class FlowCanvas {
             const w = Math.max(4, node.width * layout.scale);
             const h = Math.max(3, node.height * layout.scale);
 
-            cacheCtx.fillStyle = node.disabled ? '#666' : (node.color || '#1890ff');
+            cacheCtx.fillStyle = node.disabled
+                ? (this.themePalette?.minimapDisabled || FLOW_CANVAS_THEME_DEFAULTS.minimapDisabled)
+                : (node.color || '#1890ff');
             cacheCtx.fillRect(x, y, w, h);
 
             if (node.id === this.selectedNode) {
-                cacheCtx.strokeStyle = '#fff';
+                cacheCtx.strokeStyle = this.themePalette?.minimapSelected || FLOW_CANVAS_THEME_DEFAULTS.minimapSelected;
                 cacheCtx.lineWidth = 2;
                 cacheCtx.strokeRect(x - 1, y - 1, w + 2, h + 2);
             }
@@ -3066,7 +3172,7 @@ class FlowCanvas {
         const viewportW = (this._logicalWidth / this.scale) * layout.scale;
         const viewportH = (this._logicalHeight / this.scale) * layout.scale;
 
-        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+        ctx.strokeStyle = this.themePalette?.minimapViewport || FLOW_CANVAS_THEME_DEFAULTS.minimapViewport;
         ctx.lineWidth = 2;
         ctx.strokeRect(viewportX, viewportY, viewportW, viewportH);
 

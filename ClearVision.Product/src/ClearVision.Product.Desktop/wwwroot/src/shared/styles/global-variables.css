@@ -72,6 +72,27 @@
     }
 }
 
+@media (min-width: 769px) and (max-width: 900px) {
+    .toolbar-global-variable-host .global-variable-entry {
+        max-width: 90px;
+        gap: 4px;
+        padding-inline: 6px 4px;
+    }
+
+    .toolbar-global-variable-host .global-variable-entry-summary {
+        flex: 0 1 auto;
+    }
+
+    .toolbar-global-variable-host .global-variable-entry-summary span {
+        display: none;
+    }
+
+    .toolbar-global-variable-host #gv-open-manager,
+    .toolbar-global-variable-host .global-variable-entry > .btn {
+        padding-inline: 4px;
+    }
+}
+
 .global-variable-entry-summary {
     display: flex;
     align-items: center;

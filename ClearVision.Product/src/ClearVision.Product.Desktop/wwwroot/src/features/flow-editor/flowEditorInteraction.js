@@ -1037,8 +1037,6 @@ export class FlowEditorInteraction {
         this.selectionBox = document.createElement('div');
         this.selectionBox.className = 'flow-selection-box';
         this.selectionBox.style.position = 'absolute';
-        this.selectionBox.style.border = '2px dashed #1890ff';
-        this.selectionBox.style.background = 'rgba(24, 144, 255, 0.1)';
         this.selectionBox.style.pointerEvents = 'none';
         this.canvas.canvas.parentElement.appendChild(this.selectionBox);
     }

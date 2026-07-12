@@ -133,6 +133,31 @@ html[data-theme="light"] {
     --theme-backdrop: rgba(24, 27, 32, 0.48);
     --theme-shadow-soft: var(--shadow-md);
 
+    /* Flow canvas: cool engineering surface, distinct from image-viewer black. */
+    --flow-canvas-background: #e7eaee;
+    --flow-canvas-grid: rgba(75, 87, 101, 0.24);
+    --flow-canvas-border: #c7cdd4;
+    --flow-canvas-minimap-background: rgba(247, 248, 250, 0.96);
+    --flow-canvas-minimap-border: rgba(75, 87, 101, 0.28);
+    --flow-canvas-minimap-viewport: rgba(182, 69, 60, 0.9);
+    --flow-canvas-minimap-selected: #20262d;
+    --flow-canvas-minimap-disabled: #8b929a;
+    --flow-canvas-selection-background: rgba(71, 115, 143, 0.14);
+    --flow-canvas-selection-border: #47738f;
+    --flow-canvas-guide: #47738f;
+    --flow-canvas-node-background-start: #ffffff;
+    --flow-canvas-node-background-end: #edf0f3;
+    --flow-canvas-node-selected-start: #f7fbfd;
+    --flow-canvas-node-selected-end: #e2edf2;
+    --flow-canvas-node-border: rgba(63, 72, 83, 0.34);
+    --flow-canvas-node-text: #252b32;
+    --flow-canvas-node-muted-text: #5f6975;
+    --flow-canvas-node-shadow: rgba(37, 43, 50, 0.18);
+    --flow-canvas-node-badge-background: rgba(247, 248, 250, 0.94);
+    --flow-canvas-port-outline: #f8f9fa;
+    --flow-canvas-connection: #3f718e;
+    --flow-canvas-connection-selected: #20262d;
+
     --ink-primary: var(--theme-surface-1);
     --ink-secondary: var(--theme-surface-2);
     --ink-tertiary: var(--theme-surface-3);
@@ -232,6 +257,31 @@ html[data-theme="dark"] {
     --theme-hover-strong: #292c32;
     --theme-backdrop: rgba(0, 0, 0, 0.66);
     --theme-shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.28);
+
+    /* Flow canvas: retained dark professional exception. */
+    --flow-canvas-background: #0b0d10;
+    --flow-canvas-grid: rgba(143, 158, 174, 0.2);
+    --flow-canvas-border: #24272c;
+    --flow-canvas-minimap-background: rgba(17, 21, 26, 0.94);
+    --flow-canvas-minimap-border: rgba(255, 255, 255, 0.14);
+    --flow-canvas-minimap-viewport: rgba(224, 106, 95, 0.9);
+    --flow-canvas-minimap-selected: #ffffff;
+    --flow-canvas-minimap-disabled: #666b72;
+    --flow-canvas-selection-background: rgba(117, 164, 191, 0.16);
+    --flow-canvas-selection-border: #75a4bf;
+    --flow-canvas-guide: #75a4bf;
+    --flow-canvas-node-background-start: rgba(26, 58, 82, 0.86);
+    --flow-canvas-node-background-end: rgba(13, 27, 42, 0.94);
+    --flow-canvas-node-selected-start: rgba(45, 74, 94, 0.94);
+    --flow-canvas-node-selected-end: rgba(26, 58, 82, 0.98);
+    --flow-canvas-node-border: rgba(255, 255, 255, 0.14);
+    --flow-canvas-node-text: #ffffff;
+    --flow-canvas-node-muted-text: rgba(255, 255, 255, 0.58);
+    --flow-canvas-node-shadow: rgba(0, 0, 0, 0.34);
+    --flow-canvas-node-badge-background: rgba(13, 27, 42, 0.88);
+    --flow-canvas-port-outline: #ffffff;
+    --flow-canvas-connection: #5ac8fa;
+    --flow-canvas-connection-selected: #ffffff;
 
     --ink-primary: var(--theme-surface-1);
     --ink-secondary: var(--theme-surface-2);
