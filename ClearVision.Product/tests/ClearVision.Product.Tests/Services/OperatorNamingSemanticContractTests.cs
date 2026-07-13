@@ -231,6 +231,58 @@ public sealed class OperatorNamingSemanticContractTests
     }
 
     [Fact]
+    public void ActiveOperatorHandbook_ShouldUseCurrentNamingSemantics()
+    {
+        var activeRoots = new[]
+        {
+            Path.Combine(RepoRoot, "docs", "算子资料"),
+            Path.Combine(RepoRoot, "算子资料")
+        };
+        var expectedHandbookMarkers = new[]
+        {
+            "#### Threshold（全局阈值处理）",
+            "#### GeometricToleranceOperator（二维几何公差判定）",
+            "#### RoiManagerOperator（ROI裁剪与掩膜）",
+            "#### ColorDetectionOperator（颜色分析）",
+            "#### TryCatchOperator（Try分支透传）",
+            "#### ModbusCommunicationOperator（Modbus TCP通信）",
+            "| CoordinateTransform | 像素到物理坐标（单点） |"
+        };
+        var staleHandbookClaims = new[]
+        {
+            "| **显示名称** | 二值化 |",
+            "| **显示名称** | 几何公差 |",
+            "| **显示名称** | ROI管理器 |",
+            "| **显示名称** | 颜色检测 |",
+            "| **显示名称** | 异常捕获 |",
+            "| **显示名称** | Modbus通信 |",
+            "| **功能描述** | Try-Catch流程控制，异常时切换到Catch分支 |",
+            "| **功能描述** | Modbus TCP/RTU通信（带连接池） |"
+        };
+
+        foreach (var root in activeRoots)
+        {
+            var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+            readme.Should().Contain("- 正式算子：158 个。", root);
+            readme.Should().Contain("- 运行时元数据：158 个", root);
+            readme.Should().NotContain("正式算子：156 个", root);
+            readme.Should().NotContain("运行时元数据：160 个", root);
+
+            var handbook = File.ReadAllText(Path.Combine(root, "算子手册.md"));
+            handbook.Should().Contain("当前正式口径包含 **158 个算子**", root);
+            foreach (var marker in expectedHandbookMarkers)
+            {
+                handbook.Should().Contain(marker, root);
+            }
+
+            foreach (var staleClaim in staleHandbookClaims)
+            {
+                handbook.Should().NotContain(staleClaim, root);
+            }
+        }
+    }
+
+    [Fact]
     public async Task LegacyDisplayNames_ShouldRemainSearchableInAiOperatorCatalog()
     {
         var tool = new OperatorCatalogTool();
