@@ -86,6 +86,108 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <StudioUiRoot>$(MSBuildThisFileDirectory)StudioUI\</StudioUiRoot>
+    <StudioUiIntermediateDist>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\StudioUI\dist</StudioUiIntermediateDist>
+    <StudioUiNodeModulesLock>$(StudioUiRoot)node_modules\.package-lock.json</StudioUiNodeModulesLock>
+    <SkipStudioUiBuild Condition="'$(SkipStudioUiBuild)' == ''">false</SkipStudioUiBuild>
+    <SkipStudioUiInstall Condition="'$(SkipStudioUiInstall)' == ''">false</SkipStudioUiInstall>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="StudioUI\**\*" />
+    <None Remove="StudioUI\**\*" />
+    <StudioUiPackageInput Include="$(StudioUiRoot)package.json" />
+    <StudioUiPackageInput Include="$(StudioUiRoot)package-lock.json" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)index.html" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)package.json" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)package-lock.json" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)tsconfig*.json" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)vite.config.ts" />
+    <StudioUiBuildInput Include="$(StudioUiRoot)src\**\*" />
+  </ItemGroup>
+
+  <Target Name="InstallStudioUiDependencies"
+          Condition="Exists('$(StudioUiRoot)package.json') and '$(SkipStudioUiBuild)' != 'true'"
+          Inputs="@(StudioUiPackageInput)"
+          Outputs="$(StudioUiNodeModulesLock)">
+    <Error Condition="'$(SkipStudioUiInstall)' == 'true'"
+           Text="SkipStudioUiInstall=true requires up-to-date StudioUI node_modules and $(StudioUiNodeModulesLock). Run npm ci before invoking MSBuild with this property." />
+    <Message Importance="high"
+             Text="Installing StudioUI dependencies from $(StudioUiRoot)" />
+    <Exec WorkingDirectory="$(StudioUiRoot)"
+          Command="npm ci" />
+  </Target>
+
+  <Target Name="BuildStudioUi"
+          BeforeTargets="BeforeBuild"
+          DependsOnTargets="InstallStudioUiDependencies"
+          Condition="Exists('$(StudioUiRoot)package.json')"
+          Inputs="@(StudioUiBuildInput);$(StudioUiNodeModulesLock)"
+          Outputs="$(StudioUiIntermediateDist)\index.html;$(StudioUiIntermediateDist)\.vite\manifest.json">
+    <Error Condition="'$(SkipStudioUiBuild)' == 'true'"
+           Text="SkipStudioUiBuild=true requires current StudioUI assets at $(StudioUiIntermediateDist). Rebuild assets before using this property." />
+    <Message Importance="high"
+             Text="Building StudioUI assets into $(StudioUiIntermediateDist)" />
+    <RemoveDir Directories="$(StudioUiIntermediateDist)" />
+    <Exec WorkingDirectory="$(StudioUiRoot)"
+          Command="npm run build"
+          EnvironmentVariables="VITE_OUT_DIR=$(StudioUiIntermediateDist);CONFIGURATION=$(Configuration);TARGET_FRAMEWORK=$(TargetFramework)" />
+  </Target>
+
+  <Target Name="CollectStudioUiDistAssets"
+          DependsOnTargets="BuildStudioUi"
+          Condition="Exists('$(StudioUiRoot)package.json')">
+    <ItemGroup>
+      <StudioUiDistAsset Include="$(StudioUiIntermediateDist)\**\*" />
+      <StudioUiBundledAsset Include="$(StudioUiIntermediateDist)\assets\**\*" />
+    </ItemGroup>
+    <Error Condition="'@(StudioUiDistAsset)' == ''"
+           Text="StudioUI build produced no assets in $(StudioUiIntermediateDist)." />
+    <Error Condition="!Exists('$(StudioUiIntermediateDist)\index.html')"
+           Text="StudioUI build is missing index.html in $(StudioUiIntermediateDist)." />
+    <Error Condition="!Exists('$(StudioUiIntermediateDist)\.vite\manifest.json')"
+           Text="StudioUI build is missing .vite/manifest.json in $(StudioUiIntermediateDist)." />
+    <Error Condition="'@(StudioUiBundledAsset)' == ''"
+           Text="StudioUI build is missing bundled assets in $(StudioUiIntermediateDist)\assets." />
+  </Target>
+
+  <Target Name="CopyStudioUiAssetsToOutput"
+          AfterTargets="AfterBuild"
+          DependsOnTargets="CollectStudioUiDistAssets">
+    <RemoveDir Directories="$(OutDir)wwwroot\studio" />
+    <Copy SourceFiles="@(StudioUiDistAsset)"
+          DestinationFiles="@(StudioUiDistAsset->'$(OutDir)wwwroot\studio\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(OutDir)wwwroot\studio\index.html')"
+           Text="StudioUI output copy is missing $(OutDir)wwwroot\studio\index.html." />
+    <Error Condition="!Exists('$(OutDir)wwwroot\studio\.vite\manifest.json')"
+           Text="StudioUI output copy is missing its manifest." />
+  </Target>
+
+  <Target Name="CopyStudioUiAssetsToPublish"
+          AfterTargets="Publish"
+          DependsOnTargets="CollectStudioUiDistAssets"
+          Condition="'$(PublishDir)' != ''">
+    <RemoveDir Directories="$(PublishDir)wwwroot\studio" />
+    <Copy SourceFiles="@(StudioUiDistAsset)"
+          DestinationFiles="@(StudioUiDistAsset->'$(PublishDir)wwwroot\studio\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(PublishDir)wwwroot\studio\index.html')"
+           Text="StudioUI publish copy is missing $(PublishDir)wwwroot\studio\index.html." />
+    <Error Condition="!Exists('$(PublishDir)wwwroot\studio\.vite\manifest.json')"
+           Text="StudioUI publish copy is missing its manifest." />
+  </Target>
+
+  <Target Name="CleanStudioUiAssets"
+          AfterTargets="Clean">
+    <RemoveDir Directories="$(StudioUiIntermediateDist)" />
+    <RemoveDir Directories="$(OutDir)wwwroot\studio"
+               Condition="'$(OutDir)' != ''" />
+    <RemoveDir Directories="$(PublishDir)wwwroot\studio"
+               Condition="'$(PublishDir)' != ''" />
+  </Target>
+
+  <PropertyGroup>
     <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
   </PropertyGroup>
 

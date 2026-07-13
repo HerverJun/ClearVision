@@ -27,6 +27,8 @@ Run the desktop app:
 & ".\ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 ```
 
+Desktop build/publish builds StudioUI automatically. After running `npm ci` in `ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI`, use `-p:SkipStudioUiInstall=true` to skip only the redundant install step; do not skip the StudioUI build unless current validated assets already exist in the Desktop `obj` tree.
+
 ### Tests — always serialize per project
 
 **Never run more than one `dotnet test` against the same `.csproj` at once.** Use the serial runner, which merges multiple filters into one invocation and holds a per-project lock:
@@ -39,6 +41,15 @@ Run the desktop app:
 - Invoke it from the current shell with `& "./scripts/..."`; do **not** wrap it in `powershell.exe -File` (leaks child processes).
 - After the project has already built in this session, add `-NoBuild -NoRestore` to follow-up runs.
 - Prefer the fixed preset scripts when they match the task: `run-tests-services-regression.ps1`, `run-tests-plc-regression.ps1`, `run-tests-desktop-endpoints.ps1`, `run-tests-detection-regression.ps1`, `run-tests-measurement-performance.ps1`, `run-tests-phase42-regression.ps1`, and the other `run-tests-*.ps1` under `scripts/`.
+
+StudioUI quality gates (from `ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI`):
+```powershell
+npm ci
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run build
+```
 
 UI/Playwright tests live in `ClearVision.Product/tests/ClearVision.Product.UI.Tests` (`npm run test:unit`, `npm run test:preview-smoke`, `npx playwright test`).
 

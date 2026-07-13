@@ -24,6 +24,7 @@ on:
 env:
   SOLUTION_PATH: ClearVision.Product/ClearVision.Product.sln
   DESKTOP_PROJECT: ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj
+  STUDIO_UI_DIR: ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI
   PRODUCT_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj
   DESKTOP_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj
   OPERATOR_PROJECT: ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj
@@ -167,9 +168,21 @@ jobs:
           cache: npm
           cache-dependency-path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
+
+      - name: Run StudioUI Quality Gates
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
 
       - name: Build (Debug)
-        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipStudioUiInstall=true
 
       - name: Run Product Tests with Coverage
         shell: pwsh
@@ -697,6 +710,11 @@ jobs:
           cache: npm
           cache-dependency-path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
 
       - name: Get Version
         id: version
@@ -722,6 +740,7 @@ jobs:
             -p:PublishReadyToRun=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
+            -p:SkipStudioUiInstall=true `
             -p:Version=${{ steps.version.outputs.VERSION }} `
             -o "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}"
 
