@@ -105,7 +105,6 @@ static class Program
 
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-            System.Windows.Forms.Application.SetHighDpiMode(HighDpiMode.SystemAware);
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -374,25 +373,46 @@ static class Program
 
     internal static void UseDesktopStaticAssets(
         IApplicationBuilder app,
-        string? legacyWebRootPath = null)
+        string? legacyWebRootPath = null,
+        string? studioUiWebRootPath = null)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var resolvedLegacyWebRootPath = legacyWebRootPath ?? DesktopWebRootResolver.Resolve();
-        if (!Directory.Exists(resolvedLegacyWebRootPath))
+        var resolvedLegacyWebRootPath = Path.GetFullPath(
+            legacyWebRootPath ?? DesktopWebRootResolver.Resolve());
+        var resolvedStudioUiWebRootPath = Path.GetFullPath(
+            studioUiWebRootPath ?? DesktopWebRootResolver.ResolveStudioUi());
+
+        if (Directory.Exists(resolvedStudioUiWebRootPath))
         {
-            return;
+            var studioUiProvider = new PhysicalFileProvider(resolvedStudioUiWebRootPath);
+            app.UseDefaultFiles(new DefaultFilesOptions
+            {
+                FileProvider = studioUiProvider,
+                RequestPath = "/studio",
+                DefaultFileNames = new List<string> { "index.html" }
+            });
+            app.UseStaticFiles(CreateStudioUiStaticFileOptions(studioUiProvider));
+            Debug.WriteLine($"StudioUI 静态资源目录: {resolvedStudioUiWebRootPath}");
         }
 
-        var legacyProvider = new PhysicalFileProvider(resolvedLegacyWebRootPath);
-        app.UseDefaultFiles(new DefaultFilesOptions
+        if (Directory.Exists(resolvedLegacyWebRootPath))
         {
-            FileProvider = legacyProvider,
-            DefaultFileNames = new List<string> { "index.html" }
-        });
+            var legacyProvider = new PhysicalFileProvider(resolvedLegacyWebRootPath);
+            app.UseWhen(
+                context => !context.Request.Path.StartsWithSegments("/studio"),
+                legacyApp =>
+                {
+                    legacyApp.UseDefaultFiles(new DefaultFilesOptions
+                    {
+                        FileProvider = legacyProvider,
+                        DefaultFileNames = new List<string> { "index.html" }
+                    });
 
-        app.UseStaticFiles(CreateDesktopStaticFileOptions(legacyProvider));
-        Debug.WriteLine($"静态资源目录: {resolvedLegacyWebRootPath}");
+                    legacyApp.UseStaticFiles(CreateDesktopStaticFileOptions(legacyProvider));
+                });
+            Debug.WriteLine($"Legacy 静态资源目录: {resolvedLegacyWebRootPath}");
+        }
     }
 
     private static StaticFileOptions CreateDesktopStaticFileOptions(IFileProvider provider)
@@ -407,13 +427,32 @@ static class Program
                     return;
                 }
 
-                context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
-                context.Context.Response.Headers.Pragma = "no-cache";
-                context.Context.Response.Headers.Expires = "0";
+                DisableDesktopStaticFileCaching(context.Context.Response);
             }
         };
 
         return staticFileOptions;
+    }
+
+    private static StaticFileOptions CreateStudioUiStaticFileOptions(IFileProvider provider)
+    {
+        return new StaticFileOptions
+        {
+            FileProvider = provider,
+            RequestPath = "/studio",
+            OnPrepareResponse = context =>
+            {
+                var requestPath = context.Context.Request.Path.Value ?? string.Empty;
+                if (IsHashedStudioUiAsset(requestPath))
+                {
+                    context.Context.Response.Headers.CacheControl =
+                        "public, max-age=31536000, immutable";
+                    return;
+                }
+
+                DisableDesktopStaticFileCaching(context.Context.Response);
+            }
+        };
     }
 
     private static bool ShouldDisableDesktopStaticFileCaching(string? fileName)
@@ -423,6 +462,38 @@ static class Program
             string.Equals(extension, ".js", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(extension, ".mjs", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(extension, ".css", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsHashedStudioUiAsset(string requestPath)
+    {
+        if (!requestPath.StartsWith("/studio/assets/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(requestPath);
+        var extension = Path.GetExtension(fileName);
+        var stem = extension.Length == 0
+            ? fileName
+            : fileName[..^extension.Length];
+        var hashSeparator = stem.LastIndexOf('-');
+        if (hashSeparator < 0 || hashSeparator == stem.Length - 1)
+        {
+            return false;
+        }
+
+        var hash = stem[(hashSeparator + 1)..];
+        return hash.Length >= 8 &&
+            hash.All(character =>
+                char.IsAsciiLetterOrDigit(character) ||
+                character is '_' or '-');
+    }
+
+    private static void DisableDesktopStaticFileCaching(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        response.Headers.Pragma = "no-cache";
+        response.Headers.Expires = "0";
     }
 
     private static void InitializeVisionDatabase(IServiceProvider services)

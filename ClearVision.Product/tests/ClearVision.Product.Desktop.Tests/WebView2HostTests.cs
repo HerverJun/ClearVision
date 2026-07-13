@@ -1,4 +1,5 @@
 using ClearVision.Product.Desktop;
+using ClearVision.Product.Desktop.Configuration;
 using FluentAssertions;
 
 namespace ClearVision.Product.Desktop.Tests;
@@ -21,6 +22,110 @@ public class WebView2HostTests
         var act = () => WebView2Host.CreateInitialPageUri(port);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void CreateStartupPlan_WhenStudioUiIsEnabled_ShouldUseExactV1ContractAndStudioUri()
+    {
+        var tempRoot = CreateCompleteStudioUiRoot();
+        try
+        {
+            var options = new StudioOptions
+            {
+                StudioUiEnabled = true,
+                NodePreviewInspectorEnabled = true,
+                PropertyPanelCapabilityEnabled = true
+            };
+
+            var plan = WebView2Host.CreateStartupPlan(
+                webPort: 5000,
+                studioOptions: options,
+                cssVersion: "123",
+                studioUiWebRoot: tempRoot);
+
+            plan.Decision.Kind.Should().Be(StudioStartupPageKind.StudioUi);
+            plan.InitialPageUri.Should().Be(new Uri("http://localhost:5000/studio/index.html"));
+            plan.DiagnosticHtml.Should().BeNull();
+            plan.StartupInjectionScript.Should().NotBeNull();
+            plan.StartupInjectionScript.Should().Contain("\"schemaVersion\":1");
+            plan.StartupInjectionScript.Should().Contain("\"uiKind\":\"studio-ui\"");
+            plan.StartupInjectionScript.Should().Contain("\"hostKind\":\"desktop-webview2\"");
+            plan.StartupInjectionScript.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
+            plan.StartupInjectionScript.Should().Contain("\"studioUiBasePath\":\"/studio/\"");
+            plan.StartupInjectionScript.Should().Contain("\"featureFlags\":");
+            plan.StartupInjectionScript.Should().Contain("Object.freeze(startup)");
+            plan.StartupInjectionScript.Should().Contain("writable: false");
+            plan.StartupInjectionScript.Should().Contain("configurable: false");
+            plan.StartupInjectionScript.Should().NotContain("window.__API_BASE_URL__");
+            plan.StartupInjectionScript.Should().NotContain("window.__CSS_VERSION__");
+            plan.StartupInjectionScript.Should().NotContain("\"nodePreviewInspectorEnabled\":");
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CreateStartupPlan_WhenStudioUiIsDisabled_ShouldKeepLegacyStartupAndAliases()
+    {
+        var legacyRoot = Path.Combine(
+            Path.GetTempPath(),
+            "clearvision-webview-plan-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(legacyRoot);
+        File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy");
+        try
+        {
+            var plan = WebView2Host.CreateStartupPlan(
+                webPort: 5000,
+                studioOptions: new StudioOptions { StudioUiEnabled = false },
+                cssVersion: "123",
+                legacyWebRoot: legacyRoot);
+
+            plan.Decision.Kind.Should().Be(StudioStartupPageKind.Legacy);
+            plan.InitialPageUri.Should().Be(new Uri("http://localhost:5000/index.html"));
+            plan.DiagnosticHtml.Should().BeNull();
+            plan.StartupInjectionScript.Should().Contain("window.__API_BASE_URL__");
+            plan.StartupInjectionScript.Should().Contain("window.__CSS_VERSION__");
+            plan.StartupInjectionScript.Should().Contain("\"nodePreviewInspectorEnabled\":false");
+            plan.StartupInjectionScript.Should().NotContain("\"schemaVersion\":1");
+            plan.StartupInjectionScript.Should().NotContain("\"uiKind\":\"studio-ui\"");
+        }
+        finally
+        {
+            Directory.Delete(legacyRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CreateStartupPlan_WhenStudioUiAssetsAreMissing_ShouldUseDiagnosticWithoutInjection()
+    {
+        var studioUiRoot = Path.Combine(
+            Path.GetTempPath(),
+            "clearvision-webview-plan-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(studioUiRoot);
+        try
+        {
+            var plan = WebView2Host.CreateStartupPlan(
+                webPort: 5000,
+                studioOptions: new StudioOptions { StudioUiEnabled = true },
+                cssVersion: "123",
+                studioUiWebRoot: studioUiRoot);
+
+            plan.Decision.Kind.Should().Be(StudioStartupPageKind.Diagnostic);
+            plan.InitialPageUri.Should().BeNull();
+            plan.StartupInjectionScript.Should().BeNull();
+            plan.DiagnosticHtml.Should().Contain("不会回退 Legacy");
+            plan.DiagnosticHtml.Should().Contain(Path.Combine(studioUiRoot, "index.html"));
+            plan.DiagnosticHtml.Should().Contain(Path.Combine(studioUiRoot, "assets"));
+            plan.DiagnosticHtml.Should().Contain(Path.Combine(studioUiRoot, ".vite", "manifest.json"));
+        }
+        finally
+        {
+            Directory.Delete(studioUiRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -135,5 +240,19 @@ public class WebView2HostTests
 
         status.IsTerminal.Should().Be(expectedTerminal);
         status.Succeeded.Should().Be(expectedSucceeded);
+    }
+
+    private static string CreateCompleteStudioUiRoot()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "clearvision-webview-plan-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "assets"));
+        Directory.CreateDirectory(Path.Combine(root, ".vite"));
+        File.WriteAllText(Path.Combine(root, "index.html"), "studio");
+        File.WriteAllText(Path.Combine(root, "assets", "app-12345678.js"), "asset");
+        File.WriteAllText(Path.Combine(root, ".vite", "manifest.json"), "{}");
+        return root;
     }
 }

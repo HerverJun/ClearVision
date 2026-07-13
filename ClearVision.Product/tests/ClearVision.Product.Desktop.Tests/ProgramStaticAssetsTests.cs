@@ -31,7 +31,10 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot);
+        Program.UseDesktopStaticAssets(
+            app,
+            legacyRoot,
+            Path.Combine(_tempRoot, "missing-studio-root"));
         await app.StartAsync();
         try
         {
@@ -68,7 +71,10 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot);
+        Program.UseDesktopStaticAssets(
+            app,
+            legacyRoot,
+            Path.Combine(_tempRoot, "missing-studio-root"));
         await app.StartAsync();
         try
         {
@@ -79,6 +85,120 @@ public sealed class ProgramStaticAssetsTests : IDisposable
 
             legacyIndex.Should().Be("legacy-index");
             legacyApp.Should().Be("legacy-app");
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData("index.html")]
+    [InlineData(".vite/manifest.json")]
+    public async Task UseDesktopStaticAssets_ShouldDisableCachingForStudioEntryAndManifest(
+        string relativePath)
+    {
+        var legacyRoot = Path.Combine(_tempRoot, "legacy-cache-root");
+        var studioUiRoot = Path.Combine(_tempRoot, "studio-cache-root");
+        Directory.CreateDirectory(legacyRoot);
+        var targetPath = Path.Combine(
+            studioUiRoot,
+            relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        File.WriteAllText(targetPath, "studio-asset");
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        builder.WebHost.UseTestServer();
+        var app = builder.Build();
+        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        await app.StartAsync();
+        try
+        {
+            using var client = app.GetTestClient();
+            using var response = await client.GetAsync($"/studio/{relativePath}");
+
+            response.EnsureSuccessStatusCode();
+            GetHeader(response, "Cache-Control").Should().Contain("no-store");
+            GetHeader(response, "Cache-Control").Should().Contain("no-cache");
+            GetHeader(response, "Cache-Control").Should().Contain("max-age=0");
+            GetHeader(response, "Pragma").Should().Contain("no-cache");
+            GetHeader(response, "Expires").Should().Be("0");
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task UseDesktopStaticAssets_ShouldCacheHashedStudioAssetsAsImmutable()
+    {
+        var legacyRoot = Path.Combine(_tempRoot, "legacy-immutable-root");
+        var studioUiRoot = Path.Combine(_tempRoot, "studio-immutable-root");
+        var hashedAsset = Path.Combine(studioUiRoot, "assets", "app-Clear1234.js");
+        Directory.CreateDirectory(legacyRoot);
+        Directory.CreateDirectory(Path.GetDirectoryName(hashedAsset)!);
+        File.WriteAllText(hashedAsset, "studio-hash");
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        builder.WebHost.UseTestServer();
+        var app = builder.Build();
+        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        await app.StartAsync();
+        try
+        {
+            using var client = app.GetTestClient();
+            using var response = await client.GetAsync("/studio/assets/app-Clear1234.js");
+
+            response.EnsureSuccessStatusCode();
+            GetHeader(response, "Cache-Control").Should().Contain("public");
+            GetHeader(response, "Cache-Control").Should().Contain("max-age=31536000");
+            GetHeader(response, "Cache-Control").Should().Contain("immutable");
+            GetHeader(response, "Cache-Control").Should().NotContain("no-store");
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task UseDesktopStaticAssets_ShouldKeepStudioProviderScopedFromLegacyRoot()
+    {
+        var legacyRoot = Path.Combine(_tempRoot, "legacy-scope-root");
+        var studioUiRoot = Path.Combine(_tempRoot, "studio-scope-root");
+        Directory.CreateDirectory(Path.Combine(legacyRoot, "studio"));
+        Directory.CreateDirectory(Path.Combine(studioUiRoot, "assets"));
+        File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy-index");
+        File.WriteAllText(Path.Combine(legacyRoot, "studio", "index.html"), "legacy-shadow");
+        File.WriteAllText(Path.Combine(studioUiRoot, "index.html"), "studio-index");
+        File.WriteAllText(Path.Combine(studioUiRoot, "assets", "app-Clear1234.js"), "studio-asset");
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        builder.WebHost.UseTestServer();
+        var app = builder.Build();
+        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        await app.StartAsync();
+        try
+        {
+            using var client = app.GetTestClient();
+
+            (await client.GetStringAsync("/index.html")).Should().Be("legacy-index");
+            (await client.GetStringAsync("/studio/index.html")).Should().Be("studio-index");
+            using var unscopedStudioAsset = await client.GetAsync("/assets/app-Clear1234.js");
+            unscopedStudioAsset.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
         }
         finally
         {

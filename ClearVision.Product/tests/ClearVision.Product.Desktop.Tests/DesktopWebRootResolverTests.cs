@@ -46,6 +46,30 @@ public sealed class DesktopWebRootResolverTests : IDisposable
         resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot")));
     }
 
+    [Fact]
+    public void ResolveStudioUi_WithRidOutputUnderProject_ShouldUseOutputStudioRoot()
+    {
+        var projectRoot = CreateDesktopProject();
+        var baseDirectory = Path.Combine(projectRoot, "bin", "Debug", "net8.0-windows", "win-x64");
+        CreateOutputWwwRoot(baseDirectory);
+
+        var resolved = DesktopWebRootResolver.ResolveStudioUi(baseDirectory);
+
+        resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot", "studio")));
+        resolved.Should().NotBe(Path.GetFullPath(Path.Combine(projectRoot, "wwwroot", "studio")));
+    }
+
+    [Fact]
+    public void ResolveStudioUi_ShouldNotRequireStudioAssetsInSourceWwwRoot()
+    {
+        var baseDirectory = Path.Combine(_tempRoot, "standalone-output");
+        Directory.CreateDirectory(baseDirectory);
+
+        var resolved = DesktopWebRootResolver.ResolveStudioUi(baseDirectory);
+
+        resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot", "studio")));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))

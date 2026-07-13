@@ -26,6 +26,16 @@ internal static class DesktopWebRootResolver
         return Path.GetFullPath(Path.Combine(normalizedBaseDirectory, "wwwroot"));
     }
 
+    public static string ResolveStudioUi(string? baseDirectory = null)
+    {
+        var normalizedBaseDirectory = Path.GetFullPath(
+            string.IsNullOrWhiteSpace(baseDirectory)
+                ? AppContext.BaseDirectory
+                : baseDirectory);
+
+        return Path.GetFullPath(Path.Combine(normalizedBaseDirectory, "wwwroot", "studio"));
+    }
+
     private static bool TryFindProjectWwwRoot(string baseDirectory, out string wwwRoot)
     {
         var current = new DirectoryInfo(baseDirectory);

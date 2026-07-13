@@ -13,6 +13,12 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace ClearVision.Product.Desktop;
 
+internal sealed record WebView2StartupPlan(
+    StudioStartupPageDecision Decision,
+    Uri? InitialPageUri,
+    string? StartupInjectionScript,
+    string? DiagnosticHtml);
+
 /// <summary>
 /// WebView2 宿主类，负责 WebView2 控件的异步初始化和配置。
 /// 基于《代码实践指导》中的 WebView2Host 设计模式。
@@ -27,6 +33,7 @@ public sealed class WebView2Host : IAsyncDisposable
     private readonly WebView2 _webView;
     private readonly StudioOptions _studioOptions;
     private CoreWebView2Environment? _environment;
+    private WebView2StartupPlan? _startupPlan;
     private bool _isInitialized;
     private bool _isDisposed;
     private readonly WebMessageHandler? _messageHandler;
@@ -114,6 +121,126 @@ public sealed class WebView2Host : IAsyncDisposable
         """;
     }
 
+    internal static string BuildStudioUiStartupInjectionScript(
+        string apiBaseUrl,
+        StudioOptions studioOptions)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
+        ArgumentNullException.ThrowIfNull(studioOptions);
+
+        var startup = new
+        {
+            schemaVersion = 1,
+            uiKind = "studio-ui",
+            hostKind = "desktop-webview2",
+            apiBaseUrl,
+            studioUiBasePath = "/studio/",
+            featureFlags = BuildStudioUiFeatureFlags(studioOptions)
+        };
+        var startupJson = JsonSerializer.Serialize(startup, StartupScriptJsonOptions);
+
+        return $$"""
+            (() => {
+                const startup = {{startupJson}};
+                const featureFlags = Object.freeze({
+                    ...(startup.featureFlags && typeof startup.featureFlags === 'object'
+                        ? startup.featureFlags
+                        : {})
+                });
+                Object.defineProperty(startup, 'featureFlags', {
+                    value: featureFlags,
+                    writable: false,
+                    configurable: false,
+                    enumerable: true
+                });
+                Object.freeze(startup);
+                Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
+                    value: startup,
+                    writable: false,
+                    configurable: false,
+                    enumerable: true
+                });
+                console.log('[Desktop] StudioUI startup:', window.__CLEARVISION_STARTUP__);
+            })();
+        """;
+    }
+
+    internal static WebView2StartupPlan CreateStartupPlan(
+        int webPort,
+        StudioOptions studioOptions,
+        string cssVersion,
+        string? baseDirectory = null,
+        string? legacyWebRoot = null,
+        string? studioUiWebRoot = null)
+    {
+        if (webPort < 1 || webPort > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(webPort), "Web port must be between 1 and 65535.");
+        }
+
+        ArgumentNullException.ThrowIfNull(studioOptions);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
+
+        var decision = StudioStartupPageResolver.Resolve(
+            studioOptions.StudioUiEnabled,
+            baseDirectory,
+            legacyWebRoot,
+            studioUiWebRoot);
+        var apiBaseUrl = $"http://localhost:{webPort}/api";
+        var startupInjectionScript = decision.Kind switch
+        {
+            StudioStartupPageKind.Legacy => BuildStartupInjectionScript(
+                apiBaseUrl,
+                cssVersion,
+                studioOptions.NodePreviewInspectorEnabled,
+                studioOptions.PropertyPanelCapabilityEnabled,
+                studioOptions.PreviewPanelCapabilityEnabled,
+                studioOptions.GlobalVariablesCapabilityEnabled,
+                studioOptions.SettingsCapabilityEnabled,
+                studioOptions.ProjectPageCapabilityEnabled,
+                studioOptions.InspectionCapabilityEnabled,
+                studioOptions.ResultsReviewCapabilityEnabled,
+                studioOptions.AiPanelCapabilityEnabled,
+                studioOptions.CircleSearchV2ToolEnabled,
+                studioOptions.NPointCalibrationWorkbenchEnabled),
+            StudioStartupPageKind.StudioUi => BuildStudioUiStartupInjectionScript(
+                apiBaseUrl,
+                studioOptions),
+            _ => null
+        };
+        var initialPageUri = decision.IsNavigable
+            ? StudioStartupPageResolver.CreateInitialPageUri(webPort, decision)
+            : null;
+        var diagnosticHtml = decision.IsNavigable
+            ? null
+            : BuildStartupDiagnosticHtml(decision);
+
+        return new WebView2StartupPlan(
+            decision,
+            initialPageUri,
+            startupInjectionScript,
+            diagnosticHtml);
+    }
+
+    private static IReadOnlyDictionary<string, bool> BuildStudioUiFeatureFlags(
+        StudioOptions studioOptions)
+    {
+        return new Dictionary<string, bool>
+        {
+            ["Studio:NodePreviewInspectorEnabled"] = studioOptions.NodePreviewInspectorEnabled,
+            ["Studio2.PropertyPanel"] = studioOptions.PropertyPanelCapabilityEnabled,
+            ["Studio2.PreviewPanel"] = studioOptions.PreviewPanelCapabilityEnabled,
+            ["Studio2.GlobalVariables"] = studioOptions.GlobalVariablesCapabilityEnabled,
+            ["Studio2.Settings"] = studioOptions.SettingsCapabilityEnabled,
+            ["Studio2.ProjectPage"] = studioOptions.ProjectPageCapabilityEnabled,
+            ["Studio2.Inspection"] = studioOptions.InspectionCapabilityEnabled,
+            ["Studio2.ResultsReview"] = studioOptions.ResultsReviewCapabilityEnabled,
+            ["Studio2.AiPanel"] = studioOptions.AiPanelCapabilityEnabled,
+            ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled,
+            ["Studio:NPointCalibrationWorkbenchEnabled"] = studioOptions.NPointCalibrationWorkbenchEnabled
+        };
+    }
+
     /// <summary>
     /// WebView2 初始化完成事件。
     /// </summary>
@@ -167,6 +294,11 @@ public sealed class WebView2Host : IAsyncDisposable
 
         try
         {
+            var startupPlan = _startupPlan ??= CreateStartupPlan(
+                Program.GetWebPort(),
+                _studioOptions,
+                GenerateCssVersion());
+
             // 配置用户数据文件夹
             var dataFolder = userDataFolder ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -190,13 +322,13 @@ public sealed class WebView2Host : IAsyncDisposable
             await _webView.EnsureCoreWebView2Async(_environment);
 
             // 配置 WebView2
-            await ConfigureWebView2Async();
+            await ConfigureWebView2Async(startupPlan);
 
             // 注册消息处理器
             RegisterMessageHandlers();
 
             // 加载初始页面
-            LoadInitialPage();
+            LoadInitialPage(startupPlan);
 
             _isInitialized = true;
 
@@ -213,8 +345,10 @@ public sealed class WebView2Host : IAsyncDisposable
     /// <summary>
     /// 配置 WebView2 设置。
     /// </summary>
-    private async Task ConfigureWebView2Async()
+    private async Task ConfigureWebView2Async(WebView2StartupPlan startupPlan)
     {
+        ArgumentNullException.ThrowIfNull(startupPlan);
+
         var core = _webView.CoreWebView2
             ?? throw new InvalidOperationException("WebView2 Core 尚未初始化");
         var settings = core.Settings;
@@ -232,38 +366,33 @@ public sealed class WebView2Host : IAsyncDisposable
         settings.IsStatusBarEnabled = false;
         settings.IsZoomControlEnabled = false;
 
-        // 启用本地文件访问（允许ES6模块加载）
-        core.SetVirtualHostNameToFolderMapping(
-            "app.local",
-            DesktopWebRootResolver.Resolve(),
-            CoreWebView2HostResourceAccessKind.Allow);
+        if (startupPlan.Decision.Kind == StudioStartupPageKind.Legacy &&
+            !string.IsNullOrWhiteSpace(startupPlan.Decision.RequiredFilePath))
+        {
+            // Legacy compatibility only. The active document still uses the
+            // localhost origin, and StudioUI never depends on this mapping.
+            var legacyWebRoot = Path.GetDirectoryName(startupPlan.Decision.RequiredFilePath);
+            if (!string.IsNullOrWhiteSpace(legacyWebRoot))
+            {
+                core.SetVirtualHostNameToFolderMapping(
+                    "app.local",
+                    legacyWebRoot,
+                    CoreWebView2HostResourceAccessKind.Allow);
+            }
+        }
 
 #if DEBUG
         await ClearDiskCacheAsync(core);
         System.Diagnostics.Debug.WriteLine("[WebView2Host] DEBUG模式：已清除 WebView2 缓存");
 #endif
 
-        // 注入 API 配置脚本和动态版本号（在每个文档创建时执行）
-        var apiPort = Program.GetWebPort();
-        var apiBaseUrl = $"http://localhost:{apiPort}/api";
-        var cssVersion = GenerateCssVersion();
-        var initScript = BuildStartupInjectionScript(
-            apiBaseUrl,
-            cssVersion,
-            _studioOptions.NodePreviewInspectorEnabled,
-            _studioOptions.PropertyPanelCapabilityEnabled,
-            _studioOptions.PreviewPanelCapabilityEnabled,
-            _studioOptions.GlobalVariablesCapabilityEnabled,
-            _studioOptions.SettingsCapabilityEnabled,
-            _studioOptions.ProjectPageCapabilityEnabled,
-            _studioOptions.InspectionCapabilityEnabled,
-            _studioOptions.ResultsReviewCapabilityEnabled,
-            _studioOptions.AiPanelCapabilityEnabled,
-            _studioOptions.CircleSearchV2ToolEnabled,
-            _studioOptions.NPointCalibrationWorkbenchEnabled);
-        await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
-        System.Diagnostics.Debug.WriteLine($"[WebView2Host] 已注入 API 配置脚本: {apiBaseUrl}");
-        System.Diagnostics.Debug.WriteLine($"[WebView2Host] CSS版本号: {cssVersion}");
+        if (!string.IsNullOrWhiteSpace(startupPlan.StartupInjectionScript))
+        {
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(
+                startupPlan.StartupInjectionScript);
+            System.Diagnostics.Debug.WriteLine(
+                $"[WebView2Host] 已注入 {startupPlan.Decision.Kind} 启动配置");
+        }
 
         // 新窗口处理：强制在当前窗口打开
         core.NewWindowRequested += (sender, e) =>
@@ -406,25 +535,26 @@ public sealed class WebView2Host : IAsyncDisposable
     /// <summary>
     /// 加载初始页面。
     /// </summary>
-    private void LoadInitialPage()
+    private void LoadInitialPage(WebView2StartupPlan startupPlan)
     {
-        var decision = StudioStartupPageResolver.Resolve();
-        if (decision.IsNavigable)
+        ArgumentNullException.ThrowIfNull(startupPlan);
+
+        if (startupPlan.InitialPageUri is not null)
         {
             // Keep the WebView2 document and API calls on the same localhost
             // origin. In packaged installs, app.local -> localhost can be
             // blocked or misreported as a missing backend.
-            _webView.Source = StudioStartupPageResolver.CreateInitialPageUri(
-                Program.GetWebPort(),
-                decision);
+            _webView.Source = startupPlan.InitialPageUri;
         }
         else
         {
-            _webView.CoreWebView2.NavigateToString(BuildStartupDiagnosticHtml(decision));
+            _webView.CoreWebView2.NavigateToString(
+                startupPlan.DiagnosticHtml ??
+                BuildStartupDiagnosticHtml(startupPlan.Decision));
         }
     }
 
-    private static string BuildStartupDiagnosticHtml(StudioStartupPageDecision decision)
+    internal static string BuildStartupDiagnosticHtml(StudioStartupPageDecision decision)
     {
         const string title = "ClearVision Product";
         var message = decision.DiagnosticMessage ?? "WebView2 已成功初始化，但未找到前端入口文件。";
@@ -454,7 +584,13 @@ public sealed class WebView2Host : IAsyncDisposable
                         background: #1f2937;
                     }
                     h1 { font-size: 24px; margin: 0 0 12px; }
-                    p { font-size: 14px; line-height: 1.7; margin: 0; color: #d1d5db; }
+                    p {
+                        font-size: 14px;
+                        line-height: 1.7;
+                        margin: 0;
+                        color: #d1d5db;
+                        white-space: pre-wrap;
+                    }
                 </style>
             </head>
             <body>
