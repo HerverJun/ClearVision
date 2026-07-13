@@ -42,7 +42,15 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 4. **Prompt 4｜Canvas 与 WebView2**：接入 existing FlowCanvas canonical adapter，完成 lifecycle/identity/interaction、runner 泛化、Debug/publish WebView2 和标准化性能 A/B。
 5. **Prompt 5｜最终收口**：完成全量回归、publish/no-Node 本机证据、架构守卫、用户视觉确认、GitHub Actions、最终报告和 F02 输入。
 
-每轮必须通过本轮门禁后才能进入下一轮。Prompt 1 完成后必须停止，不自动实现 Host 新入口、Design Lab 或 Canvas。
+每轮必须通过本轮门禁后才能进入下一轮，并在该轮停止边界处结束。当前 Prompt 2 完成后不自动实现 Design Lab 或 Canvas。
+
+## 当前进度
+
+- Prompt 1：`COMPLETE`。FrontendV2 已退役，StudioUI 独立 build/publish 地基和 legacy 回退基线已验证。
+- Prompt 2：`COMPLETE`。Desktop 已具备默认关闭的 `/studio` 启动选择、fail-closed 资产诊断、StudioStartupConfigV1、唯一 startup reader/WebView2 adapter/GET transport、Platform composition 和 `.csproj PerMonitorV2` DPI 代码权威。
+- Prompt 3：`NOT_STARTED`，但 `PROMPT_3_READY=YES`。
+
+Prompt 2 保持以下停止边界：没有实现 Design tokens/primitives、Design Foundation Lab、FlowCanvas、ImageCanvas、正式 App Shell、登录迁移、SSE/EventSource 或业务 capability。真实 WebView2、实际进程 DPI 查询、GitHub Actions 与干净 no-Node 目标机均如实记录为 `NOT RUN`。
 
 ## 阶段门禁
 
