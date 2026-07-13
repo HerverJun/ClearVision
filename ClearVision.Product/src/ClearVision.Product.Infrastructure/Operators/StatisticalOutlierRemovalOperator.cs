@@ -9,12 +9,12 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "统计滤波",
-    Description = "Statistical Outlier Removal (SOR) for point clouds.",
+    DisplayName = "点云统计离群点去除（SOR）",
+    Description = "对点云执行统计离群点去除（SOR），输出过滤点云、保留点数和移除点数。",
     Category = "3D",
     IconName = "filter",
-    Keywords = new[] { "PointCloud", "Filter", "Outlier", "SOR", "3D" },
-    Version = "1.0.0"
+    Keywords = new[] { "PointCloud", "Filter", "Outlier", "SOR", "3D", "统计滤波" },
+    Version = "1.0.1"
 )]
 [InputPort("PointCloud", "Point Cloud", PortDataType.Any, IsRequired = true)]
 [OutputPort("PointCloud", "Point Cloud", PortDataType.Any)]

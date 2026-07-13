@@ -94,8 +94,8 @@ public class PositionCorrectionOperatorTests
     public void Metadata_ShouldDescribePixelSpaceUsage()
     {
         var meta = (OperatorMetaAttribute)Attribute.GetCustomAttribute(typeof(PositionCorrectionOperator), typeof(OperatorMetaAttribute))!;
-        Assert.Contains("Pixel-space", meta.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("calibration", meta.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("像素", meta.Description, StringComparison.Ordinal);
+        Assert.Contains("标定", meta.Description, StringComparison.Ordinal);
     }
 
     private static Operator CreateOperator(Dictionary<string, object>? parameters = null)

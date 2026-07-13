@@ -1,6 +1,6 @@
 // PointAlignmentOperator.cs
-// 点集对齐算子
-// 计算源点集到目标点集的对齐变换
+// 点位偏差计算算子
+// 计算当前点相对参考点的偏差与距离
 // 作者：蘅芜君
 using System.Collections;
 using ClearVision.Product.Core.Attributes;
@@ -13,12 +13,12 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "点位对齐",
-    Description = "Pixel-space alignment helper for offsets and repeatability checks. Physical-world interpretation requires calibration.",
+    DisplayName = "点位偏差计算",
+    Description = "计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 PixelSize 换算 mm 前需确认标定尺度。",
     Category = "数据处理",
     IconName = "align-point",
-    Keywords = new[] { "alignment", "offset", "reference point", "distance" },
-    Version = "1.0.3"
+    Keywords = new[] { "alignment", "offset", "reference point", "distance", "点位对齐" },
+    Version = "1.0.4"
 )]
 [InputPort("CurrentPoint", "Current Point", PortDataType.Point, IsRequired = true)]
 [InputPort("ReferencePoint", "Reference Point", PortDataType.Point, IsRequired = true)]

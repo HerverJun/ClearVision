@@ -1,6 +1,6 @@
 // EdgePairDefectOperator.cs
-// 双边缘缺陷检测算子
-// 基于边缘对关系检测缺陷与异常
+// 边缘间距缺陷检测算子
+// 基于边缘对间距偏差检测缺陷
 // 作者：蘅芜君
 using System.Collections;
 using ClearVision.Product.Core.Attributes;
@@ -13,11 +13,12 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "边缘对缺陷",
-    Description = "Checks edge-pair spacing deviations against expected width.",
+    DisplayName = "边缘间距缺陷检测",
+    Description = "沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。",
     Category = "AI检测",
     IconName = "edge-pair-defect",
-    Keywords = new[] { "edge pair", "notch", "bump", "deviation" }
+    Keywords = new[] { "edge pair", "notch", "bump", "deviation", "边缘对缺陷" },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Line1", "Line 1", PortDataType.LineData, IsRequired = false)]

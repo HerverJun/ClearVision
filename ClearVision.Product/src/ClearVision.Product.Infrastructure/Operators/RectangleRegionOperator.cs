@@ -7,11 +7,12 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "矩形区域",
-    Description = "Outputs a rectangular geometry value for operators that consume Rectangle input ports.",
+    DisplayName = "矩形框定义",
+    Description = "根据 X、Y、宽度和高度参数生成 Rectangle 矩形框，供需要 Rectangle 输入的算子使用。",
     Category = "几何",
     IconName = "rectangle-region",
-    Keywords = new[] { "rectangle", "region", "search region", "caliper" }
+    Keywords = new[] { "rectangle", "region", "search region", "caliper", "矩形区域" },
+    Version = "1.0.1"
 )]
 [OutputPort("Rectangle", "Rectangle", PortDataType.Rectangle)]
 [OperatorParam("X", "X", "int", DefaultValue = 0, Min = 0)]

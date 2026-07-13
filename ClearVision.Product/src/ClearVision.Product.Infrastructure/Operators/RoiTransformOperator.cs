@@ -10,16 +10,16 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// Converts an upstream match pose (position/angle/scale) into a tracked ROI rectangle.
+/// Converts an upstream match pose (position/angle/scale) into a transformed ROI rectangle.
 /// Intended to "bridge" shape matching output with downstream measurement operators (e.g. CaliperTool).
 /// </summary>
 [OperatorMeta(
-    DisplayName = "ROI跟踪",
-    Description = "Transforms a base ROI using match pose (CenterX/CenterY/Angle/Scale) and outputs SearchRegion.",
+    DisplayName = "ROI位姿变换",
+    Description = "根据匹配位姿（中心、角度、尺度）变换基础 ROI，并输出矩形 SearchRegion。",
     Category = "辅助",
     IconName = "roi-track",
-    Keywords = new[] { "ROI", "track", "transform", "match", "pose", "SearchRegion" },
-    Version = "1.0.1"
+    Keywords = new[] { "ROI", "track", "transform", "match", "pose", "SearchRegion", "ROI跟踪" },
+    Version = "1.0.2"
 )]
 [AlgorithmInfo(
     Name = "Pose-driven ROI rectangle transform",

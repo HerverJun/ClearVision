@@ -263,8 +263,8 @@ public class PointCorrectionOperatorTests
     public void Metadata_ShouldDescribeCalibrationRequirement()
     {
         var meta = (OperatorMetaAttribute)Attribute.GetCustomAttribute(typeof(PointCorrectionOperator), typeof(OperatorMetaAttribute))!;
-        Assert.Contains("Pixel-space", meta.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("calibration", meta.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("像素空间", meta.Description, StringComparison.Ordinal);
+        Assert.Contains("标定", meta.Description, StringComparison.Ordinal);
     }
 
     private static PointCorrectionOperator CreateSut()

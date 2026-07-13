@@ -38,7 +38,7 @@ internal static class OperatorMetadataTextLocalization
             ["Morphology (Legacy)"] = "形态学（旧版）",
             ["Phase Closure"] = "相位闭合",
             ["Pixel To World Transform"] = "像素到世界坐标转换",
-            ["Planar Matching"] = "平面匹配",
+            ["Planar Matching"] = "平面特征匹配",
             ["Region Closing"] = "区域闭运算",
             ["Region Complement"] = "区域补集",
             ["Region Difference"] = "区域差集",

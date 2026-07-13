@@ -1,4 +1,4 @@
-# 位置修正 / PositionCorrection
+# ROI位姿补偿（像素） / PositionCorrection
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,12 +6,12 @@
 | 类名 (Class) | `PositionCorrectionOperator` |
 | 枚举值 (Enum) | `OperatorType.PositionCorrection` |
 | 分类 (Category) | 定位 |
-| 版本 (Version) | `1.0.2` |
+| 版本 (Version) | `1.0.3` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:定位`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Pixel-space ROI offset tool. Use calibration operators before treating the result as physical-world compensation。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -87,4 +87,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.3 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

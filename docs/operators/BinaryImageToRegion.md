@@ -1,70 +1,61 @@
-# 边缘间距缺陷检测 / EdgePairDefect
+# 二值图转区域 / BinaryImageToRegion
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
-| 类名 (Class) | `EdgePairDefectOperator` |
-| 枚举值 (Enum) | `OperatorType.EdgePairDefect` |
-| 分类 (Category) | AI检测 |
-| 版本 (Version) | `1.0.1` |
+| 类名 (Class) | `BinaryImageToRegionOperator` |
+| 枚举值 (Enum) | `OperatorType.BinaryImageToRegion` |
+| 分类 (Category) | 区域处理 |
+| 版本 (Version) | `1.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 可选输入用于覆盖或补充参数配置：`Line1`、`Line2`。
-- 参数解析覆盖 4 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 3 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
-- `Cv2.Line`
-- `Cv2.Circle`
-- `Cv2.PutText`
-- `Cv2.HoughLinesP`
-- `Cv2.CvtColor`
-- `Cv2.Sobel`
-- `Cv2.ConvertScaleAbs`
-- `Cv2.AddWeighted`
 - `Cv2.Threshold`
-- `Cv2.Canny`
-- `Math.Sqrt`
-- `Math.Max`
-- `Math.Ceiling`
+- `Cv2.BitwiseNot`
+- `Cv2.CvtColor`
+- `Cv2.ExtractChannel`
+- `Cv2.AddWeighted`
+- `Cv2.PutText`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ExpectedWidth` | Expected Width | `double` | 20 | [0, 100000] | Yes | - |
-| `Tolerance` | Tolerance | `double` | 2 | [0, 100000] | Yes | - |
-| `NumSamples` | Sample Count | `int` | 100 | [5, 5000] | Yes | - |
-| `EdgeMethod` | Edge Method | `enum` | Canny | Canny/Canny；Sobel/Sobel | Yes | - |
+| `ForegroundMode` | Foreground Mode | `enum` | NonZero | NonZero/Non-zero pixels；Threshold/Threshold or above | Yes | - |
+| `Threshold` | Threshold | `int` | 1 | [0, 255] | Yes | - |
+| `Invert` | Invert Foreground | `bool` | false | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `Line1` | Line 1 | `LineData` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
-| `Line2` | Line 2 | `LineData` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Image` | 二值图/掩膜 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `DefectCount` | Defect Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `MaxDeviation` | Max Deviation | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Deviations` | Deviations | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Region` | 像素区域 | `Region` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Image` | 可视化图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `Area` | 区域面积 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `RunCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -75,10 +66,9 @@
 | 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
-- 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
-- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -92,4 +82,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

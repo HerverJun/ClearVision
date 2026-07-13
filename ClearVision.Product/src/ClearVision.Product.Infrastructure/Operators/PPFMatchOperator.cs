@@ -10,12 +10,12 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "PPF表面匹配",
-    Description = "Simplified PPF-based 3D coarse surface matching (model -> scene pose). Intended for coarse pose alignment diagnostics.",
+    DisplayName = "PPF点云粗匹配",
+    Description = "基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定性诊断。",
     Category = "3D",
     IconName = "match3d",
-    Keywords = new[] { "PointCloud", "PPF", "Match", "Pose", "3D" },
-    Version = "1.0.4"
+    Keywords = new[] { "PointCloud", "PPF", "Match", "Pose", "3D", "PPF表面匹配" },
+    Version = "1.0.5"
 )]
 [InputPort("ModelPointCloud", "Model Point Cloud", PortDataType.Any, IsRequired = true)]
 [InputPort("ScenePointCloud", "Scene Point Cloud", PortDataType.Any, IsRequired = true)]

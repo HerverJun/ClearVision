@@ -27,13 +27,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
         "connector",
         "harness",
         "线序",
+        "线序判定",
         "顺序",
         "接线",
         "端子",
         "line-sequence",
         "judge"
     },
-    Tags = new[] { "experimental", "industrial-remediation", "sequence-judge" })]
+    Tags = new[] { "experimental", "industrial-remediation", "sequence-judge" },
+    Version = "1.0.1")]
 [InputPort("Detections", "检测结果", PortDataType.DetectionList, IsRequired = true)]
 [InputPort("SlotPoints", "槽位点", PortDataType.PointList, IsRequired = false)]
 [InputPort("PerspectiveSrcPoints", "透视源点", PortDataType.PointList, IsRequired = false)]

@@ -1,5 +1,5 @@
 // BlobLabelingOperator.cs
-// 连通域标注算子
+// Blob 分类标注算子
 using System.Collections;
 using System.Text.Json;
 using ClearVision.Product.Core.Attributes;
@@ -12,11 +12,12 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "连通域标注",
-    Description = "Classifies connected blobs by geometric features and draws labels.",
+    DisplayName = "Blob分类标注",
+    Description = "按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制标签。",
     Category = "定位",
     IconName = "blob-label",
-    Keywords = new[] { "blob", "label", "classify connected component" }
+    Keywords = new[] { "blob", "label", "classify connected component", "连通域标注" },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Blobs", "Blob结果列表", PortDataType.BlobList, IsRequired = false, Description = "BlobAnalysis.Blobs 输出的 Blob 结果列表；不是 Contour 或 Region。")]

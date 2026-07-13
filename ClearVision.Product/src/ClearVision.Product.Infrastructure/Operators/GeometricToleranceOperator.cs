@@ -11,13 +11,14 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "几何公差",
-    Description = "Evaluates a constrained 2D GD&T subset using feature/datum and tolerance-zone semantics.",
+    DisplayName = "二维几何公差判定",
+    Description = "基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定。",
     Category = "检测",
     IconName = "geometric-tolerance",
     Keywords = new[]
     {
         "公差",
+        "几何公差",
         "平行度",
         "垂直度",
         "位置度",
@@ -25,7 +26,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
         "GD&T",
         "Tolerance",
         "Datum"
-    }
+    },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = false)]
 [InputPort("FeaturePrimary", "Primary Feature", PortDataType.Any, IsRequired = true)]

@@ -1,17 +1,17 @@
-# Detection Sequence Judge / DetectionSequenceJudge
+# 检测顺序判定 / DetectionSequenceJudge
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `DetectionSequenceJudgeOperator` |
 | 枚举值 (Enum) | `OperatorType.DetectionSequenceJudge` |
-| 分类 (Category) | AI Inspection |
-| 版本 (Version) | `1.0.0` |
+| 分类 (Category) | AI 检测 |
+| 版本 (Version) | `1.0.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `experimental`, `industrial-remediation`, `sequence-judge`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Sorts detections and compares the resulting label order against an expected sequence。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -38,45 +38,45 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ExpectedLabels` | Expected Labels | `string` | "" | - | Yes | Comma-separated expected labels in order. |
-| `SortBy` | Sort By | `enum` | CenterX | CenterX/Center X；CenterY/Center Y；TopY/Top Y；Confidence/Confidence；Area/Area | Yes | Field used to sort detections before judging the sequence. |
-| `Direction` | Direction | `enum` | Ascending | Ascending/Ascending；Descending/Descending；LeftToRight/Left To Right；RightToLeft/Right To Left；TopToBottom/Top To Bottom；BottomToTop/Bottom To Top | Yes | Ordering direction after sorting. |
-| `ExpectedCount` | Expected Count | `int` | 0 | [0, 256] | Yes | Expected detection count. Use 0 to derive from ExpectedLabels. |
-| `MinConfidence` | Min Confidence | `double` | 0 | [0, 1] | Yes | Ignore detections below this confidence before sequence judgment. |
-| `AllowMissing` | Allow Missing | `bool` | false | - | Yes | Whether missing expected labels should still be treated as a match. |
-| `AllowDuplicate` | Allow Duplicate | `bool` | false | - | Yes | Whether duplicate labels should still be treated as a match. |
-| `GroupingMode` | Grouping Mode | `enum` | SingleRow | SingleRow/Single Row；RowCluster/Row Cluster；SlotAssignment/Slot Assignment；Auto/Auto | Yes | SingleRow keeps legacy sorting, RowCluster groups detections into rows, SlotAssignment assigns detections to expected slot points, Auto prefers slots when provided. |
-| `ExpectedSlots` | Expected Slots | `string` | "" | - | Yes | JSON array or shorthand x:y;x:y list of expected slot centers. |
-| `RowTolerance` | Row Tolerance | `double` | 0 | [0, 5000] | Yes | Maximum Y delta for row clustering. Use 0 for auto. |
-| `SlotTolerance` | Slot Tolerance | `double` | 0 | [0, 5000] | Yes | Maximum assignment distance to an expected slot. Use 0 for auto. |
-| `PerspectiveSrcPointsJson` | Perspective Source Points JSON | `string` | "" | - | Yes | Optional 4-point JSON array for perspective source points. |
-| `PerspectiveDstPointsJson` | Perspective Destination Points JSON | `string` | "" | - | Yes | Optional 4-point JSON array for perspective destination points. |
+| `ExpectedLabels` | 期望标签序列 | `string` | "" | - | Yes | 按顺序填写的期望标签，使用逗号分隔。 |
+| `SortBy` | 排序字段 | `enum` | CenterX | CenterX/中心 X；CenterY/中心 Y；TopY/顶部 Y；Confidence/置信度；Area/面积 | Yes | 判定前用于排序检测结果的字段。 |
+| `Direction` | 排序方向 | `enum` | Ascending | Ascending/升序；Descending/降序；LeftToRight/从左到右；RightToLeft/从右到左；TopToBottom/从上到下；BottomToTop/从下到上 | Yes | 排序后的方向。 |
+| `ExpectedCount` | 期望数量 | `int` | 0 | [0, 256] | Yes | 期望检测数量；为 0 时从期望标签序列推导。 |
+| `MinConfidence` | 最低置信度 | `double` | 0 | [0, 1] | Yes | 顺序判定前忽略低于该置信度的检测结果。 |
+| `AllowMissing` | 允许缺失 | `bool` | false | - | Yes | 期望标签缺失时是否仍判为匹配。 |
+| `AllowDuplicate` | 允许重复 | `bool` | false | - | Yes | 标签重复时是否仍判为匹配。 |
+| `GroupingMode` | 分组模式 | `enum` | SingleRow | SingleRow/单行；RowCluster/行聚类；SlotAssignment/槽位分配；Auto/Auto | Yes | SingleRow 使用单行排序，RowCluster 按行分组，SlotAssignment 按槽位分配，Auto 优先使用槽位。 |
+| `ExpectedSlots` | 期望槽位 | `string` | "" | - | Yes | 期望槽位中心点，支持 JSON 数组或 x:y;x:y 简写。 |
+| `RowTolerance` | 行容差 | `double` | 0 | [0, 5000] | Yes | 行聚类允许的最大 Y 偏差；0 表示自动。 |
+| `SlotTolerance` | 槽位容差 | `double` | 0 | [0, 5000] | Yes | 分配到期望槽位的最大距离；0 表示自动。 |
+| `PerspectiveSrcPointsJson` | 透视源点 JSON | `string` | "" | - | Yes | 可选的 4 点透视源点 JSON 数组。 |
+| `PerspectiveDstPointsJson` | 透视目标点 JSON | `string` | "" | - | Yes | 可选的 4 点透视目标点 JSON 数组。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Detections` | Detections | `DetectionList` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `SlotPoints` | Slot Points | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
-| `PerspectiveSrcPoints` | Perspective Source Points | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
-| `PerspectiveDstPoints` | Perspective Destination Points | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Detections` | 检测结果 | `DetectionList` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `SlotPoints` | 槽位点 | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `PerspectiveSrcPoints` | 透视源点 | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `PerspectiveDstPoints` | 透视目标点 | `PointList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `IsMatch` | Is Match | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `ActualOrder` | Actual Order | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `Count` | Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `MissingLabels` | Missing Labels | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `DuplicateLabels` | Duplicate Labels | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `SortedDetections` | Sorted Detections | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
-| `Assignment` | Assignment | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `UnassignedDetections` | Unassigned Detections | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
-| `SlotDistances` | Slot Distances | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `RowCount` | Row Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `PerspectiveApplied` | Perspective Applied | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `Diagnostics` | Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `Message` | Message | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `IsMatch` | 是否匹配 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `ActualOrder` | 实际顺序 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Count` | 数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `MissingLabels` | 缺失标签 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `DuplicateLabels` | 重复标签 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `SortedDetections` | 排序后检测 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
+| `Assignment` | 分配结果 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `UnassignedDetections` | 未分配检测 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
+| `SlotDistances` | 槽位距离 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `RowCount` | 行数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `PerspectiveApplied` | 已应用透视 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `Diagnostics` | 诊断信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Message` | 消息 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -125,4 +125,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

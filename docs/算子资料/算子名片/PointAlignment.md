@@ -1,4 +1,4 @@
-# 点位对齐 / PointAlignment
+# 点位偏差计算 / PointAlignment
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,12 +6,12 @@
 | 类名 (Class) | `PointAlignmentOperator` |
 | 枚举值 (Enum) | `OperatorType.PointAlignment` |
 | 分类 (Category) | 数据处理 |
-| 版本 (Version) | `1.0.3` |
+| 版本 (Version) | `1.0.4` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:定位`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Pixel-space alignment helper for offsets and repeatability checks. Physical-world interpretation requires calibration。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 PixelSize 换算 mm 前需确认标定尺度。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -73,4 +73,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.3 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.4 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

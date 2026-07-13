@@ -1,6 +1,6 @@
 // PointCorrectionOperator.cs
-// 点位修正算子
-// 根据参考点对输入坐标执行偏移修正
+// 点位刚性补偿算子
+// 根据检测点与参考点计算二维刚性补偿
 // 作者：蘅芜君
 using System.Collections;
 using ClearVision.Product.Core.Attributes;
@@ -13,12 +13,12 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "点位修正",
-    Description = "Pixel-space rigid correction helper. Do not use it as a physical-world conversion substitute without calibration.",
+    DisplayName = "点位刚性补偿",
+    Description = "根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 PixelSize 输出 mm 前需确认标定尺度。",
     Category = "数据处理",
     IconName = "point-correction",
-    Keywords = new[] { "correction", "compensation", "robot", "pick place" },
-    Version = "1.0.3"
+    Keywords = new[] { "correction", "compensation", "robot", "pick place", "点位修正" },
+    Version = "1.0.4"
 )]
 [InputPort("DetectedPoint", "Detected Point", PortDataType.Point, IsRequired = true)]
 [InputPort("DetectedAngle", "Detected Angle", PortDataType.Float, IsRequired = false)]

@@ -1,4 +1,4 @@
-# 连通域标注 / BlobLabeling
+# Blob分类标注 / BlobLabeling
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,12 +6,12 @@
 | 类名 (Class) | `BlobLabelingOperator` |
 | 枚举值 (Enum) | `OperatorType.BlobLabeling` |
 | 分类 (Category) | 定位 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Classifies connected blobs by geometric features and draws labels。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制标签。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -50,7 +50,7 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `Blobs` | Blobs | `Contour` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Blobs` | Blob结果列表 | `BlobList` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
@@ -97,4 +97,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

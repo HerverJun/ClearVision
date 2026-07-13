@@ -1,5 +1,5 @@
 // PlanarMatchingOperator.cs
-// 透视匹配算子 - 基于特征匹配和单应性估计的平面物体检测
+// 平面特征匹配算子 - 基于特征匹配和单应性估计的平面物体检测
 // 对标 Halcon: find_planar_uncalib_deformable_model
 // 作者：AI Assistant
 
@@ -15,16 +15,16 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 透视匹配算子 - 基于特征匹配和单应性估计的平面物体检测
+/// 平面特征匹配算子 - 基于特征匹配和单应性估计的平面物体检测
 /// 对标 Halcon find_planar_uncalib_deformable_model
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Planar Matching",
-    Description = "Feature-based planar matching with homography verification. Suitable for textured planar targets under perspective change.",
+    DisplayName = "平面特征匹配",
+    Description = "基于局部特征匹配和单应性验证定位纹理平面目标，输出投影角点、评分与诊断。",
     Category = "Matching",
     IconName = "planar-match",
-    Keywords = new[] { "Planar", "Matching", "Homography", "Perspective", "ORB", "AKAZE", "RANSAC" },
-    Version = "1.1.2"
+    Keywords = new[] { "Planar", "Matching", "Homography", "Perspective", "ORB", "AKAZE", "RANSAC", "透视匹配", "Planar Matching" },
+    Version = "1.1.3"
 )]
 [AlgorithmInfo(
     Name = "Feature homography planar matching",

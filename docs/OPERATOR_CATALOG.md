@@ -1,7 +1,7 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-10 11:21:26 +08:00`
-> 算子总数 / Total Operators: **156**
+> 生成时间 / Generated At: `2026-07-13 11:38:11 +08:00`
+> 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
 | 分类 (Category) | 数量 (Count) | 占比 (Ratio) |
@@ -16,34 +16,36 @@
 | Flow Control | 1 | 0.6% |
 | Frequency | 3 | 1.9% |
 | Morphology | 5 | 3.2% |
-| Region | 4 | 2.6% |
+| Region | 4 | 2.5% |
 | Texture | 2 | 1.3% |
+| 几何 | 1 | 0.6% |
 | 匹配定位 | 8 | 5.1% |
-| 变量 | 4 | 2.6% |
-| 图像处理 | 4 | 2.6% |
-| 定位 | 7 | 4.5% |
+| 区域处理 | 1 | 0.6% |
+| 变量 | 4 | 2.5% |
+| 图像处理 | 4 | 2.5% |
+| 定位 | 7 | 4.4% |
 | 拆分组合 | 2 | 1.3% |
-| 数据处理 | 10 | 6.4% |
-| 标定 | 12 | 7.7% |
-| 检测 | 18 | 11.5% |
+| 数据处理 | 10 | 6.3% |
+| 标定 | 12 | 7.6% |
+| 检测 | 18 | 11.4% |
 | 流程控制 | 5 | 3.2% |
-| 特征提取 | 4 | 2.6% |
+| 特征提取 | 4 | 2.5% |
 | 识别 | 2 | 1.3% |
 | 辅助 | 3 | 1.9% |
 | 输出 | 2 | 1.3% |
 | 通信 | 5 | 3.2% |
-| 通用 | 4 | 2.6% |
+| 通用 | 4 | 2.5% |
 | 逻辑工具 | 6 | 3.8% |
 | 采集 | 1 | 0.6% |
-| 预处理 | 23 | 14.7% |
+| 预处理 | 23 | 14.6% |
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.5**
+- 平均分 / Average: **95.3**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
-| B | 3 |
+| B | 5 |
 
 ## 分类索引 / Grouped Index
 
@@ -52,9 +54,9 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | 1 | 3 | 3 | 100 (A) | `1.0.0` | 当前元数据描述为：Euclidean Cluster Extraction for … | [EuclideanClusterExtraction](./operators/EuclideanClusterExtraction.md) |
 | `OperatorType.PPFEstimation` | PPF点对特征 | 1 | 3 | 3 | 95 (A) | `1.0.0` | 当前元数据描述为：Compute Point Pair Features (PPF)… | [PPFEstimation](./operators/PPFEstimation.md) |
-| `OperatorType.PPFMatch` | PPF表面匹配 | 2 | 16 | 10 | 95 (A) | `1.0.4` | 当前元数据描述为：Simplified PPF-based 3D coarse su… | [PPFMatch](./operators/PPFMatch.md) |
+| `OperatorType.PPFMatch` | PPF点云粗匹配 | 2 | 16 | 10 | 95 (A) | `1.0.5` | 该算子用于基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定… | [PPFMatch](./operators/PPFMatch.md) |
 | `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 1 | 8 | 4 | 95 (A) | `1.0.0` | 当前元数据描述为：RANSAC plane segmentation for poi… | [RansacPlaneSegmentation](./operators/RansacPlaneSegmentation.md) |
-| `OperatorType.StatisticalOutlierRemoval` | 统计滤波 | 1 | 3 | 2 | 95 (A) | `1.0.0` | 当前元数据描述为：Statistical Outlier Removal (SOR)… | [StatisticalOutlierRemoval](./operators/StatisticalOutlierRemoval.md) |
+| `OperatorType.StatisticalOutlierRemoval` | 点云统计离群点去除（SOR） | 1 | 3 | 2 | 95 (A) | `1.0.1` | 该算子用于对点云执行统计离群点去除（SOR），输出过滤点云、保留点数和移除点数。运行… | [StatisticalOutlierRemoval](./operators/StatisticalOutlierRemoval.md) |
 | `OperatorType.VoxelDownsample` | 体素下采样 | 1 | 2 | 1 | 95 (A) | `1.0.1` | Voxel grid centroid downsampling | [VoxelDownsample](./operators/VoxelDownsample.md) |
 
 ### AI Detection (1)
@@ -65,14 +67,14 @@
 ### AI 检测 (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | 4 | 13 | 13 | 100 (A) | `1.0.0` | 当前元数据描述为：Sorts detections and compares the… | [DetectionSequenceJudge](./operators/DetectionSequenceJudge.md) |
+| `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | 4 | 13 | 13 | 100 (A) | `1.0.1` | 该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按… | [DetectionSequenceJudge](./operators/DetectionSequenceJudge.md) |
 
 ### AI检测 (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AnomalyDetection` | 异常检测 | 2 | 8 | 16 | 100 (A) | `1.0.0` | Simplified PatchCore | [AnomalyDetection](./operators/AnomalyDetection.md) |
 | `OperatorType.DeepLearning` | 深度学习 | 1 | 14 | 14 | 100 (A) | `1.0.0` | 该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺… | [DeepLearning](./operators/DeepLearning.md) |
-| `OperatorType.EdgePairDefect` | 边缘对缺陷 | 3 | 4 | 4 | 96 (A) | `1.0.0` | 当前元数据描述为：Checks edge-pair spacing deviatio… | [EdgePairDefect](./operators/EdgePairDefect.md) |
+| `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | 3 | 4 | 4 | 96 (A) | `1.0.1` | 该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行… | [EdgePairDefect](./operators/EdgePairDefect.md) |
 | `OperatorType.SemanticSegmentation` | 语义分割 | 1 | 12 | 12 | 100 (A) | `1.0.0` | 当前元数据描述为：Runs an ONNX semantic segmentatio… | [SemanticSegmentation](./operators/SemanticSegmentation.md) |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | 2 | 8 | 24 | 100 (A) | `2.0.0` | 当前元数据描述为：Detects surface defects using gra… | [SurfaceDefectDetection](./operators/SurfaceDefectDetection.md) |
 
@@ -109,25 +111,30 @@
 ### Morphology (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology closing | [RegionClosing](./operators/RegionClosing.md) |
-| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology dilation | [RegionDilation](./operators/RegionDilation.md) |
-| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology erosion | [RegionErosion](./operators/RegionErosion.md) |
-| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology opening | [RegionOpening](./operators/RegionOpening.md) |
-| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 90 (A) | `1.0.1` | Zhang-Suen thinning | [RegionSkeleton](./operators/RegionSkeleton.md) |
+| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology closing | [RegionClosing](./operators/RegionClosing.md) |
+| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 90 (A) | `1.0.2` | Region morphology dilation | [RegionDilation](./operators/RegionDilation.md) |
+| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 90 (A) | `1.0.2` | Region morphology erosion | [RegionErosion](./operators/RegionErosion.md) |
+| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology opening | [RegionOpening](./operators/RegionOpening.md) |
+| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 90 (A) | `1.0.2` | Zhang-Suen thinning | [RegionSkeleton](./operators/RegionSkeleton.md) |
 
 ### Region (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 85 (A) | `1.0.1` | Bounded run-length complement | [RegionComplement](./operators/RegionComplement.md) |
-| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row subtraction | [RegionDifference](./operators/RegionDifference.md) |
-| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row intersection | [RegionIntersection](./operators/RegionIntersection.md) |
-| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length region union | [RegionUnion](./operators/RegionUnion.md) |
+| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 85 (A) | `1.0.2` | Bounded run-length complement | [RegionComplement](./operators/RegionComplement.md) |
+| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length row subtraction | [RegionDifference](./operators/RegionDifference.md) |
+| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length row intersection | [RegionIntersection](./operators/RegionIntersection.md) |
+| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length region union | [RegionUnion](./operators/RegionUnion.md) |
 
 ### Texture (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.GlcmTexture` | GLCM Texture Features | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./operators/GlcmTexture.md) |
 | `OperatorType.LawsTextureFilter` | Laws Texture Filter | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./operators/LawsTextureFilter.md) |
+
+### 几何 (1)
+| 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
+|------|------|------:|------:|------:|------|------|------|------|
+| `OperatorType.RectangleRegion` | 矩形框定义 | 0 | 1 | 4 | 84 (B) | `1.0.1` | 该算子用于根据 X、Y、宽度和高度参数生成 Rectangle 矩形框，供需要 Re… | [RectangleRegion](./operators/RectangleRegion.md) |
 
 ### 匹配定位 (8)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -136,18 +143,23 @@
 | `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 2 | 6 | 12 | 100 (A) | `1.1.0` | Gradient Direction Template Match | [GradientShapeMatch](./operators/GradientShapeMatch.md) |
 | `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 2 | 6 | 15 | 100 (A) | `1.1.1` | Coarse-to-fine local deformable matching | [LocalDeformableMatching](./operators/LocalDeformableMatching.md) |
 | `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 2 | 13 | 17 | 90 (A) | `1.0.0` | ORB Homography Feature Match | [OrbFeatureMatch](./operators/OrbFeatureMatch.md) |
-| `OperatorType.PlanarMatching` | Planar Matching | 2 | 19 | 20 | 100 (A) | `1.1.2` | Feature homography planar matching | [PlanarMatching](./operators/PlanarMatching.md) |
+| `OperatorType.PlanarMatching` | 平面特征匹配 | 2 | 19 | 20 | 100 (A) | `1.1.3` | Feature homography planar matching | [PlanarMatching](./operators/PlanarMatching.md) |
 | `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 2 | 5 | 15 | 100 (A) | `1.0.0` | LINEMOD Pyramid Shape Matching | [PyramidShapeMatch](./operators/PyramidShapeMatch.md) |
 | `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 2 | 2 | 13 | 100 (A) | `1.2.0` | 当前元数据描述为：Rotation-scale template matching … | [ShapeMatching](./operators/ShapeMatching.md) |
 | `OperatorType.TemplateMatching` | 模板匹配 | 3 | 13 | 20 | 96 (A) | `1.2.0` | 当前元数据描述为：Classic template matching with op… | [TemplateMatching](./operators/TemplateMatching.md) |
+
+### 区域处理 (1)
+| 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
+|------|------|------:|------:|------:|------|------|------|------|
+| `OperatorType.BinaryImageToRegion` | 二值图转区域 | 1 | 3 | 3 | 76 (B) | `1.1.0` | 该算子用于将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区… | [BinaryImageToRegion](./operators/BinaryImageToRegion.md) |
 
 ### 变量 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 96 (A) | `1.0.0` | 该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置… | [CycleCounter](./operators/CycleCounter.md) |
 | `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 7 | 100 (A) | `1.0.0` | 该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析… | [VariableIncrement](./operators/VariableIncrement.md) |
-| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 7 | 100 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./operators/VariableRead.md) |
-| `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 8 | 90 (A) | `1.0.0` | 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析… | [VariableWrite](./operators/VariableWrite.md) |
+| `OperatorType.VariableRead` | 变量读取 | 0 | 12 | 10 | 100 (A) | `1.0.0` | 该算子用于从单次运行变量或项目全局变量读取值。运行时从声明输入端口读取数据，按参数表… | [VariableRead](./operators/VariableRead.md) |
+| `OperatorType.VariableWrite` | 变量写入 | 1 | 11 | 12 | 90 (A) | `1.0.0` | 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析… | [VariableWrite](./operators/VariableWrite.md) |
 
 ### 图像处理 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -160,11 +172,11 @@
 ### 定位 (7)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.BlobLabeling` | 连通域标注 | 2 | 3 | 3 | 100 (A) | `1.0.0` | 当前元数据描述为：Classifies connected blobs by geo… | [BlobLabeling](./operators/BlobLabeling.md) |
+| `OperatorType.BlobLabeling` | Blob分类标注 | 2 | 3 | 3 | 100 (A) | `1.0.1` | 该算子用于按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制… | [BlobLabeling](./operators/BlobLabeling.md) |
 | `OperatorType.CornerDetection` | 角点检测 | 1 | 3 | 5 | 94 (A) | `1.0.0` | 当前元数据描述为：Detects corner points using Harri… | [CornerDetection](./operators/CornerDetection.md) |
 | `OperatorType.EdgeIntersection` | 边线交点 | 2 | 4 | 1 | 96 (A) | `1.0.0` | 当前元数据描述为：Computes line intersection and an… | [EdgeIntersection](./operators/EdgeIntersection.md) |
 | `OperatorType.ParallelLineFind` | 平行线查找 | 1 | 6 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Finds best pair of near-parallel … | [ParallelLineFind](./operators/ParallelLineFind.md) |
-| `OperatorType.PositionCorrection` | 位置修正 | 4 | 10 | 3 | 94 (A) | `1.0.2` | 当前元数据描述为：Pixel-space ROI offset tool. Use … | [PositionCorrection](./operators/PositionCorrection.md) |
+| `OperatorType.PositionCorrection` | ROI位姿补偿（像素） | 4 | 10 | 3 | 94 (A) | `1.0.3` | 该算子用于根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出… | [PositionCorrection](./operators/PositionCorrection.md) |
 | `OperatorType.QuadrilateralFind` | 四边形查找 | 1 | 6 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Finds quadrilateral contours with… | [QuadrilateralFind](./operators/QuadrilateralFind.md) |
 | `OperatorType.RectangleDetection` | 矩形检测 | 1 | 10 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Detects rectangular/quadrilateral… | [RectangleDetection](./operators/RectangleDetection.md) |
 
@@ -184,8 +196,8 @@
 | `OperatorType.DatabaseWrite` | 数据库写入 | 2 | 2 | 3 | 100 (A) | `1.0.0` | 该算子用于将输入数据写入 SQLite / SQL Server / MySQL 表… | [DatabaseWrite](./operators/DatabaseWrite.md) |
 | `OperatorType.JsonExtractor` | JSON 提取器 | 1 | 2 | 4 | 100 (A) | `1.0.0` | 该算子用于按 JSONPath 从字符串中提取字段。运行时从声明输入端口读取数据，按… | [JsonExtractor](./operators/JsonExtractor.md) |
 | `OperatorType.MathOperation` | 数值计算 | 2 | 2 | 1 | 100 (A) | `1.0.0` | 该算子用于支持加减乘除、取绝对值、开方等常用运算。运行时从声明输入端口读取数据，按参… | [MathOperation](./operators/MathOperation.md) |
-| `OperatorType.PointAlignment` | 点位对齐 | 2 | 3 | 2 | 96 (A) | `1.0.3` | 当前元数据描述为：Pixel-space alignment helper for … | [PointAlignment](./operators/PointAlignment.md) |
-| `OperatorType.PointCorrection` | 点位修正 | 4 | 5 | 4 | 96 (A) | `1.0.3` | 当前元数据描述为：Pixel-space rigid correction help… | [PointCorrection](./operators/PointCorrection.md) |
+| `OperatorType.PointAlignment` | 点位偏差计算 | 2 | 3 | 2 | 96 (A) | `1.0.4` | 该算子用于计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 Pi… | [PointAlignment](./operators/PointAlignment.md) |
+| `OperatorType.PointCorrection` | 点位刚性补偿 | 4 | 5 | 4 | 96 (A) | `1.0.4` | 该算子用于根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 P… | [PointCorrection](./operators/PointCorrection.md) |
 | `OperatorType.UnitConvert` | 单位换算 | 2 | 2 | 4 | 96 (A) | `1.0.0` | 当前元数据描述为：Converts value between pixel, mm,… | [UnitConvert](./operators/UnitConvert.md) |
 
 ### 标定 (12)
@@ -199,7 +211,7 @@
 | `OperatorType.HandEyeCalibration` | Hand-Eye Calibration | 2 | 7 | 4 | 100 (A) | `1.0.0` | OpenCV Hand-Eye Calibration | [HandEyeCalibration](./operators/HandEyeCalibration.md) |
 | `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 3 | 8 | 1 | 100 (A) | `1.0.1` | Hand-Eye Consistency Validation | [HandEyeCalibrationValidator](./operators/HandEyeCalibrationValidator.md) |
 | `OperatorType.NPointCalibration` | N Point Calibration | 1 | 9 | 10 | 100 (A) | `1.0.0` | 当前元数据描述为：Builds robust affine or homograph… | [NPointCalibration](./operators/NPointCalibration.md) |
-| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 3 | 3 | 9 | 100 (A) | `1.0.1` | 当前元数据描述为：Transforms coordinates via Calibr… | [PixelToWorldTransform](./operators/PixelToWorldTransform.md) |
+| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 3 | 3 | 11 | 100 (A) | `1.0.1` | 当前元数据描述为：Transforms coordinates via Calibr… | [PixelToWorldTransform](./operators/PixelToWorldTransform.md) |
 | `OperatorType.StereoCalibration` | Stereo Calibration | 2 | 6 | 11 | 100 (A) | `1.0.0` | 当前元数据描述为：Calibrates stereo camera pair and… | [StereoCalibration](./operators/StereoCalibration.md) |
 | `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 1 | 3 | 3 | 100 (A) | `1.0.0` | 当前元数据描述为：Fits robust 2D rigid or similarit… | [TranslationRotationCalibration](./operators/TranslationRotationCalibration.md) |
 | `OperatorType.Undistort` | Undistort | 2 | 1 | 0 | 91 (A) | `1.0.0` | 当前元数据描述为：Correct lens distortion using cal… | [Undistort](./operators/Undistort.md) |
@@ -214,7 +226,7 @@
 | `OperatorType.GapMeasurement` | 间隙测量 | 2 | 9 | 8 | 96 (A) | `1.0.0` | 当前元数据描述为：Measures spacing using points or … | [GapMeasurement](./operators/GapMeasurement.md) |
 | `OperatorType.GeoMeasurement` | 几何测量 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 当前元数据描述为：General geometry measurement betw… | [GeoMeasurement](./operators/GeoMeasurement.md) |
 | `OperatorType.GeometricFitting` | Geometric Fitting | 1 | 2 | 8 | 100 (A) | `1.0.0` | 当前元数据描述为：Fits line, circle or ellipse from… | [GeometricFitting](./operators/GeometricFitting.md) |
-| `OperatorType.GeometricTolerance` | 几何公差 | 5 | 7 | 5 | 96 (A) | `1.0.0` | 当前元数据描述为：Evaluates a constrained 2D GD&T s… | [GeometricTolerance](./operators/GeometricTolerance.md) |
+| `OperatorType.GeometricTolerance` | 二维几何公差判定 | 5 | 7 | 5 | 96 (A) | `1.0.1` | 该算子用于基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定… | [GeometricTolerance](./operators/GeometricTolerance.md) |
 | `OperatorType.HistogramAnalysis` | 直方图分析 | 1 | 11 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Computes histogram and intensity-… | [HistogramAnalysis](./operators/HistogramAnalysis.md) |
 | `OperatorType.LineLineDistance` | 线线距离 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 当前元数据描述为：Computes distance and angle betwe… | [LineLineDistance](./operators/LineLineDistance.md) |
 | `OperatorType.LineMeasurement` | 直线测量 | 1 | 5 | 4 | 96 (A) | `1.0.0` | 当前元数据描述为：Detects line features and reports… | [LineMeasurement](./operators/LineMeasurement.md) |
@@ -230,7 +242,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 89 (A) | `1.0.0` | 该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数… | [Comparator](./operators/Comparator.md) |
-| `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 100 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./operators/ConditionalBranch.md) |
+| `OperatorType.ConditionalBranch` | 条件分支 | 2 | 5 | 12 | 100 (A) | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./operators/ConditionalBranch.md) |
 | `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 94 (A) | `1.0.0` | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | [Delay](./operators/Delay.md) |
 | `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./operators/ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配… | [TryCatch](./operators/TryCatch.md) |
@@ -238,7 +250,7 @@
 ### 特征提取 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.BlobAnalysis` | Blob分析 | 2 | 4 | 17 | 100 (A) | `1.1.0` | 该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [BlobAnalysis](./operators/BlobAnalysis.md) |
+| `OperatorType.BlobAnalysis` | Blob分析 | 2 | 4 | 17 | 100 (A) | `1.2.1` | 该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [BlobAnalysis](./operators/BlobAnalysis.md) |
 | `OperatorType.ContourDetection` | 轮廓检测 | 1 | 3 | 11 | 94 (A) | `1.0.0` | 该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输… | [ContourDetection](./operators/ContourDetection.md) |
 | `OperatorType.EdgeDetection` | Edge Detection | 1 | 2 | 14 | 100 (A) | `1.0.0` | 当前元数据描述为：Detects edges with Canny and opti… | [EdgeDetection](./operators/EdgeDetection.md) |
 | `OperatorType.SubpixelEdgeDetection` | Subpixel Edge Detection | 1 | 2 | 5 | 94 (A) | `1.0.0` | 当前元数据描述为：Non-industrial reference subpixel… | [SubpixelEdgeDetection](./operators/SubpixelEdgeDetection.md) |
@@ -254,7 +266,7 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Comment` | 注释 | 1 | 2 | 1 | 90 (A) | `1.0.1` | Workflow annotation passthrough | [Comment](./operators/Comment.md) |
 | `OperatorType.RoiManager` | ROI管理器 | 1 | 3 | 10 | 100 (A) | `1.0.0` | 该算子用于矩形/圆形/多边形区域选择。运行时从声明输入端口读取数据，按参数表解析配置… | [RoiManager](./operators/RoiManager.md) |
-| `OperatorType.RoiTransform` | ROI跟踪 | 2 | 1 | 1 | 96 (A) | `1.0.1` | Pose-driven ROI rectangle transform | [RoiTransform](./operators/RoiTransform.md) |
+| `OperatorType.RoiTransform` | ROI位姿变换 | 2 | 1 | 1 | 96 (A) | `1.0.2` | Pose-driven ROI rectangle transform | [RoiTransform](./operators/RoiTransform.md) |
 
 ### 输出 (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -267,9 +279,9 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.HttpRequest` | HTTP 请求 | 2 | 3 | 6 | 100 (A) | `1.0.0` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./operators/HttpRequest.md) |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 1 | 2 | 13 | 98 (A) | `1.0.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
-| `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
+| `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 9 | 100 (A) | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
 | `OperatorType.SiemensS7Communication` | 西门子S7通信 | 1 | 2 | 15 | 98 (A) | `1.0.0` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./operators/SiemensS7Communication.md) |
-| `OperatorType.TcpCommunication` | TCP通信 | 1 | 2 | 6 | 100 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
+| `OperatorType.TcpCommunication` | TCP通信 | 1 | 12 | 39 | 100 (A) | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
 
 ### 通用 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -307,7 +319,7 @@
 | `OperatorType.ImageAdd` | 图像加法 | 2 | 1 | 6 | 100 (A) | `1.0.0` | 该算子用于两幅图像叠加/合并。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageAdd](./operators/ImageAdd.md) |
 | `OperatorType.ImageBlend` | 图像融合 | 2 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageBlend](./operators/ImageBlend.md) |
 | `OperatorType.ImageCrop` | 图像裁剪 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于ROI区域提取。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [ImageCrop](./operators/ImageCrop.md) |
-| `OperatorType.ImageDiff` | 图像对比 | 2 | 2 | 0 | 89 (A) | `1.0.0` | 该算子用于分析两幅图像的差异。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageDiff](./operators/ImageDiff.md) |
+| `OperatorType.ImageDiff` | 图像差异率分析 | 2 | 2 | 0 | 89 (A) | `1.0.1` | 该算子用于计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。运行时从声明输入端… | [ImageDiff](./operators/ImageDiff.md) |
 | `OperatorType.ImageNormalize` | 图像归一化 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Normalizes pixel distribution for… | [ImageNormalize](./operators/ImageNormalize.md) |
 | `OperatorType.ImageResize` | 图像缩放 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于调整图像尺寸。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageResize](./operators/ImageResize.md) |
 | `OperatorType.ImageRotate` | 图像旋转 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于任意角度旋转。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageRotate](./operators/ImageRotate.md) |
@@ -316,7 +328,7 @@
 | `OperatorType.MeanFilter` | 均值滤波 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 当前元数据描述为：Applies mean (box blur) filtering… | [MeanFilter](./operators/MeanFilter.md) |
 | `OperatorType.MedianBlur` | 中值滤波 | 1 | 1 | 1 | 94 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./operators/MedianBlur.md) |
 | `OperatorType.MorphologicalOperation` | Morphological Operation | 1 | 1 | 7 | 94 (A) | `1.0.0` | 当前元数据描述为：Erode, Dilate, Open, Close, Gradi… | [MorphologicalOperation](./operators/MorphologicalOperation.md) |
-| `OperatorType.Morphology` | Morphology (Legacy) | 1 | 1 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Legacy image morphology node. Use… | [Morphology](./operators/Morphology.md) |
+| `OperatorType.Morphology` | 形态学（旧版） | 1 | 1 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Legacy image morphology node. Use… | [Morphology](./operators/Morphology.md) |
 | `OperatorType.PerspectiveTransform` | 透视变换 | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./operators/PerspectiveTransform.md) |
 | `OperatorType.ShadingCorrection` | 光照校正 | 2 | 1 | 3 | 96 (A) | `1.0.0` | 当前元数据描述为：Corrects uneven illumination by b… | [ShadingCorrection](./operators/ShadingCorrection.md) |
 | `OperatorType.Thresholding` | Threshold | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Global thresholding with optional… | [Thresholding](./operators/Thresholding.md) |
@@ -324,5 +336,5 @@
 ### 颜色处理 (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ColorDetection` | 颜色检测 | 2 | 10 | 18 | 96 (A) | `2.0.0` | 当前元数据描述为：Supports compatibility color anal… | [ColorDetection](./operators/ColorDetection.md) |
+| `OperatorType.ColorDetection` | 颜色分析 | 2 | 10 | 18 | 96 (A) | `2.0.1` | 该算子用于对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab De… | [ColorDetection](./operators/ColorDetection.md) |
 | `OperatorType.ColorMeasurement` | 颜色测量 | 2 | 8 | 9 | 96 (A) | `2.0.0` | 当前元数据描述为：Measures Lab delta-E or HSV stati… | [ColorMeasurement](./operators/ColorMeasurement.md) |

@@ -258,7 +258,7 @@ public class AnalysisDataBuilderTests
 
         var sequenceCard = cards.Single(card => ReadString(card, "sourceOperatorType") == "DetectionSequenceJudge");
         ReadString(sequenceCard, "category").Should().Be("diagnostic");
-        ReadString(sequenceCard, "title").Should().Be("线序判定");
+        ReadString(sequenceCard, "title").Should().Be("检测顺序判定");
         ReadString(sequenceCard, "status").Should().Be("OK");
         ReadString(sequenceCard, "message").Should().Contain("Sequence matched");
 

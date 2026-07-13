@@ -481,7 +481,7 @@ public class DetectionSequenceJudgeAnalysisCardMapper : IAnalysisCardMapper
             Category = "diagnostic",
             SourceOperatorId = @operator.Id,
             SourceOperatorType = @operator.Type.ToString(),
-            Title = "线序判定",
+            Title = "检测顺序判定",
             Status = status,
             Priority = status == "OK" ? 140 : 170,
             Message = message,

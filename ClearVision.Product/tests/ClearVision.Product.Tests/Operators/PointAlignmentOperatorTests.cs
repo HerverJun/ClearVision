@@ -150,8 +150,8 @@ public class PointAlignmentOperatorTests
     public void Metadata_ShouldDescribeCalibrationRequirement()
     {
         var meta = (OperatorMetaAttribute)Attribute.GetCustomAttribute(typeof(PointAlignmentOperator), typeof(OperatorMetaAttribute))!;
-        Assert.Contains("Pixel-space", meta.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("calibration", meta.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("像素空间", meta.Description, StringComparison.Ordinal);
+        Assert.Contains("标定", meta.Description, StringComparison.Ordinal);
     }
 
     private static PointAlignmentOperator CreateSut()

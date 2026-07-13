@@ -1,6 +1,6 @@
 // PositionCorrectionOperator.cs
-// 位置修正算子
-// 基于偏差模型对目标位置进行校正
+// ROI 位姿补偿算子
+// 基于像素偏差对 ROI 坐标执行位姿补偿
 // 作者：蘅芜君
 using System.Collections;
 using ClearVision.Product.Core.Attributes;
@@ -14,12 +14,12 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "位置修正",
-    Description = "Pixel-space ROI offset tool. Use calibration operators before treating the result as physical-world compensation.",
+    DisplayName = "ROI位姿补偿（像素）",
+    Description = "根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。",
     Category = "定位",
     IconName = "position",
-    Keywords = new[] { "position correction", "roi offset", "translation", "rotation" },
-    Version = "1.0.2"
+    Keywords = new[] { "position correction", "roi offset", "translation", "rotation", "位置修正" },
+    Version = "1.0.3"
 )]
 [InputPort("ReferencePoint", "Reference Point", PortDataType.Point, IsRequired = true)]
 [InputPort("BasePoint", "Base Point", PortDataType.Point, IsRequired = true)]

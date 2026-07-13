@@ -9,12 +9,13 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "颜色检测",
-    Description = "Supports compatibility color analysis plus HSV inspection and Lab DeltaE inspection.",
+    DisplayName = "颜色分析",
+    Description = "对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。",
     Category = "颜色处理",
     IconName = "color",
+    Keywords = new[] { "color", "analysis", "HSV", "Lab", "DeltaE", "颜色检测" },
     Tags = new[] { "experimental", "industrial-remediation", "color-inspection" },
-    Version = "2.0.0"
+    Version = "2.0.1"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [InputPort("ReferenceColor", "Reference Color", PortDataType.Any, IsRequired = false)]

@@ -1,5 +1,5 @@
 // ImageDiffOperator.cs
-// 图像对比算子实现
+// 图像差异率分析算子实现
 // 作者：蘅芜君
 
 using ClearVision.Product.Core.Attributes;
@@ -12,13 +12,15 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 图像对比算子 - 差分分析
+/// 图像差异率分析算子
 /// </summary>
 [OperatorMeta(
-    DisplayName = "图像对比",
-    Description = "分析两幅图像的差异",
+    DisplayName = "图像差异率分析",
+    Description = "计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。",
     Category = "预处理",
-    IconName = "diff"
+    IconName = "diff",
+    Keywords = new[] { "image diff", "difference rate", "absolute difference", "图像对比" },
+    Version = "1.0.1"
 )]
 [InputPort("BaseImage", "基准图", PortDataType.Image, IsRequired = true)]
 [InputPort("CompareImage", "对比图", PortDataType.Image, IsRequired = true)]

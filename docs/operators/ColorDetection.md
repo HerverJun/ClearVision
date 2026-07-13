@@ -1,4 +1,4 @@
-# 颜色检测 / ColorDetection
+# 颜色分析 / ColorDetection
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,12 +6,12 @@
 | 类名 (Class) | `ColorDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.ColorDetection` |
 | 分类 (Category) | 颜色处理 |
-| 版本 (Version) | `2.0.0` |
+| 版本 (Version) | `2.0.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `color-inspection`, `experimental`, `industrial-remediation`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Supports compatibility color analysis plus HSV inspection and Lab DeltaE inspection。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -132,4 +132,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 2.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
