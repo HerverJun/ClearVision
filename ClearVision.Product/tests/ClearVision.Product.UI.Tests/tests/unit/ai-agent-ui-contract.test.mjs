@@ -1768,7 +1768,13 @@ test('AI agent workspace uses corrected operator display names', async () => {
     Thresholding: '全局阈值处理',
     FFT1D: '信号/图像傅里叶变换（FFT）',
     InverseFFT1D: '信号/图像逆傅里叶变换（IFFT）',
-    PhaseClosure: '相位解缠绕'
+    PhaseClosure: '相位解缠绕',
+    DeepLearning: '深度学习',
+    GeoMeasurement: '几何测量',
+    Measurement: '测量',
+    TcpCommunication: 'TCP通信',
+    ImageAdd: '图像加法',
+    BlobAnalysis: 'Blob分析'
   };
 
   for (const [operatorType, displayName] of Object.entries(expectedNames)) {

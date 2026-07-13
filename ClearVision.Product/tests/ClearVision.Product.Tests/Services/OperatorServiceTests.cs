@@ -25,6 +25,23 @@ public class OperatorServiceTests
     }
 
     [Fact]
+    public async Task GetLibraryAsync_DisplayNames_ShouldMatchFactoryMetadata()
+    {
+        var factory = new OperatorFactory();
+        var sut = new OperatorService(Substitute.For<IOperatorRepository>(), factory);
+        var library = (await sut.GetLibraryAsync())
+            .ToDictionary(item => item.Type, StringComparer.Ordinal);
+
+        foreach (var metadata in factory.GetAllMetadata())
+        {
+            library.Should().ContainKey(metadata.Type.ToString());
+            library[metadata.Type.ToString()].DisplayName.Should().Be(
+                metadata.DisplayName,
+                metadata.Type.ToString());
+        }
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_ForAnomalyDetection_ShouldExposeFactoryParameters()
     {
         var sut = CreateSut();

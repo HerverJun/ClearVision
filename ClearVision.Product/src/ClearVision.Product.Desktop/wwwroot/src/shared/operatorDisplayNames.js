@@ -26,25 +26,25 @@ export const OPERATOR_DISPLAY_NAMES = Object.freeze({
     PhaseClosure: '相位解缠绕',
     TemplateMatching: '模板匹配',
     TemplateMatch: '模板匹配',
-    DeepLearning: '深度学习检测',
+    DeepLearning: '深度学习',
     CircleMeasurement: '圆测量',
-    GeoMeasurement: '几何距离测量',
-    Measurement: '几何测量',
+    GeoMeasurement: '几何测量',
+    Measurement: '测量',
     MeasureDistance: '距离测量',
     UnitConvert: '单位换算',
     ConditionJudge: '条件判断',
     ResultJudgment: '结果判定',
     ResultOutput: '结果输出',
-    TcpCommunication: 'TCP通讯',
+    TcpCommunication: 'TCP通信',
     SurfaceDefectDetection: '表面缺陷检测',
-    ImageAdd: '图像叠加',
-    ImageCompose: '图像合成',
-    BlobAnalysis: '斑点分析',
+    ImageAdd: '图像加法',
+    ImageCompose: '图像组合',
+    BlobAnalysis: 'Blob分析',
     BinaryImageToRegion: '二值图转区域',
     RegionClosing: '区域闭运算',
     Grayscale: '灰度化',
     GaussianBlur: '高斯滤波',
-    Filtering: '滤波处理'
+    Filtering: '滤波'
 });
 
 export const PARAMETER_DISPLAY_NAMES = Object.freeze({

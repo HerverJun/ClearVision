@@ -4,27 +4,27 @@ internal static class VisionAgentReadOnlyCatalog
 {
     public static IReadOnlyList<OperatorCatalogItem> Operators { get; } =
     [
-        new("ImageAcquisition", "Image Acquisition", "image", "Provides a camera/file image input node; agent read-only tools never capture frames.", ["image", "camera", "input", "acquisition"]),
-        new("Filtering", "Filtering", "image", "Applies Gaussian, mean/box, median, or bilateral spatial smoothing according to FilterMode.", ["filter", "gaussian", "mean", "median", "bilateral", "denoise"]),
-        new("RoiManager", "ROI Manager", "roi", "Defines named regions of interest for downstream inspection.", ["roi", "region", "crop"]),
-        new("TemplateMatching", "Template Matching", "matching", "Finds a known pattern by template and score.", ["template", "matching", "alignment", "position"]),
-        new("BlobAnalysis", "Blob Analysis", "vision", "Describes connected-component inspection metadata without reading images.", ["blob", "area", "count"]),
-        new("Thresholding", "Thresholding", "vision", "Defines threshold metadata for binary segmentation review.", ["threshold", "binary", "segmentation"]),
-        new("EdgeDetection", "Edge Detection", "vision", "Defines edge extraction metadata for dry-run validation.", ["edge", "gradient", "contour"]),
-        new("ShapeMatching", "Shape Matching", "matching", "Finds a shape by catalog template metadata.", ["shape", "matching", "template"]),
-        new("DeepLearning", "Deep Learning", "ai", "Runs ONNX object detection, image classification, or semantic segmentation according to TaskType.", ["model", "onnx", "detection", "classification", "segmentation", "defect"]),
-        new("SemanticSegmentation", "Semantic Segmentation", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask"]),
-        new("SurfaceDefectDetection", "Surface Defect Detection", "ai", "Traditional surface defect metadata without loading model files.", ["defect", "surface", "scratch"]),
-        new("CircleMeasurement", "Circle Measurement", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter"]),
-        new("Measurement", "Measurement", "measurement", "Measures point-point, point-line, line-line distance, or a three-point angle according to MeasureType.", ["distance", "angle", "point", "line", "measurement"]),
-        new("UnitConvert", "Unit Convert", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement"]),
-        new("DetectionSequenceJudge", "检测顺序判定", "logic", "检查检测标签顺序，适用于端子线序检测。", ["wire", "sequence", "terminal", "order"]),
-        new("ImageAdd", "Image Add", "image", "Combines images using the real ImageAdd operator.", ["compose", "multi-camera"]),
-        new("ResultJudgment", "Result Judgment", "logic", "Evaluates pass/fail conditions using Value/Confidence inputs.", ["judgment", "pass", "fail", "tolerance"]),
-        new("ResultOutput", "Result Output", "output", "Summarizes inspection result payloads.", ["output", "result", "mes", "plc"]),
-        new("ModbusCommunication", "Modbus Communication", "communication", "Forbidden preview communication metadata; dry-run only.", ["modbus", "plc", "forbidden"]),
-        new("HttpRequest", "HTTP Request", "communication", "Forbidden preview network metadata; dry-run only.", ["http", "network", "forbidden"]),
-        new("ScriptOperator", "Script Operator", "logic", "Forbidden preview script metadata; dry-run only.", ["script", "command", "forbidden"])
+        new("ImageAcquisition", "图像采集", "image", "Provides a camera/file image input node; agent read-only tools never capture frames.", ["image", "camera", "input", "acquisition", "Image Acquisition"]),
+        new("Filtering", "滤波", "image", "Applies Gaussian, mean/box, median, or bilateral spatial smoothing according to FilterMode.", ["filter", "gaussian", "mean", "median", "bilateral", "denoise", "Filtering", "滤波处理"]),
+        new("RoiManager", "ROI裁剪与掩膜", "roi", "Crops a rectangular/circular/polygon ROI or applies its mask and exposes spatial context for downstream inspection.", ["roi", "region", "crop", "mask", "ROI Manager", "ROI管理器", "ROI管理"]),
+        new("TemplateMatching", "模板匹配", "matching", "Finds a known pattern by template and score.", ["template", "matching", "alignment", "position", "Template Matching"]),
+        new("BlobAnalysis", "Blob分析", "vision", "Describes connected-component inspection metadata without reading images.", ["blob", "area", "count", "Blob Analysis", "斑点分析"]),
+        new("Thresholding", "全局阈值处理", "vision", "Defines global threshold metadata, including binary, truncation, ToZero, Otsu, and Triangle modes.", ["threshold", "binary", "segmentation", "Thresholding", "二值化", "阈值分割"]),
+        new("EdgeDetection", "边缘检测", "vision", "Defines edge extraction metadata for dry-run validation.", ["edge", "gradient", "contour", "Edge Detection"]),
+        new("ShapeMatching", "旋转尺度模板匹配", "matching", "Finds a template by coarse-to-fine rotation and scale search.", ["shape", "matching", "template", "Shape Matching"]),
+        new("DeepLearning", "深度学习", "ai", "Runs ONNX object detection, image classification, or semantic segmentation according to TaskType.", ["model", "onnx", "detection", "classification", "segmentation", "defect", "Deep Learning", "深度学习检测", "深度学习推理"]),
+        new("SemanticSegmentation", "语义分割", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask", "Semantic Segmentation"]),
+        new("SurfaceDefectDetection", "表面缺陷检测", "ai", "Traditional surface defect metadata without loading model files.", ["defect", "surface", "scratch", "Surface Defect Detection"]),
+        new("CircleMeasurement", "圆测量", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter", "Circle Measurement"]),
+        new("Measurement", "测量", "measurement", "Measures point-point, point-line, line-line distance, or a three-point angle according to MeasureType.", ["distance", "angle", "point", "line", "measurement", "Measurement", "几何测量"]),
+        new("UnitConvert", "单位换算", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement", "Unit Convert"]),
+        new("DetectionSequenceJudge", "检测顺序判定", "logic", "检查检测标签顺序，适用于端子线序检测。", ["wire", "sequence", "terminal", "order", "线序判定", "序列判定"]),
+        new("ImageAdd", "图像加法", "image", "Combines two images using weighted addition and optional offset.", ["compose", "multi-camera", "Image Add", "图像叠加"]),
+        new("ResultJudgment", "结果判定", "logic", "Evaluates pass/fail conditions using Value/Confidence inputs.", ["judgment", "pass", "fail", "tolerance", "Result Judgment"]),
+        new("ResultOutput", "结果输出", "output", "Summarizes inspection result payloads.", ["output", "result", "mes", "plc", "Result Output"]),
+        new("ModbusCommunication", "Modbus TCP通信", "communication", "Describes Modbus TCP read/write metadata for dry-run review; RTU is not executed by this operator.", ["modbus", "plc", "forbidden", "Modbus Communication", "Modbus通信"]),
+        new("HttpRequest", "HTTP 请求", "communication", "Forbidden preview network metadata; dry-run only.", ["http", "network", "forbidden", "HTTP Request", "HTTP请求"]),
+        new("ScriptOperator", "脚本算子", "logic", "Forbidden preview script metadata; dry-run only.", ["script", "command", "forbidden", "Script Operator"])
     ];
 
     public static IReadOnlyDictionary<string, OperatorSchemaItem> Schemas { get; } =

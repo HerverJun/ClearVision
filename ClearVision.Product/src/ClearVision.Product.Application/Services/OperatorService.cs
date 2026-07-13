@@ -152,10 +152,10 @@ public class OperatorService : IOperatorService
             {
                 Id = Guid.NewGuid(),
                 Type = "Morphology",
-                DisplayName = "形态学",
+                DisplayName = "形态学（旧版）",
                 Category = "预处理",
                 Icon = "🔄",
-                Description = "腐蚀、膨胀、开闭运算",
+                Description = "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
                 Inputs = new List<PortDefinitionDto>
                 {
                     new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }

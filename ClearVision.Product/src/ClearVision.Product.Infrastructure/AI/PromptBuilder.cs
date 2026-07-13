@@ -777,7 +777,7 @@ public class PromptBuilder
           "explanation": "Load calibration data, convert the pixel point into physical coordinates, and output the converted values. The calibration file path needs review.",
           "operators": [
             {"tempId": "op_1", "operatorType": "CalibrationLoader", "displayName": "Calibration Loader", "parameters": {"FilePath": "calibration_bundle_v2.json"}},
-            {"tempId": "op_2", "operatorType": "CoordinateTransform", "displayName": "Coordinate Transform", "parameters": {"PixelX": "120", "PixelY": "160"}},
+            {"tempId": "op_2", "operatorType": "CoordinateTransform", "displayName": "像素到物理坐标（单点）", "parameters": {"PixelX": "120", "PixelY": "160"}},
             {"tempId": "op_3", "operatorType": "ResultOutput", "displayName": "Result Output", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [

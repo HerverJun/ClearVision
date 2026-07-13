@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Attributes;
@@ -43,6 +44,40 @@ public sealed class OperatorNamingSemanticContractTests
         new(OperatorType.PhaseClosure, typeof(PhaseClosureOperator), 254, "相位解缠绕", "Phase Closure", 4, 4, 0, ["相位闭合"])
     ];
 
+    private static readonly IReadOnlyDictionary<OperatorType, string[]> CompatibilitySearchAliases =
+        new Dictionary<OperatorType, string[]>
+        {
+            [OperatorType.ImageAcquisition] = ["Image Acquisition"],
+            [OperatorType.Filtering] = ["Filtering", "滤波处理"],
+            [OperatorType.RoiManager] = ["ROI管理", "ROI Manager"],
+            [OperatorType.TemplateMatching] = ["Template Matching"],
+            [OperatorType.BlobAnalysis] = ["Blob Analysis", "斑点分析"],
+            [OperatorType.EdgeDetection] = ["Edge Detection"],
+            [OperatorType.ShapeMatching] = ["Shape Matching"],
+            [OperatorType.DeepLearning] = ["Deep Learning", "深度学习检测", "深度学习推理"],
+            [OperatorType.SemanticSegmentation] = ["Semantic Segmentation"],
+            [OperatorType.SurfaceDefectDetection] = ["Surface Defect Detection"],
+            [OperatorType.CircleMeasurement] = ["Circle Measurement"],
+            [OperatorType.Measurement] = ["Measurement", "几何测量"],
+            [OperatorType.UnitConvert] = ["Unit Convert"],
+            [OperatorType.DetectionSequenceJudge] = ["序列判定"],
+            [OperatorType.ImageAdd] = ["Image Add", "图像叠加"],
+            [OperatorType.ImageCompose] = ["图像合成"],
+            [OperatorType.ResultJudgment] = ["Result Judgment"],
+            [OperatorType.ResultOutput] = ["Result Output"],
+            [OperatorType.Thresholding] = ["阈值分割", "Thresholding"],
+            [OperatorType.HttpRequest] = ["HTTP Request", "HTTP请求"],
+            [OperatorType.ScriptOperator] = ["Script Operator"],
+            [OperatorType.GeoMeasurement] = ["几何距离测量"],
+            [OperatorType.TcpCommunication] = ["TCP通讯"],
+            [OperatorType.ForEach] = ["循环处理"],
+            [OperatorType.ArrayIndexer] = ["数组索引"],
+            [OperatorType.JsonExtractor] = ["JSON提取"],
+            [OperatorType.MathOperation] = ["数学运算"],
+            [OperatorType.MqttPublish] = ["MQTT Publish", "MQTT发布"],
+            [OperatorType.SiemensS7Communication] = ["西门子S7"]
+        };
+
     [Fact]
     public void SourceRuntimeAndAiCatalog_ShouldExposeTheSameCorrectedDisplayNames()
     {
@@ -80,18 +115,38 @@ public sealed class OperatorNamingSemanticContractTests
     }
 
     [Fact]
-    public void LegacyCompatibilityPrompt_ShouldUseCurrentCorrectedDisplayNames()
+    public void ManualAiCatalogs_ShouldUseRuntimeDisplayNames()
     {
+        var runtimeNames = new OperatorFactory()
+            .GetAllMetadata()
+            .ToDictionary(item => item.Type, item => item.DisplayName);
+
+        foreach (var item in VisionAgentReadOnlyCatalog.Operators)
+        {
+            Enum.TryParse<OperatorType>(item.OperatorType, out var operatorType).Should().BeTrue(item.OperatorType);
+            item.DisplayName.Should().Be(runtimeNames[operatorType], item.OperatorType);
+        }
+
 #pragma warning disable CS0618
         var prompt = new AIPromptBuilder()
             .WithOperatorLibrary()
             .Build();
 #pragma warning restore CS0618
 
-        prompt.Should().Contain("- **全局阈值处理** (`Thresholding`):");
-        prompt.Should().Contain("- **Modbus TCP通信** (`ModbusCommunication`):");
-        prompt.Should().NotContain("- **二值化** (`Thresholding`):");
-        prompt.Should().NotContain("- **Modbus通信** (`ModbusCommunication`):");
+        var promptNames = Regex.Matches(
+                prompt,
+                @"^- \*\*(?<name>.+?)\*\* \(`(?<type>[^`]+)`\):",
+                RegexOptions.Multiline)
+            .Cast<Match>()
+            .ToDictionary(
+                match => Enum.Parse<OperatorType>(match.Groups["type"].Value),
+                match => match.Groups["name"].Value);
+
+        promptNames.Should().NotBeEmpty();
+        foreach (var (operatorType, displayName) in promptNames)
+        {
+            displayName.Should().Be(runtimeNames[operatorType], operatorType.ToString());
+        }
     }
 
     [Fact]
@@ -198,6 +253,33 @@ public sealed class OperatorNamingSemanticContractTests
                     .Contain(contract.OperatorType.ToString(), legacyName);
             }
         }
+
+        var runtimeFactory = new OperatorFactory();
+        foreach (var (operatorType, aliases) in CompatibilitySearchAliases)
+        {
+            var metadata = runtimeFactory.GetMetadata(operatorType);
+            metadata.Should().NotBeNull();
+
+            foreach (var alias in aliases)
+            {
+                metadata!.Keywords.Should().Contain(
+                    keyword => string.Equals(keyword, alias, StringComparison.OrdinalIgnoreCase),
+                    alias);
+
+                var result = await tool.ExecuteAsync(
+                    new VisionAgentToolContext(),
+                    JsonSerializer.SerializeToElement(new { keyword = alias, topN = 50 }),
+                    CancellationToken.None);
+
+                result.Success.Should().BeTrue(alias);
+                var payload = JsonSerializer.SerializeToElement(result.Data);
+                payload.GetProperty("operators")
+                    .EnumerateArray()
+                    .Select(item => item.GetProperty("operatorType").GetString())
+                    .Should()
+                    .Contain(operatorType.ToString(), alias);
+            }
+        }
     }
 
     [Fact]
@@ -283,6 +365,23 @@ public sealed class OperatorNamingSemanticContractTests
                 .Where(item => item != null)
                 .ToList();
             foreach (var legacyName in LegacyNames(contract))
+            {
+                aliases.Should().Contain(
+                    alias => string.Equals(alias, legacyName, StringComparison.OrdinalIgnoreCase),
+                    path);
+            }
+        }
+
+        foreach (var (operatorType, legacyNames) in CompatibilitySearchAliases)
+        {
+            var aliases = cards[operatorType.ToString()]
+                .GetProperty("Aliases")
+                .EnumerateArray()
+                .Select(item => item.GetString())
+                .Where(item => item != null)
+                .ToList();
+
+            foreach (var legacyName in legacyNames)
             {
                 aliases.Should().Contain(
                     alias => string.Equals(alias, legacyName, StringComparison.OrdinalIgnoreCase),

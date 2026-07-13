@@ -41,7 +41,7 @@ public class AIPromptBuilder
         _operators.Add(new PromptOperatorInfo(OperatorType.EdgeDetection, "边缘检测", "Canny 边缘检测", "Image", "Image"));
 
         // 深度学习
-        _operators.Add(new PromptOperatorInfo(OperatorType.DeepLearning, "深度学习推理", "统一 ONNX 目标检测、图像分类和语义分割入口", "Image", "DetectionList/ClassificationResult/SegmentationMap", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.DeepLearning, "深度学习", "统一 ONNX 目标检测、图像分类和语义分割入口", "Image", "DetectionList/ClassificationResult/SegmentationMap", new[] {
             new PromptParamInfo("TaskType", "enum", "任务类型", true, "ObjectDetection", options: new[] { "ObjectDetection", "ImageClassification", "SemanticSegmentation", "Auto" }),
             new PromptParamInfo("ModelPath", "string", "模型文件路径", true),
             new PromptParamInfo("Confidence", "float", "仅目标检测使用的置信度阈值(0-1)", false, "0.5", "0.0", "1.0"),
@@ -59,16 +59,16 @@ public class AIPromptBuilder
         }));
 
         // 数据操作（Sprint 1-2）
-        _operators.Add(new PromptOperatorInfo(OperatorType.ForEach, "循环处理", "对集合中的每个元素执行子图", "List", "Result", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.ForEach, "ForEach 循环", "对集合中的每个元素执行子图", "List", "Result", new[] {
             new PromptParamInfo("IoMode", "enum", "执行模式", true, "Parallel", options: new[] { "Parallel", "Sequential" }),
             new PromptParamInfo("MaxParallelism", "int", "最大并行度", false, "8", "1", "64")
         }, specialNotes: "IoMode=Parallel 用于纯计算，IoMode=Sequential 用于含通信的子图"));
 
-        _operators.Add(new PromptOperatorInfo(OperatorType.ArrayIndexer, "数组索引", "从列表中提取单个元素", "List", "Any"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.JsonExtractor, "JSON提取", "从 JSON 中提取字段", "String", "Any"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.ArrayIndexer, "数组索引器", "从列表中提取单个元素", "List", "Any"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.JsonExtractor, "JSON 提取器", "从 JSON 中提取字段", "String", "Any"));
 
         // 数值与逻辑（Sprint 3）
-        _operators.Add(new PromptOperatorInfo(OperatorType.MathOperation, "数学运算", "加减乘除等运算", "Float", "Float", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.MathOperation, "数值计算", "加减乘除等运算", "Float", "Float", new[] {
             new PromptParamInfo("Operation", "enum", "运算类型", true, "Add", options: new[] { "Add", "Subtract", "Multiply", "Divide", "Abs", "Min", "Max", "Power", "Sqrt", "Round", "Modulo" })
         }));
 
@@ -79,19 +79,19 @@ public class AIPromptBuilder
         _operators.Add(new PromptOperatorInfo(OperatorType.TypeConvert, "类型转换", "类型转换", "Any", "Any"));
 
         // 通信（Sprint 3）
-        _operators.Add(new PromptOperatorInfo(OperatorType.HttpRequest, "HTTP请求", "调用 REST API", "Any", "String", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.HttpRequest, "HTTP 请求", "调用 REST API", "Any", "String", new[] {
             new PromptParamInfo("Url", "string", "请求地址", true),
             new PromptParamInfo("Method", "enum", "请求方法", true, "POST", options: new[] { "GET", "POST", "PUT", "DELETE", "PATCH" })
         }, specialNotes: "通信算子上游必须有 ConditionalBranch 或 ResultJudgment 保护"));
 
-        _operators.Add(new PromptOperatorInfo(OperatorType.MqttPublish, "MQTT发布", "发布 MQTT 消息", "Any", "Boolean", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.MqttPublish, "MQTT 发布", "发布 MQTT 消息", "Any", "Boolean", new[] {
             new PromptParamInfo("Broker", "string", "Broker 地址", true),
             new PromptParamInfo("Topic", "string", "主题", true)
         }, specialNotes: "通信算子上游必须有 ConditionalBranch 或 ResultJudgment 保护"));
 
         // 工业通信
         _operators.Add(new PromptOperatorInfo(OperatorType.ModbusCommunication, "Modbus TCP通信", "Modbus TCP 通信", "Any", "Any"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.SiemensS7Communication, "西门子S7", "S7 协议通信", "Any", "Any"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.SiemensS7Communication, "西门子S7通信", "S7 协议通信", "Any", "Any"));
 
         // 流程控制
         _operators.Add(new PromptOperatorInfo(OperatorType.ConditionalBranch, "条件分支", "根据条件走不同分支", "Any", "Any", specialNotes: "必须提供 True 和 False 两个分支的输出"));
@@ -107,7 +107,7 @@ public class AIPromptBuilder
 
         _operators.Add(new PromptOperatorInfo(
             OperatorType.ArrayIndexer,
-            "数组索引",
+            "数组索引器",
             "从列表中按索引或条件提取单个元素",
             "List",
             "Any",
@@ -120,7 +120,7 @@ public class AIPromptBuilder
 
         _operators.Add(new PromptOperatorInfo(
             OperatorType.JsonExtractor,
-            "JSON提取",
+            "JSON 提取器",
             "从 JSON 中按 JSONPath 提取字段",
             "Json",
             "Any",
@@ -134,7 +134,7 @@ public class AIPromptBuilder
 
         _operators.Add(new PromptOperatorInfo(
             OperatorType.MathOperation,
-            "数学运算",
+            "数值计算",
             "加减乘除等运算",
             "ValueA",
             "Float",
@@ -293,7 +293,7 @@ public class AIPromptBuilder
   ""operators"": [
     { ""id"": ""op1"", ""name"": ""图像采集"", ""type"": ""ImageAcquisition"", ""outputPorts"": [{ ""id"": ""p1"", ""name"": ""Image"", ""dataType"": ""Image"" }] },
     { ""id"": ""op2"", ""name"": ""YOLO检测"", ""type"": ""DeepLearning"", ""parameters"": [{ ""name"": ""ModelPath"", ""value"": ""models/defect.onnx"" }, { ""name"": ""Confidence"", ""value"": ""0.5"" }], ""inputPorts"": [{ ""id"": ""p2"", ""name"": ""Image"" }], ""outputPorts"": [{ ""id"": ""p3"", ""name"": ""DetectionList"" }] },
-    { ""id"": ""op3"", ""name"": ""循环处理"", ""type"": ""ForEach"", ""parameters"": [{ ""name"": ""IoMode"", ""value"": ""Sequential"" }], ""inputPorts"": [{ ""id"": ""p4"", ""name"": ""Items"" }] }
+    { ""id"": ""op3"", ""name"": ""ForEach 循环"", ""type"": ""ForEach"", ""parameters"": [{ ""name"": ""IoMode"", ""value"": ""Sequential"" }], ""inputPorts"": [{ ""id"": ""p4"", ""name"": ""Items"" }] }
   ],
   ""connections"": [
     { ""sourceOperatorId"": ""op1"", ""sourcePortId"": ""p1"", ""targetOperatorId"": ""op2"", ""targetPortId"": ""p2"" },

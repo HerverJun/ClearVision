@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-13T11:36:34.0995003Z",
+  "GeneratedAtUtc": "2026-07-13T14:58:44.152616Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -1328,7 +1328,8 @@
       "Category": "\u6570\u636E\u5904\u7406",
       "Aliases": [
         "\u6570\u7EC4\u7D22\u5F15\u5668",
-        "ArrayIndexer"
+        "ArrayIndexer",
+        "\u6570\u7EC4\u7D22\u5F15"
       ],
       "IntentTags": [
         "general"
@@ -1647,7 +1648,9 @@
         "\u9762\u79EF\u63D0\u53D6",
         "\u7F3A\u9677\u5206\u6790",
         "Blob",
-        "Connected components"
+        "Connected components",
+        "Blob Analysis",
+        "\u6591\u70B9\u5206\u6790"
       ],
       "IntentTags": [
         "general"
@@ -2851,7 +2854,8 @@
         "Circle",
         "Radius",
         "Hough",
-        "CaliperFitV2"
+        "CaliperFitV2",
+        "Circle Measurement"
       ],
       "IntentTags": [
         "measurement",
@@ -5682,6 +5686,8 @@
         "ONNX",
         "YOLO",
         "Deep learning",
+        "\u6DF1\u5EA6\u5B66\u4E60\u68C0\u6D4B",
+        "\u6DF1\u5EA6\u5B66\u4E60\u63A8\u7406",
         "\u7F3A\u9677\u68C0\u6D4B",
         "AI\u68C0\u6D4B",
         "\u5206\u7C7B\u63A8\u7406",
@@ -6386,6 +6392,7 @@
         "\u7AEF\u5B50",
         "line-sequence",
         "judge",
+        "\u5E8F\u5217\u5224\u5B9A",
         "\u987A\u5E8F\u5224\u5B9A"
       ],
       "IntentTags": [
@@ -7034,6 +7041,7 @@
         "Canny",
         "Contour",
         "Threshold",
+        "Edge Detection",
         "\u8FB9\u7F18\u63D0\u53D6"
       ],
       "IntentTags": [
@@ -7704,7 +7712,8 @@
         "bilateral",
         "blur",
         "filter",
-        "denoise"
+        "denoise",
+        "\u6EE4\u6CE2\u5904\u7406"
       ],
       "IntentTags": [
         "preprocess"
@@ -8163,7 +8172,8 @@
       "Category": "\u6D41\u7A0B\u63A7\u5236",
       "Aliases": [
         "ForEach \u5FAA\u73AF",
-        "ForEach"
+        "ForEach",
+        "\u5FAA\u73AF\u5904\u7406"
       ],
       "IntentTags": [
         "general"
@@ -9041,7 +9051,8 @@
         "geometry",
         "point-line",
         "line-circle",
-        "circle-circle"
+        "circle-circle",
+        "\u51E0\u4F55\u8DDD\u79BB\u6D4B\u91CF"
       ],
       "IntentTags": [
         "measurement",
@@ -10558,7 +10569,9 @@
       "Category": "\u901A\u4FE1",
       "Aliases": [
         "HTTP \u8BF7\u6C42",
-        "HttpRequest"
+        "HttpRequest",
+        "HTTP Request",
+        "HTTP\u8BF7\u6C42"
       ],
       "IntentTags": [
         "integration",
@@ -10713,7 +10726,8 @@
         "\u56FE\u50CF\u8F93\u5165",
         "Acquire",
         "Camera",
-        "Capture"
+        "Capture",
+        "Image Acquisition"
       ],
       "IntentTags": [
         "general"
@@ -10859,7 +10873,9 @@
       "Category": "\u9884\u5904\u7406",
       "Aliases": [
         "\u56FE\u50CF\u52A0\u6CD5",
-        "ImageAdd"
+        "ImageAdd",
+        "Image Add",
+        "\u56FE\u50CF\u53E0\u52A0"
       ],
       "IntentTags": [
         "preprocess"
@@ -11087,7 +11103,8 @@
         "compose",
         "concat",
         "grid",
-        "merge channels"
+        "merge channels",
+        "\u56FE\u50CF\u5408\u6210"
       ],
       "IntentTags": [
         "general"
@@ -12218,7 +12235,8 @@
       "Category": "\u6570\u636E\u5904\u7406",
       "Aliases": [
         "JSON \u63D0\u53D6\u5668",
-        "JsonExtractor"
+        "JsonExtractor",
+        "JSON\u63D0\u53D6"
       ],
       "IntentTags": [
         "general"
@@ -13168,7 +13186,8 @@
         "Add",
         "Subtract",
         "Multiply",
-        "Divide"
+        "Divide",
+        "\u6570\u5B66\u8FD0\u7B97"
       ],
       "IntentTags": [
         "general"
@@ -13352,7 +13371,8 @@
         "\u4E09\u70B9\u89D2\u5EA6",
         "Measure",
         "Distance",
-        "Angle"
+        "Angle",
+        "\u51E0\u4F55\u6D4B\u91CF"
       ],
       "IntentTags": [
         "measurement",
@@ -14602,7 +14622,9 @@
         "MQTT",
         "IoT",
         "Publish",
-        "Communication"
+        "Communication",
+        "MQTT Publish",
+        "MQTT\u53D1\u5E03"
       ],
       "IntentTags": [
         "maturity:placeholder-disabled",
@@ -19902,6 +19924,7 @@
         "ng",
         "condition",
         "threshold",
+        "Result Judgment",
         "OKNG\u5224\u5B9A",
         "\u9608\u503C\u5224\u5B9A"
       ],
@@ -20110,7 +20133,8 @@
         "\u8BB0\u5F55",
         "Output",
         "Result",
-        "Display"
+        "Display",
+        "Result Output"
       ],
       "IntentTags": [
         "decision_output"
@@ -20281,7 +20305,9 @@
         "Region",
         "Mask",
         "Area of interest",
-        "ROI\u7BA1\u7406\u5668"
+        "ROI\u7BA1\u7406\u5668",
+        "ROI Manager",
+        "ROI\u7BA1\u7406"
       ],
       "IntentTags": [
         "general"
@@ -20548,7 +20574,8 @@
         "custom",
         "code",
         "expression",
-        "formula"
+        "formula",
+        "Script Operator"
       ],
       "IntentTags": [
         "general"
@@ -21225,7 +21252,8 @@
       "Category": "\u5339\u914D\u5B9A\u4F4D",
       "Aliases": [
         "\u65CB\u8F6C\u5C3A\u5EA6\u6A21\u677F\u5339\u914D",
-        "ShapeMatching"
+        "ShapeMatching",
+        "Shape Matching"
       ],
       "IntentTags": [
         "general"
@@ -21619,7 +21647,8 @@
       "Category": "\u901A\u4FE1",
       "Aliases": [
         "\u897F\u95E8\u5B50S7\u901A\u4FE1",
-        "SiemensS7Communication"
+        "SiemensS7Communication",
+        "\u897F\u95E8\u5B50S7"
       ],
       "IntentTags": [
         "integration",
@@ -22546,6 +22575,7 @@
         "scratch",
         "stain",
         "traditional detection",
+        "Surface Defect Detection",
         "\u8868\u9762\u7F3A\u9677",
         "\u5916\u89C2\u7F3A\u9677",
         "\u7455\u75B5\u68C0\u6D4B"
@@ -22970,7 +23000,8 @@
         "\u53D1\u9001",
         "\u63A5\u6536",
         "IP",
-        "Communication"
+        "Communication",
+        "TCP\u901A\u8BAF"
       ],
       "IntentTags": [
         "integration",
@@ -23561,6 +23592,7 @@
         "Template",
         "Match",
         "Locate",
+        "Template Matching",
         "\u4F20\u7EDF\u89C6\u89C9",
         "\u6807\u51C6\u6A21\u677F",
         "\u53C2\u8003\u56FE",
@@ -24095,7 +24127,8 @@
         "segmentation",
         "otsu",
         "triangle",
-        "\u4E8C\u503C\u5316"
+        "\u4E8C\u503C\u5316",
+        "\u9608\u503C\u5206\u5272"
       ],
       "IntentTags": [
         "preprocess"
@@ -26248,6 +26281,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Blob Analysis",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Blob\u5206\u6790",
       "Target": "BlobAnalysis",
       "Weight": 1,
@@ -26572,6 +26612,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "circle fit",
       "Target": "GeometricFitting",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Circle Measurement",
+      "Target": "CircleMeasurement",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27151,6 +27198,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Edge Detection",
+      "Target": "EdgeDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "edge pair",
       "Target": "CaliperTool",
       "Weight": 1,
@@ -27669,7 +27723,21 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "HTTP Request",
+      "Target": "HttpRequest",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "HTTP \u8BF7\u6C42",
+      "Target": "HttpRequest",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "HTTP\u8BF7\u6C42",
       "Target": "HttpRequest",
       "Weight": 1,
       "Metadata": {}
@@ -27692,6 +27760,20 @@
       "RelationType": "ALIAS_OF",
       "Source": "illumination",
       "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Image Acquisition",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Image Add",
+      "Target": "ImageAdd",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27817,6 +27899,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "JSON \u63D0\u53D6\u5668",
+      "Target": "JsonExtractor",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "JSON\u63D0\u53D6",
       "Target": "JsonExtractor",
       "Weight": 1,
       "Metadata": {}
@@ -28320,7 +28409,21 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "MQTT Publish",
+      "Target": "MqttPublish",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "MQTT \u53D1\u5E03",
+      "Target": "MqttPublish",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "MQTT\u53D1\u5E03",
       "Target": "MqttPublish",
       "Weight": 1,
       "Metadata": {}
@@ -29097,6 +29200,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Result Judgment",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Result Output",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "ring",
       "Target": "PolarUnwrap",
       "Weight": 1,
@@ -29160,6 +29277,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "ROI Manager",
+      "Target": "RoiManager",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "roi offset",
       "Target": "PositionCorrection",
       "Weight": 1,
@@ -29183,6 +29307,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "ROI\u5019\u9009\u6846\u7B5B\u9009",
       "Target": "BoxFilter",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "ROI\u7BA1\u7406",
+      "Target": "RoiManager",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29293,6 +29424,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Script Operator",
+      "Target": "ScriptOperator",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "search region",
       "Target": "RectangleRegion",
       "Weight": 1,
@@ -29386,6 +29524,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Shape",
       "Target": "ContourMeasurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Shape Matching",
+      "Target": "ShapeMatching",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29601,6 +29746,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Surface Defect Detection",
+      "Target": "SurfaceDefectDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "svd",
       "Target": "TranslationRotationCalibration",
       "Weight": 1,
@@ -29636,7 +29788,21 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "TCP\u901A\u8BAF",
+      "Target": "TcpCommunication",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Template",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Template Matching",
       "Target": "TemplateMatching",
       "Weight": 1,
       "Metadata": {}
@@ -30336,6 +30502,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u51E0\u4F55\u6D4B\u91CF",
+      "Target": "Measurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u51E0\u4F55\u8DDD\u79BB\u6D4B\u91CF",
+      "Target": "GeoMeasurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u5206\u652F",
       "Target": "ConditionalBranch",
       "Weight": 1,
@@ -30653,6 +30833,20 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u56FE\u50CF\u52A0\u6CD5",
       "Target": "ImageAdd",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u56FE\u50CF\u53E0\u52A0",
+      "Target": "ImageAdd",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u56FE\u50CF\u5408\u6210",
+      "Target": "ImageCompose",
       "Weight": 1,
       "Metadata": {}
     },
@@ -30987,6 +31181,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u5E8F\u5217\u5224\u5B9A",
+      "Target": "DetectionSequenceJudge",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u5EF6\u65F6",
       "Target": "Delay",
       "Weight": 1,
@@ -31038,6 +31239,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5F62\u72B6",
       "Target": "ContourDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5FAA\u73AF\u5904\u7406",
+      "Target": "ForEach",
       "Weight": 1,
       "Metadata": {}
     },
@@ -31176,6 +31384,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u6570\u5B66\u8FD0\u7B97",
+      "Target": "MathOperation",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u6570\u636E\u5E93",
       "Target": "DatabaseWrite",
       "Weight": 1,
@@ -31192,6 +31407,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u6570\u636E\u805A\u5408",
       "Target": "Aggregator",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u6570\u7EC4\u7D22\u5F15",
+      "Target": "ArrayIndexer",
       "Weight": 1,
       "Metadata": {}
     },
@@ -31219,6 +31441,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "\u6591\u70B9",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u6591\u70B9\u5206\u6790",
       "Target": "BlobAnalysis",
       "Weight": 1,
       "Metadata": {}
@@ -31435,6 +31664,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u6DF1\u5EA6\u5B66\u4E60\u63A8\u7406",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u6DF1\u5EA6\u5B66\u4E60\u68C0\u6D4B",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u6E05\u6670\u5EA6\u8BC4\u4F30",
       "Target": "SharpnessEvaluation",
       "Weight": 1,
@@ -31458,6 +31701,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u6EE4\u6CE2",
       "Target": "MedianBlur",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u6EE4\u6CE2\u5904\u7406",
+      "Target": "Filtering",
       "Weight": 1,
       "Metadata": {}
     },
@@ -31862,6 +32112,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u897F\u95E8\u5B50S7",
+      "Target": "SiemensS7Communication",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u897F\u95E8\u5B50S7\u901A\u4FE1",
       "Target": "SiemensS7Communication",
       "Weight": 1,
@@ -32207,6 +32464,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u95F4\u9699\u6D4B\u91CF",
       "Target": "GapMeasurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u9608\u503C\u5206\u5272",
+      "Target": "Thresholding",
       "Weight": 1,
       "Metadata": {}
     },
