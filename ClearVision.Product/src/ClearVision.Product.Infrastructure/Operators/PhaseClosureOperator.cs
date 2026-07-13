@@ -11,11 +11,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Phase Closure",
-    Description = "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
+    DisplayName = "相位解缠绕",
+    Description = "对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。",
     Category = "Measurement",
     IconName = "phase-closure",
-    Keywords = new[] { "Phase", "Unwrap", "Interferometry", "Closure", "Wavelength" },
+    Keywords = new[] { "Phase", "Unwrap", "Interferometry", "Closure", "Wavelength", "Phase Closure", "相位闭合" },
     Version = "1.0.1"
 )]
 [AlgorithmInfo(

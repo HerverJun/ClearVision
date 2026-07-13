@@ -1,4 +1,4 @@
-# Morphology (Legacy) / Morphology
+# 形态学（旧版） / Morphology
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -8,10 +8,10 @@
 | 分类 (Category) | 预处理 |
 | 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `Compatibility`, `Deprecated`, `ImageOnly`, `Legacy`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 标签 (Tags) | `compatibility`, `deprecated`, `image-only`, `legacy`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Legacy image morphology node. Use Morphological Operation for image workflows and Region* morphology operators for region workflows。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
@@ -78,4 +78,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

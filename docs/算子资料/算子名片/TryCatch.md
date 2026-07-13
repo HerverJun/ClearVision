@@ -1,4 +1,4 @@
-# 异常捕获 / TryCatch
+# Try分支透传 / TryCatch
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 该类算子主要对上游值、集合或流程状态做判断、转换、聚合或路由，不直接改写图像像素。
 
 ## 实现策略 / Implementation Strategy
@@ -30,9 +30,9 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `EnableCatch` | 启用Catch | `bool` | true | - | Yes | 是否启用异常捕获 |
-| `CatchOutputError` | 输出错误信息 | `bool` | true | - | Yes | - |
-| `CatchOutputStackTrace` | 输出堆栈 | `bool` | false | - | Yes | - |
+| `EnableCatch` | 启用Catch | `bool` | true | - | Yes | 兼容旧流程的开关；当前仅记录配置，不执行异常捕获。 |
+| `CatchOutputError` | 输出错误信息 | `bool` | true | - | Yes | 兼容旧流程的配置；当前 Error 输出始终为空。 |
+| `CatchOutputStackTrace` | 输出堆栈 | `bool` | false | - | Yes | 兼容旧流程的配置；当前不输出异常堆栈。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -73,4 +73,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

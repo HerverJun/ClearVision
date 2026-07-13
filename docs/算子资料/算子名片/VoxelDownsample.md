@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Voxel grid downsampling for point clouds (centroid per voxel)。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于对点云执行体素网格下采样（每个体素取质心）。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 算法类型以 `Voxel grid centroid downsampling` 为主；元数据未声明更多细分时，以当前源码实现为准。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
@@ -76,4 +76,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

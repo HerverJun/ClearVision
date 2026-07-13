@@ -124,10 +124,10 @@ public class OperatorService : IOperatorService
             {
                 Id = Guid.NewGuid(),
                 Type = "Thresholding",
-                DisplayName = "二值化",
+                DisplayName = "全局阈值处理",
                 Category = "预处理",
                 Icon = "⚫",
-                Description = "图像阈值分割",
+                Description = "支持二值、截断、ToZero 及自动阈值的全局阈值处理",
                 Inputs = new List<PortDefinitionDto>
                 {
                     new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }

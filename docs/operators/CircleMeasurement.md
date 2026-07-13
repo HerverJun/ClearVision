@@ -6,7 +6,7 @@
 | 类名 (Class) | `CircleMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.CircleMeasurement` |
 | 分类 (Category) | 检测 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.1.2` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
 
@@ -87,6 +87,7 @@
 | `InlierPoints` | V2 内点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `OutlierPoints` | V2 离群点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `CaliperDiagnostics` | V2 诊断 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `CaliperProfileEvidence` | V2 profile evidence | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -134,4 +135,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-03 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.2 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

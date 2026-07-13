@@ -11,23 +11,24 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 异常处理算子 - Try-Catch 流程控制。
-/// 算子本身不执行异常捕获，仅输出统一的流程控制契约。
+/// Try 分支透传算子。
+/// 算子本身不执行异常捕获，仅把输入透传到 Try 输出并返回无错误状态。
 /// </summary>
 [OperatorMeta(
-    DisplayName = "异常捕获",
-    Description = "Try-Catch 流程控制",
+    DisplayName = "Try分支透传",
+    Description = "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
     Category = "流程控制",
-    IconName = "trycatch"
+    IconName = "trycatch",
+    Keywords = new[] { "Try", "Catch", "passthrough", "branch", "异常捕获", "Try-Catch 流程控制" }
 )]
 [InputPort("Input", "输入", PortDataType.Any, IsRequired = false)]
 [OutputPort("Try", "Try分支", PortDataType.Any)]
 [OutputPort("Catch", "Catch分支", PortDataType.Any)]
 [OutputPort("Error", "错误信息", PortDataType.String)]
 [OutputPort("HasError", "是否有错", PortDataType.Boolean)]
-[OperatorParam("EnableCatch", "启用Catch", "bool", Description = "是否启用异常捕获", DefaultValue = true)]
-[OperatorParam("CatchOutputError", "输出错误信息", "bool", DefaultValue = true)]
-[OperatorParam("CatchOutputStackTrace", "输出堆栈", "bool", DefaultValue = false)]
+[OperatorParam("EnableCatch", "启用Catch", "bool", Description = "兼容旧流程的开关；当前仅记录配置，不执行异常捕获。", DefaultValue = true)]
+[OperatorParam("CatchOutputError", "输出错误信息", "bool", Description = "兼容旧流程的配置；当前 Error 输出始终为空。", DefaultValue = true)]
+[OperatorParam("CatchOutputStackTrace", "输出堆栈", "bool", Description = "兼容旧流程的配置；当前不输出异常堆栈。", DefaultValue = false)]
 public class TryCatchOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.TryCatch;

@@ -1,4 +1,4 @@
-# Hand-Eye Calibration Validator / HandEyeCalibrationValidator
+# 手眼标定验证 / HandEyeCalibrationValidator
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:第三方SDK` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Validates a hand-eye CalibrationBundleV2 payload and produces quality metrics, HTML report, and pose suggestions。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于验证手眼标定 CalibrationBundleV2 并生成质量指标、HTML 报告和位姿建议。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 算法类型以 `Hand-Eye Consistency Validation` 为主；元数据未声明更多细分时，以当前源码实现为准。
 处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
@@ -87,4 +87,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

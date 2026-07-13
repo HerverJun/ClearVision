@@ -31,7 +31,15 @@ public sealed class OperatorNamingSemanticContractTests
         new(OperatorType.GeometricTolerance, typeof(GeometricToleranceOperator), 23, "二维几何公差判定", "几何公差", 5, 7, 5),
         new(OperatorType.DetectionSequenceJudge, typeof(DetectionSequenceJudgeOperator), 61, "检测顺序判定", "线序判定", 4, 13, 13),
         new(OperatorType.ImageDiff, typeof(ImageDiffOperator), 118, "图像差异率分析", "图像对比", 2, 2, 0),
-        new(OperatorType.RectangleRegion, typeof(RectangleRegionOperator), 237, "矩形框定义", "矩形区域", 0, 1, 4)
+        new(OperatorType.RectangleRegion, typeof(RectangleRegionOperator), 237, "矩形框定义", "矩形区域", 0, 1, 4),
+        new(OperatorType.CoordinateTransform, typeof(CoordinateTransformOperator), 26, "像素到物理坐标（单点）", "坐标转换", 4, 3, 2, ["Coordinate Transform"]),
+        new(OperatorType.RoiManager, typeof(RoiManagerOperator), 42, "ROI裁剪与掩膜", "ROI管理器", 1, 3, 10),
+        new(OperatorType.TryCatch, typeof(TryCatchOperator), 83, "Try分支透传", "异常捕获", 1, 4, 3, ["Try-Catch 流程控制"]),
+        new(OperatorType.ModbusCommunication, typeof(ModbusCommunicationOperator), 27, "Modbus TCP通信", "Modbus通信", 1, 2, 9, ["Modbus Communication"]),
+        new(OperatorType.Thresholding, typeof(ThresholdOperator), 4, "全局阈值处理", "二值化", 1, 1, 4, ["Threshold"]),
+        new(OperatorType.FFT1D, typeof(FFT1DOperator), 251, "信号/图像傅里叶变换（FFT）", "一维FFT", 2, 4, 0, ["FFT 1D"]),
+        new(OperatorType.InverseFFT1D, typeof(InverseFFT1DOperator), 253, "信号/图像逆傅里叶变换（IFFT）", "一维逆FFT", 2, 4, 0, ["Inverse FFT 1D"]),
+        new(OperatorType.PhaseClosure, typeof(PhaseClosureOperator), 254, "相位解缠绕", "Phase Closure", 4, 4, 0, ["相位闭合"])
     ];
 
     [Fact]
@@ -73,6 +81,11 @@ public sealed class OperatorNamingSemanticContractTests
     [Fact]
     public void ActiveGeneratedCatalogsAndCards_ShouldMatchRuntimeNames()
     {
+        var runtimeNames = new OperatorFactory()
+            .GetAllMetadata()
+            .ToDictionary(item => item.Type, item => item.DisplayName);
+        runtimeNames.Should().HaveCount(158);
+
         var catalogPaths = new[]
         {
             Path.Combine(RepoRoot, "docs", "算子资料", "算子目录.json"),
@@ -91,12 +104,13 @@ public sealed class OperatorNamingSemanticContractTests
                 .EnumerateArray()
                 .ToDictionary(item => item.GetProperty("id").GetString()!, StringComparer.Ordinal);
 
-            foreach (var contract in Contracts)
+            operators.Should().HaveCount(runtimeNames.Count, catalogPath);
+            foreach (var (operatorType, displayName) in runtimeNames)
             {
-                operators[contract.OperatorType.ToString()]
+                operators[operatorType.ToString()]
                     .GetProperty("displayName")
                     .GetString()
-                    .Should().Be(contract.DisplayName, catalogPath);
+                    .Should().Be(displayName, catalogPath);
             }
         }
 
@@ -104,6 +118,9 @@ public sealed class OperatorNamingSemanticContractTests
         {
             Path.Combine(RepoRoot, "docs", "算子资料", "算子目录.md"),
             Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", "CATALOG.md"),
+            Path.Combine(RepoRoot, "docs", "CATALOG.md"),
+            Path.Combine(RepoRoot, "docs", "OPERATOR_CATALOG.md"),
+            Path.Combine(RepoRoot, "docs", "operators", "CATALOG.md"),
             Path.Combine(RepoRoot, "算子资料", "算子目录.md"),
             Path.Combine(RepoRoot, "算子资料", "算子名片", "CATALOG.md")
         };
@@ -111,33 +128,35 @@ public sealed class OperatorNamingSemanticContractTests
         foreach (var markdownPath in markdownCatalogs)
         {
             var markdown = File.ReadAllText(markdownPath);
-            foreach (var contract in Contracts)
+            foreach (var (operatorType, displayName) in runtimeNames)
             {
-                markdown.Should().Contain($"`OperatorType.{contract.OperatorType}` | {contract.DisplayName}", markdownPath);
+                markdown.Should().Contain($"`OperatorType.{operatorType}` | {displayName}", markdownPath);
             }
         }
 
-        foreach (var contract in Contracts)
+        foreach (var (operatorType, displayName) in runtimeNames)
         {
             var cardPaths = new[]
             {
-                Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", $"{contract.OperatorType}.md"),
-                Path.Combine(RepoRoot, "docs", "operators", $"{contract.OperatorType}.md"),
-                Path.Combine(RepoRoot, "算子资料", "算子名片", $"{contract.OperatorType}.md")
+                Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", $"{operatorType}.md"),
+                Path.Combine(RepoRoot, "docs", "operators", $"{operatorType}.md"),
+                Path.Combine(RepoRoot, "算子资料", "算子名片", $"{operatorType}.md")
             };
 
             foreach (var cardPath in cardPaths)
             {
-                File.ReadLines(cardPath).First().Should().StartWith($"# {contract.DisplayName} / ", cardPath);
+                File.ReadLines(cardPath).First().Should().StartWith($"# {displayName} / ", cardPath);
             }
         }
 
         AssertKnowledgeCards(
             Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_cards.json"),
-            root => root);
+            root => root,
+            runtimeNames);
         AssertKnowledgeCards(
             Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"),
-            root => root.GetProperty("Cards"));
+            root => root.GetProperty("Cards"),
+            runtimeNames);
     }
 
     [Fact]
@@ -217,7 +236,10 @@ public sealed class OperatorNamingSemanticContractTests
         }
     }
 
-    private static void AssertKnowledgeCards(string path, Func<JsonElement, JsonElement> selectCards)
+    private static void AssertKnowledgeCards(
+        string path,
+        Func<JsonElement, JsonElement> selectCards,
+        IReadOnlyDictionary<OperatorType, string> runtimeNames)
     {
         File.Exists(path).Should().BeTrue(path);
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -226,6 +248,14 @@ public sealed class OperatorNamingSemanticContractTests
         var cards = cardsElement
             .EnumerateArray()
             .ToDictionary(item => item.GetProperty("OperatorType").GetString()!, StringComparer.Ordinal);
+
+        foreach (var (operatorType, displayName) in runtimeNames)
+        {
+            cards[operatorType.ToString()]
+                .GetProperty("DisplayName")
+                .GetString()
+                .Should().Be(displayName, path);
+        }
 
         foreach (var contract in Contracts)
         {
@@ -238,7 +268,9 @@ public sealed class OperatorNamingSemanticContractTests
                 .ToList();
             foreach (var legacyName in LegacyNames(contract))
             {
-                aliases.Should().Contain(legacyName, path);
+                aliases.Should().Contain(
+                    alias => string.Equals(alias, legacyName, StringComparison.OrdinalIgnoreCase),
+                    path);
             }
         }
     }

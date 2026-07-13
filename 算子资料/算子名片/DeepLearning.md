@@ -16,7 +16,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 14 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
@@ -50,6 +50,7 @@
 | `LabelsPath` | 标签文件路径 | `file` | "" | - | Yes | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
 | `EnableInternalNms` | 启用内部NMS | `bool` | true | - | Yes | 仅用于 RawYolo 输出的后处理开关；OutputFormat=EndToEndNms 时信任 ONNX 模型内部候选框抑制/NMS，平台侧不再额外拆出 BoxNms。 |
 | `NmsIouThreshold` | NMS IoU Threshold | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
+| `OutputFormat` | 输出格式 | `enum` | Auto | Auto/自动识别；RawYolo/原始 YOLO；EndToEndNms/端到端 NMS | Yes | Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。 |
 | `DetectionMode` | 检测模式 | `enum` | Defect | Defect/缺陷检测；Object/目标检测 | Yes | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
 | `ModelId` | Model Id | `string` | "" | - | Yes | - |
 | `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
@@ -75,11 +76,14 @@
 | `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ModelSource` | Model Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ModelProvenance` | Model Provenance | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `PostprocessDiagnostics` | Postprocess Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `OutputFormat` | Output Format | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `CandidatesByClass` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ClassificationResult` | `Any` | 源码输出字典初始化中可见字段。 |
 | `DroppedBeforeNms` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `InternalNmsEnabled` | `Boolean` | 源码输出字典初始化中可见字段。 |
@@ -90,9 +94,10 @@
 | `NmsCandidateLimit` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `NmsIoUComparisons` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `NmsPrefilteredCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
-| `PostprocessDiagnostics` | `Any` | 源码输出字典初始化中可见字段。 |
 | `RawCandidateCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `ResolvedLabels` | `Any` | 源码输出字典初始化中可见字段。 |
+| `TopClassConfidence` | `Float` | 源码输出字典初始化中可见字段。 |
+| `TopClassLabel` | `Any` | 源码输出字典初始化中可见字段。 |
 | `VisualizationDetectionCount` | `Integer` | 源码输出字典初始化中可见字段。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
@@ -126,4 +131,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

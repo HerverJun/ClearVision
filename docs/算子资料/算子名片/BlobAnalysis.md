@@ -6,7 +6,7 @@
 | 类名 (Class) | `BlobDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.BlobAnalysis` |
 | 分类 (Category) | 特征提取 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.2.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
@@ -50,7 +50,7 @@
 | `MinRectangularity` | 最小矩形度 | `double` | 0 | [0, 1] | Yes | - |
 | `MinEccentricity` | 最小离心率 | `double` | 0 | [0, 1] | Yes | - |
 | `OutputDetailedFeatures` | 输出详细特征 | `bool` | false | - | Yes | - |
-| `FeatureFilter` | Feature Filter | `string` | "" | - | Yes | - |
+| `FeatureFilter` | 特征过滤表达式 | `string` | "" | - | No | 可选。支持 Area、ContourArea、Perimeter、Circularity、Convexity、Rectangularity、Eccentricity、EulerNumber、MeanGray、GrayDeviation、Width、Height、X、Y、CenterX、CenterY、InertiaRatio、ConvexHullArea、HoleCount；示例：Area >= 100 && Circularity >= 0.8。留空不过滤。 |
 | `EnableColorFilter` | 启用颜色过滤 | `bool` | false | - | Yes | 启用HSV颜色范围预过滤 |
 | `HueLow` | 色相下限 | `int` | 0 | [0, 180] | Yes | - |
 | `HueHigh` | 色相上限 | `int` | 180 | [0, 180] | Yes | - |
@@ -63,21 +63,22 @@
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `SourceImage` | Source Image | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Image` | 二值图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `SourceImage` | 参考图像 | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Image` | 标记图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `Blobs` | Blob数据 | `Contour` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `BlobFeatures` | Blob特征 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Blobs` | Blob结果列表 | `BlobList` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `BlobFeatures` | Blob详细特征 | `BlobFeatureList` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `BlobCount` | Blob数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `Area` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `BlobId` | `String` | 源码通过输出字典索引赋值写入。 |
 | `CenterX` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `CenterY` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Circularity` | `Any` | 源码通过输出字典索引赋值写入。 |
@@ -86,6 +87,7 @@
 | `Convexity` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Eccentricity` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `EulerNumber` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Features` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `GrayDeviation` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `HoleCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
@@ -108,7 +110,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 6 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -122,4 +124,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.2.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

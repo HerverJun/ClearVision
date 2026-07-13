@@ -1,4 +1,4 @@
-# ROI管理器 / RoiManager
+# ROI裁剪与掩膜 / RoiManager
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于矩形/圆形/多边形区域选择。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -27,9 +27,12 @@
 - `Cv2.BitwiseAnd`
 - `Cv2.Circle`
 - `Cv2.FillPoly`
+- `JsonDocument.Parse`
 - `JsonSerializer.Deserialize`
-- `Math.Min`
 - `Math.Max`
+- `Math.Min`
+- `Math.Clamp`
+- `Math.Round`
 - `ImageWrapper`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
@@ -78,7 +81,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 6 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -92,4 +95,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-02 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

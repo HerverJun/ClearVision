@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T11:38:11.7496141+08:00",
+  "generatedAt": "2026-07-13T15:39:26.9211489+08:00",
   "totalCount": 158,
   "categories": {
     "3D": {
@@ -13,87 +13,16 @@
         "VoxelDownsample"
       ]
     },
-    "AI Detection": {
-      "count": 1,
-      "operators": [
-        "DualModalVoting"
-      ]
-    },
-    "AI 检测": {
-      "count": 1,
-      "operators": [
-        "DetectionSequenceJudge"
-      ]
-    },
     "AI检测": {
-      "count": 5,
+      "count": 7,
       "operators": [
         "AnomalyDetection",
         "DeepLearning",
+        "DetectionSequenceJudge",
+        "DualModalVoting",
         "EdgePairDefect",
         "SemanticSegmentation",
         "SurfaceDefectDetection"
-      ]
-    },
-    "Analysis": {
-      "count": 1,
-      "operators": [
-        "DistanceTransform"
-      ]
-    },
-    "Communication": {
-      "count": 3,
-      "operators": [
-        "MitsubishiMcCommunication",
-        "ModbusCommunication",
-        "MqttPublish"
-      ]
-    },
-    "Detection": {
-      "count": 2,
-      "operators": [
-        "AngleMeasurement",
-        "ContourMeasurement"
-      ]
-    },
-    "Flow Control": {
-      "count": 1,
-      "operators": [
-        "ResultJudgment"
-      ]
-    },
-    "Frequency": {
-      "count": 3,
-      "operators": [
-        "FFT1D",
-        "FrequencyFilter",
-        "InverseFFT1D"
-      ]
-    },
-    "Morphology": {
-      "count": 5,
-      "operators": [
-        "RegionClosing",
-        "RegionDilation",
-        "RegionErosion",
-        "RegionOpening",
-        "RegionSkeleton"
-      ]
-    },
-    "Region": {
-      "count": 4,
-      "operators": [
-        "RegionComplement",
-        "RegionDifference",
-        "RegionIntersection",
-        "RegionUnion"
-      ]
-    },
-    "Texture": {
-      "count": 2,
-      "operators": [
-        "GlcmTexture",
-        "LawsTextureFilter"
       ]
     },
     "几何": {
@@ -116,9 +45,18 @@
       ]
     },
     "区域处理": {
-      "count": 1,
+      "count": 10,
       "operators": [
-        "BinaryImageToRegion"
+        "BinaryImageToRegion",
+        "RegionClosing",
+        "RegionComplement",
+        "RegionDifference",
+        "RegionDilation",
+        "RegionErosion",
+        "RegionIntersection",
+        "RegionOpening",
+        "RegionSkeleton",
+        "RegionUnion"
       ]
     },
     "变量": {
@@ -131,10 +69,11 @@
       ]
     },
     "图像处理": {
-      "count": 4,
+      "count": 5,
       "operators": [
         "AffineTransform",
         "CopyMakeBorder",
+        "DistanceTransform",
         "ImageStitching",
         "PolarUnwrap"
       ]
@@ -191,12 +130,14 @@
       ]
     },
     "检测": {
-      "count": 18,
+      "count": 20,
       "operators": [
+        "AngleMeasurement",
         "ArcCaliper",
         "CaliperTool",
         "CircleMeasurement",
         "ContourExtrema",
+        "ContourMeasurement",
         "GapMeasurement",
         "GeoMeasurement",
         "GeometricFitting",
@@ -216,10 +157,10 @@
     "流程控制": {
       "count": 5,
       "operators": [
-        "Comparator",
         "ConditionalBranch",
         "Delay",
         "ForEach",
+        "ResultJudgment",
         "TryCatch"
       ]
     },
@@ -230,6 +171,13 @@
         "ContourDetection",
         "EdgeDetection",
         "SubpixelEdgeDetection"
+      ]
+    },
+    "纹理": {
+      "count": 2,
+      "operators": [
+        "GlcmTexture",
+        "LawsTextureFilter"
       ]
     },
     "识别": {
@@ -255,9 +203,12 @@
       ]
     },
     "通信": {
-      "count": 5,
+      "count": 8,
       "operators": [
         "HttpRequest",
+        "MitsubishiMcCommunication",
+        "ModbusCommunication",
+        "MqttPublish",
         "OmronFinsCommunication",
         "SerialCommunication",
         "SiemensS7Communication",
@@ -274,8 +225,9 @@
       ]
     },
     "逻辑工具": {
-      "count": 6,
+      "count": 7,
       "operators": [
+        "Comparator",
         "FrameChangeTrigger",
         "PointSetTool",
         "ScriptOperator",
@@ -316,6 +268,14 @@
         "PerspectiveTransform",
         "ShadingCorrection",
         "Thresholding"
+      ]
+    },
+    "频域": {
+      "count": 3,
+      "operators": [
+        "FFT1D",
+        "FrequencyFilter",
+        "InverseFFT1D"
       ]
     },
     "颜色处理": {
@@ -466,8 +426,8 @@
     {
       "id": "Filtering",
       "type": 2,
-      "displayName": "Gaussian Blur",
-      "description": "Apply Gaussian filtering to suppress image noise",
+      "displayName": "滤波",
+      "description": "应用高斯滤波抑制图像噪声。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -573,8 +533,8 @@
     {
       "id": "EdgeDetection",
       "type": 3,
-      "displayName": "Edge Detection",
-      "description": "Detects edges with Canny and optional auto-thresholding.",
+      "displayName": "边缘检测",
+      "description": "使用 Canny 进行边缘检测，并可选自动阈值。",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
@@ -582,7 +542,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects edges with Canny and opti…",
+      "algorithm": "该算子用于使用 Canny 进行边缘检测，并可选自动阈值。运行时从声明输入端口读取数…",
       "inputPorts": [
         {
           "name": "Image",
@@ -814,8 +774,8 @@
     {
       "id": "Thresholding",
       "type": 4,
-      "displayName": "Threshold",
-      "description": "Global thresholding with optional Otsu or Triangle auto-thresholding.",
+      "displayName": "全局阈值处理",
+      "description": "执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/Triangle 自动阈值。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -823,7 +783,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Global thresholding with optional…",
+      "algorithm": "该算子用于执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/T…",
       "inputPorts": [
         {
           "name": "Image",
@@ -942,7 +902,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Legacy image morphology node. Use…",
+      "algorithm": "该算子用于旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Re…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1304,7 +1264,7 @@
       "id": "TemplateMatching",
       "type": 7,
       "displayName": "模板匹配",
-      "description": "Classic template matching with optional bounded rotation/scale pose search. Multi-match outputs are filtered by IoU-based NMS.",
+      "description": "执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的 NMS 去重。",
       "category": "匹配定位",
       "version": "1.2.0",
       "tags": [
@@ -1312,7 +1272,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Classic template matching with op…",
+      "algorithm": "该算子用于执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3752,7 +3712,7 @@
       "id": "LineMeasurement",
       "type": 20,
       "displayName": "直线测量",
-      "description": "Detects line features and reports line direction, span and fitting diagnostics.",
+      "description": "检测直线特征，输出方向、跨度和拟合质量诊断。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -3760,7 +3720,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects line features and reports…",
+      "algorithm": "该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3874,16 +3834,16 @@
     {
       "id": "ContourMeasurement",
       "type": 21,
-      "displayName": "Contour Measurement",
-      "description": "Measures contour area, perimeter, and centroid with grayscale-weighted area estimation.",
-      "category": "Detection",
+      "displayName": "轮廓测量",
+      "description": "计算轮廓面积、周长和质心，并支持按灰度权重估算面积。",
+      "category": "检测",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures contour area, perimeter,…",
+      "algorithm": "该算子用于计算轮廓面积、周长和质心，并支持按灰度权重估算面积。运行时从声明输入端口读…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3987,16 +3947,16 @@
     {
       "id": "AngleMeasurement",
       "type": 22,
-      "displayName": "Angle Measurement",
-      "description": "Measures angle from three points or two lines with subpixel-compatible inputs.",
-      "category": "Detection",
+      "displayName": "角度测量",
+      "description": "通过三点或两线计算角度，兼容亚像素级输入。",
+      "category": "检测",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures angle from three points …",
+      "algorithm": "该算子用于通过三点或两线计算角度，兼容亚像素级输入。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4344,8 +4304,8 @@
     {
       "id": "CameraCalibration",
       "type": 24,
-      "displayName": "Camera Calibration",
-      "description": "Calibrates camera intrinsics from chessboard or circle grid images.",
+      "displayName": "相机标定",
+      "description": "根据棋盘格或圆点阵图像标定相机内参。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -4353,7 +4313,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Calibrates camera intrinsics from…",
+      "algorithm": "该算子用于根据棋盘格或圆点阵图像标定相机内参。运行时从声明输入端口读取数据，按参数表…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4487,8 +4447,8 @@
     {
       "id": "Undistort",
       "type": 25,
-      "displayName": "Undistort",
-      "description": "Correct lens distortion using calibration data.",
+      "displayName": "畸变校正",
+      "description": "使用标定数据校正镜头畸变。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -4496,7 +4456,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Correct lens distortion using cal…",
+      "algorithm": "该算子用于使用标定数据校正镜头畸变。运行时从声明输入端口读取数据，按参数表解析配置，…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4534,8 +4494,8 @@
     {
       "id": "CoordinateTransform",
       "type": 26,
-      "displayName": "Coordinate Transform",
-      "description": "Converts pixel coordinates to physical coordinates using CalibrationBundleV2 Transform2D.",
+      "displayName": "像素到物理坐标（单点）",
+      "description": "使用 CalibrationBundleV2 的二维标定变换，将单个像素坐标转换为物理坐标。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -4543,7 +4503,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Converts pixel coordinates to phy…",
+      "algorithm": "该算子用于使用 CalibrationBundleV2 的二维标定变换，将单个像素坐…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4628,16 +4588,16 @@
     {
       "id": "ModbusCommunication",
       "type": 27,
-      "displayName": "Modbus Communication",
-      "description": "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
-      "category": "Communication",
+      "displayName": "Modbus TCP通信",
+      "description": "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
+      "category": "通信",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Industrial Modbus TCP communicati…",
+      "algorithm": "该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb…",
       "inputPorts": [
         {
           "name": "Data",
@@ -4665,7 +4625,7 @@
           "name": "Protocol",
           "displayName": "Protocol",
           "dataType": "enum",
-          "description": null,
+          "description": "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。",
           "defaultValue": "TCP",
           "min": null,
           "max": null,
@@ -5410,13 +5370,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
+        "totalScore": 90,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
@@ -5893,8 +5853,8 @@
     {
       "id": "AdaptiveThreshold",
       "type": 39,
-      "displayName": "Adaptive Threshold",
-      "description": "Local mean or Gaussian adaptive thresholding.",
+      "displayName": "自适应阈值",
+      "description": "根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -5902,7 +5862,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Local mean or Gaussian adaptive t…",
+      "algorithm": "该算子用于根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。运行时从声…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6009,7 +5969,7 @@
       "id": "HistogramEqualization",
       "type": 40,
       "displayName": "直方图均衡化",
-      "description": "Supports global histogram equalization and CLAHE.",
+      "description": "支持全局直方图均衡与 CLAHE，用于增强图像对比度。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -6017,7 +5977,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Supports global histogram equaliz…",
+      "algorithm": "该算子用于支持全局直方图均衡与 CLAHE，用于增强图像对比度。运行时从声明输入端口…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6103,8 +6063,8 @@
     {
       "id": "GeometricFitting",
       "type": 41,
-      "displayName": "Geometric Fitting",
-      "description": "Fits line, circle or ellipse from contour points.",
+      "displayName": "几何拟合",
+      "description": "根据轮廓点拟合直线、圆或椭圆。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -6112,7 +6072,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Fits line, circle or ellipse from…",
+      "algorithm": "该算子用于根据轮廓点拟合直线、圆或椭圆。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6270,8 +6230,8 @@
     {
       "id": "RoiManager",
       "type": 42,
-      "displayName": "ROI管理器",
-      "description": "矩形/圆形/多边形区域选择",
+      "displayName": "ROI裁剪与掩膜",
+      "description": "按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。",
       "category": "辅助",
       "version": "1.0.0",
       "tags": [
@@ -6279,7 +6239,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于矩形/圆形/多边形区域选择。运行时从声明输入端口读取数据，按参数表解析配置…",
+      "algorithm": "该算子用于按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。运行时…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6457,7 +6417,7 @@
       "id": "ShapeMatching",
       "type": 43,
       "displayName": "旋转尺度模板匹配",
-      "description": "Rotation-scale template matching with pyramid coarse-to-fine search. This is not a generic contour-descriptor matcher.",
+      "description": "基于金字塔粗到细搜索的旋转/尺度模板匹配；不是通用轮廓描述子匹配。",
       "category": "匹配定位",
       "version": "1.2.0",
       "tags": [
@@ -6465,7 +6425,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Rotation-scale template matching …",
+      "algorithm": "该算子用于基于金字塔粗到细搜索的旋转/尺度模板匹配；不是通用轮廓描述子匹配。运行时从…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6666,8 +6626,8 @@
     {
       "id": "SubpixelEdgeDetection",
       "type": 44,
-      "displayName": "Subpixel Edge Detection",
-      "description": "Non-industrial reference subpixel edge extraction; requires application validation before metrology use.",
+      "displayName": "亚像素边缘",
+      "description": "非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
@@ -6678,7 +6638,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Non-industrial reference subpixel…",
+      "algorithm": "该算子用于非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明…",
       "inputPorts": [
         {
           "name": "Image",
@@ -7646,16 +7606,16 @@
     {
       "id": "MitsubishiMcCommunication",
       "type": 51,
-      "displayName": "Mitsubishi MC Communication",
-      "description": "Mitsubishi MC protocol PLC read/write communication.",
-      "category": "Communication",
+      "displayName": "三菱MC通信",
+      "description": "三菱 MC 协议 PLC 读写通信。",
+      "category": "通信",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Mitsubishi MC protocol PLC read/w…",
+      "algorithm": "该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表…",
       "inputPorts": [
         {
           "name": "Data",
@@ -8172,16 +8132,16 @@
     {
       "id": "ResultJudgment",
       "type": 60,
-      "displayName": "Result Judgment",
-      "description": "Generic business judgment with numeric/string condition checks.",
-      "category": "Flow Control",
+      "displayName": "结果判定",
+      "description": "对数值、字符串等结果执行业务判定，输出条件检查结果。",
+      "category": "流程控制",
       "version": "1.0.1",
       "tags": [
         "功能域:流程",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Generic business judgment with nu…",
+      "algorithm": "该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读…",
       "inputPorts": [
         {
           "name": "Value",
@@ -8363,7 +8323,7 @@
       "type": 61,
       "displayName": "检测顺序判定",
       "description": "对检测结果排序，并与期望标签序列进行比对。",
-      "category": "AI 检测",
+      "category": "AI检测",
       "version": "1.0.1",
       "tags": [
         "experimental",
@@ -8703,7 +8663,7 @@
       "id": "ClaheEnhancement",
       "type": 71,
       "displayName": "CLAHE增强",
-      "description": "Adaptive histogram equalization for local contrast enhancement.",
+      "description": "使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -8711,7 +8671,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Adaptive histogram equalization f…",
+      "algorithm": "该算子用于使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。运行时从声…",
       "inputPorts": [
         {
           "name": "Image",
@@ -8837,8 +8797,8 @@
     {
       "id": "MorphologicalOperation",
       "type": 72,
-      "displayName": "Morphological Operation",
-      "description": "Erode, Dilate, Open, Close, Gradient, TopHat, BlackHat.",
+      "displayName": "形态学操作",
+      "description": "支持腐蚀、膨胀、开运算、闭运算、梯度、顶帽、黑帽等形态学操作。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -8846,7 +8806,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Erode, Dilate, Open, Close, Gradi…",
+      "algorithm": "该算子用于支持腐蚀、膨胀、开运算、闭运算、梯度、顶帽、黑帽等形态学操作。运行时从声明…",
       "inputPorts": [
         {
           "name": "Image",
@@ -9204,8 +9164,8 @@
     {
       "id": "ImageSubtract",
       "type": 77,
-      "displayName": "Image Subtract",
-      "description": "Computes subtraction or absolute difference between two images.",
+      "displayName": "图像减法",
+      "description": "计算两张图像的相减结果或绝对差值。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -9213,7 +9173,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes subtraction or absolute …",
+      "algorithm": "该算子用于计算两张图像的相减结果或绝对差值。运行时从声明输入端口读取数据，按参数表解…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -9918,7 +9878,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析…",
+      "algorithm": "该算子用于递增单次运行变量或项目全局 Int64 变量。运行时从声明输入端口读取数据…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -10071,8 +10031,8 @@
     {
       "id": "TryCatch",
       "type": 83,
-      "displayName": "异常捕获",
-      "description": "Try-Catch 流程控制",
+      "displayName": "Try分支透传",
+      "description": "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
       "category": "流程控制",
       "version": "1.0.0",
       "tags": [
@@ -10080,7 +10040,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配…",
+      "algorithm": "该算子用于将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下…",
       "inputPorts": [
         {
           "name": "Input",
@@ -10120,7 +10080,7 @@
           "name": "EnableCatch",
           "displayName": "启用Catch",
           "dataType": "bool",
-          "description": "是否启用异常捕获",
+          "description": "兼容旧流程的开关；当前仅记录配置，不执行异常捕获。",
           "defaultValue": "true",
           "min": null,
           "max": null,
@@ -10131,7 +10091,7 @@
           "name": "CatchOutputError",
           "displayName": "输出错误信息",
           "dataType": "bool",
-          "description": null,
+          "description": "兼容旧流程的配置；当前 Error 输出始终为空。",
           "defaultValue": "true",
           "min": null,
           "max": null,
@@ -10142,7 +10102,7 @@
           "name": "CatchOutputStackTrace",
           "displayName": "输出堆栈",
           "dataType": "bool",
-          "description": null,
+          "description": "兼容旧流程的配置；当前不输出异常堆栈。",
           "defaultValue": "false",
           "min": null,
           "max": null,
@@ -10259,7 +10219,7 @@
       "id": "AkazeFeatureMatch",
       "type": 90,
       "displayName": "AKAZE特征匹配",
-      "description": "AKAZE feature matching with verified homography gating for robust template localization.",
+      "description": "使用 AKAZE 局部特征与单应性校验进行模板定位，适合纹理目标的稳健匹配。",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -10555,7 +10515,7 @@
       "id": "OrbFeatureMatch",
       "type": 91,
       "displayName": "ORB特征匹配",
-      "description": "ORB feature matching with homography verification for fast template localization.",
+      "description": "使用 ORB 特征和单应性校验进行快速模板定位。",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -11352,16 +11312,16 @@
     {
       "id": "DualModalVoting",
       "type": 94,
-      "displayName": "Dual Modal Voting",
-      "description": "Combines deep learning and traditional inspection results into a final judgment.",
-      "category": "AI Detection",
+      "displayName": "双模态投票",
+      "description": "融合深度学习与传统视觉检测结果，输出最终判定。",
+      "category": "AI检测",
       "version": "1.0.0",
       "tags": [
         "功能域:AI",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Combines deep learning and tradit…",
+      "algorithm": "该算子用于融合深度学习与传统视觉检测结果，输出最终判定。运行时从声明输入端口读取数据…",
       "inputPorts": [
         {
           "name": "DLResult",
@@ -11992,8 +11952,8 @@
     {
       "id": "TypeConvert",
       "type": 112,
-      "displayName": "Type Convert",
-      "description": "Converts input data across String/Float/Integer/Boolean types.",
+      "displayName": "类型转换",
+      "description": "在字符串、浮点、整数、布尔等类型之间转换输入数据。",
       "category": "通用",
       "version": "1.0.0",
       "tags": [
@@ -12001,7 +11961,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Converts input data across String…",
+      "algorithm": "该算子用于在字符串、浮点、整数、布尔等类型之间转换输入数据。运行时从声明输入端口读取…",
       "inputPorts": [
         {
           "name": "Input",
@@ -12246,9 +12206,9 @@
     {
       "id": "MqttPublish",
       "type": 114,
-      "displayName": "MQTT Publish",
-      "description": "Publishes inspection data to MQTT when the optional MQTT integration is enabled.",
-      "category": "Communication",
+      "displayName": "MQTT 发布",
+      "description": "在启用可选 MQTT 集成时发布检测数据。",
+      "category": "通信",
       "version": "0.1.0",
       "tags": [
         "experimental",
@@ -12258,7 +12218,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Publishes inspection data to MQTT…",
+      "algorithm": "该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Payload",
@@ -12603,8 +12563,8 @@
     {
       "id": "Statistics",
       "type": 119,
-      "displayName": "Statistics",
-      "description": "Computes Mean/StdDev/Cpk statistics over rolling history.",
+      "displayName": "统计分析",
+      "description": "基于滚动历史计算均值、标准差和 Cpk 统计结果。",
       "category": "通用",
       "version": "1.0.0",
       "tags": [
@@ -12612,7 +12572,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes Mean/StdDev/Cpk statisti…",
+      "algorithm": "该算子用于基于滚动历史计算均值、标准差和 Cpk 统计结果。运行时从声明输入端口读取…",
       "inputPorts": [
         {
           "name": "Value",
@@ -12909,7 +12869,7 @@
       "type": 122,
       "displayName": "数值比较",
       "description": "比较两个数值的大小关系，输出布尔判定结果与差值",
-      "category": "流程控制",
+      "category": "逻辑工具",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -13105,7 +13065,7 @@
       "id": "CaliperTool",
       "type": 130,
       "displayName": "卡尺工具",
-      "description": "Detects edge pairs along a scan line and reports width.",
+      "description": "沿扫描线检测边缘对并输出宽度。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -13113,7 +13073,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects edge pairs along a scan l…",
+      "algorithm": "该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -13345,7 +13305,7 @@
       "id": "WidthMeasurement",
       "type": 131,
       "displayName": "宽度测量",
-      "description": "Measures width between parallel edges or lines.",
+      "description": "测量平行边缘或直线之间的宽度。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -13353,7 +13313,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures width between parallel e…",
+      "algorithm": "该算子用于测量平行边缘或直线之间的宽度。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -13547,7 +13507,7 @@
       "id": "PointLineDistance",
       "type": 132,
       "displayName": "点线距离",
-      "description": "Computes distance from a point to a line or segment.",
+      "description": "计算点到直线或线段的最短距离。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -13555,7 +13515,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes distance from a point to…",
+      "algorithm": "该算子用于计算点到直线或线段的最短距离。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Point",
@@ -13637,7 +13597,7 @@
       "id": "LineLineDistance",
       "type": 133,
       "displayName": "线线距离",
-      "description": "Computes distance and angle between two lines or segments.",
+      "description": "计算两条直线或线段之间的距离与夹角。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -13645,7 +13605,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes distance and angle betwe…",
+      "algorithm": "该算子用于计算两条直线或线段之间的距离与夹角。运行时从声明输入端口读取数据，按参数表…",
       "inputPorts": [
         {
           "name": "Line1",
@@ -13756,7 +13716,7 @@
       "id": "BoxNms",
       "type": 140,
       "displayName": "候选框抑制",
-      "description": "Runs non-maximum suppression on detection boxes.",
+      "description": "对检测框执行非极大值抑制。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -13764,7 +13724,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Runs non-maximum suppression on d…",
+      "algorithm": "该算子用于对检测框执行非极大值抑制。运行时从声明输入端口读取数据，按参数表解析配置，…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -13889,8 +13849,8 @@
     {
       "id": "BoxFilter",
       "type": 141,
-      "displayName": "候选框过滤 (Bounding Box)",
-      "description": "Filters detections by area, class, region, or score.",
+      "displayName": "候选框筛选",
+      "description": "按面积、类别、区域或分数过滤检测结果。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -13898,7 +13858,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Filters detections by area, class…",
+      "algorithm": "该算子用于按面积、类别、区域或分数过滤检测结果。运行时从声明输入端口读取数据，按参数…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -14066,7 +14026,7 @@
       "id": "SharpnessEvaluation",
       "type": 142,
       "displayName": "清晰度评估",
-      "description": "Evaluates focus quality of an image.",
+      "description": "评估图像的对焦清晰度。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -14074,7 +14034,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Evaluates focus quality of an ima…",
+      "algorithm": "该算子用于评估图像的对焦清晰度。运行时从声明输入端口读取数据，按参数表解析配置，并把…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14402,8 +14362,8 @@
     {
       "id": "NPointCalibration",
       "type": 150,
-      "displayName": "N Point Calibration",
-      "description": "Builds robust affine or homography calibration from all point pairs.",
+      "displayName": "N点标定",
+      "description": "基于全部点对鲁棒估计仿射或单应性标定模型。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -14411,7 +14371,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Builds robust affine or homograph…",
+      "algorithm": "该算子用于基于全部点对鲁棒估计仿射或单应性标定模型。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14611,8 +14571,8 @@
     {
       "id": "CalibrationLoader",
       "type": 151,
-      "displayName": "Calibration Loader",
-      "description": "Loads CalibrationBundleV2 JSON and exposes typed calibration outputs.",
+      "displayName": "标定加载",
+      "description": "从 CalibrationBundleV2 JSON 文件加载标定数据并输出强类型结果。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -14620,7 +14580,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Loads CalibrationBundleV2 JSON an…",
+      "algorithm": "该算子用于从 CalibrationBundleV2 JSON 文件加载标定数据并输…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -14670,7 +14630,7 @@
       "id": "UnitConvert",
       "type": 152,
       "displayName": "单位换算",
-      "description": "Converts value between pixel, mm, um and inch.",
+      "description": "在像素、mm、um 和英寸之间进行数值换算。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -14678,7 +14638,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Converts value between pixel, mm,…",
+      "algorithm": "该算子用于在像素、mm、um 和英寸之间进行数值换算。运行时从声明输入端口读取数据，…",
       "inputPorts": [
         {
           "name": "Value",
@@ -14802,7 +14762,7 @@
       "id": "TimerStatistics",
       "type": 153,
       "displayName": "计时统计",
-      "description": "Measures elapsed and cycle time statistics.",
+      "description": "统计耗时和周期时间。",
       "category": "逻辑工具",
       "version": "1.0.1",
       "tags": [
@@ -14810,7 +14770,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures elapsed and cycle time s…",
+      "algorithm": "该算子用于统计耗时和周期时间。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "Trigger",
@@ -14915,7 +14875,7 @@
       "id": "ScriptOperator",
       "type": 160,
       "displayName": "脚本算子",
-      "description": "Runs user-defined expression or script snippet.",
+      "description": "运行用户自定义表达式或脚本片段。",
       "category": "逻辑工具",
       "version": "1.0.0",
       "tags": [
@@ -14923,7 +14883,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Runs user-defined expression or s…",
+      "algorithm": "该算子用于运行用户自定义表达式或脚本片段。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [
         {
           "name": "Input1",
@@ -15023,7 +14983,7 @@
       "id": "TriggerModule",
       "type": 161,
       "displayName": "触发模块",
-      "description": "Generates software, timer, or external triggers.",
+      "description": "生成软件、定时或外部触发信号。",
       "category": "逻辑工具",
       "version": "1.0.0",
       "tags": [
@@ -15031,7 +14991,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Generates software, timer, or ext…",
+      "algorithm": "该算子用于生成软件、定时或外部触发信号。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Signal",
@@ -15360,7 +15320,7 @@
       "id": "GapMeasurement",
       "type": 164,
       "displayName": "间隙测量",
-      "description": "Measures spacing using points or image projection.",
+      "description": "通过点或图像投影方式测量间距。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -15368,7 +15328,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures spacing using points or …",
+      "algorithm": "该算子用于通过点或图像投影方式测量间距。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15557,7 +15517,7 @@
       "id": "PolarUnwrap",
       "type": 170,
       "displayName": "极坐标展开",
-      "description": "Unwraps annular image regions into rectangular view.",
+      "description": "将环形图像区域展开为矩形视图。",
       "category": "图像处理",
       "version": "1.0.0",
       "tags": [
@@ -15565,7 +15525,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Unwraps annular image regions int…",
+      "algorithm": "该算子用于将环形图像区域展开为矩形视图。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15693,7 +15653,7 @@
       "id": "ShadingCorrection",
       "type": 171,
       "displayName": "光照校正",
-      "description": "Corrects uneven illumination by background or model-based methods.",
+      "description": "通过背景法或模型法校正光照不均。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -15701,7 +15661,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Corrects uneven illumination by b…",
+      "algorithm": "该算子用于通过背景法或模型法校正光照不均。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15796,7 +15756,7 @@
       "id": "FrameAveraging",
       "type": 172,
       "displayName": "帧平均",
-      "description": "Averages multi-frame input to reduce temporal noise.",
+      "description": "对多帧输入取平均以降低时域噪声。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -15804,7 +15764,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Averages multi-frame input to red…",
+      "algorithm": "该算子用于对多帧输入取平均以降低时域噪声。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15875,7 +15835,7 @@
       "id": "AffineTransform",
       "type": 173,
       "displayName": "仿射变换",
-      "description": "Applies 2D affine transform using 3-point or rotate-scale-translate mode.",
+      "description": "使用三点或旋转-缩放-平移模式执行二维仿射变换。",
       "category": "图像处理",
       "version": "1.0.0",
       "tags": [
@@ -15883,7 +15843,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Applies 2D affine transform using…",
+      "algorithm": "该算子用于使用三点或旋转-缩放-平移模式执行二维仿射变换。运行时从声明输入端口读取数…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16031,7 +15991,7 @@
       "id": "ColorMeasurement",
       "type": 174,
       "displayName": "颜色测量",
-      "description": "Measures Lab delta-E or HSV statistics over a selected ROI.",
+      "description": "在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。",
       "category": "颜色处理",
       "version": "2.0.0",
       "tags": [
@@ -16039,7 +15999,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Measures Lab delta-E or HSV stati…",
+      "algorithm": "该算子用于在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。运行时从声明输入…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16238,7 +16198,7 @@
       "id": "SurfaceDefectDetection",
       "type": 180,
       "displayName": "表面缺陷检测",
-      "description": "Detects surface defects using gradient, aligned reference diff, or local contrast.",
+      "description": "使用梯度、配准后的参考差分或局部对比度检测表面缺陷。",
       "category": "AI检测",
       "version": "2.0.0",
       "tags": [
@@ -16249,7 +16209,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects surface defects using gra…",
+      "algorithm": "该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16824,7 +16784,7 @@
       "id": "RectangleDetection",
       "type": 182,
       "displayName": "矩形检测",
-      "description": "Detects rectangular/quadrilateral objects from contours.",
+      "description": "根据轮廓检测矩形/四边形目标。",
       "category": "定位",
       "version": "1.0.0",
       "tags": [
@@ -16832,7 +16792,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects rectangular/quadrilateral…",
+      "algorithm": "该算子用于根据轮廓检测矩形/四边形目标。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16964,7 +16924,7 @@
       "id": "TranslationRotationCalibration",
       "type": 183,
       "displayName": "平移旋转标定",
-      "description": "Fits robust 2D rigid or similarity transform from image-to-robot point pairs.",
+      "description": "从图像-机器人点对鲁棒拟合二维刚性或相似变换。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -16972,7 +16932,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Fits robust 2D rigid or similarit…",
+      "algorithm": "该算子用于从图像-机器人点对鲁棒拟合二维刚性或相似变换。运行时从声明输入端口读取数据…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17060,7 +17020,7 @@
       "id": "CornerDetection",
       "type": 190,
       "displayName": "角点检测",
-      "description": "Detects corner points using Harris or Shi-Tomasi.",
+      "description": "使用 Harris 或 Shi-Tomasi 检测角点。",
       "category": "定位",
       "version": "1.0.0",
       "tags": [
@@ -17068,7 +17028,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Detects corner points using Harri…",
+      "algorithm": "该算子用于使用 Harris 或 Shi-Tomasi 检测角点。运行时从声明输入端…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17178,7 +17138,7 @@
       "id": "EdgeIntersection",
       "type": 191,
       "displayName": "边线交点",
-      "description": "Computes line intersection and angle between two lines.",
+      "description": "计算两条直线的交点和夹角。",
       "category": "定位",
       "version": "1.0.0",
       "tags": [
@@ -17186,7 +17146,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes line intersection and an…",
+      "algorithm": "该算子用于计算两条直线的交点和夹角。运行时从声明输入端口读取数据，按参数表解析配置，…",
       "inputPorts": [
         {
           "name": "Line1",
@@ -17264,7 +17224,7 @@
       "id": "ParallelLineFind",
       "type": 192,
       "displayName": "平行线查找",
-      "description": "Finds best pair of near-parallel lines in an image.",
+      "description": "在图像中查找最佳近似平行线对。",
       "category": "定位",
       "version": "1.0.0",
       "tags": [
@@ -17272,7 +17232,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Finds best pair of near-parallel …",
+      "algorithm": "该算子用于在图像中查找最佳近似平行线对。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17380,7 +17340,7 @@
       "id": "QuadrilateralFind",
       "type": 193,
       "displayName": "四边形查找",
-      "description": "Finds quadrilateral contours without right-angle constraints.",
+      "description": "查找不受直角约束的四边形轮廓。",
       "category": "定位",
       "version": "1.0.0",
       "tags": [
@@ -17388,7 +17348,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Finds quadrilateral contours with…",
+      "algorithm": "该算子用于查找不受直角约束的四边形轮廓。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17496,7 +17456,7 @@
       "id": "GeoMeasurement",
       "type": 194,
       "displayName": "几何测量",
-      "description": "General geometry measurement between point/line/circle elements.",
+      "description": "对点、线、圆等几何元素进行通用几何测量。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -17504,7 +17464,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：General geometry measurement betw…",
+      "algorithm": "该算子用于对点、线、圆等几何元素进行通用几何测量。运行时从声明输入端口读取数据，按参…",
       "inputPorts": [
         {
           "name": "Element1",
@@ -17644,7 +17604,7 @@
       "id": "ImageStitching",
       "type": 200,
       "displayName": "图像拼接",
-      "description": "Stitches two images into a larger panorama-like output.",
+      "description": "将两张图像拼接成更大的全景式输出。",
       "category": "图像处理",
       "version": "1.0.0",
       "tags": [
@@ -17652,7 +17612,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Stitches two images into a larger…",
+      "algorithm": "该算子用于将两张图像拼接成更大的全景式输出。运行时从声明输入端口读取数据，按参数表解…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -17749,7 +17709,7 @@
       "id": "ImageTiling",
       "type": 201,
       "displayName": "图像切片",
-      "description": "Splits an image into tiled regions with optional overlap.",
+      "description": "将图像切分为可选重叠的分块区域。",
       "category": "拆分组合",
       "version": "1.0.0",
       "tags": [
@@ -17757,7 +17717,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Splits an image into tiled region…",
+      "algorithm": "该算子用于将图像切分为可选重叠的分块区域。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17856,7 +17816,7 @@
       "id": "ImageNormalize",
       "type": 202,
       "displayName": "图像归一化",
-      "description": "Normalizes pixel distribution for robust downstream processing.",
+      "description": "归一化像素分布，以提升下游处理稳定性。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -17864,7 +17824,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Normalizes pixel distribution for…",
+      "algorithm": "该算子用于归一化像素分布，以提升下游处理稳定性。运行时从声明输入端口读取数据，按参数…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17964,7 +17924,7 @@
       "id": "ImageCompose",
       "type": 203,
       "displayName": "图像组合",
-      "description": "Composes multiple images by concat/grid/channel merge.",
+      "description": "通过拼接、网格或通道合并方式组合多张图像。",
       "category": "拆分组合",
       "version": "1.0.0",
       "tags": [
@@ -17972,7 +17932,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Composes multiple images by conca…",
+      "algorithm": "该算子用于通过拼接、网格或通道合并方式组合多张图像。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -18074,7 +18034,7 @@
       "id": "CopyMakeBorder",
       "type": 204,
       "displayName": "边界填充",
-      "description": "Pads image border using OpenCV border policies.",
+      "description": "使用 OpenCV 边界策略填充图像边缘。",
       "category": "图像处理",
       "version": "1.0.0",
       "tags": [
@@ -18082,7 +18042,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Pads image border using OpenCV bo…",
+      "algorithm": "该算子用于使用 OpenCV 边界策略填充图像边缘。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Image",
@@ -18198,8 +18158,8 @@
     {
       "id": "TextSave",
       "type": 210,
-      "displayName": "Text Save",
-      "description": "Saves text or structured data to text/csv/json file.",
+      "displayName": "文本保存",
+      "description": "将文本或结构化数据保存为 text/csv/json 文件。",
       "category": "逻辑工具",
       "version": "1.0.0",
       "tags": [
@@ -18207,7 +18167,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Saves text or structured data to …",
+      "algorithm": "该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输…",
       "inputPorts": [
         {
           "name": "Data",
@@ -18330,7 +18290,7 @@
       "id": "PointSetTool",
       "type": 211,
       "displayName": "点集工具",
-      "description": "Merges/sorts/filters point lists and computes set properties.",
+      "description": "合并、排序、过滤点列表并计算集合属性。",
       "category": "逻辑工具",
       "version": "1.0.0",
       "tags": [
@@ -18338,7 +18298,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Merges/sorts/filters point lists …",
+      "algorithm": "该算子用于合并、排序、过滤点列表并计算集合属性。运行时从声明输入端口读取数据，按参数…",
       "inputPorts": [
         {
           "name": "Points1",
@@ -18606,7 +18566,7 @@
       "id": "HistogramAnalysis",
       "type": 213,
       "displayName": "直方图分析",
-      "description": "Computes histogram and intensity-domain distribution statistics for a selected channel.",
+      "description": "统计指定通道的直方图及灰度/强度分布指标。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -18614,7 +18574,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes histogram and intensity-…",
+      "algorithm": "该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Image",
@@ -18791,7 +18751,7 @@
       "id": "PixelStatistics",
       "type": 214,
       "displayName": "像素统计",
-      "description": "Computes ROI/masked pixel-level statistics.",
+      "description": "计算 ROI 或掩码区域内的像素级统计信息。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -18799,7 +18759,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Computes ROI/masked pixel-level s…",
+      "algorithm": "该算子用于计算 ROI 或掩码区域内的像素级统计信息。运行时从声明输入端口读取数据，…",
       "inputPorts": [
         {
           "name": "Image",
@@ -18945,7 +18905,7 @@
       "id": "MeanFilter",
       "type": 215,
       "displayName": "均值滤波",
-      "description": "Applies mean (box blur) filtering to smooth image noise.",
+      "description": "使用均值（方框）滤波平滑图像噪声。",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -18953,7 +18913,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Applies mean (box blur) filtering…",
+      "algorithm": "该算子用于使用均值（方框）滤波平滑图像噪声。运行时从声明输入端口读取数据，按参数表解…",
       "inputPorts": [
         {
           "name": "Image",
@@ -19089,7 +19049,7 @@
       "id": "VoxelDownsample",
       "type": 217,
       "displayName": "体素下采样",
-      "description": "Voxel grid downsampling for point clouds (centroid per voxel).",
+      "description": "对点云执行体素网格下采样（每个体素取质心）。",
       "category": "3D",
       "version": "1.0.1",
       "tags": [
@@ -19224,7 +19184,7 @@
       "id": "RansacPlaneSegmentation",
       "type": 219,
       "displayName": "RANSAC平面分割",
-      "description": "RANSAC plane segmentation for point clouds. Outputs plane coefficients and inliers.",
+      "description": "对点云执行 RANSAC 平面分割，输出平面系数和内点。",
       "category": "3D",
       "version": "1.0.0",
       "tags": [
@@ -19232,7 +19192,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：RANSAC plane segmentation for poi…",
+      "algorithm": "该算子用于对点云执行 RANSAC 平面分割，输出平面系数和内点。运行时从声明输入端…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -19352,7 +19312,7 @@
       "id": "EuclideanClusterExtraction",
       "type": 220,
       "displayName": "欧氏聚类分割",
-      "description": "Euclidean Cluster Extraction for point clouds (3D connected components by distance).",
+      "description": "对点云执行欧式聚类提取（按距离划分三维连通分量）。",
       "category": "3D",
       "version": "1.0.0",
       "tags": [
@@ -19360,7 +19320,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Euclidean Cluster Extraction for …",
+      "algorithm": "该算子用于对点云执行欧式聚类提取（按距离划分三维连通分量）。运行时从声明输入端口读取…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -19439,7 +19399,7 @@
       "id": "PPFEstimation",
       "type": 221,
       "displayName": "PPF点对特征",
-      "description": "Compute Point Pair Features (PPF) for a point cloud and build a per-point feature map.",
+      "description": "为点云计算点对特征（PPF）并构建逐点特征图。",
       "category": "3D",
       "version": "1.0.0",
       "tags": [
@@ -19447,7 +19407,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Compute Point Pair Features (PPF)…",
+      "algorithm": "该算子用于为点云计算点对特征（PPF）并构建逐点特征图。运行时从声明输入端口读取数据…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -19773,9 +19733,9 @@
     {
       "id": "LawsTextureFilter",
       "type": 223,
-      "displayName": "Laws Texture Filter",
-      "description": "Apply 5x5 Laws texture filtering and compute local energy.",
-      "category": "Texture",
+      "displayName": "Laws纹理滤波",
+      "description": "应用 5x5 Laws 纹理滤波并计算局部能量。",
+      "category": "纹理",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -19895,9 +19855,9 @@
     {
       "id": "GlcmTexture",
       "type": 224,
-      "displayName": "GLCM Texture Features",
-      "description": "Compute Gray-Level Co-occurrence Matrix (GLCM) texture features.",
-      "category": "Texture",
+      "displayName": "GLCM纹理特征",
+      "description": "计算灰度共生矩阵（GLCM）纹理特征。",
+      "category": "纹理",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -20067,7 +20027,7 @@
       "id": "SemanticSegmentation",
       "type": 225,
       "displayName": "语义分割",
-      "description": "Runs an ONNX semantic segmentation model and returns class map, colored visualization, and per-class masks.",
+      "description": "运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。",
       "category": "AI检测",
       "version": "1.0.0",
       "tags": [
@@ -20075,7 +20035,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Runs an ONNX semantic segmentatio…",
+      "algorithm": "该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行…",
       "inputPorts": [
         {
           "name": "Image",
@@ -20325,7 +20285,7 @@
       "id": "AnomalyDetection",
       "type": 226,
       "displayName": "异常检测",
-      "description": "Runs a simplified PatchCore-style anomaly detector with train/inference modes and feature-bank persistence.",
+      "description": "运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。",
       "category": "AI检测",
       "version": "1.0.0",
       "tags": [
@@ -20620,8 +20580,8 @@
     {
       "id": "HandEyeCalibration",
       "type": 227,
-      "displayName": "Hand-Eye Calibration",
-      "description": "Solves eye-in-hand or simplified eye-to-hand calibration from robot poses and calibration-board poses.",
+      "displayName": "手眼标定",
+      "description": "根据机器人位姿和标定板位姿求解手眼或简化眼在手外标定。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -20778,8 +20738,8 @@
     {
       "id": "HandEyeCalibrationValidator",
       "type": 228,
-      "displayName": "Hand-Eye Calibration Validator",
-      "description": "Validates a hand-eye CalibrationBundleV2 payload and produces quality metrics, HTML report, and pose suggestions.",
+      "displayName": "手眼标定验证",
+      "description": "验证手眼标定 CalibrationBundleV2 并生成质量指标、HTML 报告和位姿建议。",
       "category": "标定",
       "version": "1.0.1",
       "tags": [
@@ -20894,8 +20854,8 @@
     {
       "id": "FisheyeCalibration",
       "type": 229,
-      "displayName": "Fisheye Calibration",
-      "description": "Calibrates fisheye camera intrinsics and distortion parameters using chessboard or circle grid patterns.",
+      "displayName": "鱼眼标定",
+      "description": "使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -20903,7 +20863,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Calibrates fisheye camera intrins…",
+      "algorithm": "该算子用于使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。运行时从声明输入端口读取…",
       "inputPorts": [
         {
           "name": "Image",
@@ -21059,8 +21019,8 @@
     {
       "id": "FisheyeUndistort",
       "type": 230,
-      "displayName": "Fisheye Undistort",
-      "description": "Correct fisheye lens distortion using calibration data with LUT acceleration.",
+      "displayName": "鱼眼去畸变",
+      "description": "使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -21068,7 +21028,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Correct fisheye lens distortion u…",
+      "algorithm": "该算子用于使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。运行时从声明输入端口读…",
       "inputPorts": [
         {
           "name": "Image",
@@ -21157,8 +21117,8 @@
     {
       "id": "StereoCalibration",
       "type": 231,
-      "displayName": "Stereo Calibration",
-      "description": "Calibrates stereo camera pair and generates rectification maps for epipolar alignment.",
+      "displayName": "双目标定",
+      "description": "标定双目相机并生成极线校正映射。",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -21166,7 +21126,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Calibrates stereo camera pair and…",
+      "algorithm": "该算子用于标定双目相机并生成极线校正映射。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [
         {
           "name": "LeftImage",
@@ -21374,8 +21334,8 @@
     {
       "id": "PixelToWorldTransform",
       "type": 232,
-      "displayName": "Pixel To World Transform",
-      "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
+      "displayName": "像素世界映射",
+      "description": "通过 CalibrationBundleV2 执行坐标转换，可使用 Transform2D 或相机射线与平面求交。",
       "category": "标定",
       "version": "1.0.1",
       "tags": [
@@ -21383,7 +21343,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Transforms coordinates via Calibr…",
+      "algorithm": "该算子用于通过 CalibrationBundleV2 执行坐标转换，可使用 Tra…",
       "inputPorts": [
         {
           "name": "Image",
@@ -22001,8 +21961,8 @@
     {
       "id": "LocalDeformableMatching",
       "type": 234,
-      "displayName": "Local Deformable Matching",
-      "description": "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
+      "displayName": "局部可变形匹配",
+      "description": "实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。",
       "category": "匹配定位",
       "version": "1.1.1",
       "tags": [
@@ -22244,9 +22204,9 @@
     {
       "id": "DistanceTransform",
       "type": 235,
-      "displayName": "Distance Transform",
-      "description": "Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances.",
-      "category": "Analysis",
+      "displayName": "距离变换",
+      "description": "计算每个像素到最近零像素的距离，支持多种距离度量和有符号距离。",
+      "category": "图像处理",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -22402,8 +22362,8 @@
     {
       "id": "MinEnclosingGeometry",
       "type": 236,
-      "displayName": "Min Enclosing Geometry",
-      "description": "Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting with RANSAC.",
+      "displayName": "最小外接几何体",
+      "description": "计算最小包围几何（圆、矩形、三角形），并支持基于 RANSAC 的鲁棒圆弧拟合。",
       "category": "检测",
       "version": "1.0.1",
       "tags": [
@@ -22777,9 +22737,9 @@
     {
       "id": "RegionErosion",
       "type": 240,
-      "displayName": "Region Erosion",
-      "description": "Erodes a region using a specified structuring element (Region-based morphology).",
-      "category": "Morphology",
+      "displayName": "区域腐蚀",
+      "description": "使用指定结构元素对区域执行腐蚀（基于区域的形态学）。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -22894,9 +22854,9 @@
     {
       "id": "RegionDilation",
       "type": 241,
-      "displayName": "Region Dilation",
-      "description": "Dilates a region using a specified structuring element (Region-based morphology).",
-      "category": "Morphology",
+      "displayName": "区域膨胀",
+      "description": "使用指定结构元素对区域执行膨胀（基于区域的形态学）。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23011,9 +22971,9 @@
     {
       "id": "RegionOpening",
       "type": 242,
-      "displayName": "Region Opening",
-      "description": "Opening operation (erosion followed by dilation) for noise removal and smooth region boundaries.",
-      "category": "Morphology",
+      "displayName": "区域开运算",
+      "description": "执行开运算（先腐蚀后膨胀），用于去噪并平滑区域边界。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23117,9 +23077,9 @@
     {
       "id": "RegionClosing",
       "type": 243,
-      "displayName": "Region Closing",
-      "description": "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
-      "category": "Morphology",
+      "displayName": "区域闭运算",
+      "description": "执行闭运算（先膨胀后腐蚀），用于填补小孔洞并连接相近区域。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23223,9 +23183,9 @@
     {
       "id": "RegionSkeleton",
       "type": 244,
-      "displayName": "Region Skeleton",
-      "description": "Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity.",
-      "category": "Morphology",
+      "displayName": "区域骨架化",
+      "description": "使用 Zhang-Suen 细化算法提取骨架，并保持拓扑与连通性。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23317,9 +23277,9 @@
     {
       "id": "RegionUnion",
       "type": 245,
-      "displayName": "Region Union",
-      "description": "Computes the union of two regions (A ∪ B).",
-      "category": "Region",
+      "displayName": "区域并集",
+      "description": "计算两个区域的并集（A ∪ B）。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23376,9 +23336,9 @@
     {
       "id": "RegionIntersection",
       "type": 246,
-      "displayName": "Region Intersection",
-      "description": "Computes the intersection of two regions (A ∩ B).",
-      "category": "Region",
+      "displayName": "区域交集",
+      "description": "计算两个区域的交集（A ∩ B）。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23435,9 +23395,9 @@
     {
       "id": "RegionDifference",
       "type": 247,
-      "displayName": "Region Difference",
-      "description": "Computes the difference of two regions (A - B).",
-      "category": "Region",
+      "displayName": "区域差集",
+      "description": "计算两个区域的差集（A - B）。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23494,9 +23454,9 @@
     {
       "id": "RegionComplement",
       "type": 248,
-      "displayName": "Region Complement",
-      "description": "Computes the complement of a region relative to an image size.",
-      "category": "Region",
+      "displayName": "区域补集",
+      "description": "相对于图像尺寸计算区域补集。",
+      "category": "区域处理",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23565,8 +23525,8 @@
     {
       "id": "ArcCaliper",
       "type": 249,
-      "displayName": "Arc Caliper",
-      "description": "Detects edges along an arc path with subpixel accuracy.",
+      "displayName": "圆弧卡尺",
+      "description": "沿圆弧路径检测边缘，支持亚像素精度。",
       "category": "检测",
       "version": "1.0.1",
       "tags": [
@@ -23648,8 +23608,8 @@
     {
       "id": "ContourExtrema",
       "type": 250,
-      "displayName": "Contour Extrema",
-      "description": "Finds extremal points of a contour in specified directions.",
+      "displayName": "轮廓极值",
+      "description": "在指定方向上查找轮廓极值点。",
       "category": "检测",
       "version": "1.0.1",
       "tags": [
@@ -23731,16 +23691,16 @@
     {
       "id": "FFT1D",
       "type": 251,
-      "displayName": "FFT 1D",
-      "description": "Performs FFT on 1D signals and emits a full complex spectrum for image inputs.",
-      "category": "Frequency",
+      "displayName": "信号/图像傅里叶变换（FFT）",
+      "description": "对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、幅度和相位。",
+      "category": "频域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Performs FFT on 1D signals and em…",
+      "algorithm": "该算子用于对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、…",
       "inputPorts": [
         {
           "name": "Input",
@@ -23796,16 +23756,16 @@
     {
       "id": "FrequencyFilter",
       "type": 252,
-      "displayName": "Frequency Filter",
-      "description": "Applies frequency-domain filters to 1D or 2D complex spectra.",
-      "category": "Frequency",
+      "displayName": "频域滤波",
+      "description": "对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。",
+      "category": "频域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Applies frequency-domain filters …",
+      "algorithm": "该算子用于对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。运行时从声明…",
       "inputPorts": [
         {
           "name": "Spectrum",
@@ -23873,16 +23833,16 @@
     {
       "id": "InverseFFT1D",
       "type": 253,
-      "displayName": "Inverse FFT 1D",
-      "description": "Performs inverse FFT on 1D spectra and reconstructs images from 2D complex spectra.",
-      "category": "Frequency",
+      "displayName": "信号/图像逆傅里叶变换（IFFT）",
+      "description": "对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信号。",
+      "category": "频域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前元数据描述为：Performs inverse FFT on 1D spectr…",
+      "algorithm": "该算子用于对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信…",
       "inputPorts": [
         {
           "name": "Spectrum",
@@ -23938,8 +23898,8 @@
     {
       "id": "PhaseClosure",
       "type": 254,
-      "displayName": "Phase Closure",
-      "description": "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
+      "displayName": "相位解缠绕",
+      "description": "对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。",
       "category": "检测",
       "version": "1.0.1",
       "tags": [
@@ -24357,13 +24317,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
+        "totalScore": 90,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     }

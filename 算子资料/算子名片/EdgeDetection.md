@@ -1,4 +1,4 @@
-# Edge Detection / CannyEdge
+# 边缘检测 / CannyEdge
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Detects edges with Canny and optional auto-thresholding。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于使用 Canny 进行边缘检测，并可选自动阈值。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
@@ -50,10 +50,10 @@
 | `GaussianKernelSize` | Gaussian Kernel Size | `int` | 5 | [3, 15] | Yes | - |
 | `ApertureSize` | Sobel Aperture Size | `enum` | 3 | 3/3；5/5；7/7 | Yes | - |
 | `L2Gradient` | L2 梯度 | `bool` | false | - | Yes | 使用 L2 范数计算梯度幅值，更精确但稍慢 |
-| `EdgeModelPath` | Edge Model Path | `file` | "" | - | Yes | - |
-| `EdgeModelId` | Edge Model Id | `string` | "" | - | Yes | - |
-| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
-| `EdgeBinarizationThreshold` | Edge Binarization Threshold | `double` | 0.5 | [0, 1] | Yes | - |
+| `EdgeModelPath` | Edge Model Path | `file` | "" | - | No | - |
+| `EdgeModelId` | Edge Model Id | `string` | "" | - | No | - |
+| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | No | - |
+| `EdgeBinarizationThreshold` | Edge Binarization Threshold | `double` | 0.5 | [0, 1] | No | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -108,4 +108,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

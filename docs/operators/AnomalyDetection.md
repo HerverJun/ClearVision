@@ -11,7 +11,7 @@
 | 标签 (Tags) | `anomaly-detection`, `experimental`, `industrial-remediation`, `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Runs a simplified PatchCore-style anomaly detector with train/inference modes and feature-bank persistence。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 算法类型以 `Simplified PatchCore` 为主；元数据未声明更多细分时，以当前源码实现为准。
 源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
@@ -118,4 +118,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

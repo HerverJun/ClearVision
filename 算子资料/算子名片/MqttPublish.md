@@ -1,17 +1,17 @@
-# MQTT Publish / MqttPublish
+# MQTT 发布 / MqttPublish
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `MqttPublishOperator` |
 | 枚举值 (Enum) | `OperatorType.MqttPublish` |
-| 分类 (Category) | Communication |
+| 分类 (Category) | 通信 |
 | 版本 (Version) | `0.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `experimental`, `integration:mqtt`, `maturity:placeholder-disabled`, `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Publishes inspection data to MQTT when the optional MQTT integration is enabled。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
@@ -68,7 +68,7 @@
 - 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
+- 适合 (Suitable)：检测结果需要与现场设备、上位系统或网络服务进行读写交互的场景。
 - 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
@@ -77,4 +77,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 0.1.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 0.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

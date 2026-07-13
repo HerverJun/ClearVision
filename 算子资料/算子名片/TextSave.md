@@ -1,4 +1,4 @@
-# Text Save / TextSave
+# 文本保存 / TextSave
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Saves text or structured data to text/csv/json file。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含外部资源访问逻辑，执行结果会受文件系统、网络、PLC、串口或外部服务状态影响。
 
 ## 实现策略 / Implementation Strategy
@@ -27,8 +27,6 @@
 - `Path.GetDirectoryName`
 - `Directory.CreateDirectory`
 - `Path.GetFullPath`
-- `File.AppendAllText`
-- `File.WriteAllText`
 - `JsonSerializer.Serialize`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
@@ -83,4 +81,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

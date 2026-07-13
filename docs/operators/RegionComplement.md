@@ -1,17 +1,17 @@
-# Region Complement / RegionComplement
+# 区域补集 / RegionComplement
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `RegionComplementOperator` |
 | 枚举值 (Enum) | `OperatorType.RegionComplement` |
-| 分类 (Category) | Region |
-| 版本 (Version) | `1.0.1` |
+| 分类 (Category) | 区域处理 |
+| 版本 (Version) | `1.0.2` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Computes the complement of a region relative to an image size。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于相对于图像尺寸计算区域补集。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 算法类型以 `Bounded run-length complement` 为主；元数据未声明更多细分时，以当前源码实现为准。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
@@ -42,7 +42,7 @@
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Region` | Input Region | `Any` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Region` | Input Region | `Region` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 | `ImageWidth` | Image Width | `Integer` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 | `ImageHeight` | Image Height | `Integer` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 | `Image` | Reference Image (optional) | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
@@ -50,7 +50,7 @@
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Region` | Complement Region | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Region` | Complement Region | `Region` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `Image` | Visualization | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `Area` | Complement Area | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
@@ -91,4 +91,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.2 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

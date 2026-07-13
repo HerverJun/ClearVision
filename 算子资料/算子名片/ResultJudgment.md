@@ -1,18 +1,18 @@
-# Result Judgment / ResultJudgment
+# 结果判定 / ResultJudgment
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `ResultJudgmentOperator` |
 | 枚举值 (Enum) | `OperatorType.ResultJudgment` |
-| 分类 (Category) | Flow Control |
+| 分类 (Category) | 流程控制 |
 | 版本 (Version) | `1.0.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Generic business judgment with numeric/string condition checks。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
-处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
+该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该类算子主要对上游值、集合或流程状态做判断、转换、聚合或路由，不直接改写图像像素。
 
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
@@ -75,7 +75,7 @@
 - 执行失败契约：源码中发现 1 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
+- 适合 (Suitable)：需要对上游结果做判断、转换、聚合、计数、延时或流程路由的场景。
 - 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
@@ -85,4 +85,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

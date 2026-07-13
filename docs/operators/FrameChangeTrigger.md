@@ -12,28 +12,22 @@
 
 ## 算法原理 / Algorithm Principle
 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
-核心算法已收敛到 `FrameChangeTriggerKernel`：先裁剪 ROI 并转灰度，可选执行模糊、形态学开运算和亮度归一化，再依据像素差阈值、最小变化比例、冷却期、连续变化帧数和上升沿语义输出触发决策。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
 - 参数解析覆盖 20 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 源码包含短路输出路径，可在条件不满足时阻止后续节点继续执行。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
-- `OperatorBase.Get*Param(...)`
-- `FrameChangeTriggerKernel.ResolveRoi(...)`
-- `FrameChangeTriggerKernel.BuildGrayRoi(...)`
-- `FrameChangeTriggerKernel.Evaluate(...)`
-- `Cv2.Absdiff`
-- `Cv2.Threshold`
-- `Cv2.GaussianBlur`
-- `Cv2.MorphologyEx`
-- `Cv2.MeanStdDev`
-- `Cv2.CountNonZero`
 - `Math.Max`
-- `Math.Clamp`
+- `Convert.ToInt32`
+- `Convert.ToDouble`
+- `Convert.ToBoolean`
+- `Convert.ToString`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
 
@@ -42,7 +36,7 @@
 |--------|------|------|--------|------|------|------|
 | `Enabled` | 启用检测 | `bool` | true | - | Yes | 关闭后图像直接放行，不做帧差判断。 |
 | `ShortCircuitWhenNotTriggered` | 未触发时跳过本轮 | `bool` | true | - | Yes | 开启后，未检测到到料变化时短路当前流程，不执行后续 YOLO 和结果输出。 |
-| `Profile` | 参数配置档 | `enum` | line_fast_default | line_fast_default / line_noise_guard / line_low_contrast | Yes | 模板默认使用 line_fast_default；其他 profile 需显式选择。 |
+| `Profile` | 参数配置档 | `enum` | line_fast_default | line_fast_default；line_noise_guard；line_low_contrast | Yes | 默认 line_fast_default；line_noise_guard 和 line_low_contrast 必须作为证据 profile 显式启用。 |
 | `PixelThreshold` | 像素差阈值 | `int` | 30 | [1, 255] | Yes | 单个像素灰度差超过该值才计入变化区域。现场反光/抖动多时可适当调高。 |
 | `MinChangeRatio` | 最小变化比例 | `double` | 0.02 | [0, 1] | Yes | ROI 内变化像素占比达到该值才认为到料。误触发多时调高，漏检时调低。 |
 | `MinChangePixels` | 最小变化像素数 | `int` | 500 | >= 0 | Yes | ROI 内变化像素数量下限，用于过滤小面积噪声。 |
@@ -51,15 +45,15 @@
 | `RoiY` | 检测区域Y | `int` | 0 | >= 0 | Yes | 到料检测 ROI 左上角 Y。 |
 | `RoiW` | 检测区域宽度 | `int` | 0 | >= 0 | Yes | 到料检测 ROI 宽度；0 表示从 X 到图像右边界。 |
 | `RoiH` | 检测区域高度 | `int` | 0 | >= 0 | Yes | 到料检测 ROI 高度；0 表示从 Y 到图像下边界。 |
-| `BlurSize` | 降噪模糊核 | `int` | 0 | 0 或 3-15 奇数 | Yes | 可选高斯模糊，用于抑制点噪声。 |
-| `MorphOpenSize` | 开运算核 | `int` | 0 | 0 或 3-15 奇数 | Yes | 可选形态学开运算，用于去除孤立噪声。 |
-| `NormalizeMode` | 亮度归一化 | `enum` | None | None / MeanShift / PercentileClip | Yes | 抑制整体亮度漂移的可选预处理。 |
-| `ReferenceUpdateMode` | 参考帧更新 | `enum` | PreviousFrame | PreviousFrame / StableBackground / ExponentialMovingAverage | Yes | 控制参考帧如何随时间更新。 |
-| `ReferenceUpdateAlpha` | 参考更新系数 | `double` | 0.05 | [0, 1] | Yes | EMA 参考更新的权重。 |
-| `AdaptivePixelThreshold` | 自适应像素阈值 | `bool` | false | - | Yes | 低对比 evidence profile 可显式启用，默认关闭。 |
-| `MinConsecutiveChangedFrames` | 连续变化帧数 | `int` | 1 | >= 1 | Yes | 需要连续多少帧达到变化阈值才触发。 |
-| `ResetAfterNoChangeFrames` | 无变化复位帧数 | `int` | 1 | >= 0 | Yes | 连续无变化达到该帧数后复位边沿状态。 |
-| `TriggerOnRisingEdgeOnly` | 仅上升沿触发 | `bool` | true | - | Yes | 持续变化只在进入变化状态时触发一次。 |
+| `BlurSize` | 降噪模糊核 | `int` | 0 | [0, 15] | Yes | 0 表示关闭；开启时必须为 3 到 15 的奇数。 |
+| `MorphOpenSize` | 开运算核 | `int` | 0 | [0, 15] | Yes | 0 表示关闭；开启时必须为 3 到 15 的奇数，用于去除孤立噪声。 |
+| `NormalizeMode` | 亮度归一化 | `enum` | None | None；MeanShift；PercentileClip | Yes | None、MeanShift 或 PercentileClip。 |
+| `ReferenceUpdateMode` | 参考帧更新 | `enum` | PreviousFrame | PreviousFrame；StableBackground；ExponentialMovingAverage | Yes | PreviousFrame、StableBackground 或 ExponentialMovingAverage。 |
+| `ReferenceUpdateAlpha` | 参考更新系数 | `double` | 0.05 | [0, 1] | Yes | 仅 ExponentialMovingAverage 使用，范围 0 到 1。 |
+| `AdaptivePixelThreshold` | 自适应像素阈值 | `bool` | false | - | Yes | 默认关闭；低对比 evidence profile 可显式启用。 |
+| `MinConsecutiveChangedFrames` | 连续变化帧数 | `int` | 1 | >= 1 | Yes | 至少连续多少帧达到变化阈值才触发，用于抑制单帧闪烁。 |
+| `ResetAfterNoChangeFrames` | 无变化复位帧数 | `int` | 1 | >= 0 | Yes | 连续无变化达到该帧数后复位边沿状态；0 表示关闭。 |
+| `TriggerOnRisingEdgeOnly` | 仅上升沿触发 | `bool` | true | - | Yes | 开启后持续变化只在进入变化状态的边沿触发一次。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -75,23 +69,19 @@
 | `ChangeScore` | 变化比例 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `ChangedPixels` | 变化像素数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Reason` | 判定原因 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `BaselineReady` | 基线已建立 | `Boolean` | 标识参考帧状态已经建立，可用于调试和面板展示。 |
-| `TotalPixels` | 有效像素数 | `Integer` | 当前 ROI 中参与判定的像素数。 |
-| `CooldownRemainingMs` | 剩余冷却时间(ms) | `Integer` | 当前帧若受冷却期抑制，输出剩余冷却时间。 |
-| `EffectivePixelThreshold` | 有效像素差阈值 | `Integer` | 自适应阈值开启后记录实际使用阈值。 |
-| `EffectiveMinChangeRatio` | 有效最小变化比例 | `Float` | 记录当前 profile 和参数解析后的最小变化比例。 |
+| `BaselineReady` | 基线已建立 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `TotalPixels` | 有效像素数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `CooldownRemainingMs` | 剩余冷却时间(ms) | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `EffectivePixelThreshold` | 有效像素差阈值 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `EffectiveMinChangeRatio` | 有效最小变化比例 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
+| `ConsecutiveChangedFrames` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
-| `ConsecutiveChangedFrames` | `Integer` | 当前连续达到变化阈值的帧数。 |
-| `NoChangeFrames` | `Integer` | 当前连续未达到变化阈值的帧数。 |
+| `NoChangeFrames` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `NoMaterialFrame` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `RoiX` | `Integer` | 裁剪后的有效 ROI X。 |
-| `RoiY` | `Integer` | 裁剪后的有效 ROI Y。 |
-| `RoiW` | `Integer` | 裁剪后的有效 ROI 宽度。 |
-| `RoiH` | `Integer` | 裁剪后的有效 ROI 高度。 |
 | `StateKey` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StateScope` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
@@ -100,16 +90,14 @@
 | 指标 (Metric) | 值 (Value) |
 |------|------|
 | 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
-| 典型耗时 (Typical Latency) | `FrameChangeTrigger_contract_baseline.md` 记录 31/31 passed；`FrameChangeTrigger_dataset_baseline.md` 记录 140/140 passed，并包含 256x256 ROI 的 P95 runtime gate。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
 | 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
-- 单元/契约测试：`FrameChangeTriggerOperatorTests` 覆盖基础行为和新增参数边界。
-- Quality contract evidence：`quality/evals/reports/FrameChangeTrigger_contract_baseline.md`，31/31 passed。
-- Dataset evidence：`quality/evals/reports/FrameChangeTrigger_dataset_baseline.md`，140/140 passed，Trigger Precision/Recall 均为 1.0。
-- Field-substitute replay：`quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.md`，20/20 passed；声明为替代 replay，不声明真实产线签核。
+- 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：缺失图像、空图像和非法参数会返回稳定失败信息。
+- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
 - 短路契约：算子可返回 `ShortCircuit`，用于阻止后续节点在当前周期继续执行。
 
 ## 适用场景 / Use Cases
@@ -125,4 +113,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

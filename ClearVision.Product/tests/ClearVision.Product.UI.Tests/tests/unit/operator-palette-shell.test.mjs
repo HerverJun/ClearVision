@@ -118,21 +118,69 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
       type: 'RoiTransform',
       displayName: 'ROI位姿变换',
       keywords: ['ROI跟踪']
+    },
+    {
+      type: 'CoordinateTransform',
+      displayName: '像素到物理坐标（单点）',
+      keywords: ['坐标转换', 'Coordinate Transform']
+    },
+    {
+      type: 'RoiManager',
+      displayName: 'ROI裁剪与掩膜',
+      keywords: ['ROI管理器']
+    },
+    {
+      type: 'TryCatch',
+      displayName: 'Try分支透传',
+      keywords: ['异常捕获']
+    },
+    {
+      type: 'ModbusCommunication',
+      displayName: 'Modbus TCP通信',
+      keywords: ['Modbus通信']
+    },
+    {
+      type: 'Thresholding',
+      displayName: '全局阈值处理',
+      keywords: ['二值化']
+    },
+    {
+      type: 'FFT1D',
+      displayName: '信号/图像傅里叶变换（FFT）',
+      keywords: ['一维FFT']
+    },
+    {
+      type: 'InverseFFT1D',
+      displayName: '信号/图像逆傅里叶变换（IFFT）',
+      keywords: ['一维逆FFT']
+    },
+    {
+      type: 'PhaseClosure',
+      displayName: '相位解缠绕',
+      keywords: ['Phase Closure']
     }
   ];
 
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, '连通域标注').map(operator => operator.type),
-    ['BlobLabeling']
-  );
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, '点位对齐').map(operator => operator.type),
-    ['PointAlignment']
-  );
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, 'ROI跟踪').map(operator => operator.type),
-    ['RoiTransform']
-  );
+  const expectations = [
+    ['连通域标注', 'BlobLabeling'],
+    ['点位对齐', 'PointAlignment'],
+    ['ROI跟踪', 'RoiTransform'],
+    ['坐标转换', 'CoordinateTransform'],
+    ['ROI管理器', 'RoiManager'],
+    ['异常捕获', 'TryCatch'],
+    ['Modbus通信', 'ModbusCommunication'],
+    ['二值化', 'Thresholding'],
+    ['一维FFT', 'FFT1D'],
+    ['一维逆FFT', 'InverseFFT1D'],
+    ['Phase Closure', 'PhaseClosure']
+  ];
+
+  for (const [legacyName, expectedType] of expectations) {
+    assert.deepEqual(
+      filterOperatorsForFlyout(renamedOperators, legacyName).map(operator => operator.type),
+      [expectedType]
+    );
+  }
 });
 
 test('OperatorPaletteShell exposes a global search rail entry before categories', () => {

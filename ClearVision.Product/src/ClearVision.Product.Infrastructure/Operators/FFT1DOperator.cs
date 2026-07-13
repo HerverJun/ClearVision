@@ -13,11 +13,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "FFT 1D",
-    Description = "Performs FFT on 1D signals and emits a full complex spectrum for image inputs.",
+    DisplayName = "信号/图像傅里叶变换（FFT）",
+    Description = "对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、幅度和相位。",
     Category = "Frequency",
     IconName = "fft-1d",
-    Keywords = new[] { "FFT", "Fourier", "Frequency", "Spectrum", "DFT" }
+    Keywords = new[] { "FFT", "Fourier", "Frequency", "Spectrum", "DFT", "一维FFT", "FFT 1D" }
 )]
 [InputPort("Input", "Input Signal or Image", PortDataType.Any, IsRequired = true)]
 [InputPort("Axis", "Transform Axis (legacy parameter for signal/image profiles)", PortDataType.Integer, IsRequired = false)]

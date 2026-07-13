@@ -11,16 +11,16 @@ using NModbus;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Modbus Communication",
-    Description = "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
+    DisplayName = "Modbus TCP通信",
+    Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
     Category = "Communication",
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial" }
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
 )]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "Response", PortDataType.String)]
 [OutputPort("Status", "Status", PortDataType.Boolean)]
-[OperatorParam("Protocol", "Protocol", "enum", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
+[OperatorParam("Protocol", "Protocol", "enum", Description = "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
 [OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.1.1")]
 [OperatorParam("Port", "Port", "int", DefaultValue = 502, Min = 1, Max = 65535)]
 [OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 247)]

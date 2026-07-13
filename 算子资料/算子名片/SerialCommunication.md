@@ -17,14 +17,17 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 8 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 9 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
+- `Math.Clamp`
 - `Convert.ToByte`
+- `Math.Max`
+- `Math.Min`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
 
@@ -39,6 +42,7 @@
 | `SendData` | 发送内容 | `string` | "" | - | Yes | - |
 | `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII/ASCII；HEX/HEX | Yes | - |
 | `TimeoutMs` | 超时(毫秒) | `int` | 3000 | [100, 30000] | Yes | - |
+| `ResponseWaitMs` | 响应等待(毫秒) | `int` | 100 | [0, 30000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -83,4 +87,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

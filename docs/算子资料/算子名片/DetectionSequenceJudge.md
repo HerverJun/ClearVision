@@ -5,7 +5,7 @@
 |------|------|
 | 类名 (Class) | `DetectionSequenceJudgeOperator` |
 | 枚举值 (Enum) | `OperatorType.DetectionSequenceJudge` |
-| 分类 (Category) | AI 检测 |
+| 分类 (Category) | AI检测 |
 | 版本 (Version) | `1.0.1` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `experimental`, `industrial-remediation`, `sequence-judge`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |

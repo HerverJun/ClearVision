@@ -11,12 +11,12 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Runs an ONNX semantic segmentation model and returns class map, colored visualization, and per-class masks。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 11 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 12 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -30,11 +30,12 @@
 - `Path.GetFullPath`
 - `JsonSerializer.Serialize`
 - `JsonSerializer.Deserialize`
+- `Math.Max`
+- `Math.Min`
 - `Enumerable.Range`
 - `InferenceSession`
 - `ImageWrapper`
 - `OperatorExecutionOutput.Success(...)`
-- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -45,6 +46,7 @@
 | `InputSize` | Input Size | `string` | 512,512 | - | Yes | Width,Height |
 | `NumClasses` | Num Classes | `int` | 21 | [2, 4096] | Yes | - |
 | `ClassNames` | Class Names | `string` | "" | - | Yes | JSON array or comma-separated names |
+| `MaxClassMasks` | Max Class Masks | `int` | 32 | [0, 4096] | Yes | Limits generated per-class mask images; 0 disables per-class masks. |
 | `ExecutionProvider` | Execution Provider | `enum` | cpu | cpu/CPU；cuda/CUDA | Yes | - |
 | `ScaleToUnitRange` | Scale To Unit Range | `bool` | true | - | Yes | - |
 | `ChannelOrder` | Channel Order | `enum` | RGB | RGB/RGB；BGR/BGR | Yes | - |
@@ -64,6 +66,8 @@
 | `ColoredMap` | Colored Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `ClassMasks` | Class Masks | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `ClassCount` | Class Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ClassMaskCount` | Class Mask Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `OmittedClassMaskCount` | Omitted Class Mask Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `PresentClasses` | Present Classes | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
@@ -103,4 +107,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

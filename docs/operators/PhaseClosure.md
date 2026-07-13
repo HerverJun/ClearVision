@@ -1,4 +1,4 @@
-# Phase Closure / PhaseClosure
+# 相位解缠绕 / PhaseClosure
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -11,7 +11,7 @@
 | 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前元数据描述为：Unwraps wrapped phase maps while preserving the original phase domain semantics。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 算法类型以 `Itoh/quality-guided phase unwrapping` 为主；元数据未声明更多细分时，以当前源码实现为准。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
@@ -96,4 +96,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-13T04:42:30.0856584Z",
+  "GeneratedAtUtc": "2026-07-13T07:30:38.5548997Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -5083,16 +5083,18 @@
     },
     {
       "OperatorType": "CoordinateTransform",
-      "DisplayName": "\u5750\u6807\u8F6C\u6362",
+      "DisplayName": "\u50CF\u7D20\u5230\u7269\u7406\u5750\u6807\uFF08\u5355\u70B9\uFF09",
       "Category": "\u6807\u5B9A",
       "Aliases": [
-        "\u5750\u6807\u8F6C\u6362",
+        "\u50CF\u7D20\u5230\u7269\u7406\u5750\u6807\uFF08\u5355\u70B9\uFF09",
         "CoordinateTransform",
         "coordinate",
         "pixel",
         "physical",
         "calibration",
-        "transform2d"
+        "transform2d",
+        "\u5750\u6807\u8F6C\u6362",
+        "Coordinate Transform"
       ],
       "IntentTags": [
         "calibration"
@@ -7317,16 +7319,18 @@
     },
     {
       "OperatorType": "FFT1D",
-      "DisplayName": "\u4E00\u7EF4FFT",
+      "DisplayName": "\u4FE1\u53F7/\u56FE\u50CF\u5085\u91CC\u53F6\u53D8\u6362\uFF08FFT\uFF09",
       "Category": "\u9891\u57DF",
       "Aliases": [
-        "\u4E00\u7EF4FFT",
+        "\u4FE1\u53F7/\u56FE\u50CF\u5085\u91CC\u53F6\u53D8\u6362\uFF08FFT\uFF09",
         "FFT1D",
         "FFT",
         "Fourier",
         "Frequency",
         "Spectrum",
-        "DFT"
+        "DFT",
+        "\u4E00\u7EF4FFT",
+        "FFT 1D"
       ],
       "IntentTags": [
         "general"
@@ -11770,16 +11774,18 @@
     },
     {
       "OperatorType": "InverseFFT1D",
-      "DisplayName": "\u4E00\u7EF4\u9006FFT",
+      "DisplayName": "\u4FE1\u53F7/\u56FE\u50CF\u9006\u5085\u91CC\u53F6\u53D8\u6362\uFF08IFFT\uFF09",
       "Category": "\u9891\u57DF",
       "Aliases": [
-        "\u4E00\u7EF4\u9006FFT",
+        "\u4FE1\u53F7/\u56FE\u50CF\u9006\u5085\u91CC\u53F6\u53D8\u6362\uFF08IFFT\uFF09",
         "InverseFFT1D",
         "IFFT",
         "InverseFFT",
         "Fourier",
         "Reconstruction",
-        "Signal"
+        "Signal",
+        "\u4E00\u7EF4\u9006FFT",
+        "Inverse FFT 1D"
       ],
       "IntentTags": [
         "general"
@@ -13609,10 +13615,10 @@
     },
     {
       "OperatorType": "ModbusCommunication",
-      "DisplayName": "Modbus\u901A\u4FE1",
+      "DisplayName": "Modbus TCP\u901A\u4FE1",
       "Category": "\u901A\u4FE1",
       "Aliases": [
-        "Modbus\u901A\u4FE1",
+        "Modbus TCP\u901A\u4FE1",
         "ModbusCommunication",
         "Modbus",
         "PLC",
@@ -13620,7 +13626,9 @@
         "Register",
         "RTU",
         "TCP",
-        "Industrial"
+        "Industrial",
+        "Modbus\u901A\u4FE1",
+        "Modbus Communication"
       ],
       "IntentTags": [
         "integration",
@@ -13659,7 +13667,7 @@
           "Name": "Protocol",
           "DisplayName": "Protocol",
           "DataType": "enum",
-          "Description": "",
+          "Description": "\u5F53\u524D\u4EC5\u652F\u6301 TCP\uFF1BRTU \u9009\u9879\u7528\u4E8E\u65E7\u6D41\u7A0B\u517C\u5BB9\uFF0C\u6267\u884C\u65F6\u8FD4\u56DE\u4E0D\u652F\u6301\u3002",
           "DefaultValue": "TCP",
           "MinValue": null,
           "MaxValue": null,
@@ -15485,7 +15493,9 @@
         "Unwrap",
         "Interferometry",
         "Closure",
-        "Wavelength"
+        "Wavelength",
+        "Phase Closure",
+        "\u76F8\u4F4D\u95ED\u5408"
       ],
       "IntentTags": [
         "general"
@@ -19732,10 +19742,10 @@
     },
     {
       "OperatorType": "RoiManager",
-      "DisplayName": "ROI\u7BA1\u7406\u5668",
+      "DisplayName": "ROI\u88C1\u526A\u4E0E\u63A9\u819C",
       "Category": "\u8F85\u52A9",
       "Aliases": [
-        "ROI\u7BA1\u7406\u5668",
+        "ROI\u88C1\u526A\u4E0E\u63A9\u819C",
         "RoiManager",
         "ROI",
         "\u533A\u57DF",
@@ -19744,7 +19754,8 @@
         "\u9009\u533A",
         "Region",
         "Mask",
-        "Area of interest"
+        "Area of interest",
+        "ROI\u7BA1\u7406\u5668"
       ],
       "IntentTags": [
         "general"
@@ -23548,16 +23559,17 @@
     },
     {
       "OperatorType": "Thresholding",
-      "DisplayName": "\u4E8C\u503C\u5316",
+      "DisplayName": "\u5168\u5C40\u9608\u503C\u5904\u7406",
       "Category": "\u9884\u5904\u7406",
       "Aliases": [
-        "\u4E8C\u503C\u5316",
+        "\u5168\u5C40\u9608\u503C\u5904\u7406",
         "Thresholding",
         "threshold",
         "binarize",
         "segmentation",
         "otsu",
-        "triangle"
+        "triangle",
+        "\u4E8C\u503C\u5316"
       ],
       "IntentTags": [
         "preprocess"
@@ -24006,11 +24018,17 @@
     },
     {
       "OperatorType": "TryCatch",
-      "DisplayName": "\u5F02\u5E38\u6355\u83B7",
+      "DisplayName": "Try\u5206\u652F\u900F\u4F20",
       "Category": "\u6D41\u7A0B\u63A7\u5236",
       "Aliases": [
+        "Try\u5206\u652F\u900F\u4F20",
+        "TryCatch",
+        "Try",
+        "Catch",
+        "passthrough",
+        "branch",
         "\u5F02\u5E38\u6355\u83B7",
-        "TryCatch"
+        "Try-Catch \u6D41\u7A0B\u63A7\u5236"
       ],
       "IntentTags": [
         "general"
@@ -24062,7 +24080,7 @@
           "Name": "EnableCatch",
           "DisplayName": "\u542F\u7528Catch",
           "DataType": "bool",
-          "Description": "\u662F\u5426\u542F\u7528\u5F02\u5E38\u6355\u83B7",
+          "Description": "\u517C\u5BB9\u65E7\u6D41\u7A0B\u7684\u5F00\u5173\uFF1B\u5F53\u524D\u4EC5\u8BB0\u5F55\u914D\u7F6E\uFF0C\u4E0D\u6267\u884C\u5F02\u5E38\u6355\u83B7\u3002",
           "DefaultValue": "True",
           "MinValue": null,
           "MaxValue": null,
@@ -24073,7 +24091,7 @@
           "Name": "CatchOutputError",
           "DisplayName": "\u8F93\u51FA\u9519\u8BEF\u4FE1\u606F",
           "DataType": "bool",
-          "Description": "",
+          "Description": "\u517C\u5BB9\u65E7\u6D41\u7A0B\u7684\u914D\u7F6E\uFF1B\u5F53\u524D Error \u8F93\u51FA\u59CB\u7EC8\u4E3A\u7A7A\u3002",
           "DefaultValue": "True",
           "MinValue": null,
           "MaxValue": null,
@@ -24084,7 +24102,7 @@
           "Name": "CatchOutputStackTrace",
           "DisplayName": "\u8F93\u51FA\u5806\u6808",
           "DataType": "bool",
-          "Description": "",
+          "Description": "\u517C\u5BB9\u65E7\u6D41\u7A0B\u7684\u914D\u7F6E\uFF1B\u5F53\u524D\u4E0D\u8F93\u51FA\u5F02\u5E38\u5806\u6808\u3002",
           "DefaultValue": "False",
           "MinValue": null,
           "MaxValue": null,
@@ -25809,6 +25827,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "branch",
+      "Target": "TryCatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "bump",
       "Target": "EdgePairDefect",
       "Weight": 1,
@@ -25951,6 +25976,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Capture",
       "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Catch",
+      "Target": "TryCatch",
       "Weight": 1,
       "Metadata": {}
     },
@@ -26252,6 +26284,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "coordinate",
       "Target": "PixelToWorldTransform",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Coordinate Transform",
+      "Target": "CoordinateTransform",
       "Weight": 1,
       "Metadata": {}
     },
@@ -26726,6 +26765,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "FFT 1D",
+      "Target": "FFT1D",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "filter",
       "Target": "Filtering",
       "Weight": 1,
@@ -27155,6 +27201,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Intrinsic",
       "Target": "CameraCalibration",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Inverse FFT 1D",
+      "Target": "InverseFFT1D",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27650,6 +27703,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Modbus Communication",
+      "Target": "ModbusCommunication",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Modbus TCP\u901A\u4FE1",
+      "Target": "ModbusCommunication",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Modbus\u901A\u4FE1",
       "Target": "ModbusCommunication",
       "Weight": 1,
@@ -27923,6 +27990,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "passthrough",
+      "Target": "TryCatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "patchcore",
       "Target": "AnomalyDetection",
       "Weight": 1,
@@ -27966,6 +28040,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "Phase",
+      "Target": "PhaseClosure",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Phase Closure",
       "Target": "PhaseClosure",
       "Weight": 1,
       "Metadata": {}
@@ -28540,6 +28621,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "ROI\u7BA1\u7406\u5668",
+      "Target": "RoiManager",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "ROI\u88C1\u526A\u4E0E\u63A9\u819C",
       "Target": "RoiManager",
       "Weight": 1,
       "Metadata": {}
@@ -29211,6 +29299,27 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Try",
+      "Target": "TryCatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Try-Catch \u6D41\u7A0B\u63A7\u5236",
+      "Target": "TryCatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Try\u5206\u652F\u900F\u4F20",
+      "Target": "TryCatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "um",
       "Target": "UnitConvert",
       "Weight": 1,
@@ -29519,6 +29628,20 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u4FE1\u53F7/\u56FE\u50CF\u5085\u91CC\u53F6\u53D8\u6362\uFF08FFT\uFF09",
+      "Target": "FFT1D",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u4FE1\u53F7/\u56FE\u50CF\u9006\u5085\u91CC\u53F6\u53D8\u6362\uFF08IFFT\uFF09",
+      "Target": "InverseFFT1D",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u5019\u9009\u6846\u6291\u5236",
       "Target": "BoxNms",
       "Weight": 1,
@@ -29540,6 +29663,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u50CF\u7D20\u5230\u7269\u7406\u5750\u6807\uFF08\u5355\u70B9\uFF09",
+      "Target": "CoordinateTransform",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u50CF\u7D20\u7EA7\u5206\u5272",
       "Target": "SemanticSegmentation",
       "Weight": 1,
@@ -29556,6 +29686,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5149\u7167\u6821\u6B63",
       "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5168\u5C40\u9608\u503C\u5904\u7406",
+      "Target": "Thresholding",
       "Weight": 1,
       "Metadata": {}
     },
@@ -30829,6 +30966,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "\u76F8\u4F4D\u89E3\u7F20\u7ED5",
+      "Target": "PhaseClosure",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u76F8\u4F4D\u95ED\u5408",
       "Target": "PhaseClosure",
       "Weight": 1,
       "Metadata": {}

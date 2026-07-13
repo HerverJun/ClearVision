@@ -8,7 +8,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 
 var repoRoot = ResolveRepoRoot(args);
 var overwrite = args.Any(arg => string.Equals(arg, "--overwrite", StringComparison.OrdinalIgnoreCase));
@@ -24,6 +26,10 @@ var qualityContext = BuildQualityContext(repoRoot, docsRoot);
 Directory.CreateDirectory(operatorDocsRoot);
 Directory.CreateDirectory(docsRoot);
 
+var runtimeMetadataByType = new OperatorFactory()
+    .GetAllMetadata()
+    .ToDictionary(metadata => metadata.Type);
+
 var candidates = typeof(OperatorBase).Assembly
     .GetTypes()
     .Where(type => type.IsClass && !type.IsAbstract)
@@ -38,15 +44,21 @@ var candidates = typeof(OperatorBase).Assembly
         Parameters = type.GetCustomAttributes<OperatorParamAttribute>(inherit: false).ToArray()
     })
     .Where(x => x.Meta != null)
-    .Select(x => new OperatorDocModel(
-        x.Type,
-        x.Meta!,
-        x.Algo,
-        x.Inputs,
-        x.Outputs,
-        x.Parameters,
-        ResolveOperatorType(x.Type)))
+    .Select(x => new
+    {
+        Source = x,
+        OperatorType = ResolveOperatorType(x.Type)
+    })
     .Where(x => x.OperatorType != null)
+    .Select(x => new OperatorDocModel(
+        x.Source.Type,
+        x.Source.Meta!,
+        x.Source.Algo,
+        x.Source.Inputs,
+        x.Source.Outputs,
+        x.Source.Parameters,
+        x.OperatorType,
+        runtimeMetadataByType.GetValueOrDefault(x.OperatorType!.Value)))
     .OrderBy(x => x.OperatorType!.Value.ToString(), StringComparer.Ordinal)
     .ToList();
 
@@ -431,11 +443,11 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     var englishName = className.EndsWith("Operator", StringComparison.Ordinal)
         ? className[..^"Operator".Length]
         : className;
-    var category = NormalizeCategory(item.Meta.Category);
+    var category = NormalizeCategory(EffectiveCategory(item));
     var facts = AnalyzeOperatorSource(item, qualityContext);
     var tags = BuildOperatorTags(item);
 
-    sb.AppendLine($"# {item.Meta.DisplayName} / {englishName}");
+    sb.AppendLine($"# {EffectiveDisplayName(item)} / {englishName}");
     sb.AppendLine();
     sb.AppendLine("## 基本信息 / Basic Info");
     sb.AppendLine("| 项目 (Field) | 值 (Value) |");
@@ -443,7 +455,7 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine($"| 类名 (Class) | `{className}` |");
     sb.AppendLine($"| 枚举值 (Enum) | `OperatorType.{item.OperatorType}` |");
     sb.AppendLine($"| 分类 (Category) | {EscapeCell(category)} |");
-    sb.AppendLine($"| 版本 (Version) | `{NormalizeSemVersion(item.Meta.Version)}` |");
+    sb.AppendLine($"| 版本 (Version) | `{NormalizeSemVersion(EffectiveVersion(item))}` |");
     sb.AppendLine("| 成熟度 (Maturity) | 稳定 Stable |");
     sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
 
@@ -576,7 +588,7 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine("## 变更记录 / Changelog");
     sb.AppendLine("| 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |");
     sb.AppendLine("|------|------|----------|");
-    sb.AppendLine($"| {NormalizeSemVersion(item.Meta.Version)} | {DateTime.UtcNow:yyyy-MM-dd} | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |");
+    sb.AppendLine($"| {NormalizeSemVersion(EffectiveVersion(item))} | {DateTime.UtcNow:yyyy-MM-dd} | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |");
 
     return sb.ToString();
 }
@@ -610,7 +622,7 @@ static OperatorSourceFacts AnalyzeOperatorSource(OperatorDocModel item, QualityC
 static List<string> BuildAlgorithmPrinciple(OperatorDocModel item, string category, OperatorSourceFacts facts)
 {
     var lines = new List<string>();
-    var description = Fallback(item.Meta.Description, $"{item.Meta.DisplayName} 算子执行当前声明的视觉/流程处理逻辑");
+    var description = Fallback(EffectiveDescription(item), $"{EffectiveDisplayName(item)} 算子执行当前声明的视觉/流程处理逻辑");
 
     var descriptionSentence = ContainsCjk(description)
         ? $"该算子用于{TrimSentence(description)}。"
@@ -1313,10 +1325,10 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
     {
         Id = id,
         Type = (int)item.OperatorType.Value,
-        DisplayName = item.Meta.DisplayName,
-        Description = item.Meta.Description,
-        Category = NormalizeCategory(item.Meta.Category),
-        Version = NormalizeSemVersion(item.Meta.Version),
+        DisplayName = EffectiveDisplayName(item),
+        Description = EffectiveDescription(item),
+        Category = NormalizeCategory(EffectiveCategory(item)),
+        Version = NormalizeSemVersion(EffectiveVersion(item)),
         Tags = BuildOperatorTags(item),
         Algorithm = ResolveCatalogAlgorithm(item, qualityContext),
         InputPorts = inputPorts,
@@ -2153,6 +2165,18 @@ static string BoolToMark(bool value) => value ? "Yes" : "No";
 
 static string Fallback(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
+static string EffectiveDisplayName(OperatorDocModel item) =>
+    Fallback(item.RuntimeMetadata?.DisplayName, item.Meta.DisplayName);
+
+static string EffectiveDescription(OperatorDocModel item) =>
+    Fallback(item.RuntimeMetadata?.Description, item.Meta.Description);
+
+static string EffectiveCategory(OperatorDocModel item) =>
+    Fallback(item.RuntimeMetadata?.Category, item.Meta.Category);
+
+static string EffectiveVersion(OperatorDocModel item) =>
+    Fallback(item.RuntimeMetadata?.Version, item.Meta.Version);
+
 static IEnumerable<string> NonEmptyItems(string[]? values) =>
     values?
         .Select(value => value?.Trim())
@@ -2168,7 +2192,8 @@ internal sealed record OperatorDocModel(
     InputPortAttribute[] Inputs,
     OutputPortAttribute[] Outputs,
     OperatorParamAttribute[] Parameters,
-    OperatorType? OperatorType);
+    OperatorType? OperatorType,
+    OperatorMetadata? RuntimeMetadata);
 
 internal sealed record OperatorSourceFacts(
     string SourceText,

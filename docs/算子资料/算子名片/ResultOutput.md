@@ -17,7 +17,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Image`、`Result`、`Text`、`Data`。
-- 参数解析覆盖 2 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 3 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -29,6 +29,7 @@
 - `Directory.CreateDirectory`
 - `File.WriteAllText`
 - `JsonSerializer.Serialize`
+- `Math.Min`
 - `ImageWrapper`
 - `OperatorExecutionOutput.Success(...)`
 
@@ -37,6 +38,7 @@
 |--------|------|------|--------|------|------|------|
 | `Format` | 输出格式 | `enum` | JSON | JSON/JSON；CSV/CSV；Text/Text | Yes | - |
 | `SaveToFile` | 保存到文件 | `bool` | false | - | Yes | - |
+| `MaxFormattedCollectionItems` | Max formatted collection items | `int` | 256 | [1, 10000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -60,7 +62,11 @@
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
+| `Items` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `OmittedCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `SaveError` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `TotalCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `Truncated` | `Any` | 源码通过输出字典索引赋值写入。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
@@ -86,4 +92,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

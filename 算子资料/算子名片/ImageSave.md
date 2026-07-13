@@ -23,7 +23,7 @@
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
-- `Cv2.ImWrite`
+- `Cv2.ImEncode`
 - `Directory.Exists`
 - `Directory.CreateDirectory`
 - `Path.ChangeExtension`
@@ -32,10 +32,10 @@
 - `Path.GetDirectoryName`
 - `Path.GetFileNameWithoutExtension`
 - `Path.GetExtension`
+- `File.WriteAllBytesAsync`
 - `Path.IsPathRooted`
 - `Path.DirectorySeparatorChar`
 - `Path.AltDirectorySeparatorChar`
-- `Path.VolumeSeparatorChar`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -93,4 +93,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

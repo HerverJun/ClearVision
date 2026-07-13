@@ -9,11 +9,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Coordinate Transform",
-    Description = "Converts pixel coordinates to physical coordinates using CalibrationBundleV2 Transform2D.",
+    DisplayName = "像素到物理坐标（单点）",
+    Description = "使用 CalibrationBundleV2 的二维标定变换，将单个像素坐标转换为物理坐标。",
     Category = "Calibration",
     IconName = "coordinate-transform",
-    Keywords = new[] { "coordinate", "pixel", "physical", "calibration", "transform2d" }
+    Keywords = new[] { "coordinate", "pixel", "physical", "calibration", "transform2d", "坐标转换", "Coordinate Transform" }
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = false)]
 [InputPort("PixelX", "Pixel X", PortDataType.Float, IsRequired = false)]
