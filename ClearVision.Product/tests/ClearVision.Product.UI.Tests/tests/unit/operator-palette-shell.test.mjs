@@ -102,6 +102,39 @@ test('OperatorPaletteShell search keeps name, type, description, port, parameter
   );
 });
 
+test('OperatorPaletteShell keeps corrected operators searchable by legacy display names', () => {
+  const renamedOperators = [
+    {
+      type: 'BlobLabeling',
+      displayName: 'Blob分类标注',
+      keywords: ['连通域标注']
+    },
+    {
+      type: 'PointAlignment',
+      displayName: '点位偏差计算',
+      keywords: ['点位对齐']
+    },
+    {
+      type: 'RoiTransform',
+      displayName: 'ROI位姿变换',
+      keywords: ['ROI跟踪']
+    }
+  ];
+
+  assert.deepEqual(
+    filterOperatorsForFlyout(renamedOperators, '连通域标注').map(operator => operator.type),
+    ['BlobLabeling']
+  );
+  assert.deepEqual(
+    filterOperatorsForFlyout(renamedOperators, '点位对齐').map(operator => operator.type),
+    ['PointAlignment']
+  );
+  assert.deepEqual(
+    filterOperatorsForFlyout(renamedOperators, 'ROI跟踪').map(operator => operator.type),
+    ['RoiTransform']
+  );
+});
+
 test('OperatorPaletteShell exposes a global search rail entry before categories', () => {
   const groups = buildPaletteGroups(operators);
 

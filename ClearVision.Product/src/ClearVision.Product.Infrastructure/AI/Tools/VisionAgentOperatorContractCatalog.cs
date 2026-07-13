@@ -95,7 +95,11 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
             metadata.InputPorts.Select(ToPort).ToList(),
             outputPorts,
             metadata.Parameters.Select(ToParameter).ToList(),
-            metadata.ParameterConstraints);
+            metadata.ParameterConstraints,
+            (metadata.Keywords ?? Array.Empty<string>())
+                .Where(keyword => !string.IsNullOrWhiteSpace(keyword))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList());
     }
 
     private static void AddPortIfMissing(
@@ -167,7 +171,9 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
                 Param("TargetClasses", "目标类别", "string", false, ""),
                 Param("ModelId", "Model Id", "string", false, ""),
                 Param("ModelCatalogPath", "Model Catalog Path", "file", false, "")
-            ]);
+            ],
+            null,
+            []);
 
         yield return new VisionAgentOperatorContract(
             "DetectionSequenceJudge",
@@ -198,7 +204,9 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
                 Param("Direction", "排序方向", "enum", false, "Ascending"),
                 Param("ExpectedCount", "期望数量", "int", false, 0, 0, 256),
                 Param("MinConfidence", "最低置信度", "double", false, 0.0, 0.0, 1.0)
-            ]);
+            ],
+            null,
+            []);
     }
 
     private static VisionAgentPortContract Port(
@@ -240,7 +248,8 @@ internal sealed record VisionAgentOperatorContract(
     IReadOnlyList<VisionAgentPortContract> InputPorts,
     IReadOnlyList<VisionAgentPortContract> OutputPorts,
     IReadOnlyList<VisionAgentParameterContract> Parameters,
-    IReadOnlyList<OperatorParameterConstraint>? ParameterConstraints = null);
+    IReadOnlyList<OperatorParameterConstraint>? ParameterConstraints,
+    IReadOnlyList<string> Keywords);
 
 internal sealed record VisionAgentPortContract(
     string Name,

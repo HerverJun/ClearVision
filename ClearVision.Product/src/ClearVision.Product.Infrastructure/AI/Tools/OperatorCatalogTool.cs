@@ -53,7 +53,8 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
                 item.OperatorType.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                 item.DisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                 item.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                item.Category.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                item.Category.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                item.Keywords.Any(alias => alias.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
         }
 
         var results = operators
@@ -64,6 +65,7 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
                 displayName = item.DisplayName,
                 category = item.Category,
                 summary = item.Description,
+                keywords = item.Keywords,
                 inputPortCount = item.InputPorts.Count,
                 outputPortCount = item.OutputPorts.Count,
                 parameterCount = item.Parameters.Count

@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Text.Json;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Attributes;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Operators;
@@ -128,6 +131,38 @@ public sealed class OperatorNamingSemanticContractTests
                 File.ReadLines(cardPath).First().Should().StartWith($"# {contract.DisplayName} / ", cardPath);
             }
         }
+
+        AssertKnowledgeCards(
+            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_cards.json"),
+            root => root);
+        AssertKnowledgeCards(
+            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"),
+            root => root.GetProperty("Cards"));
+    }
+
+    [Fact]
+    public async Task LegacyDisplayNames_ShouldRemainSearchableInAiOperatorCatalog()
+    {
+        var tool = new OperatorCatalogTool();
+
+        foreach (var contract in Contracts)
+        {
+            foreach (var legacyName in LegacyNames(contract))
+            {
+                var result = await tool.ExecuteAsync(
+                    new VisionAgentToolContext(),
+                    JsonSerializer.SerializeToElement(new { keyword = legacyName, topN = 50 }),
+                    CancellationToken.None);
+
+                result.Success.Should().BeTrue(legacyName);
+                var payload = JsonSerializer.SerializeToElement(result.Data);
+                payload.GetProperty("operators")
+                    .EnumerateArray()
+                    .Select(item => item.GetProperty("operatorType").GetString())
+                    .Should()
+                    .Contain(contract.OperatorType.ToString(), legacyName);
+            }
+        }
     }
 
     [Fact]
@@ -144,6 +179,130 @@ public sealed class OperatorNamingSemanticContractTests
             created.OutputPorts.Should().HaveCount(contract.OutputPortCount);
             created.Parameters.Should().HaveCount(contract.ParameterCount);
         }
+    }
+
+    [Fact]
+    public void LegacyNamedFlows_ShouldRoundTripWithoutIdentityOrContractDrift()
+    {
+        var factory = new OperatorFactory();
+        var created = Contracts
+            .Select((contract, index) => factory.CreateOperator(
+                contract.OperatorType,
+                contract.LegacyDisplayName,
+                index * 10,
+                index * 20))
+            .ToList();
+        var saved = new OperatorFlowDto
+        {
+            Name = "legacy-operator-name-roundtrip",
+            Operators = created.Select(ToDto).ToList()
+        };
+
+        var json = JsonSerializer.Serialize(saved);
+        var loadedDto = JsonSerializer.Deserialize<OperatorFlowDto>(json);
+        loadedDto.Should().NotBeNull();
+        var loaded = loadedDto!.ToEntity().Operators;
+
+        loaded.Should().HaveCount(created.Count);
+        for (var index = 0; index < created.Count; index++)
+        {
+            var before = created[index];
+            var after = loaded[index];
+            after.Id.Should().Be(before.Id);
+            after.Type.Should().Be(before.Type);
+            after.Name.Should().Be(before.Name);
+            after.InputPorts.Select(PortIdentity).Should().Equal(before.InputPorts.Select(PortIdentity));
+            after.OutputPorts.Select(PortIdentity).Should().Equal(before.OutputPorts.Select(PortIdentity));
+            after.Parameters.Select(ParameterIdentity).Should().Equal(before.Parameters.Select(ParameterIdentity));
+        }
+    }
+
+    private static void AssertKnowledgeCards(string path, Func<JsonElement, JsonElement> selectCards)
+    {
+        File.Exists(path).Should().BeTrue(path);
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var cardsElement = selectCards(document.RootElement);
+        cardsElement.GetArrayLength().Should().Be(158, path);
+        var cards = cardsElement
+            .EnumerateArray()
+            .ToDictionary(item => item.GetProperty("OperatorType").GetString()!, StringComparer.Ordinal);
+
+        foreach (var contract in Contracts)
+        {
+            var card = cards[contract.OperatorType.ToString()];
+            card.GetProperty("DisplayName").GetString().Should().Be(contract.DisplayName, path);
+            var aliases = card.GetProperty("Aliases")
+                .EnumerateArray()
+                .Select(item => item.GetString())
+                .Where(item => item != null)
+                .ToList();
+            foreach (var legacyName in LegacyNames(contract))
+            {
+                aliases.Should().Contain(legacyName, path);
+            }
+        }
+    }
+
+    private static IEnumerable<string> LegacyNames(NamingContract contract)
+    {
+        yield return contract.LegacyDisplayName;
+        foreach (var additionalLegacyName in contract.AdditionalLegacyNames)
+        {
+            yield return additionalLegacyName;
+        }
+    }
+
+    private static OperatorDto ToDto(Operator source)
+    {
+        return new OperatorDto
+        {
+            Id = source.Id,
+            Name = source.Name,
+            Type = source.Type,
+            X = source.Position.X,
+            Y = source.Position.Y,
+            IsEnabled = source.IsEnabled,
+            InputPorts = source.InputPorts.Select(port => new PortDto
+            {
+                Id = port.Id,
+                Name = port.Name,
+                Direction = port.Direction,
+                DataType = port.DataType,
+                IsRequired = port.IsRequired
+            }).ToList(),
+            OutputPorts = source.OutputPorts.Select(port => new PortDto
+            {
+                Id = port.Id,
+                Name = port.Name,
+                Direction = port.Direction,
+                DataType = port.DataType,
+                IsRequired = port.IsRequired
+            }).ToList(),
+            Parameters = source.Parameters.Select(parameter => new ParameterDto
+            {
+                Id = parameter.Id,
+                Name = parameter.Name,
+                DisplayName = parameter.DisplayName,
+                Description = parameter.Description,
+                DataType = parameter.DataType,
+                Value = parameter.Value,
+                DefaultValue = parameter.DefaultValue,
+                MinValue = parameter.MinValue,
+                MaxValue = parameter.MaxValue,
+                IsRequired = parameter.IsRequired,
+                Options = parameter.Options
+            }).ToList()
+        };
+    }
+
+    private static string PortIdentity(ClearVision.Product.Core.ValueObjects.Port port)
+    {
+        return $"{port.Id:N}|{port.Name}|{port.Direction}|{port.DataType}|{port.IsRequired}";
+    }
+
+    private static string ParameterIdentity(ClearVision.Product.Core.ValueObjects.Parameter parameter)
+    {
+        return $"{parameter.Id:N}|{parameter.Name}|{parameter.DisplayName}|{parameter.DataType}|{parameter.IsRequired}";
     }
 
     private static void AssertStableShape(int inputs, int outputs, int parameters, NamingContract contract)
