@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
@@ -6,11 +7,13 @@ using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Services;
 
@@ -386,6 +389,43 @@ public sealed class OperatorNamingSemanticContractTests
         }
     }
 
+    [Fact]
+    public async Task LegacyNamedFlow_ShouldExecuteAfterRoundTripUsingOperatorTypeIdentity()
+    {
+        var factory = new OperatorFactory();
+        var created = factory.CreateOperator(OperatorType.RectangleRegion, "矩形区域", 12, 34);
+        created.UpdateParameter("X", 7);
+        created.UpdateParameter("Y", 9);
+        created.UpdateParameter("Width", 40);
+        created.UpdateParameter("Height", 22);
+
+        var saved = new OperatorFlowDto
+        {
+            Name = "legacy-name-execution",
+            Operators = [ToDto(created)]
+        };
+        var json = JsonSerializer.Serialize(saved);
+        var loaded = JsonSerializer.Deserialize<OperatorFlowDto>(json)!.ToEntity();
+
+        using var service = new FlowExecutionService(
+            [new RectangleRegionOperator(NullLogger<RectangleRegionOperator>.Instance)],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext());
+
+        var result = await service.ExecuteFlowAsync(loaded);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var operatorResult = result.OperatorResults.Should().ContainSingle().Subject;
+        operatorResult.OperatorId.Should().Be(created.Id);
+        operatorResult.OperatorName.Should().Be("矩形区域");
+        var rectangle = operatorResult.OutputData!["Rectangle"]
+            .Should().BeAssignableTo<IDictionary<string, object>>().Subject;
+        Convert.ToInt32(rectangle["X"]).Should().Be(7);
+        Convert.ToInt32(rectangle["Y"]).Should().Be(9);
+        Convert.ToInt32(rectangle["Width"]).Should().Be(40);
+        Convert.ToInt32(rectangle["Height"]).Should().Be(22);
+    }
+
     private static void AssertKnowledgeCards(
         string path,
         Func<JsonElement, JsonElement> selectCards,
@@ -511,9 +551,12 @@ public sealed class OperatorNamingSemanticContractTests
         parameters.Should().Be(contract.ParameterCount, contract.OperatorType.ToString());
     }
 
-    private static string ResolveRepoRoot()
+    private static string ResolveRepoRoot([CallerFilePath] string sourceFilePath = "")
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        var current = !string.IsNullOrWhiteSpace(sourceFilePath)
+            ? new FileInfo(sourceFilePath).Directory
+            : new DirectoryInfo(AppContext.BaseDirectory);
+
         while (current != null)
         {
             if (Directory.Exists(Path.Combine(current.FullName, "ClearVision.Product")) &&
