@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createTestRouter } from '@/test-support/createTestRouter';
 
 describe('StudioUI router', () => {
-  it('exposes only the Prompt 1 route skeleton', () => {
+  it('keeps only the reserved F01 technical routes', () => {
     const routePaths = createTestRouter()
       .getRoutes()
       .map(route => route.path);

@@ -45,3 +45,28 @@ a {
 .foundation-page dd {
   line-height: 1.6;
 }
+
+.foundation-page dl {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(0, 1.3fr);
+  gap: 8px 16px;
+}
+
+.foundation-page dt {
+  font-weight: 600;
+}
+
+.foundation-page dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.bootstrap-diagnostic pre {
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f9fafb;
+  white-space: pre-wrap;
+}

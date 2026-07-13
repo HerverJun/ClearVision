@@ -1,4 +1,7 @@
-import { mountStudioApp } from '@/app/createStudioApp';
+import { mountDesktopStudioApp } from '@/app/createStudioApp';
+import { renderBootstrapDiagnostic } from '@/platform/diagnostics/bootstrapDiagnostic';
 import '@/app/base.css';
 
-void mountStudioApp('#app');
+void mountDesktopStudioApp('#app').catch(error => {
+  renderBootstrapDiagnostic('#app', error);
+});
