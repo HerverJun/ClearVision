@@ -53,7 +53,7 @@ function isRectanglePort(port) {
 function createRectangleRegionMetadataFallback() {
     return {
         type: 'RectangleRegion',
-        displayName: '矩形区域',
+        displayName: '矩形框定义',
         category: '几何',
         parameters: [
             { name: 'X', displayName: 'X', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },

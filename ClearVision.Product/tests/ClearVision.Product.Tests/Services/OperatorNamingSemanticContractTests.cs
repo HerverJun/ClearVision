@@ -5,6 +5,7 @@ using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
@@ -76,6 +77,21 @@ public sealed class OperatorNamingSemanticContractTests
             aiCatalog.TryGet(contract.OperatorType.ToString(), out var aiContract).Should().BeTrue();
             aiContract.DisplayName.Should().Be(contract.DisplayName);
         }
+    }
+
+    [Fact]
+    public void LegacyCompatibilityPrompt_ShouldUseCurrentCorrectedDisplayNames()
+    {
+#pragma warning disable CS0618
+        var prompt = new AIPromptBuilder()
+            .WithOperatorLibrary()
+            .Build();
+#pragma warning restore CS0618
+
+        prompt.Should().Contain("- **全局阈值处理** (`Thresholding`):");
+        prompt.Should().Contain("- **Modbus TCP通信** (`ModbusCommunication`):");
+        prompt.Should().NotContain("- **二值化** (`Thresholding`):");
+        prompt.Should().NotContain("- **Modbus通信** (`ModbusCommunication`):");
     }
 
     [Fact]

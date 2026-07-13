@@ -1,5 +1,5 @@
 // TryCatchOperator.cs
-// 异常处理算子 - Try-Catch 流程控制
+// Try 分支透传算子
 // 作者：蘅芜君
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
@@ -57,7 +57,7 @@ public class TryCatchOperator : OperatorBase
             ["HasError"] = false
         };
 
-        Logger.LogDebug("[TryCatch] 异常处理节点已激活，Catch启用: {EnableCatch}", enableCatch);
+        Logger.LogDebug("[TryCatch] Try分支透传完成，兼容Catch配置: {EnableCatch}", enableCatch);
 
         return Task.FromResult(OperatorExecutionOutput.Success(outputData));
     }

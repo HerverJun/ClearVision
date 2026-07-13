@@ -4,6 +4,7 @@ import {
   PROPERTY_SIDEBAR_DEFAULT_WIDTH,
   PROPERTY_SIDEBAR_MAX_WIDTH,
   PROPERTY_SIDEBAR_MIN_WIDTH,
+  PropertyPanelCapabilityAdapter,
   clampWidth,
   getMaxWidth,
   readSavedWidth
@@ -50,4 +51,15 @@ test('getMaxWidth allows a wider preview workbench while reserving flow editor s
   assert.equal(getMaxWidth(1366), 606);
   assert.equal(getMaxWidth(1440), 680);
   assert.equal(getMaxWidth(1920), PROPERTY_SIDEBAR_MAX_WIDTH);
+});
+
+test('RectangleRegion fallback metadata uses the corrected display name', () => {
+  const adapter = new PropertyPanelCapabilityAdapter({
+    flowCanvasAdapter: { nodes: new Map() },
+    getOperatorMetadata: () => null
+  });
+
+  const config = adapter.getRectangleRegionNodeConfig();
+
+  assert.equal(config.title, '矩形框定义');
 });

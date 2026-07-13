@@ -1,5 +1,5 @@
 // PhaseClosureOperator.cs
-// 相位闭合 / 解缠绕算子
+// 相位解缠绕算子
 
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;

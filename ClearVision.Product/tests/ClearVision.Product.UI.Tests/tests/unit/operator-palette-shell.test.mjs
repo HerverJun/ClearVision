@@ -10,13 +10,14 @@ import {
   createOperatorPayload,
   filterOperatorsForFlyout
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorPaletteShell.js';
+import { getOperatorTypeDisplayName } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorDisplayNames.js';
 
 const operators = [
   {
     type: 'Thresholding',
-    displayName: '阈值分割',
+    displayName: '全局阈值处理',
     category: '预处理',
-    description: '按灰度阈值生成二值图',
+    description: '执行全局阈值处理',
     inputPorts: [{ name: 'Image', dataType: 'Image' }],
     outputPorts: [{ name: 'Mask', dataType: 'Image' }],
     parameters: [{ name: 'Threshold', displayName: '阈值', dataType: 'int' }]
@@ -68,7 +69,7 @@ test('OperatorPaletteShell groups operators by category for the rail', () => {
     ['预处理', 2]
   ]);
   assert.equal(groups[2].operators[0].displayName, '高斯滤波');
-  assert.equal(groups[2].operators[1].displayName, '阈值分割');
+  assert.equal(groups[2].operators[1].displayName, '全局阈值处理');
 });
 
 test('OperatorPaletteShell search keeps name, type, description, port, parameter and keyword matches', () => {
@@ -180,6 +181,39 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
       filterOperatorsForFlyout(renamedOperators, legacyName).map(operator => operator.type),
       [expectedType]
     );
+  }
+});
+
+test('Shared operator labels stay aligned with corrected runtime display names', () => {
+  const expectedNames = {
+    BlobLabeling: 'Blob分类标注',
+    PointAlignment: '点位偏差计算',
+    RoiTransform: 'ROI位姿变换',
+    PositionCorrection: 'ROI位姿补偿（像素）',
+    PointCorrection: '点位刚性补偿',
+    EdgePairDefect: '边缘间距缺陷检测',
+    StatisticalOutlierRemoval: '点云统计离群点去除（SOR）',
+    PPFMatch: 'PPF点云粗匹配',
+    PlanarMatching: '平面特征匹配',
+    ColorDetection: '颜色分析',
+    GeometricTolerance: '二维几何公差判定',
+    DetectionSequenceJudge: '检测顺序判定',
+    ImageDiff: '图像差异率分析',
+    RectangleRegion: '矩形框定义',
+    CoordinateTransform: '像素到物理坐标（单点）',
+    ROIManager: 'ROI裁剪与掩膜',
+    RoiManager: 'ROI裁剪与掩膜',
+    TryCatch: 'Try分支透传',
+    ModbusCommunication: 'Modbus TCP通信',
+    Threshold: '全局阈值处理',
+    Thresholding: '全局阈值处理',
+    FFT1D: '信号/图像傅里叶变换（FFT）',
+    InverseFFT1D: '信号/图像逆傅里叶变换（IFFT）',
+    PhaseClosure: '相位解缠绕'
+  };
+
+  for (const [operatorType, displayName] of Object.entries(expectedNames)) {
+    assert.equal(getOperatorTypeDisplayName(operatorType), displayName, operatorType);
   }
 });
 

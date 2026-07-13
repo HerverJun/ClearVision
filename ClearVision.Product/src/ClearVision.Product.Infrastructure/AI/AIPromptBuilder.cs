@@ -34,7 +34,7 @@ public class AIPromptBuilder
         // 图像采集与处理
         _operators.Add(new PromptOperatorInfo(OperatorType.ImageAcquisition, "图像采集", "从相机获取图像", "Image"));
         _operators.Add(new PromptOperatorInfo(OperatorType.GaussianBlur, "高斯滤波", "图像平滑降噪", "Image", "Image"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.Thresholding, "二值化", "阈值分割", "Image", "Image"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.Thresholding, "全局阈值处理", "支持二值、截断、ToZero 及自动阈值的全局阈值处理", "Image", "Image"));
         _operators.Add(new PromptOperatorInfo(OperatorType.EdgeDetection, "边缘检测", "Canny 边缘检测", "Image", "Image"));
 
         // 深度学习
@@ -79,7 +79,7 @@ public class AIPromptBuilder
         }, specialNotes: "通信算子上游必须有 ConditionalBranch 或 ResultJudgment 保护"));
 
         // 工业通信
-        _operators.Add(new PromptOperatorInfo(OperatorType.ModbusCommunication, "Modbus通信", "Modbus TCP 通信", "Any", "Any"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.ModbusCommunication, "Modbus TCP通信", "Modbus TCP 通信", "Any", "Any"));
         _operators.Add(new PromptOperatorInfo(OperatorType.SiemensS7Communication, "西门子S7", "S7 协议通信", "Any", "Any"));
 
         // 流程控制
