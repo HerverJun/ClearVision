@@ -22,23 +22,27 @@
 - `FlowCanvas`、`ImageCanvas`：现有命令式内核，通过窄 adapter 接入；新 UI 不复制内核。
 - 前端 store 只保存 UI 投影、草稿和可丢弃缓存，不保存业务权威。
 
-## `FrontendV2` 的废弃定位
+## `FrontendV2` 的最终定位
 
-`ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/` 仍存在于当前代码，并仍被 Desktop build/publish 生成到 `/v2`；默认配置没有把它作为正式入口。对本分支而言，它是已废弃的迁移原型：
+F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/` 及其 `/v2` build、publish、Host、配置、CI 和专属测试链：
 
-- 可以读取其中的架构教训、权威边界和验收类别；
-- 不复制其 Vue 组件、store、port、HostBridge、动态 legacy import、视觉样式或 Goal 路线；
-- 不把 `/v2`、`Studio:WorkspaceV2Enabled` 或旧 Studio2 Goal 当作新实现的既定前提。
+- `FRONTEND_V2_DECISION=DELETE_COMPLETELY`；
+- 不修复、不复用、不建立兼容层；
+- 只允许在删除前审计其外围耦合；
+- legacy `/index.html` 是当前正式入口和回退基线；
+- StudioUI 从零建立，不继承其组件、store、router、port、HostBridge、Canvas adapter、样式、测试组织或旧 Goal 路线。
 
-## 推荐阶段
+历史 Git 和 `docs/进行中/Studio2/` 可继续取证，但不充当当前执行事实。
 
-1. **初始化与基线**：冻结真实仓库现状、规则、风险和未验证事项；只改文档。
-2. **技术地基验证**：验证候选工具链、静态资产、Desktop build/publish、HostBridge/HTTP/Canvas 边界和 lifecycle；不迁移业务 capability。
-3. **Design System**：建立 Quiet Precision tokens、可访问性、DPI/分辨率和视觉回归基线。
-4. **低风险 capability**：先迁移只读、弱状态、易回滚的页面或区域。
-5. **状态密集 capability**：迁移 Project、Variables、Results、AI 等强状态区域，逐项证明单 owner、单写入口和恢复语义。
-6. **流程工作台**：接入 FlowCanvas、ImageCanvas、属性、预览和几何编辑，保持既有内核与保存权威。
-7. **发布切换**：完成真实 WebView2、无 Node、DPI、生命周期、发布包、CI 和回滚证据后，才允许正式切换入口。
+## F01 五轮执行
+
+1. **Prompt 1｜退役与构建地基**：完整退役 FrontendV2；完成 runner、DPI、CI 事实取证与 ADR；建立 StudioUI Vue 最小工程和 Desktop build/publish 静态资产链。
+2. **Prompt 2｜Host 与最小 Platform**：增加 `/studio` 启动入口、`StudioUiEnabled`、StartupConfigV1、startup reader 和 minimal Host/API platform。
+3. **Prompt 3｜Design Foundation**：建立 tokens、representative primitives、Design Foundation Lab、browser fixture 和 central Playwright。
+4. **Prompt 4｜Canvas 与 WebView2**：接入 existing FlowCanvas canonical adapter，完成 lifecycle/identity/interaction、runner 泛化、Debug/publish WebView2 和标准化性能 A/B。
+5. **Prompt 5｜最终收口**：完成全量回归、publish/no-Node 本机证据、架构守卫、用户视觉确认、GitHub Actions、最终报告和 F02 输入。
+
+每轮必须通过本轮门禁后才能进入下一轮。Prompt 1 完成后必须停止，不自动实现 Host 新入口、Design Lab 或 Canvas。
 
 ## 阶段门禁
 
@@ -55,5 +59,7 @@ F01 执行期间以本目录链接的计划为唯一权威；仓库外来源文�
 
 - [初始化基线](./初始化基线.md)
 - [F01 完整开发计划（正式执行权威）](./Studio_UI_Next_F01_完整开发计划.md)
+- [F01 架构决策记录](./F01_架构决策记录.md)
+- [F01 五轮执行卡](./F01_五轮执行卡.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

@@ -23,7 +23,7 @@ F01 的目标不是把全部 Studio 页面迁移到 Vue，也不是在第一阶�
 3. 现有 host startup 注入、HTTP、HostBridge 和 Canvas 能否通过窄 adapter 接入，而不形成第二套运行时基础设施；
 4. 现有 FlowCanvas 能否在 Vue 生命周期中稳定 mount、resize、交互、serialize 和 dispose；
 5. 现有浏览器测试和 WebView2/CDP runner 候选实现能否先被准确定位、验证，再扩展到新入口；
-6. 新入口验证成功后，旧 FrontendV2 构建、启动和 CI 链路能否安全退役；
+6. Prompt 1 能否先完整退役旧 FrontendV2 构建、启动和 CI 链路，并以 legacy `/index.html` 作为当前回退基线；
 7. 哪些证据已经实际运行；最终提交是否已通过真实 GitHub Actions；哪些仍属于真实 DPI 矩阵、干净 no-Node 目标机或现场环境的后续发布证据。
 
 F01 默认不开发新的 Pointer Canvas Kernel。如果现有 FlowCanvas 被证据证明存在不可修复或改造成本接近重写的基础缺陷，F01 只能输出阻断报告和独立 ADR 建议。任何 Pointer Kernel 实验必须在用户明确批准后另立专项；即使批准，也不得与现有 FlowCanvas 同时成为生产候选。
@@ -86,7 +86,7 @@ FrontendV2 仍参与：
 - Studio:WorkspaceV2Enabled 启动选择；
 - 多组 Desktop 和 Playwright 测试。
 
-FrontendV2 只作历史取证，不作为新工程底座。F01 允许在新入口通过完整门禁后退役它，但退役必须覆盖源码、MSBuild、Host、CI、测试、文档入口和忽略规则，不能只删除目录。
+FrontendV2 只作历史取证，不作为新工程底座。F01 在 Prompt 1 先行完整退役它；退役必须覆盖源码、MSBuild、Host、CI、测试、文档入口和忽略规则，不能只删除目录。legacy `/index.html` 是 Prompt 1 至 Prompt 2 之间的唯一正式入口和回退基线；StudioUI 从零建立，不承担 FrontendV2 兼容义务。
 
 ### 2.5 Startup 注入
 
@@ -175,6 +175,20 @@ DONE
 - RELEASE_READY 不属于 F01 状态。真实 Windows DPI/跨显示器矩阵、干净 no-Node 目标机、现场硬件和发布切换在后续发布阶段单独判定。
 
 F01 可以记录外部证据为 NOT RUN 或 NOT PERFORMED，但不得把它们误写为 PASS。
+
+### 3.1 五轮实施方式
+
+F01 按以下五个 Prompt 串行实施；任一轮未过本轮门禁时不得自动进入下一轮：
+
+| Prompt | 范围 | 明确停止边界 |
+| --- | --- | --- |
+| Prompt 1 | FrontendV2 完整退役；WebView2 runner、DPI、CI 事实取证；F01 ADR；StudioUI Vue 最小工程；Desktop build/publish 静态资产链 | 不增加 `/studio` Desktop 启动入口，不建立 `StudioUiEnabled`、StartupConfigV1、Host/API adapter、Design Lab 或 Canvas 宿主 |
+| Prompt 2 | Desktop Host、`/studio` 启动入口、`StudioUiEnabled`、StartupConfigV1、startup reader、minimal Host/API platform | 不实现 Design Lab 或 Canvas |
+| Prompt 3 | Design tokens、representative primitives、Design Foundation Lab、browser fixture、central Playwright | 不接入 FlowCanvas |
+| Prompt 4 | existing FlowCanvas Vue 宿主、fixture、interaction、lifecycle、identity、WebView2 runner 泛化、Debug/publish WebView2、标准化性能 A/B | 不迁移正式业务 capability |
+| Prompt 5 | 全量回归、publish/no-Node 本机证据、architecture guards、用户视觉确认、GitHub Actions、F01 最终报告和 F02 输入 | 未满足 F01 DONE 门禁时不启动 F02 |
+
+Prompt 1 的代码事实取证可以将真实 WebView2 运行和实际进程 DPI 查询如实记录为 `NOT RUN`；这不会降低 F01 DONE 门禁。真实 WebView2、有效 DPI mode、Canvas、用户视觉确认和最终提交 CI 仍须在后续指定 Prompt 中闭环。
 
 ---
 
@@ -308,6 +322,8 @@ F01 必须交付：
 17. FrontendV2 构建、启动和 CI 链退役；
 18. 针对最终提交的真实 GitHub Actions 运行证据；
 19. F01 完成报告和 F02 输入。
+
+以上交付物分布在 3.1 的五轮中。Prompt 1 只交付退役、架构事实、ADR、最小 StudioUI 工具链和 Desktop 静态资产链，不提前实现后续轮次的 Host、Platform、Design 或 Canvas 范围。
 
 ### 5.2 F01 不交付
 
@@ -681,36 +697,16 @@ Studio:StudioUiEnabled
 false
 ~~~
 
-过渡期间仍可能存在：
+Prompt 1 已先行退役 `WorkspaceV2Enabled`。Prompt 2 只定义一个启动选择：
 
-~~~text
-Studio:WorkspaceV2Enabled
-~~~
-
-必须定义：
-
-| StudioUiEnabled | WorkspaceV2Enabled | 结果 |
-|---:|---:|---|
-| false | false | Legacy |
-| true | false | StudioUi |
-| false | true | FrontendV2，仅在退役前 |
-| true | true | Diagnostic，禁止自行选择优先级 |
-
-FrontendV2 退役后删除 WorkspaceV2Enabled 和 FrontendV2 startup kind。
+| StudioUiEnabled | 结果 |
+|---:|---|
+| false | Legacy |
+| true | StudioUi；资产缺失时 Diagnostic |
 
 ### 9.3 Resolver
 
-过渡阶段允许：
-
-~~~text
-Legacy
-FrontendV2
-StudioUi
-Diagnostic
-Welcome
-~~~
-
-退役后只保留：
+只允许：
 
 ~~~text
 Legacy
@@ -731,7 +727,6 @@ StudioUi 资产至少检查：
 - 显示 Diagnostic；
 - 明确缺失路径；
 - 不导航 legacy；
-- 不加载 FrontendV2；
 - 不在前端用重试循环猜测资产。
 
 ### 9.4 静态资产
@@ -759,7 +754,7 @@ interface StudioStartupConfigV1 {
 }
 ~~~
 
-Host 过渡期内部仍可识别 Legacy、FrontendV2、StudioUi 和 Diagnostic，但只有真正启动 StudioUI 时才向该页面注入 `StudioStartupConfigV1`。FrontendV2 兼容字段只存在于旧 Host 过渡逻辑，不进入新的 TypeScript v1 契约，也不要求 FrontendV2 退役后立即发布 `schemaVersion: 2`。
+Host 内部只识别 Legacy、StudioUi、Diagnostic 和 Welcome；只有真正启动 StudioUI 时才向该页面注入 `StudioStartupConfigV1`。Prompt 1 已删除的 FrontendV2 字段不得以兼容名义重新进入 Host 或 TypeScript 契约。
 
 过渡期间 host 注入可保留旧 alias，但必须：
 
@@ -777,13 +772,11 @@ Host 过渡期内部仍可识别 Legacy、FrontendV2、StudioUi 和 Diagnostic�
 
 - flag off 使用 legacy；
 - StudioUi flag on 使用 /studio/index.html；
-- V2 flag on 在退役前使用 /v2/index.html；
-- 两 flag 同开进入 Diagnostic；
 - StudioUi 资产缺失 fail-closed；
 - legacy 资产缺失保持 Welcome/Diagnostic 现有语义；
 - startup schemaVersion；
 - StudioUI 的 uiKind 只能为 `studio-ui`；
-- Legacy 与 FrontendV2 不接收新的 `StudioStartupConfigV1`；
+- Legacy 不接收新的 `StudioStartupConfigV1`；
 - apiBaseUrl；
 - studioUiBasePath；
 - featureFlags deep freeze；
@@ -794,8 +787,8 @@ Host 过渡期内部仍可识别 Legacy、FrontendV2、StudioUi 和 Diagnostic�
 ### 9.7 通过条件
 
 - 默认配置仍启动 legacy；
-- Studio UI 启动时 legacy 和 V2 均未挂载；
-- StudioStartupConfigV1 只描述 StudioUI，Host 过渡枚举不泄漏到新 TypeScript 契约；
+- Studio UI 启动时 legacy 未挂载；
+- StudioStartupConfigV1 只描述 StudioUI，Host 内部枚举不泄漏到新 TypeScript 契约；
 - startup config 是 StudioUI 唯一宿主启动配置；
 - 不支持运行时热切换；
 - Host 变更不新增业务 endpoint。
@@ -1428,23 +1421,17 @@ F01 的可执行证据包括：
 
 ## 14. F01-7：FrontendV2 退役
 
-### 14.1 前置条件
+### 14.1 Prompt 1 前置条件
 
-只有以下全部成立后才能退役：
+FrontendV2 在 Prompt 1 先行退役，不再依赖 StudioUI、Host、Design、Canvas、Playwright 或真实 WebView2 的后续门禁。退役前只要求：
 
-- StudioUI build 成功；
-- Desktop Debug build 成功；
-- Release publish 成功；
-- /studio startup 成功；
-- flag off legacy 回归成功；
-- missing StudioUI asset fail-closed；
-- startup contract 通过；
-- StudioStartupConfigV1 的 `uiKind` 仅为 `studio-ui`；
-- DPI authority 已确定，Canvas/WebView2 证据未受冲突 mode 污染；
-- Design Lab 通过；
-- 现有 FlowCanvas 宿主通过；
-- Playwright 通过；
-- 真实 WebView2 Debug 和 publish smoke 通过。
+- 当前分支、远端历史、upstream 和工作区审计通过；
+- FrontendV2 与 Desktop build、publish、Host、配置、CI 和测试的活动引用已形成清单；
+- legacy `/index.html` 仍是默认正式入口；
+- 退役不会改写 Project、Flow、GlobalVariables、AgentRun、Inspection、Runtime 或 Station 权威；
+- 权威计划和 ADR 已记录“先退役、legacy 回退、StudioUI 从零建立”的决定。
+
+StudioUI build、Desktop Debug、Release publish、legacy 回归和架构守卫仍是 Prompt 1 完成门禁；`/studio` startup、StartupConfigV1、Design、Canvas、Playwright 和真实 WebView2 则按 3.1 在 Prompt 2～5 闭环，且仍属于 F01 DONE 门禁。
 
 ### 14.2 必须删除或替换
 
@@ -1518,82 +1505,26 @@ Studio2ArchitectureGuardTests 同时包含 V2 专属断言和当前正式 owner/
 
 ## 15. 执行顺序与依赖 DAG
 
-### Wave 0：只读审计与 ADR
+### Prompt 1：退役与构建地基
 
-主协调 owner：
+主协调 owner 独占共享文件，依次完成：Git/worktree 审计 → 权威计划与 ADR → FrontendV2 完整退役 → StudioUI 最小工程 → Desktop build/publish 静态资产链 → frontend/Desktop/legacy/publish 验证。完成后停止，不创建 Host 新入口或业务 capability。
 
-- Git 和 worktree；
-- FrontendV2 引用清单；
-- ADR；
-- WebView2/CDP runner 事实清单；
-- 当前有效 DPI mode 与唯一 DPI authority；
-- 最终提交 CI 触发路径；
-- 文件白名单；
-- evidence 矩阵；
-- 用户批准。
+### Prompt 2：Host 与最小 Platform
 
-未批准 ADR 前不修改共享实现。
+在 Prompt 1 通过后，扩展现有 resolver、静态资产映射和 startup 注入，建立 `/studio`、`StudioUiEnabled`、StartupConfigV1、startup reader 以及最小 Host/API platform。不得创建第二 HostBridge、HTTP 基础设施或端口发现机制。
 
-### Wave 1：共享地基
+### Prompt 3：Design Foundation
 
-仅主协调 owner 修改：
+在 Prompt 2 通过后，建立 tokens、representative primitives、Design Foundation Lab、browser fixture 和 central Playwright；不加载 legacy CSS，不接入 Canvas。
 
-- package.json；
-- package-lock.json；
-- Vite；
-- Router；
-- main.ts；
-- App.vue；
-- Design Tokens；
-- startup contract；
-- HostBridge interface；
-- API transport interface；
-- Desktop.csproj；
-- StudioOptions；
-- Resolver；
-- WebView2Host；
-- Program static assets；
-- CI。
+### Prompt 4：Canvas 与真实 WebView2
 
-输出最小可构建骨架后，再开放叶子工作包。
+在 Prompt 3 通过后，由唯一 Canvas owner 接入 existing FlowCanvas canonical adapter，完成 fixture、interaction、lifecycle、identity 和标准化 A/B；同时泛化现有 WebView2 runner，完成 Debug/publish WebView2 和分层 DPI 证据。
 
-### Wave 2：可并行叶子工作
+### Prompt 5：最终收口
 
-在明确白名单下并行：
-
-- Design primitives；
-- Design Lab page；
-- canonical Flow fixture；
-- Canvas Lab owner；
-- unit tests；
-- Playwright scenario；
-- WebView2 Studio UI scenario；若 F01-0 证明没有可复用 runner，则由唯一 owner 建立最小 runner 后再添加 scenario。
-
-Canvas 只能有一个实现 owner。
-
-### Wave 3：集成
-
-主协调 owner：
-
-- 合并叶子工作；
-- 处理 shared contract；
-- 运行前端质量门禁；
-- 串行运行 Desktop tests；
-- 运行 build/publish；
-- 运行 WebView2；
-- 在 DPI authority 已确定的前提下运行 Canvas 标准化 A/B；
-- 作出 Canvas 结论。
-
-### Wave 4：FrontendV2 退役
-
-只有 Wave 3 通过后执行。
-
-### Wave 5：收口
-
-- 完成本地报告草案、技术债和 F02 输入；
-- 获得用户视觉确认；
-- 形成包含 FrontendV2 退役和全部本地证据的最终候选提交；
-- 使用现有 `workflow_dispatch`、适当分支触发规则或 Draft PR 中的一种方式，对最终提交运行真实 GitHub Actions；
+- 完成全量回归、publish/no-Node 本机证据、最终 architecture guards、用户视觉确认、技术债和 F02 输入；
+- 使用现有 `workflow_dispatch` 或 Draft PR，对最终提交运行真实 GitHub Actions；
 - 记录 workflow run URL、run ID、commit SHA 和 conclusion；
 - 若 CI 证据写回仓库后产生新最终提交，必须针对新提交重新运行 CI；
 - CI 外部服务故障时保持 AWAITING_CI；配置无法触发或最终提交验证失败时使用对应阻断码；
@@ -1830,81 +1761,17 @@ git status --short
 
 ---
 
-## 18. 时间安排
+## 18. 五轮安排
 
-### Day 0～1：ADR 与最小骨架
+| 轮次 | 主要工作 | 进入下一轮前的证据 |
+| --- | --- | --- |
+| Prompt 1 | Git/ADR、FrontendV2 退役、StudioUI scaffold、MSBuild build/publish | frontend quality、Desktop Debug、focused tests、legacy 回归、Release publish 与产物审计 |
+| Prompt 2 | Host、`/studio`、flag、StartupConfigV1、startup reader、minimal Host/API | flag off/on、missing asset、startup contract、唯一直接访问点 |
+| Prompt 3 | tokens、primitives、Design Lab、browser fixture、central Playwright | light/dark、分辨率、keyboard、reduced motion、browser tests |
+| Prompt 4 | existing FlowCanvas、WebView2 runner 泛化、DPI、标准化 A/B | interaction、lifecycle、identity、Debug/publish WebView2、原始性能样本 |
+| Prompt 5 | 全量回归、no-Node 本机证据、用户确认、GitHub Actions、最终报告 | F01 DONE 全部门禁与远端一致性 |
 
-- Git 审计；
-- 共享 owner；
-- WebView2/CDP runner 事实取证；
-- 有效 DPI mode 与唯一 authority 决策；
-- 最终提交 CI 触发路径；
-- ADR；
-- StudioUI scaffold；
-- Vite base；
-- hash router；
-- frontend quality gates。
-
-### Day 2～3：Build、Host、Platform
-
-- MSBuild；
-- /studio static mapping；
-- StudioUiEnabled；
-- startup schema；
-- `uiKind: 'studio-ui'` 的 StudioStartupConfigV1；
-- startup reader；
-- minimal API transport；
-- Host adapter interface；
-- focused Desktop tests。
-
-### Day 4：Design 与 browser tests
-
-- tokens；
-- representative primitives；
-- Design Lab；
-- central Playwright；
-- light/dark；
-- 1366 和 1920；
-- keyboard/reduced motion。
-
-### Day 5～6：FlowCanvas 与 WebView2
-
-- canonical Flow fixture；
-- existing FlowCanvas owner；
-- lifecycle matrix；
-- interaction matrix；
-- 标准化 A/B performance baseline；
-- DPI authority focused test/诊断与分层证据；
-- Debug WebView2；
-- Release publish WebView2。
-
-若 F01-0 证明候选 runner 不存在或不可运行，本时段由唯一 owner 建立最小 runner，并使用 Day 9 缓冲；不得并行保留第二套实现。
-
-### Day 7～8：FrontendV2 退役与回归
-
-- 删除 V2 build/host/CI；
-- 更新 guards；
-- clean build；
-- publish audit；
-- legacy regression；
-- StudioUI regression；
-- 形成最终候选提交并准备 CI 取证。
-
-### Day 9：缓冲
-
-只用于：
-
-- MSBuild 增量问题；
-- WebView2 user-data 或端口隔离；
-- Canvas dispose；
-- test flake；
-- CI 配置修复；
-- 最终提交 GitHub Actions 运行、失败修复与重跑；
-- 文档与证据收口。
-
-不得趁缓冲时间迁移业务页面。
-
-GitHub Actions 排队/外部服务故障和用户确认等待不计入 6～9 个有效工作日，但未取得这些证据前状态只能是 AWAITING_VISUAL_CONFIRMATION、AWAITING_CI 或对应 BLOCKED，不能标记 DONE。
+GitHub Actions 排队/外部服务故障和用户确认等待不计入有效开发时间，但未取得这些证据前状态只能是 AWAITING_VISUAL_CONFIRMATION、AWAITING_CI 或对应 BLOCKED，不能标记 DONE。不得利用任何轮次的缓冲迁移业务页面。
 
 ---
 
@@ -1917,7 +1784,7 @@ GitHub Actions 排队/外部服务故障和用户确认等待不计入 6～9 个
 | 生成资产污染源码 wwwroot | 中 | 高 | 只写 obj、OutDir、PublishDir |
 | hash/history 路由与 Desktop 静态服务不一致 | 中 | 高 | F01 默认 hash history |
 | 两个启动 flag 同时开启 | 中 | 高 | fail-closed Diagnostic |
-| FrontendV2 与 StudioUI 同时构建拖慢或冲突 | 高 | 中高 | 仅过渡保留，门禁后单独退役 |
+| FrontendV2 与 StudioUI 同时构建拖慢或冲突 | 高 | 中高 | Prompt 1 先完整退役 FrontendV2，再从零建立 StudioUI |
 | 删除 FrontendV2 破坏 CI | 高 | 高 | 退役清单必须包含 ci.yml 和 cache |
 | 删除混合架构守卫造成覆盖丢失 | 中 | 高 | 只移除 V2-only cases，保留长期 guards |
 | project/operator smoke 缺少认证 | 高 | 中 | 隔离 DB setup/login 与同源 sessionStorage |
@@ -2295,7 +2162,7 @@ F02 不应优先：
 - Startup readonly:
 - Startup schema:
 - StudioStartupConfigV1 uiKind:
-- FrontendV2 compatibility fields location:
+- Legacy alias boundary:
 
 ## 5. Platform
 - Startup reader:
@@ -2418,7 +2285,7 @@ F01 必须做到：
 5. DPI authority 在 F01 ADR 中确定，当前有效 mode 可审计；
 6. 现有 FlowCanvas 在 Vue 生命周期中被真实验证，并以标准化 A/B、原始样本和 warning-first 规则评估性能；
 7. 浏览器、Playwright、真实 WebView2、模拟 DPI 和真实 Windows DPI 证据分开；
-8. FrontendV2 在新链路通过后完整退役；
+8. FrontendV2 在 Prompt 1 先行完整退役，legacy `/index.html` 作为当前回退基线，StudioUI 不承担兼容义务；
 9. 最终提交至少通过一次真实 GitHub Actions；未运行的真实 DPI 矩阵、干净 no-Node 目标机和硬件证据保持诚实。
 
 只有本地技术门禁、用户视觉确认、CI、DPI authority、唯一 Canvas 结论、FrontendV2 退役以及工作区/远端一致性全部完成，F02 的 Design System 和低风险 capability 迁移才具备可靠地基。
