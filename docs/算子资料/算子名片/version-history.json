@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T18:59:07.8829638\u002B08:00",
+  "generatedAt": "2026-07-13T19:08:24.4997898\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -318,6 +318,11 @@
           "version": "1.0.0",
           "sourceHash": "2C092A81F025EF55EAD890FFCA6DF8C0E67DB0EB141B3D222D700DDB3E93EF19",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "1DFC22FA6A4B143B6F325F064F7B5019BF731EACA2748A1E1A51E6CCBFAB3AD9",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -556,6 +561,11 @@
           "version": "1.0.0",
           "sourceHash": "E28184F3B6593D3FF113B28D6570A9D0BC3CE3954BFC9CC0E222D57B6816975F",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "5B8CECBAF5D9EF539706ECC456AC62751C084A2AE0847248C554FE769C3CC186",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -1898,6 +1908,11 @@
           "version": "1.0.0",
           "sourceHash": "B2A08CA721CA661DEA576A8A2174EFE933740B30629E4C8B8AE9D343D276FBB9",
           "recordedAt": "2026-07-13T15:25:22.2877465\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "7118851688D066684B200D7225CCEAB8823E43EBD926AD355A4EE5F6BF3A4005",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -2278,6 +2293,11 @@
           "version": "1.0.0",
           "sourceHash": "21E09294F69BB1E08FD16C5C4116F0397E4BE1F359267D239F784633624DA365",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "6E22F78869DDD7F0E74B42B4A442C3DB98615C6E3DA998E9C29A6168A203C0FB",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -2831,6 +2851,11 @@
           "version": "1.0.0",
           "sourceHash": "59EB7F16DFD5322D280524ADFAD5401B74AB4692B1AE5C2CBD98DB93EED96955",
           "recordedAt": "2026-07-13T15:25:22.2877465\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "0B57F07C871EE987BE2949258E29B5C38B6BAA965446F472762B11B600B95DB4",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -2883,6 +2908,11 @@
           "version": "1.0.0",
           "sourceHash": "9BA39849E6742BA4E9D06918106CA1A68C149F7FE77445E31D83B4572D4BC6F4",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "E0A97FB54B33F59D5D59D1006AC33ED3D40CEAB835DDE7299658F26BBC0DED6E",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -4725,6 +4755,11 @@
           "version": "1.0.0",
           "sourceHash": "E37F539412D42E998A3C0E0800A2B7DEA82DF87EA7DFDA5C52A78D7446E2F65F",
           "recordedAt": "2026-07-13T15:25:22.2877465\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "BDB934A52583A93DCD243420D64FF3713A994FA686EA7C04721A1130D2664CCD",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -5233,6 +5268,11 @@
           "version": "1.0.0",
           "sourceHash": "A1F41A8612BB229A0A8099F01CF23002485F2582634B8079309AB2845D4AA0F4",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "7AEFDE1FD3AC1E5EA8A2B8A61C9421DC76C71634BC894A237A7F736785D8F593",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -5295,6 +5335,11 @@
           "version": "1.0.0",
           "sourceHash": "F6EE8AFE310EE06C1BDC38C20AFFDACF6F59CA1CFCD0E3C7EE42BD3642973F9F",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "D7E2B739EC5EE5CF17AA7AFDB07BEDA1C2C02F946BF8318E73AC14C35E48E4B8",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -5327,6 +5372,11 @@
           "version": "1.0.0",
           "sourceHash": "142E9C987CAF6ADFEE882298BE84D3A56D523C9BA4BF1F94F2F77B3CE856983C",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "0584E7F41C4F9C4223A1DA5444B84F664E200116714A05F051D1740B47A28A0F",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -5548,6 +5598,11 @@
           "version": "1.0.0",
           "sourceHash": "861C9C537804C5501B9525BF19E3717CB98F316B59180E256FFF90B37A7064BC",
           "recordedAt": "2026-07-13T15:30:35.6120213\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "0E80FF1315C9A4ECE70B8CBE7AF019F00A60033E84040D5EB7138B9C180AD153",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -6292,6 +6347,11 @@
           "version": "1.0.1",
           "sourceHash": "744DA119B81FADAF3E43BC4A654C8662A362E23ED4DC43F7A2489CC4B66EF490",
           "recordedAt": "2026-07-13T18:54:34.0417583\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "8E9923CE7B6B00000521AFB34DB8A824CEB14627710A75AB369BC2FDA6BF8CEE",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -8159,6 +8219,11 @@
           "version": "1.0.0",
           "sourceHash": "13321800C5D515D946731EE794E52932B37F4ACD5BFDEF23B2424E994978EB00",
           "recordedAt": "2026-07-13T18:54:34.0417583\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "9A970238C67EB0BE5DE2B5798EF297E4839AD2E73EFD921909234F1EB4BFC95E",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -8345,6 +8410,11 @@
           "version": "1.0.0",
           "sourceHash": "E342AFC81C7ED429CE074D3033AF6C73B431D74D41A764C6C9EBE2ABA211CD76",
           "recordedAt": "2026-07-06T21:35:46.7699945\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "D5C001B2B2A9BD2FF8145BAD6BDE467F974F58D1F91C730E51D227407E9C490B",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -9375,6 +9445,11 @@
           "version": "1.0.0",
           "sourceHash": "CC76C90CCB8B98D5571500556DC995CEC37F09B7A77EA21605AE524353C37E0F",
           "recordedAt": "2026-07-13T15:25:22.2877465\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "5CB05C0001C9F7040A8A5AC2C8E23FC9BA7C088470C63C7DD75CDBB8ABCDE60D",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },
@@ -9673,6 +9748,11 @@
           "version": "1.0.0",
           "sourceHash": "7D94B210096E81E8E5BDCE710ED21AD0680A58BF344421A070616AE9F1366ECC",
           "recordedAt": "2026-07-13T18:54:34.0417583\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "3004B982B8F0524448171E6D5C93B0B699243E13209C70FD777BFFC559909AC3",
+          "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
         }
       ]
     },

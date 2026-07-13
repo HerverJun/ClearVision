@@ -323,6 +323,105 @@ public class FlowNodePreviewServiceTests
         }
     }
 
+    [Theory]
+    [InlineData("ImageClassification")]
+    [InlineData("SemanticSegmentation")]
+    public async Task PreviewWithMetricsAsync_NonDetectionTask_ShouldNotRequireDetectionLabels(string taskType)
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
+        var modelPath = Path.GetTempFileName();
+        target.AddParameter(new Parameter(Guid.NewGuid(), "TaskType", "TaskType", string.Empty, "enum", taskType));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelPath", "ModelPath", string.Empty, "file", modelPath));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "LabelsPath", "LabelsPath", string.Empty, "file", string.Empty));
+
+        var flow = new OperatorFlow("non-detection-preview-flow");
+        flow.AddOperator(target);
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowDebugExecutionResult
+            {
+                IsSuccess = true,
+                DebugSessionId = Guid.NewGuid(),
+                IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                {
+                    [target.Id] = new() { ["Image"] = CreatePreviewImageBytes() }
+                }
+            }));
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>());
+
+        try
+        {
+            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+
+            result.Success.Should().BeTrue();
+            result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
+            result.DiagnosticCodes.Should().NotContain("missing_labels");
+        }
+        finally
+        {
+            File.Delete(modelPath);
+        }
+    }
+
+    [Fact]
+    public async Task PreviewWithMetricsAsync_AutoClassificationCatalog_ShouldResolveModelWithoutDetectionLabels()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
+        var modelPath = Path.GetTempFileName();
+        var catalogPath = CreateTempModelCatalog("demo_classification", "classification", modelPath);
+        target.AddParameter(new Parameter(Guid.NewGuid(), "TaskType", "TaskType", string.Empty, "enum", "Auto"));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelId", "ModelId", string.Empty, "string", "demo_classification"));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelCatalogPath", "ModelCatalogPath", string.Empty, "file", catalogPath));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "LabelsPath", "LabelsPath", string.Empty, "file", string.Empty));
+
+        var flow = new OperatorFlow("auto-classification-preview-flow");
+        flow.AddOperator(target);
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowDebugExecutionResult
+            {
+                IsSuccess = true,
+                DebugSessionId = Guid.NewGuid(),
+                IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                {
+                    [target.Id] = new() { ["Image"] = CreatePreviewImageBytes() }
+                }
+            }));
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>());
+
+        try
+        {
+            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+
+            result.Success.Should().BeTrue();
+            result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.ModelPath");
+            result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
+        }
+        finally
+        {
+            File.Delete(modelPath);
+            File.Delete(catalogPath);
+        }
+    }
+
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldExcludeOriginalImageFromOutputs()
     {

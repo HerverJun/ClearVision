@@ -13,7 +13,12 @@ namespace ClearVision.Product.Infrastructure.Services;
 
 public sealed class FlowNodePreviewService : IFlowNodePreviewService
 {
-    private static readonly string[] DeepLearningCatalogTypes = ["detection", "object_detection", "deep_learning", "yolo"];
+    private static readonly string[] DeepLearningCatalogTypes =
+    [
+        "detection", "object_detection", "deep_learning", "yolo",
+        "classification", "image_classification", "classifier",
+        "segmentation", "semantic_segmentation"
+    ];
 
     private readonly ILogger<FlowNodePreviewService> _logger;
     private readonly IFlowExecutionService _flowExecution;
@@ -190,12 +195,18 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             var modelId = GetStringParam(op, "ModelId");
             var modelCatalogPath = GetStringParam(op, "ModelCatalogPath");
             var resolvedModelPath = explicitModelPath;
+            ModelCatalogEntry? catalogEntry = null;
             var modelResolutionError = string.Empty;
             if (string.IsNullOrWhiteSpace(resolvedModelPath) && !string.IsNullOrWhiteSpace(modelId))
             {
                 try
                 {
-                    resolvedModelPath = ModelCatalog.ResolveExplicitOrCatalogPath(null, modelId, modelCatalogPath, DeepLearningCatalogTypes, out _);
+                    resolvedModelPath = ModelCatalog.ResolveExplicitOrCatalogPath(
+                        null,
+                        modelId,
+                        modelCatalogPath,
+                        DeepLearningCatalogTypes,
+                        out catalogEntry);
                 }
                 catch (Exception ex)
                 {
@@ -220,19 +231,22 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
                 });
             }
 
-            var labelsPath = GetStringParam(op, "LabelsPath", "LabelFile");
-            var targetClasses = GetStringParam(op, "TargetClasses");
-            if (!DeepLearningLabelResolver.AreLabelsResolvable(labelsPath, modelPath, targetClasses, out _))
+            if (RequiresDetectionLabels(op, catalogEntry?.Type))
             {
-                missing.Add(new PreviewMissingResource
+                var labelsPath = GetStringParam(op, "LabelsPath", "LabelFile");
+                var targetClasses = GetStringParam(op, "TargetClasses");
+                if (!DeepLearningLabelResolver.AreLabelsResolvable(labelsPath, modelPath, targetClasses, out _))
                 {
-                    ResourceType = "Label",
-                    ResourceKey = "DeepLearning.LabelsPath",
-                    Description = string.IsNullOrWhiteSpace(labelsPath)
-                        ? "缺少可用的标签文件，且未找到可匹配目标类别的内置标签"
-                        : $"标签文件不存在，且未找到可匹配目标类别的内置标签：{labelsPath}",
-                    DiagnosticCode = "missing_labels"
-                });
+                    missing.Add(new PreviewMissingResource
+                    {
+                        ResourceType = "Label",
+                        ResourceKey = "DeepLearning.LabelsPath",
+                        Description = string.IsNullOrWhiteSpace(labelsPath)
+                            ? "缺少可用的标签文件，且未找到可匹配目标类别的内置标签"
+                            : $"标签文件不存在，且未找到可匹配目标类别的内置标签：{labelsPath}",
+                        DiagnosticCode = "missing_labels"
+                    });
+                }
             }
         }
 
@@ -240,6 +254,23 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             .GroupBy(item => item.ResourceKey, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList();
+    }
+
+    private static bool RequiresDetectionLabels(Operator op, string? catalogType)
+    {
+        if (!DeepLearningTaskResolver.TryParse(GetStringParam(op, "TaskType"), out var requestedTask))
+        {
+            return false;
+        }
+
+        if (requestedTask == DeepLearningTaskType.ObjectDetection)
+        {
+            return true;
+        }
+
+        return requestedTask == DeepLearningTaskType.Auto &&
+               DeepLearningTaskResolver.TryResolveCatalogType(catalogType, out var catalogTask) &&
+               catalogTask == DeepLearningTaskType.ObjectDetection;
     }
 
     private static FlowNodePreviewWithMetricsResult BuildFailureResult(

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-13T10:54:51.5534271Z",
+  "GeneratedAtUtc": "2026-07-13T11:08:41.4719739Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -5677,20 +5677,28 @@
         "\u63A8\u7406",
         "\u7F3A\u9677\u8BC6\u522B",
         "\u76EE\u6807\u68C0\u6D4B",
+        "\u56FE\u50CF\u5206\u7C7B",
+        "\u8BED\u4E49\u5206\u5272",
+        "ONNX",
         "YOLO",
-        "\u5224\u65AD\u7455\u75B5",
         "Deep learning",
         "\u7F3A\u9677\u68C0\u6D4B",
-        "AI\u68C0\u6D4B"
+        "AI\u68C0\u6D4B",
+        "\u5206\u7C7B\u63A8\u7406",
+        "\u50CF\u7D20\u7EA7\u5206\u5272",
+        "image classification",
+        "semantic segmentation"
       ],
       "IntentTags": [
         "defect_detection",
         "object_detection",
         "measurement",
-        "inspection"
+        "inspection",
+        "image_classification",
+        "semantic_segmentation"
       ],
       "ScenarioTags": [
-        "appearance_inspection"
+        "general"
       ],
       "Inputs": [
         {
@@ -5752,6 +5760,125 @@
           "Description": ""
         },
         {
+          "Name": "TaskType",
+          "DisplayName": "\u5B9E\u9645\u4EFB\u52A1\u7C7B\u578B",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "RequestedTaskType",
+          "DisplayName": "\u8BF7\u6C42\u4EFB\u52A1\u7C7B\u578B",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "TaskResolutionSource",
+          "DisplayName": "\u4EFB\u52A1\u8BC6\u522B\u6765\u6E90",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "TaskResolutionEvidence",
+          "DisplayName": "\u4EFB\u52A1\u8BC6\u522B\u4F9D\u636E",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "StatusCode",
+          "DisplayName": "\u72B6\u6001\u7801",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "StatusMessage",
+          "DisplayName": "\u72B6\u6001\u4FE1\u606F",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "TopClassLabel",
+          "DisplayName": "\u6700\u9AD8\u7C7B\u522B",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "TopClassConfidence",
+          "DisplayName": "\u6700\u9AD8\u7C7B\u522B\u7F6E\u4FE1\u5EA6",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ClassificationTopK",
+          "DisplayName": "\u5206\u7C7B Top-K",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ClassificationResult",
+          "DisplayName": "\u5206\u7C7B\u7ED3\u679C",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "SegmentationMap",
+          "DisplayName": "\u5206\u5272\u7C7B\u522B\u56FE",
+          "DataType": "Image",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ColoredMap",
+          "DisplayName": "\u5206\u5272\u53EF\u89C6\u5316",
+          "DataType": "Image",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ClassMasks",
+          "DisplayName": "\u7C7B\u522B\u63A9\u7801",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ClassCount",
+          "DisplayName": "\u5206\u5272\u7C7B\u522B\u6570",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ClassMaskCount",
+          "DisplayName": "\u7C7B\u522B\u63A9\u7801\u6570",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "OmittedClassMaskCount",
+          "DisplayName": "\u672A\u8F93\u51FA\u7C7B\u522B\u63A9\u7801\u6570",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "PresentClasses",
+          "DisplayName": "\u51FA\u73B0\u7C7B\u522B",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
           "Name": "ResolvedModelPath",
           "DisplayName": "\u89E3\u6790\u540E\u7684\u6A21\u578B\u8DEF\u5F84",
           "DataType": "String",
@@ -5802,6 +5929,22 @@
         }
       ],
       "Parameters": [
+        {
+          "Name": "TaskType",
+          "DisplayName": "\u4EFB\u52A1\u7C7B\u578B",
+          "DataType": "enum",
+          "Description": "\u9ED8\u8BA4 ObjectDetection \u4FDD\u6301\u65E7\u6D41\u7A0B\uFF1BAuto \u4EC5\u5728\u6A21\u578B\u76EE\u5F55\u7C7B\u578B\u6216\u8F93\u51FA\u5F62\u72B6\u80FD\u552F\u4E00\u5224\u5B9A\u65F6\u751F\u6548\u3002",
+          "DefaultValue": "ObjectDetection",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u76EE\u6807\u68C0\u6D4B",
+            "\u56FE\u50CF\u5206\u7C7B",
+            "\u8BED\u4E49\u5206\u5272",
+            "\u53EF\u9760\u81EA\u52A8\u8BC6\u522B"
+          ]
+        },
         {
           "Name": "ModelPath",
           "DisplayName": "\u6A21\u578B\u8DEF\u5F84",
@@ -5946,6 +6089,149 @@
             "\u7F3A\u9677\u68C0\u6D4B",
             "\u76EE\u6807\u68C0\u6D4B"
           ]
+        },
+        {
+          "Name": "TopK",
+          "DisplayName": "\u5206\u7C7B Top-K",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "5",
+          "MinValue": "1",
+          "MaxValue": "100",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "ClassificationInputSize",
+          "DisplayName": "\u5206\u7C7B\u8F93\u5165\u5C3A\u5BF8",
+          "DataType": "string",
+          "Description": "Auto \u4F7F\u7528\u6A21\u578B\u76EE\u5F55\u6216 ONNX \u9759\u6001\u8F93\u5165\u5C3A\u5BF8\uFF1B\u4E5F\u53EF\u586B\u5199 Width,Height\u3002",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "ClassificationScoreMode",
+          "DisplayName": "\u5206\u7C7B\u5206\u6570\u6A21\u5F0F",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u81EA\u52A8\u8BC6\u522B logits/\u6982\u7387",
+            "\u6267\u884C Softmax",
+            "\u6982\u7387\u76F4\u51FA"
+          ]
+        },
+        {
+          "Name": "ClassNames",
+          "DisplayName": "\u7C7B\u522B\u540D\u79F0",
+          "DataType": "string",
+          "Description": "JSON \u6570\u7EC4\u6216\u9017\u53F7\u5206\u9694\uFF1BONNX metadata names \u548C\u6A21\u578B\u76EE\u5F55 class_names \u4F18\u5148\u3002",
+          "DefaultValue": "",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "SegmentationInputSize",
+          "DisplayName": "\u5206\u5272\u8F93\u5165\u5C3A\u5BF8",
+          "DataType": "string",
+          "Description": "Auto \u4F7F\u7528\u6A21\u578B\u76EE\u5F55\u6216 ONNX \u9759\u6001\u8F93\u5165\u5C3A\u5BF8\uFF1B\u4E5F\u53EF\u586B\u5199 Width,Height\u3002",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "NumClasses",
+          "DisplayName": "\u5206\u5272\u7C7B\u522B\u6570",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "21",
+          "MinValue": "2",
+          "MaxValue": "4096",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "MaxClassMasks",
+          "DisplayName": "\u6700\u5927\u7C7B\u522B\u63A9\u7801\u6570",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "32",
+          "MinValue": "0",
+          "MaxValue": "4096",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "ExecutionProvider",
+          "DisplayName": "\u6267\u884C\u540E\u7AEF",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Auto",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u8DDF\u968F UseGpu",
+            "CPU",
+            "CUDA \u4F18\u5148\u5E76\u5141\u8BB8 CPU \u56DE\u9000"
+          ]
+        },
+        {
+          "Name": "ScaleToUnitRange",
+          "DisplayName": "\u7F29\u653E\u5230 0-1",
+          "DataType": "bool",
+          "Description": "",
+          "DefaultValue": "True",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "ChannelOrder",
+          "DisplayName": "\u901A\u9053\u987A\u5E8F",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "RGB",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "RGB",
+            "BGR"
+          ]
+        },
+        {
+          "Name": "Mean",
+          "DisplayName": "\u5F52\u4E00\u5316\u5747\u503C",
+          "DataType": "string",
+          "Description": "",
+          "DefaultValue": "0,0,0",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "Std",
+          "DisplayName": "\u5F52\u4E00\u5316\u6807\u51C6\u5DEE",
+          "DataType": "string",
+          "Description": "",
+          "DefaultValue": "1,1,1",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
         },
         {
           "Name": "ModelId",
@@ -7412,6 +7698,10 @@
         "\u6EE4\u6CE2",
         "Filtering",
         "gaussian",
+        "mean",
+        "box",
+        "median",
+        "bilateral",
         "blur",
         "filter",
         "denoise"
@@ -7438,17 +7728,47 @@
           "DataType": "Image",
           "IsRequired": false,
           "Description": ""
+        },
+        {
+          "Name": "FilterMode",
+          "DisplayName": "\u5B9E\u9645\u6EE4\u6CE2\u6A21\u5F0F",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "FilterDiagnostics",
+          "DisplayName": "\u6EE4\u6CE2\u8BCA\u65AD",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
         }
       ],
       "Parameters": [
         {
+          "Name": "FilterMode",
+          "DisplayName": "\u6EE4\u6CE2\u6A21\u5F0F",
+          "DataType": "enum",
+          "Description": "\u9ED8\u8BA4 Gaussian \u4FDD\u6301\u65E7\u6D41\u7A0B\u884C\u4E3A\u3002",
+          "DefaultValue": "Gaussian",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u9AD8\u65AF\u6EE4\u6CE2",
+            "\u5747\u503C/Box\u6EE4\u6CE2",
+            "\u4E2D\u503C\u6EE4\u6CE2",
+            "\u53CC\u8FB9\u6EE4\u6CE2"
+          ]
+        },
+        {
           "Name": "KernelSize",
           "DisplayName": "\u6838\u5927\u5C0F",
           "DataType": "int",
-          "Description": "",
+          "Description": "Gaussian/Mean/Median \u4F7F\u7528\uFF1B\u5076\u6570\u4F1A\u5411\u4E0A\u8C03\u6574\u4E3A\u5947\u6570\u3002",
           "DefaultValue": "5",
           "MinValue": "1",
-          "MaxValue": "31",
+          "MaxValue": "63",
           "IsRequired": true,
           "AllowedValues": []
         },
@@ -7490,6 +7810,39 @@
             "\u73AF\u7ED5",
             "\u9ED8\u8BA4"
           ]
+        },
+        {
+          "Name": "Diameter",
+          "DisplayName": "\u53CC\u8FB9\u76F4\u5F84",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "9",
+          "MinValue": "1",
+          "MaxValue": "25",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "SigmaColor",
+          "DisplayName": "\u53CC\u8FB9\u8272\u5F69Sigma",
+          "DataType": "double",
+          "Description": "",
+          "DefaultValue": "75",
+          "MinValue": "1",
+          "MaxValue": "255",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "SigmaSpace",
+          "DisplayName": "\u53CC\u8FB9\u7A7A\u95F4Sigma",
+          "DataType": "double",
+          "Description": "",
+          "DefaultValue": "75",
+          "MinValue": "1",
+          "MaxValue": "255",
+          "IsRequired": true,
+          "AllowedValues": []
         }
       ],
       "RequiredResources": [],
@@ -12993,10 +13346,13 @@
         "\u6D4B\u91CF",
         "Measurement",
         "\u8DDD\u79BB",
-        "\u957F\u5EA6",
+        "\u70B9\u7EBF",
+        "\u7EBF\u7EBF",
+        "\u5939\u89D2",
+        "\u4E09\u70B9\u89D2\u5EA6",
         "Measure",
         "Distance",
-        "Length"
+        "Angle"
       ],
       "IntentTags": [
         "measurement",
@@ -13015,15 +13371,36 @@
         },
         {
           "Name": "PointA",
-          "DisplayName": "\u8D77\u70B9",
+          "DisplayName": "\u70B9A/\u5F85\u6D4B\u70B9",
           "DataType": "Point",
           "IsRequired": false,
           "Description": ""
         },
         {
           "Name": "PointB",
-          "DisplayName": "\u7EC8\u70B9",
+          "DisplayName": "\u70B9B/\u89D2\u5EA6\u9876\u70B9",
           "DataType": "Point",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "PointC",
+          "DisplayName": "\u70B9C",
+          "DataType": "Point",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Line1",
+          "DisplayName": "\u7EBF1",
+          "DataType": "LineData",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Line2",
+          "DisplayName": "\u7EBF2",
+          "DataType": "LineData",
           "IsRequired": false,
           "Description": ""
         }
@@ -13039,6 +13416,111 @@
         {
           "Name": "Distance",
           "DisplayName": "\u6D4B\u91CF\u8DDD\u79BB",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "DeltaX",
+          "DisplayName": "\u6C34\u5E73\u5206\u91CF",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "DeltaY",
+          "DisplayName": "\u5782\u76F4\u5206\u91CF",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Angle",
+          "DisplayName": "\u5939\u89D2",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Value",
+          "DisplayName": "\u4E3B\u6D4B\u91CF\u503C",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Unit",
+          "DisplayName": "\u5355\u4F4D",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "MeasurementType",
+          "DisplayName": "\u5B9E\u9645\u6D4B\u91CF\u7C7B\u578B",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "StatusCode",
+          "DisplayName": "\u72B6\u6001\u7801",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "StatusMessage",
+          "DisplayName": "\u72B6\u6001\u4FE1\u606F",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "FootPoint",
+          "DisplayName": "\u5782\u8DB3",
+          "DataType": "Point",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Intersection",
+          "DisplayName": "\u4EA4\u70B9",
+          "DataType": "Point",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "HasIntersection",
+          "DisplayName": "\u662F\u5426\u76F8\u4EA4",
+          "DataType": "Boolean",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "IsParallel",
+          "DisplayName": "\u662F\u5426\u5E73\u884C",
+          "DataType": "Boolean",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Confidence",
+          "DisplayName": "\u6D4B\u91CF\u7F6E\u4FE1\u5EA6",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "UncertaintyPx",
+          "DisplayName": "\u8F93\u5165\u51E0\u4F55\u50CF\u7D20\u4E0D\u786E\u5B9A\u5EA6",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "UncertaintyDeg",
+          "DisplayName": "\u89D2\u5EA6\u4E0D\u786E\u5B9A\u5EA6\uFF08\u5EA6\uFF09",
           "DataType": "Float",
           "IsRequired": false,
           "Description": ""
@@ -13093,19 +13575,63 @@
           "Name": "MeasureType",
           "DisplayName": "\u6D4B\u91CF\u7C7B\u578B",
           "DataType": "enum",
-          "Description": "",
+          "Description": "\u9ED8\u8BA4 PointToPoint \u4FDD\u6301\u65E7\u6D41\u7A0B\u3002",
           "DefaultValue": "PointToPoint",
           "MinValue": null,
           "MaxValue": null,
           "IsRequired": true,
           "AllowedValues": [
             "\u70B9\u5230\u70B9",
-            "\u6C34\u5E73",
-            "\u5782\u76F4"
+            "\u6C34\u5E73\u8DDD\u79BB",
+            "\u5782\u76F4\u8DDD\u79BB",
+            "\u70B9\u5230\u7EBF",
+            "\u7EBF\u5230\u7EBF",
+            "\u4E09\u70B9\u89D2\u5EA6"
+          ]
+        },
+        {
+          "Name": "DistanceModel",
+          "DisplayName": "\u7EBF\u8DDD\u79BB\u6A21\u578B",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Segment",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u7EBF\u6BB5",
+            "\u65E0\u9650\u76F4\u7EBF"
+          ]
+        },
+        {
+          "Name": "ParallelThreshold",
+          "DisplayName": "\u5E73\u884C\u9608\u503C(\u5EA6)",
+          "DataType": "double",
+          "Description": "",
+          "DefaultValue": "2",
+          "MinValue": "0",
+          "MaxValue": "45",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "AngleUnit",
+          "DisplayName": "\u89D2\u5EA6\u5355\u4F4D",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Degree",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u5EA6",
+            "\u5F27\u5EA6"
           ]
         }
       ],
-      "RequiredResources": [],
+      "RequiredResources": [
+        "Measurement.DistanceModel"
+      ],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
       "AntiPatterns": [],
@@ -25554,6 +26080,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "Angle",
+      "Target": "Measurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Annotation",
       "Target": "Comment",
       "Weight": 1,
@@ -25668,6 +26201,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Bilateral",
       "Target": "BilateralFilter",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "bilateral",
+      "Target": "Filtering",
       "Weight": 1,
       "Metadata": {}
     },
@@ -25794,6 +26334,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "box",
       "Target": "BoxNms",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "box",
+      "Target": "Filtering",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27150,6 +27697,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "image classification",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "image diff",
       "Target": "ImageDiff",
       "Weight": 1,
@@ -27348,13 +27902,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "Legacy",
       "Target": "Morphology",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "Length",
-      "Target": "Measurement",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27564,6 +28111,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "mean",
+      "Target": "Filtering",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "mean",
       "Target": "PixelStatistics",
       "Weight": 1,
       "Metadata": {}
@@ -27586,6 +28140,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Measurement",
       "Target": "ArcCaliper",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "median",
+      "Target": "Filtering",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27894,6 +28455,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "OKNG\u5224\u5B9A",
       "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "ONNX",
+      "Target": "DeepLearning",
       "Weight": 1,
       "Metadata": {}
     },
@@ -28782,6 +29350,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "semantic segmentation",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "semantic segmentation",
       "Target": "SemanticSegmentation",
       "Weight": 1,
       "Metadata": {}
@@ -29516,6 +30091,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u4E09\u70B9\u89D2\u5EA6",
+      "Target": "Measurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u4E09\u83F1MC\u901A\u4FE1",
       "Target": "MitsubishiMcCommunication",
       "Weight": 1,
@@ -29671,6 +30253,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "\u50CF\u7D20\u7EA7\u5206\u5272",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u50CF\u7D20\u7EA7\u5206\u5272",
       "Target": "SemanticSegmentation",
       "Weight": 1,
       "Metadata": {}
@@ -29754,6 +30343,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u5206\u7C7B\u63A8\u7406",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u5207\u5272",
       "Target": "ImageCrop",
       "Weight": 1,
@@ -29777,13 +30373,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5224\u65AD\u5927\u5C0F",
       "Target": "MathOperation",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "\u5224\u65AD\u7455\u75B5",
-      "Target": "DeepLearning",
       "Weight": 1,
       "Metadata": {}
     },
@@ -30048,6 +30637,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u56FE\u50CF\u5206\u7C7B",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u56FE\u50CF\u5207\u7247",
       "Target": "ImageTiling",
       "Weight": 1,
@@ -30246,6 +30842,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5927\u4E8E",
       "Target": "Comparator",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5939\u89D2",
+      "Target": "Measurement",
       "Weight": 1,
       "Metadata": {}
     },
@@ -30902,6 +31505,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u70B9\u7EBF",
+      "Target": "Measurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u70B9\u7EBF\u8DDD\u79BB",
       "Target": "PointLineDistance",
       "Weight": 1,
@@ -31072,6 +31682,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u7EBF\u6BB5",
       "Target": "LineMeasurement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u7EBF\u7EBF",
+      "Target": "Measurement",
       "Weight": 1,
       "Metadata": {}
     },
@@ -31330,6 +31947,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "\u8BED\u4E49\u5206\u5272",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u8BED\u4E49\u5206\u5272",
       "Target": "SemanticSegmentation",
       "Weight": 1,
       "Metadata": {}
@@ -31562,13 +32186,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u91D1\u5B57\u5854\u5F62\u72B6\u5339\u914D",
       "Target": "PyramidShapeMatch",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "\u957F\u5EA6",
-      "Target": "Measurement",
       "Weight": 1,
       "Metadata": {}
     },
@@ -33857,6 +34474,15 @@
       "Weight": 1,
       "Metadata": {
         "port": "Image"
+      }
+    },
+    {
+      "RelationType": "CONSUMES",
+      "Source": "Measurement",
+      "Target": "LineData",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Line1"
       }
     },
     {
@@ -36735,7 +37361,7 @@
       "Target": "Any",
       "Weight": 1,
       "Metadata": {
-        "port": "ModelProvenance"
+        "port": "ClassificationTopK"
       }
     },
     {
@@ -36745,6 +37371,15 @@
       "Weight": 1,
       "Metadata": {
         "port": "DetectionList"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "DeepLearning",
+      "Target": "Float",
+      "Weight": 1,
+      "Metadata": {
+        "port": "TopClassConfidence"
       }
     },
     {
@@ -36771,7 +37406,7 @@
       "Target": "String",
       "Weight": 1,
       "Metadata": {
-        "port": "ResolvedModelPath"
+        "port": "TaskType"
       }
     },
     {
@@ -37011,10 +37646,28 @@
     {
       "RelationType": "PRODUCES",
       "Source": "Filtering",
+      "Target": "Any",
+      "Weight": 1,
+      "Metadata": {
+        "port": "FilterDiagnostics"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "Filtering",
       "Target": "Image",
       "Weight": 1,
       "Metadata": {
         "port": "Image"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "Filtering",
+      "Target": "String",
+      "Weight": 1,
+      "Metadata": {
+        "port": "FilterMode"
       }
     },
     {
@@ -37794,6 +38447,15 @@
     {
       "RelationType": "PRODUCES",
       "Source": "Measurement",
+      "Target": "Boolean",
+      "Weight": 1,
+      "Metadata": {
+        "port": "HasIntersection"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "Measurement",
       "Target": "Float",
       "Weight": 1,
       "Metadata": {
@@ -37807,6 +38469,24 @@
       "Weight": 1,
       "Metadata": {
         "port": "Image"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "Measurement",
+      "Target": "Point",
+      "Weight": 1,
+      "Metadata": {
+        "port": "FootPoint"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "Measurement",
+      "Target": "String",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Unit"
       }
     },
     {
@@ -39729,6 +40409,13 @@
       "RelationType": "REQUIRES_RESOURCE",
       "Source": "LocalDeformableMatching",
       "Target": "LocalDeformableMatching.TemplatePath",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "REQUIRES_RESOURCE",
+      "Source": "Measurement",
+      "Target": "Measurement.DistanceModel",
       "Weight": 1,
       "Metadata": {}
     },

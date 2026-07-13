@@ -145,37 +145,6 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
     private static IEnumerable<VisionAgentOperatorContract> SupplementalContracts()
     {
         yield return new VisionAgentOperatorContract(
-            "DeepLearning",
-            "深度学习",
-            "AI检测",
-            "AI 深度学习推理，支持 YOLO 系列模型，用于缺陷检测和目标分类。",
-            [
-                Port("Image", "输入图像", PortDataType.Image, true)
-            ],
-            [
-                Port("Image", "结果图像", PortDataType.Image, false),
-                Port("OriginalImage", "原始图像", PortDataType.Image, false),
-                Port("DetectionList", "检测列表", PortDataType.DetectionList, false),
-                Port("Defects", "缺陷列表", PortDataType.DetectionList, false),
-                Port("DefectCount", "缺陷数量", PortDataType.Integer, false),
-                Port("Objects", "目标列表", PortDataType.DetectionList, false),
-                Port("ObjectCount", "目标数量", PortDataType.Integer, false)
-            ],
-            [
-                Param("ModelPath", "模型路径", "file", true, ""),
-                Param("Confidence", "置信度阈值", "double", false, 0.5, 0.0, 1.0),
-                Param("ModelVersion", "YOLO版本", "enum", false, "Auto"),
-                Param("InputSize", "输入尺寸", "int", false, 640, 320, 1280),
-                Param("UseGpu", "使用GPU", "bool", false, true),
-                Param("GpuDeviceId", "GPU设备ID", "int", false, 0, 0, 15),
-                Param("TargetClasses", "目标类别", "string", false, ""),
-                Param("ModelId", "Model Id", "string", false, ""),
-                Param("ModelCatalogPath", "Model Catalog Path", "file", false, "")
-            ],
-            null,
-            []);
-
-        yield return new VisionAgentOperatorContract(
             "DetectionSequenceJudge",
             "检测顺序判定",
             "AI 检测",

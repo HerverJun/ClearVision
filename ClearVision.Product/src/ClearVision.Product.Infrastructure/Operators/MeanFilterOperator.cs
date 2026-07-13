@@ -52,12 +52,6 @@ public class MeanFilterOperator : OperatorBase
         var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 63);
         var borderType = GetIntParam(@operator, "BorderType", 4, min: 0, max: 7);
 
-        // Force odd kernel size to keep a symmetric anchor at center.
-        if (kernelSize % 2 == 0)
-        {
-            kernelSize++;
-        }
-
         var src = imageWrapper.GetMat();
         if (src.Empty())
         {
@@ -65,7 +59,10 @@ public class MeanFilterOperator : OperatorBase
         }
 
         var dst = new Mat();
-        Cv2.Blur(src, dst, new Size(kernelSize, kernelSize), new Point(-1, -1), (BorderTypes)borderType);
+        SpatialFilterKernel.Apply(src, dst, new SpatialFilterSettings(
+            SpatialFilterMode.Mean,
+            KernelSize: kernelSize,
+            BorderType: borderType));
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));
     }

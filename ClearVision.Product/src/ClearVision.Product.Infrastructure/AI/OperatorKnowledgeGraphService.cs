@@ -22,7 +22,11 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
     private static readonly IReadOnlyDictionary<string, string[]> AliasHints =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["DeepLearning"] = ["YOLO", "目标检测", "缺陷检测", "AI检测"],
+            ["DeepLearning"] =
+            [
+                "YOLO", "目标检测", "缺陷检测", "AI检测", "图像分类", "分类推理", "语义分割", "像素级分割",
+                "image classification", "semantic segmentation"
+            ],
             ["TemplateMatching"] = ["传统视觉", "模板匹配", "标准模板", "参考图", "基准图", "找图", "TemplateMatch"],
             ["SemanticSegmentation"] = ["语义分割", "像素级分割"],
             ["AnomalyDetection"] = ["异常检测", "无监督缺陷检测"],
@@ -413,6 +417,13 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
 
         if (metadata.Type == OperatorType.ResultOutput || metadata.Type == OperatorType.ResultJudgment)
             tags.Add("decision_output");
+
+        if (metadata.Type == OperatorType.DeepLearning)
+        {
+            tags.Add("object_detection");
+            tags.Add("image_classification");
+            tags.Add("semantic_segmentation");
+        }
 
         if (tags.Count == 0)
             tags.Add("general");

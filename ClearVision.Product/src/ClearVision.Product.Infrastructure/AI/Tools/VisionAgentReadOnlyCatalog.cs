@@ -5,17 +5,18 @@ internal static class VisionAgentReadOnlyCatalog
     public static IReadOnlyList<OperatorCatalogItem> Operators { get; } =
     [
         new("ImageAcquisition", "Image Acquisition", "image", "Provides a camera/file image input node; agent read-only tools never capture frames.", ["image", "camera", "input", "acquisition"]),
+        new("Filtering", "Filtering", "image", "Applies Gaussian, mean/box, median, or bilateral spatial smoothing according to FilterMode.", ["filter", "gaussian", "mean", "median", "bilateral", "denoise"]),
         new("RoiManager", "ROI Manager", "roi", "Defines named regions of interest for downstream inspection.", ["roi", "region", "crop"]),
         new("TemplateMatching", "Template Matching", "matching", "Finds a known pattern by template and score.", ["template", "matching", "alignment", "position"]),
         new("BlobAnalysis", "Blob Analysis", "vision", "Describes connected-component inspection metadata without reading images.", ["blob", "area", "count"]),
         new("Thresholding", "Thresholding", "vision", "Defines threshold metadata for binary segmentation review.", ["threshold", "binary", "segmentation"]),
         new("EdgeDetection", "Edge Detection", "vision", "Defines edge extraction metadata for dry-run validation.", ["edge", "gradient", "contour"]),
         new("ShapeMatching", "Shape Matching", "matching", "Finds a shape by catalog template metadata.", ["shape", "matching", "template"]),
-        new("DeepLearning", "Deep Learning", "ai", "Runs model-based detection or classification when a model path is configured.", ["model", "detection", "wire", "defect"]),
+        new("DeepLearning", "Deep Learning", "ai", "Runs ONNX object detection, image classification, or semantic segmentation according to TaskType.", ["model", "onnx", "detection", "classification", "segmentation", "defect"]),
         new("SemanticSegmentation", "Semantic Segmentation", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask"]),
         new("SurfaceDefectDetection", "Surface Defect Detection", "ai", "Traditional surface defect metadata without loading model files.", ["defect", "surface", "scratch"]),
         new("CircleMeasurement", "Circle Measurement", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter"]),
-        new("Measurement", "Measurement", "measurement", "Measures distance between points or features.", ["distance", "spacing", "hole", "measurement"]),
+        new("Measurement", "Measurement", "measurement", "Measures point-point, point-line, line-line distance, or a three-point angle according to MeasureType.", ["distance", "angle", "point", "line", "measurement"]),
         new("UnitConvert", "Unit Convert", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement"]),
         new("DetectionSequenceJudge", "检测顺序判定", "logic", "检查检测标签顺序，适用于端子线序检测。", ["wire", "sequence", "terminal", "order"]),
         new("ImageAdd", "Image Add", "image", "Combines images using the real ImageAdd operator.", ["compose", "multi-camera"]),
@@ -37,6 +38,20 @@ internal static class VisionAgentReadOnlyCatalog
                     new("SourceType", "string", false, "Camera/File/ProvidedFrame; read-only agent tools do not acquire images."),
                     new("CameraId", "cameraBinding", false, "Logical camera binding id supplied by engineer."),
                     new("FilePath", "string", false, "Optional offline file source; not read by read-only agent tools.")
+                ]),
+            ["Filtering"] = new(
+                "Filtering",
+                ["Image", "FilterMode", "FilterDiagnostics"],
+                ["Image"],
+                [
+                    new("FilterMode", "enum", false, "Gaussian (default), Mean/Box, Median, or Bilateral."),
+                    new("KernelSize", "int", false, "Used by Gaussian, Mean/Box, and Median modes."),
+                    new("SigmaX", "double", false, "Gaussian horizontal sigma."),
+                    new("SigmaY", "double", false, "Gaussian vertical sigma; zero follows OpenCV Gaussian semantics."),
+                    new("BorderType", "enum", false, "Used by Gaussian, Mean/Box, and Bilateral modes."),
+                    new("Diameter", "int", false, "Bilateral neighborhood diameter."),
+                    new("SigmaColor", "double", false, "Bilateral color sigma."),
+                    new("SigmaSpace", "double", false, "Bilateral spatial sigma.")
                 ]),
             ["TemplateMatching"] = new(
                 "TemplateMatching",
@@ -82,12 +97,29 @@ internal static class VisionAgentReadOnlyCatalog
                 ]),
             ["DeepLearning"] = new(
                 "DeepLearning",
-                ["Detections", "Classes", "Scores", "TopClassLabel", "TopClassConfidence", "ClassificationResult"],
+                [
+                    "Image", "OriginalImage", "DetectionList", "Defects", "DefectCount", "Objects", "ObjectCount",
+                    "TaskType", "RequestedTaskType", "TaskResolutionSource", "TaskResolutionEvidence",
+                    "TopClassLabel", "TopClassConfidence", "ClassificationTopK", "ClassificationResult",
+                    "SegmentationMap", "ColoredMap", "ClassMasks", "ClassCount", "PresentClasses",
+                    "StatusCode", "StatusMessage", "ResolvedModelPath", "ResolvedModelId", "ModelSource", "PostprocessDiagnostics"
+                ],
                 ["Image"],
                 [
+                    new("TaskType", "enum", false, "ObjectDetection (legacy default), ImageClassification, SemanticSegmentation, or reliable Auto."),
                     new("ModelPath", "file", true, "Configured model artifact path; not loaded by read-only agent tools."),
-                    new("Confidence", "double", false, "Detection confidence threshold."),
-                    new("ModelId", "string", false, "Catalog model id metadata.")
+                    new("ModelId", "string", false, "Catalog model id metadata; use instead of ModelPath."),
+                    new("ModelCatalogPath", "file", false, "Optional catalog path when ModelId is used."),
+                    new("Confidence", "double", false, "ObjectDetection confidence threshold only."),
+                    new("OutputFormat", "enum", false, "ObjectDetection output format only."),
+                    new("TargetClasses", "string", false, "ObjectDetection class filter only."),
+                    new("TopK", "int", false, "ImageClassification Top-K only."),
+                    new("ClassificationInputSize", "string", false, "ImageClassification input size only."),
+                    new("ClassificationScoreMode", "enum", false, "ImageClassification logits/probability handling only."),
+                    new("SegmentationInputSize", "string", false, "SemanticSegmentation input size only."),
+                    new("NumClasses", "int", false, "SemanticSegmentation class count only."),
+                    new("MaxClassMasks", "int", false, "SemanticSegmentation mask output limit only."),
+                    new("ClassNames", "string", false, "Classification or segmentation labels when metadata/catalog names are unavailable.")
                 ]),
             ["SemanticSegmentation"] = new(
                 "SemanticSegmentation",
@@ -117,14 +149,21 @@ internal static class VisionAgentReadOnlyCatalog
                 ]),
             ["Measurement"] = new(
                 "Measurement",
-                ["Distance"],
-                ["Image", "PointA", "PointB"],
                 [
-                    new("X1", "int", false, "Start point X."),
-                    new("Y1", "int", false, "Start point Y."),
-                    new("X2", "int", false, "End point X."),
-                    new("Y2", "int", false, "End point Y."),
-                    new("MeasureType", "enum", false, "Measurement mode.")
+                    "Image", "Distance", "DeltaX", "DeltaY", "Angle", "Value", "Unit", "MeasurementType",
+                    "StatusCode", "StatusMessage", "FootPoint", "Intersection", "HasIntersection", "IsParallel",
+                    "Confidence", "UncertaintyPx", "UncertaintyDeg"
+                ],
+                ["Image", "PointA", "PointB", "PointC", "Line1", "Line2"],
+                [
+                    new("MeasureType", "enum", false, "PointToPoint (legacy default), Horizontal, Vertical, PointToLine, LineToLine, or ThreePointAngle."),
+                    new("X1", "int", false, "Legacy start point X for point-distance modes without PointA input."),
+                    new("Y1", "int", false, "Legacy start point Y for point-distance modes without PointA input."),
+                    new("X2", "int", false, "Legacy end point X for point-distance modes without PointB input."),
+                    new("Y2", "int", false, "Legacy end point Y for point-distance modes without PointB input."),
+                    new("DistanceModel", "enum", false, "Segment or InfiniteLine for point-line and line-line distance."),
+                    new("ParallelThreshold", "double", false, "LineToLine parallel-angle threshold in degrees."),
+                    new("AngleUnit", "enum", false, "Degree or Radian for ThreePointAngle.")
                 ]),
             ["UnitConvert"] = new(
                 "UnitConvert",

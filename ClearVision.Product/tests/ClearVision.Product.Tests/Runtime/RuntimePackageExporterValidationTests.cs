@@ -379,6 +379,66 @@ public class RuntimePackageExporterValidationTests
     }
 
     [Fact]
+    public async Task ExportAsync_ClassificationTask_ShouldNotAutoBundleSiblingDetectionLabels()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var modelDirectory = Path.Combine(root, "classification-model");
+            Directory.CreateDirectory(modelDirectory);
+            var modelPath = Path.Combine(modelDirectory, "classifier.onnx");
+            var labelsPath = Path.Combine(modelDirectory, "labels.txt");
+            await File.WriteAllBytesAsync(modelPath, [1, 2, 3, 4, 5]);
+            await File.WriteAllTextAsync(labelsPath, "red\ngreen\nblue\n");
+
+            var exporter = CreateExporter();
+            var project = new ProjectDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "classification-model",
+                Flow = new OperatorFlowDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "main",
+                    Operators =
+                    [
+                        CreateOperatorDto(
+                            "Image classification",
+                            OperatorType.DeepLearning,
+                            CreateParameter("TaskType", "enum", "ImageClassification"),
+                            CreateParameter("ModelPath", "file", modelPath),
+                            CreateParameter("LabelsPath", "file", string.Empty),
+                            CreateParameter("ClassNames", "string", "red,green,blue"),
+                            CreateParameter("ModelId", "string", string.Empty),
+                            CreateParameter("ModelCatalogPath", "file", string.Empty))
+                    ]
+                }
+            };
+
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var exportedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(
+                await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "flow.json")),
+                CreateJsonOptions())!;
+            var exportedDeepLearning = exportedFlow.Operators.Single(op => op.Type == OperatorType.DeepLearning);
+            ReadParameter(exportedDeepLearning, "LabelsPath").Should().BeEmpty();
+
+            var modelAssetsText = await File.ReadAllTextAsync(
+                Path.Combine(export.PackageRootPath, "field", "model-assets.json"));
+            modelAssetsText.Should().Contain("ModelPath");
+            modelAssetsText.Should().NotContain("LabelsPath");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_ShouldRejectAbsoluteEntryFlowPath()
     {
         var root = CreateTempDirectory();

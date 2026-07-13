@@ -498,7 +498,7 @@ public sealed class RuntimePackageExporter
         return relativePath;
     }
 
-    private static RuntimeParameterSchema BuildRuntimeParameterSchema(
+    private RuntimeParameterSchema BuildRuntimeParameterSchema(
         string packageId,
         string flowHash,
         OperatorFlowDto flow)
@@ -513,7 +513,7 @@ public sealed class RuntimePackageExporter
         var order = 10;
         foreach (var op in flow.Operators)
         {
-            if (op.Type != OperatorType.DeepLearning)
+            if (op.Type != OperatorType.DeepLearning || !MayResolveToObjectDetection(op))
             {
                 continue;
             }
@@ -566,6 +566,8 @@ public sealed class RuntimePackageExporter
                 continue;
             }
 
+            var disabledParameters = ResolveDisabledRuntimeParameters(op);
+
             foreach (var parameter in op.Parameters)
             {
                 var parameterId = BuildParameterId(op.Id, parameter.Name);
@@ -574,7 +576,12 @@ public sealed class RuntimePackageExporter
                     continue;
                 }
 
-                if (!TryBuildRuntimeParameterDefinition(op, parameter, order, out var definition))
+                if (!TryBuildRuntimeParameterDefinition(
+                        op,
+                        parameter,
+                        disabledParameters,
+                        order,
+                        out var definition))
                 {
                     continue;
                 }
@@ -590,11 +597,12 @@ public sealed class RuntimePackageExporter
     private static bool TryBuildRuntimeParameterDefinition(
         OperatorDto op,
         ParameterDto parameter,
+        IReadOnlySet<string> disabledParameters,
         int order,
         out RuntimeParameterDefinition definition)
     {
         definition = null!;
-        if (!ShouldExposeRuntimeParameter(op, parameter))
+        if (!ShouldExposeRuntimeParameter(op, parameter, disabledParameters))
         {
             return false;
         }
@@ -637,9 +645,13 @@ public sealed class RuntimePackageExporter
         return true;
     }
 
-    private static bool ShouldExposeRuntimeParameter(OperatorDto op, ParameterDto parameter)
+    private static bool ShouldExposeRuntimeParameter(
+        OperatorDto op,
+        ParameterDto parameter,
+        IReadOnlySet<string> disabledParameters)
     {
         if (!op.IsEnabled ||
+            disabledParameters.Contains(parameter.Name) ||
             string.IsNullOrWhiteSpace(parameter.Name) ||
             LooksLikeFileParameter(parameter) ||
             LooksLikeSecretParameter(parameter) ||
@@ -663,6 +675,27 @@ public sealed class RuntimePackageExporter
         return LooksLikeCoordinateParameter(parameter.Name) ||
                LooksLikeNormalizedParameter(parameter.Name) ||
                LooksLikeByteThresholdParameter(parameter.Name);
+    }
+
+    private IReadOnlySet<string> ResolveDisabledRuntimeParameters(OperatorDto op)
+    {
+        var metadata = _operatorFactory.GetMetadata(op.Type);
+        if (metadata == null || metadata.ParameterConstraints.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var values = op.Parameters
+            .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Value,
+                StringComparer.OrdinalIgnoreCase);
+
+        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
+            .Where(state => state.EffectiveDisabled)
+            .Select(state => state.Constraint.Parameter)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool TryInferRuntimeParameterBounds(
@@ -861,6 +894,11 @@ public sealed class RuntimePackageExporter
             return;
         }
 
+        if (!MayResolveToObjectDetection(op))
+        {
+            return;
+        }
+
         var labelsParameter = FindParameter(op, "LabelsPath");
         if (!string.IsNullOrWhiteSpace(NormalizeScalar(labelsParameter?.Value)))
         {
@@ -914,6 +952,15 @@ public sealed class RuntimePackageExporter
         {
             labelsParameter.Value = labelsAsset.RelativePath;
         }
+    }
+
+    private static bool MayResolveToObjectDetection(OperatorDto op)
+    {
+        var taskType = NormalizeScalar(FindParameter(op, "TaskType")?.Value);
+        return string.IsNullOrWhiteSpace(taskType) ||
+               taskType.Equals("ObjectDetection", StringComparison.OrdinalIgnoreCase) ||
+               taskType.Equals("Detection", StringComparison.OrdinalIgnoreCase) ||
+               taskType.Equals("Auto", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<RuntimeBundledAsset> BundleResourceAsync(

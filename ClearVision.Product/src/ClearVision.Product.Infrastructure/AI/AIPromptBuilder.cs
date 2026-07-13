@@ -33,19 +33,30 @@ public class AIPromptBuilder
     {
         // 图像采集与处理
         _operators.Add(new PromptOperatorInfo(OperatorType.ImageAcquisition, "图像采集", "从相机获取图像", "Image"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.GaussianBlur, "高斯滤波", "图像平滑降噪", "Image", "Image"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.Filtering, "滤波", "统一空间平滑入口：高斯、均值/Box、中值或双边滤波", "Image", "Image", new[] {
+            new PromptParamInfo("FilterMode", "enum", "滤波模式", true, "Gaussian", options: new[] { "Gaussian", "Mean", "Median", "Bilateral" }),
+            new PromptParamInfo("KernelSize", "int", "Gaussian/Mean/Median 核大小", false, "5", "1", "63")
+        }));
         _operators.Add(new PromptOperatorInfo(OperatorType.Thresholding, "全局阈值处理", "支持二值、截断、ToZero 及自动阈值的全局阈值处理", "Image", "Image"));
         _operators.Add(new PromptOperatorInfo(OperatorType.EdgeDetection, "边缘检测", "Canny 边缘检测", "Image", "Image"));
 
         // 深度学习
-        _operators.Add(new PromptOperatorInfo(OperatorType.DeepLearning, "深度学习检测", "YOLO 目标检测", "Image", "DetectionList", new[] {
+        _operators.Add(new PromptOperatorInfo(OperatorType.DeepLearning, "深度学习推理", "统一 ONNX 目标检测、图像分类和语义分割入口", "Image", "DetectionList/ClassificationResult/SegmentationMap", new[] {
+            new PromptParamInfo("TaskType", "enum", "任务类型", true, "ObjectDetection", options: new[] { "ObjectDetection", "ImageClassification", "SemanticSegmentation", "Auto" }),
             new PromptParamInfo("ModelPath", "string", "模型文件路径", true),
-            new PromptParamInfo("Confidence", "float", "置信度阈值(0-1)", true, "0.5", "0.0", "1.0")
-        }));
+            new PromptParamInfo("Confidence", "float", "仅目标检测使用的置信度阈值(0-1)", false, "0.5", "0.0", "1.0"),
+            new PromptParamInfo("TopK", "int", "仅图像分类使用的 Top-K", false, "5", "1", "100"),
+            new PromptParamInfo("NumClasses", "int", "仅语义分割使用的类别数", false, "21", "2", "4096")
+        }, specialNotes: "缺少 TaskType 的旧流程按 ObjectDetection 执行；仅在目录类型或输出形状可可靠判定时使用 Auto"));
 
         // 几何测量
         _operators.Add(new PromptOperatorInfo(OperatorType.CircleMeasurement, "圆测量", "霍夫圆检测", "Image", "CircleData"));
         _operators.Add(new PromptOperatorInfo(OperatorType.LineMeasurement, "直线测量", "霍夫直线检测", "Image", "LineData"));
+        _operators.Add(new PromptOperatorInfo(OperatorType.Measurement, "测量", "统一点点、点线、线线距离和三点角度入口", "Image/Point/LineData", "Value", new[] {
+            new PromptParamInfo("MeasureType", "enum", "测量类型", true, "PointToPoint", options: new[] { "PointToPoint", "Horizontal", "Vertical", "PointToLine", "LineToLine", "ThreePointAngle" }),
+            new PromptParamInfo("DistanceModel", "enum", "点线/线线距离模型", false, "Segment", options: new[] { "Segment", "InfiniteLine" }),
+            new PromptParamInfo("AngleUnit", "enum", "三点角度单位", false, "Degree", options: new[] { "Degree", "Radian" })
+        }));
 
         // 数据操作（Sprint 1-2）
         _operators.Add(new PromptOperatorInfo(OperatorType.ForEach, "循环处理", "对集合中的每个元素执行子图", "List", "Result", new[] {
@@ -374,9 +385,9 @@ public class PromptOperatorInfo
     {
         return type switch
         {
-            OperatorType.ImageAcquisition or OperatorType.GaussianBlur or OperatorType.Thresholding or OperatorType.EdgeDetection => "图像处理",
+            OperatorType.ImageAcquisition or OperatorType.Filtering or OperatorType.GaussianBlur or OperatorType.Thresholding or OperatorType.EdgeDetection => "图像处理",
             OperatorType.DeepLearning => "深度学习",
-            OperatorType.CircleMeasurement or OperatorType.LineMeasurement => "几何测量",
+            OperatorType.Measurement or OperatorType.CircleMeasurement or OperatorType.LineMeasurement => "几何测量",
             OperatorType.ForEach or OperatorType.ArrayIndexer or OperatorType.JsonExtractor => "数据操作",
             OperatorType.MathOperation or OperatorType.LogicGate or OperatorType.TypeConvert => "数值逻辑",
             OperatorType.HttpRequest or OperatorType.MqttPublish or OperatorType.ModbusCommunication or OperatorType.SiemensS7Communication => "通信",

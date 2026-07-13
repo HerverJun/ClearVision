@@ -1,4 +1,6 @@
+using System.Collections;
 using ClearVision.Product.Core.ValueObjects;
+using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -69,6 +71,124 @@ internal static class MeasurementGeometryHelper
 
         var cosTheta = Math.Clamp(Math.Abs((v1x * v2x) + (v1y * v2y)) / (norm1 * norm2), -1.0, 1.0);
         return Math.Acos(cosTheta) * 180.0 / Math.PI;
+    }
+
+    public static double ThreePointAngleRadians(Position first, Position vertex, Position third)
+    {
+        var v1x = first.X - vertex.X;
+        var v1y = first.Y - vertex.Y;
+        var v2x = third.X - vertex.X;
+        var v2y = third.Y - vertex.Y;
+        var norm1 = Math.Sqrt((v1x * v1x) + (v1y * v1y));
+        var norm2 = Math.Sqrt((v2x * v2x) + (v2y * v2y));
+        if (norm1 < 1e-9 || norm2 < 1e-9)
+        {
+            return double.NaN;
+        }
+
+        var cosine = Math.Clamp(((v1x * v2x) + (v1y * v2y)) / (norm1 * norm2), -1.0, 1.0);
+        return Math.Acos(cosine);
+    }
+
+    public static double PropagateThreePointAngleUncertaintyDegrees(
+        Position first,
+        double firstSigmaPx,
+        Position vertex,
+        double vertexSigmaPx,
+        Position third,
+        double thirdSigmaPx)
+    {
+        var variables = new[] { first.X, first.Y, vertex.X, vertex.Y, third.X, third.Y };
+        var sigmas = new[]
+        {
+            firstSigmaPx, firstSigmaPx,
+            vertexSigmaPx, vertexSigmaPx,
+            thirdSigmaPx, thirdSigmaPx
+        };
+
+        var uncertaintyRadians = PropagateCoordinateUncertainty(
+            variables,
+            sigmas,
+            values => ThreePointAngleRadians(
+                new Position(values[0], values[1]),
+                new Position(values[2], values[3]),
+                new Position(values[4], values[5])));
+
+        return double.IsFinite(uncertaintyRadians)
+            ? uncertaintyRadians * 180.0 / Math.PI
+            : double.NaN;
+    }
+
+    public static bool TryParsePoint(object? value, out Position point)
+    {
+        point = new Position(0, 0);
+        switch (value)
+        {
+            case Position position:
+                point = position;
+                return double.IsFinite(point.X) && double.IsFinite(point.Y);
+            case Point integerPoint:
+                point = new Position(integerPoint.X, integerPoint.Y);
+                return true;
+            case Point2f singlePoint:
+                point = new Position(singlePoint.X, singlePoint.Y);
+                return double.IsFinite(point.X) && double.IsFinite(point.Y);
+            case Point2d doublePoint:
+                point = new Position(doublePoint.X, doublePoint.Y);
+                return double.IsFinite(point.X) && double.IsFinite(point.Y);
+            case IDictionary<string, object> dictionary:
+                return TryParsePointDictionary(dictionary, out point);
+            case IDictionary legacyDictionary:
+                var normalized = legacyDictionary.Cast<DictionaryEntry>()
+                    .Where(entry => entry.Key != null)
+                    .ToDictionary(
+                        entry => entry.Key!.ToString() ?? string.Empty,
+                        entry => entry.Value ?? 0.0,
+                        StringComparer.OrdinalIgnoreCase);
+                return TryParsePointDictionary(normalized, out point);
+        }
+
+        var text = value?.ToString()?.Trim('(', ')', '[', ']', ' ');
+        var parts = text?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts is not { Length: 2 } ||
+            !double.TryParse(parts[0], out var x) ||
+            !double.TryParse(parts[1], out var y) ||
+            !double.IsFinite(x) ||
+            !double.IsFinite(y))
+        {
+            return false;
+        }
+
+        point = new Position(x, y);
+        return true;
+    }
+
+    public static bool TryParseLine(object? value, out LineData line)
+    {
+        line = new LineData();
+        if (value is LineData lineData)
+        {
+            line = lineData;
+            return IsFinite(line);
+        }
+
+        if (value is IDictionary<string, object> dictionary)
+        {
+            return TryParseLineDictionary(dictionary, out line);
+        }
+
+        if (value is IDictionary legacyDictionary)
+        {
+            var normalized = legacyDictionary.Cast<DictionaryEntry>()
+                .Where(entry => entry.Key != null)
+                .ToDictionary(
+                    entry => entry.Key!.ToString() ?? string.Empty,
+                    entry => entry.Value ?? 0.0,
+                    StringComparer.OrdinalIgnoreCase);
+            return TryParseLineDictionary(normalized, out line);
+        }
+
+        return false;
     }
 
     public static double Distance(Position first, Position second)
@@ -442,5 +562,74 @@ internal static class MeasurementGeometryHelper
     private static bool HasFractionalComponent(double value)
     {
         return Math.Abs(value - Math.Round(value)) > 1e-6;
+    }
+
+    private static bool TryParsePointDictionary(IDictionary<string, object> dictionary, out Position point)
+    {
+        point = new Position(0, 0);
+        if (!TryReadDouble(dictionary, "X", out var x) ||
+            !TryReadDouble(dictionary, "Y", out var y) ||
+            !double.IsFinite(x) ||
+            !double.IsFinite(y))
+        {
+            return false;
+        }
+
+        point = new Position(x, y);
+        return true;
+    }
+
+    private static bool TryParseLineDictionary(IDictionary<string, object> dictionary, out LineData line)
+    {
+        line = new LineData();
+        var startX = 0.0;
+        var startY = 0.0;
+        var endX = 0.0;
+        var endY = 0.0;
+        var hasNamedCoordinates =
+            TryReadDouble(dictionary, "StartX", out startX) &&
+            TryReadDouble(dictionary, "StartY", out startY) &&
+            TryReadDouble(dictionary, "EndX", out endX) &&
+            TryReadDouble(dictionary, "EndY", out endY);
+
+        if (!hasNamedCoordinates)
+        {
+            hasNamedCoordinates =
+                TryReadDouble(dictionary, "X1", out startX) &&
+                TryReadDouble(dictionary, "Y1", out startY) &&
+                TryReadDouble(dictionary, "X2", out endX) &&
+                TryReadDouble(dictionary, "Y2", out endY);
+        }
+
+        if (!hasNamedCoordinates ||
+            !double.IsFinite(startX) ||
+            !double.IsFinite(startY) ||
+            !double.IsFinite(endX) ||
+            !double.IsFinite(endY))
+        {
+            return false;
+        }
+
+        line = new LineData((float)startX, (float)startY, (float)endX, (float)endY);
+        return IsFinite(line);
+    }
+
+    private static bool TryReadDouble(IDictionary<string, object> dictionary, string key, out double value)
+    {
+        value = 0.0;
+        if (!dictionary.TryGetValue(key, out var raw) || raw == null)
+        {
+            return false;
+        }
+
+        return raw switch
+        {
+            double d => (value = d) == d,
+            float f => (value = f) == f,
+            int i => (value = i) == i,
+            long l => (value = l) == l,
+            decimal m => (value = (double)m) == (double)m,
+            _ => double.TryParse(raw.ToString(), out value)
+        };
     }
 }

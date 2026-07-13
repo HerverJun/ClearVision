@@ -57,7 +57,12 @@ public class BilateralFilterOperator : OperatorBase
         var dst = MatPool.Shared.Rent(src.Width, src.Height, src.Type());
         try
         {
-            Cv2.BilateralFilter(src, dst, diameter, sigmaColor, sigmaSpace);
+            SpatialFilterKernel.Apply(src, dst, new SpatialFilterSettings(
+                SpatialFilterMode.Bilateral,
+                BorderType: 4,
+                Diameter: diameter,
+                SigmaColor: sigmaColor,
+                SigmaSpace: sigmaSpace));
         }
         catch
         {

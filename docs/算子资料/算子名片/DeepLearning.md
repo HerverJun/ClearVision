@@ -6,17 +6,17 @@
 | 类名 (Class) | `DeepLearningOperator` |
 | 枚举值 (Enum) | `OperatorType.DeepLearning` |
 | 分类 (Category) | AI检测 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 标签 (Tags) | `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 14 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 27 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
@@ -24,22 +24,23 @@
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
 - `Cv2.Resize`
+- `Cv2.Rectangle`
+- `Cv2.PutText`
 - `Cv2.CvtColor`
 - `Cv2.MinMaxLoc`
 - `Cv2.Split`
-- `Cv2.Rectangle`
 - `Cv2.GetTextSize`
-- `Cv2.PutText`
 - `File.Exists`
 - `Path.GetDirectoryName`
 - `Path.Combine`
+- `JsonSerializer.Deserialize`
 - `Math.Clamp`
 - `Math.Min`
-- `Math.Max`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
+| `TaskType` | 任务类型 | `enum` | ObjectDetection | ObjectDetection/目标检测；ImageClassification/图像分类；SemanticSegmentation/语义分割；Auto/可靠自动识别 | Yes | 默认 ObjectDetection 保持旧流程；Auto 仅在模型目录类型或输出形状能唯一判定时生效。 |
 | `ModelPath` | 模型路径 | `file` | "" | - | Yes | - |
 | `Confidence` | 置信度阈值 | `double` | 0.5 | [0, 1] | Yes | - |
 | `ModelVersion` | YOLO版本 | `enum` | Auto | Auto/自动检测；YOLOv5/YOLOv5；YOLOv6/YOLOv6；YOLOv8/YOLOv8；YOLOv11/YOLOv11 | Yes | - |
@@ -52,6 +53,18 @@
 | `NmsIouThreshold` | NMS IoU Threshold | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
 | `OutputFormat` | 输出格式 | `enum` | Auto | Auto/自动识别；RawYolo/原始 YOLO；EndToEndNms/端到端 NMS | Yes | Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。 |
 | `DetectionMode` | 检测模式 | `enum` | Defect | Defect/缺陷检测；Object/目标检测 | Yes | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
+| `TopK` | 分类 Top-K | `int` | 5 | [1, 100] | Yes | - |
+| `ClassificationInputSize` | 分类输入尺寸 | `string` | Auto | - | Yes | Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。 |
+| `ClassificationScoreMode` | 分类分数模式 | `enum` | Auto | Auto/自动识别 logits/概率；Logits/执行 Softmax；Probabilities/概率直出 | Yes | - |
+| `ClassNames` | 类别名称 | `string` | "" | - | Yes | JSON 数组或逗号分隔；ONNX metadata names 和模型目录 class_names 优先。 |
+| `SegmentationInputSize` | 分割输入尺寸 | `string` | Auto | - | Yes | Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。 |
+| `NumClasses` | 分割类别数 | `int` | 21 | [2, 4096] | Yes | - |
+| `MaxClassMasks` | 最大类别掩码数 | `int` | 32 | [0, 4096] | Yes | - |
+| `ExecutionProvider` | 执行后端 | `enum` | Auto | Auto/跟随 UseGpu；CPU/CPU；CUDA/CUDA 优先并允许 CPU 回退 | Yes | - |
+| `ScaleToUnitRange` | 缩放到 0-1 | `bool` | true | - | Yes | - |
+| `ChannelOrder` | 通道顺序 | `enum` | RGB | RGB/RGB；BGR/BGR | Yes | - |
+| `Mean` | 归一化均值 | `string` | 0,0,0 | - | Yes | - |
+| `Std` | 归一化标准差 | `string` | 1,1,1 | - | Yes | - |
 | `ModelId` | Model Id | `string` | "" | - | Yes | - |
 | `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
 
@@ -71,6 +84,23 @@
 | `DefectCount` | 缺陷数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Objects` | 目标列表 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
 | `ObjectCount` | 目标数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `TaskType` | 实际任务类型 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `RequestedTaskType` | 请求任务类型 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `TaskResolutionSource` | 任务识别来源 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `TaskResolutionEvidence` | 任务识别依据 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `StatusCode` | 状态码 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `StatusMessage` | 状态信息 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `TopClassLabel` | 最高类别 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `TopClassConfidence` | 最高类别置信度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ClassificationTopK` | 分类 Top-K | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ClassificationResult` | 分类结果 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `SegmentationMap` | 分割类别图 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ColoredMap` | 分割可视化 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ClassMasks` | 类别掩码 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ClassCount` | 分割类别数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ClassMaskCount` | 类别掩码数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `OmittedClassMaskCount` | 未输出类别掩码数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `PresentClasses` | 出现类别 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
@@ -83,21 +113,28 @@
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `CandidatesByClass` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `ClassificationResult` | `Any` | 源码输出字典初始化中可见字段。 |
+| `ClassId` | `String` | 源码通过输出字典索引赋值写入。 |
 | `DroppedBeforeNms` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `InputHeight` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `InputLayout` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `InputSizeSource` | `String` | 源码通过输出字典索引赋值写入。 |
+| `InputWidth` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `InternalNmsEnabled` | `Boolean` | 源码输出字典初始化中可见字段。 |
-| `LabelSource` | `String` | 源码输出字典初始化中可见字段。 |
+| `Label` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `LabelSource` | `String` | 源码通过输出字典索引赋值写入。 |
 | `LabelValidationStatus` | `Boolean` | 源码输出字典初始化中可见字段。 |
 | `ModelMetadataLabels` | `String` | 源码输出字典初始化中可见字段。 |
 | `NmsApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `NmsCandidateLimit` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `NmsIoUComparisons` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `NmsPrefilteredCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `OutputName` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `OutputShape` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Rank` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `RawCandidateCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `ResolvedLabels` | `Any` | 源码输出字典初始化中可见字段。 |
-| `TopClassConfidence` | `Float` | 源码输出字典初始化中可见字段。 |
-| `TopClassLabel` | `Any` | 源码输出字典初始化中可见字段。 |
+| `ResolvedScoreMode` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `VisualizationDetectionCount` | `Integer` | 源码输出字典初始化中可见字段。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
@@ -112,7 +149,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 8 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 16 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。
@@ -131,4 +168,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

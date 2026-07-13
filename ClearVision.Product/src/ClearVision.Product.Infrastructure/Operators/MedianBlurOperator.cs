@@ -44,10 +44,6 @@ public class MedianBlurOperator : OperatorBase
 
         var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 31);
 
-        // 确保核大小为奇数
-        if (kernelSize % 2 == 0)
-            kernelSize++;
-
         var src = imageWrapper.GetMat();
         if (src.Empty())
         {
@@ -55,7 +51,9 @@ public class MedianBlurOperator : OperatorBase
         }
 
         var dst = MatPool.Shared.Rent(src.Width, src.Height, src.Type());
-        Cv2.MedianBlur(src, dst, kernelSize);
+        SpatialFilterKernel.Apply(src, dst, new SpatialFilterSettings(
+            SpatialFilterMode.Median,
+            KernelSize: kernelSize));
 
         // P0: 使用ImageWrapper实现零拷贝输出
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));

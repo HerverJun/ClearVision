@@ -71,9 +71,9 @@ public class PromptBuilder
         1. Defect detection:
            ImageAcquisition -> Filtering -> Thresholding -> BlobAnalysis -> ResultJudgment -> ResultOutput
         2. AI detection:
-           ImageAcquisition -> ImageResize -> DeepLearning(OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
+           ImageAcquisition -> ImageResize -> DeepLearning(TaskType=ObjectDetection, OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
         3. Measurement:
-           ImageAcquisition -> Filtering -> EdgeDetection -> CircleMeasurement/LineMeasurement -> CoordinateTransform -> ResultOutput
+           ImageAcquisition -> Filtering -> feature extraction -> Measurement(choose PointToPoint/PointToLine/LineToLine/ThreePointAngle) -> UnitConvert/ResultOutput
         4. OCR or barcode:
            ImageAcquisition -> CodeRecognition/OcrRecognition -> ConditionalBranch -> DatabaseWrite/PLC output -> ResultOutput
         5. PLC decision:
@@ -82,6 +82,10 @@ public class PromptBuilder
            include ResultOutput or DatabaseWrite when the request mentions traceability, reporting, or production records.
         7. Traditional template matching:
            ImageAcquisition(current image) + ImageAcquisition(reference template) -> TemplateMatching -> ResultJudgment -> ResultOutput
+        8. AI classification:
+           ImageAcquisition -> DeepLearning(TaskType=ImageClassification) -> ResultJudgment -> ResultOutput
+        9. AI semantic segmentation:
+           ImageAcquisition -> DeepLearning(TaskType=SemanticSegmentation) -> region/statistics/judgment -> ResultOutput
 
         ## Practical defaults
         - Start with ImageAcquisition unless the user explicitly says the image already exists in the flow.
@@ -220,12 +224,19 @@ public class PromptBuilder
         - Feed calibration consumers through CalibrationData when possible, and mark calibration bundle paths and coordinate-system choices for review.
 
         3. AI models
-        - For DeepLearning, include ModelPath, InputSize, Confidence, OutputFormat=EndToEndNms, and TargetClasses when known.
-        - Do not set EnableInternalNms=false unless the user explicitly says the ONNX model emits raw YOLO candidates for downstream platform-side NMS.
-        - Do not add BoxNms after DeepLearning when OutputFormat=EndToEndNms; the ONNX model owns candidate suppression/NMS.
+        - Always set DeepLearning.TaskType explicitly unless the model catalog type or ONNX output shape can reliably resolve Auto.
+        - For ObjectDetection, use InputSize, Confidence, OutputFormat, TargetClasses, and NMS parameters; prefer OutputFormat=EndToEndNms when the model owns NMS.
+        - For ImageClassification, use ClassificationInputSize, ClassificationScoreMode, TopK, and ClassNames when metadata/catalog labels are unavailable. Do not add detection thresholds or BoxNms.
+        - For SemanticSegmentation, use SegmentationInputSize, NumClasses, MaxClassMasks, and ClassNames. Do not require detection labels, Confidence, or NMS parameters.
+        - Do not set EnableInternalNms=false unless the user explicitly says an ObjectDetection ONNX model emits raw YOLO candidates for downstream platform-side NMS.
+        - Do not add BoxNms after ObjectDetection when OutputFormat=EndToEndNms; the ONNX model owns candidate suppression/NMS.
         - If any model resource is missing, list it in parametersNeedingReview.
 
-        4. Hardware and database output
+        4. Generalized operators
+        - Set Filtering.FilterMode to Gaussian, Mean, Median, or Bilateral and only configure parameters used by that mode.
+        - Set Measurement.MeasureType explicitly and connect the matching PointA/PointB/PointC or Line1/Line2 inputs; use legacy X1/Y1/X2/Y2 only for point-distance modes without point inputs.
+
+        5. Hardware and database output
         - Do not invent IP addresses, PLC station numbers, register addresses, credentials, or table names.
         - Use placeholder-safe defaults only when the operator requires a value, and mark them for review.
         """;
@@ -726,7 +737,7 @@ public class PromptBuilder
           "explanation": "Capture an image, smooth noise, threshold bright regions, count blobs, judge OK/NG, and output the result. Blob area limits need site tuning.",
           "operators": [
             {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "Image Acquisition", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
-            {"tempId": "op_2", "operatorType": "Filtering", "displayName": "Noise Filter", "parameters": {"KernelSize": "5"}},
+            {"tempId": "op_2", "operatorType": "Filtering", "displayName": "Noise Filter", "parameters": {"FilterMode": "Gaussian", "KernelSize": "5"}},
             {"tempId": "op_3", "operatorType": "Thresholding", "displayName": "Bright Region Threshold", "parameters": {"UseOtsu": "true"}},
             {"tempId": "op_4", "operatorType": "BlobAnalysis", "displayName": "Defect Blob Analysis", "parameters": {"MinArea": "50", "MaxArea": "5000"}},
             {"tempId": "op_5", "operatorType": "ResultOutput", "displayName": "Result Output", "parameters": {"Format": "JSON", "SaveToFile": "false"}}

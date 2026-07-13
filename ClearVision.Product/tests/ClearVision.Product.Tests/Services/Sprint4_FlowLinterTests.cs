@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
+using FluentAssertions;
 using Xunit;
 
 namespace ClearVision.Product.Tests.Services;
@@ -269,6 +270,27 @@ public class Sprint4_FlowLinterTests
 
         Assert.True(result.HasErrors);
         Assert.Contains(result.Issues, i => i.Code == "PARAM_003");
+    }
+
+    [Theory]
+    [InlineData("ImageClassification")]
+    [InlineData("SemanticSegmentation")]
+    public void FlowLinter_NonDetectionTask_ShouldIgnoreStaleDetectionThresholds(string taskType)
+    {
+        var flow = new OperatorFlow("TestFlow");
+        var dlOp = new Operator(Guid.NewGuid(), "DL", OperatorType.DeepLearning, 0, 0);
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "TaskType", "TaskType", "", "enum", taskType));
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "Confidence", "Conf", "", "float", 1.5f, 0.0f, 1.0f));
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "NmsIouThreshold", "NMS", "", "double", 1.5d, 0.0d, 1.0d));
+        flow.AddOperator(dlOp);
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().NotContain(issue =>
+            issue.Code == "PARAM_003" ||
+            (issue.Code == "PARAM_002" &&
+             (issue.Message.Contains("Confidence", StringComparison.OrdinalIgnoreCase) ||
+              issue.Message.Contains("NmsIouThreshold", StringComparison.OrdinalIgnoreCase))));
     }
 
     [Fact]

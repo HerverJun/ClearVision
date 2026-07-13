@@ -28,12 +28,9 @@
 - `Cv2.PutText`
 - `Math.Sqrt`
 - `Math.PI`
-- `Math.Clamp`
-- `Math.Acos`
-- `Math.Abs`
 - `Math.Max`
+- `Math.Clamp`
 - `Math.Round`
-- `Math.Pow`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
 

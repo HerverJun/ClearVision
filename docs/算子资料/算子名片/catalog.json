@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T18:59:07.8829638+08:00",
+  "generatedAt": "2026-07-13T19:08:24.4997898+08:00",
   "totalCount": 158,
   "categories": {
     "3D": {
@@ -427,15 +427,15 @@
       "id": "Filtering",
       "type": 2,
       "displayName": "滤波",
-      "description": "应用高斯滤波抑制图像噪声。",
+      "description": "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。",
       "category": "预处理",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:基于OpenCV"
       ],
-      "algorithm": "Gaussian Blur (OpenCV)",
+      "algorithm": "Unified spatial smoothing filters (OpenCV)",
       "inputPorts": [
         {
           "name": "Image",
@@ -450,17 +450,57 @@
           "displayName": "Image",
           "dataType": "Image",
           "isRequired": null
+        },
+        {
+          "name": "FilterMode",
+          "displayName": "实际滤波模式",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "FilterDiagnostics",
+          "displayName": "滤波诊断",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
         {
+          "name": "FilterMode",
+          "displayName": "滤波模式",
+          "dataType": "enum",
+          "description": "默认 Gaussian 保持旧流程行为。",
+          "defaultValue": "Gaussian",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Gaussian",
+              "label": "高斯滤波"
+            },
+            {
+              "value": "Mean",
+              "label": "均值/Box滤波"
+            },
+            {
+              "value": "Median",
+              "label": "中值滤波"
+            },
+            {
+              "value": "Bilateral",
+              "label": "双边滤波"
+            }
+          ]
+        },
+        {
           "name": "KernelSize",
           "displayName": "Kernel Size",
           "dataType": "int",
-          "description": null,
+          "description": "Gaussian/Mean/Median 使用；偶数会向上调整为奇数。",
           "defaultValue": "5",
           "min": "1",
-          "max": "31",
+          "max": "63",
           "isRequired": true,
           "options": null
         },
@@ -517,16 +557,49 @@
               "label": "Default"
             }
           ]
+        },
+        {
+          "name": "Diameter",
+          "displayName": "双边直径",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "9",
+          "min": "1",
+          "max": "25",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "SigmaColor",
+          "displayName": "双边色彩Sigma",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "75",
+          "min": "1",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "SigmaSpace",
+          "displayName": "双边空间Sigma",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "75",
+          "min": "1",
+          "max": "255",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/Filtering.md"
     },
@@ -1661,15 +1734,15 @@
       "id": "Measurement",
       "type": 8,
       "displayName": "测量",
-      "description": "两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入。",
+      "description": "统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入…",
+      "algorithm": "该算子用于统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1679,14 +1752,32 @@
         },
         {
           "name": "PointA",
-          "displayName": "起点",
+          "displayName": "点A/待测点",
           "dataType": "Point",
           "isRequired": false
         },
         {
           "name": "PointB",
-          "displayName": "终点",
+          "displayName": "点B/角度顶点",
           "dataType": "Point",
+          "isRequired": false
+        },
+        {
+          "name": "PointC",
+          "displayName": "点C",
+          "dataType": "Point",
+          "isRequired": false
+        },
+        {
+          "name": "Line1",
+          "displayName": "线1",
+          "dataType": "LineData",
+          "isRequired": false
+        },
+        {
+          "name": "Line2",
+          "displayName": "线2",
+          "dataType": "LineData",
           "isRequired": false
         }
       ],
@@ -1700,6 +1791,96 @@
         {
           "name": "Distance",
           "displayName": "测量距离",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "DeltaX",
+          "displayName": "水平分量",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "DeltaY",
+          "displayName": "垂直分量",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Angle",
+          "displayName": "夹角",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Value",
+          "displayName": "主测量值",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Unit",
+          "displayName": "单位",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "MeasurementType",
+          "displayName": "实际测量类型",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "StatusCode",
+          "displayName": "状态码",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "StatusMessage",
+          "displayName": "状态信息",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "FootPoint",
+          "displayName": "垂足",
+          "dataType": "Point",
+          "isRequired": null
+        },
+        {
+          "name": "Intersection",
+          "displayName": "交点",
+          "dataType": "Point",
+          "isRequired": null
+        },
+        {
+          "name": "HasIntersection",
+          "displayName": "是否相交",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "IsParallel",
+          "displayName": "是否平行",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Confidence",
+          "displayName": "测量置信度",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "UncertaintyPx",
+          "displayName": "输入几何像素不确定度",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "UncertaintyDeg",
+          "displayName": "角度不确定度（度）",
           "dataType": "Float",
           "isRequired": null
         }
@@ -1753,7 +1934,7 @@
           "name": "MeasureType",
           "displayName": "测量类型",
           "dataType": "enum",
-          "description": null,
+          "description": "默认 PointToPoint 保持旧流程。",
           "defaultValue": "PointToPoint",
           "min": null,
           "max": null,
@@ -1765,11 +1946,74 @@
             },
             {
               "value": "Horizontal",
-              "label": "水平"
+              "label": "水平距离"
             },
             {
               "value": "Vertical",
-              "label": "垂直"
+              "label": "垂直距离"
+            },
+            {
+              "value": "PointToLine",
+              "label": "点到线"
+            },
+            {
+              "value": "LineToLine",
+              "label": "线到线"
+            },
+            {
+              "value": "ThreePointAngle",
+              "label": "三点角度"
+            }
+          ]
+        },
+        {
+          "name": "DistanceModel",
+          "displayName": "线距离模型",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Segment",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Segment",
+              "label": "线段"
+            },
+            {
+              "value": "InfiniteLine",
+              "label": "无限直线"
+            }
+          ]
+        },
+        {
+          "name": "ParallelThreshold",
+          "displayName": "平行阈值(度)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2",
+          "min": "0",
+          "max": "45",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AngleUnit",
+          "displayName": "角度单位",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Degree",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Degree",
+              "label": "度"
+            },
+            {
+              "value": "Radian",
+              "label": "弧度"
             }
           ]
         }
@@ -1896,15 +2140,15 @@
       "id": "DeepLearning",
       "type": 10,
       "displayName": "深度学习",
-      "description": "AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类",
+      "description": "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
       "category": "AI检测",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:AI",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺…",
+      "algorithm": "该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1957,6 +2201,108 @@
           "isRequired": null
         },
         {
+          "name": "TaskType",
+          "displayName": "实际任务类型",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "RequestedTaskType",
+          "displayName": "请求任务类型",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "TaskResolutionSource",
+          "displayName": "任务识别来源",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "TaskResolutionEvidence",
+          "displayName": "任务识别依据",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "StatusCode",
+          "displayName": "状态码",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "StatusMessage",
+          "displayName": "状态信息",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "TopClassLabel",
+          "displayName": "最高类别",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "TopClassConfidence",
+          "displayName": "最高类别置信度",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ClassificationTopK",
+          "displayName": "分类 Top-K",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ClassificationResult",
+          "displayName": "分类结果",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "SegmentationMap",
+          "displayName": "分割类别图",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "ColoredMap",
+          "displayName": "分割可视化",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "ClassMasks",
+          "displayName": "类别掩码",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ClassCount",
+          "displayName": "分割类别数",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "ClassMaskCount",
+          "displayName": "类别掩码数",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "OmittedClassMaskCount",
+          "displayName": "未输出类别掩码数",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "PresentClasses",
+          "displayName": "出现类别",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
           "name": "ResolvedModelPath",
           "displayName": "Resolved Model Path",
           "dataType": "String",
@@ -2000,6 +2346,34 @@
         }
       ],
       "parameters": [
+        {
+          "name": "TaskType",
+          "displayName": "任务类型",
+          "dataType": "enum",
+          "description": "默认 ObjectDetection 保持旧流程；Auto 仅在模型目录类型或输出形状能唯一判定时生效。",
+          "defaultValue": "ObjectDetection",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "ObjectDetection",
+              "label": "目标检测"
+            },
+            {
+              "value": "ImageClassification",
+              "label": "图像分类"
+            },
+            {
+              "value": "SemanticSegmentation",
+              "label": "语义分割"
+            },
+            {
+              "value": "Auto",
+              "label": "可靠自动识别"
+            }
+          ]
+        },
         {
           "name": "ModelPath",
           "displayName": "模型路径",
@@ -2174,6 +2548,173 @@
               "label": "目标检测"
             }
           ]
+        },
+        {
+          "name": "TopK",
+          "displayName": "分类 Top-K",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "5",
+          "min": "1",
+          "max": "100",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ClassificationInputSize",
+          "displayName": "分类输入尺寸",
+          "dataType": "string",
+          "description": "Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。",
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ClassificationScoreMode",
+          "displayName": "分类分数模式",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "自动识别 logits/概率"
+            },
+            {
+              "value": "Logits",
+              "label": "执行 Softmax"
+            },
+            {
+              "value": "Probabilities",
+              "label": "概率直出"
+            }
+          ]
+        },
+        {
+          "name": "ClassNames",
+          "displayName": "类别名称",
+          "dataType": "string",
+          "description": "JSON 数组或逗号分隔；ONNX metadata names 和模型目录 class_names 优先。",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "SegmentationInputSize",
+          "displayName": "分割输入尺寸",
+          "dataType": "string",
+          "description": "Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。",
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NumClasses",
+          "displayName": "分割类别数",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "21",
+          "min": "2",
+          "max": "4096",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MaxClassMasks",
+          "displayName": "最大类别掩码数",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "32",
+          "min": "0",
+          "max": "4096",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ExecutionProvider",
+          "displayName": "执行后端",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "跟随 UseGpu"
+            },
+            {
+              "value": "CPU",
+              "label": "CPU"
+            },
+            {
+              "value": "CUDA",
+              "label": "CUDA 优先并允许 CPU 回退"
+            }
+          ]
+        },
+        {
+          "name": "ScaleToUnitRange",
+          "displayName": "缩放到 0-1",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ChannelOrder",
+          "displayName": "通道顺序",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "RGB",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "RGB",
+              "label": "RGB"
+            },
+            {
+              "value": "BGR",
+              "label": "BGR"
+            }
+          ]
+        },
+        {
+          "name": "Mean",
+          "displayName": "归一化均值",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "0,0,0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Std",
+          "displayName": "归一化标准差",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "1,1,1",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         },
         {
           "name": "ModelId",

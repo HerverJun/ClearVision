@@ -6,6 +6,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Text.Json;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -14,6 +15,7 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
@@ -63,10 +65,11 @@ public enum DetectionOutputFormat
 /// </summary>
 [OperatorMeta(
     DisplayName = "深度学习",
-    Description = "AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类",
+    Description = "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
     Category = "AI检测",
     IconName = "ai",
-    Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "YOLO", "判断瑕疵", "Deep learning" }
+    Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "图像分类", "语义分割", "ONNX", "YOLO", "Deep learning" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
@@ -76,6 +79,24 @@ public enum DetectionOutputFormat
 [OutputPort("DefectCount", "缺陷数量", PortDataType.Integer)]
 [OutputPort("Objects", "目标列表", PortDataType.DetectionList)]
 [OutputPort("ObjectCount", "目标数量", PortDataType.Integer)]
+[OutputPort("TaskType", "实际任务类型", PortDataType.String)]
+[OutputPort("RequestedTaskType", "请求任务类型", PortDataType.String)]
+[OutputPort("TaskResolutionSource", "任务识别来源", PortDataType.String)]
+[OutputPort("TaskResolutionEvidence", "任务识别依据", PortDataType.String)]
+[OutputPort("StatusCode", "状态码", PortDataType.String)]
+[OutputPort("StatusMessage", "状态信息", PortDataType.String)]
+[OutputPort("TopClassLabel", "最高类别", PortDataType.String)]
+[OutputPort("TopClassConfidence", "最高类别置信度", PortDataType.Float)]
+[OutputPort("ClassificationTopK", "分类 Top-K", PortDataType.Any)]
+[OutputPort("ClassificationResult", "分类结果", PortDataType.Any)]
+[OutputPort("SegmentationMap", "分割类别图", PortDataType.Image)]
+[OutputPort("ColoredMap", "分割可视化", PortDataType.Image)]
+[OutputPort("ClassMasks", "类别掩码", PortDataType.Any)]
+[OutputPort("ClassCount", "分割类别数", PortDataType.Integer)]
+[OutputPort("ClassMaskCount", "类别掩码数", PortDataType.Integer)]
+[OutputPort("OmittedClassMaskCount", "未输出类别掩码数", PortDataType.Integer)]
+[OutputPort("PresentClasses", "出现类别", PortDataType.Any)]
+[OperatorParam("TaskType", "任务类型", "enum", Description = "默认 ObjectDetection 保持旧流程；Auto 仅在模型目录类型或输出形状能唯一判定时生效。", DefaultValue = "ObjectDetection", Options = new[] { "ObjectDetection|目标检测", "ImageClassification|图像分类", "SemanticSegmentation|语义分割", "Auto|可靠自动识别" })]
 [OperatorParam("ModelPath", "模型路径", "file", DefaultValue = "")]
 [OperatorParam("Confidence", "置信度阈值", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0)]
 [OperatorParam("ModelVersion", "YOLO版本", "enum", DefaultValue = "Auto", Options = new[] { "Auto|自动检测", "YOLOv5|YOLOv5", "YOLOv6|YOLOv6", "YOLOv8|YOLOv8", "YOLOv11|YOLOv11" })]
@@ -88,6 +109,18 @@ public enum DetectionOutputFormat
 [OperatorParam("NmsIouThreshold", "NMS IoU Threshold", "double", Description = "内部 NMS 与预览 NMS 使用的 IoU 阈值。", DefaultValue = 0.45, Min = 0.0, Max = 1.0)]
 [OperatorParam("OutputFormat", "输出格式", "enum", Description = "Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。", DefaultValue = "Auto", Options = new[] { "Auto|自动识别", "RawYolo|原始 YOLO", "EndToEndNms|端到端 NMS" })]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
+[OperatorParam("TopK", "分类 Top-K", "int", DefaultValue = 5, Min = 1, Max = 100)]
+[OperatorParam("ClassificationInputSize", "分类输入尺寸", "string", DefaultValue = "Auto", Description = "Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。")]
+[OperatorParam("ClassificationScoreMode", "分类分数模式", "enum", DefaultValue = "Auto", Options = new[] { "Auto|自动识别 logits/概率", "Logits|执行 Softmax", "Probabilities|概率直出" })]
+[OperatorParam("ClassNames", "类别名称", "string", DefaultValue = "", Description = "JSON 数组或逗号分隔；ONNX metadata names 和模型目录 class_names 优先。")]
+[OperatorParam("SegmentationInputSize", "分割输入尺寸", "string", DefaultValue = "Auto", Description = "Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。")]
+[OperatorParam("NumClasses", "分割类别数", "int", DefaultValue = 21, Min = 2, Max = 4096)]
+[OperatorParam("MaxClassMasks", "最大类别掩码数", "int", DefaultValue = 32, Min = 0, Max = 4096)]
+[OperatorParam("ExecutionProvider", "执行后端", "enum", DefaultValue = "Auto", Options = new[] { "Auto|跟随 UseGpu", "CPU|CPU", "CUDA|CUDA 优先并允许 CPU 回退" })]
+[OperatorParam("ScaleToUnitRange", "缩放到 0-1", "bool", DefaultValue = true)]
+[OperatorParam("ChannelOrder", "通道顺序", "enum", DefaultValue = "RGB", Options = new[] { "RGB|RGB", "BGR|BGR" })]
+[OperatorParam("Mean", "归一化均值", "string", DefaultValue = "0,0,0")]
+[OperatorParam("Std", "归一化标准差", "string", DefaultValue = "1,1,1")]
 [OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
 [OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
 [OutputPort("ResolvedModelCatalogPath", "Resolved Model Catalog Path", PortDataType.String)]
@@ -99,7 +132,12 @@ public enum DetectionOutputFormat
 [OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "")]
 public class DeepLearningOperator : OperatorBase
 {
-    private static readonly string[] SupportedCatalogTypes = ["detection", "object_detection", "deep_learning", "yolo"];
+    private static readonly string[] SupportedCatalogTypes =
+    [
+        "detection", "object_detection", "deep_learning", "yolo",
+        "classification", "image_classification", "classifier",
+        "segmentation", "semantic_segmentation"
+    ];
     private static readonly DeepLearningRuntimeOptions RuntimeOptions = DeepLearningRuntimeOptions.Load();
 
     public override OperatorType OperatorType => OperatorType.DeepLearning;
@@ -314,20 +352,12 @@ public class DeepLearningOperator : OperatorBase
         // 2. 获取参数
         var explicitModelPath = GetStringParam(@operator, "ModelPath", string.Empty);
         var modelId = GetStringParam(@operator, "ModelId", string.Empty);
-        var confidenceThreshold = GetFloatParam(@operator, "Confidence", 0.5f, 0.0f, 1.0f);
-        var inputSize = GetIntParam(@operator, "InputSize", DefaultInputSize);
-        var yoloVersionStr = GetStringParam(@operator, "ModelVersion", "Auto");
-        var yoloVersion = ParseYoloVersion(yoloVersionStr);
-        var targetClassesStr = GetStringParam(@operator, "TargetClasses", string.Empty);
-        var labelsPath = ResolveLabelsPath(@operator);
-        var enableInternalNms = GetBoolParam(@operator, "EnableInternalNms", true);
-        var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f, 0.0f, 1.0f);
-        var outputFormat = ParseDetectionOutputFormat(GetStringParam(@operator, "OutputFormat", "Auto"));
-
-        // 2.1 加载自定义标签
-        var labels = Array.Empty<string>();
-        var unresolvedTargetClasses = new List<string>();
-        HashSet<int>? targetClasses = null;
+        var requestedTaskRaw = GetStringParam(@operator, "TaskType", "ObjectDetection");
+        if (!DeepLearningTaskResolver.TryParse(requestedTaskRaw, out var requestedTaskType))
+        {
+            return OperatorExecutionOutput.Failure(
+                "TaskType must be ObjectDetection, ImageClassification, SemanticSegmentation or Auto.");
+        }
 
         // 3. 验证模型路径
         if (string.IsNullOrWhiteSpace(explicitModelPath) && string.IsNullOrWhiteSpace(modelId))
@@ -363,7 +393,12 @@ public class DeepLearningOperator : OperatorBase
         var originalHeight = src.Height;
 
         // 5. 加载模型（支持GPU加速 - P3-O3.1）
-        var useGpu = GetBoolParam(@operator, "UseGpu", true);
+        var executionProvider = GetStringParam(@operator, "ExecutionProvider", "Auto");
+        if (!TryResolveSessionGpuMode(@operator, executionProvider, out var useGpu, out var providerError))
+        {
+            return OperatorExecutionOutput.Failure(providerError);
+        }
+
         var gpuDeviceId = GetIntParam(@operator, "GpuDeviceId", 0, 0, 15);
         using var modelSessionLease = await AcquireModelSessionWithVerifiedExecutionProviderAsync(modelPath, useGpu, gpuDeviceId, cancellationToken).ConfigureAwait(false);
         if (modelSessionLease == null)
@@ -372,6 +407,65 @@ public class DeepLearningOperator : OperatorBase
         }
 
         var session = modelSessionLease.Session;
+
+        DeepLearningTaskResolution taskResolution;
+        try
+        {
+            taskResolution = DeepLearningTaskResolver.Resolve(
+                requestedTaskType,
+                modelTarget.Entry?.Type,
+                GetOutputSignatures(session));
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure(ex.Message);
+        }
+
+        if (taskResolution.TaskType == DeepLearningTaskType.ImageClassification)
+        {
+            return ExecuteImageClassification(
+                @operator,
+                src,
+                session,
+                modelTarget,
+                requestedTaskType,
+                taskResolution,
+                cancellationToken);
+        }
+
+        if (taskResolution.TaskType == DeepLearningTaskType.SemanticSegmentation)
+        {
+            return await ExecuteSemanticSegmentationAsync(
+                @operator,
+                src,
+                session,
+                modelTarget,
+                requestedTaskType,
+                taskResolution,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var confidenceThreshold = GetFloatParam(@operator, "Confidence", 0.5f, 0.0f, 1.0f);
+        var inputSize = GetIntParam(@operator, "InputSize", DefaultInputSize);
+        var yoloVersionStr = GetStringParam(@operator, "ModelVersion", "Auto");
+        var yoloVersion = ParseYoloVersion(yoloVersionStr);
+        var targetClassesStr = GetStringParam(@operator, "TargetClasses", string.Empty);
+        var labelsPath = ResolveLabelsPath(@operator);
+        var enableInternalNms = GetBoolParam(@operator, "EnableInternalNms", true);
+        var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f, 0.0f, 1.0f);
+        DetectionOutputFormat outputFormat;
+        try
+        {
+            outputFormat = ParseDetectionOutputFormat(GetStringParam(@operator, "OutputFormat", "Auto"));
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure(ex.Message);
+        }
+
+        var labels = Array.Empty<string>();
+        var unresolvedTargetClasses = new List<string>();
+        HashSet<int>? targetClasses = null;
 
         // 6. 预处理图像
         var labelContract = ResolveLabelContract(session, labelsPath, modelPath, targetClassesStr);
@@ -472,6 +566,12 @@ public class DeepLearningOperator : OperatorBase
         var additionalData = new Dictionary<string, object>
         {
             { "DetectionMode", detectionMode },
+            { "TaskType", DeepLearningTaskType.ObjectDetection.ToString() },
+            { "RequestedTaskType", requestedTaskType.ToString() },
+            { "TaskResolutionSource", taskResolution.Source },
+            { "TaskResolutionEvidence", taskResolution.Evidence },
+            { "StatusCode", "OK" },
+            { "StatusMessage", "Success" },
             { "InternalNmsEnabled", enableInternalNms || postprocessResult.ResolvedOutputFormat == DetectionOutputFormat.EndToEndNms },
             { "NmsIouThreshold", nmsIouThreshold },
             { "OutputFormat", postprocessResult.ResolvedOutputFormat.ToString() },
@@ -502,6 +602,691 @@ public class DeepLearningOperator : OperatorBase
         Logger.LogInformation("[DeepLearning] 执行完毕. 检测总数: {Count}, 过滤后输出: {DefectCount}", detections.Count, detections.Count);
 
         return OperatorExecutionOutput.Success(CreateImageOutput(outputImage, additionalData));
+    }
+
+    private static IReadOnlyList<OnnxOutputSignature> GetOutputSignatures(InferenceSession session)
+    {
+        return session.OutputMetadata
+            .Select(pair => new OnnxOutputSignature(pair.Key, pair.Value.Dimensions.ToArray()))
+            .ToArray();
+    }
+
+    private static bool TryResolveSessionGpuMode(
+        Operator @operator,
+        string executionProvider,
+        out bool useGpu,
+        out string error)
+    {
+        error = string.Empty;
+        useGpu = false;
+        switch (executionProvider.Trim().ToUpperInvariant())
+        {
+            case "AUTO":
+                useGpu = GetBoolParameter(@operator, "UseGpu", true);
+                return true;
+            case "CPU":
+                return true;
+            case "CUDA":
+                useGpu = true;
+                return true;
+            default:
+                error = "ExecutionProvider must be Auto, CPU or CUDA.";
+                return false;
+        }
+    }
+
+    private OperatorExecutionOutput ExecuteImageClassification(
+        Operator @operator,
+        Mat source,
+        InferenceSession session,
+        ResolvedModelTarget modelTarget,
+        DeepLearningTaskType requestedTaskType,
+        DeepLearningTaskResolution taskResolution,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var inputContract = ResolveClassificationInputContract(@operator, session, modelTarget.Entry);
+            var channelOrder = GetStringParam(@operator, "ChannelOrder", "RGB").Trim().ToUpperInvariant();
+            if (channelOrder is not ("RGB" or "BGR"))
+            {
+                return OperatorExecutionOutput.Failure("ChannelOrder must be RGB or BGR.");
+            }
+
+            if (!TryParseFloatTriplet(GetStringParam(@operator, "Mean", "0,0,0"), out var mean) ||
+                !TryParseFloatTriplet(GetStringParam(@operator, "Std", "1,1,1"), out var std) ||
+                std.Any(value => value <= 0f))
+            {
+                return OperatorExecutionOutput.Failure("Mean/Std must contain 3 numeric values and Std must be > 0.");
+            }
+
+            var scaleToUnitRange = GetBoolParam(@operator, "ScaleToUnitRange", true);
+            var inputName = session.InputMetadata.Keys.Single();
+            var tensor = PreprocessClassification(
+                source,
+                inputContract.Width,
+                inputContract.Height,
+                inputContract.Layout,
+                channelOrder,
+                mean,
+                std,
+                scaleToUnitRange);
+
+            using var results = session.Run([NamedOnnxValue.CreateFromTensor(inputName, tensor)]);
+            var classificationOutputs = new List<(string Name, float[] Values, int[] Shape)>();
+            foreach (var resultValue in results)
+            {
+                try
+                {
+                    var outputTensor = resultValue.AsTensor<float>();
+                    if (TryExtractClassificationValues(outputTensor, out var values))
+                    {
+                        classificationOutputs.Add((resultValue.Name, values, outputTensor.Dimensions.ToArray()));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug(ex, "Ignoring non-float classification output {OutputName}.", resultValue.Name);
+                }
+            }
+
+            if (classificationOutputs.Count != 1)
+            {
+                return OperatorExecutionOutput.Failure(
+                    $"ImageClassification requires exactly one [classes], [1,classes] or [1,classes,1,1] float output; found {classificationOutputs.Count}.");
+            }
+
+            var selected = classificationOutputs[0];
+            var (labels, labelSource) = ResolveClassificationLabels(@operator, session, modelTarget.Entry, selected.Values.Length);
+            var topK = GetIntParam(@operator, "TopK", 5, min: 1, max: 100);
+            var scoreMode = GetStringParam(@operator, "ClassificationScoreMode", "Auto");
+            var postprocess = PostprocessClassification(selected.Values, labels, topK, scoreMode);
+
+            var outputImage = source.Clone();
+            DrawClassificationResult(outputImage, postprocess.TopPrediction);
+            var originalImage = source.Clone();
+            var emptyDetections = new DetectionList();
+            var classificationTopK = postprocess.Predictions
+                .Select(prediction => new Dictionary<string, object>
+                {
+                    ["Rank"] = prediction.Rank,
+                    ["ClassId"] = prediction.ClassId,
+                    ["Label"] = prediction.Label,
+                    ["Confidence"] = prediction.Confidence
+                })
+                .ToArray();
+            var classificationResult = new Dictionary<string, object>
+            {
+                ["ClassId"] = postprocess.TopPrediction.ClassId,
+                ["Label"] = postprocess.TopPrediction.Label,
+                ["Confidence"] = postprocess.TopPrediction.Confidence,
+                ["TopK"] = classificationTopK
+            };
+
+            var output = new Dictionary<string, object>
+            {
+                ["OriginalImage"] = new ImageWrapper(originalImage),
+                ["DetectionList"] = emptyDetections,
+                ["Objects"] = new DetectionList(),
+                ["ObjectCount"] = 0,
+                ["Defects"] = new DetectionList(),
+                ["DefectCount"] = 0,
+                ["TopClassLabel"] = postprocess.TopPrediction.Label,
+                ["TopClassConfidence"] = postprocess.TopPrediction.Confidence,
+                ["ClassificationTopK"] = classificationTopK,
+                ["ClassificationResult"] = classificationResult,
+                ["OutputFormat"] = "ImageClassification",
+                ["PostprocessDiagnostics"] = new Dictionary<string, object>
+                {
+                    ["TaskType"] = DeepLearningTaskType.ImageClassification.ToString(),
+                    ["OutputName"] = selected.Name,
+                    ["OutputShape"] = selected.Shape,
+                    ["InputWidth"] = inputContract.Width,
+                    ["InputHeight"] = inputContract.Height,
+                    ["InputLayout"] = inputContract.Layout.ToString(),
+                    ["InputSizeSource"] = inputContract.Source,
+                    ["LabelSource"] = labelSource,
+                    ["ResolvedScoreMode"] = postprocess.ResolvedScoreMode
+                },
+                ["ResolvedModelPath"] = modelTarget.ResolvedPath,
+                ["ResolvedModelId"] = modelTarget.ModelId,
+                ["ResolvedModelCatalogPath"] = modelTarget.CatalogPath,
+                ["ModelSource"] = modelTarget.Source,
+                ["ModelProvenance"] = modelTarget.ToProvenancePayload()
+            };
+            AddTaskContract(output, requestedTaskType, taskResolution);
+            return OperatorExecutionOutput.Success(CreateImageOutput(outputImage, output));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Image classification execution failed.");
+            return OperatorExecutionOutput.Failure($"Image classification failed: {ex.Message}");
+        }
+    }
+
+    private async Task<OperatorExecutionOutput> ExecuteSemanticSegmentationAsync(
+        Operator @operator,
+        Mat source,
+        InferenceSession session,
+        ResolvedModelTarget modelTarget,
+        DeepLearningTaskType requestedTaskType,
+        DeepLearningTaskResolution taskResolution,
+        CancellationToken cancellationToken)
+    {
+        var segmentationOperator = BuildSegmentationOperator(@operator, session, modelTarget);
+        var executor = new SemanticSegmentationOperator(NullLogger<SemanticSegmentationOperator>.Instance);
+        var result = await executor.ExecuteWithSessionAsync(
+            segmentationOperator,
+            source,
+            session,
+            modelTarget,
+            cancellationToken).ConfigureAwait(false);
+        if (!result.IsSuccess || result.OutputData == null)
+        {
+            return result;
+        }
+
+        var output = result.OutputData;
+        if (output.TryGetValue("ColoredMap", out var coloredValue) && coloredValue is ImageWrapper coloredMap)
+        {
+            output["Image"] = new ImageWrapper(coloredMap.MatReadOnly.Clone());
+        }
+
+        output["OriginalImage"] = new ImageWrapper(source.Clone());
+        output["DetectionList"] = new DetectionList();
+        output["Objects"] = new DetectionList();
+        output["ObjectCount"] = 0;
+        output["Defects"] = new DetectionList();
+        output["DefectCount"] = 0;
+        output["TopClassLabel"] = string.Empty;
+        output["TopClassConfidence"] = 0.0;
+        output["ClassificationTopK"] = Array.Empty<object>();
+        output["ClassificationResult"] = new Dictionary<string, object>();
+        output["OutputFormat"] = "SemanticSegmentation";
+        output["PostprocessDiagnostics"] = new Dictionary<string, object>
+        {
+            ["TaskType"] = DeepLearningTaskType.SemanticSegmentation.ToString(),
+            ["ClassCount"] = output.GetValueOrDefault("ClassCount", 0),
+            ["ClassMaskCount"] = output.GetValueOrDefault("ClassMaskCount", 0)
+        };
+        AddTaskContract(output, requestedTaskType, taskResolution);
+        return result;
+    }
+
+    private Operator BuildSegmentationOperator(
+        Operator source,
+        InferenceSession session,
+        ResolvedModelTarget modelTarget)
+    {
+        var op = new Operator(source.Name, OperatorType.SemanticSegmentation, source.Position.X, source.Position.Y);
+        AddParameter(op, "ModelPath", modelTarget.ResolvedPath, "file");
+        AddParameter(op, "ModelId", string.Empty, "string");
+        AddParameter(op, "ModelCatalogPath", string.Empty, "file");
+        AddParameter(op, "InputSize", ResolveSegmentationInputSize(source, session, modelTarget.Entry), "string");
+        AddParameter(op, "NumClasses", ResolveSegmentationClassCount(source, session, modelTarget.Entry), "int");
+        AddParameter(op, "ClassNames", GetStringParam(source, "ClassNames", string.Empty), "string");
+        AddParameter(op, "MaxClassMasks", GetIntParam(source, "MaxClassMasks", 32), "int");
+        AddParameter(op, "ExecutionProvider", "cpu", "enum");
+        AddParameter(op, "ScaleToUnitRange", GetBoolParam(source, "ScaleToUnitRange", true), "bool");
+        AddParameter(op, "ChannelOrder", GetStringParam(source, "ChannelOrder", "RGB"), "enum");
+        AddParameter(op, "Mean", GetStringParam(source, "Mean", "0,0,0"), "string");
+        AddParameter(op, "Std", GetStringParam(source, "Std", "1,1,1"), "string");
+        return op;
+    }
+
+    private ClassificationInputContract ResolveClassificationInputContract(
+        Operator @operator,
+        InferenceSession session,
+        ModelCatalogEntry? catalogEntry)
+    {
+        var inputMetadata = session.InputMetadata.Single();
+        var dimensions = inputMetadata.Value.Dimensions.ToArray();
+        var layout = ResolveTensorLayout(dimensions);
+        var configured = GetStringParam(@operator, "ClassificationInputSize", "Auto");
+        if (!configured.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryParseImageSize(configured, out var width, out var height))
+            {
+                throw new InvalidOperationException("ClassificationInputSize must be Auto, N or Width,Height.");
+            }
+
+            return new ClassificationInputContract(width, height, layout, "Parameter");
+        }
+
+        if (catalogEntry?.InputSize is { Length: 2 } catalogSize && catalogSize[0] > 0 && catalogSize[1] > 0)
+        {
+            return new ClassificationInputContract(catalogSize[0], catalogSize[1], layout, "ModelCatalog");
+        }
+
+        if (TryGetStaticInputSize(dimensions, layout, out var modelWidth, out var modelHeight))
+        {
+            return new ClassificationInputContract(modelWidth, modelHeight, layout, "OnnxInputShape");
+        }
+
+        throw new InvalidOperationException(
+            "Classification input size is dynamic and no catalog input_size is available. Set ClassificationInputSize explicitly.");
+    }
+
+    private string ResolveSegmentationInputSize(
+        Operator @operator,
+        InferenceSession session,
+        ModelCatalogEntry? catalogEntry)
+    {
+        var configured = GetStringParam(@operator, "SegmentationInputSize", "Auto");
+        if (!configured.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryParseImageSize(configured, out var width, out var height))
+            {
+                throw new InvalidOperationException("SegmentationInputSize must be Auto, N or Width,Height.");
+            }
+
+            return $"{width},{height}";
+        }
+
+        if (catalogEntry?.InputSize is { Length: 2 } catalogSize && catalogSize[0] > 0 && catalogSize[1] > 0)
+        {
+            return $"{catalogSize[0]},{catalogSize[1]}";
+        }
+
+        var dimensions = session.InputMetadata.Single().Value.Dimensions.ToArray();
+        var layout = ResolveTensorLayout(dimensions);
+        if (TryGetStaticInputSize(dimensions, layout, out var modelWidth, out var modelHeight))
+        {
+            return $"{modelWidth},{modelHeight}";
+        }
+
+        var legacySize = GetIntParam(@operator, "InputSize", DefaultInputSize, min: 1, max: 8192);
+        return $"{legacySize},{legacySize}";
+    }
+
+    private int ResolveSegmentationClassCount(
+        Operator @operator,
+        InferenceSession session,
+        ModelCatalogEntry? catalogEntry)
+    {
+        var configured = GetIntParam(@operator, "NumClasses", 21, min: 2, max: 4096);
+        if (configured != 21)
+        {
+            return configured;
+        }
+
+        if (catalogEntry?.NumClasses > 1)
+        {
+            return catalogEntry.NumClasses;
+        }
+
+        foreach (var metadata in session.OutputMetadata.Values)
+        {
+            var dimensions = metadata.Dimensions;
+            if (dimensions.Length != 4)
+            {
+                continue;
+            }
+
+            if (dimensions[1] > 1 && dimensions[2] > 1 && dimensions[3] > 1)
+            {
+                return dimensions[1];
+            }
+
+            if (dimensions[3] > 1 && dimensions[1] > 1 && dimensions[2] > 1)
+            {
+                return dimensions[3];
+            }
+        }
+
+        return configured;
+    }
+
+    private static DenseTensor<float> PreprocessClassification(
+        Mat source,
+        int width,
+        int height,
+        TensorLayout layout,
+        string channelOrder,
+        IReadOnlyList<float> mean,
+        IReadOnlyList<float> std,
+        bool scaleToUnitRange)
+    {
+        using var bgr = NormalizeToBgr8(source);
+        using var resized = new Mat();
+        Cv2.Resize(bgr, resized, new Size(width, height), 0, 0, InterpolationFlags.Linear);
+        var indexer = resized.GetGenericIndexer<Vec3b>();
+        var tensor = layout == TensorLayout.Nchw
+            ? new DenseTensor<float>([1, 3, height, width])
+            : new DenseTensor<float>([1, height, width, 3]);
+        var scale = scaleToUnitRange ? 1.0f / 255.0f : 1.0f;
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var pixel = indexer[y, x];
+                var channels = channelOrder == "RGB"
+                    ? new[] { pixel.Item2, pixel.Item1, pixel.Item0 }
+                    : new[] { pixel.Item0, pixel.Item1, pixel.Item2 };
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var value = ((channels[channel] * scale) - mean[channel]) / std[channel];
+                    if (layout == TensorLayout.Nchw)
+                    {
+                        tensor[0, channel, y, x] = value;
+                    }
+                    else
+                    {
+                        tensor[0, y, x, channel] = value;
+                    }
+                }
+            }
+        }
+
+        return tensor;
+    }
+
+    private static bool TryExtractClassificationValues(Tensor<float> tensor, out float[] values)
+    {
+        values = [];
+        var dimensions = tensor.Dimensions.ToArray();
+        var valid = dimensions.Length switch
+        {
+            1 => dimensions[0] > 1,
+            2 => dimensions[0] == 1 && dimensions[1] > 1,
+            4 => dimensions[0] == 1 &&
+                 ((dimensions[1] > 1 && dimensions[2] == 1 && dimensions[3] == 1) ||
+                  (dimensions[3] > 1 && dimensions[1] == 1 && dimensions[2] == 1)),
+            _ => false
+        };
+        if (!valid)
+        {
+            return false;
+        }
+
+        values = tensor.ToArray();
+        return values.Length > 1;
+    }
+
+    internal static ClassificationPostprocessResult PostprocessClassification(
+        IReadOnlyList<float> rawScores,
+        IReadOnlyList<string> labels,
+        int topK,
+        string scoreMode)
+    {
+        if (rawScores.Count == 0 || rawScores.Any(score => !float.IsFinite(score)))
+        {
+            throw new InvalidOperationException("Classification output must contain finite scores.");
+        }
+
+        if (labels.Count != rawScores.Count)
+        {
+            throw new InvalidOperationException(
+                $"Classification label count {labels.Count} does not match output class count {rawScores.Count}.");
+        }
+
+        var normalizedMode = scoreMode.Trim();
+        var isProbabilityVector = rawScores.All(score => score is >= 0f and <= 1f) &&
+                                  Math.Abs(rawScores.Sum(score => (double)score) - 1.0) <= 0.01;
+        string resolvedMode;
+        double[] probabilities;
+        if (normalizedMode.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            resolvedMode = isProbabilityVector ? "Probabilities" : "Logits";
+            probabilities = isProbabilityVector
+                ? rawScores.Select(score => (double)score).ToArray()
+                : Softmax(rawScores);
+        }
+        else if (normalizedMode.Equals("Logits", StringComparison.OrdinalIgnoreCase))
+        {
+            resolvedMode = "Logits";
+            probabilities = Softmax(rawScores);
+        }
+        else if (normalizedMode.Equals("Probabilities", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!isProbabilityVector)
+            {
+                throw new InvalidOperationException(
+                    "ClassificationScoreMode=Probabilities requires finite scores in [0,1] whose sum is approximately 1.");
+            }
+
+            resolvedMode = "Probabilities";
+            probabilities = rawScores.Select(score => (double)score).ToArray();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "ClassificationScoreMode must be Auto, Logits or Probabilities.");
+        }
+
+        var count = Math.Min(Math.Max(topK, 1), probabilities.Length);
+        var predictions = probabilities
+            .Select((probability, classId) => new { probability, classId })
+            .OrderByDescending(item => item.probability)
+            .ThenBy(item => item.classId)
+            .Take(count)
+            .Select((item, index) => new ClassificationPrediction(
+                index + 1,
+                item.classId,
+                labels[item.classId],
+                item.probability))
+            .ToArray();
+        return new ClassificationPostprocessResult(predictions[0], predictions, resolvedMode);
+    }
+
+    private (string[] Labels, string Source) ResolveClassificationLabels(
+        Operator @operator,
+        InferenceSession session,
+        ModelCatalogEntry? catalogEntry,
+        int classCount)
+    {
+        var metadataLabels = DeepLearningLabelResolver.GetMetadataLabels(session);
+        if (metadataLabels.Length > 0)
+        {
+            return ValidateLabels(metadataLabels, "ModelMetadata", classCount);
+        }
+
+        if (catalogEntry?.ResolvedClassNames is { Length: > 0 } catalogLabels)
+        {
+            return ValidateLabels(catalogLabels, "ModelCatalog", classCount);
+        }
+
+        var configured = ParseClassNames(GetStringParam(@operator, "ClassNames", string.Empty));
+        if (configured.Length > 0)
+        {
+            return ValidateLabels(configured, "ClassNames", classCount);
+        }
+
+        var labelsPath = ResolveLabelsPath(@operator);
+        if (!string.IsNullOrWhiteSpace(labelsPath) && File.Exists(labelsPath))
+        {
+            return ValidateLabels(DeepLearningLabelResolver.ReadLabelsFromFile(labelsPath), "LabelsPath", classCount);
+        }
+
+        return (Enumerable.Range(0, classCount).Select(index => $"class_{index}").ToArray(), "GeneratedClassIndex");
+    }
+
+    private static (string[] Labels, string Source) ValidateLabels(
+        IReadOnlyCollection<string> labels,
+        string source,
+        int classCount)
+    {
+        if (labels.Count != classCount)
+        {
+            throw new InvalidOperationException(
+                $"Classification label count {labels.Count} from {source} does not match output class count {classCount}.");
+        }
+
+        return (labels.ToArray(), source);
+    }
+
+    private static string[] ParseClassNames(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        try
+        {
+            return raw.TrimStart().StartsWith("[", StringComparison.Ordinal)
+                ? JsonSerializer.Deserialize<string[]>(raw)?.Where(item => !string.IsNullOrWhiteSpace(item)).ToArray() ?? []
+                : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"ClassNames must be a JSON array or comma-separated list: {ex.Message}", ex);
+        }
+    }
+
+    private static void DrawClassificationResult(Mat image, ClassificationPrediction prediction)
+    {
+        var label = $"{prediction.Label}: {prediction.Confidence:P1}";
+        Cv2.Rectangle(image, new Rect(0, 0, image.Width, Math.Min(42, image.Height)), new Scalar(0, 0, 0), -1);
+        Cv2.PutText(image, label, new Point(8, Math.Min(30, image.Height - 4)), HersheyFonts.HersheySimplex, 0.75, new Scalar(0, 255, 0), 2);
+    }
+
+    private static double[] Softmax(IReadOnlyList<float> logits)
+    {
+        var maximum = logits.Max();
+        var exponentials = logits.Select(value => Math.Exp(value - maximum)).ToArray();
+        var sum = exponentials.Sum();
+        if (!double.IsFinite(sum) || sum <= 0.0)
+        {
+            throw new InvalidOperationException("Classification logits could not be normalized with Softmax.");
+        }
+
+        return exponentials.Select(value => value / sum).ToArray();
+    }
+
+    private static TensorLayout ResolveTensorLayout(IReadOnlyList<int> dimensions)
+    {
+        if (dimensions.Count != 4)
+        {
+            throw new InvalidOperationException(
+                $"Deep learning image input must be rank 4. Actual shape: [{string.Join(',', dimensions)}].");
+        }
+
+        var nchw = dimensions[1] is 3 or -1 or 0;
+        var nhwc = dimensions[3] is 3 or -1 or 0;
+        if (nchw == nhwc)
+        {
+            throw new InvalidOperationException(
+                $"Unable to determine NCHW/NHWC input layout from [{string.Join(',', dimensions)}].");
+        }
+
+        return nchw ? TensorLayout.Nchw : TensorLayout.Nhwc;
+    }
+
+    private static bool TryGetStaticInputSize(
+        IReadOnlyList<int> dimensions,
+        TensorLayout layout,
+        out int width,
+        out int height)
+    {
+        width = layout == TensorLayout.Nchw ? dimensions[3] : dimensions[2];
+        height = layout == TensorLayout.Nchw ? dimensions[2] : dimensions[1];
+        return width > 0 && height > 0;
+    }
+
+    private static bool TryParseImageSize(string raw, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 1 && int.TryParse(parts[0], out var square) && square > 0)
+        {
+            width = square;
+            height = square;
+            return true;
+        }
+
+        return parts.Length == 2 &&
+               int.TryParse(parts[0], out width) &&
+               int.TryParse(parts[1], out height) &&
+               width > 0 &&
+               height > 0;
+    }
+
+    private static bool TryParseFloatTriplet(string raw, out float[] values)
+    {
+        values = [];
+        var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length != 3)
+        {
+            return false;
+        }
+
+        values = new float[3];
+        for (var index = 0; index < parts.Length; index++)
+        {
+            if (!float.TryParse(parts[index], out values[index]) || !float.IsFinite(values[index]))
+            {
+                values = [];
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void AddTaskContract(
+        IDictionary<string, object> output,
+        DeepLearningTaskType requestedTaskType,
+        DeepLearningTaskResolution resolution)
+    {
+        output["TaskType"] = resolution.TaskType.ToString();
+        output["RequestedTaskType"] = requestedTaskType.ToString();
+        output["TaskResolutionSource"] = resolution.Source;
+        output["TaskResolutionEvidence"] = resolution.Evidence;
+        output["StatusCode"] = "OK";
+        output["StatusMessage"] = "Success";
+    }
+
+    private static void AddParameter(Operator @operator, string name, object value, string dataType)
+    {
+        @operator.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            name,
+            name,
+            string.Empty,
+            dataType,
+            value,
+            null,
+            null,
+            false,
+            null));
+    }
+
+    private static bool GetBoolParameter(Operator @operator, string name, bool fallback)
+    {
+        var value = @operator.Parameters.FirstOrDefault(parameter =>
+            parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Value;
+        return value == null ? fallback : Convert.ToBoolean(value);
+    }
+
+    internal sealed record ClassificationPrediction(
+        int Rank,
+        int ClassId,
+        string Label,
+        double Confidence);
+
+    internal sealed record ClassificationPostprocessResult(
+        ClassificationPrediction TopPrediction,
+        IReadOnlyList<ClassificationPrediction> Predictions,
+        string ResolvedScoreMode);
+
+    private sealed record ClassificationInputContract(
+        int Width,
+        int Height,
+        TensorLayout Layout,
+        string Source);
+
+    private enum TensorLayout
+    {
+        Nchw = 0,
+        Nhwc = 1
     }
 
     private async Task<CachedModelSession.ModelSessionLease?> AcquireModelSessionWithVerifiedExecutionProviderAsync(
@@ -1172,31 +1957,122 @@ public class DeepLearningOperator : OperatorBase
     {
         var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
         var modelId = GetStringParam(@operator, "ModelId", string.Empty);
-        var confidence = GetFloatParam(@operator, "Confidence", 0.5f);
-        var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f);
 
         if (string.IsNullOrWhiteSpace(modelPath) && string.IsNullOrWhiteSpace(modelId))
         {
             return ValidationResult.Invalid("必须指定模型路径");
         }
 
+        ResolvedModelTarget modelTarget;
         try
         {
-            _ = ResolveModelTarget(@operator);
+            modelTarget = ResolveModelTarget(@operator);
         }
         catch (Exception ex)
         {
             return ValidationResult.Invalid(ex.Message);
         }
 
-        if (confidence < 0 || confidence > 1)
+        if (!DeepLearningTaskResolver.TryParse(
+                GetStringParam(@operator, "TaskType", "ObjectDetection"),
+                out var taskType))
         {
-            return ValidationResult.Invalid("置信度阈值必须在 0-1 之间");
+            return ValidationResult.Invalid(
+                "TaskType must be ObjectDetection, ImageClassification, SemanticSegmentation or Auto.");
         }
 
-        if (nmsIouThreshold < 0 || nmsIouThreshold > 1)
+        if (taskType == DeepLearningTaskType.Auto &&
+            DeepLearningTaskResolver.TryResolveCatalogType(modelTarget.Entry?.Type, out var catalogTask))
         {
-            return ValidationResult.Invalid("NMS IoU threshold must be between 0 and 1.");
+            taskType = catalogTask;
+        }
+
+        if (!TryResolveSessionGpuMode(
+                @operator,
+                GetStringParam(@operator, "ExecutionProvider", "Auto"),
+                out _,
+                out var providerError))
+        {
+            return ValidationResult.Invalid(providerError);
+        }
+
+        if (taskType is DeepLearningTaskType.ObjectDetection or DeepLearningTaskType.Auto)
+        {
+            var confidence = GetFloatParam(@operator, "Confidence", 0.5f);
+            var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f);
+            if (confidence < 0 || confidence > 1)
+            {
+                return ValidationResult.Invalid("置信度阈值必须在 0-1 之间");
+            }
+
+            if (nmsIouThreshold < 0 || nmsIouThreshold > 1)
+            {
+                return ValidationResult.Invalid("NMS IoU threshold must be between 0 and 1.");
+            }
+
+            try
+            {
+                _ = ParseDetectionOutputFormat(GetStringParam(@operator, "OutputFormat", "Auto"));
+            }
+            catch (Exception ex)
+            {
+                return ValidationResult.Invalid(ex.Message);
+            }
+        }
+
+        if (taskType is DeepLearningTaskType.ImageClassification or DeepLearningTaskType.SemanticSegmentation)
+        {
+            var channelOrder = GetStringParam(@operator, "ChannelOrder", "RGB");
+            if (!channelOrder.Equals("RGB", StringComparison.OrdinalIgnoreCase) &&
+                !channelOrder.Equals("BGR", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Invalid("ChannelOrder must be RGB or BGR.");
+            }
+
+            if (!TryParseFloatTriplet(GetStringParam(@operator, "Mean", "0,0,0"), out _))
+            {
+                return ValidationResult.Invalid("Mean must contain 3 numeric values.");
+            }
+
+            if (!TryParseFloatTriplet(GetStringParam(@operator, "Std", "1,1,1"), out var std) ||
+                std.Any(value => value <= 0f))
+            {
+                return ValidationResult.Invalid("Std must contain 3 positive numeric values.");
+            }
+        }
+
+        if (taskType == DeepLearningTaskType.ImageClassification)
+        {
+            var inputSize = GetStringParam(@operator, "ClassificationInputSize", "Auto");
+            if (!inputSize.Equals("Auto", StringComparison.OrdinalIgnoreCase) &&
+                !TryParseImageSize(inputSize, out _, out _))
+            {
+                return ValidationResult.Invalid(
+                    "ClassificationInputSize must be Auto, N or Width,Height.");
+            }
+
+            var scoreMode = GetStringParam(@operator, "ClassificationScoreMode", "Auto");
+            if (!new[] { "Auto", "Logits", "Probabilities" }.Contains(scoreMode, StringComparer.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Invalid(
+                    "ClassificationScoreMode must be Auto, Logits or Probabilities.");
+            }
+
+            _ = GetIntParam(@operator, "TopK", 5, min: 1, max: 100);
+        }
+
+        if (taskType == DeepLearningTaskType.SemanticSegmentation)
+        {
+            var inputSize = GetStringParam(@operator, "SegmentationInputSize", "Auto");
+            if (!inputSize.Equals("Auto", StringComparison.OrdinalIgnoreCase) &&
+                !TryParseImageSize(inputSize, out _, out _))
+            {
+                return ValidationResult.Invalid(
+                    "SegmentationInputSize must be Auto, N or Width,Height.");
+            }
+
+            _ = GetIntParam(@operator, "NumClasses", 21, min: 2, max: 4096);
+            _ = GetIntParam(@operator, "MaxClassMasks", 32, min: 0, max: 4096);
         }
 
         return ValidationResult.Valid();

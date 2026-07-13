@@ -59,7 +59,9 @@ public class Sprint5_AIWorkflowServiceTests
 
         // Assert
         prompt.Should().Contain("图像采集");
-        prompt.Should().Contain("深度学习检测");
+        prompt.Should().Contain("深度学习推理");
+        prompt.Should().Contain("ImageClassification");
+        prompt.Should().Contain("ThreePointAngle");
         prompt.Should().Contain("边缘检测");
         prompt.Should().Contain("ForEach");
     }

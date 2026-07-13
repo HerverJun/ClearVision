@@ -54,6 +54,8 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
             new Dictionary<OperatorType, IReadOnlyList<OperatorParameterConstraint>>
             {
                 [OperatorType.ImageAcquisition] = ImageAcquisitionConstraints(),
+                [OperatorType.Filtering] = FilteringConstraints(),
+                [OperatorType.Measurement] = MeasurementConstraints(),
                 [OperatorType.DeepLearning] = DeepLearningConstraints(),
                 [OperatorType.EdgeDetection] = EdgeDetectionConstraints(),
                 [OperatorType.ResultOutput] = ResultOutputConstraints(),
@@ -108,8 +110,20 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
 
     private static IReadOnlyList<OperatorParameterConstraint> DeepLearningConstraints()
     {
+        var detectionOnlyDisabled = Any(
+            Equals("TaskType", "ImageClassification"),
+            Equals("TaskType", "SemanticSegmentation"));
+        var classificationOnlyDisabled = Any(
+            Equals("TaskType", "ObjectDetection"),
+            Equals("TaskType", "SemanticSegmentation"));
+        var segmentationOnlyDisabled = Any(
+            Equals("TaskType", "ObjectDetection"),
+            Equals("TaskType", "ImageClassification"));
+        var classificationAndSegmentationDisabled = All(Equals("TaskType", "ObjectDetection"));
+
         return
         [
+            Constraint("TaskType", reasonCode: "DEEP_LEARNING_TASK_TYPE"),
             Constraint(
                 "ModelPath",
                 OperatorParameterRequiredPolicies.Required,
@@ -133,21 +147,186 @@ public sealed class OperatorParameterConstraintProvider : IOperatorParameterCons
             Constraint(
                 "LabelsPath",
                 OperatorParameterRequiredPolicies.Optional,
+                disabledWhen: All(Equals("TaskType", "SemanticSegmentation")),
                 resourceKind: "model_labels",
-                reasonCode: "DEEP_LEARNING_LABELS_OPTIONAL_FALLBACK"),
+                reasonCode: "DEEP_LEARNING_LABELS_FOR_DETECTION_OR_CLASSIFICATION"),
+            Constraint(
+                "Confidence",
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_CONFIDENCE_ONLY_FOR_DETECTION"),
+            Constraint(
+                "ModelVersion",
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_YOLO_VERSION_ONLY_FOR_DETECTION"),
+            Constraint(
+                "InputSize",
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_DETECTION_INPUT_SIZE_ONLY_FOR_DETECTION"),
+            Constraint(
+                "TargetClasses",
+                OperatorParameterRequiredPolicies.Optional,
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_TARGET_CLASSES_ONLY_FOR_DETECTION"),
             Constraint(
                 "GpuDeviceId",
-                disabledWhen: All(Equals("UseGpu", false)),
+                disabledWhen: All(Equals("ExecutionProvider", "CPU")),
                 reasonCode: "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU"),
             Constraint(
+                "UseGpu",
+                disabledWhen: Any(
+                    Equals("ExecutionProvider", "CPU"),
+                    Equals("ExecutionProvider", "CUDA")),
+                reasonCode: "DEEP_LEARNING_USE_GPU_ONLY_FOR_AUTO_PROVIDER"),
+            Constraint(
                 "EnableInternalNms",
-                disabledWhen: All(Equals("OutputFormat", "EndToEndNms")),
+                disabledWhen: Any(
+                    Equals("TaskType", "ImageClassification"),
+                    Equals("TaskType", "SemanticSegmentation"),
+                    Equals("OutputFormat", "EndToEndNms")),
                 reasonCode: "DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS"),
             Constraint(
                 "NmsIouThreshold",
-                requiredWhen: All(Equals("OutputFormat", "RawYolo"), Equals("EnableInternalNms", true)),
-                disabledWhen: Any(Equals("OutputFormat", "EndToEndNms"), Equals("EnableInternalNms", false)),
-                reasonCode: "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS")
+                requiredWhen: When(
+                    all:
+                    [
+                        Equals("OutputFormat", "RawYolo"),
+                        Equals("EnableInternalNms", true)
+                    ],
+                    any:
+                    [
+                        Equals("TaskType", "ObjectDetection"),
+                        Equals("TaskType", "Auto")
+                    ]),
+                disabledWhen: Any(
+                    Equals("TaskType", "ImageClassification"),
+                    Equals("TaskType", "SemanticSegmentation"),
+                    Equals("OutputFormat", "EndToEndNms"),
+                    Equals("EnableInternalNms", false)),
+                reasonCode: "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS"),
+            Constraint(
+                "OutputFormat",
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_OUTPUT_FORMAT_ONLY_FOR_DETECTION"),
+            Constraint(
+                "DetectionMode",
+                disabledWhen: detectionOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_DETECTION_MODE_ONLY_FOR_DETECTION"),
+            Constraint(
+                "TopK",
+                disabledWhen: classificationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_TOP_K_ONLY_FOR_CLASSIFICATION"),
+            Constraint(
+                "ClassificationInputSize",
+                disabledWhen: classificationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_CLASSIFICATION"),
+            Constraint(
+                "ClassificationScoreMode",
+                disabledWhen: classificationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_SCORE_MODE_ONLY_FOR_CLASSIFICATION"),
+            Constraint(
+                "ClassNames",
+                OperatorParameterRequiredPolicies.Optional,
+                disabledWhen: classificationAndSegmentationDisabled,
+                reasonCode: "DEEP_LEARNING_CLASS_NAMES_FOR_CLASSIFICATION_OR_SEGMENTATION"),
+            Constraint(
+                "SegmentationInputSize",
+                disabledWhen: segmentationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_SEGMENTATION"),
+            Constraint(
+                "NumClasses",
+                disabledWhen: segmentationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_CLASS_COUNT_ONLY_FOR_SEGMENTATION"),
+            Constraint(
+                "MaxClassMasks",
+                disabledWhen: segmentationOnlyDisabled,
+                reasonCode: "DEEP_LEARNING_CLASS_MASKS_ONLY_FOR_SEGMENTATION"),
+            Constraint("ExecutionProvider", reasonCode: "DEEP_LEARNING_EXECUTION_PROVIDER"),
+            Constraint(
+                "ScaleToUnitRange",
+                disabledWhen: classificationAndSegmentationDisabled,
+                reasonCode: "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"),
+            Constraint(
+                "ChannelOrder",
+                disabledWhen: classificationAndSegmentationDisabled,
+                reasonCode: "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"),
+            Constraint(
+                "Mean",
+                disabledWhen: classificationAndSegmentationDisabled,
+                reasonCode: "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"),
+            Constraint(
+                "Std",
+                disabledWhen: classificationAndSegmentationDisabled,
+                reasonCode: "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION")
+        ];
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraint> FilteringConstraints()
+    {
+        return
+        [
+            Constraint("FilterMode", reasonCode: "FILTERING_MODE"),
+            Constraint(
+                "KernelSize",
+                disabledWhen: All(Equals("FilterMode", "Bilateral")),
+                reasonCode: "FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL"),
+            Constraint(
+                "SigmaX",
+                disabledWhen: All(NotEquals("FilterMode", "Gaussian")),
+                reasonCode: "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN"),
+            Constraint(
+                "SigmaY",
+                disabledWhen: All(NotEquals("FilterMode", "Gaussian")),
+                reasonCode: "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN"),
+            Constraint(
+                "BorderType",
+                disabledWhen: All(Equals("FilterMode", "Median")),
+                reasonCode: "FILTERING_BORDER_NOT_USED_BY_MEDIAN"),
+            Constraint(
+                "Diameter",
+                disabledWhen: All(NotEquals("FilterMode", "Bilateral")),
+                reasonCode: "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL"),
+            Constraint(
+                "SigmaColor",
+                disabledWhen: All(NotEquals("FilterMode", "Bilateral")),
+                reasonCode: "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL"),
+            Constraint(
+                "SigmaSpace",
+                disabledWhen: All(NotEquals("FilterMode", "Bilateral")),
+                reasonCode: "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")
+        ];
+    }
+
+    private static IReadOnlyList<OperatorParameterConstraint> MeasurementConstraints()
+    {
+        var coordinateParametersDisabled = Any(
+            Equals("MeasureType", "PointToLine"),
+            Equals("MeasureType", "LineToLine"),
+            Equals("MeasureType", "ThreePointAngle"));
+        var lineDistanceParametersDisabled = Any(
+            Equals("MeasureType", "PointToPoint"),
+            Equals("MeasureType", "Horizontal"),
+            Equals("MeasureType", "Vertical"),
+            Equals("MeasureType", "ThreePointAngle"));
+
+        return
+        [
+            Constraint("MeasureType", reasonCode: "MEASUREMENT_TYPE"),
+            Constraint("X1", disabledWhen: coordinateParametersDisabled, reasonCode: "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"),
+            Constraint("Y1", disabledWhen: coordinateParametersDisabled, reasonCode: "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"),
+            Constraint("X2", disabledWhen: coordinateParametersDisabled, reasonCode: "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"),
+            Constraint("Y2", disabledWhen: coordinateParametersDisabled, reasonCode: "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"),
+            Constraint(
+                "DistanceModel",
+                disabledWhen: lineDistanceParametersDisabled,
+                reasonCode: "MEASUREMENT_DISTANCE_MODEL_ONLY_FOR_LINE_DISTANCE"),
+            Constraint(
+                "ParallelThreshold",
+                disabledWhen: All(NotEquals("MeasureType", "LineToLine")),
+                reasonCode: "MEASUREMENT_PARALLEL_THRESHOLD_ONLY_FOR_LINE_TO_LINE"),
+            Constraint(
+                "AngleUnit",
+                disabledWhen: All(NotEquals("MeasureType", "ThreePointAngle")),
+                reasonCode: "MEASUREMENT_ANGLE_UNIT_ONLY_FOR_ANGLE")
         ];
     }
 

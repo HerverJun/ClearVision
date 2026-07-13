@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-13 18:59:07 +08:00`
+> 生成时间 / Generated At: `2026-07-13 19:08:24 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -55,7 +55,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AnomalyDetection` | 异常检测 | 2 | 8 | 16 | 100 (A) | `1.0.0` | Simplified PatchCore | [AnomalyDetection](./operators/AnomalyDetection.md) |
-| `OperatorType.DeepLearning` | 深度学习 | 1 | 14 | 14 | 100 (A) | `1.0.0` | 该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺… | [DeepLearning](./operators/DeepLearning.md) |
+| `OperatorType.DeepLearning` | 深度学习 | 1 | 31 | 27 | 100 (A) | `1.1.0` | 该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保… | [DeepLearning](./operators/DeepLearning.md) |
 | `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | 4 | 13 | 13 | 100 (A) | `1.0.1` | 该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按… | [DetectionSequenceJudge](./operators/DetectionSequenceJudge.md) |
 | `OperatorType.DualModalVoting` | 双模态投票 | 2 | 3 | 6 | 84 (B) | `1.0.0` | 该算子用于融合深度学习与传统视觉检测结果，输出最终判定。运行时从声明输入端口读取数据… | [DualModalVoting](./operators/DualModalVoting.md) |
 | `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | 3 | 4 | 4 | 96 (A) | `1.0.1` | 该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行… | [EdgePairDefect](./operators/EdgePairDefect.md) |
@@ -173,7 +173,7 @@
 | `OperatorType.HistogramAnalysis` | 直方图分析 | 1 | 11 | 6 | 94 (A) | `1.0.0` | 该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按… | [HistogramAnalysis](./operators/HistogramAnalysis.md) |
 | `OperatorType.LineLineDistance` | 线线距离 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 该算子用于计算两条直线或线段之间的距离与夹角。运行时从声明输入端口读取数据，按参数表… | [LineLineDistance](./operators/LineLineDistance.md) |
 | `OperatorType.LineMeasurement` | 直线测量 | 1 | 5 | 4 | 96 (A) | `1.0.0` | 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，… | [LineMeasurement](./operators/LineMeasurement.md) |
-| `OperatorType.Measurement` | 测量 | 3 | 2 | 5 | 96 (A) | `1.0.0` | 该算子用于两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入… | [Measurement](./operators/Measurement.md) |
+| `OperatorType.Measurement` | 测量 | 6 | 17 | 8 | 96 (A) | `1.1.0` | 该算子用于统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度… | [Measurement](./operators/Measurement.md) |
 | `OperatorType.MinEnclosingGeometry` | 最小外接几何体 | 1 | 2 | 10 | 100 (A) | `1.0.1` | Contour-derived enclosing geometry and robust fitting | [MinEnclosingGeometry](./operators/MinEnclosingGeometry.md) |
 | `OperatorType.PhaseClosure` | 相位解缠绕 | 4 | 4 | 0 | 89 (A) | `1.0.1` | Itoh/quality-guided phase unwrapping | [PhaseClosure](./operators/PhaseClosure.md) |
 | `OperatorType.PixelStatistics` | 像素统计 | 2 | 6 | 5 | 96 (A) | `1.0.0` | 该算子用于计算 ROI 或掩码区域内的像素级统计信息。运行时从声明输入端口读取数据，… | [PixelStatistics](./operators/PixelStatistics.md) |
@@ -266,7 +266,7 @@
 | `OperatorType.BilateralFilter` | 双边滤波 | 1 | 1 | 3 | 100 (A) | `1.0.0` | 该算子用于边缘保留的平滑滤波。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [BilateralFilter](./operators/BilateralFilter.md) |
 | `OperatorType.ClaheEnhancement` | CLAHE增强 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。运行时从声… | [ClaheEnhancement](./operators/ClaheEnhancement.md) |
 | `OperatorType.ColorConversion` | 颜色空间转换 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子用于BGR/GRAY/HSV/Lab/YUV等颜色空间转换。运行时从声明输入端… | [ColorConversion](./operators/ColorConversion.md) |
-| `OperatorType.Filtering` | 滤波 | 1 | 1 | 4 | 94 (A) | `1.0.0` | Gaussian Blur (OpenCV) | [Filtering](./operators/Filtering.md) |
+| `OperatorType.Filtering` | 滤波 | 1 | 3 | 8 | 100 (A) | `1.1.0` | Unified spatial smoothing filters (OpenCV) | [Filtering](./operators/Filtering.md) |
 | `OperatorType.FrameAveraging` | 帧平均 | 1 | 2 | 2 | 94 (A) | `1.0.0` | 该算子用于对多帧输入取平均以降低时域噪声。运行时从声明输入端口读取数据，按参数表解析… | [FrameAveraging](./operators/FrameAveraging.md) |
 | `OperatorType.HistogramEqualization` | 直方图均衡化 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于支持全局直方图均衡与 CLAHE，用于增强图像对比度。运行时从声明输入端口… | [HistogramEqualization](./operators/HistogramEqualization.md) |
 | `OperatorType.ImageAdd` | 图像加法 | 2 | 1 | 6 | 100 (A) | `1.0.0` | 该算子用于两幅图像叠加/合并。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageAdd](./operators/ImageAdd.md) |

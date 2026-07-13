@@ -13,9 +13,11 @@ public sealed class VisionAgentParameterRuleParityTests
     {
         var spec = LoadSpec();
 
-        spec.SchemaVersion.Should().Be("2026-07-10.vision-agent-parameter-rule-parity.v3");
+        spec.SchemaVersion.Should().Be("2026-07-13.vision-agent-parameter-rule-parity.v4");
         spec.Cases.Select(item => item.OperatorType).Should().Contain([
             "ImageAcquisition",
+            "Filtering",
+            "Measurement",
             "TemplateMatching",
             "DeepLearning",
             "EdgeDetection",
@@ -40,6 +42,8 @@ public sealed class VisionAgentParameterRuleParityTests
         var migratedOperators = new[]
         {
             "ImageAcquisition",
+            "Filtering",
+            "Measurement",
             "DeepLearning",
             "EdgeDetection",
             "ResultOutput",

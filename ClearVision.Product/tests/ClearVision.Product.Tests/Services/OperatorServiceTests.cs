@@ -36,6 +36,30 @@ public class OperatorServiceTests
         metadata.Outputs.Should().Contain(output => output.Name == "Diagnostics");
     }
 
+    [Theory]
+    [InlineData(OperatorType.Filtering, "FilterMode", "FilterDiagnostics")]
+    [InlineData(OperatorType.Measurement, "MeasureType", "MeasurementType")]
+    [InlineData(OperatorType.DeepLearning, "TaskType", "TaskResolutionSource")]
+    public async Task GetMetadataAsync_GeneralizedOperators_ShouldMatchFactoryContracts(
+        OperatorType type,
+        string expectedParameter,
+        string expectedOutput)
+    {
+        var factory = new OperatorFactory();
+        var sut = new OperatorService(Substitute.For<IOperatorRepository>(), factory);
+
+        var serviceMetadata = await sut.GetMetadataAsync(type);
+        var factoryMetadata = factory.GetMetadata(type)!;
+
+        serviceMetadata.Should().NotBeNull();
+        serviceMetadata!.Description.Should().Be(factoryMetadata.Description);
+        serviceMetadata.Inputs.Select(port => port.Name).Should().Equal(factoryMetadata.InputPorts.Select(port => port.Name));
+        serviceMetadata.Outputs.Select(port => port.Name).Should().Equal(factoryMetadata.OutputPorts.Select(port => port.Name));
+        serviceMetadata.Parameters.Select(parameter => parameter.Name).Should().Equal(factoryMetadata.Parameters.Select(parameter => parameter.Name));
+        serviceMetadata.Parameters.Should().Contain(parameter => parameter.Name == expectedParameter);
+        serviceMetadata.Outputs.Should().Contain(output => output.Name == expectedOutput);
+    }
+
     [Fact]
     public async Task CreateAsync_WhenParameterIsInvalid_ShouldLogWarningAndContinue()
     {

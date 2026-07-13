@@ -81,20 +81,26 @@ public class OperatorService : IOperatorService
                 DisplayName = "滤波",
                 Category = "预处理",
                 Icon = "🔍",
-                Description = "图像滤波降噪处理",
+                Description = "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波",
                 Inputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
                 },
                 Outputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "输出图像", DataType = PortDataType.Image, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "输出图像", DataType = PortDataType.Image, IsRequired = true },
+                    new() { Name = "FilterMode", DisplayName = "实际滤波模式", DataType = PortDataType.String },
+                    new() { Name = "FilterDiagnostics", DisplayName = "滤波诊断", DataType = PortDataType.Any }
                 },
                 Parameters = new List<ParameterDefinitionDto>
                 {
-                    new() { Name = "method", DisplayName = "滤波方法", DataType = "enum", DefaultValue = "gaussian", IsRequired = true },
-                    new() { Name = "kernelSize", DisplayName = "核大小", DataType = "int", DefaultValue = 5, MinValue = 3, MaxValue = 31, IsRequired = true },
-                    new() { Name = "sigma", DisplayName = "Sigma", DataType = "double", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 10.0, IsRequired = true }
+                    new() { Name = "FilterMode", DisplayName = "滤波模式", DataType = "enum", DefaultValue = "Gaussian", IsRequired = true },
+                    new() { Name = "KernelSize", DisplayName = "核大小", DataType = "int", DefaultValue = 5, MinValue = 1, MaxValue = 63, IsRequired = true },
+                    new() { Name = "SigmaX", DisplayName = "Sigma X", DataType = "double", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 10.0 },
+                    new() { Name = "SigmaY", DisplayName = "Sigma Y", DataType = "double", DefaultValue = 0.0, MinValue = 0.0, MaxValue = 10.0 },
+                    new() { Name = "Diameter", DisplayName = "双边直径", DataType = "int", DefaultValue = 9, MinValue = 1, MaxValue = 25 },
+                    new() { Name = "SigmaColor", DisplayName = "双边色彩Sigma", DataType = "double", DefaultValue = 75.0, MinValue = 1.0, MaxValue = 255.0 },
+                    new() { Name = "SigmaSpace", DisplayName = "双边空间Sigma", DataType = "double", DefaultValue = 75.0, MinValue = 1.0, MaxValue = 255.0 }
                 }
             },
             new()
@@ -219,23 +225,34 @@ public class OperatorService : IOperatorService
                 DisplayName = "测量",
                 Category = "检测",
                 Icon = "📏",
-                Description = "几何尺寸测量",
+                Description = "统一基础二维几何测量入口，支持点点、点线、线线和三点角度",
                 Inputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image },
+                    new() { Name = "PointA", DisplayName = "点A", DataType = PortDataType.Point },
+                    new() { Name = "PointB", DisplayName = "点B", DataType = PortDataType.Point },
+                    new() { Name = "PointC", DisplayName = "点C", DataType = PortDataType.Point },
+                    new() { Name = "Line1", DisplayName = "线1", DataType = PortDataType.LineData },
+                    new() { Name = "Line2", DisplayName = "线2", DataType = PortDataType.LineData }
                 },
                 Outputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "distance", DisplayName = "距离", DataType = PortDataType.Float, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
+                    new() { Name = "Distance", DisplayName = "距离", DataType = PortDataType.Float },
+                    new() { Name = "Value", DisplayName = "主测量值", DataType = PortDataType.Float },
+                    new() { Name = "Angle", DisplayName = "夹角", DataType = PortDataType.Float },
+                    new() { Name = "MeasurementType", DisplayName = "实际测量类型", DataType = PortDataType.String },
+                    new() { Name = "Unit", DisplayName = "单位", DataType = PortDataType.String }
                 },
                 Parameters = new List<ParameterDefinitionDto>
                 {
-                    new() { Name = "x1", DisplayName = "起点X", DataType = "int", DefaultValue = 0, IsRequired = true },
-                    new() { Name = "y1", DisplayName = "起点Y", DataType = "int", DefaultValue = 0, IsRequired = true },
-                    new() { Name = "x2", DisplayName = "终点X", DataType = "int", DefaultValue = 100, IsRequired = true },
-                    new() { Name = "y2", DisplayName = "终点Y", DataType = "int", DefaultValue = 100, IsRequired = true },
-                    new() { Name = "measureType", DisplayName = "测量类型", DataType = "enum", DefaultValue = "PointToPoint", IsRequired = true }
+                    new() { Name = "X1", DisplayName = "起点X", DataType = "int", DefaultValue = 0 },
+                    new() { Name = "Y1", DisplayName = "起点Y", DataType = "int", DefaultValue = 0 },
+                    new() { Name = "X2", DisplayName = "终点X", DataType = "int", DefaultValue = 100 },
+                    new() { Name = "Y2", DisplayName = "终点Y", DataType = "int", DefaultValue = 100 },
+                    new() { Name = "MeasureType", DisplayName = "测量类型", DataType = "enum", DefaultValue = "PointToPoint", IsRequired = true },
+                    new() { Name = "DistanceModel", DisplayName = "线距离模型", DataType = "enum", DefaultValue = "Segment" },
+                    new() { Name = "AngleUnit", DisplayName = "角度单位", DataType = "enum", DefaultValue = "Degree" }
                 }
             },
             new()
@@ -267,18 +284,23 @@ public class OperatorService : IOperatorService
                 DisplayName = "深度学习",
                 Category = "AI检测",
                 Icon = "🧠",
-                Description = "AI缺陷检测",
+                Description = "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割",
                 Inputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
                 },
                 Outputs = new List<PortDefinitionDto>
                 {
-                    new() { Name = "image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "defects", DisplayName = "缺陷列表", DataType = PortDataType.Contour, IsRequired = true }
+                    new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true },
+                    new() { Name = "Defects", DisplayName = "缺陷列表", DataType = PortDataType.DetectionList, IsRequired = true },
+                    new() { Name = "TaskType", DisplayName = "实际任务类型", DataType = PortDataType.String },
+                    new() { Name = "TopClassLabel", DisplayName = "最高类别", DataType = PortDataType.String },
+                    new() { Name = "TopClassConfidence", DisplayName = "最高类别置信度", DataType = PortDataType.Float },
+                    new() { Name = "SegmentationMap", DisplayName = "分割类别图", DataType = PortDataType.Image }
                 },
                 Parameters = new List<ParameterDefinitionDto>
                 {
+                    new() { Name = "TaskType", DisplayName = "任务类型", DataType = "enum", DefaultValue = "ObjectDetection", IsRequired = true },
                     new() { Name = "ModelPath", DisplayName = "模型路径", DataType = "file", DefaultValue = "", IsRequired = true },
                     new() { Name = "Confidence", DisplayName = "置信度阈值", DataType = "double", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 1.0, IsRequired = true },
                     new() { Name = "ModelVersion", DisplayName = "YOLO版本", DataType = "enum", DefaultValue = "Auto", IsRequired = true,
@@ -295,7 +317,11 @@ public class OperatorService : IOperatorService
                     new() { Name = "TargetClasses", DisplayName = "目标类别", DataType = "string", DefaultValue = "", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别" },
                     new() { Name = "LabelsPath", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。" },
                     new() { Name = "EnableInternalNms", DisplayName = "启用内部NMS", DataType = "bool", DefaultValue = true },
-                    new() { Name = "NmsIouThreshold", DisplayName = "NMS IoU阈值", DataType = "double", DefaultValue = 0.45, MinValue = 0.0, MaxValue = 1.0 }
+                    new() { Name = "NmsIouThreshold", DisplayName = "NMS IoU阈值", DataType = "double", DefaultValue = 0.45, MinValue = 0.0, MaxValue = 1.0 },
+                    new() { Name = "TopK", DisplayName = "分类 Top-K", DataType = "int", DefaultValue = 5, MinValue = 1, MaxValue = 100 },
+                    new() { Name = "ClassificationInputSize", DisplayName = "分类输入尺寸", DataType = "string", DefaultValue = "Auto" },
+                    new() { Name = "SegmentationInputSize", DisplayName = "分割输入尺寸", DataType = "string", DefaultValue = "Auto" },
+                    new() { Name = "NumClasses", DisplayName = "分割类别数", DataType = "int", DefaultValue = 21, MinValue = 2, MaxValue = 4096 }
                 }
             },
             new()
@@ -364,8 +390,7 @@ public class OperatorService : IOperatorService
 
         foreach (var meta in factoryMetadata)
         {
-            if (Enum.TryParse<OperatorType>(meta.Type, out var type) &&
-                !OperatorMetadataCache.ContainsKey(type))
+            if (Enum.TryParse<OperatorType>(meta.Type, out var type))
             {
                 OperatorMetadataCache[type] = meta;
             }

@@ -45,9 +45,20 @@ public sealed class ParameterMappingService
                 continue;
             }
 
+            var mappedByName = schema.Parameters.ToDictionary(
+                parameter => parameter.Name,
+                parameter => MapParameterValue(op, parameter, load, parameterStrategy),
+                StringComparer.OrdinalIgnoreCase);
+            var disabledParameters = ResolveDisabledParameters(schema, mappedByName.Values);
+
             foreach (var parameter in schema.Parameters)
             {
-                var mapped = MapParameterValue(op, parameter, load, parameterStrategy);
+                if (disabledParameters.Contains(parameter.Name))
+                {
+                    continue;
+                }
+
+                var mapped = mappedByName[parameter.Name];
                 mappings.Add(mapped);
                 if (mapped.Pending)
                 {
@@ -124,6 +135,44 @@ public sealed class ParameterMappingService
             warningCode: resolution.MissingResources.Count > 0 ? "resources_pending" : string.Empty,
             applyImpact: "editable_draft_allowed",
             deploymentImpact: resolution.MissingResources.Count > 0 ? "deployment_blocked_until_resources_bound" : "no_deployment_blocker");
+    }
+
+    private static HashSet<string> ResolveDisabledParameters(
+        VisionAgentOperatorContract schema,
+        IEnumerable<VisionAgentParameterMapping> mappings)
+    {
+        if (schema.ParameterConstraints is not { Count: > 0 })
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var metadata = new OperatorMetadata
+        {
+            DisplayName = schema.DisplayName,
+            Category = schema.Category,
+            Description = schema.Description,
+            Parameters = schema.Parameters.Select(parameter => new ParameterDefinition
+            {
+                Name = parameter.Name,
+                DisplayName = parameter.DisplayName,
+                DataType = parameter.DataType,
+                IsRequired = parameter.IsRequired,
+                DefaultValue = parameter.DefaultValue,
+                MinValue = parameter.MinValue,
+                MaxValue = parameter.MaxValue,
+                Description = parameter.Description
+            }).ToList(),
+            ParameterConstraints = schema.ParameterConstraints.ToList()
+        };
+        var values = mappings.ToDictionary(
+            mapping => mapping.ParameterName,
+            mapping => (object?)mapping.ValueSummary,
+            StringComparer.OrdinalIgnoreCase);
+
+        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
+            .Where(state => state.EffectiveDisabled)
+            .Select(state => state.Constraint.Parameter)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static string ResolveParameterStrategy(
@@ -269,7 +318,7 @@ public sealed class ParameterMappingService
                 : "<pending-tolerance>";
         }
 
-        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
+        if (IsOutputChannelBindingParameter(operatorType, parameterName))
         {
             return "<pending-output-channel>";
         }
@@ -285,6 +334,8 @@ public sealed class ParameterMappingService
 
         return operatorType switch
         {
+            "DeepLearning" when parameterName.Equals("TaskType", StringComparison.OrdinalIgnoreCase) =>
+                EffectiveDeepLearningTaskType(load, parameterStrategy),
             "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Value",
             "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Equal",
             "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "线序待确认",
@@ -377,9 +428,17 @@ public sealed class ParameterMappingService
                                        parameterName.Equals("Scale", StringComparison.OrdinalIgnoreCase),
             "plc_address" => parameterName.Contains("Address", StringComparison.OrdinalIgnoreCase) ||
                              parameterName.Contains("PLC", StringComparison.OrdinalIgnoreCase),
-            "output_channel" => parameterName.Contains("Channel", StringComparison.OrdinalIgnoreCase),
+            "output_channel" => IsOutputChannelBindingParameter(operatorType, parameterName),
             _ => false
         };
+    }
+
+    private static bool IsOutputChannelBindingParameter(string operatorType, string parameterName)
+    {
+        return parameterName.Equals("OutputChannel", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("OutputChannelId", StringComparison.OrdinalIgnoreCase) ||
+               (operatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase) &&
+                parameterName.Equals("Channel", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsPreferredModelParameter(string parameterName)
@@ -420,7 +479,31 @@ public sealed class ParameterMappingService
         return taskType.Equals(AiVisionTaskTypes.AttributeClassification, StringComparison.OrdinalIgnoreCase) ||
                taskType.Equals(AiVisionTaskTypes.Classification, StringComparison.OrdinalIgnoreCase) ||
                text.Contains("attribute_classification", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("classification", StringComparison.OrdinalIgnoreCase);
+               text.Contains("classification", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("classify", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string EffectiveDeepLearningTaskType(BuildPlanLoad load, string parameterStrategy)
+    {
+        if (parameterStrategy.Equals("deep_learning_classification", StringComparison.OrdinalIgnoreCase) ||
+            IsAttributeClassificationScenario(load))
+        {
+            return "ImageClassification";
+        }
+
+        return IsSemanticSegmentationScenario(load)
+            ? "SemanticSegmentation"
+            : "ObjectDetection";
+    }
+
+    private static bool IsSemanticSegmentationScenario(BuildPlanLoad load)
+    {
+        var taskType = EffectiveTaskType(load);
+        var text = $"{EffectiveValue(load, VisionAgentPlanAnswerFields.TargetAttribute)} {EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria)} {load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute?.RouteId}";
+        return taskType.Contains("segmentation", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("semantic segmentation", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("segmentation mask", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("pixel segmentation", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTraditionalNumericRule(string parameterStrategy)
