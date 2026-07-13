@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-07-13T11:08:41.4719739Z",
+  "GeneratedAtUtc": "2026-07-13T11:36:34.0995003Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -7765,7 +7765,7 @@
           "Name": "KernelSize",
           "DisplayName": "\u6838\u5927\u5C0F",
           "DataType": "int",
-          "Description": "Gaussian/Mean/Median \u4F7F\u7528\uFF1B\u5076\u6570\u4F1A\u5411\u4E0A\u8C03\u6574\u4E3A\u5947\u6570\u3002",
+          "Description": "Gaussian/Median \u8303\u56F4 1-31 \u4E14\u5076\u6570\u6838\u5411\u4E0A\u8C03\u6574\u4E3A\u5947\u6570\uFF1BMean/Box \u8303\u56F4 1-63 \u5E76\u4FDD\u7559\u914D\u7F6E\u5C3A\u5BF8\u3002",
           "DefaultValue": "5",
           "MinValue": "1",
           "MaxValue": "63",

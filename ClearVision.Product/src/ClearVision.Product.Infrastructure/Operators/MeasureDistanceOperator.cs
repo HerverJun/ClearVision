@@ -305,9 +305,9 @@ public class MeasureDistanceOperator : OperatorBase
 
     private OperatorExecutionOutput ExecuteThreePointAngle(Operator @operator, Dictionary<string, object>? inputs)
     {
-        if (!TryGetPoint(inputs, "PointA", out var pointA) ||
-            !TryGetPoint(inputs, "PointB", out var vertex) ||
-            !TryGetPoint(inputs, "PointC", out var pointC))
+        if (!TryGetAnglePoint(inputs, "PointA", out var pointA, out var pointASigmaPx) ||
+            !TryGetAnglePoint(inputs, "PointB", out var vertex, out var vertexSigmaPx) ||
+            !TryGetAnglePoint(inputs, "PointC", out var pointC, out var pointCSigmaPx))
         {
             return OperatorExecutionOutput.Failure("ThreePointAngle requires PointA, PointB and PointC");
         }
@@ -325,9 +325,6 @@ public class MeasureDistanceOperator : OperatorBase
 
         var value = angleUnit == AngleUnit.Radian ? radians : radians * 180.0 / Math.PI;
         var unit = angleUnit == AngleUnit.Radian ? "Radian" : "Degree";
-        var pointASigmaPx = MeasurementGeometryHelper.EstimatePointSigma(pointA);
-        var vertexSigmaPx = MeasurementGeometryHelper.EstimatePointSigma(vertex);
-        var pointCSigmaPx = MeasurementGeometryHelper.EstimatePointSigma(pointC);
         var uncertaintyDeg = MeasurementGeometryHelper.PropagateThreePointAngleUncertaintyDegrees(
             pointA,
             pointASigmaPx,
@@ -421,6 +418,25 @@ public class MeasureDistanceOperator : OperatorBase
         return inputs != null &&
                inputs.TryGetValue(key, out var raw) &&
                MeasurementGeometryHelper.TryParsePoint(raw, out point);
+    }
+
+    private static bool TryGetAnglePoint(
+        Dictionary<string, object>? inputs,
+        string key,
+        out Position point,
+        out double sigmaPx)
+    {
+        point = new Position(0, 0);
+        sigmaPx = 0.0;
+        if (inputs == null ||
+            !inputs.TryGetValue(key, out var raw) ||
+            !MeasurementGeometryHelper.TryParsePoint(raw, out point))
+        {
+            return false;
+        }
+
+        sigmaPx = MeasurementGeometryHelper.EstimateAnglePointSigma(raw, point);
+        return true;
     }
 
     private static bool TryGetLine(Dictionary<string, object>? inputs, string key, out LineData line)

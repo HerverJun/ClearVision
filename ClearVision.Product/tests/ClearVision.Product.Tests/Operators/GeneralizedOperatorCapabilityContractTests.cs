@@ -48,12 +48,9 @@ public sealed class GeneralizedOperatorCapabilityContractTests
             ]);
 
         VisionAgentReadOnlyCatalog.Schemas.Should().ContainKey("Filtering");
-        VisionAgentReadOnlyCatalog.Schemas["Filtering"].Parameters.Select(parameter => parameter.Name)
-            .Should().Contain("FilterMode");
-        VisionAgentReadOnlyCatalog.Schemas["Measurement"].InputPorts
-            .Should().Contain(["PointC", "Line1", "Line2"]);
-        VisionAgentReadOnlyCatalog.Schemas["DeepLearning"].Parameters.Select(parameter => parameter.Name)
-            .Should().Contain(["TaskType", "TopK", "SegmentationInputSize"]);
+        AssertAiSchemaMatchesMetadata(VisionAgentReadOnlyCatalog.Schemas["Filtering"], filtering);
+        AssertAiSchemaMatchesMetadata(VisionAgentReadOnlyCatalog.Schemas["Measurement"], measurement);
+        AssertAiSchemaMatchesMetadata(VisionAgentReadOnlyCatalog.Schemas["DeepLearning"], deepLearning);
     }
 
     [Fact]
@@ -148,5 +145,15 @@ public sealed class GeneralizedOperatorCapabilityContractTests
             DefaultValue = value,
             Value = value
         };
+    }
+
+    private static void AssertAiSchemaMatchesMetadata(
+        OperatorSchemaItem schema,
+        ClearVision.Product.Core.Services.OperatorMetadata metadata)
+    {
+        schema.InputPorts.Should().BeEquivalentTo(metadata.InputPorts.Select(port => port.Name));
+        schema.OutputPorts.Should().BeEquivalentTo(metadata.OutputPorts.Select(port => port.Name));
+        schema.Parameters.Select(parameter => parameter.Name)
+            .Should().BeEquivalentTo(metadata.Parameters.Select(parameter => parameter.Name));
     }
 }

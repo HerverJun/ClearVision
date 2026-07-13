@@ -390,7 +390,9 @@ public class OperatorService : IOperatorService
 
         foreach (var meta in factoryMetadata)
         {
-            if (Enum.TryParse<OperatorType>(meta.Type, out var type))
+            if (Enum.TryParse<OperatorType>(meta.Type, out var type) &&
+                (!OperatorMetadataCache.ContainsKey(type) ||
+                 type is OperatorType.Filtering or OperatorType.Measurement or OperatorType.DeepLearning))
             {
                 OperatorMetadataCache[type] = meta;
             }

@@ -216,7 +216,7 @@ public class AngleMeasurementOperator : OperatorBase
             return false;
         }
 
-        sigmaPx = MeasurementGeometryHelper.EstimatePointSigma(point);
+        sigmaPx = MeasurementGeometryHelper.EstimateAnglePointSigma(raw, point);
         return true;
     }
 

@@ -36,7 +36,7 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `FilterMode` | 滤波模式 | `enum` | Gaussian | Gaussian/高斯滤波；Mean/均值/Box滤波；Median/中值滤波；Bilateral/双边滤波 | Yes | 默认 Gaussian 保持旧流程行为。 |
-| `KernelSize` | Kernel Size | `int` | 5 | [1, 63] | Yes | Gaussian/Mean/Median 使用；偶数会向上调整为奇数。 |
+| `KernelSize` | Kernel Size | `int` | 5 | [1, 63] | Yes | Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。 |
 | `SigmaX` | Sigma X | `double` | 1 | [0.1, 10] | Yes | - |
 | `SigmaY` | Sigma Y | `double` | 0 | [0, 10] | Yes | - |
 | `BorderType` | Border Type | `enum` | 4 | 0/Constant；1/Replicate；2/Reflect；3/Wrap；4/Default | Yes | - |

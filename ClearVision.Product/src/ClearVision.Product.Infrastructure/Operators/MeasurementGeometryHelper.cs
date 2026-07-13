@@ -13,6 +13,18 @@ internal static class MeasurementGeometryHelper
         return HasFractionalComponent(point.X) || HasFractionalComponent(point.Y) ? 0.05 : 0.5;
     }
 
+    public static double EstimateAnglePointSigma(object? source, Position point)
+    {
+        return source switch
+        {
+            Position => 0.05,
+            Point2d => 0.05,
+            Point2f => 0.08,
+            Point => 0.5,
+            _ => EstimatePointSigma(point)
+        };
+    }
+
     public static double EstimateLineSigma(LineData line)
     {
         return HasFractionalComponent(line.StartX) ||
@@ -98,25 +110,21 @@ internal static class MeasurementGeometryHelper
         Position third,
         double thirdSigmaPx)
     {
-        var variables = new[] { first.X, first.Y, vertex.X, vertex.Y, third.X, third.Y };
-        var sigmas = new[]
+        var firstArmLength = Distance(first, vertex);
+        var secondArmLength = Distance(third, vertex);
+        if (firstArmLength < 1e-9 || secondArmLength < 1e-9)
         {
-            firstSigmaPx, firstSigmaPx,
-            vertexSigmaPx, vertexSigmaPx,
-            thirdSigmaPx, thirdSigmaPx
-        };
+            return double.NaN;
+        }
 
-        var uncertaintyRadians = PropagateCoordinateUncertainty(
-            variables,
-            sigmas,
-            values => ThreePointAngleRadians(
-                new Position(values[0], values[1]),
-                new Position(values[2], values[3]),
-                new Position(values[4], values[5])));
-
-        return double.IsFinite(uncertaintyRadians)
-            ? uncertaintyRadians * 180.0 / Math.PI
-            : double.NaN;
+        var firstArmSigma = Math.Sqrt(
+            (firstSigmaPx * firstSigmaPx) + (vertexSigmaPx * vertexSigmaPx));
+        var secondArmSigma = Math.Sqrt(
+            (thirdSigmaPx * thirdSigmaPx) + (vertexSigmaPx * vertexSigmaPx));
+        var uncertaintyRadians = Math.Sqrt(
+            Math.Pow(firstArmSigma / firstArmLength, 2) +
+            Math.Pow(secondArmSigma / secondArmLength, 2));
+        return uncertaintyRadians * 180.0 / Math.PI;
     }
 
     public static bool TryParsePoint(object? value, out Position point)

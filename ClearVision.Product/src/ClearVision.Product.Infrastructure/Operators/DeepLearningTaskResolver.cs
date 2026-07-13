@@ -135,12 +135,12 @@ internal static class DeepLearningTaskResolver
 
         if (dimensions.Count == 2)
         {
-            if (IsBatchDimension(dimensions[0]) && dimensions[1] > 1)
+            if (dimensions[0] == 1 && dimensions[1] > 1 && dimensions[1] is not (6 or 7))
             {
                 return DeepLearningTaskType.ImageClassification;
             }
 
-            if (dimensions[0] > 1 && dimensions[1] >= 6)
+            if (dimensions[0] > 1 && dimensions[1] is 6 or 7)
             {
                 return DeepLearningTaskType.ObjectDetection;
             }

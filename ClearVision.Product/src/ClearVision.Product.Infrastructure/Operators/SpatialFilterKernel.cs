@@ -73,16 +73,15 @@ internal static class SpatialFilterKernel
             return false;
         }
 
-        if (settings.Mode == SpatialFilterMode.Median)
+        if (settings.Mode is SpatialFilterMode.Gaussian or SpatialFilterMode.Median)
         {
             if (settings.KernelSize is < 1 or > 31)
             {
-                error = "KernelSize must be in [1, 31] for Median filtering.";
+                error = $"KernelSize must be in [1, 31] for {settings.Mode} filtering.";
                 return false;
             }
         }
-        else if ((settings.Mode is SpatialFilterMode.Gaussian or SpatialFilterMode.Mean) &&
-                 settings.KernelSize is < 1 or > 63)
+        else if (settings.Mode == SpatialFilterMode.Mean && settings.KernelSize is < 1 or > 63)
         {
             error = $"KernelSize must be in [1, 63] for {settings.Mode} filtering.";
             return false;
@@ -142,7 +141,9 @@ internal static class SpatialFilterKernel
             throw new ArgumentOutOfRangeException(nameof(settings), error);
         }
 
-        var kernelSize = NormalizeOddKernelSize(settings.KernelSize);
+        var kernelSize = settings.Mode == SpatialFilterMode.Mean
+            ? settings.KernelSize
+            : NormalizeOddKernelSize(settings.KernelSize);
         var borderType = (BorderTypes)settings.BorderType;
 
         switch (settings.Mode)

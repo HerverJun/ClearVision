@@ -27,7 +27,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("FilterMode", "实际滤波模式", PortDataType.String)]
 [OutputPort("FilterDiagnostics", "滤波诊断", PortDataType.Any)]
 [OperatorParam("FilterMode", "滤波模式", "enum", Description = "默认 Gaussian 保持旧流程行为。", DefaultValue = "Gaussian", Options = new[] { "Gaussian|高斯滤波", "Mean|均值/Box滤波", "Median|中值滤波", "Bilateral|双边滤波" })]
-[OperatorParam("KernelSize", "Kernel Size", "int", Description = "Gaussian/Mean/Median 使用；偶数会向上调整为奇数。", DefaultValue = 5, Min = 1, Max = 63)]
+[OperatorParam("KernelSize", "Kernel Size", "int", Description = "Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。", DefaultValue = 5, Min = 1, Max = 63)]
 [OperatorParam("SigmaX", "Sigma X", "double", DefaultValue = 1.0, Min = 0.1, Max = 10.0)]
 [OperatorParam("SigmaY", "Sigma Y", "double", DefaultValue = 0.0, Min = 0.0, Max = 10.0)]
 [OperatorParam(
@@ -152,9 +152,15 @@ public class GaussianBlurOperator : OperatorBase
             return ValidationResult.Invalid("FilterMode must be Gaussian, Mean, Box, Median or Bilateral.");
         }
 
+        var kernelSize = GetIntParam(@operator, "KernelSize", 5);
+        if (mode == SpatialFilterMode.Gaussian && kernelSize is < 1 or > 31)
+        {
+            return ValidationResult.Invalid("核大小必须在 1-31 之间");
+        }
+
         var settings = new SpatialFilterSettings(
             mode,
-            GetIntParam(@operator, "KernelSize", 5),
+            kernelSize,
             GetDoubleParam(@operator, "SigmaX", 1.0),
             GetDoubleParam(@operator, "SigmaY", 0.0),
             GetIntParam(@operator, "BorderType", 4),

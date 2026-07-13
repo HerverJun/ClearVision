@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T19:08:24.4997898\u002B08:00",
+  "generatedAt": "2026-07-13T19:43:16.5497367\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -323,6 +323,11 @@
           "version": "1.0.0",
           "sourceHash": "1DFC22FA6A4B143B6F325F064F7B5019BF731EACA2748A1E1A51E6CCBFAB3AD9",
           "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "1957ADB39B622A1ED8C46E8319341576FB9DBD29042F12D4F86857B6A7CC1FDE",
+          "recordedAt": "2026-07-13T19:31:36.3593491\u002B08:00"
         }
       ]
     },
@@ -2298,6 +2303,11 @@
           "version": "1.1.0",
           "sourceHash": "6E22F78869DDD7F0E74B42B4A442C3DB98615C6E3DA998E9C29A6168A203C0FB",
           "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "EE2D68C2F977767454570DD2F9CC01091E5E479C4CB64FECC342E04089BC86C5",
+          "recordedAt": "2026-07-13T19:31:36.3593491\u002B08:00"
         }
       ]
     },
@@ -2913,6 +2923,16 @@
           "version": "1.1.0",
           "sourceHash": "E0A97FB54B33F59D5D59D1006AC33ED3D40CEAB835DDE7299658F26BBC0DED6E",
           "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "01385017D3A60CC34EB06537EFD24B71C1ACBC4F09E84E2D1B805C6C23015878",
+          "recordedAt": "2026-07-13T19:31:36.3593491\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "47E1A288F2BAD17C18348C781DE8ACA7FC877A75BEE089DF96731F9C5F312A4E",
+          "recordedAt": "2026-07-13T19:36:09.4305891\u002B08:00"
         }
       ]
     },
@@ -5340,6 +5360,11 @@
           "version": "1.1.0",
           "sourceHash": "D7E2B739EC5EE5CF17AA7AFDB07BEDA1C2C02F946BF8318E73AC14C35E48E4B8",
           "recordedAt": "2026-07-13T19:08:24.4997898\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "5E984D5C3F8A25C260FD8F784140460751F974876A3168BA905AFFDD11F19F61",
+          "recordedAt": "2026-07-13T19:31:36.3593491\u002B08:00"
         }
       ]
     },

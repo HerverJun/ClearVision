@@ -92,6 +92,36 @@ public class AngleMeasurementOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithIntegerPositionInputs_ShouldPreserveLegacyPositionUncertainty()
+    {
+        var op = new Operator("angle", OperatorType.AngleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Unit", "Degree", "string"));
+        using var image = TestHelpers.CreateTestImage(width: 160, height: 120);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        var point1 = new Position(0, 0);
+        var vertex = new Position(10, 0);
+        var point3 = new Position(20, 10);
+        inputs["Point1"] = point1;
+        inputs["Point2"] = vertex;
+        inputs["Point3"] = point3;
+        const double positionSigmaPx = 0.05;
+        var firstArmLength = 10.0;
+        var secondArmLength = Math.Sqrt(200.0);
+        var armSigma = Math.Sqrt(2.0 * positionSigmaPx * positionSigmaPx);
+        var expectedUncertaintyDeg = Math.Sqrt(
+            Math.Pow(armSigma / firstArmLength, 2) +
+            Math.Pow(armSigma / secondArmLength, 2)) * 180.0 / Math.PI;
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToDouble(result.OutputData!["Angle"]).Should().BeApproximately(135.0, 1e-6);
+        Convert.ToDouble(result.OutputData["UncertaintyDeg"])
+            .Should().BeApproximately(expectedUncertaintyDeg, 1e-9);
+        (result.OutputData["Image"] as IDisposable)?.Dispose();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithLineInputs_ShouldPreserveSubpixelLineAngle()
     {
         var op = new Operator("angle", OperatorType.AngleMeasurement, 0, 0);

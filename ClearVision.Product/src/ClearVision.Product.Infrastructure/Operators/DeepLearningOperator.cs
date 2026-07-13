@@ -611,7 +611,7 @@ public class DeepLearningOperator : OperatorBase
             .ToArray();
     }
 
-    private static bool TryResolveSessionGpuMode(
+    private bool TryResolveSessionGpuMode(
         Operator @operator,
         string executionProvider,
         out bool useGpu,
@@ -622,7 +622,7 @@ public class DeepLearningOperator : OperatorBase
         switch (executionProvider.Trim().ToUpperInvariant())
         {
             case "AUTO":
-                useGpu = GetBoolParameter(@operator, "UseGpu", true);
+                useGpu = GetBoolParam(@operator, "UseGpu", true);
                 return true;
             case "CPU":
                 return true;
@@ -920,26 +920,37 @@ public class DeepLearningOperator : OperatorBase
             return catalogEntry.NumClasses;
         }
 
-        foreach (var metadata in session.OutputMetadata.Values)
+        var configuredClassNames = ParseClassNames(GetStringParam(@operator, "ClassNames", string.Empty));
+        if (configuredClassNames.Length > 1)
         {
-            var dimensions = metadata.Dimensions;
-            if (dimensions.Length != 4)
-            {
-                continue;
-            }
-
-            if (dimensions[1] > 1 && dimensions[2] > 1 && dimensions[3] > 1)
-            {
-                return dimensions[1];
-            }
-
-            if (dimensions[3] > 1 && dimensions[1] > 1 && dimensions[2] > 1)
-            {
-                return dimensions[3];
-            }
+            return configuredClassNames.Length;
         }
 
-        return configured;
+        var metadataClassNames = DeepLearningLabelResolver.GetMetadataLabels(session);
+        if (metadataClassNames.Length > 1)
+        {
+            return metadataClassNames.Length;
+        }
+
+        var inputLayout = ResolveTensorLayout(session.InputMetadata.Single().Value.Dimensions);
+        return InferSegmentationClassCountFromOutputShapes(
+            configured,
+            inputLayout == TensorLayout.Nchw,
+            GetOutputSignatures(session));
+    }
+
+    internal static int InferSegmentationClassCountFromOutputShapes(
+        int fallback,
+        bool channelsFirst,
+        IReadOnlyCollection<OnnxOutputSignature> outputSignatures)
+    {
+        var candidates = outputSignatures
+            .Where(signature => signature.Dimensions.Length == 4)
+            .Select(signature => signature.Dimensions[channelsFirst ? 1 : 3])
+            .Where(value => value > 1)
+            .Distinct()
+            .ToArray();
+        return candidates.Length == 1 ? candidates[0] : fallback;
     }
 
     private static DenseTensor<float> PreprocessClassification(
@@ -1257,13 +1268,6 @@ public class DeepLearningOperator : OperatorBase
             null,
             false,
             null));
-    }
-
-    private static bool GetBoolParameter(Operator @operator, string name, bool fallback)
-    {
-        var value = @operator.Parameters.FirstOrDefault(parameter =>
-            parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Value;
-        return value == null ? fallback : Convert.ToBoolean(value);
     }
 
     internal sealed record ClassificationPrediction(

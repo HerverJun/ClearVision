@@ -48,6 +48,16 @@ public class FilteringOperatorTests
     }
 
     [Fact]
+    public void ValidateParameters_MeanModeShouldAllowExtendedKernelRange()
+    {
+        var op = CreateOperator();
+        op.AddParameter(TestHelpers.CreateParameter("FilterMode", "Mean", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("KernelSize", 63, "int"));
+
+        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithoutImage_ShouldReturnFailure()
     {
         var result = await _operator.ExecuteAsync(CreateOperator(), new Dictionary<string, object>());
@@ -125,6 +135,43 @@ public class FilteringOperatorTests
         Cv2.Norm(unifiedOutput.MatReadOnly, professionalOutput.MatReadOnly, NormTypes.L1).Should().Be(0.0);
         unifiedResult.OutputData["FilterMode"].Should().Be(mode);
         unifiedResult.OutputData["FilterDiagnostics"].Should().BeAssignableTo<IDictionary<string, object>>();
+    }
+
+    [Fact]
+    public async Task MeanMode_WithEvenKernel_ShouldPreserveHistoricalBoxKernelSize()
+    {
+        var unifiedOperator = CreateOperator();
+        unifiedOperator.AddParameter(TestHelpers.CreateParameter("FilterMode", "Mean", "enum"));
+        unifiedOperator.AddParameter(TestHelpers.CreateParameter("KernelSize", 4, "int"));
+        unifiedOperator.AddParameter(TestHelpers.CreateParameter("BorderType", 4, "int"));
+        var professionalOperator = new Operator("Mean", OperatorType.MeanFilter, 0, 0);
+        professionalOperator.AddParameter(TestHelpers.CreateParameter("KernelSize", 4, "int"));
+        professionalOperator.AddParameter(TestHelpers.CreateParameter("BorderType", 4, "int"));
+        var professionalExecutor = new MeanFilterOperator(Substitute.For<ILogger<MeanFilterOperator>>());
+        using var unifiedImage = TestHelpers.CreateShapeTestImage();
+        using var professionalImage = TestHelpers.CreateShapeTestImage();
+        using var expected = new Mat();
+        Cv2.Blur(
+            unifiedImage.MatReadOnly,
+            expected,
+            new Size(4, 4),
+            new Point(-1, -1),
+            BorderTypes.Default);
+
+        var unifiedResult = await _operator.ExecuteAsync(
+            unifiedOperator,
+            TestHelpers.CreateImageInputs(unifiedImage));
+        var professionalResult = await professionalExecutor.ExecuteAsync(
+            professionalOperator,
+            TestHelpers.CreateImageInputs(professionalImage));
+
+        unifiedResult.IsSuccess.Should().BeTrue(unifiedResult.ErrorMessage);
+        professionalResult.IsSuccess.Should().BeTrue(professionalResult.ErrorMessage);
+        using var unifiedOutput = unifiedResult.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        using var professionalOutput = professionalResult.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        Cv2.Norm(unifiedOutput.MatReadOnly, expected, NormTypes.L1).Should().Be(0.0);
+        Cv2.Norm(professionalOutput.MatReadOnly, expected, NormTypes.L1).Should().Be(0.0);
+        unifiedResult.OutputData["KernelSizeApplied"].Should().Be(4);
     }
 
     [Fact]

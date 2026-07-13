@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T19:08:24.4997898+08:00",
+  "generatedAt": "2026-07-13T19:43:16.5497367+08:00",
   "totalCount": 158,
   "categories": {
     "3D": {
@@ -497,7 +497,7 @@
           "name": "KernelSize",
           "displayName": "Kernel Size",
           "dataType": "int",
-          "description": "Gaussian/Mean/Median 使用；偶数会向上调整为奇数。",
+          "description": "Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。",
           "defaultValue": "5",
           "min": "1",
           "max": "63",

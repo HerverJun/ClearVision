@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -48,6 +49,72 @@ public sealed class DeepLearningMultiTaskOperatorTests
 
         action.Should().Throw<InvalidOperationException>()
             .WithMessage("*could not reliably resolve*");
+    }
+
+    [Fact]
+    public void AutoTaskResolution_WithDynamicRankTwoDetectionShape_ShouldFailInsteadOfClassifying()
+    {
+        var action = () => DeepLearningTaskResolver.Resolve(
+            DeepLearningTaskType.Auto,
+            catalogType: null,
+            [new OnnxOutputSignature("detections", [-1, 6])]);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*could not reliably resolve*");
+    }
+
+    [Fact]
+    public void AutoTaskResolution_WithSingleSixValueRow_ShouldFailAsAmbiguous()
+    {
+        var action = () => DeepLearningTaskResolver.Resolve(
+            DeepLearningTaskType.Auto,
+            catalogType: null,
+            [new OnnxOutputSignature("output", [1, 6])]);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*could not reliably resolve*");
+    }
+
+    [Fact]
+    public void AutoTaskResolution_WithMultipleDetectionRows_ShouldResolveDetection()
+    {
+        var resolution = DeepLearningTaskResolver.Resolve(
+            DeepLearningTaskType.Auto,
+            catalogType: null,
+            [new OnnxOutputSignature("detections", [20, 6])]);
+
+        resolution.TaskType.Should().Be(DeepLearningTaskType.ObjectDetection);
+        resolution.Source.Should().Be("OutputShape");
+    }
+
+    [Theory]
+    [InlineData(true, new[] { 1, 3, 16, 16 }, 3)]
+    [InlineData(false, new[] { 1, 16, 16, 5 }, 5)]
+    public void SegmentationClassCountInference_ShouldRespectTensorLayout(
+        bool channelsFirst,
+        int[] outputShape,
+        int expectedClassCount)
+    {
+        var resolved = DeepLearningOperator.InferSegmentationClassCountFromOutputShapes(
+            fallback: 21,
+            channelsFirst,
+            [new OnnxOutputSignature("segmentation", outputShape)]);
+
+        resolved.Should().Be(expectedClassCount);
+    }
+
+    [Fact]
+    public void SegmentationClassCountInference_WithConflictingOutputs_ShouldKeepFallback()
+    {
+        var resolved = DeepLearningOperator.InferSegmentationClassCountFromOutputShapes(
+            fallback: 21,
+            channelsFirst: true,
+            [
+                new OnnxOutputSignature("primary", [1, 3, 16, 16]),
+                new OnnxOutputSignature("auxiliary", [1, 5, 8, 8])
+            ]);
+
+        resolved.Should().Be(21);
     }
 
     [Fact]
@@ -189,6 +256,19 @@ public sealed class DeepLearningMultiTaskOperatorTests
         ReplaceParameter(op, "Confidence", 2.0);
         ReplaceParameter(op, "NmsIouThreshold", 2.0);
         ReplaceParameter(op, "OutputFormat", "InvalidDetectionFormat");
+
+        var result = _sut.ValidateParameters(op);
+
+        result.IsValid.Should().BeTrue(string.Join("; ", result.Errors));
+    }
+
+    [Fact]
+    public void Validation_WithLegacyJsonBooleanUseGpu_ShouldPreserveHistoricalConversion()
+    {
+        var op = CreateDeepLearningOperator("ImageClassification", ClassificationModelPath());
+        ReplaceParameter(op, "ExecutionProvider", "Auto");
+        using var json = JsonDocument.Parse("false");
+        ReplaceParameter(op, "UseGpu", json.RootElement.Clone());
 
         var result = _sut.ValidateParameters(op);
 
