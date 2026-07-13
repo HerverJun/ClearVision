@@ -30,7 +30,6 @@ env:
   OPERATOR_SMOKE_TEST_PROJECT: ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj
   OPERATOR_BENCHMARK_PROJECT: quality/tools/OperatorPerformanceBenchmarkRunner/OperatorPerformanceBenchmarkRunner.csproj
   OPERATOR_PACKAGE_DIR: ClearVision.OperatorLibrary/nupkg
-  FRONTEND_V2_DIR: ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2
   PUBLISH_DIR: ./publish
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
@@ -168,21 +167,9 @@ jobs:
           cache: npm
           cache-dependency-path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
-            ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
-
-      - name: Install FrontendV2 Dependencies
-        working-directory: ${{ env.FRONTEND_V2_DIR }}
-        run: npm ci
-
-      - name: Run FrontendV2 Quality Gates
-        working-directory: ${{ env.FRONTEND_V2_DIR }}
-        run: |
-          npm run lint
-          npm run typecheck
-          npm run test:unit
 
       - name: Build (Debug)
-        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipFrontendV2Install=true
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
 
       - name: Run Product Tests with Coverage
         shell: pwsh
@@ -710,11 +697,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
-            ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
-
-      - name: Install FrontendV2 Dependencies
-        working-directory: ${{ env.FRONTEND_V2_DIR }}
-        run: npm ci
 
       - name: Get Version
         id: version
@@ -740,7 +722,6 @@ jobs:
             -p:PublishReadyToRun=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
-            -p:SkipFrontendV2Install=true `
             -p:Version=${{ steps.version.outputs.VERSION }} `
             -o "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}"
 

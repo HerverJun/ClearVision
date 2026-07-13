@@ -31,7 +31,7 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot, frontendV2WebRootPath: Path.Combine(_tempRoot, "missing-v2"));
+        Program.UseDesktopStaticAssets(app, legacyRoot);
         await app.StartAsync();
         try
         {
@@ -54,16 +54,13 @@ public sealed class ProgramStaticAssetsTests : IDisposable
     }
 
     [Fact]
-    public async Task UseDesktopStaticAssets_ShouldServeLegacyFromLegacyRootAndV2FromOutputRoot()
+    public async Task UseDesktopStaticAssets_ShouldServeLegacyIndexAndNestedAssetsFromLegacyRoot()
     {
         var legacyRoot = Path.Combine(_tempRoot, "legacy-wwwroot");
-        var legacyV2Root = Path.Combine(legacyRoot, "v2");
-        var outputV2Root = Path.Combine(_tempRoot, "output", "wwwroot", "v2");
-        Directory.CreateDirectory(legacyV2Root);
-        Directory.CreateDirectory(outputV2Root);
+        var nestedAsset = Path.Combine(legacyRoot, "src", "app.js");
+        Directory.CreateDirectory(Path.GetDirectoryName(nestedAsset)!);
         File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy-index");
-        File.WriteAllText(Path.Combine(legacyV2Root, "index.html"), "legacy-v2-index");
-        File.WriteAllText(Path.Combine(outputV2Root, "index.html"), "output-v2-index");
+        File.WriteAllText(nestedAsset, "legacy-app");
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -71,17 +68,17 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot, outputV2Root);
+        Program.UseDesktopStaticAssets(app, legacyRoot);
         await app.StartAsync();
         try
         {
             using var client = app.GetTestClient();
 
             var legacyIndex = await client.GetStringAsync("/index.html");
-            var v2Index = await client.GetStringAsync("/v2/index.html");
+            var legacyApp = await client.GetStringAsync("/src/app.js");
 
             legacyIndex.Should().Be("legacy-index");
-            v2Index.Should().Be("output-v2-index");
+            legacyApp.Should().Be("legacy-app");
         }
         finally
         {

@@ -374,20 +374,9 @@ static class Program
 
     internal static void UseDesktopStaticAssets(
         IApplicationBuilder app,
-        string? legacyWebRootPath = null,
-        string? frontendV2WebRootPath = null)
+        string? legacyWebRootPath = null)
     {
         ArgumentNullException.ThrowIfNull(app);
-
-        var resolvedFrontendV2WebRootPath = frontendV2WebRootPath ?? DesktopWebRootResolver.ResolveFrontendV2();
-        if (Directory.Exists(resolvedFrontendV2WebRootPath))
-        {
-            var frontendV2Provider = new PhysicalFileProvider(resolvedFrontendV2WebRootPath);
-            var frontendV2Options = CreateDesktopStaticFileOptions(frontendV2Provider);
-            frontendV2Options.RequestPath = StudioStartupPageResolver.FrontendV2BasePath;
-            app.UseStaticFiles(frontendV2Options);
-            Debug.WriteLine($"Studio 2.0 V2 静态资源目录: {resolvedFrontendV2WebRootPath}");
-        }
 
         var resolvedLegacyWebRootPath = legacyWebRootPath ?? DesktopWebRootResolver.Resolve();
         if (!Directory.Exists(resolvedLegacyWebRootPath))

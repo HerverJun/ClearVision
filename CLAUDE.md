@@ -27,8 +27,6 @@ Run the desktop app:
 & ".\ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 ```
 
-Skip the FrontendV2 npm build/install during .NET builds when you are not touching the Vue app: add `-p:SkipFrontendV2Install=true` (and/or `-p:SkipFrontendV2Build=true`).
-
 ### Tests — always serialize per project
 
 **Never run more than one `dotnet test` against the same `.csproj` at once.** Use the serial runner, which merges multiple filters into one invocation and holds a per-project lock:
@@ -41,13 +39,6 @@ Skip the FrontendV2 npm build/install during .NET builds when you are not touchi
 - Invoke it from the current shell with `& "./scripts/..."`; do **not** wrap it in `powershell.exe -File` (leaks child processes).
 - After the project has already built in this session, add `-NoBuild -NoRestore` to follow-up runs.
 - Prefer the fixed preset scripts when they match the task: `run-tests-services-regression.ps1`, `run-tests-plc-regression.ps1`, `run-tests-desktop-endpoints.ps1`, `run-tests-detection-regression.ps1`, `run-tests-measurement-performance.ps1`, `run-tests-phase42-regression.ps1`, and the other `run-tests-*.ps1` under `scripts/`.
-
-FrontendV2 quality gates (from `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2`):
-```powershell
-npm run lint
-npm run typecheck
-npm run test:unit
-```
 
 UI/Playwright tests live in `ClearVision.Product/tests/ClearVision.Product.UI.Tests` (`npm run test:unit`, `npm run test:preview-smoke`, `npx playwright test`).
 
@@ -89,11 +80,11 @@ Operators are **attribute-driven**. Each operator class in `Infrastructure/Opera
 
 When adding or changing an operator you typically touch: the operator class, the `OperatorType` enum (`Core/Enums/OperatorEnums.cs`), and DI registration. The **git pre-commit hook** (`.githooks/pre-commit`) auto-regenerates the operator catalog (`算子资料/算子目录.{json,md}`) via `scripts/OperatorDocGenerator` whenever operator sources, attributes, `OperatorEnums.cs`, or the generator change. Install hooks with `scripts/install-githooks.ps1`.
 
-### Frontend — two coexisting apps
+### Frontend
 
-The Desktop app can serve one of two frontends, selected by `StudioStartupPageResolver` based on `StudioOptions.WorkspaceV2Enabled`:
-- **Legacy** (`wwwroot/`, served at `/index.html`) — vanilla JS/CSS, no build step. `wwwroot/src/` (app.js, core/features/shared).
-- **FrontendV2** (`FrontendV2/`, served at `/v2/index.html`) — **Vue 3 + Pinia + Vite + TypeScript**, built by the Desktop csproj's MSBuild targets into the output. Source under `FrontendV2/src/` (flowEditor, workspace, project, api, host, etc.).
+- **Legacy** (`wwwroot/`, served at `/index.html`) remains the formal Desktop entry and rollback baseline. It is vanilla JS/CSS with source under `wwwroot/src/`.
+- **StudioUI** (`StudioUI/`) is the independent Vue 3 + TypeScript + Vite rebuild line. During F01 Prompt 1 its assets may be built into output/publish `wwwroot/studio/`, but it is not a Desktop startup choice until Prompt 2.
+- The retired migration prototype and `/v2` route are not compatibility targets and must not be recreated.
 
 `ClearVision.Product/UI.md` documents DOM IDs, CSS class names, HTTP endpoints, WebMessage types, and `data-*` attributes that the **legacy** JS depends on — treat those as a contract and do not rename/remove them without updating the JS.
 

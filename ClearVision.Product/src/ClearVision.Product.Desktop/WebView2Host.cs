@@ -41,20 +41,7 @@ public sealed class WebView2Host : IAsyncDisposable
         return new Uri($"http://localhost:{webPort}/index.html");
     }
 
-    internal static Uri CreateInitialPageUri(int webPort, bool workspaceV2Enabled)
-    {
-        var decision = new StudioStartupPageDecision(
-            workspaceV2Enabled ? StudioStartupPageKind.FrontendV2 : StudioStartupPageKind.Legacy,
-            workspaceV2Enabled,
-            workspaceV2Enabled ? StudioStartupPageResolver.FrontendV2PagePath : StudioStartupPageResolver.LegacyPagePath,
-            RequiredFilePath: null,
-            DiagnosticMessage: null);
-
-        return StudioStartupPageResolver.CreateInitialPageUri(webPort, decision);
-    }
-
     internal static string BuildStartupInjectionScript(
-        bool workspaceV2Enabled,
         string apiBaseUrl,
         string cssVersion,
         bool nodePreviewInspectorEnabled = false,
@@ -74,11 +61,9 @@ public sealed class WebView2Host : IAsyncDisposable
 
         var startup = new
         {
-            workspaceV2Enabled,
             nodePreviewInspectorEnabled,
             apiBaseUrl,
             hostKind = "desktop-webview2",
-            frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath,
             featureFlags = new Dictionary<string, bool>
             {
                 ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
@@ -263,7 +248,6 @@ public sealed class WebView2Host : IAsyncDisposable
         var apiBaseUrl = $"http://localhost:{apiPort}/api";
         var cssVersion = GenerateCssVersion();
         var initScript = BuildStartupInjectionScript(
-            _studioOptions.WorkspaceV2Enabled,
             apiBaseUrl,
             cssVersion,
             _studioOptions.NodePreviewInspectorEnabled,
@@ -424,7 +408,7 @@ public sealed class WebView2Host : IAsyncDisposable
     /// </summary>
     private void LoadInitialPage()
     {
-        var decision = StudioStartupPageResolver.Resolve(_studioOptions);
+        var decision = StudioStartupPageResolver.Resolve();
         if (decision.IsNavigable)
         {
             // Keep the WebView2 document and API calls on the same localhost
@@ -442,9 +426,7 @@ public sealed class WebView2Host : IAsyncDisposable
 
     private static string BuildStartupDiagnosticHtml(StudioStartupPageDecision decision)
     {
-        var title = decision.WorkspaceV2Enabled
-            ? "Studio 2.0 V2 启动失败"
-            : "ClearVision Product";
+        const string title = "ClearVision Product";
         var message = decision.DiagnosticMessage ?? "WebView2 已成功初始化，但未找到前端入口文件。";
 
         return $$"""
