@@ -607,10 +607,14 @@ export const aiPanelSessionHistoryMixin = {
                 optimisticAnswers: snapshot.optimisticPlanAnswers,
                 answerRevision: snapshot.answerRevision,
                 selections: snapshot.planQuestionSelections,
-                readiness: snapshot.appliedDowngraded ? null : normalizedPlan?.buildReadiness,
+                readiness: snapshot.appliedDowngraded ? null : (snapshot.readinessPreview?.buildReadiness || normalizedPlan?.buildReadiness),
                 readinessPreview: snapshot.appliedDowngraded ? null : (snapshot.readinessPreview || normalizedPlan?.effectiveReadiness),
-                readinessStatus: snapshot.appliedDowngraded ? 'idle' : (snapshot.readinessPreview || normalizedPlan ? 'ready' : 'idle'),
+                readinessStatus: snapshot.appliedDowngraded ? 'idle' : (snapshot.readinessPreview
+                    ? (snapshot.readinessPreview.buildReadiness?.canBuild === true ? 'ready' : 'blocked')
+                    : 'idle'),
+                missingResources: snapshot.missingResources,
                 resourceDecisions: snapshot.resourceDecisions,
+                resourceRevision: snapshot.resourceRevision,
                 run: {
                     plan: { runId: snapshot.planRunId || '', status: snapshot.planRunStatus || 'idle', events: [], eventKeys: {}, terminalSequence: snapshot.planTerminalSequence },
                     build: { runId: snapshot.buildRunId || '', status: snapshot.buildRunStatus || 'idle', events: [], eventKeys: {}, terminalSequence: snapshot.buildTerminalSequence }

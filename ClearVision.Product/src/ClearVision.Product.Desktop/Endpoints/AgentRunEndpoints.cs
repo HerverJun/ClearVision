@@ -1364,12 +1364,38 @@ public static class AgentRunEndpoints
                 Field = SanitizePlanToken(blocker.Field),
                 QuestionId = SanitizePlanToken(blocker.QuestionId),
                 ResolutionMode = SanitizePlanToken(blocker.ResolutionMode),
-                PublicLabel = SanitizePlanText(blocker.PublicLabel)
+                PublicLabel = SanitizePlanText(blocker.PublicLabel),
+                Resource = SanitizeResourceRequirement(blocker.Resource)
             }).ToList(),
             ResolvedFields = SanitizePlanList(readiness.ResolvedFields).Select(SanitizePlanToken).ToList(),
             RemainingFields = SanitizePlanList(readiness.RemainingFields).Select(SanitizePlanToken).ToList(),
             PrimaryMessage = SanitizePlanText(readiness.PrimaryMessage),
-            ContractVersion = SanitizePlanToken(readiness.ContractVersion)
+            ContractVersion = SanitizePlanToken(readiness.ContractVersion),
+            MissingResources = readiness.MissingResources
+                .Select(resource => SanitizeResourceRequirement(resource)!)
+                .ToList()
+        };
+    }
+
+    private static VisionAgentResourceRequirement? SanitizeResourceRequirement(VisionAgentResourceRequirement? resource)
+    {
+        return resource == null ? null : resource with
+        {
+            CanonicalId = SanitizePlanText(resource.CanonicalId),
+            ResourceType = SanitizePlanToken(resource.ResourceType),
+            ResourceName = SanitizePlanText(resource.ResourceName),
+            ResourceKey = SanitizePlanText(resource.ResourceKey),
+            OperatorKey = SanitizePlanText(resource.OperatorKey),
+            OperatorId = SanitizePlanToken(resource.OperatorId),
+            OperatorType = SanitizePlanToken(resource.OperatorType),
+            ParameterName = SanitizePlanToken(resource.ParameterName),
+            Status = SanitizePlanToken(resource.Status),
+            BlockingScope = SanitizePlanToken(resource.BlockingScope),
+            Source = SanitizePlanToken(resource.Source),
+            ResolutionTarget = SanitizePlanText(resource.ResolutionTarget),
+            DraftPolicy = SanitizePlanToken(resource.DraftPolicy),
+            Description = SanitizePlanText(resource.Description),
+            Aliases = resource.Aliases.Select(SanitizePlanText).Where(value => value.Length > 0).ToList()
         };
     }
 

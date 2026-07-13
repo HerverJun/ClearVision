@@ -44,6 +44,7 @@ internal sealed record BuildPlanLoad
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
     public IReadOnlyList<string> AcceptedDefaults { get; init; } = [];
     public bool AcceptedRecommendedDefaults { get; init; }
+    public IReadOnlyList<VisionAgentResourceDecision> ResourceDecisions { get; init; } = [];
     public string CurrentFlowSnapshot { get; init; } = string.Empty;
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
     public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();

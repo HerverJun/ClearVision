@@ -105,6 +105,23 @@ test('canonical answers layer confirmed server values under optimistic explicit 
   assert.equal(state.projection.answersByField.inspection_object.resolved, true);
 });
 
+test('authoritative readiness acknowledgement confirms answers without inventing a new answer revision', () => {
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
+    plan: plan()
+  }, { sessionId: 's1' });
+  state = reduce(state, AgentWorkspaceEventTypes.ANSWER_OPTIMISTIC_SET, {
+    answer: { questionId: 'q-task', field: 'task_type', value: 'surface_defect', origin: 'explicit_user_selection' }
+  });
+  const revision = state.answers.answerRevision;
+  state = reduce(state, AgentWorkspaceEventTypes.ANSWERS_CONFIRMED, {
+    answers: [{ questionId: 'q-task', field: 'task_type', value: 'surface_defect', origin: 'explicit_user_selection' }],
+    preserveRevision: true
+  });
+  assert.equal(state.answers.answerRevision, revision);
+  assert.equal(state.projection.confirmedAnswers[0].value, 'surface_defect');
+  assert.equal(state.projection.optimisticAnswers.length, 0);
+});
+
 test('custom and other controls are never accepted as business answers', () => {
   assert.equal(isPlaceholderAnswer('other'), true);
   assert.equal(isPlaceholderAnswer('custom_input'), true);
@@ -178,6 +195,75 @@ test('Build result MissingResources enter only the resource projection', () => {
   assert.equal(state.projection.clarificationQueue.some(item => item.resourceKey === 'camera:line-1'), false);
 });
 
+test('same canonical resource from Plan Readiness Build Result and Workspace is projected once', () => {
+  const canonicalId = 'resource:v1|camera_binding|imageacquisition#1|camera_binding_id';
+  const requirement = {
+    canonicalId,
+    resourceType: 'camera_binding',
+    resourceName: '相机绑定',
+    resourceKey: 'imageacquisition#1.CameraBindingId',
+    operatorKey: 'imageacquisition#1',
+    operatorType: 'ImageAcquisition',
+    operatorIndex: 0,
+    parameterName: 'CameraBindingId',
+    blockingScope: 'build',
+    draftPolicy: 'draft_allowed',
+    resolutionTarget: 'settings:cameras'
+  };
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
+    plan: plan({
+      missingResources: [{ ...requirement, source: 'plan' }],
+      buildReadiness: {
+        canBuild: false,
+        blockers: [{ id: 'resource_pending:camera', category: 'resource_pending', blocksBuild: true, resource: { ...requirement, source: 'readiness' } }],
+        missingResources: [{ ...requirement, source: 'readiness' }],
+        resolvedFields: [], remainingFields: [], primaryMessage: '相机绑定必须补齐。', contractVersion: 'v2'
+      }
+    })
+  }, { sessionId: 's1' });
+  state = reduce(state, AgentWorkspaceEventTypes.RESULT_RECEIVED, {
+    result: { missingResources: [{ ...requirement, resourceKey: 'op_acq.CameraBindingId', operatorId: 'op_acq', source: 'build_result' }] }
+  }, { planId: 'plan-1', planHash: 'hash-1' });
+  state = reduce(state, AgentWorkspaceEventTypes.RESOURCE_DECISION_SET, {
+    resource: requirement,
+    decision: { status: 'deferred', source: 'user_deferred' }
+  }, { planId: 'plan-1', planHash: 'hash-1' });
+
+  assert.equal(state.projection.missingResources.length, 1);
+  assert.equal(state.projection.missingResources[0].canonicalId, canonicalId);
+  const sources = new Set(state.projection.missingResources[0].sources);
+  ['plan', 'readiness', 'build_result', 'build_readiness', 'workspace'].forEach(source => assert.equal(sources.has(source), true));
+  assert.equal(state.resources.revision, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(state.resources.missingByKey[canonicalId], 'raw'), false);
+  assert.ok(JSON.stringify(state.resources.missingByKey[canonicalId]).length < 2000);
+});
+
+test('same resource type on different operator identities or parameters never merges', () => {
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
+    plan: plan({
+      missingResources: [
+        { canonicalId: 'resource:v1|model_resource|onnxinference#1|modelpath', resourceType: 'model_resource', operatorKey: 'onnxinference#1', parameterName: 'ModelPath' },
+        { canonicalId: 'resource:v1|model_resource|onnxinference#2|modelpath', resourceType: 'model_resource', operatorKey: 'onnxinference#2', parameterName: 'ModelPath' },
+        { canonicalId: 'resource:v1|model_resource|onnxinference#1|labelspath', resourceType: 'model_resource', operatorKey: 'onnxinference#1', parameterName: 'LabelsPath' }
+      ]
+    })
+  }, { sessionId: 's1' });
+  assert.equal(state.projection.missingResources.length, 3);
+});
+
+test('readiness status distinguishes blocked failed timeout and active validation', () => {
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, { plan: plan() }, { sessionId: 's1' });
+  assert.equal(state.readinessStatus, 'blocked');
+  state = reduce(state, AgentWorkspaceEventTypes.READINESS_REQUESTED, { requestId: 'r1', startedAt: 1 }, { planId: 'plan-1', planHash: 'hash-1' });
+  assert.equal(state.readinessStatus, 'validating');
+  assert.equal(state.readinessRequest.requestId, 'r1');
+  state = reduce(state, AgentWorkspaceEventTypes.READINESS_FAILED, { message: 'timeout', status: 'timeout' }, { planId: 'plan-1', planHash: 'hash-1' });
+  assert.equal(state.readinessStatus, 'timeout');
+  assert.equal(state.readinessRequest, null);
+  state = reduce(state, AgentWorkspaceEventTypes.READINESS_FAILED, { message: 'failed' }, { planId: 'plan-1', planHash: 'hash-1' });
+  assert.equal(state.readinessStatus, 'failed');
+});
+
 test('run reducer drops duplicate events and ignores nonterminal events after a terminal event', () => {
   let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.RUN_STARTED, { kind: 'build', runId: 'run-1' }, { sessionId: 's1' });
   const started = { runId: 'run-1', sequence: 1, eventType: 'run.started' };
@@ -224,6 +310,9 @@ test('session restoration atomically restores plan, result, answers, run, and pe
       build: { runId: 'build-run', status: 'failed', events: [], eventKeys: {}, terminalSequence: 11 }
     },
     persistence: { snapshotRevision: 9, buildRunId: 'build-run' },
+    missingResources: [{ canonicalId: 'resource:v1|camera_binding|imageacquisition#1|camera_binding_id', resourceType: 'camera_binding', operatorKey: 'imageacquisition#1', parameterName: 'CameraBindingId' }],
+    resourceDecisions: { 'resource:v1|camera_binding|imageacquisition#1|camera_binding_id': { status: 'deferred' } },
+    resourceRevision: 4,
     ui: { workspaceMode: 'build', viewMode: 'build' }
   });
 
@@ -234,4 +323,6 @@ test('session restoration atomically restores plan, result, answers, run, and pe
   assert.equal(restored.run.build.runId, 'build-run');
   assert.equal(restored.persistence.snapshotRevision, 9);
   assert.equal(restored.ui.viewMode, 'build');
+  assert.equal(restored.resources.revision, 4);
+  assert.equal(restored.projection.missingResources.find(item => item.resourceType === 'camera_binding').deferred, true);
 });

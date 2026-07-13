@@ -6,6 +6,7 @@ import {
     shouldIncludePendingParameter
 } from '../../shared/parameterDependencyRules.js';
 import { partitionPendingParameters } from './aiPendingParameterPartition.js';
+import { mergeCanonicalResources, normalizeCanonicalResource } from './aiResourceIdentity.js';
 
 export const aiPanelPendingParametersMixin = {
     _renderParameterDraftEditor(data, flow = null) {
@@ -1784,34 +1785,9 @@ export const aiPanelPendingParametersMixin = {
 
     _normalizeMissingResources(items) {
         if (!Array.isArray(items)) return [];
-
-        return items
-            .map(item => {
-                const resourceKey = String(item?.resourceKey ?? item?.ResourceKey ?? '').trim();
-                const actualOperatorId = String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim();
-                const operatorId = String(
-                    item?.operatorId ??
-                    item?.OperatorId ??
-                    item?.tempId ??
-                    item?.TempId ??
-                    ''
-                ).trim() || this._inferPendingOperatorIdFromResourceKey(resourceKey) || actualOperatorId;
-                const parameterName = String(
-                    item?.parameterName ??
-                    item?.ParameterName ??
-                    this._inferPendingParameterNameFromResourceKey(resourceKey) ??
-                    ''
-                ).trim();
-                return {
-                    resourceType: String(item?.resourceType ?? item?.ResourceType ?? '').trim(),
-                    resourceKey,
-                    description: String(item?.description ?? item?.Description ?? '').trim(),
-                    operatorId,
-                    actualOperatorId,
-                    parameterName
-                };
-            })
-            .filter(item => item.resourceType || item.resourceKey || item.description);
+        return mergeCanonicalResources(items.map(item => normalizeCanonicalResource(item, {
+            source: item?.source || item?.Source || 'missing_resource'
+        }))).filter(item => item.resourceType || item.resourceKey || item.description);
     },
 
     _inferPendingOperatorIdFromResourceKey(resourceKey) {

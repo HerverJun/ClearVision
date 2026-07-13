@@ -1,0 +1,1471 @@
+{
+  "interfaceResponse": {
+    "planId": "plan_5dd0de7a21de432db887c8f6aa41447d",
+    "planHash": "sha256:f2f79f3a42d752c2b68e1ab2831f45a90ff00594ac08e85634d7b219b8cc19bd",
+    "requirementMode": "strict",
+    "answerRevision": 5,
+    "acceptedAnswers": [
+      {
+        "questionId": "",
+        "field": "acceptance_criteria",
+        "value": "visible_damage_is_ng",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "questionId": "",
+        "field": "defect_type",
+        "value": "visible damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "questionId": "",
+        "field": "image_source",
+        "value": "station_camera",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "questionId": "",
+        "field": "inspection_object",
+        "value": "packaging_box_surface",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "questionId": "",
+        "field": "output_target",
+        "value": "local_structured_result",
+        "origin": "explicit_user_selection",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "questionId": "",
+        "field": "task_type",
+        "value": "surface_or_pose_defect",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      }
+    ],
+    "answerSetFingerprint": "sha256:c64ee9fe47b7a3fee69f7e90e75e79b772397f5e8bd1c7e18d889d37fe2fe669",
+    "buildReadiness": {
+      "canBuild": false,
+      "blockers": [
+        {
+          "id": "resource_pending:stationcameraconfigurationoridentifier",
+          "category": "resource_pending",
+          "field": "",
+          "questionId": "",
+          "blocksBuild": true,
+          "resolutionMode": "provide_resource",
+          "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+        },
+        {
+          "id": "resource_pending:localoutputdestinationandformat",
+          "category": "resource_pending",
+          "field": "",
+          "questionId": "",
+          "blocksBuild": true,
+          "resolutionMode": "provide_resource",
+          "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+        },
+        {
+          "id": "hard_requirement:algorithm_strategy_missing",
+          "category": "hard_requirement",
+          "field": "algorithm_strategy",
+          "questionId": "q_fallback_algorithm_strategy",
+          "blocksBuild": true,
+          "resolutionMode": "answer_question",
+          "publicLabel": "还缺：构建策略"
+        },
+        {
+          "id": "resource_pending:camera_binding",
+          "category": "resource_pending",
+          "field": "image_source",
+          "questionId": "",
+          "blocksBuild": true,
+          "resolutionMode": "provide_resource",
+          "publicLabel": "资源仍待绑定，当前模式下不能开始构建。"
+        }
+      ],
+      "resolvedFields": [
+        "acceptance_criteria",
+        "defect_type",
+        "image_source",
+        "inspection_object",
+        "output_target",
+        "task_type"
+      ],
+      "remainingFields": [
+        "algorithm_strategy"
+      ],
+      "primaryMessage": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+      "contractVersion": "v2"
+    },
+    "deferredQuestionIds": [],
+    "pendingConfirmationCount": 2,
+    "resourcePendingCount": 3,
+    "hardBlockerCount": 1,
+    "contractValid": true,
+    "failureCode": "",
+    "failureMessage": "",
+    "metadataOnly": true
+  },
+  "request": {
+    "planId": "plan_5dd0de7a21de432db887c8f6aa41447d",
+    "planHash": "sha256:f2f79f3a42d752c2b68e1ab2831f45a90ff00594ac08e85634d7b219b8cc19bd",
+    "workspaceExpectedRevision": 0,
+    "planSnapshot": {
+      "planContractVersion": "v2",
+      "planId": "plan_5dd0de7a21de432db887c8f6aa41447d",
+      "planHash": "sha256:f2f79f3a42d752c2b68e1ab2831f45a90ff00594ac08e85634d7b219b8cc19bd",
+      "planSource": "model_planner",
+      "currentPhase": "planning",
+      "fallbackReason": "",
+      "plannerFailureStage": "",
+      "plannerFailureCode": "",
+      "sanitizedErrorKind": "",
+      "sanitizedErrorMessage": "",
+      "originalUserPrompt": "Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.",
+      "goal": "Inspect packaging surfaces for visible damage and produce a local OK/NG result.",
+      "intent": "surface_defect",
+      "confidence": "high",
+      "requirementUnderstanding": [
+        "The inspection object is a packaging surface.",
+        "The target attribute is surface condition.",
+        "Visible surface damage is NG.",
+        "No visible surface damage is OK.",
+        "Images are expected from a station camera.",
+        "Results should remain local."
+      ],
+      "confirmedPlanAnswers": [
+        {
+          "questionId": "",
+          "field": "inspection_object",
+          "value": "packaging surface",
+          "origin": "explicit_user_text",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "task_type",
+          "value": "surface_or_pose_defect",
+          "origin": "explicit_user_text",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "image_source",
+          "value": "station_camera",
+          "origin": "explicit_user_text",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "acceptance_criteria",
+          "value": "OK: No visible surface damage; NG: Visible surface damage",
+          "origin": "explicit_user_text",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "defect_type",
+          "value": "visible damage",
+          "origin": "explicit_user_text",
+          "confidence": 1,
+          "resolved": true
+        }
+      ],
+      "resolvedPlanFields": [
+        "inspection_object",
+        "task_type",
+        "image_source",
+        "acceptance_criteria",
+        "defect_type"
+      ],
+      "remainingPlanFields": [
+        "output_target",
+        "algorithm_strategy"
+      ],
+      "recommendedRoute": {
+        "routeId": "surface_defect_inspection",
+        "title": "Packaging surface damage inspection",
+        "summary": "Use a station-camera image, define an inspection ROI, evaluate surface defects, convert the evaluation to OK/NG, and keep the result in local output.",
+        "operators": [
+          "ImageAcquisition",
+          "RoiManager",
+          "SurfaceDefectDetection",
+          "ResultJudgment",
+          "ResultOutput"
+        ],
+        "templateDecision": "planner_route"
+      },
+      "clarificationQuestions": [
+        {
+          "id": "q_fallback_output_target",
+          "field": "output_target",
+          "title": "结果输出目标说明",
+          "why": "流程规划需要明确 结果输出目标说明。",
+          "defaultValue": "output_pending",
+          "defaultAssumption": "暂无安全默认输出目标，推荐保持待确认；该选择不视为已解决字段。",
+          "impact": "缺少此字段将阻碍流程的自动构建。",
+          "options": [
+            {
+              "value": "output_pending",
+              "label": "保持输出目标待确认",
+              "recommended": true,
+              "answerEffect": "defer",
+              "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+              "description": "不猜测 PLC、网络或文件输出，先保留为待确认输出。",
+              "impact": "不会解除构建或部署前的输出阻断。"
+            },
+            {
+              "value": "local_result",
+              "label": "本地结构化结果",
+              "recommended": false,
+              "answerEffect": "resolve_field",
+              "recommendationReason": "",
+              "description": "仅输出本地结果字段。",
+              "impact": "适合早期验证，避免不安全外部写入。"
+            },
+            {
+              "value": "plc_pending",
+              "label": "PLC 输出待确认",
+              "recommended": false,
+              "answerEffect": "defer",
+              "recommendationReason": "",
+              "description": "保留 PLC 地址、握手和失效保护为待确认元数据。",
+              "impact": "需要工程师确认后才能部署。"
+            }
+          ]
+        },
+        {
+          "id": "q_fallback_algorithm_strategy",
+          "field": "algorithm_strategy",
+          "title": "算法策略说明",
+          "why": "流程规划需要明确 算法策略说明。",
+          "defaultValue": "strategy_pending",
+          "defaultAssumption": "暂无安全默认算法策略，推荐保持待确认；该选择不视为已解决字段。",
+          "impact": "缺少此字段将阻碍流程的自动构建。",
+          "options": [
+            {
+              "value": "strategy_pending",
+              "label": "保持算法策略待确认",
+              "recommended": true,
+              "answerEffect": "defer",
+              "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+              "description": "不默认选择规则、模板或模型，先保留策略确认。",
+              "impact": "不会解除构建阻断。"
+            },
+            {
+              "value": "traditional_rule",
+              "label": "优先规则/几何算法",
+              "recommended": false,
+              "answerEffect": "resolve_field",
+              "recommendationReason": "",
+              "description": "目标特征稳定、可测量且用户确认时使用。",
+              "impact": "不适合外观变化大或需模型识别的任务。"
+            },
+            {
+              "value": "model_pending",
+              "label": "模型资源待确认",
+              "recommended": false,
+              "answerEffect": "defer",
+              "recommendationReason": "",
+              "description": "规划模型算子，但模型资源仍待绑定。",
+              "impact": "构建或部署前需要模型元数据。"
+            }
+          ]
+        }
+      ],
+      "recommendedDefaults": [
+        {
+          "id": "metadata_only",
+          "label": "仅公开诊断",
+          "value": "redacted_metadata",
+          "impact": "不会暴露原始路径、图像字节、令牌、提示词或工站网络细节。"
+        },
+        {
+          "id": "algorithm_strategy",
+          "label": "Initial detection strategy",
+          "value": "traditional_surface_defect_pending",
+          "impact": "Provides a suitable initial route for visible damage without assuming that a trained model is available."
+        },
+        {
+          "id": "output_target",
+          "label": "Output handling",
+          "value": "local_output_pending",
+          "impact": "Keeps output local while leaving the exact format and destination configurable."
+        },
+        {
+          "id": "inspection_roi",
+          "label": "Inspection region",
+          "value": "packaging_surface_roi_pending",
+          "impact": "Limits evaluation to the packaging surface after the camera view is configured."
+        }
+      ],
+      "risks": [
+        "Specific damage categories and severity thresholds are not defined.",
+        "The station camera identifier and configuration are not available for readiness validation.",
+        "The exact local output format and destination are not defined.",
+        "Detection performance requires representative OK and NG samples before production use."
+      ],
+      "acceptanceCriteria": [
+        "A packaging surface with visible damage produces an NG result.",
+        "A packaging surface with no visible damage produces an OK result.",
+        "The inspection evaluates only the configured packaging-surface region.",
+        "Results remain local and do not use PLC, network, or external communication output.",
+        "Detection thresholds and behavior are verified against representative samples before deployment."
+      ],
+      "executablePlan": [
+        "Configure the station-camera image source.",
+        "Define and name the packaging-surface ROI.",
+        "Configure surface-defect detection for visible damage.",
+        "Map detected damage to an NG judgment and no detected damage to an OK judgment.",
+        "Configure local result output after the destination and format are provided.",
+        "Run readiness checks with representative OK and NG samples.",
+        "Review the editable draft before any deployment decision."
+      ],
+      "canBuild": false,
+      "blockingReasons": [
+        "resource_pending:stationcameraconfigurationoridentifier",
+        "resource_pending:localoutputdestinationandformat",
+        "hard_requirement:algorithm_strategy_missing"
+      ],
+      "buildReadiness": {
+        "canBuild": false,
+        "blockers": [
+          {
+            "id": "resource_pending:stationcameraconfigurationoridentifier",
+            "category": "resource_pending",
+            "field": "",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "provide_resource",
+            "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+          },
+          {
+            "id": "contract_warning:strategy_pendingdetectionstrategyanddamagethresholdconfirmation",
+            "category": "contract_warning",
+            "field": "",
+            "questionId": "",
+            "blocksBuild": false,
+            "resolutionMode": "non_blocking",
+            "publicLabel": "规划返回了无法映射到问题的策略确认项，已作为诊断保留。"
+          },
+          {
+            "id": "resource_pending:localoutputdestinationandformat",
+            "category": "resource_pending",
+            "field": "",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "provide_resource",
+            "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+          },
+          {
+            "id": "hard_requirement:algorithm_strategy_missing",
+            "category": "hard_requirement",
+            "field": "algorithm_strategy",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "answer_question",
+            "publicLabel": "还缺：构建策略"
+          }
+        ],
+        "resolvedFields": [
+          "acceptance_criteria",
+          "defect_type",
+          "image_source",
+          "inspection_object",
+          "task_type"
+        ],
+        "remainingFields": [
+          "algorithm_strategy",
+          "output_target"
+        ],
+        "primaryMessage": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+        "contractVersion": "v2"
+      },
+      "semanticExtraction": {
+        "isVisionRequest": true,
+        "intent": "unknown",
+        "taskType": "surface_defect",
+        "confidence": 0.98,
+        "taskTypeConfidence": 0.99,
+        "inspectionObject": "packaging surface",
+        "targetAttribute": "surface condition",
+        "defectType": "visible damage",
+        "measurementTarget": "",
+        "imageSource": "station camera",
+        "okCondition": "No visible surface damage",
+        "ngCondition": "Visible surface damage",
+        "outputTarget": "local output",
+        "suggestedRoute": "surface_defect_inspection",
+        "canPlanCandidate": true,
+        "canBuildCandidate": false,
+        "objectSignals": [
+          "packaging",
+          "surface",
+          "packaging surface"
+        ],
+        "taskSignals": [
+          "inspect",
+          "visible damage",
+          "NG on damage",
+          "local output",
+          "surface condition",
+          "No visible surface damage",
+          "Visible surface damage"
+        ],
+        "missingFields": [
+          "specific_damage_types",
+          "camera_or_station_identifier",
+          "local_output_format_or_destination"
+        ],
+        "clarificationQuestions": [
+          "Which damage types should be detected?",
+          "Which station camera should be used?",
+          "What local output format or destination is required?"
+        ],
+        "source": "model",
+        "failureCode": "",
+        "sanitizedErrorMessage": "",
+        "metadataOnly": true
+      },
+      "requirementMaturity": {
+        "maturity": "actionable",
+        "taskType": "surface_defect",
+        "canPlan": true,
+        "canBuild": true,
+        "objectSignals": [
+          "packaging",
+          "surface",
+          "packaging surface"
+        ],
+        "taskSignals": [
+          "inspect",
+          "visible damage",
+          "NG on damage",
+          "local output",
+          "surface condition",
+          "No visible surface damage",
+          "Visible surface damage",
+          "surface_defect"
+        ],
+        "missingFields": [
+          "output_target",
+          "algorithm_strategy"
+        ],
+        "blockingReasons": [],
+        "publicReason": "语义抽取结果已明确到可规划视觉流程。",
+        "metadataOnly": true
+      },
+      "decisionTrace": {
+        "rawUserText": "Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.",
+        "turnIntent": "actionable_vision_plan",
+        "interactionState": "planning",
+        "businessSignalsHit": [
+          "inspect"
+        ],
+        "newFlowSignalsHit": [],
+        "taskTypeSignalsHit": [
+          "inspect",
+          "visible damage",
+          "NG on damage",
+          "local output",
+          "surface condition",
+          "No visible surface damage",
+          "Visible surface damage",
+          "surface_defect"
+        ],
+        "objectSignalsHit": [
+          "packaging",
+          "surface",
+          "packaging surface"
+        ],
+        "maturityLevel": "actionable",
+        "taskType": "surface_defect",
+        "canPlan": true,
+        "canBuild": true,
+        "fallbackReason": "",
+        "blockingReasons": [],
+        "metadataOnly": true
+      },
+      "nextAction": "Provide the station-camera resource and local output specification, confirm the detection strategy, then build the editable draft.",
+      "contextSummary": {
+        "hasCurrentFlow": false,
+        "hasCurrentResult": false,
+        "attachmentCount": 0,
+        "templateSelectionMode": "",
+        "templateId": "",
+        "contextKinds": [
+          "user_requirement",
+          "new_flow",
+          "no_current_result",
+          "template_catalog",
+          "operator_catalog",
+          "station_boundary"
+        ],
+        "operatorCatalogTools": [
+          "capture_test_frame",
+          "dryrun_flow",
+          "get_flow_template_skeleton",
+          "get_operator_schema",
+          "inspect_current_flow",
+          "list_operator_catalog",
+          "match_flow_template",
+          "replay_flow_with_frame",
+          "retrieve_operator_knowledge",
+          "runtime_package_precheck",
+          "runtime_preview_simulate_metadata_session",
+          "validate_flow"
+        ]
+      },
+      "operatorCatalogVersion": "vision-agent-tools:12:76ad4d8d5dfd",
+      "templateCatalogVersion": "metadata-template-catalog.v1",
+      "templateSelection": null,
+      "stationBoundarySummary": "仅元数据工站边界；规划阶段不会触碰相机、PLC、文件系统或网络资源。",
+      "plcOutputPolicy": "优先本地结果输出；构建就绪复核前保持 PLC 写入禁用。",
+      "planWarnings": [],
+      "contractRepairNotes": [
+        "clarification_questions_repaired_to_baseline",
+        "metadata_only_default_added",
+        "plan_build_readiness_blocked"
+      ],
+      "publicEvents": [
+        {
+          "stage": "semantic_extraction",
+          "status": "running",
+          "title": "语义抽取已开始",
+          "summary": "正在抽取视觉需求语义槽位。",
+          "metadata": {
+            "metadataOnly": "true"
+          },
+          "metadataOnly": true
+        },
+        {
+          "stage": "semantic_extraction",
+          "status": "completed",
+          "title": "语义抽取完成",
+          "summary": "语义理解来自模型，已生成公开结构化摘要。",
+          "metadata": {
+            "semanticSource": "model",
+            "taskType": "surface_defect",
+            "inspectionObject": "packaging surface",
+            "targetAttribute": "surface condition",
+            "okCondition": "No visible surface damage",
+            "ngCondition": "Visible surface damage",
+            "imageSource": "station camera",
+            "missingFields": "specific damage types,camera or station identifier,local output format or destination",
+            "metadataOnly": "true"
+          },
+          "metadataOnly": true
+        },
+        {
+          "stage": "collecting_context",
+          "status": "completed",
+          "title": "上下文收集完成",
+          "summary": "已收集公开需求、流程、模板、附件、算子和工站边界元数据。",
+          "metadata": {
+            "hasCurrentFlow": "false",
+            "attachmentCount": "0",
+            "templateSelectionMode": ""
+          },
+          "metadataOnly": true
+        },
+        {
+          "stage": "planning_with_model",
+          "status": "started",
+          "title": "模型规划已开始",
+          "summary": "模型正在生成结构化 PlanModeResult 候选。",
+          "metadata": {
+            "modelRole": "planner",
+            "metadataOnly": "true"
+          },
+          "metadataOnly": true
+        },
+        {
+          "stage": "planning_with_model",
+          "status": "completed",
+          "title": "模型规划候选已返回",
+          "summary": "模型已返回公开结构化候选，等待校验。",
+          "metadata": {},
+          "metadataOnly": true
+        },
+        {
+          "stage": "validating_plan_contract",
+          "status": "started",
+          "title": "校验规划契约",
+          "summary": "正在校验 JSON 结构、问题质量、算子目录和模板约束。",
+          "metadata": {},
+          "metadataOnly": true
+        },
+        {
+          "stage": "validating_plan_contract",
+          "status": "completed",
+          "title": "规划契约已校验",
+          "summary": "模型规划已归一到公开 PlanModeResult 契约。",
+          "metadata": {
+            "repairCount": "3",
+            "warningCount": "0"
+          },
+          "metadataOnly": true
+        },
+        {
+          "stage": "applying_safety_constraints",
+          "status": "completed",
+          "title": "安全约束已应用",
+          "summary": "已应用脱敏、元数据边界、资源占位和 PLC 安全策略。",
+          "metadata": {},
+          "metadataOnly": true
+        },
+        {
+          "stage": "plan_ready",
+          "status": "completed",
+          "title": "规划已就绪",
+          "summary": "Planner 规划已就绪，等待用户确认。",
+          "metadata": {},
+          "metadataOnly": true
+        }
+      ],
+      "metadataOnly": true
+    },
+    "confirmedAnswers": [
+      {
+        "questionId": "",
+        "field": "acceptance_criteria",
+        "value": "visible_damage_is_ng",
+        "origin": "explicit_user_text"
+      },
+      {
+        "questionId": "",
+        "field": "defect_type",
+        "value": "visible damage",
+        "origin": "explicit_user_text"
+      },
+      {
+        "questionId": "",
+        "field": "image_source",
+        "value": "station_camera",
+        "origin": "explicit_user_text"
+      },
+      {
+        "questionId": "",
+        "field": "inspection_object",
+        "value": "packaging_box_surface",
+        "origin": "explicit_user_text"
+      },
+      {
+        "questionId": "",
+        "field": "output_target",
+        "value": "local_structured_result",
+        "origin": "explicit_user_selection"
+      },
+      {
+        "questionId": "",
+        "field": "task_type",
+        "value": "surface_or_pose_defect",
+        "origin": "explicit_user_text"
+      }
+    ],
+    "userSelections": {
+      "q_fallback_output_target": "local_structured_result"
+    },
+    "acceptedDefaults": [],
+    "currentFlowSnapshot": null,
+    "templateSelection": null,
+    "attachmentSummary": {
+      "count": 0,
+      "resourceKinds": [],
+      "pathsRedacted": true
+    },
+    "operatorCatalogVersion": "vision-agent-tools:12:76ad4d8d5dfd",
+    "stationBoundarySummary": "仅元数据工站边界；规划阶段不会触碰相机、PLC、文件系统或网络资源。",
+    "plcOutputPolicy": "优先本地结果输出；构建就绪复核前保持 PLC 写入禁用。",
+    "buildIntent": "new",
+    "originalUserPrompt": "Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.",
+    "acceptedRecommendedDefaults": false,
+    "requirementMaturity": {
+      "maturity": "actionable",
+      "taskType": "surface_defect",
+      "canPlan": true,
+      "canBuild": true,
+      "objectSignals": [
+        "packaging",
+        "surface",
+        "packaging surface"
+      ],
+      "taskSignals": [
+        "inspect",
+        "visible damage",
+        "NG on damage",
+        "local output",
+        "surface condition",
+        "No visible surface damage",
+        "Visible surface damage",
+        "surface_defect"
+      ],
+      "missingFields": [
+        "output_target",
+        "algorithm_strategy"
+      ],
+      "blockingReasons": [],
+      "publicReason": "语义抽取结果已明确到可规划视觉流程。",
+      "metadataOnly": true
+    },
+    "decisionTrace": {
+      "rawUserText": "Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.",
+      "turnIntent": "actionable_vision_plan",
+      "interactionState": "planning",
+      "businessSignalsHit": [
+        "inspect"
+      ],
+      "newFlowSignalsHit": [],
+      "taskTypeSignalsHit": [
+        "inspect",
+        "visible damage",
+        "NG on damage",
+        "local output",
+        "surface condition",
+        "No visible surface damage",
+        "Visible surface damage",
+        "surface_defect"
+      ],
+      "objectSignalsHit": [
+        "packaging",
+        "surface",
+        "packaging surface"
+      ],
+      "maturityLevel": "actionable",
+      "taskType": "surface_defect",
+      "canPlan": true,
+      "canBuild": true,
+      "fallbackReason": "",
+      "blockingReasons": [],
+      "metadataOnly": true
+    },
+    "metadataOnly": true,
+    "requirementMode": "strict",
+    "answerRevision": 5
+  },
+  "workspaceSnapshot": {
+    "lifecycleState": "plan",
+    "planQuestionSelections": {},
+    "confirmedPlanAnswers": [
+      {
+        "field": "inspection_object",
+        "questionId": "",
+        "value": "packaging surface",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "task_type",
+        "questionId": "",
+        "value": "surface_or_pose_defect",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "image_source",
+        "questionId": "",
+        "value": "station_camera",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "acceptance_criteria",
+        "questionId": "",
+        "value": "OK: No visible surface damage; NG: Visible surface damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "defect_type",
+        "questionId": "",
+        "value": "visible damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "output_target",
+        "questionId": "",
+        "value": "local_structured_result",
+        "origin": "explicit_user_selection",
+        "confidence": 1,
+        "resolved": true
+      }
+    ],
+    "optimisticPlanAnswers": [],
+    "answerRevision": 6,
+    "readinessPreview": {
+      "planId": "plan_5dd0de7a21de432db887c8f6aa41447d",
+      "planHash": "sha256:f2f79f3a42d752c2b68e1ab2831f45a90ff00594ac08e85634d7b219b8cc19bd",
+      "requirementMode": "strict",
+      "answerRevision": 5,
+      "acceptedAnswers": [
+        {
+          "questionId": "",
+          "field": "acceptance_criteria",
+          "value": "visible_damage_is_ng",
+          "origin": "explicit_user_text"
+        },
+        {
+          "questionId": "",
+          "field": "defect_type",
+          "value": "visible damage",
+          "origin": "explicit_user_text"
+        },
+        {
+          "questionId": "",
+          "field": "image_source",
+          "value": "station_camera",
+          "origin": "explicit_user_text"
+        },
+        {
+          "questionId": "",
+          "field": "inspection_object",
+          "value": "packaging_box_surface",
+          "origin": "explicit_user_text"
+        },
+        {
+          "questionId": "",
+          "field": "output_target",
+          "value": "local_structured_result",
+          "origin": "explicit_user_selection"
+        },
+        {
+          "questionId": "",
+          "field": "task_type",
+          "value": "surface_or_pose_defect",
+          "origin": "explicit_user_text"
+        }
+      ],
+      "answerSetFingerprint": "sha256:c64ee9fe47b7a3fee69f7e90e75e79b772397f5e8bd1c7e18d889d37fe2fe669",
+      "buildReadiness": {
+        "canBuild": false,
+        "blockers": [
+          {
+            "id": "resource_pending:stationcameraconfigurationoridentifier",
+            "category": "resource_pending",
+            "field": "",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "provide_resource",
+            "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+          },
+          {
+            "id": "resource_pending:localoutputdestinationandformat",
+            "category": "resource_pending",
+            "field": "",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "provide_resource",
+            "publicLabel": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。"
+          },
+          {
+            "id": "hard_requirement:algorithm_strategy_missing",
+            "category": "hard_requirement",
+            "field": "algorithm_strategy",
+            "questionId": "q_fallback_algorithm_strategy",
+            "blocksBuild": true,
+            "resolutionMode": "answer_question",
+            "publicLabel": "还缺：构建策略"
+          },
+          {
+            "id": "resource_pending:camera_binding",
+            "category": "resource_pending",
+            "field": "image_source",
+            "questionId": "",
+            "blocksBuild": true,
+            "resolutionMode": "provide_resource",
+            "publicLabel": "资源仍待绑定，当前模式下不能开始构建。"
+          }
+        ],
+        "resolvedFields": [
+          "acceptance_criteria",
+          "defect_type",
+          "image_source",
+          "inspection_object",
+          "output_target",
+          "task_type"
+        ],
+        "remainingFields": [
+          "algorithm_strategy"
+        ],
+        "primaryMessage": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+        "contractVersion": "v2"
+      },
+      "deferredQuestionIds": [],
+      "pendingConfirmationCount": 2,
+      "resourcePendingCount": 3,
+      "hardBlockerCount": 1,
+      "metadataOnly": true,
+      "contractValid": true,
+      "failureCode": "",
+      "failureMessage": ""
+    },
+    "resourceDecisions": {
+      "image_source": {
+        "status": "deferred",
+        "source": "user_deferred"
+      }
+    },
+    "requirementMode": "strict",
+    "workspaceViewMode": "plan",
+    "planAcceptedRecommendedDefaults": false,
+    "submittedBuildFingerprint": ""
+  },
+  "projection": {
+    "phase": "clarifying",
+    "confirmedAnswers": [
+      {
+        "field": "inspection_object",
+        "questionId": "",
+        "value": "packaging surface",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "task_type",
+        "questionId": "",
+        "value": "surface_or_pose_defect",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "image_source",
+        "questionId": "",
+        "value": "station_camera",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "acceptance_criteria",
+        "questionId": "",
+        "value": "OK: No visible surface damage; NG: Visible surface damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "defect_type",
+        "questionId": "",
+        "value": "visible damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      {
+        "field": "output_target",
+        "questionId": "",
+        "value": "local_structured_result",
+        "origin": "explicit_user_selection",
+        "confidence": 1,
+        "resolved": true
+      }
+    ],
+    "optimisticAnswers": [],
+    "answersByField": {
+      "inspection_object": {
+        "field": "inspection_object",
+        "questionId": "",
+        "value": "packaging surface",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      "task_type": {
+        "field": "task_type",
+        "questionId": "",
+        "value": "surface_or_pose_defect",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      "image_source": {
+        "field": "image_source",
+        "questionId": "",
+        "value": "station_camera",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      "acceptance_criteria": {
+        "field": "acceptance_criteria",
+        "questionId": "",
+        "value": "OK: No visible surface damage; NG: Visible surface damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      "defect_type": {
+        "field": "defect_type",
+        "questionId": "",
+        "value": "visible damage",
+        "origin": "explicit_user_text",
+        "confidence": 1,
+        "resolved": true
+      },
+      "output_target": {
+        "field": "output_target",
+        "questionId": "",
+        "value": "local_structured_result",
+        "origin": "explicit_user_selection",
+        "confidence": 1,
+        "resolved": true
+      }
+    },
+    "clarificationQueue": [
+      {
+        "kind": "question",
+        "id": "q_fallback_output_target",
+        "questionId": "q_fallback_output_target",
+        "field": "output_target",
+        "title": "结果输出目标说明",
+        "why": "流程规划需要明确 结果输出目标说明。",
+        "impact": "缺少此字段将阻碍流程的自动构建。",
+        "defaultValue": "output_pending",
+        "defaultAssumption": "暂无安全默认输出目标，推荐保持待确认；该选择不视为已解决字段。",
+        "options": [
+          {
+            "value": "output_pending",
+            "label": "保持输出目标待确认",
+            "recommended": true,
+            "answerEffect": "defer",
+            "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+            "description": "不猜测 PLC、网络或文件输出，先保留为待确认输出。",
+            "impact": "不会解除构建或部署前的输出阻断。"
+          },
+          {
+            "value": "local_result",
+            "label": "本地结构化结果",
+            "recommended": false,
+            "answerEffect": "resolve_field",
+            "recommendationReason": "",
+            "description": "仅输出本地结果字段。",
+            "impact": "适合早期验证，避免不安全外部写入。"
+          },
+          {
+            "value": "plc_pending",
+            "label": "PLC 输出待确认",
+            "recommended": false,
+            "answerEffect": "defer",
+            "recommendationReason": "",
+            "description": "保留 PLC 地址、握手和失效保护为待确认元数据。",
+            "impact": "需要工程师确认后才能部署。"
+          }
+        ],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "clarification_question",
+        "answer": {
+          "field": "output_target",
+          "questionId": "",
+          "value": "local_structured_result",
+          "origin": "explicit_user_selection",
+          "confidence": 1,
+          "resolved": true
+        },
+        "answered": true,
+        "deferred": false,
+        "resourceDecision": null
+      },
+      {
+        "kind": "question",
+        "id": "q_fallback_algorithm_strategy",
+        "questionId": "q_fallback_algorithm_strategy",
+        "field": "algorithm_strategy",
+        "title": "算法策略说明",
+        "why": "流程规划需要明确 算法策略说明。",
+        "impact": "缺少此字段将阻碍流程的自动构建。",
+        "defaultValue": "strategy_pending",
+        "defaultAssumption": "暂无安全默认算法策略，推荐保持待确认；该选择不视为已解决字段。",
+        "options": [
+          {
+            "value": "strategy_pending",
+            "label": "保持算法策略待确认",
+            "recommended": true,
+            "answerEffect": "defer",
+            "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+            "description": "不默认选择规则、模板或模型，先保留策略确认。",
+            "impact": "不会解除构建阻断。"
+          },
+          {
+            "value": "traditional_rule",
+            "label": "优先规则/几何算法",
+            "recommended": false,
+            "answerEffect": "resolve_field",
+            "recommendationReason": "",
+            "description": "目标特征稳定、可测量且用户确认时使用。",
+            "impact": "不适合外观变化大或需模型识别的任务。"
+          },
+          {
+            "value": "model_pending",
+            "label": "模型资源待确认",
+            "recommended": false,
+            "answerEffect": "defer",
+            "recommendationReason": "",
+            "description": "规划模型算子，但模型资源仍待绑定。",
+            "impact": "构建或部署前需要模型元数据。"
+          }
+        ],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "clarification_question",
+        "category": "hard_requirement",
+        "resolutionMode": "answer_question",
+        "sources": [
+          "clarification_question",
+          "build_readiness"
+        ],
+        "answer": null,
+        "answered": false,
+        "deferred": false,
+        "resourceDecision": null
+      }
+    ],
+    "clarificationBatch": [
+      {
+        "kind": "question",
+        "id": "q_fallback_output_target",
+        "questionId": "q_fallback_output_target",
+        "field": "output_target",
+        "title": "结果输出目标说明",
+        "why": "流程规划需要明确 结果输出目标说明。",
+        "impact": "缺少此字段将阻碍流程的自动构建。",
+        "defaultValue": "output_pending",
+        "defaultAssumption": "暂无安全默认输出目标，推荐保持待确认；该选择不视为已解决字段。",
+        "options": [
+          {
+            "value": "output_pending",
+            "label": "保持输出目标待确认",
+            "recommended": true,
+            "answerEffect": "defer",
+            "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+            "description": "不猜测 PLC、网络或文件输出，先保留为待确认输出。",
+            "impact": "不会解除构建或部署前的输出阻断。"
+          },
+          {
+            "value": "local_result",
+            "label": "本地结构化结果",
+            "recommended": false,
+            "answerEffect": "resolve_field",
+            "recommendationReason": "",
+            "description": "仅输出本地结果字段。",
+            "impact": "适合早期验证，避免不安全外部写入。"
+          },
+          {
+            "value": "plc_pending",
+            "label": "PLC 输出待确认",
+            "recommended": false,
+            "answerEffect": "defer",
+            "recommendationReason": "",
+            "description": "保留 PLC 地址、握手和失效保护为待确认元数据。",
+            "impact": "需要工程师确认后才能部署。"
+          }
+        ],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "clarification_question",
+        "answer": {
+          "field": "output_target",
+          "questionId": "",
+          "value": "local_structured_result",
+          "origin": "explicit_user_selection",
+          "confidence": 1,
+          "resolved": true
+        },
+        "answered": true,
+        "deferred": false,
+        "resourceDecision": null
+      },
+      {
+        "kind": "question",
+        "id": "q_fallback_algorithm_strategy",
+        "questionId": "q_fallback_algorithm_strategy",
+        "field": "algorithm_strategy",
+        "title": "算法策略说明",
+        "why": "流程规划需要明确 算法策略说明。",
+        "impact": "缺少此字段将阻碍流程的自动构建。",
+        "defaultValue": "strategy_pending",
+        "defaultAssumption": "暂无安全默认算法策略，推荐保持待确认；该选择不视为已解决字段。",
+        "options": [
+          {
+            "value": "strategy_pending",
+            "label": "保持算法策略待确认",
+            "recommended": true,
+            "answerEffect": "defer",
+            "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+            "description": "不默认选择规则、模板或模型，先保留策略确认。",
+            "impact": "不会解除构建阻断。"
+          },
+          {
+            "value": "traditional_rule",
+            "label": "优先规则/几何算法",
+            "recommended": false,
+            "answerEffect": "resolve_field",
+            "recommendationReason": "",
+            "description": "目标特征稳定、可测量且用户确认时使用。",
+            "impact": "不适合外观变化大或需模型识别的任务。"
+          },
+          {
+            "value": "model_pending",
+            "label": "模型资源待确认",
+            "recommended": false,
+            "answerEffect": "defer",
+            "recommendationReason": "",
+            "description": "规划模型算子，但模型资源仍待绑定。",
+            "impact": "构建或部署前需要模型元数据。"
+          }
+        ],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "clarification_question",
+        "category": "hard_requirement",
+        "resolutionMode": "answer_question",
+        "sources": [
+          "clarification_question",
+          "build_readiness"
+        ],
+        "answer": null,
+        "answered": false,
+        "deferred": false,
+        "resourceDecision": null
+      }
+    ],
+    "missingResources": [
+      {
+        "kind": "resource",
+        "id": "resource_pending:camera_binding",
+        "resourceKey": "camera_binding",
+        "resourceType": "camera_binding",
+        "operatorId": "",
+        "parameterName": "",
+        "field": "image_source",
+        "title": "资源仍待绑定，当前模式下不能开始构建。",
+        "why": "",
+        "impact": "",
+        "options": [],
+        "interactive": false,
+        "blocksBuild": true,
+        "source": "build_readiness",
+        "raw": {
+          "resourceType": "camera_binding",
+          "resourceKey": "camera_binding",
+          "description": "资源仍待绑定，当前模式下不能开始构建。"
+        },
+        "resourceDecision": null,
+        "deferred": false,
+        "answered": false,
+        "questionId": "",
+        "category": "resource_pending",
+        "resolutionMode": "provide_resource"
+      },
+      {
+        "kind": "resource",
+        "id": "op_acq.CameraBindingId",
+        "resourceKey": "op_acq.CameraBindingId",
+        "resourceType": "camera_binding",
+        "operatorId": "",
+        "parameterName": "",
+        "field": "camera_binding",
+        "title": "资源仍待绑定，当前模式下不能开始构建。",
+        "why": "资源仍待绑定，当前模式下不能开始构建。",
+        "impact": "资源仍保持待绑定状态；稍后补齐不等于资源已就绪。",
+        "options": [],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "missing_resource",
+        "raw": {
+          "resourceType": "camera_binding",
+          "resourceKey": "op_acq.CameraBindingId",
+          "description": "资源仍待绑定，当前模式下不能开始构建。"
+        },
+        "resourceDecision": null,
+        "deferred": false,
+        "answered": false
+      },
+      {
+        "kind": "resource",
+        "id": "image_source",
+        "resourceKey": "image_source",
+        "resourceType": "camera_binding",
+        "operatorId": "",
+        "parameterName": "",
+        "field": "camera_binding",
+        "title": "资源仍待绑定，当前模式下不能开始构建。",
+        "why": "资源仍待绑定，当前模式下不能开始构建。",
+        "impact": "资源仍保持待绑定状态；稍后补齐不等于资源已就绪。",
+        "options": [],
+        "interactive": true,
+        "blocksBuild": true,
+        "source": "missing_resource",
+        "raw": {
+          "resourceType": "camera_binding",
+          "resourceKey": "image_source",
+          "description": "资源仍待绑定，当前模式下不能开始构建。"
+        },
+        "resourceDecision": {
+          "status": "deferred",
+          "source": "user_deferred"
+        },
+        "deferred": true,
+        "answered": false
+      },
+      {
+        "kind": "resource",
+        "id": "resource_pending:stationcameraconfigurationoridentifier",
+        "resourceKey": "stationcameraconfigurationoridentifier",
+        "questionId": "",
+        "field": "resource_pending:stationcameraconfigurationoridentifier",
+        "title": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+        "why": "",
+        "impact": "",
+        "options": [],
+        "interactive": false,
+        "blocksBuild": true,
+        "category": "resource_pending",
+        "resolutionMode": "provide_resource",
+        "source": "build_readiness",
+        "resourceDecision": null,
+        "deferred": false,
+        "answered": false
+      },
+      {
+        "kind": "resource",
+        "id": "resource_pending:localoutputdestinationandformat",
+        "resourceKey": "localoutputdestinationandformat",
+        "questionId": "",
+        "field": "resource_pending:localoutputdestinationandformat",
+        "title": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+        "why": "",
+        "impact": "",
+        "options": [],
+        "interactive": false,
+        "blocksBuild": true,
+        "category": "resource_pending",
+        "resolutionMode": "provide_resource",
+        "source": "build_readiness",
+        "resourceDecision": null,
+        "deferred": false,
+        "answered": false
+      }
+    ],
+    "readiness": {
+      "canBuild": false,
+      "blockers": [
+        {
+          "kind": "resource",
+          "id": "resource_pending:stationcameraconfigurationoridentifier",
+          "resourceKey": "stationcameraconfigurationoridentifier",
+          "questionId": "",
+          "field": "resource_pending:stationcameraconfigurationoridentifier",
+          "title": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+          "why": "",
+          "impact": "",
+          "options": [],
+          "interactive": false,
+          "blocksBuild": true,
+          "category": "resource_pending",
+          "resolutionMode": "provide_resource",
+          "source": "build_readiness"
+        },
+        {
+          "kind": "resource",
+          "id": "resource_pending:localoutputdestinationandformat",
+          "resourceKey": "localoutputdestinationandformat",
+          "questionId": "",
+          "field": "resource_pending:localoutputdestinationandformat",
+          "title": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+          "why": "",
+          "impact": "",
+          "options": [],
+          "interactive": false,
+          "blocksBuild": true,
+          "category": "resource_pending",
+          "resolutionMode": "provide_resource",
+          "source": "build_readiness"
+        },
+        {
+          "kind": "blocker",
+          "id": "hard_requirement:algorithm_strategy_missing",
+          "resourceKey": "",
+          "questionId": "q_fallback_algorithm_strategy",
+          "field": "algorithm_strategy",
+          "title": "还缺：构建策略",
+          "why": "",
+          "impact": "",
+          "options": [],
+          "interactive": false,
+          "blocksBuild": true,
+          "category": "hard_requirement",
+          "resolutionMode": "answer_question",
+          "source": "build_readiness"
+        },
+        {
+          "kind": "resource",
+          "id": "resource_pending:camera_binding",
+          "resourceKey": "camera_binding",
+          "questionId": "",
+          "field": "image_source",
+          "title": "资源仍待绑定，当前模式下不能开始构建。",
+          "why": "",
+          "impact": "",
+          "options": [],
+          "interactive": false,
+          "blocksBuild": true,
+          "category": "resource_pending",
+          "resolutionMode": "provide_resource",
+          "source": "build_readiness"
+        }
+      ],
+      "resolvedFields": [
+        "acceptance_criteria",
+        "defect_type",
+        "image_source",
+        "inspection_object",
+        "output_target",
+        "task_type"
+      ],
+      "remainingFields": [
+        "algorithm_strategy"
+      ],
+      "primaryMessage": "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。",
+      "contractVersion": "v2"
+    },
+    "buildAction": {
+      "canBuild": false,
+      "canStart": false,
+      "status": "clarifying"
+    }
+  },
+  "readinessStatus": "ready",
+  "buildLabel": "正在校验构建条件…",
+  "resourceTexts": [
+    "资源仍待绑定，当前模式下不能开始构建。\n                    当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。",
+    "资源仍待绑定，当前模式下不能开始构建。\n                    当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。",
+    "资源仍待绑定，当前模式下不能开始构建。\n                    当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。",
+    "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。\n                    当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。",
+    "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。\n                    当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。"
+  ]
+}

@@ -295,6 +295,7 @@ public sealed class AgentRunEndpointsTests
             acceptedDefaults = new[] { "resource_policy" },
             acceptedRecommendedDefaults = false,
             answerRevision = 12,
+            resourceRevision = 4,
             metadataOnly = true
         });
 
@@ -304,6 +305,7 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("planId").GetString().Should().Be(plan.PlanId);
         root.GetProperty("planHash").GetString().Should().Be(plan.PlanHash);
         root.GetProperty("answerRevision").GetInt32().Should().Be(12);
+        root.GetProperty("resourceRevision").GetInt32().Should().Be(4);
         root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
         root.TryGetProperty("runId", out _).Should().BeFalse();
         host.StreamService.ReplayLatest(string.Empty).Should().BeNull();
@@ -2772,6 +2774,7 @@ public sealed class AgentRunEndpointsTests
                 PlanHash = request.PlanHash,
                 RequirementMode = request.RequirementMode,
                 AnswerRevision = request.AnswerRevision,
+                ResourceRevision = request.ResourceRevision,
                 AcceptedAnswers = request.ConfirmedAnswers,
                 AnswerSetFingerprint = "sha256:test-preview",
                 BuildReadiness = readiness,

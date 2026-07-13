@@ -436,15 +436,28 @@ public class ConversationalFlowServiceTests : IDisposable
                     RemainingFields = ["acceptance_criteria"]
                 }
             },
+            MissingResources =
+            [
+                new VisionAgentResourceRequirement
+                {
+                    CanonicalId = "resource:v1|model_resource|deeplearning#1|modelpath",
+                    ResourceType = "model_resource",
+                    ResourceName = "模型资源",
+                    OperatorKey = "deeplearning#1",
+                    ParameterName = "ModelPath",
+                    Status = VisionAgentResourceStatuses.Pending
+                }
+            ],
             ResourceDecisions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
             {
-                ["model:detector"] = JsonSerializer.SerializeToElement(new
+                ["resource:v1|model_resource|deeplearning#1|modelpath"] = JsonSerializer.SerializeToElement(new
                 {
                     status = "deferred",
                     source = "user_deferred",
                     metadataOnly = true
                 })
             },
+            ResourceRevision = 3,
             WorkspaceViewMode = "build",
             PendingPlanSnapshot = new VisionAgentPlanModeResult
             {
@@ -473,8 +486,10 @@ public class ConversationalFlowServiceTests : IDisposable
         reloaded.WorkspaceSnapshot.OptimisticPlanAnswers.Should().ContainSingle(answer => answer.Field == "acceptance_criteria");
         reloaded.WorkspaceSnapshot.AnswerRevision.Should().Be(7);
         reloaded.WorkspaceSnapshot.ReadinessPreview!.AnswerRevision.Should().Be(7);
-        reloaded.WorkspaceSnapshot.ResourceDecisions["model:detector"].GetProperty("status").GetString()
+        reloaded.WorkspaceSnapshot.MissingResources.Should().ContainSingle(resource => resource.CanonicalId == "resource:v1|model_resource|deeplearning#1|modelpath");
+        reloaded.WorkspaceSnapshot.ResourceDecisions["resource:v1|model_resource|deeplearning#1|modelpath"].GetProperty("status").GetString()
             .Should().Be("deferred");
+        reloaded.WorkspaceSnapshot.ResourceRevision.Should().Be(3);
         reloaded.WorkspaceSnapshot.WorkspaceViewMode.Should().Be("build");
         reloaded.WorkspaceSnapshot.PendingPlanSnapshot!.PlanId.Should().Be("plan-1");
     }

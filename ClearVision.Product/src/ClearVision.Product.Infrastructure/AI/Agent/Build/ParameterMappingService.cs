@@ -33,9 +33,13 @@ public sealed class ParameterMappingService
         var mappings = new List<VisionAgentParameterMapping>();
         var pending = new List<AiPendingParameterInfo>();
         var missing = new List<AiMissingResourceInfo>();
+        var operatorOrdinals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var op in pipeline.Steps)
         {
+            operatorOrdinals.TryGetValue(op.OperatorType, out var operatorIndex);
+            operatorOrdinals[op.OperatorType] = operatorIndex + 1;
+            var operatorKey = VisionAgentResourceIdentity.OperatorKey(op.OperatorType, operatorIndex);
             if (!_contractCatalog.TryGet(op.OperatorType, out var schema))
             {
                 continue;
@@ -58,10 +62,40 @@ public sealed class ParameterMappingService
                 var missingKind = MissingResourceKind(op.OperatorType, parameter.Name, mapped.Pending, parameterStrategy);
                 if (!string.IsNullOrWhiteSpace(missingKind))
                 {
+                    var canonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                        missingKind,
+                        operatorKey,
+                        parameter.Name);
+                    var bound = load.ResourceDecisions.Any(decision =>
+                        decision.Status.Equals(VisionAgentResourceStatuses.Bound, StringComparison.OrdinalIgnoreCase) &&
+                        decision.CanonicalId.Equals(canonicalId, StringComparison.OrdinalIgnoreCase));
+                    if (bound)
+                    {
+                        continue;
+                    }
+
                     missing.Add(new AiMissingResourceInfo
                     {
-                        ResourceType = missingKind,
+                        CanonicalId = canonicalId,
+                        ResourceType = VisionAgentResourceIdentity.NormalizeResourceType(missingKind),
+                        ResourceName = ResourceName(missingKind),
                         ResourceKey = $"{op.TempId}.{parameter.Name}",
+                        OperatorKey = operatorKey,
+                        OperatorId = op.TempId,
+                        OperatorType = op.OperatorType,
+                        OperatorIndex = operatorIndex,
+                        ParameterName = parameter.Name,
+                        Status = VisionAgentResourceStatuses.Pending,
+                        BlockingScope = VisionAgentResourceBlockingScopes.DeployRun,
+                        Source = "parameter_mapping",
+                        ResolutionTarget = ResolutionTarget(missingKind),
+                        DraftPolicy = DraftPolicy(missingKind),
+                        Aliases = VisionAgentResourceIdentity.BuildAliases(
+                            canonicalId,
+                            $"{op.TempId}.{parameter.Name}",
+                            missingKind,
+                            operatorKey,
+                            parameter.Name).ToList(),
                         Description = $"{op.OperatorType}.{parameter.Name} 仍为待绑定元数据，系统未进行猜测。"
                     });
                 }
@@ -523,5 +557,39 @@ public sealed class ParameterMappingService
         return IsPreferredResourceParameter(operatorType, parameterName, resourceKind)
             ? resourceKind
             : string.Empty;
+    }
+
+    private static string ResourceName(string resourceType)
+    {
+        return VisionAgentResourceIdentity.NormalizeResourceType(resourceType) switch
+        {
+            "camera_binding" => "相机绑定",
+            "model_resource" => "模型资源",
+            "template_artifact" => "模板资源",
+            "calibration_resource" => "标定参数",
+            "plc_output" => "外部输出资源",
+            "output_channel" => "输出通道",
+            _ => "工程资源"
+        };
+    }
+
+    private static string ResolutionTarget(string resourceType)
+    {
+        return VisionAgentResourceIdentity.NormalizeResourceType(resourceType) switch
+        {
+            "camera_binding" => VisionAgentResourceResolutionTargets.CameraSettings,
+            "model_resource" => VisionAgentResourceResolutionTargets.ModelPicker,
+            "template_artifact" => VisionAgentResourceResolutionTargets.TemplatePicker,
+            "calibration_resource" => VisionAgentResourceResolutionTargets.CalibrationSettings,
+            "plc_output" or "output_channel" => VisionAgentResourceResolutionTargets.OutputSettings,
+            _ => VisionAgentResourceResolutionTargets.PlanWorkbench
+        };
+    }
+
+    private static string DraftPolicy(string resourceType)
+    {
+        return VisionAgentResourceIdentity.NormalizeResourceType(resourceType) is "plc_output" or "output_channel"
+            ? VisionAgentResourceDraftPolicies.BuildRequired
+            : VisionAgentResourceDraftPolicies.DraftAllowed;
     }
 }

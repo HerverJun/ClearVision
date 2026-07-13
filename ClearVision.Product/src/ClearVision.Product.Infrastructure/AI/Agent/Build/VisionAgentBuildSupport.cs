@@ -54,12 +54,69 @@ internal static class VisionAgentBuildSupport
 
     public static List<AiMissingResourceInfo> DeduplicateMissing(IEnumerable<AiMissingResourceInfo> items)
     {
-        return items
+        var normalized = items
             .Where(item => !string.IsNullOrWhiteSpace(item.ResourceType) ||
                            !string.IsNullOrWhiteSpace(item.ResourceKey))
-            .GroupBy(item => $"{item.ResourceType}|{item.ResourceKey}", StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
+            .Select(NormalizeMissingResource)
             .ToList();
+        var result = new List<AiMissingResourceInfo>();
+        foreach (var item in normalized)
+        {
+            var aliases = item.Aliases.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var existing = result.FirstOrDefault(candidate =>
+                candidate.CanonicalId.Equals(item.CanonicalId, StringComparison.OrdinalIgnoreCase) ||
+                candidate.Aliases.Any(aliases.Contains));
+            if (existing == null)
+            {
+                result.Add(item);
+                continue;
+            }
+
+            existing.Aliases = existing.Aliases
+                    .Concat(item.Aliases)
+                    .Append(item.ResourceKey)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            existing.Source = string.Join(",", new[] { existing.Source, item.Source }
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(existing.CanonicalId) ||
+                existing.CanonicalId.Contains(existing.ResourceKey, StringComparison.OrdinalIgnoreCase))
+            {
+                existing.CanonicalId = item.CanonicalId;
+            }
+        }
+        return result;
+    }
+
+    public static AiMissingResourceInfo NormalizeMissingResource(AiMissingResourceInfo item)
+    {
+        item.ResourceType = VisionAgentResourceIdentity.NormalizeResourceType(item.ResourceType);
+        item.OperatorKey = FirstNonEmpty(
+            item.OperatorKey,
+            string.IsNullOrWhiteSpace(item.OperatorType) || item.OperatorIndex < 0
+                ? string.Empty
+                : VisionAgentResourceIdentity.OperatorKey(item.OperatorType, item.OperatorIndex));
+        item.CanonicalId = FirstNonEmpty(
+            item.CanonicalId,
+            VisionAgentResourceIdentity.CreateCanonicalId(
+                item.ResourceType,
+                item.OperatorKey,
+                item.ParameterName,
+                item.ResourceKey));
+        item.Status = FirstNonEmpty(item.Status, VisionAgentResourceStatuses.Pending);
+        item.Aliases = item.Aliases
+            .Concat(VisionAgentResourceIdentity.BuildAliases(
+                item.CanonicalId,
+                item.ResourceKey,
+                item.ResourceType,
+                item.OperatorKey,
+                item.OperatorId,
+                item.ParameterName))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return item;
     }
 
     public static IEnumerable<AiMissingResourceInfo> ReadMissingResources(object? data)
@@ -83,6 +140,17 @@ internal static class VisionAgentBuildSupport
             {
                 ResourceType = kind,
                 ResourceKey = key,
+                CanonicalId = ReadString(item, "canonicalId") ?? string.Empty,
+                ResourceName = ReadString(item, "resourceName") ?? string.Empty,
+                OperatorKey = ReadString(item, "operatorKey") ?? string.Empty,
+                OperatorId = ReadString(item, "operatorId") ?? ReadString(item, "tempId") ?? string.Empty,
+                OperatorType = ReadString(item, "operatorType") ?? string.Empty,
+                ParameterName = ReadString(item, "parameterName") ?? string.Empty,
+                Status = ReadString(item, "status") ?? VisionAgentResourceStatuses.Pending,
+                BlockingScope = ReadString(item, "blockingScope") ?? VisionAgentResourceBlockingScopes.DeployRun,
+                Source = ReadString(item, "source") ?? "tool_readiness",
+                ResolutionTarget = ReadString(item, "resolutionTarget") ?? VisionAgentResourceResolutionTargets.PlanWorkbench,
+                DraftPolicy = ReadString(item, "draftPolicy") ?? VisionAgentResourceDraftPolicies.DraftAllowed,
                 Description = FirstNonEmpty(
                     ReadString(item, "description"),
                     ReadString(item, "message"),

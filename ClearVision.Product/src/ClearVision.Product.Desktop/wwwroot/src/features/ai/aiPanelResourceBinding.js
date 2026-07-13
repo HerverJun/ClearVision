@@ -3,6 +3,7 @@ import {
     getResourceDisplayName
 } from '../../shared/operatorDisplayNames.js';
 import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
+import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 
 export const aiPanelResourceBindingMixin = {
     _getMissingResourceActionModel(item = {}) {
@@ -23,11 +24,12 @@ export const aiPanelResourceBindingMixin = {
 
         if (resourceType.includes('model')) {
             return make({
-                action: 'bind_model_resource',
-                primaryLabel: '人工确认模型资源',
+                action: 'pick_model_resource',
+                primaryLabel: '选择模型文件',
                 inputLabel: '模型资源',
-                placeholder: '输入模型资源 ID / 元数据键，不填写本地完整路径',
-                parameterName: parameterName || 'ModelPath'
+                inputType: '',
+                parameterName: parameterName || 'ModelPath',
+                writesParameter: true
             });
         }
 
@@ -36,10 +38,10 @@ export const aiPanelResourceBindingMixin = {
                 ? parameterName
                 : 'Template';
             return make({
-                action: 'select_template_artifact',
-                primaryLabel: '人工选择模板资源',
+                action: 'pick_template_resource',
+                primaryLabel: '选择模板文件',
                 inputLabel: '模板资源',
-                placeholder: '输入模板 ID / 模板元数据键，不填写本地完整路径',
+                inputType: '',
                 parameterName: templateParameter,
                 writesParameter: templateParameter.toLowerCase() !== 'template'
             });
@@ -60,9 +62,9 @@ export const aiPanelResourceBindingMixin = {
         if (resourceType.includes('camera')) {
             return make({
                 action: 'select_camera_binding',
-                primaryLabel: '人工选择相机绑定',
+                primaryLabel: '绑定所选相机',
                 inputLabel: '相机绑定',
-                placeholder: '输入相机绑定 ID',
+                inputType: 'camera_select',
                 parameterName: parameterName || 'CameraBindingId'
             });
         }
@@ -70,20 +72,22 @@ export const aiPanelResourceBindingMixin = {
         if (resourceType.includes('output')) {
             return make({
                 action: 'set_output_channel',
-                primaryLabel: '人工确认输出通道',
+                primaryLabel: '前往输出设置',
                 inputLabel: '输出通道',
-                placeholder: '输入输出通道 ID',
-                parameterName: parameterName || 'OutputChannelId'
+                inputType: '',
+                parameterName: parameterName || 'OutputChannelId',
+                writesParameter: false
             });
         }
 
         if (resourceType.includes('plc')) {
             return make({
                 action: 'set_plc_address_metadata',
-                primaryLabel: '仅记录 PLC 元数据',
+                primaryLabel: '前往通信设置',
                 inputLabel: 'PLC 地址元数据',
-                placeholder: '仅记录地址元数据，不写入 PLC',
-                parameterName: parameterName || 'PlcAddress'
+                inputType: '',
+                parameterName: parameterName || 'PlcAddress',
+                writesParameter: false
             });
         }
 
@@ -93,7 +97,19 @@ export const aiPanelResourceBindingMixin = {
     _renderMissingResourceActionControls(item, actionModel, index) {
         const draft = this._getPendingResourceDraft(item);
         const currentValue = draft?.value ?? '';
-        const inputHtml = actionModel?.inputType
+        const inputHtml = actionModel?.inputType === 'camera_select'
+            ? `
+                <label class="ai-followup-resource-input">
+                    <span>${this._escapeHtml(actionModel.inputLabel || '相机绑定')}</span>
+                    <select data-resource-input="true">
+                        <option value="">请选择已登记相机</option>
+                        ${(this.cameraBindingsCache || []).map(binding => `
+                            <option value="${this._escapeHtml(String(binding?.id || ''))}">${this._escapeHtml(`${binding?.displayName || binding?.id || '相机'}${binding?.serialNumber ? ` (${binding.serialNumber})` : ''}`)}</option>
+                        `).join('')}
+                    </select>
+                </label>
+            `
+            : actionModel?.inputType
             ? `
                 <label class="ai-followup-resource-input">
                     <span>${this._escapeHtml(actionModel.inputLabel || '资源元数据')}</span>
@@ -107,9 +123,9 @@ export const aiPanelResourceBindingMixin = {
             `
             : '';
         const metadataNote = String(item?.resourceType || '').toLowerCase().includes('plc')
-            ? '<div class="ai-followup-item-meta">仅记录 metadata，不触发真实 PLC 写入。</div>'
+            ? '<div class="ai-followup-item-meta">必须在通信设置中完成；不会从 AI 工作台直接写入 PLC。</div>'
             : '';
-        const resolvedNote = draft?.status === 'resolved'
+        const resolvedNote = ['bound', 'resolved'].includes(draft?.status)
             ? '<div class="ai-followup-item-meta">已写入待补草稿。</div>'
             : draft?.status === 'deferred'
                 ? '<div class="ai-followup-item-meta">已标记稍后处理。</div>'
@@ -120,7 +136,9 @@ export const aiPanelResourceBindingMixin = {
                 ${inputHtml}
                 <div class="ai-followup-resource-actions">
                     <button class="ai-followup-resource-action" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="${this._escapeHtml(actionModel.action)}">${this._escapeHtml(actionModel.primaryLabel)}</button>
-                    <button class="ai-followup-resource-action is-secondary" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="defer_resource">稍后处理</button>
+                    ${String(item?.draftPolicy || '').toLowerCase() === 'build_required'
+                        ? `<button class="ai-followup-resource-action is-secondary" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="open_resource_location">前往解决位置</button>`
+                        : `<button class="ai-followup-resource-action is-secondary" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="switch_to_draft">切换为可编辑草稿</button>`}
                 </div>
                 ${metadataNote}
                 ${resolvedNote}
@@ -130,16 +148,29 @@ export const aiPanelResourceBindingMixin = {
 
     _renderResourceAuditTaskCard(item, actionModel, index) {
         const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item || {};
+        if (String(normalizedItem.resourceType || '').toLowerCase().includes('camera') &&
+            (this.cameraBindingsCache || []).length === 0 &&
+            !this.cameraBindingsLoadingPromise) {
+            this._ensureCameraBindings?.('plan-resource').then(() => {
+                if (this.pendingVisionPlan) this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            });
+        }
         const resourceTypeRaw = normalizedItem.resourceType || 'resource';
         const resourceType = this._sanitizeResourceAuditDisplayText(resourceTypeRaw, 100) || 'resource';
         const resourceLabel = getResourceDisplayName(resourceType, { fallback: '资源' });
-        const operatorIdRaw = normalizedItem.operatorId || normalizedItem.actualOperatorId || this._inferPendingOperatorIdFromResourceKey?.(normalizedItem.resourceKey) || '';
+        const operatorIdRaw = normalizedItem.operatorId || normalizedItem.actualOperatorId || normalizedItem.operatorKey || normalizedItem.operatorType || this._inferPendingOperatorIdFromResourceKey?.(normalizedItem.resourceKey) || '';
         const operatorId = this._sanitizeResourceAuditDisplayText(operatorIdRaw, 120);
         const parameterNameRaw = normalizedItem.parameterName || this._inferPendingParameterNameFromMissingResource?.(normalizedItem) || actionModel?.parameterName || '';
         const parameterName = this._sanitizeResourceAuditDisplayText(parameterNameRaw, 120);
         const parameterLabel = getParameterDisplayName(parameterName, { fallback: parameterName || '影响参数' });
         const blockerReason = normalizedItem.description || normalizedItem.resourceKey || '部署前资源元数据缺失，必须人工确认后才能进入部署就绪。';
         const suggestion = this._getResourceAuditSuggestion(normalizedItem, actionModel);
+        const statusLabel = normalizedItem.resourceDecision?.status === 'bound' || normalizedItem.status === 'bound' ? '已绑定' : '待绑定';
+        const scopeLabel = normalizedItem.blocksBuild === true || normalizedItem.blockingScope === 'build'
+            ? '阻止构建'
+            : normalizedItem.blockingScope === 'build_deploy_run' ? '阻止构建、部署和运行' : '允许草稿；阻止部署和运行';
+        const sourceLabel = (normalizedItem.sources || [normalizedItem.source]).filter(Boolean).join(' / ') || '权威 Readiness';
+        const resolutionLabel = this._formatResourceResolutionTarget?.(normalizedItem.resolutionTarget) || normalizedItem.resolutionTarget || '当前 Plan 工作台';
         const technical = [
             resourceType ? `resourceType=${resourceType}` : '',
             normalizedItem.resourceKey ? `resourceRef=${this._sanitizeResourceAuditDisplayText(normalizedItem.resourceKey, 160)}` : '',
@@ -152,17 +183,21 @@ export const aiPanelResourceBindingMixin = {
                 <div class="ai-resource-audit-card-head">
                     <div>
                         <div class="ai-followup-item-title" title="${this._escapeHtml(resourceType)}">${this._escapeHtml(resourceLabel)}</div>
-                        <div class="ai-followup-item-body">资源补齐在此处集中完成，便于审计。</div>
+                        <div class="ai-followup-item-body">${this._escapeHtml(normalizedItem.resourceKey || normalizedItem.canonicalId || '资源任务')}</div>
                     </div>
-                    <span class="ai-resource-audit-badge">metadata-only</span>
+                    <span class="ai-resource-audit-badge">${this._escapeHtml(statusLabel)}</span>
                 </div>
                 <div class="ai-resource-audit-grid">
+                    <span><small>资源</small><b>${this._escapeHtml(`${resourceLabel}${normalizedItem.resourceName && normalizedItem.resourceName !== resourceLabel ? ` · ${normalizedItem.resourceName}` : ''}`)}</b></span>
                     <span><small>影响算子</small><b>${this._escapeHtml(operatorId || '待识别')}</b></span>
                     <span><small>影响参数</small><b>${this._escapeHtml(parameterLabel)}</b></span>
+                    <span><small>阻断范围</small><b>${this._escapeHtml(scopeLabel)}</b></span>
+                    <span><small>来源</small><b>${this._escapeHtml(sourceLabel)}</b></span>
+                    <span><small>解决位置</small><b>${this._escapeHtml(resolutionLabel)}</b></span>
                     <span><small>阻断原因</small><b>${this._escapeHtml(this._sanitizeAuditText(blockerReason))}</b></span>
                     <span><small>AI 建议</small><b>${this._escapeHtml(suggestion)}</b></span>
                 </div>
-                <div class="ai-resource-audit-manual-title">人工确认输入区</div>
+                <div class="ai-resource-audit-manual-title">下一步</div>
                 ${this._renderMissingResourceActionControls(normalizedItem, actionModel, index)}
                 <details class="ai-resource-audit-details">
                     <summary>查看技术详情</summary>
@@ -184,8 +219,21 @@ export const aiPanelResourceBindingMixin = {
         return '请人工确认资源元数据，AI 只提示缺口与风险。';
     },
 
+    _formatResourceResolutionTarget(value = '') {
+        const target = String(value || '').toLowerCase();
+        if (target === 'settings:cameras') return '设置 → 相机';
+        if (target === 'picker:model') return '模型文件选择器';
+        if (target === 'picker:template') return '模板文件选择器';
+        if (target === 'settings:calibration') return '标定设置';
+        if (target === 'settings:communication') return '设置 → 通信';
+        if (target === 'replan') return '重新规划';
+        return '当前 Plan 工作台';
+    },
+
     _getPendingResourceDraftKey(item = {}) {
         const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item;
+        const canonicalId = String(normalizedItem?.canonicalId || '').trim();
+        if (canonicalId) return canonicalId;
         const resourceKey = String(normalizedItem?.resourceKey || '').trim();
         if (resourceKey) return resourceKey;
         return [
@@ -208,11 +256,15 @@ export const aiPanelResourceBindingMixin = {
             this.pendingResourceDrafts = {};
         }
         this.pendingResourceDrafts[key] = {
+            canonicalId: String(normalizedItem?.canonicalId || key).trim(),
             resourceType: String(normalizedItem?.resourceType || '').trim(),
             resourceKey: String(normalizedItem?.resourceKey || '').trim(),
             operatorId: String(normalizedItem?.operatorId || normalizedItem?.actualOperatorId || '').trim(),
             actualOperatorId: String(normalizedItem?.actualOperatorId || '').trim(),
             parameterName: String(normalizedItem?.parameterName || '').trim(),
+            operatorKey: String(normalizedItem?.operatorKey || '').trim(),
+            operatorType: String(normalizedItem?.operatorType || '').trim(),
+            operatorIndex: Number(normalizedItem?.operatorIndex ?? -1),
             metadataOnly: true,
             ...entry
         };
@@ -234,12 +286,49 @@ export const aiPanelResourceBindingMixin = {
         const result = options.data || this.currentResult || null;
         const flow = options.flow || result?.flow || result?.Flow || null;
 
+        if (normalizedAction === 'switch_to_draft') {
+            this._setRequirementMode?.('draft');
+            this._setPlanCtaFeedback?.('已切换为可编辑草稿模式；后端将重新判定哪些资源可后补。', 'info');
+            return true;
+        }
+
+        if (normalizedAction === 'open_resource_location' ||
+            normalizedAction === 'set_output_channel' ||
+            normalizedAction === 'set_plc_address_metadata') {
+            return this._navigateToResourceResolution?.(normalizedItem) === true;
+        }
+
+        if ((normalizedAction === 'pick_model_resource' || normalizedAction === 'pick_template_resource') &&
+            !String(options.value ?? '').trim()) {
+            this.pendingParameterFilePickContext = {
+                resource: normalizedItem,
+                action: normalizedAction,
+                result,
+                flow,
+                operatorId: normalizedItem.operatorId || '',
+                parameterName: actionModel.parameterName || normalizedItem.parameterName || ''
+            };
+            webMessageBridge.sendMessage('PickFileCommand', {
+                parameterName: 'aiPendingParameterFile',
+                filter: normalizedAction === 'pick_model_resource'
+                    ? 'Model Files|*.onnx;*.pt;*.pth;*.engine;*.bin|All Files|*.*'
+                    : 'Template Files|*.png;*.jpg;*.jpeg;*.bmp;*.json|All Files|*.*'
+            });
+            return true;
+        }
+
         if (normalizedAction === 'defer_resource') {
+            const mode = this._normalizeRequirementMode?.(this.requirementMode) || 'strict';
+            if (mode !== 'draft' || normalizedItem.draftPolicy === 'build_required') {
+                this._setResultStatusNote('该资源不能在当前模式下暂缓，请完成绑定、前往解决位置或重新规划。', 'warning');
+                return false;
+            }
             this._setPendingResourceDraft(normalizedItem, { status: 'deferred', source: 'user_deferred', value: '' });
-            this._setResultStatusNote('已标记为稍后处理；画布仍可应用，部署前会继续提示补齐。', 'info');
-            this._addMessage('system', '已标记该资源为稍后处理，部署前仍会保留为待补项。');
+            this._setResultStatusNote('已标记为草稿后补；部署和运行门禁继续保留。', 'info');
+            this._addMessage('system', '该资源由后端判定为可在草稿后补；部署和运行仍被阻止。');
             this._submitClarificationBatchIfComplete?.('resource_deferred');
-            this._renderFollowupChecklist(result, flow);
+            if (this.pendingVisionPlan) this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'resource_deferred' });
+            if (result) this._renderFollowupChecklist(result, flow);
             return false;
         }
 
@@ -268,7 +357,7 @@ export const aiPanelResourceBindingMixin = {
 
         const gateBefore = this._snapshotApplyGateState(result);
         this._setPendingResourceDraft(normalizedItem, {
-            status: 'resolved',
+            status: 'bound',
             source: 'resource_binding',
             action: normalizedAction,
             value: rawValue,
@@ -279,6 +368,16 @@ export const aiPanelResourceBindingMixin = {
             confirmedBy: 'local-user'
         });
         this._submitClarificationBatchIfComplete?.('resource_bound');
+
+        if (this.pendingVisionPlan) {
+            this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'resource_bound' });
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        }
+
+        if (!result) {
+            this._setPlanCtaFeedback?.(`已绑定${actionModel.inputLabel || normalizedItem.resourceName || '资源'}，正在重新校验构建条件。`, 'info');
+            return true;
+        }
 
         this._appendManualResourceConfirmationRecord(result, normalizedItem, {
             action: normalizedAction,
@@ -311,6 +410,43 @@ export const aiPanelResourceBindingMixin = {
         this._setResultStatusNote(note, risk.hasWarnings ? 'info' : 'success');
         this._addMessage('system', note);
         return true;
+    },
+
+    _navigateToResourceResolution(item = {}) {
+        const target = String(item?.resolutionTarget || '').toLowerCase();
+        if (target.startsWith('picker:model')) return this._handleMissingResourceAction(item, 'pick_model_resource');
+        if (target.startsWith('picker:template')) return this._handleMissingResourceAction(item, 'pick_template_resource');
+        if (target === 'replan') {
+            this._setPlanCtaFeedback?.('当前资源无法在本阶段补齐，请重新规划为已有资源可支持的路线。', 'warning');
+            return this._retryPlanningLifecycle?.() === true;
+        }
+        const settingsButton = document.querySelector('.nav-btn[data-view="settings"]');
+        if (!settingsButton) {
+            this._setPlanCtaFeedback?.('未找到设置入口，请从顶部导航进入设置页处理该资源。', 'warning');
+            return false;
+        }
+        const tab = target === 'settings:cameras' ? 'cameras'
+            : target === 'settings:communication' ? 'communication'
+                : target === 'settings:calibration' ? 'runtime' : '';
+        this._armResourceReturnRevalidation?.();
+        settingsButton.click();
+        if (tab) {
+            this._setOwnedTimeout?.(() => document.querySelector(`.settings-menu-item[data-tab="${tab}"]`)?.click?.(), 120);
+        }
+        return true;
+    },
+
+    _armResourceReturnRevalidation() {
+        if (this._resourceReturnRevalidationArmed) return;
+        this._resourceReturnRevalidationArmed = true;
+        const aiButton = document.querySelector('.nav-btn[data-view="ai"]');
+        aiButton?.addEventListener('click', () => {
+            this._resourceReturnRevalidationArmed = false;
+            if (this.pendingVisionPlan) {
+                this.lastPlanReadinessRequestFingerprint = '';
+                this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'resource_return' });
+            }
+        }, { once: true });
     },
 
     _snapshotApplyGateState(result = this.currentResult) {

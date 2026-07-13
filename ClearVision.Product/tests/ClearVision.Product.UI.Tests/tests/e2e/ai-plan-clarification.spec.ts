@@ -164,14 +164,31 @@ async function seedPlan(page: Page, options: {
       resolutionMode: 'answer_question',
       publicLabel: `请确认${question.title}`,
     }));
+    const missingResources = options.resourcePending ? [{
+      canonicalId: 'resource:v1|model_resource|surfacedefectdetection#1|modelpath',
+      resourceKey: 'op_detect.ModelPath',
+      resourceType: 'model_resource',
+      resourceName: '表面缺陷检测模型',
+      operatorKey: 'SurfaceDefectDetection#1',
+      operatorId: 'op_detect',
+      operatorType: 'SurfaceDefectDetection',
+      operatorIndex: 0,
+      parameterName: 'ModelPath',
+      blockingScope: 'build_deploy_run',
+      draftPolicy: 'draft_allowed',
+      resolutionTarget: 'picker:model',
+      source: 'plan',
+      description: '构建前需要选择与表面缺陷检测算子匹配的模型文件。',
+    }] : [];
     if (options.resourcePending) {
       blockers.push({
-        id: 'resource:model_asset',
+        id: 'resource_pending:op_detect.ModelPath',
         category: 'resource_pending',
-        field: 'model_asset',
+        field: 'model_resource',
         blocksBuild: true,
         resolutionMode: 'provide_resource',
-        publicLabel: '缺陷检测模型待补齐',
+        publicLabel: '表面缺陷检测模型待绑定',
+        resource: { ...missingResources[0], source: 'build_readiness' },
       });
     }
     const plan = panel._normalizeBackendPlanResult({
@@ -183,6 +200,7 @@ async function seedPlan(page: Page, options: {
       },
       canBuild: options.ready === true,
       clarificationQuestions: questions,
+      missingResources,
       buildReadiness: {
         canBuild: options.ready === true,
         blockers,
@@ -222,6 +240,7 @@ async function seedPlan(page: Page, options: {
           planId: plan.planId,
           planHash: plan.planHash,
           answerRevision: panel.planAnswerRevision,
+          resourceRevision: panel.agentWorkspaceState.resources.revision,
           requirementMode: 'strict',
         },
       });
@@ -351,6 +370,7 @@ test('selection stays confirming until canonical readiness confirms it, then adv
         planHash: request.planHash,
         requirementMode: request.requirementMode,
         answerRevision: request.answerRevision,
+        resourceRevision: request.resourceRevision,
         acceptedAnswers: [{
           questionId: imageSourceQuestion.id,
           field: imageSourceQuestion.field,
@@ -476,6 +496,7 @@ test('stale readiness response cannot overwrite a newer canonical selection', as
       planHash: newer.request.planHash,
       requirementMode: newer.request.requirementMode,
       answerRevision: newer.request.answerRevision,
+      resourceRevision: newer.request.resourceRevision,
       acceptedAnswers: [{
         questionId: imageSourceQuestion.id,
         field: imageSourceQuestion.field,
@@ -506,6 +527,7 @@ test('stale readiness response cannot overwrite a newer canonical selection', as
       planHash: stale.request.planHash,
       requirementMode: stale.request.requirementMode,
       answerRevision: stale.request.answerRevision,
+      resourceRevision: stale.request.resourceRevision,
       acceptedAnswers: [{
         questionId: imageSourceQuestion.id,
         field: imageSourceQuestion.field,
@@ -541,7 +563,7 @@ test('confirmed summary can reopen the canonical question for modification', asy
   await expect(page.locator('[data-ai-hook="clarification-title"]')).toBeFocused();
 });
 
-test('Router text does not create a second question and resource pending stays lightweight', async ({ page }) => {
+test('Router text does not create a second question and resource pending is unique, identifiable, and actionable', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768 });
   await seedPlan(page, { questions: 'single', resourcePending: true });
   await page.evaluate(() => {
@@ -554,9 +576,15 @@ test('Router text does not create a second question and resource pending stays l
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(1);
   await expect(page.locator('#ai-plan-workspace')).not.toContainText('旧 Router 澄清问题');
   await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 1 项');
-  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('完整资源补齐将在后续阶段处理');
+  await expect(page.locator('[data-ai-hook="clarification-resources"] .ai-resource-audit-card')).toHaveCount(1);
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('表面缺陷检测模型');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('op_detect');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('ModelPath');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('阻断范围');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('模型文件选择器');
   await expect(page.locator('#ai-plan-workspace input[type="file"]')).toHaveCount(0);
-  await expect(page.locator('#ai-plan-workspace [data-resource-action]')).toHaveCount(0);
+  await expect(page.locator('#ai-plan-workspace [data-resource-action="pick_model_resource"]')).toHaveCount(1);
+  await expect(page.locator('#ai-plan-workspace [data-resource-action="switch_to_draft"]')).toHaveCount(1);
 });
 
 test('keyboard path reaches options and keeps the current action unique', async ({ page }) => {

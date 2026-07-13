@@ -106,6 +106,72 @@ public static class VisionAgentBuildBlockerResolutionModes
     public const string NonBlocking = "non_blocking";
 }
 
+public static class VisionAgentResourceStatuses
+{
+    public const string Pending = "pending";
+    public const string Bound = "bound";
+    public const string Deferred = "deferred";
+}
+
+public static class VisionAgentResourceBlockingScopes
+{
+    public const string Build = "build";
+    public const string DeployRun = "deploy_run";
+    public const string BuildDeployRun = "build_deploy_run";
+}
+
+public static class VisionAgentResourceDraftPolicies
+{
+    public const string DraftAllowed = "draft_allowed";
+    public const string BuildRequired = "build_required";
+}
+
+public static class VisionAgentResourceResolutionTargets
+{
+    public const string PlanWorkbench = "plan_workbench";
+    public const string CameraSettings = "settings:cameras";
+    public const string ModelPicker = "picker:model";
+    public const string TemplatePicker = "picker:template";
+    public const string CalibrationSettings = "settings:calibration";
+    public const string OutputSettings = "settings:communication";
+    public const string Replan = "replan";
+}
+
+public sealed record VisionAgentResourceRequirement
+{
+    public string CanonicalId { get; init; } = string.Empty;
+    public string ResourceType { get; init; } = string.Empty;
+    public string ResourceName { get; init; } = string.Empty;
+    public string ResourceKey { get; init; } = string.Empty;
+    public string OperatorKey { get; init; } = string.Empty;
+    public string OperatorId { get; init; } = string.Empty;
+    public string OperatorType { get; init; } = string.Empty;
+    public int OperatorIndex { get; init; } = -1;
+    public string ParameterName { get; init; } = string.Empty;
+    public string Status { get; init; } = VisionAgentResourceStatuses.Pending;
+    public string BlockingScope { get; init; } = VisionAgentResourceBlockingScopes.Build;
+    public string Source { get; init; } = string.Empty;
+    public string ResolutionTarget { get; init; } = VisionAgentResourceResolutionTargets.PlanWorkbench;
+    public string DraftPolicy { get; init; } = VisionAgentResourceDraftPolicies.DraftAllowed;
+    public string Description { get; init; } = string.Empty;
+    public List<string> Aliases { get; init; } = [];
+}
+
+public sealed record VisionAgentResourceDecision
+{
+    public string CanonicalId { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public string ResourceKey { get; init; } = string.Empty;
+    public string ResourceType { get; init; } = string.Empty;
+    public string OperatorKey { get; init; } = string.Empty;
+    public string OperatorId { get; init; } = string.Empty;
+    public string OperatorType { get; init; } = string.Empty;
+    public int OperatorIndex { get; init; } = -1;
+    public string ParameterName { get; init; } = string.Empty;
+    public string ValueSummary { get; init; } = string.Empty;
+    public string Source { get; init; } = string.Empty;
+}
+
 public sealed record VisionAgentPlanAnswer
 {
     public string QuestionId { get; init; } = string.Empty;
@@ -125,6 +191,7 @@ public sealed record VisionAgentBuildBlocker
     public bool BlocksBuild { get; init; }
     public string ResolutionMode { get; init; } = string.Empty;
     public string PublicLabel { get; init; } = string.Empty;
+    public VisionAgentResourceRequirement? Resource { get; init; }
 }
 
 public sealed record VisionAgentBuildReadinessSnapshot
@@ -135,6 +202,7 @@ public sealed record VisionAgentBuildReadinessSnapshot
     public List<string> RemainingFields { get; init; } = [];
     public string PrimaryMessage { get; init; } = string.Empty;
     public string ContractVersion { get; init; } = VisionAgentPlanContractVersions.V2;
+    public List<VisionAgentResourceRequirement> MissingResources { get; init; } = [];
 }
 
 public sealed record VisionAgentSemanticExtractionRequest
@@ -435,6 +503,7 @@ public sealed record VisionAgentBuildFromPlanRequest
     public string BuildIntent { get; init; } = "new";
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public bool AcceptedRecommendedDefaults { get; init; }
+    public List<VisionAgentResourceDecision> ResourceDecisions { get; init; } = [];
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }
     public bool MetadataOnly { get; init; } = true;

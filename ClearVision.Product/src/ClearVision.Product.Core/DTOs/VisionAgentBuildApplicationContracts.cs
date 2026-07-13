@@ -69,6 +69,8 @@ public sealed record VisionAgentBuildReadinessPreviewRequest
     public List<string> AcceptedDefaults { get; init; } = [];
     public bool AcceptedRecommendedDefaults { get; init; }
     public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
+    public List<VisionAgentResourceDecision> ResourceDecisions { get; init; } = [];
     public string? AdditionalContext { get; init; }
     public string? CurrentFlowSnapshot { get; init; }
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
@@ -89,6 +91,7 @@ public sealed record VisionAgentBuildReadinessPreviewResult
     public string PlanHash { get; init; } = string.Empty;
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
     public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
     public List<VisionAgentPlanAnswer> AcceptedAnswers { get; init; } = [];
     public string AnswerSetFingerprint { get; init; } = string.Empty;
     public VisionAgentBuildReadinessSnapshot BuildReadiness { get; init; } = new();

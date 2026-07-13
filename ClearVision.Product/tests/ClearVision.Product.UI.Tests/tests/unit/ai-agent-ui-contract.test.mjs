@@ -634,6 +634,7 @@ function createPanel(AiPanel, overrides = {}) {
       planHash: request.planHash,
       requirementMode: request.requirementMode || 'strict',
       answerRevision: request.answerRevision || 0,
+      resourceRevision: request.resourceRevision || 0,
       acceptedAnswers: request.confirmedAnswers || [],
       answerSetFingerprint: `test:${request.answerRevision || 0}:${request.requirementMode || 'strict'}`,
       buildReadiness: readiness,
@@ -4466,6 +4467,7 @@ test('Recommended strategy remains optimistic until one backend readiness previe
       planHash: request.planHash,
       requirementMode: request.requirementMode,
       answerRevision: request.answerRevision,
+      resourceRevision: request.resourceRevision,
       acceptedAnswers: request.confirmedAnswers,
       buildReadiness: {
         canBuild: true,
@@ -4573,6 +4575,81 @@ test('Draft Plan can start Build with legal Planner route without accepting stra
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
   assert.deepEqual(captured.buildFromPlan.userSelections, {});
   assert.deepEqual(captured.buildFromPlan.confirmedAnswers, []);
+});
+
+test('Readiness timeout exits validating and retry accepts only the matching authoritative preview', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': createFakeButton()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.planReadinessTimeoutMs = 1000;
+  panel._requestBackendPlanReadinessPreview = (_request, options = {}) => new Promise((_, reject) => {
+    options.signal?.addEventListener('abort', () => {
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  });
+
+  assert.equal(panel._requestPlanReadinessPreview(panel.pendingVisionPlan, { reason: 'timeout_test' }), true);
+  assert.equal(panel.agentWorkspaceState.readinessStatus, 'validating');
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  assert.equal(panel.agentWorkspaceState.readinessStatus, 'timeout');
+  assert.equal(panel.activePlanReadinessPreviewRequest, null);
+  assert.match(panel._getPlanBuildActionState(panel.pendingVisionPlan).label, /超时/);
+
+  panel._requestBackendPlanReadinessPreview = async request => ({
+    ...panel._buildTestPlanReadinessPreview(request),
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'algorithm_strategy'],
+      remainingFields: [],
+      primaryMessage: 'Ready.',
+      contractVersion: 'v2'
+    }
+  });
+  assert.equal(panel._requestPlanReadinessPreview(panel.pendingVisionPlan, { reason: 'retry' }), true);
+  await waitFor(() => panel.agentWorkspaceState.readinessStatus === 'ready', 'matching readiness retry');
+  assert.equal(panel._getCurrentCanonicalPreview(panel.pendingVisionPlan)?.buildReadiness?.canBuild, true);
+  assert.equal(panel._getPlanBuildActionState(panel.pendingVisionPlan).canStart, true);
+});
+
+test('Readiness abort returns to idle and missing canonical preview never masquerades as validating', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': createFakeButton()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel._requestBackendPlanReadinessPreview = (_request, options = {}) => new Promise((_, reject) => {
+    options.signal?.addEventListener('abort', () => {
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  });
+
+  panel._requestPlanReadinessPreview(panel.pendingVisionPlan, { reason: 'abort_test' });
+  assert.equal(panel.agentWorkspaceState.readinessStatus, 'validating');
+  panel._resetPlanReadinessPreviewState({ abort: true });
+  await flushAsync(2);
+  assert.equal(panel.agentWorkspaceState.readinessStatus, 'idle');
+  assert.equal(panel.activePlanReadinessPreviewRequest, null);
+  const action = panel._getPlanBuildActionState(panel.pendingVisionPlan);
+  assert.match(action.label, /尚未获得权威校验结果/);
+  assert.doesNotMatch(action.label, /正在校验/);
+  assert.equal(action.canRetryReadiness, true);
 });
 
 test('Canonical field aliases are stored optimistically but cannot override backend readiness', async () => {
@@ -6452,9 +6529,9 @@ test('Build resource workspace exposes existing binding controls and redacts uns
   const html = elements['#ai-result-followups'].innerHTML;
   assertNoSensitiveLeak(html);
   assert.doesNotMatch(html, /data-missing-resource-action/);
-  assert.match(html, /data-resource-action="bind_model_resource"/);
-  assert.match(html, /data-resource-input="true"/);
-  assert.match(html, /具体资源在 Build 中完成绑定/);
+  assert.match(html, /data-resource-action="pick_model_resource"/);
+  assert.match(html, /选择模型文件/);
+  assert.match(html, /模型文件选择器|当前 Plan 工作台/);
 });
 test('apply hint separates canvas apply from DeploymentReady gate', async () => {
   const source = [
@@ -8996,11 +9073,11 @@ test('Build result resource cards reuse the existing binding handler without aut
   panel._renderFollowupChecklist(response, response.flow);
   assert.doesNotMatch(followups.innerHTML, /data-missing-resource-action/);
   assert.match(followups.innerHTML, /待绑定资源/);
-  assert.match(followups.innerHTML, /data-resource-action="bind_model_resource"/);
-  assert.match(followups.innerHTML, /data-resource-action="defer_resource"/);
+  assert.match(followups.innerHTML, /data-resource-action="pick_model_resource"/);
+  assert.match(followups.innerHTML, /data-resource-action="switch_to_draft"/);
   assert.doesNotMatch(followups.innerHTML, /自动绑定|自动选择|自动部署/);
 });
-test('Unified resource clarification redacts unsafe metadata while old evidence stays non-interactive', async () => {
+test('Unified resource clarification redacts unsafe metadata and exposes the canonical resolution action', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -9026,7 +9103,9 @@ test('Unified resource clarification redacts unsafe metadata while old evidence 
   panel._renderPlanWorkspace(plan);
   assertNoSensitiveLeak(planWorkspace.innerHTML);
   assert.equal((planWorkspace.innerHTML.match(/data-ai-hook="clarification-resources"/g) || []).length, 1);
-  assert.doesNotMatch(planWorkspace.innerHTML, /data-resource-action|type="file"/);
+  assert.match(planWorkspace.innerHTML, /data-resource-action="pick_model_resource"/);
+  assert.match(planWorkspace.innerHTML, /资源|影响算子|影响参数|阻断范围|解决位置/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /type="file"/);
 });
 test('resource binding action writes metadata and updates pending, missing, and apply gate state', async () => {
   const { AiPanel } = await loadAiPanel();
@@ -9056,7 +9135,8 @@ test('resource binding action writes metadata and updates pending, missing, and 
   });
 
   const modelResource = response.missingResources.find(item => item.resourceType === 'model_resource');
-  const updated = panel._handleMissingResourceAction(modelResource, 'bind_model_resource', {
+  const draftKey = panel._getPendingResourceDraftKey(modelResource);
+  const updated = panel._handleMissingResourceAction(modelResource, 'pick_model_resource', {
     value: 'model-resource:scratch-v1',
     data: response,
     flow: response.flow
@@ -9072,11 +9152,11 @@ test('resource binding action writes metadata and updates pending, missing, and 
   assert.equal(response.workflowDiff.deploymentBlockers.includes('missing_camera_binding:op_acq.CameraId'), true);
   assert.equal(response.workflowDiff.pendingParameters.includes('provide op_detect.ModelPath before deployment'), false);
   assert.equal(response.flow.operators.find(op => op.tempId === 'op_detect').parameters.ModelPath, 'model-resource:scratch-v1');
-  assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].metadataOnly, true);
-  assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].confirmedBy, 'local-user');
+  assert.equal(panel.pendingResourceDrafts[draftKey].metadataOnly, true);
+  assert.equal(panel.pendingResourceDrafts[draftKey].confirmedBy, 'local-user');
   assert.equal(response.manualResourceConfirmations.length, 1);
   assert.equal(response.manualResourceConfirmations[0].metadataOnly, true);
-  assert.match(response.manualResourceConfirmations[0].actionLabel, /人工确认模型资源/);
+  assert.match(response.manualResourceConfirmations[0].actionLabel, /选择模型文件/);
   assert.match(response.manualResourceConfirmations[0].writebackSummary, /model-resource:scratch-v1/);
   assert.match(panel.lastResultStatusNote.text, /仍有 9 项部署前待补/);
   assertNoSensitiveLeak([
@@ -9144,6 +9224,7 @@ test('resource binding action updates PascalCase replay payloads by ActualOperat
 
   const resource = response.MissingResources[0];
   const model = panel._getMissingResourceActionModel(resource);
+  const draftKey = panel._getPendingResourceDraftKey(resource);
   const updated = panel._handleMissingResourceAction(resource, model.action, {
     value: 'model-resource:pascal-v1',
     data: response,
@@ -9159,13 +9240,13 @@ test('resource binding action updates PascalCase replay payloads by ActualOperat
   const operator = response.Flow.Operators[0];
   assert.equal(operator.Parameters.ModelPath, 'model-resource:pascal-v1');
   assert.equal(Object.prototype.hasOwnProperty.call(operator, 'parameters'), false);
-  assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].value, 'model-resource:pascal-v1');
-  assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].actualOperatorId, 'op_detect');
+  assert.equal(panel.pendingResourceDrafts[draftKey].value, 'model-resource:pascal-v1');
+  assert.equal(panel.pendingResourceDrafts[draftKey].actualOperatorId, 'op_detect');
   assert.equal(response.ManualResourceConfirmations.length, 1);
   assert.equal(response.ManualResourceConfirmations[0].metadataOnly, true);
 });
 
-test('resolving all resource tasks updates apply gate without guessing file paths or PLC writes', async () => {
+test('resolving in-workbench resources keeps settings-owned output and PLC blockers authoritative', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, {
     options: { getOperators: resourceBindingOperatorMetadata }
@@ -9199,18 +9280,17 @@ test('resolving all resource tasks updates apply gate without guessing file path
     });
   }
 
-  assert.deepEqual(response.missingResources, []);
+  assert.deepEqual(response.missingResources.map(item => item.resourceType), ['output_channel', 'plc_address']);
   assert.deepEqual(response.pendingParameters, []);
-  assert.equal(response.applyGate.deploymentReady, true);
-  assert.equal(response.applyGate.status, 'deployment_ready');
-  assert.equal(response.validationPreview.deploymentPrecheck.readyForDeployment, true);
-  assert.equal(response.validationPreview.deploymentPrecheck.deploymentBlocked, false);
-  assert.equal(response.firstFixRecommendation, '');
-  assert.equal(response.manualResourceConfirmations.length, resources.length);
+  assert.equal(response.applyGate.deploymentReady, false);
+  assert.equal(response.applyGate.status, 'canvas_apply_ready');
+  assert.equal(response.validationPreview.deploymentPrecheck.readyForDeployment, false);
+  assert.equal(response.validationPreview.deploymentPrecheck.deploymentBlocked, true);
+  assert.equal(response.manualResourceConfirmations.length, resources.length - 2);
   const output = response.flow.operators.find(op => op.tempId === 'op_output');
   assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'PlcAddress'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'OutputChannel'), false);
-  assertNoSensitiveLeak(JSON.stringify(response));
+  assert.doesNotMatch(JSON.stringify(response), /C:\\|D:\\|\.onnx|192\.168\.|DB1\.DBX|base64|data:image|sk-secret|super-secret-value/i);
 });
 
 test('defer resource keeps DeploymentReady false and leaves the blocker visible', async () => {
@@ -9238,8 +9318,8 @@ test('defer resource keeps DeploymentReady false and leaves the blocker visible'
   assert.equal(updated, false);
   assert.equal(response.missingResources.some(item => item.resourceKey === 'op_output.OutputChannel'), true);
   assert.equal(response.applyGate.deploymentReady, false);
-  assert.equal(panel.pendingResourceDrafts['op_output.OutputChannel'].status, 'deferred');
-  assert.match(panel.lastResultStatusNote.text, /稍后处理/);
+  assert.equal(Object.values(panel.pendingResourceDrafts).some(item => item.resourceType === 'output_channel'), false);
+  assert.match(panel.lastResultStatusNote.text, /不能在当前模式下暂缓/);
 });
 
 test('manual confirmation records render and survive replay payload rendering', async () => {
@@ -9337,8 +9417,9 @@ test('template artifact binding stays metadata-only and does not create fake Tem
     '#ai-btn-apply': createFakeButton()
   });
   const templateResource = response.missingResources.find(item => item.resourceType === 'template_artifact');
+  const draftKey = panel._getPendingResourceDraftKey(templateResource);
 
-  panel._handleMissingResourceAction(templateResource, 'select_template_artifact', {
+  panel._handleMissingResourceAction(templateResource, 'pick_template_resource', {
     value: 'template-artifact:fixture-a',
     data: response,
     flow: response.flow
@@ -9348,7 +9429,7 @@ test('template artifact binding stays metadata-only and does not create fake Tem
   assert.equal(response.missingResources.some(item => item.resourceKey === 'op_match.Template'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'TemplatePath'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'Template'), false);
-  assert.equal(panel.pendingResourceDrafts['op_match.Template'].value, 'template-artifact:fixture-a');
+  assert.equal(panel.pendingResourceDrafts[draftKey].value, 'template-artifact:fixture-a');
 });
 
 test('applied workspace tells users to review details on the flow page without bypassing deployment gate', async () => {

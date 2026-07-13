@@ -440,9 +440,22 @@ public class AiPendingParameterInfo
 
 public class AiMissingResourceInfo
 {
+    public string CanonicalId { get; set; } = string.Empty;
     public string ResourceType { get; set; } = string.Empty;
+    public string ResourceName { get; set; } = string.Empty;
     public string ResourceKey { get; set; } = string.Empty;
+    public string OperatorKey { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = string.Empty;
+    public string OperatorType { get; set; } = string.Empty;
+    public int OperatorIndex { get; set; } = -1;
+    public string ParameterName { get; set; } = string.Empty;
+    public string Status { get; set; } = VisionAgentResourceStatuses.Pending;
+    public string BlockingScope { get; set; } = VisionAgentResourceBlockingScopes.DeployRun;
+    public string Source { get; set; } = string.Empty;
+    public string ResolutionTarget { get; set; } = VisionAgentResourceResolutionTargets.PlanWorkbench;
+    public string DraftPolicy { get; set; } = VisionAgentResourceDraftPolicies.DraftAllowed;
     public string Description { get; set; } = string.Empty;
+    public List<string> Aliases { get; set; } = new();
 }
 
 public class AiRequirementBrief

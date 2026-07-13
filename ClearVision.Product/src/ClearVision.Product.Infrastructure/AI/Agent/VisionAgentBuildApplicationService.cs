@@ -366,7 +366,8 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             build.AcceptedRecommendedDefaults,
             validatedAnswers,
             effectiveRequirement,
-            requirementMode) with
+            requirementMode,
+            build.ResourceDecisions) with
         {
             ContractVersion = contract.ContractVersion
         };
@@ -398,6 +399,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             AcceptedRecommendedDefaults = request.AcceptedRecommendedDefaults,
             RequirementMaturity = request.RequirementMaturity,
             DecisionTrace = request.DecisionTrace,
+            ResourceDecisions = request.ResourceDecisions,
             MetadataOnly = true
         };
 
@@ -443,6 +445,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             PlanHash = contract.PlanHash,
             RequirementMode = NormalizeRequirementMode(request.RequirementMode),
             AnswerRevision = request.AnswerRevision,
+            ResourceRevision = request.ResourceRevision,
             AcceptedAnswers = readinessContext.Validation.AcceptedAnswers,
             AnswerSetFingerprint = readinessContext.AnswerSetFingerprint,
             BuildReadiness = readiness,
@@ -477,6 +480,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             PlanHash = FirstNonBlank(planHash, request.PlanHash, request.PlanSnapshot?.PlanHash),
             RequirementMode = NormalizeRequirementMode(request.RequirementMode),
             AnswerRevision = request.AnswerRevision,
+            ResourceRevision = request.ResourceRevision,
             BuildReadiness = new VisionAgentBuildReadinessSnapshot
             {
                 CanBuild = false,

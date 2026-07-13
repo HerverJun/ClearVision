@@ -99,6 +99,20 @@ function createPanel({ queue = [], batch = queue, missingResources = [], confirm
       ResultOutput: '结果输出',
     }[value] || value),
     _inferPlanQuestionFieldForQuestion: question => question.field,
+    _getMissingResourceActionModel: resource => ({
+      action: resource.resourceType === 'model_resource' ? 'pick_model_resource' : 'open_resource_location',
+      primaryLabel: resource.resourceType === 'model_resource' ? '选择模型文件' : '前往解决位置',
+      parameterName: resource.parameterName || '',
+    }),
+    _renderResourceAuditTaskCard: (resource, actionModel) => `
+      <article class="ai-resource-audit-card">
+        <span>资源 ${resource.resourceName}</span>
+        <span>影响算子 ${resource.operatorKey}</span>
+        <span>影响参数 ${resource.parameterName}</span>
+        <span>阻断范围 ${resource.blockingScope}</span>
+        <span>解决位置 ${resource.resolutionTarget}</span>
+        <button data-resource-action="${actionModel.action}">${actionModel.primaryLabel}</button>
+      </article>`,
     _canViewBuildWorkspace: () => false,
     _isPlanSnapshotReadOnly: () => false,
   };
@@ -272,11 +286,16 @@ test('Router text and local clarification payload cannot create a second questio
   assert.doesNotMatch(html, /旧 Router 问题/);
 });
 
-test('resource pending remains a lightweight boundary notice without binding controls', () => {
+test('resource pending renders one identifiable task with the existing resolution action', () => {
   const resource = {
-    id: 'resource:model',
-    field: 'model_asset',
-    title: '缺陷检测模型',
+    id: 'resource:v1|model_resource|surfacedefectdetection#1|modelpath',
+    canonicalId: 'resource:v1|model_resource|surfacedefectdetection#1|modelpath',
+    resourceType: 'model_resource',
+    resourceName: '缺陷检测模型',
+    operatorKey: 'SurfaceDefectDetection#1',
+    parameterName: 'ModelPath',
+    blockingScope: 'build',
+    resolutionTarget: 'picker:model',
     kind: 'resource',
     category: 'resource_pending',
     blocksBuild: true,
@@ -287,8 +306,12 @@ test('resource pending remains a lightweight boundary notice without binding con
   assert.match(html, /当前没有待确认问题/);
   assert.match(html, /待补资源 · 1 项/);
   assert.doesNotMatch(html, /还需确认 1 项/);
-  assert.match(html, /完整资源补齐将在后续阶段处理/);
-  assert.doesNotMatch(html, /type="file"|data-resource-action|路径/);
+  assert.match(html, /缺陷检测模型/);
+  assert.match(html, /SurfaceDefectDetection#1/);
+  assert.match(html, /ModelPath/);
+  assert.match(html, /picker:model/);
+  assert.match(html, /data-resource-action="pick_model_resource"/);
+  assert.doesNotMatch(html, /type="file"/);
 });
 
 test('first planning wait renders four honest phases with cancel feedback', () => {

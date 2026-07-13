@@ -94,8 +94,10 @@ public sealed class VisionAgentWorkspaceSnapshot
     public List<VisionAgentPlanAnswer> OptimisticPlanAnswers { get; set; } = new();
     public int AnswerRevision { get; set; }
     public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
+    public List<VisionAgentResourceRequirement> MissingResources { get; set; } = new();
     public Dictionary<string, JsonElement> ResourceDecisions { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
+    public int ResourceRevision { get; set; }
     public string RequirementMode { get; set; } = AiRequirementModes.Strict;
     public string WorkspaceViewMode { get; set; } = "plan";
     public bool PlanAcceptedRecommendedDefaults { get; set; }
@@ -121,7 +123,9 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public List<VisionAgentPlanAnswer>? OptimisticPlanAnswers { get; set; }
     public int? AnswerRevision { get; set; }
     public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
+    public List<VisionAgentResourceRequirement>? MissingResources { get; set; }
     public Dictionary<string, JsonElement>? ResourceDecisions { get; set; }
+    public int? ResourceRevision { get; set; }
     public string? RequirementMode { get; set; }
     public string? WorkspaceViewMode { get; set; }
     public bool? PlanAcceptedRecommendedDefaults { get; set; }
@@ -1117,7 +1121,9 @@ public class ConversationalFlowService : IConversationalFlowService
         var hasV2WorkspaceFields = update.OptimisticPlanAnswers != null ||
             update.AnswerRevision.HasValue ||
             update.ReadinessPreview != null ||
+            update.MissingResources != null ||
             update.ResourceDecisions != null ||
+            update.ResourceRevision.HasValue ||
             update.WorkspaceViewMode != null;
 
         if (!hasV2WorkspaceFields)
@@ -1154,11 +1160,13 @@ public class ConversationalFlowService : IConversationalFlowService
             update.OptimisticPlanAnswers,
             update.AnswerRevision,
             update.ReadinessPreview,
+            update.MissingResources,
             ResourceDecisions = update.ResourceDecisions?
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(pair => new { Key = pair.Key.Trim(), Value = pair.Value })
                 .ToList(),
+            update.ResourceRevision,
             update.RequirementMode,
             update.WorkspaceViewMode,
             update.PlanAcceptedRecommendedDefaults,
@@ -1590,6 +1598,8 @@ public class ConversationalFlowService : IConversationalFlowService
             snapshot.AnswerRevision = Math.Max(0, update.AnswerRevision.Value);
         if (update.ReadinessPreview != null)
             snapshot.ReadinessPreview = CloneReadinessPreview(update.ReadinessPreview);
+        if (update.MissingResources != null)
+            snapshot.MissingResources = update.MissingResources.Select(resource => resource with { Aliases = resource.Aliases.ToList() }).ToList();
         if (update.ResourceDecisions != null)
         {
             snapshot.ResourceDecisions = update.ResourceDecisions
@@ -1599,6 +1609,8 @@ public class ConversationalFlowService : IConversationalFlowService
                     pair => pair.Value.Clone(),
                     StringComparer.OrdinalIgnoreCase);
         }
+        if (update.ResourceRevision.HasValue)
+            snapshot.ResourceRevision = Math.Max(0, update.ResourceRevision.Value);
         if (update.RequirementMode != null)
             snapshot.RequirementMode = string.IsNullOrWhiteSpace(update.RequirementMode)
                 ? AiRequirementModes.Strict
@@ -1687,8 +1699,10 @@ public class ConversationalFlowService : IConversationalFlowService
             OptimisticPlanAnswers = ClonePlanAnswers(snapshot.OptimisticPlanAnswers),
             AnswerRevision = snapshot.AnswerRevision,
             ReadinessPreview = CloneReadinessPreview(snapshot.ReadinessPreview),
+            MissingResources = snapshot.MissingResources.Select(resource => resource with { Aliases = resource.Aliases.ToList() }).ToList(),
             ResourceDecisions = snapshot.ResourceDecisions
                 .ToDictionary(pair => pair.Key, pair => pair.Value.Clone(), StringComparer.OrdinalIgnoreCase),
+            ResourceRevision = snapshot.ResourceRevision,
             RequirementMode = snapshot.RequirementMode,
             WorkspaceViewMode = snapshot.WorkspaceViewMode,
             PlanAcceptedRecommendedDefaults = snapshot.PlanAcceptedRecommendedDefaults,

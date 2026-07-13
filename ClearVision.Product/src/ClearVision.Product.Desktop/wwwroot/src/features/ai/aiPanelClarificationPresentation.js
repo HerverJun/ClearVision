@@ -309,14 +309,11 @@ function renderResources(panel, items) {
     return `
         <div class="ai-clarification-v2-resources" data-ai-hook="clarification-resources">
             <div class="ai-clarification-v2-subtitle">待补资源 · ${items.length} 项</div>
-            ${items.map(item => `
-                <div>
-                    <strong>${escapeHtml(panel, item.title || '资源待补齐')}</strong>
-                    <span>${item.blocksBuild === true
-                        ? '当前权威 Readiness 将其标记为构建阻断；完整资源补齐将在后续阶段处理。'
-                        : '该资源将在构建后补齐，本阶段不提前展示绑定控件。'}</span>
-                </div>
-            `).join('')}
+            ${items.map((item, index) => panel?._renderResourceAuditTaskCard?.(
+                item,
+                panel?._getMissingResourceActionModel?.(item) || {},
+                index
+            ) || '').join('')}
         </div>
     `;
 }
@@ -366,6 +363,19 @@ function requestConfirmation(panel, plan, field, reason) {
 
 export function bindAiClarificationInteractions(panel, root, plan) {
     if (!root) return;
+    const presentation = deriveAiClarificationPresentation(panel, plan);
+    root.querySelectorAll('[data-resource-action]').forEach(button => {
+        button.addEventListener('click', () => {
+            const index = Number.parseInt(button.dataset.resourceIndex || '-1', 10);
+            const resource = Number.isInteger(index) && index >= 0 ? presentation.resourceItems[index] : null;
+            if (!resource) return;
+            const card = button.closest?.('.ai-followup-resource-task');
+            const input = card?.querySelector?.('[data-resource-input="true"]');
+            panel?._handleMissingResourceAction?.(resource, button.dataset.resourceAction || '', {
+                value: input?.value ?? ''
+            });
+        });
+    });
     root.querySelectorAll('[data-ai-plan-option="true"]').forEach(input => {
         input.addEventListener('change', () => {
             if (!input.checked) return;

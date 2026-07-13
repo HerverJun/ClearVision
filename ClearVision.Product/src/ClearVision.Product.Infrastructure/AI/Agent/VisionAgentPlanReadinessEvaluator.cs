@@ -20,7 +20,8 @@ public static class VisionAgentPlanReadinessEvaluator
         bool acceptedRecommendedDefaults = false,
         VisionAgentPlanAnswerValidationResult? validatedAnswers = null,
         VisionAgentEffectiveRequirement? effectiveRequirement = null,
-        string requirementMode = AiRequirementModes.Strict)
+        string requirementMode = AiRequirementModes.Strict,
+        IReadOnlyList<VisionAgentResourceDecision>? resourceDecisions = null)
     {
         _ = acceptedDefaults;
         if (plan == null)
@@ -123,7 +124,14 @@ public static class VisionAgentPlanReadinessEvaluator
             }
         }
 
-        AddResourceBlockersForAcceptedAnswers(planSnapshot, blockers, answers, requirementMode, maturity, hasSupportedRoute);
+        AddResourceBlockersForAcceptedAnswers(
+            planSnapshot,
+            blockers,
+            answers,
+            requirementMode,
+            maturity,
+            hasSupportedRoute,
+            resourceDecisions);
 
         if (!hasSupportedRoute)
         {
@@ -158,7 +166,11 @@ public static class VisionAgentPlanReadinessEvaluator
 
         var distinctBlockers = blockers
             .Where(item => !string.IsNullOrWhiteSpace(item.Id))
-            .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+            .Where(item => item.Resource == null || !IsResourceBound(item.Resource, resourceDecisions))
+            .GroupBy(item => item.Resource?.CanonicalId is { Length: > 0 } canonicalId
+                    ? $"resource:{canonicalId}"
+                    : item.Id,
+                StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(item => item.BlocksBuild).First())
             .Take(16)
             .ToList();
@@ -379,15 +391,38 @@ public static class VisionAgentPlanReadinessEvaluator
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
         {
-            var blocksResource = ShouldBlockResourcePending(plan, field, requirementMode, maturity, hasSupportedRoute);
+            var normalizedResourceKey = VisionAgentResourceIdentity.NormalizeToken(idKey);
+            if ((normalizedResourceKey.Contains("localoutput", StringComparison.Ordinal) ||
+                 VisionAgentPlanFieldPolicy.NormalizeField(field).Equals(VisionAgentPlanAnswerFields.OutputTarget, StringComparison.OrdinalIgnoreCase)) &&
+                AllowsDefaultLocalOutput(plan, validatedAnswers))
+            {
+                return Blocker(
+                    $"contract_warning:{idKey}",
+                    VisionAgentBuildBlockerCategories.ContractWarning,
+                    field,
+                    questionId,
+                    false,
+                    VisionAgentBuildBlockerResolutionModes.NonBlocking,
+                    "默认使用本地结构化结果输出，不需要额外输出资源。");
+            }
+
+            var resource = BuildLegacyResourceRequirement(plan, idKey, field, questionId);
+            var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
+            resource = resource with
+            {
+                BlockingScope = blocksResource
+                    ? VisionAgentResourceBlockingScopes.Build
+                    : VisionAgentResourceBlockingScopes.DeployRun
+            };
             return Blocker(
-                $"resource_pending:{idKey}",
+                ResourceBlockerId(resource),
                 VisionAgentBuildBlockerCategories.ResourcePending,
                 field,
                 questionId,
                 blocksResource,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                "资源仍保持待绑定；稍后处理不代表资源已就绪，部署门禁继续保留。");
+                ResourcePublicLabel(resource, blocksResource),
+                resource);
         }
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
@@ -475,14 +510,20 @@ public static class VisionAgentPlanReadinessEvaluator
             field.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) &&
             !ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: true))
         {
+            var resource = BuildCameraRequirement(plan) with
+            {
+                Source = "field_blocker",
+                BlockingScope = VisionAgentResourceBlockingScopes.DeployRun
+            };
             return Blocker(
-                $"resource_pending:{idKey}_missing",
+                ResourceBlockerId(resource),
                 VisionAgentBuildBlockerCategories.ResourcePending,
                 field,
                 questionId,
                 false,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                "图像来源仍保持待绑定；可生成草稿不代表资源已就绪，部署门禁继续保留。");
+                ResourcePublicLabel(resource, false),
+                resource);
         }
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.HardRequirement, StringComparison.OrdinalIgnoreCase) ||
@@ -666,8 +707,34 @@ public static class VisionAgentPlanReadinessEvaluator
         IReadOnlyList<VisionAgentPlanAnswer> answers,
         string requirementMode,
         AiRequirementMaturityResult? maturity,
-        bool hasSupportedRoute)
+        bool hasSupportedRoute,
+        IReadOnlyList<VisionAgentResourceDecision>? resourceDecisions)
     {
+        var requirements = BuildRouteResourceRequirements(plan, answers);
+        foreach (var resource in requirements)
+        {
+            if (IsResourceBound(resource, resourceDecisions))
+            {
+                continue;
+            }
+
+            var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
+            AddOrReplace(blockers, Blocker(
+                ResourceBlockerId(resource),
+                VisionAgentBuildBlockerCategories.ResourcePending,
+                ResourceField(resource),
+                string.Empty,
+                blocksResource,
+                VisionAgentBuildBlockerResolutionModes.ProvideResource,
+                ResourcePublicLabel(resource, blocksResource),
+                resource with
+                {
+                    BlockingScope = blocksResource
+                        ? VisionAgentResourceBlockingScopes.Build
+                        : VisionAgentResourceBlockingScopes.DeployRun
+                }));
+        }
+
         foreach (var answer in answers)
         {
             var field = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
@@ -679,24 +746,206 @@ public static class VisionAgentPlanReadinessEvaluator
                 continue;
             }
 
-            var blocksResource = ShouldBlockResourcePending(
-                plan,
-                VisionAgentPlanAnswerFields.ImageSource,
-                requirementMode,
-                maturity,
-                hasSupportedRoute);
+            var resource = BuildCameraRequirement(plan);
+            if (IsResourceBound(resource, resourceDecisions)) continue;
+            var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
             AddOrReplace(blockers, Blocker(
-                "resource_pending:camera_binding",
+                ResourceBlockerId(resource),
                 VisionAgentBuildBlockerCategories.ResourcePending,
                 VisionAgentPlanAnswerFields.ImageSource,
                 Clean(answer.QuestionId),
                 blocksResource,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                blocksResource
-                    ? "资源仍待绑定，当前模式下不能开始构建。"
-                    : "可以生成可编辑草稿，部署前仍需绑定资源。"));
+                ResourcePublicLabel(resource, blocksResource),
+                resource with
+                {
+                    BlockingScope = blocksResource
+                        ? VisionAgentResourceBlockingScopes.Build
+                        : VisionAgentResourceBlockingScopes.DeployRun
+                }));
         }
     }
+
+    private static List<VisionAgentResourceRequirement> BuildRouteResourceRequirements(
+        VisionAgentPlanModeResult plan,
+        IReadOnlyList<VisionAgentPlanAnswer> answers)
+    {
+        var requirements = new List<VisionAgentResourceRequirement>();
+        var operators = plan.RecommendedRoute?.Operators ?? [];
+        var ordinals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var imageSource = answers
+            .FirstOrDefault(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field)
+                .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))?.Value ?? string.Empty;
+
+        foreach (var rawOperator in operators)
+        {
+            var operatorType = Clean(rawOperator);
+            var normalizedType = VisionAgentResourceIdentity.NormalizeToken(operatorType);
+            ordinals.TryGetValue(normalizedType, out var ordinal);
+            ordinals[normalizedType] = ordinal + 1;
+            var operatorKey = VisionAgentResourceIdentity.OperatorKey(operatorType, ordinal);
+
+            if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                imageSource is not null &&
+                (imageSource.Contains("camera", StringComparison.OrdinalIgnoreCase) ||
+                 imageSource.Contains("station", StringComparison.OrdinalIgnoreCase) ||
+                 imageSource.Contains("line", StringComparison.OrdinalIgnoreCase)))
+            {
+                requirements.Add(CreateResourceRequirement(
+                    "camera_binding", "相机绑定", operatorKey, operatorType, ordinal,
+                    "CameraBindingId", VisionAgentResourceResolutionTargets.CameraSettings,
+                    VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
+            }
+            else if (PlanMentionsResourceRequirement(plan, "model") &&
+                     (operatorType.Equals("DeepLearning", StringComparison.OrdinalIgnoreCase) ||
+                     operatorType.Equals("OnnxInference", StringComparison.OrdinalIgnoreCase) ||
+                     operatorType.Equals("SemanticSegmentation", StringComparison.OrdinalIgnoreCase) ||
+                     operatorType.Equals("AnomalyDetection", StringComparison.OrdinalIgnoreCase)))
+            {
+                requirements.Add(CreateResourceRequirement(
+                    "model_resource", "模型资源", operatorKey, operatorType, ordinal,
+                    "ModelPath", VisionAgentResourceResolutionTargets.ModelPicker,
+                    VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
+            }
+            else if (PlanMentionsResourceRequirement(plan, "template") &&
+                     operatorType.Equals("TemplateMatching", StringComparison.OrdinalIgnoreCase))
+            {
+                requirements.Add(CreateResourceRequirement(
+                    "template_artifact", "模板资源", operatorKey, operatorType, ordinal,
+                    "Template", VisionAgentResourceResolutionTargets.TemplatePicker,
+                    VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
+            }
+            else if (PlanMentionsResourceRequirement(plan, "calibration", "measurement") &&
+                     operatorType.Equals("UnitConvert", StringComparison.OrdinalIgnoreCase))
+            {
+                requirements.Add(CreateResourceRequirement(
+                    "calibration_resource", "标定参数", operatorKey, operatorType, ordinal,
+                    "Scale", VisionAgentResourceResolutionTargets.CalibrationSettings,
+                    VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
+            }
+        }
+
+        return requirements
+            .GroupBy(item => item.CanonicalId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static bool PlanMentionsResourceRequirement(VisionAgentPlanModeResult plan, params string[] markers)
+    {
+        return (plan.BlockingReasons ?? [])
+            .Any(reason => markers.Any(marker => reason.Contains(marker, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static VisionAgentResourceRequirement BuildCameraRequirement(VisionAgentPlanModeResult plan)
+    {
+        var operators = plan.RecommendedRoute?.Operators ?? [];
+        var index = operators.FindIndex(item => item.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
+        return CreateResourceRequirement(
+            "camera_binding", "相机绑定",
+            VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", Math.Max(0, index)),
+            "ImageAcquisition", Math.Max(0, index), "CameraBindingId",
+            VisionAgentResourceResolutionTargets.CameraSettings,
+            VisionAgentResourceDraftPolicies.DraftAllowed, "accepted_answer");
+    }
+
+    private static VisionAgentResourceRequirement BuildLegacyResourceRequirement(
+        VisionAgentPlanModeResult plan,
+        string key,
+        string field,
+        string questionId)
+    {
+        var normalized = VisionAgentResourceIdentity.NormalizeToken($"{key}_{field}");
+        if (normalized.Contains("camera", StringComparison.Ordinal) ||
+            VisionAgentPlanFieldPolicy.NormalizeField(field).Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
+            return BuildCameraRequirement(plan) with { Source = "legacy_blocker" };
+        if (normalized.Contains("model", StringComparison.Ordinal))
+        {
+            var operatorType = (plan.RecommendedRoute?.Operators ?? []).FirstOrDefault(op =>
+                op.Contains("learning", StringComparison.OrdinalIgnoreCase) ||
+                op.Contains("onnx", StringComparison.OrdinalIgnoreCase) ||
+                op.Contains("segmentation", StringComparison.OrdinalIgnoreCase) ||
+                op.Contains("anomaly", StringComparison.OrdinalIgnoreCase)) ?? "DeepLearning";
+            return CreateResourceRequirement("model_resource", "模型资源", VisionAgentResourceIdentity.OperatorKey(operatorType, 0), operatorType, 0, "ModelPath", VisionAgentResourceResolutionTargets.ModelPicker, VisionAgentResourceDraftPolicies.DraftAllowed, "legacy_blocker");
+        }
+        if (normalized.Contains("template", StringComparison.Ordinal))
+            return CreateResourceRequirement("template_artifact", "模板资源", VisionAgentResourceIdentity.OperatorKey("TemplateMatching", 0), "TemplateMatching", 0, "Template", VisionAgentResourceResolutionTargets.TemplatePicker, VisionAgentResourceDraftPolicies.DraftAllowed, "legacy_blocker");
+        if (normalized.Contains("plc", StringComparison.Ordinal) || normalized.Contains("external", StringComparison.Ordinal))
+            return CreateResourceRequirement("plc_output", "外部输出资源", "resultoutput#1", "ResultOutput", 0, "OutputChannel", VisionAgentResourceResolutionTargets.OutputSettings, VisionAgentResourceDraftPolicies.BuildRequired, "legacy_blocker");
+        return CreateResourceRequirement("resource", "工程资源", string.Empty, string.Empty, -1, field, VisionAgentResourceResolutionTargets.Replan, VisionAgentResourceDraftPolicies.BuildRequired, "legacy_blocker", key);
+    }
+
+    private static VisionAgentResourceRequirement CreateResourceRequirement(
+        string resourceType,
+        string resourceName,
+        string operatorKey,
+        string operatorType,
+        int operatorIndex,
+        string parameterName,
+        string resolutionTarget,
+        string draftPolicy,
+        string source,
+        string fallbackScope = "")
+    {
+        var canonicalId = VisionAgentResourceIdentity.CreateCanonicalId(resourceType, operatorKey, parameterName, fallbackScope);
+        return new VisionAgentResourceRequirement
+        {
+            CanonicalId = canonicalId,
+            ResourceType = VisionAgentResourceIdentity.NormalizeResourceType(resourceType),
+            ResourceName = resourceName,
+            ResourceKey = $"{operatorKey}.{parameterName}".Trim('.'),
+            OperatorKey = operatorKey,
+            OperatorType = operatorType,
+            OperatorIndex = operatorIndex,
+            ParameterName = parameterName,
+            Status = VisionAgentResourceStatuses.Pending,
+            BlockingScope = VisionAgentResourceBlockingScopes.Build,
+            Source = source,
+            ResolutionTarget = resolutionTarget,
+            DraftPolicy = draftPolicy,
+            Description = $"{resourceName}尚未绑定。",
+            Aliases = VisionAgentResourceIdentity.BuildAliases(canonicalId, resourceType, operatorKey, parameterName, fallbackScope).ToList()
+        };
+    }
+
+    private static bool IsResourceBound(
+        VisionAgentResourceRequirement resource,
+        IReadOnlyList<VisionAgentResourceDecision>? decisions)
+    {
+        return decisions?.Any(decision =>
+            decision.Status.Equals(VisionAgentResourceStatuses.Bound, StringComparison.OrdinalIgnoreCase) &&
+            (decision.CanonicalId.Equals(resource.CanonicalId, StringComparison.OrdinalIgnoreCase) ||
+             (!string.IsNullOrWhiteSpace(decision.OperatorKey) &&
+              VisionAgentResourceIdentity.CreateCanonicalId(
+                  decision.ResourceType,
+                  decision.OperatorKey,
+                  decision.ParameterName,
+                  decision.ResourceKey).Equals(resource.CanonicalId, StringComparison.OrdinalIgnoreCase)))) == true;
+    }
+
+    private static bool ResourceBlocksBuild(
+        VisionAgentResourceRequirement resource,
+        string requirementMode,
+        AiRequirementMaturityResult? maturity,
+        bool hasSupportedRoute)
+    {
+        if (!requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)) return true;
+        if (resource.DraftPolicy.Equals(VisionAgentResourceDraftPolicies.BuildRequired, StringComparison.OrdinalIgnoreCase)) return true;
+        return !hasSupportedRoute || maturity?.CanPlan != true;
+    }
+
+    private static string ResourceBlockerId(VisionAgentResourceRequirement resource) =>
+        $"resource_pending:{VisionAgentResourceIdentity.NormalizeToken(resource.CanonicalId)}";
+
+    private static string ResourceField(VisionAgentResourceRequirement resource) =>
+        resource.ResourceType.Equals("camera_binding", StringComparison.OrdinalIgnoreCase)
+            ? VisionAgentPlanAnswerFields.ImageSource
+            : resource.ResourceType;
+
+    private static string ResourcePublicLabel(VisionAgentResourceRequirement resource, bool blocksBuild) =>
+        blocksBuild
+            ? $"{resource.ResourceName}必须在构建前补齐。"
+            : $"{resource.ResourceName}可在草稿生成后补齐；部署和运行仍被阻止。";
 
     private static bool ShouldBlockResourcePending(
         VisionAgentPlanModeResult plan,
@@ -1017,7 +1266,13 @@ public static class VisionAgentPlanReadinessEvaluator
             ResolvedFields = resolvedFields,
             RemainingFields = remainingFields,
             PrimaryMessage = primaryMessage,
-            ContractVersion = contractVersion
+            ContractVersion = contractVersion,
+            MissingResources = blockers
+                .Where(blocker => blocker.Resource != null)
+                .Select(blocker => blocker.Resource!)
+                .GroupBy(resource => resource.CanonicalId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList()
         };
     }
 
@@ -1028,7 +1283,8 @@ public static class VisionAgentPlanReadinessEvaluator
         string questionId,
         bool blocksBuild,
         string resolutionMode,
-        string publicLabel)
+        string publicLabel,
+        VisionAgentResourceRequirement? resource = null)
     {
         return new VisionAgentBuildBlocker
         {
@@ -1038,7 +1294,8 @@ public static class VisionAgentPlanReadinessEvaluator
             QuestionId = Clean(questionId),
             BlocksBuild = blocksBuild,
             ResolutionMode = resolutionMode,
-            PublicLabel = Clean(publicLabel)
+            PublicLabel = Clean(publicLabel),
+            Resource = resource
         };
     }
 
@@ -1049,6 +1306,12 @@ public static class VisionAgentPlanReadinessEvaluator
     {
         if (canBuild)
         {
+            if (blockers.Any(blocker =>
+                    blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase) &&
+                    blocker.BlocksBuild == false))
+            {
+                return "可以生成可编辑草稿；待补资源仍会阻止部署和运行。";
+            }
             return "规划已完成，可以开始构建。";
         }
 

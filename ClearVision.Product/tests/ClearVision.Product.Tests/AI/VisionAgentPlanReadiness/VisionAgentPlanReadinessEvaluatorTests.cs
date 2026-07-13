@@ -180,8 +180,8 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
                 Question(
                     "image_source",
                     VisionAgentPlanAnswerFields.ImageSource,
-                    "camera",
-                    "Camera")
+                    "image_folder",
+                    "Image folder")
             ],
             RequirementMaturity = baseline.RequirementMaturity! with
             {
@@ -197,7 +197,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
                 {
                     QuestionId = "image_source",
                     Field = VisionAgentPlanAnswerFields.ImageSource,
-                    Value = "camera",
+                    Value = "image_folder",
                     Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
                 }
             ],
@@ -393,7 +393,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.ImageSource);
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null && blocker.Resource.ResourceType == "camera_binding" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.ResolutionMode == VisionAgentBuildBlockerResolutionModes.ProvideResource &&
             blocker.BlocksBuild);
@@ -445,9 +445,115 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null && blocker.Resource.ResourceType == "camera_binding" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild == false);
+    }
+
+    [Fact]
+    public void Evaluate_StrictModelAndTemplateResources_ShouldExposeDistinctCanonicalTasks()
+    {
+        var baseline = Plan(["resource_pending:model_resource_missing", "resource_pending:template_artifact_missing"]);
+        var plan = baseline with
+        {
+            RecommendedRoute = baseline.RecommendedRoute with
+            {
+                Operators = ["ImageAcquisition", "OnnxInference", "TemplateMatching", "ResultOutput"]
+            }
+        };
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, requirementMode: AiRequirementModes.Strict);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.MissingResources.Should().HaveCount(2);
+        readiness.MissingResources.Select(item => item.CanonicalId).Should().OnlyHaveUniqueItems();
+        readiness.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.OperatorKey == "onnxinference#1" &&
+            item.ParameterName == "ModelPath" &&
+            item.ResolutionTarget == VisionAgentResourceResolutionTargets.ModelPicker);
+        readiness.MissingResources.Should().Contain(item =>
+            item.ResourceType == "template_artifact" &&
+            item.OperatorKey == "templatematching#1" &&
+            item.ParameterName == "Template" &&
+            item.ResolutionTarget == VisionAgentResourceResolutionTargets.TemplatePicker);
+    }
+
+    [Fact]
+    public void Evaluate_BoundCanonicalResource_ShouldReleaseStrictBuildGate()
+    {
+        var plan = Plan(["resource_pending:model_resource_missing"]);
+        var blocked = VisionAgentPlanReadinessEvaluator.Evaluate(plan, requirementMode: AiRequirementModes.Strict);
+        var model = blocked.MissingResources.Should().ContainSingle(item => item.ResourceType == "model_resource").Subject;
+
+        var ready = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            requirementMode: AiRequirementModes.Strict,
+            resourceDecisions:
+            [
+                new VisionAgentResourceDecision
+                {
+                    CanonicalId = model.CanonicalId,
+                    Status = VisionAgentResourceStatuses.Bound,
+                    ResourceType = model.ResourceType,
+                    OperatorKey = model.OperatorKey,
+                    ParameterName = model.ParameterName,
+                    Source = "resource_binding"
+                }
+            ]);
+
+        ready.CanBuild.Should().BeTrue();
+        ready.MissingResources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Evaluate_DraftableModelResource_ShouldAllowDraftButKeepDeployRunBlock()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            Plan(["resource_pending:model_resource_missing"]),
+            requirementMode: AiRequirementModes.Draft);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.MissingResources.Should().ContainSingle(item =>
+            item.ResourceType == "model_resource" &&
+            item.BlockingScope == VisionAgentResourceBlockingScopes.DeployRun);
+        readiness.PrimaryMessage.Should().Contain("部署和运行");
+    }
+
+    [Fact]
+    public void Evaluate_NonDraftableExternalResource_ShouldStillBlockDraft()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            Plan(["resource_pending:plc_output_missing"]),
+            requirementMode: AiRequirementModes.Draft);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.MissingResources.Should().ContainSingle(item =>
+            item.ResourceType == "plc_output" &&
+            item.DraftPolicy == VisionAgentResourceDraftPolicies.BuildRequired);
+    }
+
+    [Fact]
+    public void Evaluate_LegacyAndRouteCameraSignals_ShouldMergeByCanonicalIdentity()
+    {
+        var baseline = Plan(["resource_pending:station_camera_configuration_or_identifier"]);
+        var plan = baseline with
+        {
+            ClarificationQuestions =
+            [
+                Question("image_source", VisionAgentPlanAnswerFields.ImageSource, "station_camera", "Station camera", VisionAgentClarificationAnswerEffects.ResolveField)
+            ]
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [new VisionAgentPlanAnswer { QuestionId = "image_source", Field = VisionAgentPlanAnswerFields.ImageSource, Value = "station_camera", Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection }],
+            null,
+            false);
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, validatedAnswers: validation);
+
+        readiness.MissingResources.Should().ContainSingle(item => item.ResourceType == "camera_binding");
+        readiness.Blockers.Count(item => item.Category == VisionAgentBuildBlockerCategories.ResourcePending).Should().Be(1);
     }
 
     [Fact]
@@ -471,7 +577,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:image_source_missing" &&
+            blocker.Resource != null && blocker.Resource.ResourceType == "camera_binding" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.Field == VisionAgentPlanAnswerFields.ImageSource &&
             blocker.BlocksBuild == false &&
@@ -822,7 +928,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.CanBuild.Should().BeFalse();
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:model_resource" &&
+            blocker.Resource!.ResourceType == "model_resource" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild);
         AssertCanBuildInvariant(readiness);
@@ -837,10 +943,34 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:model_resource" &&
+            blocker.Resource!.ResourceType == "model_resource" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild == false &&
             blocker.ResolutionMode == VisionAgentBuildBlockerResolutionModes.ProvideResource);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_NestedCanonicalLocalOutputResource_ShouldNotCreateABogusBuildRequiredResource()
+    {
+        var plan = Plan([
+            "resource_pending:resource:v1|resource|output_target_pending:local_output_interface_or_format|output_target"
+        ]) with
+        {
+            Goal = "Inspect packaging damage and keep output local.",
+            OriginalUserPrompt = "Inspect packaging damage and keep output local.",
+            SemanticExtraction = Plan([]).SemanticExtraction! with { OutputTarget = "local_structured_result" }
+        };
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, requirementMode: AiRequirementModes.Draft);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().NotContain(blocker =>
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget);
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Category == VisionAgentBuildBlockerCategories.ContractWarning &&
+            blocker.BlocksBuild == false);
         AssertCanBuildInvariant(readiness);
     }
 

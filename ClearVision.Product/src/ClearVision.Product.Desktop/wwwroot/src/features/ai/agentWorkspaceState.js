@@ -1,3 +1,5 @@
+import { mergeCanonicalResources, normalizeCanonicalResource, serializeCanonicalResource } from './aiResourceIdentity.js';
+
 export const AgentWorkspaceEventTypes = Object.freeze({
     RESET: 'workspace/reset',
     SESSION_ADOPTED: 'workspace/session-adopted',
@@ -155,6 +157,9 @@ function normalizeBlocker(value) {
     const item = asObject(value);
     const id = clean(read(item, 'id'));
     const category = lower(read(item, 'category'));
+    if (category === 'resource_pending') {
+        return normalizeCanonicalResource(item, { source: 'build_readiness' });
+    }
     const resourceKey = category === 'resource_pending'
         ? clean(read(item, 'resourceKey')) || id.replace(/^resource_pending:/i, '').replace(/^resource:/i, '')
         : '';
@@ -179,29 +184,7 @@ function normalizeBlocker(value) {
 }
 
 function normalizeMissingResource(value, index = 0) {
-    const item = asObject(value);
-    const resourceKey = clean(read(item, 'resourceKey') || read(item, 'id'));
-    const resourceType = clean(read(item, 'resourceType') || read(item, 'type')) || 'resource';
-    const operatorId = clean(read(item, 'operatorId') || read(item, 'actualOperatorId'));
-    const parameterName = clean(read(item, 'parameterName'));
-    const id = resourceKey || [resourceType, operatorId, parameterName].filter(Boolean).join(':') || `resource:${index}`;
-    return {
-        kind: 'resource',
-        id,
-        resourceKey,
-        resourceType,
-        operatorId,
-        parameterName,
-        field: normalizeCanonicalField(resourceType || parameterName),
-        title: clean(read(item, 'description')) || `${resourceType} 待绑定`,
-        why: clean(read(item, 'description')),
-        impact: '资源仍保持待绑定状态；稍后补齐不等于资源已就绪。',
-        options: [],
-        interactive: true,
-        blocksBuild: read(item, 'blocksBuild') !== false,
-        source: 'missing_resource',
-        raw: item
-    };
+    return normalizeCanonicalResource(value, { source: value?.source || 'missing_resource', index });
 }
 
 function normalizeReadiness(value) {
@@ -212,7 +195,9 @@ function normalizeReadiness(value) {
         resolvedFields: unique(asArray(read(item, 'resolvedFields')).map(normalizeCanonicalField)),
         remainingFields: unique(asArray(read(item, 'remainingFields')).map(normalizeCanonicalField)),
         primaryMessage: clean(read(item, 'primaryMessage')),
-        contractVersion: clean(read(item, 'contractVersion')) || 'v2'
+        contractVersion: clean(read(item, 'contractVersion')) || 'v2',
+        missingResources: asArray(read(item, 'missingResources'))
+            .map((resource, index) => normalizeMissingResource(resource, index))
     };
 }
 
@@ -262,6 +247,7 @@ export function deriveAgentWorkspaceProjection(state) {
     const resources = [
         ...asArray(read(plan, 'missingResources') || read(read(plan, 'rawPlanSnapshot'), 'missingResources')),
         ...asArray(resultMissingResources),
+        ...asArray(readiness.missingResources),
         ...Object.values(state.resources.missingByKey)
     ].map(normalizeMissingResource);
     const questions = asArray(read(plan, 'clarificationQuestions') || read(plan, 'questions')).map(normalizeQuestion).filter(Boolean);
@@ -304,21 +290,20 @@ export function deriveAgentWorkspaceProjection(state) {
     const clarificationBatch = requestedBatchKeys.length
         ? requestedBatchKeys.map(key => queue.find(item => (item.field || item.id) === key)).filter(Boolean)
         : unresolved.filter(item => item.interactive && asArray(item.options).length >= 2).slice(0, 3);
-    const resourceByKey = new Map();
-    [...resources, ...blockers.filter(item => item.kind === 'resource')].forEach((item, index) => {
-        const resourceKey = item.resourceKey || item.id || `resource:${index}`;
-        const decision = state.resources.decisionsByKey[resourceKey] || null;
-        const existing = resourceByKey.get(resourceKey);
-        resourceByKey.set(resourceKey, {
-            ...(existing || {}),
+    const missingResources = mergeCanonicalResources([
+        ...resources,
+        ...blockers.filter(item => item.kind === 'resource')
+    ]).map(item => {
+        const decision = state.resources.decisionsByKey[item.canonicalId] || null;
+        return {
             ...item,
             kind: 'resource',
             resourceDecision: decision,
             deferred: decision?.status === 'deferred',
-            answered: decision?.status === 'bound'
-        });
+            answered: decision?.status === 'bound' &&
+                !asArray(item.sources).some(source => ['build_readiness', 'readiness'].includes(lower(source)))
+        };
     });
-    const missingResources = [...resourceByKey.values()];
     const phase = derivePhase(state, plan, readiness, queue);
     return {
         phase,
@@ -352,11 +337,12 @@ export function createAgentWorkspaceState(seed = {}) {
         result: null,
         requirementMode: lower(seed.requirementMode) === 'draft' ? 'draft' : 'strict',
         answers: { confirmedByField: {}, optimisticByField: {}, selectionByQuestion: {}, answerRevision: 0, lastSubmittedBatch: [] },
-        readiness: { canBuild: false, blockers: [], resolvedFields: [], remainingFields: [], primaryMessage: '', contractVersion: '' },
+        readiness: { canBuild: false, blockers: [], resolvedFields: [], remainingFields: [], primaryMessage: '', contractVersion: '', missingResources: [] },
         readinessPreview: null,
         readinessStatus: 'idle',
         readinessError: '',
-        resources: { missingByKey: {}, decisionsByKey: {} },
+        readinessRequest: null,
+        resources: { missingByKey: {}, decisionsByKey: {}, revision: 0 },
         clarification: { batchKeys: [], batchRevision: 0 },
         run: {
             plan: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null },
@@ -489,12 +475,15 @@ export function agentWorkspaceReducer(state, event) {
             restored.answers.selectionByQuestion = cloneMap(payload.selections);
             restored.readiness = normalizeReadiness(payload.readiness || read(payload.plan, 'buildReadiness'));
             restored.readinessPreview = payload.readinessPreview || null;
-            restored.readinessStatus = payload.readinessStatus || (restored.plan ? 'ready' : 'idle');
+            restored.readinessStatus = payload.readinessStatus || (restored.plan
+                ? (restored.readiness.canBuild ? 'ready' : 'blocked')
+                : 'idle');
             restored.resources.missingByKey = Object.fromEntries(asArray(payload.missingResources).map((item, index) => {
                 const resource = normalizeMissingResource(item, index);
-                return [resource.id, resource.raw];
+                return [resource.canonicalId, serializeCanonicalResource(resource, { source: resource.source || 'workspace_restore' })];
             }));
             restored.resources.decisionsByKey = cloneMap(payload.resourceDecisions);
+            restored.resources.revision = Number(payload.resourceRevision) || 0;
             restored.clarification = { ...restored.clarification, ...asObject(payload.clarification) };
             restored.run = payload.run || restored.run;
             restored.apply = payload.apply || restored.apply;
@@ -532,8 +521,9 @@ export function agentWorkspaceReducer(state, event) {
                 },
                 readiness: normalizeReadiness(read(plan, 'buildReadiness')),
                 readinessPreview: read(plan, 'effectiveReadiness') || (samePlan ? state.readinessPreview : null),
-                readinessStatus: 'ready',
+                readinessStatus: normalizeReadiness(read(plan, 'buildReadiness')).canBuild ? 'ready' : 'blocked',
                 readinessError: '',
+                readinessRequest: null,
                 clarification: samePlan ? state.clarification : { batchKeys: [], batchRevision: 0 },
                 ui: { ...state.ui, workspaceMode: 'plan' }
             }, event);
@@ -547,7 +537,7 @@ export function agentWorkspaceReducer(state, event) {
                 readiness: createAgentWorkspaceState().readiness,
                 readinessPreview: null,
                 readinessStatus: 'idle',
-                resources: { missingByKey: {}, decisionsByKey: {} },
+                resources: { missingByKey: {}, decisionsByKey: {}, revision: state.resources.revision + 1 },
                 clarification: { batchKeys: [], batchRevision: state.clarification.batchRevision + 1 },
                 ui: { ...state.ui, workspaceMode: 'plan', viewMode: 'plan' }
             }, event);
@@ -607,13 +597,16 @@ export function agentWorkspaceReducer(state, event) {
             const confirmed = normalizeAnswerMap(payload.answers);
             const optimistic = { ...state.answers.optimisticByField };
             Object.keys(confirmed).forEach(field => delete optimistic[field]);
+            const answerRevision = payload.preserveRevision === true
+                ? state.answers.answerRevision
+                : state.answers.answerRevision + 1;
             return withProjection({
                 ...state,
                 answers: {
                     ...state.answers,
                     confirmedByField: { ...state.answers.confirmedByField, ...confirmed },
                     optimisticByField: optimistic,
-                    answerRevision: state.answers.answerRevision + 1
+                    answerRevision
                 }
             }, event);
         }
@@ -624,17 +617,21 @@ export function agentWorkspaceReducer(state, event) {
                 clarification: { batchKeys: [], batchRevision: state.clarification.batchRevision + 1 }
             }, event);
         case AgentWorkspaceEventTypes.READINESS_REQUESTED:
-            return withProjection({ ...state, readinessStatus: 'validating', readinessError: '' }, event);
+            return withProjection({ ...state, readinessStatus: 'validating', readinessError: '', readinessRequest: payload }, event);
         case AgentWorkspaceEventTypes.READINESS_RECEIVED:
+            {
+            const readiness = normalizeReadiness(payload.buildReadiness || payload.readiness || payload);
             return withProjection({
                 ...state,
-                readiness: normalizeReadiness(payload.buildReadiness || payload.readiness || payload),
+                readiness,
                 readinessPreview: payload.buildReadiness ? payload : { ...payload, buildReadiness: payload.readiness || payload },
-                readinessStatus: 'ready',
-                readinessError: ''
+                readinessStatus: readiness.canBuild ? 'ready' : 'blocked',
+                readinessError: '',
+                readinessRequest: null
             }, event);
+            }
         case AgentWorkspaceEventTypes.READINESS_FAILED:
-            return withProjection({ ...state, readinessStatus: 'failed', readinessError: clean(payload.message) }, event);
+            return withProjection({ ...state, readinessStatus: clean(payload.status) === 'timeout' ? 'timeout' : 'failed', readinessError: clean(payload.message), readinessRequest: null }, event);
         case AgentWorkspaceEventTypes.READINESS_CLEARED:
             return withProjection({
                 ...state,
@@ -644,25 +641,32 @@ export function agentWorkspaceReducer(state, event) {
                     resolvedFields: [],
                     remainingFields: [],
                     primaryMessage: '',
-                    contractVersion: ''
+                    contractVersion: '',
+                    missingResources: []
                 },
                 readinessPreview: null,
                 readinessStatus: 'idle',
-                readinessError: ''
+                readinessError: '',
+                readinessRequest: null
             }, event);
         case AgentWorkspaceEventTypes.READINESS_STATUS_CHANGED:
             return withProjection({
                 ...state,
                 readinessStatus: clean(payload.status) || 'idle',
-                readinessError: clean(payload.message)
+                readinessError: clean(payload.message),
+                readinessRequest: clean(payload.status) === 'validating' ? state.readinessRequest : null
             }, event);
         case AgentWorkspaceEventTypes.RESOURCE_DECISION_SET: {
             const resource = normalizeMissingResource(payload.resource || {}, 0);
             return withProjection({
                 ...state,
                 resources: {
-                    missingByKey: { ...state.resources.missingByKey, [resource.id]: resource.raw },
-                    decisionsByKey: { ...state.resources.decisionsByKey, [resource.id]: asObject(payload.decision) }
+                    missingByKey: {
+                        ...state.resources.missingByKey,
+                        [resource.canonicalId]: serializeCanonicalResource(resource, { source: 'workspace' })
+                    },
+                    decisionsByKey: { ...state.resources.decisionsByKey, [resource.canonicalId]: asObject(payload.decision) },
+                    revision: state.resources.revision + 1
                 }
             }, event);
         }
@@ -761,6 +765,7 @@ export function createAgentWorkspaceSnapshot(state) {
         readinessStatus: state.readinessStatus,
         missingResources: Object.values(state.resources.missingByKey),
         resourceDecisions: state.resources.decisionsByKey,
+        resourceRevision: state.resources.revision,
         clarification: state.clarification,
         run: state.run,
         apply: state.apply,

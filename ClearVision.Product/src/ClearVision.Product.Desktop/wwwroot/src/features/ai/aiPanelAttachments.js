@@ -32,6 +32,14 @@ export const aiPanelAttachmentsMixin = {
             const context = this.pendingParameterFilePickContext;
             this.pendingParameterFilePickContext = null;
             if (!context || payload.isCancelled || !payload.filePath) return;
+            if (context.resource) {
+                this._handleMissingResourceAction?.(context.resource, context.action || '', {
+                    value: String(payload.filePath || '').trim(),
+                    data: context.result || null,
+                    flow: context.flow || null
+                });
+                return;
+            }
             this._setPendingDraftConfirmedValue(
                 context.operatorId,
                 context.parameterName,

@@ -265,6 +265,14 @@ public sealed class BuildResultAssembler
                 ResourceKey = string.IsNullOrWhiteSpace(template.MissingTemplateResourceKey)
                     ? "template_artifact"
                     : template.MissingTemplateResourceKey,
+                ResourceName = "模板资源",
+                OperatorKey = "templatematching#1",
+                OperatorType = "TemplateMatching",
+                OperatorIndex = 0,
+                ParameterName = "Template",
+                Source = "template_strategy",
+                ResolutionTarget = VisionAgentResourceResolutionTargets.TemplatePicker,
+                DraftPolicy = VisionAgentResourceDraftPolicies.DraftAllowed,
                 Description = "未找到用户明确选择的模板骨架，请绑定模板资源或改用算子链生成。"
             });
         }

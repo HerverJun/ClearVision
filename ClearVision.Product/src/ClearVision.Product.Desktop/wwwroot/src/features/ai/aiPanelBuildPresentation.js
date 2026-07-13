@@ -239,7 +239,7 @@ function deriveDiff(diff) {
 function getResolvedResourceCount(panel, missingResources) {
     return toArray(missingResources).filter(item => {
         const draft = panel?._getPendingResourceDraft?.(item);
-        return draft?.status === 'resolved';
+        return ['bound', 'resolved'].includes(draft?.status);
     }).length;
 }
 
@@ -372,7 +372,7 @@ function deriveActionItems(panel, context) {
 
     const unresolvedResources = Math.max(missingResources.length - resolvedResourceCount, 0);
     if (unresolvedResources > 0) {
-        const first = missingResources.find(item => panel?._getPendingResourceDraft?.(item)?.status !== 'resolved') || missingResources[0];
+        const first = missingResources.find(item => !['bound', 'resolved'].includes(panel?._getPendingResourceDraft?.(item)?.status)) || missingResources[0];
         const type = clean(read(first, 'resourceType', 'ResourceType'));
         items.push({
             key: 'resources',

@@ -100,6 +100,7 @@ public sealed class BuildPlanContextLoader
             RequirementMode = requirementMode,
             AcceptedDefaults = build?.AcceptedDefaults ?? [],
             AcceptedRecommendedDefaults = build?.AcceptedRecommendedDefaults ?? false,
+            ResourceDecisions = build?.ResourceDecisions ?? [],
             CurrentFlowSnapshot = currentFlowSnapshot,
             TemplateSelection = templateSelection,
             AttachmentSummary = build?.AttachmentSummary ?? new VisionAgentAttachmentSummary(),

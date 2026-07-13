@@ -2,6 +2,7 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 import { AgentWorkspaceEventTypes } from './agentWorkspaceState.js';
 import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
+import { normalizeCanonicalResource, serializeResourceDecision } from './aiResourceIdentity.js';
 
 export const AgentWorkspaceModes = Object.freeze({
     PLAN: 'plan',
@@ -664,7 +665,9 @@ export const aiPanelAgentWorkspaceMixin = {
             optimisticPlanAnswers: this._toArray(workspace.optimisticAnswers),
             answerRevision: Number(workspace.answerRevision) || 0,
             readinessPreview: workspace.readinessPreview || null,
+            missingResources: workspace.missingResources || [],
             resourceDecisions: workspace.resourceDecisions || {},
+            resourceRevision: Number(workspace.resourceRevision) || 0,
             requirementMode: this.requirementMode || 'strict',
             workspaceViewMode: this.workspaceViewMode || AgentWorkspaceModes.PLAN,
             planAcceptedRecommendedDefaults: this.planAcceptedRecommendedDefaults === true,
@@ -894,6 +897,10 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _resetPlanReadinessPreviewState({ abort = true } = {}) {
+        if (this.activePlanReadinessPreviewTimeoutId) {
+            window.clearTimeout?.(this.activePlanReadinessPreviewTimeoutId);
+        }
+        this.activePlanReadinessPreviewTimeoutId = null;
         if (abort) {
             this.activePlanReadinessPreviewController?.abort?.();
         }
@@ -914,6 +921,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return String(request.planId || '') === String(plan.planId || plan.id || '') &&
             String(request.planHash || '') === String(plan.planHash || '') &&
             Number(request.answerRevision) === (Number(this.planAnswerRevision) || 0) &&
+            Number(request.resourceRevision) === (Number(this.agentWorkspaceState?.resources?.revision) || 0) &&
             this._normalizeRequirementMode?.(request.requirementMode) ===
                 (this._normalizeRequirementMode?.(this.requirementMode) || 'strict');
     },
@@ -926,6 +934,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: String(data.planHash || data.PlanHash || '').trim(),
             requirementMode: this._normalizeRequirementMode?.(data.requirementMode || data.RequirementMode) || 'strict',
             answerRevision: Number(data.answerRevision ?? data.AnswerRevision ?? 0) || 0,
+            resourceRevision: Number(data.resourceRevision ?? data.ResourceRevision ?? 0) || 0,
             acceptedAnswers: this._toArray(data.acceptedAnswers || data.AcceptedAnswers)
                 .map(answer => this._normalizePlanAnswer(answer))
                 .filter(Boolean),
@@ -953,6 +962,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: String(plan?.planHash || '').trim(),
             requirementMode: this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict',
             answerRevision: Number(this.planAnswerRevision) || 0,
+            resourceRevision: Number(this.agentWorkspaceState?.resources?.revision) || 0,
             acceptedAnswers: this._toArray(plan?.rawPlanSnapshot?.confirmedPlanAnswers || plan?.rawPlanSnapshot?.ConfirmedPlanAnswers)
                 .map(answer => this._normalizePlanAnswer(answer))
                 .filter(Boolean),
@@ -973,11 +983,12 @@ export const aiPanelAgentWorkspaceMixin = {
     _getCurrentCanonicalPreview(plan) {
         const preview = this.agentWorkspaceState?.readinessPreview || null;
         if (!preview || !preview.buildReadiness) return null;
-        if (this.agentWorkspaceState?.readinessStatus !== 'ready') return null;
+        if (!['ready', 'blocked'].includes(this.agentWorkspaceState?.readinessStatus)) return null;
         const planId = String(plan?.planId || plan?.id || '').trim();
         const planHash = String(plan?.planHash || '').trim();
         if (String(preview.planId || '') !== planId || String(preview.planHash || '') !== planHash) return null;
         if (Number(preview.answerRevision) !== (Number(this.planAnswerRevision) || 0)) return null;
+        if (Number(preview.resourceRevision) !== (Number(this.agentWorkspaceState?.resources?.revision) || 0)) return null;
         const mode = this._normalizeRequirementMode?.(this.requirementMode) || 'strict';
         if ((this._normalizeRequirementMode?.(preview.requirementMode) || 'strict') !== mode) return null;
         return preview;
@@ -997,6 +1008,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planId: preview.planId,
             planHash: preview.planHash,
             answerRevision: preview.answerRevision,
+            resourceRevision: preview.resourceRevision,
             requirementMode: preview.requirementMode
         };
         if (!this._isCurrentPlanReadinessPreviewRequest(request)) {
@@ -1007,7 +1019,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ...plan,
             requirementMode: preview.requirementMode,
             effectiveReadiness: preview,
-            previewState: 'ready',
+            previewState: preview.buildReadiness.canBuild === true ? 'ready' : 'blocked',
             previewError: '',
             buildReadiness: preview.buildReadiness,
             executable: preview.buildReadiness.canBuild === true,
@@ -1027,7 +1039,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (preview.acceptedAnswers.length) {
             this._dispatchAgentWorkspaceEvent?.({
                 type: AgentWorkspaceEventTypes.ANSWERS_CONFIRMED,
-                payload: { answers: preview.acceptedAnswers },
+                payload: { answers: preview.acceptedAnswers, preserveRevision: true },
                 planId: preview.planId,
                 planHash: preview.planHash
             });
@@ -1047,7 +1059,8 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             ...request,
             requirementMode: this._normalizeRequirementMode?.(this.requirementMode) || 'strict',
-            answerRevision: Number(this.planAnswerRevision) || 0
+            answerRevision: Number(this.planAnswerRevision) || 0,
+            resourceRevision: Number(this.agentWorkspaceState?.resources?.revision) || 0
         };
     },
 
@@ -1063,6 +1076,7 @@ export const aiPanelAgentWorkspaceMixin = {
             request.planId,
             request.planHash,
             Number(request.answerRevision) || 0,
+            Number(request.resourceRevision) || 0,
             this._normalizeRequirementMode?.(request.requirementMode) || 'strict',
             acceptedRecommended === true ? 'recommended' : 'answers'
         ].join('::');
@@ -1071,14 +1085,22 @@ export const aiPanelAgentWorkspaceMixin = {
         }
         this.lastPlanReadinessRequestFingerprint = requestFingerprint;
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        if (this.activePlanReadinessPreviewTimeoutId) {
+            window.clearTimeout?.(this.activePlanReadinessPreviewTimeoutId);
+        }
+        this.activePlanReadinessPreviewTimeoutId = null;
         this.activePlanReadinessPreviewController?.abort?.();
         this.activePlanReadinessPreviewController = controller;
         const previewRequest = {
             planId: String(request.planId || '').trim(),
             planHash: String(request.planHash || '').trim(),
             answerRevision: Number(request.answerRevision) || 0,
+            resourceRevision: Number(request.resourceRevision) || 0,
             requirementMode: this._normalizeRequirementMode?.(request.requirementMode) || 'strict',
-            reason
+            reason,
+            requestId: `readiness-${Date.now()}-${Number(this._planReadinessRequestSequence = (this._planReadinessRequestSequence || 0) + 1)}`,
+            startedAt: Date.now(),
+            timedOut: false
         };
         this.activePlanReadinessPreviewRequest = previewRequest;
         this._dispatchAgentWorkspaceEvent?.({
@@ -1090,12 +1112,43 @@ export const aiPanelAgentWorkspaceMixin = {
         this.lastPlanReadinessPreviewError = '';
         this._updatePlanBuildActionState?.();
 
+        const timeoutMs = Math.max(1000, Number(this.planReadinessTimeoutMs) || 15000);
+        this.activePlanReadinessPreviewTimeoutId = window.setTimeout?.(() => {
+            if (this.activePlanReadinessPreviewRequest !== previewRequest ||
+                !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) return;
+            previewRequest.timedOut = true;
+            controller?.abort?.();
+            const message = `构建条件校验超过 ${Math.ceil(timeoutMs / 1000)} 秒，请重试。`;
+            this._dispatchAgentWorkspaceEvent?.({
+                type: AgentWorkspaceEventTypes.READINESS_FAILED,
+                payload: { message, status: 'timeout', requestId: previewRequest.requestId },
+                planId: previewRequest.planId,
+                planHash: previewRequest.planHash
+            });
+            this.lastPlanReadinessPreviewError = message;
+            this.lastPlanReadinessRequestFingerprint = '';
+            this.activePlanReadinessPreviewTimeoutId = null;
+            this.activePlanReadinessPreviewController = null;
+            this.activePlanReadinessPreviewRequest = null;
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderAgentWorkspaceOverview?.();
+            this._updatePlanBuildActionState?.();
+        }, timeoutMs);
+
+        const clearRequestTimeout = () => {
+            if (this.activePlanReadinessPreviewTimeoutId) {
+                window.clearTimeout?.(this.activePlanReadinessPreviewTimeoutId);
+            }
+            this.activePlanReadinessPreviewTimeoutId = null;
+        };
+
         this._requestBackendPlanReadinessPreview(request, controller?.signal ? { signal: controller.signal } : {})
             .then(result => {
                 if (this.activePlanReadinessPreviewRequest !== previewRequest ||
                     !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) {
                     return;
                 }
+                clearRequestTimeout();
                 if (!this._applyPlanReadinessPreviewResult(plan, result)) {
                     const message = this._sanitizePlanDiagnosticText(this.lastPlanReadinessPreviewError || '构建条件校验失败，请重试', 260) || '构建条件校验失败，请重试';
                     this._dispatchAgentWorkspaceEvent?.({
@@ -1120,11 +1173,26 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._updatePlanBuildActionState?.();
             })
             .catch(error => {
-                if (error?.name === 'AbortError') return;
+                if (error?.name === 'AbortError') {
+                    if (previewRequest.timedOut) return;
+                    if (this.activePlanReadinessPreviewRequest === previewRequest) {
+                        clearRequestTimeout();
+                        this.activePlanReadinessPreviewController = null;
+                        this.activePlanReadinessPreviewRequest = null;
+                        this._dispatchAgentWorkspaceEvent?.({
+                            type: AgentWorkspaceEventTypes.READINESS_STATUS_CHANGED,
+                            payload: { status: 'idle', message: '校验已中止，可重试。' },
+                            planId: previewRequest.planId,
+                            planHash: previewRequest.planHash
+                        });
+                    }
+                    return;
+                }
                 if (this.activePlanReadinessPreviewRequest !== previewRequest ||
                     !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) {
                     return;
                 }
+                clearRequestTimeout();
                 const message = this._sanitizePlanDiagnosticText(error?.message || '构建条件校验失败，请重试', 260) || '构建条件校验失败，请重试';
                 this._dispatchAgentWorkspaceEvent?.({
                     type: AgentWorkspaceEventTypes.READINESS_FAILED,
@@ -1301,14 +1369,14 @@ export const aiPanelAgentWorkspaceMixin = {
                 : actionState.statusText || blockedTitle;
         }
 
-        const mainBuildBtn = this.container?.querySelector('#ai-btn-start-build');
-        if (mainBuildBtn) {
+        const mainBuildButtons = this.container?.querySelectorAll?.('#ai-btn-start-build') || [];
+        mainBuildButtons.forEach(mainBuildBtn => {
             mainBuildBtn.disabled = busy || !canBuild;
             mainBuildBtn.textContent = actionState.label || 'Start Build';
             mainBuildBtn.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
             mainBuildBtn.title = hasPlan ? actionState.statusText : 'Finish the plan first';
             mainBuildBtn.setAttribute?.('aria-disabled', mainBuildBtn.disabled ? 'true' : 'false');
-        }
+        });
 
         this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
             button.disabled = busy || !canBuild;
@@ -2872,6 +2940,8 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             canBuild: (item.canBuild ?? item.CanBuild) === true,
             blockers,
+            missingResources: this._toArray(item.missingResources || item.MissingResources)
+                .map(resource => normalizeCanonicalResource(resource, { source: resource?.source || resource?.Source || 'readiness' })),
             resolvedFields: this._toArray(item.resolvedFields || item.ResolvedFields)
                 .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
                 .filter(Boolean),
@@ -2918,6 +2988,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: currentPlanHash,
             requirementMode: this._normalizeRequirementMode?.(this.requirementMode || plan.requirementMode || 'strict') || 'strict',
             answerRevision: Number(this.planAnswerRevision) || 0,
+            resourceRevision: Number(this.agentWorkspaceState?.resources?.revision) || 0,
             acceptedAnswers: this._toArray(data.acceptedAnswers || data.AcceptedAnswers),
             answerSetFingerprint: String(data.answerSetFingerprint || data.AnswerSetFingerprint || ''),
             buildReadiness: readiness,
@@ -2947,7 +3018,7 @@ export const aiPanelAgentWorkspaceMixin = {
             buildReadiness: readiness,
             executable: readiness.canBuild === true,
             effectiveReadiness: canonicalState,
-            previewState: 'ready',
+            previewState: readiness.canBuild === true ? 'ready' : 'blocked',
             resolvedPlanFields: this._toArray(readiness.resolvedFields),
             remainingPlanFields: this._toArray(readiness.remainingFields),
             blockingReasons: readinessBlockers.length ? readinessBlockers : blockingFields
@@ -3000,6 +3071,9 @@ export const aiPanelAgentWorkspaceMixin = {
             String(item.field || item.Field || '').trim().toLowerCase();
         const publicLabel = this._sanitizePlanDisplayText(item.publicLabel || item.PublicLabel || '', 160);
         if (!id && !category && !field && !publicLabel) return null;
+        if (category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING) {
+            return normalizeCanonicalResource(item, { source: 'build_readiness' });
+        }
         return {
             id,
             category,
@@ -3254,14 +3328,15 @@ export const aiPanelAgentWorkspaceMixin = {
                 stats: this._getPlanReadinessStats(plan)
             };
         }
-        if (previewState === 'failed') {
+        if (previewState === 'failed' || previewState === 'timeout') {
+            const timedOut = previewState === 'timeout';
             return {
                 canBuild: false,
                 canAcceptRecommended: false,
                 canStart: false,
                 acceptedRecommended: false,
-                label: '构建条件校验失败，请重试',
-                statusText: '构建条件校验失败，请重试',
+                label: timedOut ? '构建条件校验超时，请重试' : '构建条件校验失败，请重试',
+                statusText: timedOut ? '构建条件校验超时，请重试' : '构建条件校验失败，请重试',
                 stats: this._getPlanReadinessStats(plan)
             };
         }
@@ -3273,8 +3348,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: false,
                 canStart: false,
                 acceptedRecommended: false,
-                label: '正在校验构建条件…',
-                statusText: '正在校验构建条件…',
+                label: '尚未获得权威校验结果',
+                statusText: '尚未获得与当前方案、答案版本和模式匹配的权威校验结果，请重试。',
+                canRetryReadiness: true,
                 stats: this._getPlanReadinessStats(plan)
             };
         }
@@ -5228,7 +5304,9 @@ export const aiPanelAgentWorkspaceMixin = {
         const hasDeferredStrictBlock = (this._normalizeRequirementMode?.(this.requirementMode) || 'strict') === 'strict' &&
             this._toArray(currentPreview?.deferredQuestionIds).length > 0 &&
             actionState.canStart !== true;
-        const previewFailed = (plan.previewState || this.previewState) === 'failed';
+        const readinessStatus = this.agentWorkspaceState?.readinessStatus || 'idle';
+        const previewFailed = ['failed', 'timeout'].includes(readinessStatus) || (plan.previewState || this.previewState) === 'failed';
+        const previewMissing = actionState.canRetryReadiness === true;
         const clarificationLine = this._renderWorkspaceClarificationLine(plan);
         const modeToggle = `
             <div class="ai-plan-mode-toggle" role="group" aria-label="构建确认模式">
@@ -5242,7 +5320,9 @@ export const aiPanelAgentWorkspaceMixin = {
         const ctaAssist = hasDeferredStrictBlock
             ? `<div class="ai-plan-cta-assist">当前选择要求构建前确认，暂缓项仍会阻止构建。<button type="button" id="ai-btn-switch-draft-from-defer">切换为可编辑草稿</button></div>`
             : previewFailed
-                ? `<div class="ai-plan-cta-assist">构建条件校验失败，请重试<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
+                ? `<div class="ai-plan-cta-assist">${readinessStatus === 'timeout' ? '构建条件校验超时' : '构建条件校验失败'}，请重试<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
+                : previewMissing
+                    ? `<div class="ai-plan-cta-assist">尚未获得与当前方案、答案版本和模式匹配的权威校验结果。<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
                 : '';
         el.innerHTML = `
             <section class="ai-workspace-section">
@@ -5900,6 +5980,12 @@ export const aiPanelAgentWorkspaceMixin = {
             buildIntent,
             originalUserPrompt: plan.originalDescription || plan.buildPrompt || '',
             acceptedRecommendedDefaults,
+            resourceDecisions: this._toArray(this.agentWorkspaceState?.projection?.missingResources)
+                .map(resource => {
+                    const decision = this.agentWorkspaceState?.resources?.decisionsByKey?.[resource.canonicalId];
+                    return decision ? serializeResourceDecision(resource, decision) : null;
+                })
+                .filter(Boolean),
             requirementMaturity: plan.requirementMaturity || plan.rawPlanSnapshot?.requirementMaturity || plan.rawPlanSnapshot?.RequirementMaturity || null,
             decisionTrace: plan.decisionTrace || plan.rawPlanSnapshot?.decisionTrace || plan.rawPlanSnapshot?.DecisionTrace || null,
             metadataOnly: true
