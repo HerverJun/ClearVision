@@ -17,6 +17,13 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class TcpEndpointConcurrencyCollection
+{
+    public const string Name = "TCP endpoint concurrency";
+}
+
+[Collection(TcpEndpointConcurrencyCollection.Name)]
 public class TcpEndpointsTests
 {
     [Fact]

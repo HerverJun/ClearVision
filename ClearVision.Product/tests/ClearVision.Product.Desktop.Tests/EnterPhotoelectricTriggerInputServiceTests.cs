@@ -53,14 +53,11 @@ public class EnterPhotoelectricTriggerInputServiceTests
                 AcceptPendingSignalsAfterUtc = acceptAfterUtc
             });
 
-        await Task.Delay(50);
         waitTask.IsCompleted.Should().BeFalse();
 
-        var remainingCutoffDelay = acceptAfterUtc - DateTime.UtcNow + TimeSpan.FromMilliseconds(50);
-        if (remainingCutoffDelay > TimeSpan.Zero)
-        {
-            await Task.Delay(remainingCutoffDelay);
-        }
+        SpinWait.SpinUntil(
+            () => DateTime.UtcNow >= acceptAfterUtc,
+            TimeSpan.FromSeconds(1)).Should().BeTrue();
 
         PublishEnterSignal(sut, "device-1");
         var triggerEvent = await waitTask;
