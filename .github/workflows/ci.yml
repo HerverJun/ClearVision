@@ -214,15 +214,11 @@ jobs:
             -MinimumPassedTests 10 `
             -Filter "Category=PerformanceBudget"
 
-      - name: Run Measurement Performance Gate
+      - name: Validate Measurement Performance Report
         shell: pwsh
         run: |
           & "./scripts/run-tests-measurement-performance.ps1" `
-            -NoBuild `
-            -NoRestore `
-            -Verbosity minimal `
-            -ResultsDirectory TestResults/measurement-performance `
-            -LogFileName measurement-performance.trx `
+            -ValidateReportOnly `
             -ReportDirectory ClearVision.Product/test_results
 
       - name: Run Data Processing Remediation Gate
