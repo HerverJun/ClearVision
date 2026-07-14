@@ -58,7 +58,13 @@ public class ResultAnalysisServiceIntegrationTests
             OKCount = 80,
             NGCount = 15,
             ErrorCount = 5,
-            OKRate = 0.8,
+            OKRate = 80d / 95d,
+            YieldRate = 80d / 95d,
+            ExecutionSucceededCount = 95,
+            ValidDecisionCount = 95,
+            DecisionCoverageRate = 1d,
+            ExecutionFailureCount = 5,
+            FailedCount = 5,
             AverageProcessingTimeMs = 150.5
         };
 
@@ -77,8 +83,8 @@ public class ResultAnalysisServiceIntegrationTests
         result.OKCount.Should().Be(80);
         result.NGCount.Should().Be(15);
         result.ErrorCount.Should().Be(5);
-        result.OKRate.Should().Be(0.8);
-        result.NGRate.Should().Be(0.15);
+        result.OKRate.Should().Be(80d / 95d);
+        result.NGRate.Should().Be(15d / 95d);
         result.ErrorRate.Should().Be(0.05);
         result.AverageProcessingTimeMs.Should().Be(150.5);
         result.TotalDefects.Should().Be(10);
@@ -192,7 +198,7 @@ public class ResultAnalysisServiceIntegrationTests
 
         // Assert
         csv.Should().NotBeNullOrEmpty();
-        csv.Should().Contain("检测ID,工程ID,检测时间,状态,处理时间(ms),置信度,缺陷数量,错误信息");
+        csv.Should().Contain("检测ID,工程ID,检测时间,兼容状态,执行结果,判定结果,CanonicalOutcome,原因码,处理时间(ms),置信度,缺陷数量,错误信息,缺陷类型,X,Y,Width,Height,缺陷置信度,缺陷描述");
         csv.Should().Contain(projectId.ToString());
         csv.Should().Contain("OK");
         csv.Should().Contain("NG");

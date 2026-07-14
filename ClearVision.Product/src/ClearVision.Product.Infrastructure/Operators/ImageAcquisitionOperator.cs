@@ -116,7 +116,8 @@ public class ImageAcquisitionOperator : OperatorBase
                 return OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}");
             }
 
-            var mat = Cv2.ImRead(filePath, ImreadModes.Color);
+            var imageBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+            var mat = Cv2.ImDecode(imageBytes, ImreadModes.Color);
             if (mat.Empty())
             {
                 return OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持");

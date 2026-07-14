@@ -72,7 +72,7 @@ public sealed class RuntimePackageExporterTests
                                 modelPath,
                                 confidence: 0.62d)
                         ]
-                    }
+                    }.WithOfficialDecision()
                 }
             });
 
@@ -148,7 +148,7 @@ public sealed class RuntimePackageExporterTests
                         Id = Guid.NewGuid(),
                         Name = "main",
                         Operators = [deepLearning]
-                    },
+                    }.WithOfficialDecision(),
                     GlobalVariables = new ProjectGlobalVariableSchema
                     {
                         Variables =
@@ -254,7 +254,7 @@ public sealed class RuntimePackageExporterTests
                                 ]
                             }
                         ]
-                    }
+                    }.WithOfficialDecision()
                 }
             });
 
@@ -690,6 +690,44 @@ internal static class RuntimeParameterTestData
             },
             GlobalVariables = new ProjectGlobalVariableSchema()
         };
+    }
+
+    public static OperatorFlowDto WithOfficialDecision(this OperatorFlowDto flow)
+    {
+        var operatorId = Guid.NewGuid();
+        var portId = Guid.NewGuid();
+        flow.DecisionConfiguration = new DecisionConfiguration
+        {
+            FinalDecisionBinding = new FinalDecisionBinding
+            {
+                SourceOperatorId = operatorId,
+                SourceOutputPortId = portId,
+                SourceOutputName = "JudgmentResult",
+                DataType = DecisionValueType.String,
+                Rule = DecisionInterpretationRule.StringMap,
+                OkValue = "OK",
+                NgValue = "NG"
+            }
+        };
+        flow.Operators.Add(new OperatorDto
+        {
+            Id = operatorId,
+            Name = "ResultJudgment",
+            Type = OperatorType.ResultJudgment,
+            X = 0,
+            Y = 0,
+            OutputPorts =
+            [
+                new PortDto
+                {
+                    Id = portId,
+                    Name = "JudgmentResult",
+                    Direction = PortDirection.Output,
+                    DataType = PortDataType.String
+                }
+            ]
+        });
+        return flow;
     }
 
     public static ProjectDto CreateResultOnlyProject()

@@ -493,6 +493,26 @@ public sealed class VisionAgentConsolidationTests
 
         // Readiness 仍根据真实剩余阻断决定 CanBuild
         var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, validatedAnswers: validation);
-        readiness.CanBuild.Should().BeTrue();
+        readiness.CanBuild.Should().BeFalse();
+        var cameraResource = readiness.MissingResources.Should()
+            .ContainSingle(resource => resource.ResourceType == "camera_binding")
+            .Subject;
+
+        var boundReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validatedAnswers: validation,
+            resourceDecisions:
+            [
+                new VisionAgentResourceDecision
+                {
+                    CanonicalId = cameraResource.CanonicalId,
+                    Status = VisionAgentResourceStatuses.Bound,
+                    ResourceType = cameraResource.ResourceType,
+                    OperatorKey = cameraResource.OperatorKey,
+                    ParameterName = cameraResource.ParameterName,
+                    Source = "test_fixture"
+                }
+            ]);
+        boundReadiness.CanBuild.Should().BeTrue();
     }
 }

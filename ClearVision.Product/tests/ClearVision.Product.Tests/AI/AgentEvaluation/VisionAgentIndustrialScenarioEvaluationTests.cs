@@ -31,7 +31,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         AssertWorkflowUsesOnlyRealOperatorTypes(result);
         AssertWorkflowDoesNotContainParameter(result, "ModelId", "TemplatePath", "Rule", "Channel");
         result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "camera_binding");
-        result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "output_channel");
+        result.BuildResult.MissingResources.Should().NotContain(item => item.ResourceType == "output_channel");
     }
 
     [Fact(DisplayName = "Scenario eval: terminal wire sequence should keep model and sequence labels pending")]
@@ -78,7 +78,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
             .Should().Contain(["ImageAcquisition", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"]);
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "measurement_parameter" &&
+            item.ResourceType == "calibration_resource" &&
             item.ResourceKey == "op_calibration.Scale");
         result.BuildResult.PendingParameters.Should().Contain(item =>
             item.OperatorId == "op_calibration" &&
@@ -133,7 +133,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
     {
         var existingFlow = ExistingAcquisitionJudgmentFlow();
         var (plan, request, result, sink) = await RunScenarioAsync(
-            "修改已有流程：在现有采集+判定流程中追加缺陷检测，不得清空旧节点。",
+            "修改已有流程：使用传统算法在现有采集+判定流程中追加缺陷检测，不得清空旧节点。",
             buildIntent: "modify",
             currentFlowSnapshot: JsonSerializer.Serialize(existingFlow));
 

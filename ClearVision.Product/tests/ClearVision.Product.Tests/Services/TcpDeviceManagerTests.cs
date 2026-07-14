@@ -4,12 +4,14 @@ using System.Text;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace ClearVision.Product.Tests.Services;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class TcpDeviceManagerTests
 {
     [Fact]

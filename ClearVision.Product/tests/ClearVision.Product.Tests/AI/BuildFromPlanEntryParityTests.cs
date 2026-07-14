@@ -1306,7 +1306,8 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             StationBoundarySummary = plan.StationBoundarySummary,
             PlcOutputPolicy = plan.PlcOutputPolicy,
             BuildIntent = "new",
-            OriginalUserPrompt = plan.OriginalUserPrompt
+            OriginalUserPrompt = plan.OriginalUserPrompt,
+            ResourceDecisions = [BoundCameraResourceDecision()]
         };
         build = mutate?.Invoke(build) ?? build;
         return new AiFlowGenerationRequest("detect scratches", Mode: GenerateFlowMode.New)
@@ -1314,6 +1315,26 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             UseVisionAgentGenerateFlow = true,
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted,
             BuildFromPlan = build
+        };
+    }
+
+    private static VisionAgentResourceDecision BoundCameraResourceDecision()
+    {
+        return new VisionAgentResourceDecision
+        {
+            CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                "camera_binding",
+                "imageacquisition#1",
+                "CameraId"),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceKey = "imageacquisition#1.CameraId",
+            ResourceType = "camera_binding",
+            OperatorKey = "imageacquisition#1",
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraId",
+            ValueSummary = "test-camera-binding",
+            Source = "test_fixture"
         };
     }
 

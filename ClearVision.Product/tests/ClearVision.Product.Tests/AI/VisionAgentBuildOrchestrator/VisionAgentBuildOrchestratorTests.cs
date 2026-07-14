@@ -222,8 +222,9 @@ public sealed class VisionAgentBuildOrchestratorTests
         strict.AcceptedAnswers.Should().BeEmpty();
         draft.BuildReadiness.CanBuild.Should().BeTrue();
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:image_source_missing" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
             blocker.BlocksBuild == false);
         draft.AnswerRevision.Should().Be(8);
         sink.Events.Should().BeEmpty();
@@ -284,11 +285,13 @@ public sealed class VisionAgentBuildOrchestratorTests
 
         strict.BuildReadiness.CanBuild.Should().BeFalse();
         strict.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
             blocker.BlocksBuild);
         draft.BuildReadiness.CanBuild.Should().BeTrue();
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
             blocker.BlocksBuild == false);
         draft.AcceptedAnswers.Should().ContainSingle(accepted =>
             accepted.Field == VisionAgentPlanAnswerFields.ImageSource &&
@@ -1029,7 +1032,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         plan.SemanticExtraction.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
         plan.PlanSource.Should().Be("model_planner");
         plan.FallbackReason.Should().BeEmpty();
-        plan.CanBuild.Should().BeTrue();
+        plan.CanBuild.Should().BeFalse();
+        plan.RemainingPlanFields.Should().Contain(VisionAgentPlanAnswerFields.AlgorithmStrategy);
         plan.RecommendedRoute.Operators.Should().Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]);
         plan.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
         plan.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_started");
@@ -1043,8 +1047,10 @@ public sealed class VisionAgentBuildOrchestratorTests
                 {
                     ["attribute_target"] = "semantic_attribute",
                     ["ok_ng_rule"] = "use_extracted_conditions",
-                    ["classification_ok_label"] = "熟透"
-                }),
+                    ["classification_ok_label"] = "熟透",
+                    ["algorithm_strategy"] = "model_strategy"
+                },
+                resourceDecisions: [BoundCameraResourceDecision()]),
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -1470,7 +1476,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.OperatorId == "op_calibration" &&
             item.ParameterNames.Contains("Scale"));
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "measurement_parameter" &&
+            item.ResourceType == "calibration_resource" &&
             item.ResourceKey == "op_calibration.Scale");
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
@@ -2106,7 +2112,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         Dictionary<string, string>? userSelections = null,
         List<VisionAgentPlanAnswer>? confirmedAnswers = null,
         bool acceptedRecommendedDefaults = true,
-        string requirementMode = AiRequirementModes.Strict)
+        string requirementMode = AiRequirementModes.Strict,
+        List<VisionAgentResourceDecision>? resourceDecisions = null)
     {
         return new AiFlowGenerationRequest(plan.OriginalUserPrompt, Mode: GenerateFlowModeExtensions.ParseOrAuto(buildIntent))
         {
@@ -2132,8 +2139,29 @@ public sealed class VisionAgentBuildOrchestratorTests
                 BuildIntent = buildIntent,
                 OriginalUserPrompt = plan.OriginalUserPrompt,
                 AcceptedRecommendedDefaults = acceptedRecommendedDefaults,
+                ResourceDecisions = resourceDecisions ?? [],
                 MetadataOnly = true
             }
+        };
+    }
+
+    private static VisionAgentResourceDecision BoundCameraResourceDecision()
+    {
+        return new VisionAgentResourceDecision
+        {
+            CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                "camera_binding",
+                "imageacquisition#1",
+                "CameraId"),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceKey = "imageacquisition#1.CameraId",
+            ResourceType = "camera_binding",
+            OperatorKey = "imageacquisition#1",
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraId",
+            ValueSummary = "test-camera-binding",
+            Source = "test_fixture"
         };
     }
 

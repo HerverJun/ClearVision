@@ -137,7 +137,10 @@ public sealed class Stage3_EndToEndDemoIntegrationTests
     private static string ResolveRepoPath(string relativePath)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !dir.Name.Equals("ClearVision", StringComparison.OrdinalIgnoreCase))
+        while (dir != null && !File.Exists(Path.Combine(
+                   dir.FullName,
+                   "ClearVision.Product",
+                   "ClearVision.Product.sln")))
         {
             dir = dir.Parent;
         }

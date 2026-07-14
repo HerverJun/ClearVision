@@ -1132,6 +1132,7 @@ public sealed class VisionAgentGenerateFlowTests
             },
             AcceptedDefaults = ["metadata_only"],
             AcceptedRecommendedDefaults = true,
+            ResourceDecisions = [BoundCameraResourceDecision()],
             OperatorCatalogVersion = plan.OperatorCatalogVersion,
             StationBoundarySummary = plan.StationBoundarySummary,
             PlcOutputPolicy = plan.PlcOutputPolicy,
@@ -1201,6 +1202,7 @@ public sealed class VisionAgentGenerateFlowTests
                     Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
                 }
             ],
+            ResourceDecisions = [BoundCameraResourceDecision()],
             MetadataOnly = true
         };
         var hash = VisionAgentOrchestrator.ComputePlanHash(request.PlanSnapshot);
@@ -1208,6 +1210,26 @@ public sealed class VisionAgentGenerateFlowTests
         {
             PlanHash = hash,
             PlanSnapshot = request.PlanSnapshot! with { PlanHash = hash }
+        };
+    }
+
+    private static VisionAgentResourceDecision BoundCameraResourceDecision()
+    {
+        return new VisionAgentResourceDecision
+        {
+            CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                "camera_binding",
+                "imageacquisition#1",
+                "CameraId"),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceKey = "imageacquisition#1.CameraId",
+            ResourceType = "camera_binding",
+            OperatorKey = "imageacquisition#1",
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraId",
+            ValueSummary = "test-camera-binding",
+            Source = "test_fixture"
         };
     }
 
