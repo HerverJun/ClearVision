@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-14 19:47:48 +08:00`
+> 生成时间 / Generated At: `2026-07-14 20:53:26 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -21,7 +21,7 @@
 | `OperatorType.ImageBlend` | 图像融合 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageCompose` | 图像组合 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageCrop` | 图像裁剪 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
-| `OperatorType.ImageNormalize` | 图像归一化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.1` |
+| `OperatorType.ImageNormalize` | 图像归一化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.2` |
 | `OperatorType.ImageResize` | 图像缩放 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageRotate` | 图像旋转 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageStitching` | 图像拼接 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
@@ -1286,6 +1286,7 @@
 ### OperatorType.ImageNormalize / 图像归一化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-07-14T20:53:26.4350488+08:00` | `D369FB9E53E7` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-14T19:30:44.4677421+08:00` | `48E61F15938A` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `0D788CB2E0E5` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `7FEB76F136A6` | `legacy-source-only` |

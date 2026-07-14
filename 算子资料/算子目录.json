@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-14T19:47:48.6428823+08:00",
-  "generationFingerprint": "2E8800589719796D9B540D62C4D86BBF5460AB1DBF5F1DAF77F1273647D20E16",
+  "generatedAt": "2026-07-14T20:53:26.4350488+08:00",
+  "generationFingerprint": "2F8E2641DBC140DEFC67795E6B0C23AA69A67544841C166A6EC05368D0AE7C87",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -2904,7 +2904,7 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "equalize",
         "minmax",
@@ -3191,15 +3191,15 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "48E61F15938AC60A50512A10475A28AB7621D37629DBB0668FA5729510467E85",
+      "generationFingerprint": "D369FB9E53E717E5A806E256B74FA23755962EADB9E65E3E9BC1A8CAD752EBFF",
       "quality": {
-        "totalScore": 96,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ImageNormalize.md"
     },

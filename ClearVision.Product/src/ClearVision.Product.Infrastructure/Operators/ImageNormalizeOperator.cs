@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "normalize",
     Keywords = new[] { "normalize", "minmax", "zscore", "standard score", "equalize" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [OperatorParameterRule("Method", ReasonCode = "IMAGE_NORMALIZE_METHOD")]
 [OperatorParameterRule("Alpha", DisabledWhenAll = new[] { "Method!=MinMax" }, HiddenWhenAll = new[] { "Method!=MinMax" }, IgnoredWhenAll = new[] { "Method!=MinMax" }, ReasonCode = "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX")]
@@ -42,7 +42,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [AlgorithmInfo(
     Name = "MinMax range normalization / floating ZScore standardization / histogram equalization",
     CoreApi = "Cv2.Normalize / Cv2.MeanStdDev / Cv2.Subtract / Cv2.Divide / Cv2.EqualizeHist",
-    ImplementationStrategy = "ZScore uses z=(x-mean)/sigma in CV_32F without a following MinMax pass. sigma<=1e-6 produces finite zeros. Three-channel ZScore is per-channel; ZScore+LumaOnly fails fast.",
+    ImplementationStrategy = "ZScore validates that all input values are finite, then uses z=(x-mean)/sigma in CV_32F without a following MinMax pass. Non-finite input or statistics fail with IMAGE_NORMALIZE_NONFINITE_INPUT; sigma<=1e-6 for finite inputs produces finite zeros. Three-channel ZScore is per-channel; ZScore+LumaOnly fails fast.",
     TimeComplexity = "O(W*H*C)",
     SpaceComplexity = "O(W*H*C)",
     SuitableUseCases = new[] { "MinMax for bounded display or downstream range contracts", "ZScore for statistical standardization before floating-point processing" },
@@ -52,6 +52,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 public class ImageNormalizeOperator : OperatorBase
 {
     private const double SigmaEpsilon = 1e-6;
+    private const string NonFiniteZScoreInputError = "IMAGE_NORMALIZE_NONFINITE_INPUT: input contains NaN or Infinity.";
 
     private readonly record struct NormalizationResult(Mat Image, bool SigmaDegenerate);
 
@@ -78,33 +79,52 @@ public class ImageNormalizeOperator : OperatorBase
         }
 
         var method = GetStringParam(@operator, "Method", "MinMax");
-        var alpha = GetDoubleParam(@operator, "Alpha", 0.0, -10000.0, 10000.0);
-        var beta = GetDoubleParam(@operator, "Beta", 255.0, -10000.0, 10000.0);
+        var alpha = 0.0;
+        var beta = 255.0;
+        if (method.Equals("MinMax", StringComparison.OrdinalIgnoreCase))
+        {
+            alpha = GetDoubleParam(@operator, "Alpha", 0.0, -10000.0, 10000.0);
+            beta = GetDoubleParam(@operator, "Beta", 255.0, -10000.0, 10000.0);
+        }
+
         var colorMode = GetStringParam(@operator, "ColorMode", "LumaOnly");
 
-        NormalizationResult normalization;
-        if (src.Channels() == 1)
+        if (method.Equals("ZScore", StringComparison.OrdinalIgnoreCase) &&
+            !Cv2.CheckRange(src, quiet: true))
         {
-            normalization = NormalizeSingleChannel(src, method, alpha, beta);
+            return Task.FromResult(OperatorExecutionOutput.Failure(NonFiniteZScoreInputError));
         }
-        else if (src.Channels() == 3)
-        {
-            if (method.Equals("ZScore", StringComparison.OrdinalIgnoreCase) &&
-                colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase))
-            {
-                return Task.FromResult(OperatorExecutionOutput.Failure(
-                    "ZScore with ColorMode=LumaOnly is not supported for 3-channel images; use ColorMode=PerChannel."));
-            }
 
-            normalization = colorMode.Equals("PerChannel", StringComparison.OrdinalIgnoreCase)
-                ? ApplyPerChannel(src, channel => NormalizeSingleChannel(channel, method, alpha, beta))
-                : colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase)
-                    ? ApplyLumaChannel(src, channel => NormalizeSingleChannel(channel, method, alpha, beta))
-                    : throw new InvalidOperationException("Unsupported color mode");
-        }
-        else
+        NormalizationResult normalization;
+        try
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Only 1-channel and 3-channel images are supported"));
+            if (src.Channels() == 1)
+            {
+                normalization = NormalizeSingleChannel(src, method, alpha, beta);
+            }
+            else if (src.Channels() == 3)
+            {
+                if (method.Equals("ZScore", StringComparison.OrdinalIgnoreCase) &&
+                    colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Failure(
+                        "ZScore with ColorMode=LumaOnly is not supported for 3-channel images; use ColorMode=PerChannel."));
+                }
+
+                normalization = colorMode.Equals("PerChannel", StringComparison.OrdinalIgnoreCase)
+                    ? ApplyPerChannel(src, channel => NormalizeSingleChannel(channel, method, alpha, beta))
+                    : colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase)
+                        ? ApplyLumaChannel(src, channel => NormalizeSingleChannel(channel, method, alpha, beta))
+                        : throw new InvalidOperationException("Unsupported color mode");
+            }
+            else
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure("Only 1-channel and 3-channel images are supported"));
+            }
+        }
+        catch (NonFiniteZScoreInputException)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(NonFiniteZScoreInputError));
         }
 
         var result = normalization.Image;
@@ -142,7 +162,7 @@ public class ImageNormalizeOperator : OperatorBase
         return method.ToLowerInvariant() switch
         {
             "minmax" => NormalizeMinMax(src, alpha, beta),
-            "zscore" => NormalizeZScore(src, alpha, beta),
+            "zscore" => NormalizeZScore(src),
             "histogram" => NormalizeHistogram(src),
             _ => throw new InvalidOperationException("Unsupported normalize method")
         };
@@ -156,14 +176,19 @@ public class ImageNormalizeOperator : OperatorBase
         return new NormalizationResult(normalized, SigmaDegenerate: false);
     }
 
-    private static NormalizationResult NormalizeZScore(Mat src, double alpha, double beta)
+    private static NormalizationResult NormalizeZScore(Mat src)
     {
         using var src32 = new Mat();
         src.ConvertTo(src32, MatType.CV_32FC1);
         Cv2.MeanStdDev(src32, out var mean, out var stddev);
         var sigma = stddev.Val0;
 
-        if (!double.IsFinite(mean.Val0) || !double.IsFinite(sigma) || sigma <= SigmaEpsilon)
+        if (!double.IsFinite(mean.Val0) || !double.IsFinite(sigma))
+        {
+            throw new NonFiniteZScoreInputException();
+        }
+
+        if (sigma <= SigmaEpsilon)
         {
             return new NormalizationResult(
                 new Mat(src.Rows, src.Cols, MatType.CV_32FC1, Scalar.All(0)),
@@ -175,6 +200,10 @@ public class ImageNormalizeOperator : OperatorBase
         var z = new Mat();
         Cv2.Divide(centered, new Scalar(sigma), z);
         return new NormalizationResult(z, SigmaDegenerate: false);
+    }
+
+    private sealed class NonFiniteZScoreInputException : Exception
+    {
     }
 
     private static NormalizationResult NormalizeHistogram(Mat src)

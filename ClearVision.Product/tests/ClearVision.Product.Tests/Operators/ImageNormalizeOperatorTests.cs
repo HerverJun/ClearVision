@@ -189,6 +189,53 @@ public class ImageNormalizeOperatorTests
         Assert.Equal(true, result.OutputData["SigmaDegenerate"]);
     }
 
+    public static IEnumerable<object[]> NonFiniteSingleChannelValues()
+    {
+        yield return new object[] { "NaN", float.NaN };
+        yield return new object[] { "PositiveInfinity", float.PositiveInfinity };
+        yield return new object[] { "NegativeInfinity", float.NegativeInfinity };
+    }
+
+    [Theory]
+    [MemberData(nameof(NonFiniteSingleChannelValues))]
+    public async Task ExecuteAsync_ZScoreWithNonFiniteSingleChannelInput_ShouldFailFast(
+        string caseId,
+        float nonFiniteValue)
+    {
+        _ = caseId;
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object> { { "Method", "ZScore" } });
+        using var image = CreateSingleChannelProbe("32FC1");
+        image.GetMat().Set(0, 0, nonFiniteValue);
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.OutputData);
+        Assert.Equal("IMAGE_NORMALIZE_NONFINITE_INPUT: input contains NaN or Infinity.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ZScorePerChannelWithOneNonFiniteChannel_ShouldFailFastForWholeImage()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "ZScore" },
+            { "ColorMode", "PerChannel" }
+        });
+        using var image = CreateColorZScoreProbe("32FC3");
+        var mat = image.GetMat();
+        var pixel = mat.At<Vec3f>(1, 2);
+        mat.Set(1, 2, new Vec3f(pixel.Item0, float.NaN, pixel.Item2));
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.OutputData);
+        Assert.Equal("IMAGE_NORMALIZE_NONFINITE_INPUT: input contains NaN or Infinity.", result.ErrorMessage);
+    }
+
     [Theory]
     [InlineData("8UC3")]
     [InlineData("16UC3")]
