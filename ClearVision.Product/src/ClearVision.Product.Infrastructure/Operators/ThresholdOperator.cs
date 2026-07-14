@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "全局阈值处理",
     Description = "执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/Triangle 自动阈值。",
-    Category = "Preprocessing",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "threshold",
     Keywords = new[] { "threshold", "binarize", "segmentation", "otsu", "triangle", "二值化", "Threshold" }
 )]

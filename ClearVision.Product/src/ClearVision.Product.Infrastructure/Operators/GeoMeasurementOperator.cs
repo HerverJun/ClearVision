@@ -11,8 +11,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "几何测量",
-    Description = "General geometry measurement between point/line/circle elements.",
-    Category = "检测",
+    Description = "对点、线、圆等几何元素进行通用几何测量。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "geometry",
     Keywords = new[] { "geometry", "point-line", "line-circle", "circle-circle" }
 )]

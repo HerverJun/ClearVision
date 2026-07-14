@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "颜色测量",
-    Description = "Measures Lab delta-E or HSV statistics over a selected ROI.",
-    Category = "颜色处理",
+    Description = "在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "color-measure",
     Keywords = new[] { "color", "deltaE", "lab", "hsv" },
     Version = "2.0.0"

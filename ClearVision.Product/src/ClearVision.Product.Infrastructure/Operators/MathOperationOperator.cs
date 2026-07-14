@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "数值计算",
     Description = "支持加减乘除、取绝对值、开方等常用运算",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "calc",
     Keywords = new[] { "计算", "数学", "加减乘除", "数值", "判断大小", "运算", "Math", "Calculate", "Add", "Subtract", "Multiply", "Divide" }
 )]

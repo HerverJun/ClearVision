@@ -18,9 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 对标 Halcon dilation_region
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Region Dilation",
-    Description = "Dilates a region using a specified structuring element (Region-based morphology).",
-    Category = "Morphology",
+    DisplayName = "区域膨胀",
+    Description = "使用指定结构元素对区域执行膨胀（基于区域的形态学）。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-dilation",
     Keywords = new[] { "Region", "Dilation", "Morphology", "Expand", "Grow", "RLE" },
     Version = "1.0.2"

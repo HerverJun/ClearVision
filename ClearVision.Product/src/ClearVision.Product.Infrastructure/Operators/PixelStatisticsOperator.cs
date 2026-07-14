@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "像素统计",
-    Description = "Computes ROI/masked pixel-level statistics.",
-    Category = "检测",
+    Description = "计算 ROI 或掩码区域内的像素级统计信息。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "pixel-stats",
     Keywords = new[] { "pixel statistics", "mean", "stddev", "min max", "non-zero" }
 )]

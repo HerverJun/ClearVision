@@ -40,6 +40,11 @@ public sealed record OperatorParameterConstraint(
     string? ResourceKind,
     string ReasonCode);
 
+public sealed record OperatorOutputAvailabilityRule(
+    string Output,
+    OperatorParameterConditionSet? AvailableWhen,
+    string ReasonCode);
+
 public interface IOperatorParameterConstraintProvider
 {
     IReadOnlyList<OperatorParameterConstraint> GetConstraints(OperatorType operatorType);

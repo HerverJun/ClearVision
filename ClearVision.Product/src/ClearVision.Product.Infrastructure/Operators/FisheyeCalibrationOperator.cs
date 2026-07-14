@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Fisheye Calibration",
-    Description = "Calibrates fisheye camera intrinsics and distortion parameters using chessboard or circle grid patterns.",
-    Category = "Calibration",
+    DisplayName = "鱼眼标定",
+    Description = "使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "fisheye-calibration",
     Keywords = new[] { "Fisheye", "Calibration", "Distortion", "Kannala-Brandt" }
 )]

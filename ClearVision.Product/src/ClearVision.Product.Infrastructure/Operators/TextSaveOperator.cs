@@ -15,9 +15,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Text Save",
-    Description = "Saves text or structured data to text/csv/json file.",
-    Category = "Logic Tools",
+    DisplayName = "文本保存",
+    Description = "将文本或结构化数据保存为 text/csv/json 文件。",
+    CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "save-text",
     Keywords = new[] { "save text", "export csv", "log", "json export" }
 )]

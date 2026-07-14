@@ -11,8 +11,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "点线距离",
-    Description = "Computes distance from a point to a line or segment.",
-    Category = "检测",
+    Description = "计算点到直线或线段的最短距离。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "distance",
     Keywords = new[] { "point", "line", "distance", "perpendicular", "segment" }
 )]

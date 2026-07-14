@@ -11,7 +11,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "二值图转区域",
     Description = "将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。",
-    Category = "区域处理",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "binary-image-to-region",
     Keywords = new[] { "二值图转区域", "图像转区域", "掩膜", "Region", "mask", "binary", "image-to-region", "RLE" },
     Version = "1.1.0"

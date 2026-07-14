@@ -1,264 +1,65 @@
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
+
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 internal static class VisionAgentReadOnlyCatalog
 {
-    public static IReadOnlyList<OperatorCatalogItem> Operators { get; } =
-    [
-        new("ImageAcquisition", "图像采集", "image", "Provides a camera/file image input node; agent read-only tools never capture frames.", ["image", "camera", "input", "acquisition", "Image Acquisition"]),
-        new("Filtering", "滤波", "image", "Applies Gaussian, mean/box, median, or bilateral spatial smoothing according to FilterMode.", ["filter", "gaussian", "mean", "median", "bilateral", "denoise", "Filtering", "滤波处理"]),
-        new("RoiManager", "ROI裁剪与掩膜", "roi", "Crops a rectangular/circular/polygon ROI or applies its mask and exposes spatial context for downstream inspection.", ["roi", "region", "crop", "mask", "ROI Manager", "ROI管理器", "ROI管理"]),
-        new("TemplateMatching", "模板匹配", "matching", "Finds a known pattern by template and score.", ["template", "matching", "alignment", "position", "Template Matching"]),
-        new("BlobAnalysis", "Blob分析", "vision", "Describes connected-component inspection metadata without reading images.", ["blob", "area", "count", "Blob Analysis", "斑点分析"]),
-        new("Thresholding", "全局阈值处理", "vision", "Defines global threshold metadata, including binary, truncation, ToZero, Otsu, and Triangle modes.", ["threshold", "binary", "segmentation", "Thresholding", "二值化", "阈值分割"]),
-        new("EdgeDetection", "边缘检测", "vision", "Defines edge extraction metadata for dry-run validation.", ["edge", "gradient", "contour", "Edge Detection"]),
-        new("ShapeMatching", "旋转尺度模板匹配", "matching", "Finds a template by coarse-to-fine rotation and scale search.", ["shape", "matching", "template", "Shape Matching"]),
-        new("DeepLearning", "深度学习", "ai", "Runs ONNX object detection, image classification, or semantic segmentation according to TaskType.", ["model", "onnx", "detection", "classification", "segmentation", "defect", "Deep Learning", "深度学习检测", "深度学习推理"]),
-        new("SemanticSegmentation", "语义分割", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask", "Semantic Segmentation"]),
-        new("SurfaceDefectDetection", "表面缺陷检测", "ai", "Traditional surface defect metadata without loading model files.", ["defect", "surface", "scratch", "Surface Defect Detection"]),
-        new("CircleMeasurement", "圆测量", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter", "Circle Measurement"]),
-        new("Measurement", "测量", "measurement", "Measures point-point, point-line, line-line distance, or a three-point angle according to MeasureType.", ["distance", "angle", "point", "line", "measurement", "Measurement", "几何测量"]),
-        new("UnitConvert", "单位换算", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement", "Unit Convert"]),
-        new("DetectionSequenceJudge", "检测顺序判定", "logic", "检查检测标签顺序，适用于端子线序检测。", ["wire", "sequence", "terminal", "order", "线序判定", "序列判定"]),
-        new("ImageAdd", "图像加法", "image", "Combines two images using weighted addition and optional offset.", ["compose", "multi-camera", "Image Add", "图像叠加"]),
-        new("ResultJudgment", "结果判定", "logic", "Evaluates pass/fail conditions using Value/Confidence inputs.", ["judgment", "pass", "fail", "tolerance", "Result Judgment"]),
-        new("ResultOutput", "结果输出", "output", "Summarizes inspection result payloads.", ["output", "result", "mes", "plc", "Result Output"]),
-        new("ModbusCommunication", "Modbus TCP通信", "communication", "Describes Modbus TCP read/write metadata for dry-run review; RTU is not executed by this operator.", ["modbus", "plc", "forbidden", "Modbus Communication", "Modbus通信"]),
-        new("HttpRequest", "HTTP 请求", "communication", "Forbidden preview network metadata; dry-run only.", ["http", "network", "forbidden", "HTTP Request", "HTTP请求"]),
-        new("ScriptOperator", "脚本算子", "logic", "Forbidden preview script metadata; dry-run only.", ["script", "command", "forbidden", "Script Operator"])
-    ];
+    private static readonly VisionAgentOperatorContractCatalog ContractCatalog = new();
 
-    public static IReadOnlyDictionary<string, OperatorSchemaItem> Schemas { get; } =
-        new Dictionary<string, OperatorSchemaItem>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["ImageAcquisition"] = new(
-                "ImageAcquisition",
-                ["Image"],
-                [],
-                [
-                    new("SourceType", "string", false, "Camera/File/ProvidedFrame; read-only agent tools do not acquire images."),
-                    new("CameraId", "cameraBinding", false, "Logical camera binding id supplied by engineer."),
-                    new("FilePath", "string", false, "Optional offline file source; not read by read-only agent tools.")
-                ]),
-            ["Filtering"] = new(
-                "Filtering",
-                ["Image", "FilterMode", "FilterDiagnostics"],
-                ["Image"],
-                [
-                    new("FilterMode", "enum", false, "Gaussian (default), Mean/Box, Median, or Bilateral."),
-                    new("KernelSize", "int", false, "Used by Gaussian, Mean/Box, and Median modes."),
-                    new("SigmaX", "double", false, "Gaussian horizontal sigma."),
-                    new("SigmaY", "double", false, "Gaussian vertical sigma; zero follows OpenCV Gaussian semantics."),
-                    new("BorderType", "enum", false, "Used by Gaussian, Mean/Box, and Bilateral modes."),
-                    new("Diameter", "int", false, "Bilateral neighborhood diameter."),
-                    new("SigmaColor", "double", false, "Bilateral color sigma."),
-                    new("SigmaSpace", "double", false, "Bilateral spatial sigma.")
-                ]),
-            ["TemplateMatching"] = new(
-                "TemplateMatching",
-                ["Image", "Position", "Score", "NormalizedScore", "RawResponse", "SubpixelOffsetX", "SubpixelOffsetY", "PeakCurvature", "Angle", "Scale", "IsMatch", "Matches", "MatchCount"],
-                ["Image", "Template", "Mask"],
-                [
-                    new("Method", "enum", false, "Template matching method."),
-                    new("Domain", "enum", false, "Matching domain."),
-                    new("Threshold", "double", false, "Minimum acceptable match score."),
-                    new("MaxMatches", "int", false, "Maximum number of matches.")
-                ]),
-            ["BlobAnalysis"] = new(
-                "BlobAnalysis",
-                ["Blobs", "BlobCount", "AreaStatistics"],
-                ["Image"],
-                [
-                    new("MinArea", "double", false, "Minimum blob area metadata."),
-                    new("MaxArea", "double", false, "Maximum blob area metadata.")
-                ]),
-            ["Thresholding"] = new(
-                "Thresholding",
-                ["BinaryImage"],
-                ["Image"],
-                [
-                    new("Threshold", "double", true, "Threshold metadata value."),
-                    new("Mode", "string", false, "Threshold mode metadata.")
-                ]),
-            ["EdgeDetection"] = new(
-                "EdgeDetection",
-                ["Edges"],
-                ["Image"],
-                [
-                    new("Method", "string", false, "Edge detector metadata."),
-                    new("Polarity", "string", false, "Expected edge polarity metadata.")
-                ]),
-            ["ShapeMatching"] = new(
-                "ShapeMatching",
-                ["MatchResult", "Score", "Pose"],
-                ["Image"],
-                [
-                    new("TemplateId", "string", true, "Catalog template metadata id; no template file is loaded."),
-                    new("MinScore", "double", false, "Minimum acceptable shape score.")
-                ]),
-            ["DeepLearning"] = new(
-                "DeepLearning",
-                [
-                    "Image", "OriginalImage", "DetectionList", "Defects", "DefectCount", "Objects", "ObjectCount",
-                    "TaskType", "RequestedTaskType", "TaskResolutionSource", "TaskResolutionEvidence",
-                    "TopClassLabel", "TopClassConfidence", "ClassificationTopK", "ClassificationResult",
-                    "SegmentationMap", "ColoredMap", "ClassMasks", "ClassCount", "ClassMaskCount",
-                    "OmittedClassMaskCount", "PresentClasses", "StatusCode", "StatusMessage",
-                    "ResolvedModelPath", "ResolvedModelId", "ResolvedModelCatalogPath", "ModelSource",
-                    "ModelProvenance", "PostprocessDiagnostics", "OutputFormat"
-                ],
-                ["Image"],
-                [
-                    new("TaskType", "enum", false, "ObjectDetection (legacy default), ImageClassification, SemanticSegmentation, or reliable Auto."),
-                    new("ModelPath", "file", true, "Configured model artifact path; not loaded by read-only agent tools."),
-                    new("Confidence", "double", false, "ObjectDetection confidence threshold only."),
-                    new("ModelVersion", "enum", false, "ObjectDetection YOLO format selector only."),
-                    new("InputSize", "int", false, "ObjectDetection square input size only."),
-                    new("UseGpu", "bool", false, "Legacy GPU preference used when ExecutionProvider is Auto."),
-                    new("GpuDeviceId", "int", false, "GPU device used by CUDA execution."),
-                    new("TargetClasses", "string", false, "ObjectDetection class filter only."),
-                    new("LabelsPath", "file", false, "Detection or classification label fallback."),
-                    new("EnableInternalNms", "bool", false, "ObjectDetection platform-side NMS switch only."),
-                    new("NmsIouThreshold", "double", false, "ObjectDetection NMS IoU threshold only."),
-                    new("OutputFormat", "enum", false, "ObjectDetection output format only."),
-                    new("DetectionMode", "enum", false, "ObjectDetection defect/object result semantics only."),
-                    new("TopK", "int", false, "ImageClassification Top-K only."),
-                    new("ClassificationInputSize", "string", false, "ImageClassification input size only."),
-                    new("ClassificationScoreMode", "enum", false, "ImageClassification logits/probability handling only."),
-                    new("ClassNames", "string", false, "Classification or segmentation labels when metadata/catalog names are unavailable."),
-                    new("SegmentationInputSize", "string", false, "SemanticSegmentation input size only."),
-                    new("NumClasses", "int", false, "SemanticSegmentation class count only."),
-                    new("MaxClassMasks", "int", false, "SemanticSegmentation mask output limit only."),
-                    new("ExecutionProvider", "enum", false, "Auto, CPU, or CUDA execution backend selection."),
-                    new("ScaleToUnitRange", "bool", false, "Classification or segmentation input scaling."),
-                    new("ChannelOrder", "enum", false, "Classification or segmentation RGB/BGR channel order."),
-                    new("Mean", "string", false, "Classification or segmentation normalization mean."),
-                    new("Std", "string", false, "Classification or segmentation normalization standard deviation."),
-                    new("ModelId", "string", false, "Catalog model id metadata; use instead of ModelPath."),
-                    new("ModelCatalogPath", "file", false, "Optional catalog path when ModelId is used.")
-                ]),
-            ["SemanticSegmentation"] = new(
-                "SemanticSegmentation",
-                ["Mask", "Classes", "Scores"],
-                ["Image"],
-                [
-                    new("Method", "enum", false, "Surface defect method."),
-                    new("Threshold", "double", false, "Defect response threshold."),
-                    new("MinArea", "int", false, "Minimum defect area."),
-                    new("MaxArea", "int", false, "Maximum defect area.")
-                ]),
-            ["SurfaceDefectDetection"] = new(
-                "SurfaceDefectDetection",
-                ["Defects", "Classes", "Scores"],
-                ["Image"],
-                [
-                    new("ModelId", "string", true, "Catalog model metadata id; no model file is loaded."),
-                    new("ModelKind", "string", true, "Expected model kind metadata.")
-                ]),
-            ["CircleMeasurement"] = new(
-                "CircleMeasurement",
-                ["Center", "Radius", "Diameter"],
-                ["Image"],
-                [
-                    new("Roi", "string", false, "ROI name for the circle search."),
-                    new("EdgePolarity", "string", false, "Expected edge polarity.")
-                ]),
-            ["Measurement"] = new(
-                "Measurement",
-                [
-                    "Image", "Distance", "DeltaX", "DeltaY", "Angle", "Value", "Unit", "MeasurementType",
-                    "StatusCode", "StatusMessage", "FootPoint", "Intersection", "HasIntersection", "IsParallel",
-                    "Confidence", "UncertaintyPx", "UncertaintyDeg"
-                ],
-                ["Image", "PointA", "PointB", "PointC", "Line1", "Line2"],
-                [
-                    new("MeasureType", "enum", false, "PointToPoint (legacy default), Horizontal, Vertical, PointToLine, LineToLine, or ThreePointAngle."),
-                    new("X1", "int", false, "Legacy start point X for point-distance modes without PointA input."),
-                    new("Y1", "int", false, "Legacy start point Y for point-distance modes without PointA input."),
-                    new("X2", "int", false, "Legacy end point X for point-distance modes without PointB input."),
-                    new("Y2", "int", false, "Legacy end point Y for point-distance modes without PointB input."),
-                    new("DistanceModel", "enum", false, "Segment or InfiniteLine for point-line and line-line distance."),
-                    new("ParallelThreshold", "double", false, "LineToLine parallel-angle threshold in degrees."),
-                    new("AngleUnit", "enum", false, "Degree or Radian for ThreePointAngle.")
-                ]),
-            ["UnitConvert"] = new(
-                "UnitConvert",
-                ["Result", "Unit"],
-                ["Value", "PixelSize"],
-                [
-                    new("FromUnit", "enum", false, "Source unit."),
-                    new("ToUnit", "enum", false, "Target unit."),
-                    new("Scale", "double", false, "Pixel-to-world scale; kept pending when calibration is unknown."),
-                    new("UseCalibration", "bool", false, "Whether to use PixelSize input.")
-                ]),
-            ["DetectionSequenceJudge"] = new(
-                "DetectionSequenceJudge",
-                ["IsMatch", "ActualOrder", "Count", "MissingLabels", "DuplicateLabels", "SortedDetections", "Assignment", "UnassignedDetections", "SlotDistances", "RowCount", "PerspectiveApplied", "Diagnostics", "Message"],
-                ["Detections", "SlotPoints", "PerspectiveSrcPoints", "PerspectiveDstPoints"],
-                [
-                    new("ExpectedLabels", "string", true, "Comma-separated expected labels in order."),
-                    new("SortBy", "enum", false, "Field used to sort detections."),
-                    new("Direction", "enum", false, "Ordering direction."),
-                    new("ExpectedCount", "int", false, "Expected detection count.")
-                ]),
-            ["ResultJudgment"] = new(
-                "ResultJudgment",
-                ["JudgmentResult", "IsOk", "ConditionResult", "JudgmentValue", "Details"],
-                ["Value", "Confidence"],
-                [
-                    new("FieldName", "string", false, "Field to read from input payload."),
-                    new("Condition", "enum", false, "Pass/fail condition."),
-                    new("ExpectValue", "string", false, "Expected value."),
-                    new("ExpectValueMin", "string", false, "Expected range minimum."),
-                    new("ExpectValueMax", "string", false, "Expected range maximum."),
-                    new("MinConfidence", "double", false, "Minimum confidence gate."),
-                    new("NumericAbsTolerance", "double", false, "Numeric absolute tolerance."),
-                    new("NumericRelTolerance", "double", false, "Numeric relative tolerance.")
-                ]),
-            ["ResultOutput"] = new(
-                "ResultOutput",
-                ["Output", "Image", "Result", "Text", "Data", "FilePath"],
-                ["Image", "Result", "Text", "Data"],
-                [
-                    new("Format", "enum", false, "Output format."),
-                    new("SaveToFile", "bool", false, "Whether to save output text to a file."),
-                    new("MaxFormattedCollectionItems", "int", false, "Maximum formatted collection items.")
-                ]),
-            ["ModbusCommunication"] = new(
-                "ModbusCommunication",
-                ["MetadataBlocked"],
-                ["Input"],
-                [
-                    new("WriteIntent", "bool", false, "Forbidden in RuntimePreview metadata-only review.")
-                ]),
-            ["HttpRequest"] = new(
-                "HttpRequest",
-                ["MetadataBlocked"],
-                ["Input"],
-                [
-                    new("RequestIntent", "string", false, "Forbidden in RuntimePreview metadata-only review.")
-                ]),
-            ["ScriptOperator"] = new(
-                "ScriptOperator",
-                ["MetadataBlocked"],
-                ["Input"],
-                [
-                    new("ScriptIntent", "string", false, "Forbidden in RuntimePreview metadata-only review.")
-                ]),
-            ["RoiManager"] = new(
-                "RoiManager",
-                ["RoiImage"],
-                ["Image"],
-                [
-                    new("RoiName", "string", false, "Named ROI.")
-                ]),
-            ["ImageAdd"] = new(
-                "ImageAdd",
-                ["Image"],
-                ["ImageA", "ImageB"],
-                [
-                    new("Mode", "string", false, "Composition mode.")
-                ])
-        };
+    public static IReadOnlyList<OperatorCatalogItem> Operators { get; } = ContractCatalog.Operators
+        .OrderBy(item => item.CategoryOrder)
+        .ThenBy(item => item.DisplayName, StringComparer.Ordinal)
+        .ThenBy(item => item.OperatorType, StringComparer.Ordinal)
+        .Select(item => new OperatorCatalogItem(
+            item.OperatorType,
+            item.DisplayName,
+            item.CategoryId,
+            item.CategoryOrder,
+            item.Category,
+            item.Description,
+            item.Lifecycle,
+            item.LifecycleNote,
+            item.DefaultHidden,
+            item.DefaultAiRecommendation,
+            item.RequiresLifecycleDisclosure,
+            item.Keywords,
+            item.Tags))
+        .ToList();
+
+    public static IReadOnlyDictionary<string, OperatorSchemaItem> Schemas { get; } = ContractCatalog.Operators
+        .OrderBy(item => item.OperatorType, StringComparer.Ordinal)
+        .ToDictionary(
+            item => item.OperatorType,
+            item => new OperatorSchemaItem(
+                item.OperatorType,
+                item.CategoryId,
+                item.CategoryOrder,
+                item.Category,
+                item.Lifecycle,
+                item.LifecycleNote,
+                item.DefaultHidden,
+                item.DefaultAiRecommendation,
+                item.RequiresLifecycleDisclosure,
+                item.OutputPorts.Select(port => port.Name).ToList(),
+                item.InputPorts.Select(port => port.Name).ToList(),
+                item.Parameters.Select(parameter => new OperatorParameterItem(
+                    parameter.Name,
+                    parameter.DisplayName,
+                    parameter.DataType,
+                    parameter.IsRequired,
+                    parameter.DefaultValue,
+                    parameter.MinValue,
+                    parameter.MaxValue,
+                    parameter.Options?
+                        .Select(option => option.Value?.ToString() ?? string.Empty)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList() ?? [],
+                    parameter.Description)).ToList(),
+                item.ParameterConstraints,
+                item.OutputAvailabilityRules,
+                item.Metadata),
+            StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlyList<TemplateItem> Templates { get; } =
     [
@@ -316,20 +117,44 @@ internal static class VisionAgentReadOnlyCatalog
 internal sealed record OperatorCatalogItem(
     string OperatorType,
     string DisplayName,
+    OperatorCategoryId CategoryId,
+    int CategoryOrder,
     string Category,
     string Summary,
-    IReadOnlyList<string> Keywords);
+    OperatorLifecycle Lifecycle,
+    string LifecycleNote,
+    bool DefaultHidden,
+    bool DefaultAiRecommendation,
+    bool RequiresLifecycleDisclosure,
+    IReadOnlyList<string> Keywords,
+    IReadOnlyList<string> Tags);
 
 internal sealed record OperatorSchemaItem(
     string OperatorType,
+    OperatorCategoryId CategoryId,
+    int CategoryOrder,
+    string Category,
+    OperatorLifecycle Lifecycle,
+    string LifecycleNote,
+    bool DefaultHidden,
+    bool DefaultAiRecommendation,
+    bool RequiresLifecycleDisclosure,
     IReadOnlyList<string> OutputPorts,
     IReadOnlyList<string> InputPorts,
-    IReadOnlyList<OperatorParameterItem> Parameters);
+    IReadOnlyList<OperatorParameterItem> Parameters,
+    IReadOnlyList<OperatorParameterConstraint> ParameterConstraints,
+    IReadOnlyList<OperatorOutputAvailabilityRule> OutputAvailabilityRules,
+    OperatorMetadata Metadata);
 
 internal sealed record OperatorParameterItem(
     string Name,
+    string DisplayName,
     string DataType,
     bool Required,
+    object? DefaultValue,
+    object? MinValue,
+    object? MaxValue,
+    IReadOnlyList<string> Options,
     string Summary);
 
 internal sealed record TemplateItem(

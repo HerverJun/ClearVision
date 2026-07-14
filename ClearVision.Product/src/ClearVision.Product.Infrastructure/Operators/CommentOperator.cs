@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "注释",
     Description = "在工作流中添加说明文本，不影响数据流，仅用于标注设计意图",
-    Category = "辅助",
+    CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "comment",
     Version = "1.0.1",
     Keywords = new[] { "注释", "备注", "说明", "标注", "文本", "Comment", "Note", "Annotation" }

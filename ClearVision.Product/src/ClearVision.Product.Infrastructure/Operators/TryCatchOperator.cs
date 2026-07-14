@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "Try分支透传",
     Description = "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
-    Category = "流程控制",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "trycatch",
     Keywords = new[] { "Try", "Catch", "passthrough", "branch", "异常捕获", "Try-Catch 流程控制" }
 )]

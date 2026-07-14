@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "帧平均",
-    Description = "Averages multi-frame input to reduce temporal noise.",
-    Category = "预处理",
+    Description = "对多帧输入取平均以降低时域噪声。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "frame-average",
     Keywords = new[] { "frame", "averaging", "multi-frame", "denoise" }
 )]

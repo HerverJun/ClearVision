@@ -20,9 +20,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// Phase 4.2 extends the operator with multi-target candidates, NMS, and batched deformation evaluation.
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Local Deformable Matching",
-    Description = "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
-    Category = "Matching",
+    DisplayName = "局部可变形匹配",
+    Description = "实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
+    Lifecycle = OperatorLifecycle.Experimental,
+    LifecycleNote = "TPS 局部形变与多候选搜索为实验能力，尚需目标域数据验证鲁棒性和性能。",
     IconName = "deformable-match",
     Keywords = new[] { "Deformable", "Local", "Matching", "MLS", "Occlusion", "MultiTarget", "NMS" },
     Version = "1.1.1"

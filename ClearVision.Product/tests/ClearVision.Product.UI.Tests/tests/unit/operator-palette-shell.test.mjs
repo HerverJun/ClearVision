@@ -8,7 +8,8 @@ import {
   clampScrollState,
   createFlyoutViewModel,
   createOperatorPayload,
-  filterOperatorsForFlyout
+  filterOperatorsForFlyout,
+  OperatorPaletteShell
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorPaletteShell.js';
 import { getOperatorTypeDisplayName } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorDisplayNames.js';
 
@@ -366,4 +367,53 @@ test('OperatorPaletteShell drag payload keeps operator metadata from global sear
   assert.equal(payload.type, 'CircleMeasurement');
   assert.deepEqual(payload.inputPorts, [{ name: 'Region', displayName: '区域', dataType: 'Region' }]);
   assert.deepEqual(payload.parameters, operators[3].parameters);
+});
+
+test('OperatorPaletteShell renders lifecycle badges for Experimental and Reference operators', () => {
+  const shell = Object.create(OperatorPaletteShell.prototype);
+  const experimental = shell.renderOperatorItem({
+    type: 'ColorDetection',
+    displayName: '颜色分析',
+    lifecycle: 'Experimental',
+    lifecycleNote: '实验能力边界'
+  }, 0);
+  const reference = shell.renderOperatorItem({
+    type: 'SubpixelEdgeDetection',
+    displayName: '亚像素边缘',
+    lifecycle: 'Reference',
+    lifecycleNote: '参考实现边界'
+  }, 1);
+  const stable = shell.renderOperatorItem({
+    type: 'Thresholding',
+    displayName: '全局阈值处理',
+    lifecycle: 'Stable'
+  }, 2);
+
+  assert.match(experimental, /operator-lifecycle-experimental/);
+  assert.match(experimental, />实验<\/span>/);
+  assert.match(experimental, /实验能力边界/);
+  assert.match(reference, /operator-lifecycle-reference/);
+  assert.match(reference, />参考<\/span>/);
+  assert.match(reference, /参考实现边界/);
+  assert.doesNotMatch(stable, /operator-lifecycle-badge/);
+});
+
+test('OperatorPaletteShell compatibility checkbox updates the shared library filter', () => {
+  const shell = Object.create(OperatorPaletteShell.prototype);
+  let includeCompatibility = null;
+  shell.libraryPanel = {
+    setIncludeCompatibility(value) {
+      includeCompatibility = value;
+      return Promise.resolve();
+    }
+  };
+
+  shell.handleFlyoutInput({
+    target: {
+      checked: true,
+      dataset: { paletteCompatibility: 'true' }
+    }
+  });
+
+  assert.equal(includeCompatibility, true);
 });

@@ -10,8 +10,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "异常检测",
-    Description = "Runs a simplified PatchCore-style anomaly detector with train/inference modes and feature-bank persistence.",
-    Category = "AI检测",
+    Description = "运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。",
+    CategoryId = OperatorCategoryId.AiInference,
+    Lifecycle = OperatorLifecycle.Experimental,
+    LifecycleNote = "简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。",
     IconName = "anomaly-detection",
     Keywords = new[] { "anomaly", "patchcore", "feature bank", "异常检测" },
     Version = "1.0.0",

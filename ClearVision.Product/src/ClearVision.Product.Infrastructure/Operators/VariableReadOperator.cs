@@ -14,7 +14,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "变量读取",
     Description = "从单次运行变量或项目全局变量读取值",
-    Category = "变量",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "variable-read")]
 [OutputPort("Value", "值", PortDataType.Any)]
 [OutputPort("RawValue", "Raw Value", PortDataType.Any)]

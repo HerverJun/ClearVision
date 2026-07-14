@@ -88,6 +88,15 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
         {
             var score = 0.0;
 
+            if (card.DefaultHidden)
+            {
+                score -= 1_000.0;
+            }
+            else if (!card.DefaultAiRecommendation)
+            {
+                score -= 25.0;
+            }
+
             if (CoreTypes.Contains(ParseType(card.OperatorType)))
                 score += 1.0;
 
@@ -151,7 +160,10 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
     private OperatorKnowledgeSlice BuildFallbackSlice(OperatorKnowledgeQuery query)
     {
         var metadata = _operatorFactory.GetAllMetadata()
-            .OrderBy(item => item.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Where(item => !item.DefaultHidden)
+            .OrderByDescending(item => OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle))
+            .ThenBy(item => OperatorCategoryCatalog.GetOrder(item.CategoryId))
+            .ThenBy(item => item.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var takeCount = Math.Clamp(query.TopN <= 0 ? 24 : query.TopN, 8, Math.Max(8, metadata.Count));
@@ -166,7 +178,14 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
             {
                 OperatorType = item.Type.ToString(),
                 DisplayName = item.DisplayName,
+                CategoryId = item.CategoryId.ToString(),
+                CategoryOrder = OperatorCategoryCatalog.GetOrder(item.CategoryId),
                 Category = item.Category,
+                Lifecycle = item.Lifecycle.ToString(),
+                LifecycleNote = item.LifecycleNote,
+                DefaultHidden = item.DefaultHidden,
+                DefaultAiRecommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle),
+                RequiresLifecycleDisclosure = OperatorLifecyclePolicy.RequiresDisclosure(item.Lifecycle),
                 Aliases = [item.DisplayName, item.Type.ToString()],
                 Inputs = item.InputPorts.Select(port => new OperatorKnowledgePort
                 {
@@ -194,7 +213,25 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
                     MinValue = parameter.MinValue?.ToString(),
                     MaxValue = parameter.MaxValue?.ToString(),
                     IsRequired = parameter.IsRequired
-                }).ToList()
+                }).ToList(),
+                ParameterConditions = item.ParameterConstraints.ToList(),
+                OutputConditions = item.OutputAvailabilityRules.ToList(),
+                ResourceRequirements = item.ParameterConstraints
+                    .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
+                    .Select(constraint => new OperatorKnowledgeResourceRequirement
+                    {
+                        Parameter = constraint.Parameter,
+                        ResourceKind = constraint.ResourceKind!,
+                        ReasonCode = constraint.ReasonCode,
+                        AtLeastOneGroup = constraint.AtLeastOneGroup,
+                        RequiredWhen = constraint.RequiredWhen
+                    }).ToList(),
+                RequiredResources = item.ParameterConstraints
+                    .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
+                    .Select(constraint => $"{item.Type}.{constraint.Parameter}")
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                GenerationDependencies = item.GenerationDependencies.ToList()
             }).ToList();
 
         return new OperatorKnowledgeSlice

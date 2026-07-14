@@ -14,7 +14,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "Blob分类标注",
     Description = "按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制标签。",
-    Category = "定位",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "blob-label",
     Keywords = new[] { "blob", "label", "classify connected component", "连通域标注" },
     Version = "1.0.1"

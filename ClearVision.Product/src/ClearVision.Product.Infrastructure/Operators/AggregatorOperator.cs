@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "数据聚合",
     Description = "将多路输入数据合并为列表，并提取极值与均值",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "merge",
     Keywords = new[] { "聚合", "合并", "汇总", "最大值", "最小值", "均值", "多路合并", "Aggregate", "Merge", "Max", "Min", "Average" }
 )]

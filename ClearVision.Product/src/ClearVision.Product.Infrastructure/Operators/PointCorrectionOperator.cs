@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "点位刚性补偿",
     Description = "根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 PixelSize 输出 mm 前需确认标定尺度。",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "point-correction",
     Keywords = new[] { "correction", "compensation", "robot", "pick place", "点位修正" },
     Version = "1.0.4"

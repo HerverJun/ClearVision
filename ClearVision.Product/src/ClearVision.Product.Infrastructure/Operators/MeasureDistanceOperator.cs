@@ -11,7 +11,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "测量",
     Description = "统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。",
-    Category = "检测",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "measure",
     Keywords = new[] { "测量", "距离", "点线", "线线", "夹角", "三点角度", "Measure", "Distance", "Angle" },
     Version = "1.1.0"

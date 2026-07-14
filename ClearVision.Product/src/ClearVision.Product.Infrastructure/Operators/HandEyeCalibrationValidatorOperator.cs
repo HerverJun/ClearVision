@@ -9,9 +9,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Hand-Eye Calibration Validator",
-    Description = "Validates a hand-eye CalibrationBundleV2 payload and produces quality metrics, HTML report, and pose suggestions.",
-    Category = "Calibration",
+    DisplayName = "手眼标定验证",
+    Description = "验证手眼标定 CalibrationBundleV2 并生成质量指标、HTML 报告和位姿建议。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "hand-eye-validation",
     Keywords = new[] { "handeye", "validation", "calibration report" },
     Version = "1.0.1"

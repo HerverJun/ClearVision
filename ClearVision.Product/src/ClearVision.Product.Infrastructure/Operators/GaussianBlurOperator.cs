@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "滤波",
     Description = "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。",
-    Category = "Filtering",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
     Keywords = new[] { "gaussian", "mean", "box", "median", "bilateral", "blur", "filter", "denoise", "滤波" },
     Version = "1.1.0"

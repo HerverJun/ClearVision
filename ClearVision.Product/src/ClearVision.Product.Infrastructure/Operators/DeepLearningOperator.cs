@@ -66,7 +66,7 @@ public enum DetectionOutputFormat
 [OperatorMeta(
     DisplayName = "深度学习",
     Description = "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
-    Category = "AI检测",
+    CategoryId = OperatorCategoryId.AiInference,
     IconName = "ai",
     Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "图像分类", "语义分割", "ONNX", "YOLO", "Deep learning" },
     Version = "1.1.0"

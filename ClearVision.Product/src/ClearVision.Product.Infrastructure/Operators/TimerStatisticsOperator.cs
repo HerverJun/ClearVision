@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "计时统计",
-    Description = "Measures elapsed and cycle time statistics.",
-    Category = "逻辑工具",
+    Description = "统计耗时和周期时间。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "timer",
     Keywords = new[] { "timer", "elapsed", "cycle time", "ct", "statistics" },
     Version = "1.0.1"

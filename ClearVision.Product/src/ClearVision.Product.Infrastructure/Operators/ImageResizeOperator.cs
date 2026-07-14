@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像缩放",
     Description = "调整图像尺寸",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "resize",
     Keywords = new[] { "缩放", "放大", "缩小", "尺寸", "Resize", "Scale", "Zoom" }
 )]

@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Intersection",
-    Description = "Computes the intersection of two regions (A ∩ B).",
-    Category = "Region",
+    DisplayName = "区域交集",
+    Description = "计算两个区域的交集（A ∩ B）。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-intersection",
     Keywords = new[] { "Region", "Intersection", "Boolean", "Overlap" },
     Version = "1.0.2"

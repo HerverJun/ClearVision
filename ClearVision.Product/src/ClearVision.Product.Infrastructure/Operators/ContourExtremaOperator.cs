@@ -8,9 +8,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Contour Extrema",
-    Description = "Finds extremal points of a contour in specified directions.",
-    Category = "Measurement",
+    DisplayName = "轮廓极值",
+    Description = "在指定方向上查找轮廓极值点。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "contour-extrema",
     Keywords = new[] { "Contour", "Extrema", "Min", "Max", "Boundary" },
     Version = "1.0.1"

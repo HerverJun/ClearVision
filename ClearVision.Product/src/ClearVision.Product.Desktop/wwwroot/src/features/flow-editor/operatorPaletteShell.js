@@ -10,6 +10,26 @@ import {
 
 export const GLOBAL_SEARCH_GROUP_KEY = 'global-search';
 
+export const OPERATOR_CATEGORY_ORDER = Object.freeze([
+    '采集',
+    '图像预处理',
+    '分割与区域',
+    '特征提取',
+    '匹配与定位',
+    '缺陷检测',
+    '测量',
+    '标定与坐标',
+    'AI推理',
+    '3D点云',
+    '数据处理',
+    '流程控制',
+    '通信',
+    '输出与辅助'
+]);
+
+const CATEGORY_ORDER_BY_NAME = new Map(
+    OPERATOR_CATEGORY_ORDER.map((name, index) => [name, index + 1]));
+
 const SEARCH_ICON_PATH =
     'M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.45-1.41 1.41-4.45-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z';
 
@@ -68,6 +88,29 @@ function getOperatorCategory(operator) {
     return normalizeText(operator?.category || operator?.Category || '其他') || '其他';
 }
 
+function getOperatorCategoryOrder(operator) {
+    const explicitOrder = Number(operator?.categoryOrder ?? operator?.CategoryOrder);
+    if (Number.isFinite(explicitOrder) && explicitOrder > 0) {
+        return explicitOrder;
+    }
+
+    return CATEGORY_ORDER_BY_NAME.get(getOperatorCategory(operator)) || Number.MAX_SAFE_INTEGER;
+}
+
+function getOperatorLifecycle(operator) {
+    return normalizeText(operator?.lifecycle || operator?.Lifecycle || 'Stable') || 'Stable';
+}
+
+function getLifecycleLabel(lifecycle) {
+    return ({
+        Stable: '稳定',
+        Experimental: '实验',
+        Reference: '参考',
+        Legacy: '旧版',
+        Deprecated: '已弃用'
+    })[lifecycle] || lifecycle;
+}
+
 export { buildOperatorSearchText };
 
 export function buildOperatorGroups(operators = []) {
@@ -75,18 +118,25 @@ export function buildOperatorGroups(operators = []) {
     for (const operator of operators) {
         const category = getOperatorCategory(operator);
         if (!buckets.has(category)) {
-            buckets.set(category, []);
+            buckets.set(category, {
+                order: getOperatorCategoryOrder(operator),
+                operators: []
+            });
         }
-        buckets.get(category).push(operator);
+        const bucket = buckets.get(category);
+        bucket.order = Math.min(bucket.order, getOperatorCategoryOrder(operator));
+        bucket.operators.push(operator);
     }
 
     return Array.from(buckets.entries())
-        .sort(([left], [right]) => left.localeCompare(right, 'zh-Hans-CN'))
-        .map(([label, items]) => ({
+        .sort(([leftLabel, left], [rightLabel, right]) =>
+            left.order - right.order || leftLabel.localeCompare(rightLabel, 'zh-Hans-CN'))
+        .map(([label, bucket]) => ({
             key: `category:${label}`,
             label,
             kind: 'category',
-            operators: items.slice().sort((left, right) =>
+            categoryOrder: bucket.order,
+            operators: bucket.operators.slice().sort((left, right) =>
                 getOperatorTitle(left).localeCompare(getOperatorTitle(right), 'zh-Hans-CN'))
         }));
 }
@@ -393,6 +443,12 @@ export class OperatorPaletteShell {
                            autocomplete="off"
                            value="${escapeHtml(this.searchTerm)}">
                 </label>
+                <label class="operator-flyout-compatibility">
+                    <input type="checkbox"
+                           data-palette-compatibility="true"
+                           ${this.libraryPanel?.getIncludeCompatibility?.() ? 'checked' : ''}>
+                    <span>显示兼容算子（旧版/已弃用）</span>
+                </label>
                 <div class="operator-flyout-list" data-palette-list="true">
                     ${operators.length > 0
                         ? operators.map((operator, index) =>
@@ -422,6 +478,8 @@ export class OperatorPaletteShell {
         const type = getOperatorType(operator);
         const category = getOperatorCategory(operator);
         const description = operator?.description || operator?.Description || '暂无说明';
+        const lifecycle = getOperatorLifecycle(operator);
+        const lifecycleNote = operator?.lifecycleNote || operator?.LifecycleNote || '';
         const inputCount = (operator?.inputPorts || operator?.InputPorts || []).length;
         const outputCount = (operator?.outputPorts || operator?.OutputPorts || []).length;
 
@@ -435,7 +493,9 @@ export class OperatorPaletteShell {
                 <span class="operator-flyout-drag">⋮⋮</span>
                 <span class="operator-flyout-icon" data-operator-icon="${index}"></span>
                 <span class="operator-flyout-main">
-                    <strong>${escapeHtml(title)}</strong>
+                    <strong>${escapeHtml(title)}${lifecycle !== 'Stable'
+                        ? ` <span class="operator-lifecycle-badge operator-lifecycle-${escapeHtml(lifecycle.toLowerCase())}" title="${escapeHtml(lifecycleNote || getLifecycleLabel(lifecycle))}">${escapeHtml(getLifecycleLabel(lifecycle))}</span>`
+                        : ''}</strong>
                     <em>${escapeHtml(description)}</em>
                     ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
                 </span>
@@ -486,6 +546,11 @@ export class OperatorPaletteShell {
     }
 
     handleFlyoutInput(event) {
+        if (event.target?.dataset?.paletteCompatibility === 'true') {
+            void this.libraryPanel?.setIncludeCompatibility?.(event.target.checked);
+            return;
+        }
+
         if (event.target?.dataset?.paletteSearch !== 'true') {
             return;
         }

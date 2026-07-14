@@ -72,12 +72,20 @@ public class OperatorMetadataDto
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public string CategoryId { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public int CategoryOrder { get; set; }
+    public string Lifecycle { get; set; } = string.Empty;
+    public string? LifecycleNote { get; set; }
+    public bool DefaultHidden { get; set; }
     public string Icon { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string[] Keywords { get; set; } = Array.Empty<string>();
     public List<PortDefinitionDto> Inputs { get; set; } = new();
     public List<PortDefinitionDto> Outputs { get; set; } = new();
     public List<ParameterDefinitionDto> Parameters { get; set; } = new();
+    public List<OperatorParameterConstraint> ParameterConstraints { get; set; } = new();
+    public List<OperatorOutputAvailabilityRule> OutputAvailabilityRules { get; set; } = new();
 }
 
 /// <summary>
@@ -124,7 +132,12 @@ public class OperatorTypeInfoDto
 {
     public string Type { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public string CategoryId { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public int CategoryOrder { get; set; }
+    public string Lifecycle { get; set; } = string.Empty;
+    public string? LifecycleNote { get; set; }
+    public bool DefaultHidden { get; set; }
     public string Icon { get; set; } = string.Empty;
 }
 

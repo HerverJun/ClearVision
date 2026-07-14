@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "清晰度评估",
-    Description = "Evaluates focus quality of an image.",
-    Category = "检测",
+    Description = "评估图像的对焦清晰度。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "focus",
     Keywords = new[] { "sharpness", "focus", "blur", "laplacian", "tenengrad" }
 )]

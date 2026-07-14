@@ -19,7 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "西门子S7通信",
     Description = "西门子S7系列PLC读写通信（S7-200/300/400/1200/1500）",
-    Category = "通信",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "s7"
 )]
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]

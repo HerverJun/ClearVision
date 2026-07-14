@@ -9,8 +9,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "表面缺陷检测",
-    Description = "Detects surface defects using gradient, aligned reference diff, or local contrast.",
-    Category = "AI检测",
+    Description = "使用梯度、配准后的参考差分或局部对比度检测表面缺陷。",
+    CategoryId = OperatorCategoryId.DefectDetection,
+    Lifecycle = OperatorLifecycle.Experimental,
+    LifecycleNote = "基于梯度、参考差分和局部对比度的传统缺陷候选，需要现场样本调参与误检验证。",
     IconName = "surface-defect",
     Keywords = new[] { "surface defect", "scratch", "stain", "traditional detection" },
     Tags = new[] { "experimental", "industrial-remediation", "surface-defect" },

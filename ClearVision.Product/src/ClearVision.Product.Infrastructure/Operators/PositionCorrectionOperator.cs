@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "ROI位姿补偿（像素）",
     Description = "根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。",
-    Category = "定位",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "position",
     Keywords = new[] { "position correction", "roi offset", "translation", "rotation", "位置修正" },
     Version = "1.0.3"

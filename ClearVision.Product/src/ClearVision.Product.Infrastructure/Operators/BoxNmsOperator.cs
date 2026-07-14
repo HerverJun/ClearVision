@@ -19,8 +19,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "候选框抑制",
-    Description = "Runs non-maximum suppression on detection boxes.",
-    Category = "数据处理",
+    Description = "对检测框执行非极大值抑制。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "nms",
     Keywords = new[] { "nms", "box", "iou", "suppression" }
 )]

@@ -64,8 +64,15 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
             source = "real_operator_contract_catalog",
             operatorType = schema.OperatorType,
             displayName = schema.DisplayName,
+            categoryId = schema.CategoryId.ToString(),
+            categoryOrder = schema.CategoryOrder,
             category = schema.Category,
             description = schema.Description,
+            lifecycle = schema.Lifecycle.ToString(),
+            lifecycleNote = schema.LifecycleNote,
+            defaultHidden = schema.DefaultHidden,
+            defaultAiRecommendation = schema.DefaultAiRecommendation,
+            requiresLifecycleDisclosure = schema.RequiresLifecycleDisclosure,
             inputPorts = schema.InputPorts.Select(port => new
             {
                 name = port.Name,
@@ -97,7 +104,9 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
                     value = option.Value,
                     label = option.Label
                 }).ToList()
-            }).ToList()
+            }).ToList(),
+            parameterConditions = schema.ParameterConstraints,
+            outputConditions = schema.OutputAvailabilityRules
         }));
     }
 }

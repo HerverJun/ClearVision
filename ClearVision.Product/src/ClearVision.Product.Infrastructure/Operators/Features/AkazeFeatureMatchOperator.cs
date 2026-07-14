@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "AKAZE特征匹配",
-    Description = "AKAZE feature matching with verified homography gating for robust template localization.",
-    Category = "匹配定位",
+    Description = "使用 AKAZE 局部特征与单应性校验进行模板定位，适合纹理目标的稳健匹配。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "feature-match"
 )]
 [InputPort("Image", "搜索图像", PortDataType.Image, IsRequired = true)]

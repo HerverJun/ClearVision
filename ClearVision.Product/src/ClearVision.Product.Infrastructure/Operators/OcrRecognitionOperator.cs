@@ -22,7 +22,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "OCR 识别",
     Description = "识别图像中的文本内容",
-    Category = "识别",
+    CategoryId = OperatorCategoryId.AiInference,
     IconName = "text-recognition"
 )]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]

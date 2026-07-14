@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "脚本算子",
-    Description = "Runs user-defined expression or script snippet.",
-    Category = "逻辑工具",
+    Description = "运行用户自定义表达式或脚本片段。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "script",
     Keywords = new[] { "script", "custom", "code", "expression", "formula" }
 )]

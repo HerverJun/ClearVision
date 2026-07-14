@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "点集工具",
-    Description = "Merges/sorts/filters point lists and computes set properties.",
-    Category = "逻辑工具",
+    Description = "合并、排序、过滤点列表并计算集合属性。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "point-set",
     Keywords = new[] { "point set", "sort points", "convex hull", "bounding rect" }
 )]

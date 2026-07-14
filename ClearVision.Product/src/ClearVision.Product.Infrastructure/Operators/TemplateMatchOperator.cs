@@ -17,8 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "模板匹配",
-    Description = "Classic template matching with optional bounded rotation/scale pose search. Multi-match outputs are filtered by IoU-based NMS.",
-    Category = "匹配定位",
+    Description = "执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的 NMS 去重。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "template",
     Keywords = new[] { "模板匹配", "定位", "找图", "Template", "Match", "Locate" },
     Version = "1.2.0"

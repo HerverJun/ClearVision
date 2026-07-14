@@ -278,6 +278,12 @@ class PropertyPanel {
         this.currentOperator = operator && metadata
             ? {
                 ...operator,
+                categoryId: operator.categoryId || operator.CategoryId || metadata.categoryId || metadata.CategoryId || '',
+                category: operator.category || operator.Category || metadata.category || metadata.Category || '',
+                categoryOrder: operator.categoryOrder ?? operator.CategoryOrder ?? metadata.categoryOrder ?? metadata.CategoryOrder,
+                lifecycle: operator.lifecycle || operator.Lifecycle || metadata.lifecycle || metadata.Lifecycle || 'Stable',
+                lifecycleNote: operator.lifecycleNote || operator.LifecycleNote || metadata.lifecycleNote || metadata.LifecycleNote || '',
+                defaultHidden: operator.defaultHidden ?? operator.DefaultHidden ?? metadata.defaultHidden ?? metadata.DefaultHidden ?? false,
                 parameterConstraints: operator.parameterConstraints ||
                     operator.ParameterConstraints ||
                     metadata.parameterConstraints ||
@@ -309,6 +315,26 @@ class PropertyPanel {
         }
 
         return String(operator.id || operator.type || operator.Type || operator.displayName || operator.DisplayName || '');
+    }
+
+    getLifecycleLabel(lifecycle) {
+        return ({
+            Stable: '稳定',
+            Experimental: '实验',
+            Reference: '参考',
+            Legacy: '旧版',
+            Deprecated: '已弃用'
+        })[String(lifecycle || 'Stable')] || String(lifecycle || 'Stable');
+    }
+
+    renderLifecycleBadge(operator) {
+        const lifecycle = String(operator?.lifecycle || operator?.Lifecycle || 'Stable');
+        if (lifecycle === 'Stable') {
+            return '';
+        }
+
+        const note = operator?.lifecycleNote || operator?.LifecycleNote || this.getLifecycleLabel(lifecycle);
+        return `<span class="operator-lifecycle-badge operator-lifecycle-${this.escapeAttribute(lifecycle.toLowerCase())}" title="${this.escapeAttribute(note)}">${this.escapeHtml(this.getLifecycleLabel(lifecycle))}</span>`;
     }
 
     /**
@@ -403,7 +429,7 @@ class PropertyPanel {
             <div class="property-header">
                 ${iconHtml}
                 <div class="header-text">
-                    <h4>${title}</h4>
+                    <h4>${this.escapeHtml(title)} ${this.renderLifecycleBadge(this.currentOperator)}</h4>
                     <span class="property-type">${this.escapeHtml(typeDisplay || type)}</span>
                 </div>
                 <div class="property-header-actions">
@@ -411,6 +437,9 @@ class PropertyPanel {
                 </div>
             </div>
             <div class="property-content">
+                ${this.currentOperator.lifecycle && this.currentOperator.lifecycle !== 'Stable'
+                    ? `<div class="operator-lifecycle-note">${this.escapeHtml(this.currentOperator.lifecycleNote || this.currentOperator.LifecycleNote || '该算子具有非稳定生命周期状态，使用前请确认能力边界。')}</div>`
+                    : ''}
         `;
 
         if (parametersForRender.length === 0) {
@@ -565,7 +594,7 @@ class PropertyPanel {
             <div class="property-header property-header-library">
                 ${iconHtml}
                 <div class="header-text">
-                    <h4>${this.escapeHtml(title)}</h4>
+                    <h4>${this.escapeHtml(title)} ${this.renderLifecycleBadge(operator)}</h4>
                     <span class="property-type">${this.escapeHtml(typeDisplay || type)}</span>
                 </div>
             </div>
@@ -574,6 +603,10 @@ class PropertyPanel {
                     <span>${this.escapeHtml(category)}</span>
                     <span>${this.escapeHtml(parameters.length)} 个参数</span>
                 </div>
+
+                ${(operator.lifecycle || operator.Lifecycle) && (operator.lifecycle || operator.Lifecycle) !== 'Stable'
+                    ? `<div class="operator-lifecycle-note">${this.escapeHtml(operator.lifecycleNote || operator.LifecycleNote || '该算子具有非稳定生命周期状态，使用前请确认能力边界。')}</div>`
+                    : ''}
 
                 <section class="property-summary-section">
                     <h5>说明</h5>

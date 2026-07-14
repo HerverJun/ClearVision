@@ -12,9 +12,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Type Convert",
-    Description = "Converts input data across String/Float/Integer/Boolean types.",
-    Category = "General",
+    DisplayName = "类型转换",
+    Description = "在字符串、浮点、整数、布尔等类型之间转换输入数据。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "convert"
 )]
 [InputPort("Input", "Input", PortDataType.Any, IsRequired = true)]

@@ -13,7 +13,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "Modbus TCP通信",
     Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
-    Category = "Communication",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "modbus",
     Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
 )]

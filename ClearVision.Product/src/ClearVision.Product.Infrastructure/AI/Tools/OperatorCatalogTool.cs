@@ -30,10 +30,11 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
     public override JsonElement ParametersSchema { get; } = Schema("""
         {
           "type": "object",
-          "properties": {
-            "keyword": { "type": "string" },
-            "topN": { "type": "integer", "minimum": 1, "maximum": 50 }
-          }
+            "properties": {
+              "keyword": { "type": "string" },
+              "topN": { "type": "integer", "minimum": 1, "maximum": 50 },
+              "includeCompatibility": { "type": "boolean", "default": false }
+            }
         }
         """);
 
@@ -45,7 +46,12 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
         cancellationToken.ThrowIfCancellationRequested();
         var keyword = ReadString(arguments, "keyword");
         var topN = Math.Clamp(ReadInt(arguments, "topN") ?? 20, 1, 50);
-        var operators = _contractCatalog.Operators.AsEnumerable();
+        var includeCompatibility = ReadBool(arguments, "includeCompatibility") ?? false;
+        var operators = _contractCatalog.Operators
+            .Where(item => includeCompatibility || !item.DefaultHidden)
+            .OrderBy(item => item.CategoryOrder)
+            .ThenBy(item => item.DisplayName, StringComparer.Ordinal)
+            .AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -63,7 +69,14 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
             {
                 operatorType = item.OperatorType,
                 displayName = item.DisplayName,
+                categoryId = item.CategoryId.ToString(),
+                categoryOrder = item.CategoryOrder,
                 category = item.Category,
+                lifecycle = item.Lifecycle.ToString(),
+                lifecycleNote = item.LifecycleNote,
+                defaultHidden = item.DefaultHidden,
+                defaultAiRecommendation = item.DefaultAiRecommendation,
+                requiresLifecycleDisclosure = item.RequiresLifecycleDisclosure,
                 summary = item.Description,
                 keywords = item.Keywords,
                 inputPortCount = item.InputPorts.Count,
@@ -76,6 +89,7 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
         {
             source = "real_operator_contract_catalog",
             keyword,
+            includeCompatibility,
             count = results.Count,
             operators = results
         }));

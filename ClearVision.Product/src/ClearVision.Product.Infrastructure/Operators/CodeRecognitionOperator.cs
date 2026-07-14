@@ -19,7 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "条码识别",
     Description = "一维码/二维码识别，支持 QR、Code128、DataMatrix 等多种码制",
-    Category = "识别",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "barcode",
     Keywords = new[] { "条码", "二维码", "扫码", "识别", "QR", "读取", "Barcode", "Decode", "Read code" }
 )]

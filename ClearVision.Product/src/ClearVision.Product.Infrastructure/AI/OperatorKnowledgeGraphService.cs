@@ -39,16 +39,6 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
             ["EdgeDetection"] = ["边缘提取", "Canny"]
         };
 
-    private static readonly IReadOnlyDictionary<string, string[]> IntentHints =
-        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["AI检测"] = ["defect_detection", "object_detection"],
-            ["检测"] = ["measurement", "inspection"],
-            ["预处理"] = ["preprocess"],
-            ["通信"] = ["integration", "plc_comm"],
-            ["标定"] = ["calibration"]
-        };
-
     private readonly IOperatorFactory _operatorFactory;
     private readonly IFlowTemplateService _templateService;
 
@@ -89,12 +79,23 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
         {
             var operatorType = item.Type.ToString();
             var aliases = BuildAliases(item, operatorType);
-            var requiredResources = item.Parameters
-                .Where(param => param.IsRequired &&
-                                (param.Name.Contains("Path", StringComparison.OrdinalIgnoreCase) ||
-                                 param.Name.Contains("Model", StringComparison.OrdinalIgnoreCase) ||
-                                 param.Name.Contains("Label", StringComparison.OrdinalIgnoreCase)))
-                .Select(param => $"{operatorType}.{param.Name}")
+            var resourceRequirements = item.ParameterConstraints
+                .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
+                .Select(constraint => new OperatorKnowledgeResourceRequirement
+                {
+                    Parameter = constraint.Parameter,
+                    ResourceKind = constraint.ResourceKind!,
+                    ReasonCode = constraint.ReasonCode,
+                    AtLeastOneGroup = constraint.AtLeastOneGroup,
+                    RequiredWhen = constraint.RequiredWhen
+                })
+                .GroupBy(
+                    requirement => $"{requirement.Parameter}|{requirement.ResourceKind}|{requirement.ReasonCode}",
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            var requiredResources = resourceRequirements
+                .Select(requirement => $"{operatorType}.{requirement.Parameter}")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -106,7 +107,14 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
             {
                 OperatorType = operatorType,
                 DisplayName = item.DisplayName,
+                CategoryId = item.CategoryId.ToString(),
+                CategoryOrder = OperatorCategoryCatalog.GetOrder(item.CategoryId),
                 Category = item.Category,
+                Lifecycle = item.Lifecycle.ToString(),
+                LifecycleNote = item.LifecycleNote,
+                DefaultHidden = item.DefaultHidden,
+                DefaultAiRecommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle),
+                RequiresLifecycleDisclosure = OperatorLifecyclePolicy.RequiresDisclosure(item.Lifecycle),
                 Aliases = aliases,
                 IntentTags = BuildIntentTags(item),
                 ScenarioTags = BuildScenarioTags(item),
@@ -139,8 +147,12 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                     AllowedValues = parameter.Options?.Select(option => option.Label).Where(label => !string.IsNullOrWhiteSpace(label)).ToList()
                                     ?? new List<string>()
                 }).ToList(),
+                ParameterConditions = item.ParameterConstraints.ToList(),
+                OutputConditions = item.OutputAvailabilityRules.ToList(),
+                ResourceRequirements = resourceRequirements,
+                GenerationDependencies = item.GenerationDependencies.ToList(),
                 RequiredResources = requiredResources,
-                KnownLimitations = BuildKnownLimitations(evidence),
+                KnownLimitations = BuildKnownLimitations(item, evidence),
                 Evidence = new OperatorKnowledgeEvidence
                 {
                     Contract = evidence.Contract,
@@ -406,13 +418,9 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 tags.Add(NormalizeTag(tag));
         }
 
-        foreach (var (categoryHint, intents) in IntentHints)
+        foreach (var intent in CategoryIntents(metadata.CategoryId))
         {
-            if (!metadata.Category.Contains(categoryHint, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            foreach (var intent in intents)
-                tags.Add(intent);
+            tags.Add(intent);
         }
 
         if (metadata.Type == OperatorType.ResultOutput || metadata.Type == OperatorType.ResultJudgment)
@@ -430,6 +438,25 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
 
         return tags.ToList();
     }
+
+    private static IReadOnlyList<string> CategoryIntents(OperatorCategoryId categoryId) => categoryId switch
+    {
+        OperatorCategoryId.Acquisition => ["acquisition", "image_source"],
+        OperatorCategoryId.ImagePreprocessing => ["preprocess"],
+        OperatorCategoryId.SegmentationAndRegion => ["segmentation", "region_processing"],
+        OperatorCategoryId.FeatureExtraction => ["feature_extraction"],
+        OperatorCategoryId.MatchingAndLocalization => ["matching", "localization"],
+        OperatorCategoryId.DefectDetection => ["defect_detection", "inspection"],
+        OperatorCategoryId.Measurement => ["measurement", "metrology"],
+        OperatorCategoryId.CalibrationAndCoordinates => ["calibration", "coordinate_transform"],
+        OperatorCategoryId.AiInference => ["ai_inference"],
+        OperatorCategoryId.PointCloud3D => ["point_cloud", "3d"],
+        OperatorCategoryId.DataProcessing => ["data_processing"],
+        OperatorCategoryId.FlowControl => ["flow_control"],
+        OperatorCategoryId.Communication => ["integration", "communication"],
+        OperatorCategoryId.OutputAndAuxiliary => ["output", "auxiliary"],
+        _ => ["general"]
+    };
 
     private static List<string> BuildScenarioTags(OperatorMetadata metadata)
     {
@@ -451,9 +478,18 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
         return result.ToList();
     }
 
-    private static List<string> BuildKnownLimitations(QualityOperatorEvidence evidence)
+    private static List<string> BuildKnownLimitations(
+        OperatorMetadata metadata,
+        QualityOperatorEvidence evidence)
     {
         var limitations = new List<string>();
+
+        if (OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle))
+        {
+            limitations.Add(string.IsNullOrWhiteSpace(metadata.LifecycleNote)
+                ? $"生命周期状态：{metadata.Lifecycle}"
+                : $"生命周期状态：{metadata.Lifecycle}；{metadata.LifecycleNote}");
+        }
 
         if (evidence.IndustrialStatus.Contains("未完成现场工业验证", StringComparison.OrdinalIgnoreCase))
         {

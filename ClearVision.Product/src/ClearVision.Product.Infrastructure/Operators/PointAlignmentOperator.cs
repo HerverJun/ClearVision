@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "点位偏差计算",
     Description = "计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 PixelSize 换算 mm 前需确认标定尺度。",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "align-point",
     Keywords = new[] { "alignment", "offset", "reference point", "distance", "点位对齐" },
     Version = "1.0.4"

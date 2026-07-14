@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "Blob分析",
     Description = "连通区域分析",
-    Category = "特征提取",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "blob",
     Keywords = new[] { "连通域", "缺陷区域", "斑点", "面积提取", "缺陷分析", "Blob", "Connected components" },
     Version = "1.2.1"

@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "ROI位姿变换",
     Description = "根据匹配位姿（中心、角度、尺度）变换基础 ROI，并输出矩形 SearchRegion。",
-    Category = "辅助",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "roi-track",
     Keywords = new[] { "ROI", "track", "transform", "match", "pose", "SearchRegion", "ROI跟踪" },
     Version = "1.0.2"

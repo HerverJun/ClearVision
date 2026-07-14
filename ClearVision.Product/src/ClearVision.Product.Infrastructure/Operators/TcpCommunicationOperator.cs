@@ -25,7 +25,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "TCP通信",
     Description = "TCP/IP网络通信",
-    Category = "通信",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "tcp",
     Keywords = new[] { "TCP", "网络", "Socket", "通信", "发送", "接收", "IP", "Communication" }
 )]

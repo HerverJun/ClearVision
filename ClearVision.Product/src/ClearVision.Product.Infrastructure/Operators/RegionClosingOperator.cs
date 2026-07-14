@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Closing",
-    Description = "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
-    Category = "Morphology",
+    DisplayName = "区域闭运算",
+    Description = "执行闭运算（先膨胀后腐蚀），用于填补小孔洞并连接相近区域。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-closing",
     Keywords = new[] { "Region", "Closing", "Morphology", "HoleFilling", "Connect" },
     Version = "1.0.2"

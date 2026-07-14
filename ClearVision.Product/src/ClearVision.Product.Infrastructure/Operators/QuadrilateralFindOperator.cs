@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "四边形查找",
-    Description = "Finds quadrilateral contours without right-angle constraints.",
-    Category = "定位",
+    Description = "查找不受直角约束的四边形轮廓。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "quadrilateral",
     Keywords = new[] { "quadrilateral", "polygon", "trapezoid" }
 )]

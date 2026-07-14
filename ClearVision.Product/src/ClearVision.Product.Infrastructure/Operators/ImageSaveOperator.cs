@@ -30,7 +30,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像保存",
     Description = "保存检测图像到本地硬盘",
-    Category = "输出",
+    CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "save"
 )]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]

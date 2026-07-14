@@ -3,6 +3,7 @@
 // 定义算子展示信息、分类与运行标记
 // 作者：蘅芜君
 using System;
+using ClearVision.Product.Core.Enums;
 
 namespace ClearVision.Product.Core.Attributes;
 
@@ -13,7 +14,11 @@ public sealed class OperatorMetaAttribute : Attribute
 
     public string Description { get; set; } = string.Empty;
 
-    public string Category { get; set; } = string.Empty;
+    public OperatorCategoryId CategoryId { get; set; }
+
+    public OperatorLifecycle Lifecycle { get; set; } = OperatorLifecycle.Stable;
+
+    public string? LifecycleNote { get; set; }
 
     public string? IconName { get; set; }
 

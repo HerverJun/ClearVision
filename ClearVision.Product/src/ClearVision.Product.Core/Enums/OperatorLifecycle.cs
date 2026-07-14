@@ -1,0 +1,22 @@
+namespace ClearVision.Product.Core.Enums;
+
+public enum OperatorLifecycle
+{
+    Stable,
+    Experimental,
+    Reference,
+    Legacy,
+    Deprecated
+}
+
+public static class OperatorLifecyclePolicy
+{
+    public static bool IsHiddenByDefault(OperatorLifecycle lifecycle) =>
+        lifecycle is OperatorLifecycle.Legacy or OperatorLifecycle.Deprecated;
+
+    public static bool IsDefaultAiRecommendation(OperatorLifecycle lifecycle) =>
+        lifecycle is OperatorLifecycle.Stable or OperatorLifecycle.Experimental;
+
+    public static bool RequiresDisclosure(OperatorLifecycle lifecycle) =>
+        lifecycle is not OperatorLifecycle.Stable;
+}

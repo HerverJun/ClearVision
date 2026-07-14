@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "欧姆龙FINS通信",
     Description = "欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）",
-    Category = "通信",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "fins"
 )]
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]

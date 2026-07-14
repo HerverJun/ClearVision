@@ -11,9 +11,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Morphological Operation",
-    Description = "Erode, Dilate, Open, Close, Gradient, TopHat, BlackHat.",
-    Category = "Preprocessing",
+    DisplayName = "形态学操作",
+    Description = "支持腐蚀、膨胀、开运算、闭运算、梯度、顶帽、黑帽等形态学操作。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "morphology"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]

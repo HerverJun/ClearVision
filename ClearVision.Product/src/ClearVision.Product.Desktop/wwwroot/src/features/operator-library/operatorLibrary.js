@@ -45,6 +45,7 @@ export class OperatorLibraryPanel {
         this.metadataByType = new Map();
         this.operatorLoadState = 'idle';
         this.operatorLoadError = '';
+        this.includeCompatibility = false;
 
         // 事件回调
         this.onOperatorDragStart = null;
@@ -329,7 +330,8 @@ export class OperatorLibraryPanel {
 
     async loadOperatorsFromMetadata() {
         try {
-            const operators = await httpClient.get('/operators/library');
+            const compatibilityQuery = this.includeCompatibility ? '?includeCompatibility=true' : '';
+            const operators = await httpClient.get(`/operators/library${compatibilityQuery}`);
             if (Array.isArray(operators) && operators.length > 0) {
                 const normalizedOperators = operators
                     .map(operator => this.normalizeOperatorMetadata(operator, operator.type || operator.Type))
@@ -343,7 +345,8 @@ export class OperatorLibraryPanel {
             debugLogger.warn('[OperatorLibraryPanel] 获取算子库接口失败，回退到类型元数据接口:', error);
         }
 
-        const types = await httpClient.get('/operators/types');
+        const compatibilityQuery = this.includeCompatibility ? '?includeCompatibility=true' : '';
+        const types = await httpClient.get(`/operators/types${compatibilityQuery}`);
         if (!Array.isArray(types) || types.length === 0) {
             return [];
         }
@@ -379,6 +382,11 @@ export class OperatorLibraryPanel {
         }
 
         const category = metadata.category || metadata.Category || '其他';
+        const categoryId = metadata.categoryId || metadata.CategoryId || '';
+        const categoryOrder = Number(metadata.categoryOrder ?? metadata.CategoryOrder ?? Number.MAX_SAFE_INTEGER);
+        const lifecycle = String(metadata.lifecycle || metadata.Lifecycle || 'Stable');
+        const lifecycleNote = metadata.lifecycleNote || metadata.LifecycleNote || '';
+        const defaultHidden = Boolean(metadata.defaultHidden ?? metadata.DefaultHidden ?? false);
         const displayName = metadata.displayName || metadata.DisplayName || metadata.name || metadata.Name || type;
         const parameters = metadata.parameters || metadata.Parameters || [];
         const inputPorts = metadata.inputPorts || metadata.InputPorts || [];
@@ -390,8 +398,13 @@ export class OperatorLibraryPanel {
         return {
             ...metadata,
             type,
+            categoryId,
+            categoryOrder,
             category,
             displayName,
+            lifecycle,
+            lifecycleNote,
+            defaultHidden,
             iconName,
             description: metadata.description || metadata.Description || '暂无描述',
             parameters,
@@ -402,6 +415,20 @@ export class OperatorLibraryPanel {
             inputType: metadata.inputType || metadata.InputType || (inputPorts[0]?.dataType || inputPorts[0]?.DataType || '图像'),
             outputType: metadata.outputType || metadata.OutputType || (outputPorts[0]?.dataType || outputPorts[0]?.DataType || '图像/数据')
         };
+    }
+
+    async setIncludeCompatibility(includeCompatibility) {
+        const nextValue = Boolean(includeCompatibility);
+        if (this.includeCompatibility === nextValue) {
+            return;
+        }
+
+        this.includeCompatibility = nextValue;
+        await this.loadOperators();
+    }
+
+    getIncludeCompatibility() {
+        return this.includeCompatibility;
     }
 
     getOperatorIconName(operator) {

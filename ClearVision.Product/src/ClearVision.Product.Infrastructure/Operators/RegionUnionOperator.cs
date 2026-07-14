@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Union",
-    Description = "Computes the union of two regions (A ∪ B).",
-    Category = "Region",
+    DisplayName = "区域并集",
+    Description = "计算两个区域的并集（A ∪ B）。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-union",
     Keywords = new[] { "Region", "Union", "Boolean", "Merge", "Combine" },
     Version = "1.0.2"

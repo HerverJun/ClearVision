@@ -15,8 +15,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "极坐标展开",
-    Description = "Unwraps annular image regions into rectangular view.",
-    Category = "图像处理",
+    Description = "将环形图像区域展开为矩形视图。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "polar",
     Keywords = new[] { "polar", "unwrap", "ring", "annular" }
 )]

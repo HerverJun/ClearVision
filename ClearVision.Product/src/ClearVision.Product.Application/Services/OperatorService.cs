@@ -23,7 +23,7 @@ public class OperatorService : IOperatorService
     private readonly IOperatorRepository _operatorRepository;
     private readonly IOperatorFactory _operatorFactory;
     private readonly ILogger<OperatorService>? _logger;
-    private static readonly Dictionary<OperatorType, OperatorMetadataDto> OperatorMetadataCache = new();
+    private readonly Dictionary<OperatorType, OperatorMetadataDto> _operatorMetadataCache = new();
 
     public OperatorService(
         IOperatorRepository operatorRepository,
@@ -48,366 +48,11 @@ public class OperatorService : IOperatorService
     /// </summary>
     private void InitializeMetadataCache()
     {
-        if (OperatorMetadataCache.Count > 0)
-            return;
-
-        var factoryMetadata = GetFactoryMetadataDtos();
-
-        var metadata = new List<OperatorMetadataDto>
+        _operatorMetadataCache.Clear();
+        foreach (var metadata in _operatorFactory.GetAllMetadata())
         {
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "ImageAcquisition",
-                DisplayName = "图像采集",
-                Category = "输入",
-                Icon = "📷",
-                Description = "从相机或文件获取图像",
-                Inputs = new List<PortDefinitionDto>(),
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "source", DisplayName = "数据源", DataType = "enum", DefaultValue = "file", IsRequired = true },
-                    new() { Name = "path", DisplayName = "文件路径", DataType = "string", DefaultValue = "", IsRequired = false }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "Filtering",
-                DisplayName = "滤波",
-                Category = "预处理",
-                Icon = "🔍",
-                Description = "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "输出图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "FilterMode", DisplayName = "实际滤波模式", DataType = PortDataType.String },
-                    new() { Name = "FilterDiagnostics", DisplayName = "滤波诊断", DataType = PortDataType.Any }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "FilterMode", DisplayName = "滤波模式", DataType = "enum", DefaultValue = "Gaussian", IsRequired = true },
-                    new() { Name = "KernelSize", DisplayName = "核大小", DataType = "int", DefaultValue = 5, MinValue = 1, MaxValue = 63, IsRequired = true },
-                    new() { Name = "SigmaX", DisplayName = "Sigma X", DataType = "double", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 10.0 },
-                    new() { Name = "SigmaY", DisplayName = "Sigma Y", DataType = "double", DefaultValue = 0.0, MinValue = 0.0, MaxValue = 10.0 },
-                    new() { Name = "Diameter", DisplayName = "双边直径", DataType = "int", DefaultValue = 9, MinValue = 1, MaxValue = 25 },
-                    new() { Name = "SigmaColor", DisplayName = "双边色彩Sigma", DataType = "double", DefaultValue = 75.0, MinValue = 1.0, MaxValue = 255.0 },
-                    new() { Name = "SigmaSpace", DisplayName = "双边空间Sigma", DataType = "double", DefaultValue = 75.0, MinValue = 1.0, MaxValue = 255.0 }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "EdgeDetection",
-                DisplayName = "边缘检测",
-                Category = "特征提取",
-                Icon = "〰️",
-                Description = "检测图像边缘特征",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "边缘图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "method", DisplayName = "检测方法", DataType = "enum", DefaultValue = "canny", IsRequired = true },
-                    new() { Name = "threshold1", DisplayName = "低阈值", DataType = "double", DefaultValue = 50.0, MinValue = 0, MaxValue = 255, IsRequired = true },
-                    new() { Name = "threshold2", DisplayName = "高阈值", DataType = "double", DefaultValue = 150.0, MinValue = 0, MaxValue = 255, IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "Thresholding",
-                DisplayName = "全局阈值处理",
-                Category = "预处理",
-                Icon = "⚫",
-                Description = "支持二值、截断、ToZero 及自动阈值的全局阈值处理",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "二值图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "method", DisplayName = "阈值方法", DataType = "enum", DefaultValue = "otsu", IsRequired = true },
-                    new() { Name = "threshold", DisplayName = "阈值", DataType = "int", DefaultValue = 127, MinValue = 0, MaxValue = 255, IsRequired = false }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "Morphology",
-                DisplayName = "形态学（旧版）",
-                Category = "预处理",
-                Icon = "🔄",
-                Description = "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输出图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "operation", DisplayName = "操作", DataType = "enum", DefaultValue = "open", IsRequired = true },
-                    new() { Name = "kernelSize", DisplayName = "核大小", DataType = "int", DefaultValue = 3, MinValue = 1, MaxValue = 21, IsRequired = true },
-                    new() { Name = "iterations", DisplayName = "迭代次数", DataType = "int", DefaultValue = 1, MinValue = 1, MaxValue = 10, IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "BlobAnalysis",
-                DisplayName = "Blob分析",
-                Category = "特征提取",
-                Icon = "🔵",
-                Description = "连通区域分析",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "标记图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "blobs", DisplayName = "Blob数据", DataType = PortDataType.Contour, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "minArea", DisplayName = "最小面积", DataType = "int", DefaultValue = 100, MinValue = 0, MaxValue = 10000, IsRequired = true },
-                    new() { Name = "maxArea", DisplayName = "最大面积", DataType = "int", DefaultValue = 100000, MinValue = 100, MaxValue = 1000000, IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "TemplateMatching",
-                DisplayName = "模板匹配",
-                Category = "检测",
-                Icon = "🎯",
-                Description = "图像模板匹配定位",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "template", DisplayName = "模板图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "position", DisplayName = "位置", DataType = PortDataType.Point, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "threshold", DisplayName = "匹配阈值", DataType = "double", DefaultValue = 0.8, MinValue = 0.0, MaxValue = 1.0, IsRequired = true },
-                    new() { Name = "method", DisplayName = "匹配方法", DataType = "enum", DefaultValue = "ncc", IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "Measurement",
-                DisplayName = "测量",
-                Category = "检测",
-                Icon = "📏",
-                Description = "统一基础二维几何测量入口，支持点点、点线、线线和三点角度",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image },
-                    new() { Name = "PointA", DisplayName = "点A", DataType = PortDataType.Point },
-                    new() { Name = "PointB", DisplayName = "点B", DataType = PortDataType.Point },
-                    new() { Name = "PointC", DisplayName = "点C", DataType = PortDataType.Point },
-                    new() { Name = "Line1", DisplayName = "线1", DataType = PortDataType.LineData },
-                    new() { Name = "Line2", DisplayName = "线2", DataType = PortDataType.LineData }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
-                    new() { Name = "Distance", DisplayName = "距离", DataType = PortDataType.Float },
-                    new() { Name = "Value", DisplayName = "主测量值", DataType = PortDataType.Float },
-                    new() { Name = "Angle", DisplayName = "夹角", DataType = PortDataType.Float },
-                    new() { Name = "MeasurementType", DisplayName = "实际测量类型", DataType = PortDataType.String },
-                    new() { Name = "Unit", DisplayName = "单位", DataType = PortDataType.String }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "X1", DisplayName = "起点X", DataType = "int", DefaultValue = 0 },
-                    new() { Name = "Y1", DisplayName = "起点Y", DataType = "int", DefaultValue = 0 },
-                    new() { Name = "X2", DisplayName = "终点X", DataType = "int", DefaultValue = 100 },
-                    new() { Name = "Y2", DisplayName = "终点Y", DataType = "int", DefaultValue = 100 },
-                    new() { Name = "MeasureType", DisplayName = "测量类型", DataType = "enum", DefaultValue = "PointToPoint", IsRequired = true },
-                    new() { Name = "DistanceModel", DisplayName = "线距离模型", DataType = "enum", DefaultValue = "Segment" },
-                    new() { Name = "AngleUnit", DisplayName = "角度单位", DataType = "enum", DefaultValue = "Degree" }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "ContourDetection",
-                DisplayName = "轮廓检测",
-                Category = "特征提取",
-                Icon = "💠",
-                Description = "查找并提取图像中的轮廓",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "minArea", DisplayName = "最小面积", DataType = "int", DefaultValue = 100, MinValue = 0, IsRequired = true },
-                    new() { Name = "maxArea", DisplayName = "最大面积", DataType = "int", DefaultValue = 100000, MinValue = 0, IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "DeepLearning",
-                DisplayName = "深度学习",
-                Category = "AI检测",
-                Icon = "🧠",
-                Description = "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image, IsRequired = true },
-                    new() { Name = "Defects", DisplayName = "缺陷列表", DataType = PortDataType.DetectionList, IsRequired = true },
-                    new() { Name = "TaskType", DisplayName = "实际任务类型", DataType = PortDataType.String },
-                    new() { Name = "TopClassLabel", DisplayName = "最高类别", DataType = PortDataType.String },
-                    new() { Name = "TopClassConfidence", DisplayName = "最高类别置信度", DataType = PortDataType.Float },
-                    new() { Name = "SegmentationMap", DisplayName = "分割类别图", DataType = PortDataType.Image }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "TaskType", DisplayName = "任务类型", DataType = "enum", DefaultValue = "ObjectDetection", IsRequired = true },
-                    new() { Name = "ModelPath", DisplayName = "模型路径", DataType = "file", DefaultValue = "", IsRequired = true },
-                    new() { Name = "Confidence", DisplayName = "置信度阈值", DataType = "double", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 1.0, IsRequired = true },
-                    new() { Name = "ModelVersion", DisplayName = "YOLO版本", DataType = "enum", DefaultValue = "Auto", IsRequired = true,
-                        Options = new List<ParameterOptionDto>
-                        {
-                            new() { Label = "自动检测", Value = "Auto" },
-                            new() { Label = "YOLOv5", Value = "YOLOv5" },
-                            new() { Label = "YOLOv6", Value = "YOLOv6" },
-                            new() { Label = "YOLOv8", Value = "YOLOv8" },
-                            new() { Label = "YOLOv11", Value = "YOLOv11" }
-                        }
-                    },
-                    new() { Name = "InputSize", DisplayName = "输入尺寸", DataType = "int", DefaultValue = 640, MinValue = 320, MaxValue = 1280, IsRequired = true },
-                    new() { Name = "TargetClasses", DisplayName = "目标类别", DataType = "string", DefaultValue = "", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别" },
-                    new() { Name = "LabelsPath", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。" },
-                    new() { Name = "EnableInternalNms", DisplayName = "启用内部NMS", DataType = "bool", DefaultValue = true },
-                    new() { Name = "NmsIouThreshold", DisplayName = "NMS IoU阈值", DataType = "double", DefaultValue = 0.45, MinValue = 0.0, MaxValue = 1.0 },
-                    new() { Name = "TopK", DisplayName = "分类 Top-K", DataType = "int", DefaultValue = 5, MinValue = 1, MaxValue = 100 },
-                    new() { Name = "ClassificationInputSize", DisplayName = "分类输入尺寸", DataType = "string", DefaultValue = "Auto" },
-                    new() { Name = "SegmentationInputSize", DisplayName = "分割输入尺寸", DataType = "string", DefaultValue = "Auto" },
-                    new() { Name = "NumClasses", DisplayName = "分割类别数", DataType = "int", DefaultValue = 21, MinValue = 2, MaxValue = 4096 }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "ResultOutput",
-                DisplayName = "结果输出",
-                Category = "输出",
-                Icon = "📤",
-                Description = "输出检测结果",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = false },
-                    new() { Name = "data", DisplayName = "输入数据", DataType = PortDataType.Any, IsRequired = false }
-                },
-                Outputs = new List<PortDefinitionDto>(),
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "format", DisplayName = "输出格式", DataType = "enum", DefaultValue = "json", IsRequired = true },
-                    new() { Name = "saveImage", DisplayName = "保存图像", DataType = "bool", DefaultValue = true, IsRequired = true }
-                }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Type = "ResultJudgment",
-                DisplayName = "结果判定",
-                Category = "流程控制",
-                Icon = "⚖️",
-                Description = "通用判定逻辑（数量/范围/阈值），输出OK/NG结果",
-                Inputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "Value", DisplayName = "输入值", DataType = PortDataType.Any, IsRequired = true },
-                    new() { Name = "Confidence", DisplayName = "置信度", DataType = PortDataType.Float, IsRequired = false }
-                },
-                Outputs = new List<PortDefinitionDto>
-                {
-                    new() { Name = "JudgmentResult", DisplayName = "判定结果", DataType = PortDataType.String, IsRequired = true },
-                    new() { Name = "IsOk", DisplayName = "是否OK", DataType = PortDataType.Boolean, IsRequired = true },
-                    new() { Name = "Details", DisplayName = "详细信息", DataType = PortDataType.String, IsRequired = true }
-                },
-                Parameters = new List<ParameterDefinitionDto>
-                {
-                    new() { Name = "FieldName", DisplayName = "判定字段", DataType = "string", DefaultValue = "Value", IsRequired = true },
-                    new() { Name = "Condition", DisplayName = "判定条件", DataType = "enum", DefaultValue = "Equal", IsRequired = true,
-                        Options = new List<ParameterOptionDto>
-                        {
-                            new() { Label = "等于", Value = "Equal" },
-                            new() { Label = "大于", Value = "GreaterThan" },
-                            new() { Label = "小于", Value = "LessThan" },
-                            new() { Label = "范围内", Value = "Range" }
-                        }
-                    },
-                    new() { Name = "ExpectValue", DisplayName = "期望值", DataType = "string", DefaultValue = "1", IsRequired = true }
-                }
-            }
-        };
-
-        foreach (var meta in metadata)
-        {
-            if (Enum.TryParse<OperatorType>(meta.Type, out var type))
-            {
-                OperatorMetadataCache[type] = meta;
-            }
+            _operatorMetadataCache[metadata.Type] = MapFactoryMetadata(metadata);
         }
-
-        foreach (var meta in factoryMetadata)
-        {
-            if (Enum.TryParse<OperatorType>(meta.Type, out var type) &&
-                (!OperatorMetadataCache.ContainsKey(type) ||
-                 type is OperatorType.Filtering or OperatorType.Measurement or OperatorType.DeepLearning))
-            {
-                OperatorMetadataCache[type] = meta;
-            }
-        }
-    }
-
-    private List<OperatorMetadataDto> GetFactoryMetadataDtos()
-    {
-        var metadata = _operatorFactory.GetAllMetadata()?.ToList();
-        if (metadata == null || metadata.Count == 0)
-        {
-            return new List<OperatorMetadataDto>();
-        }
-
-        return metadata.Select(MapFactoryMetadata).ToList();
     }
 
     private static OperatorMetadataDto MapFactoryMetadata(OperatorMetadata metadata)
@@ -417,12 +62,20 @@ public class OperatorService : IOperatorService
             Id = Guid.NewGuid(),
             Type = metadata.Type.ToString(),
             DisplayName = metadata.DisplayName,
+            CategoryId = metadata.CategoryId.ToString(),
             Category = metadata.Category,
+            CategoryOrder = OperatorCategoryCatalog.GetOrder(metadata.CategoryId),
+            Lifecycle = metadata.Lifecycle.ToString(),
+            LifecycleNote = metadata.LifecycleNote,
+            DefaultHidden = metadata.DefaultHidden,
             Icon = metadata.IconName ?? string.Empty,
             Description = metadata.Description,
+            Keywords = metadata.Keywords?.ToArray() ?? Array.Empty<string>(),
             Inputs = metadata.InputPorts.Select(MapPortDefinition).ToList(),
             Outputs = metadata.OutputPorts.Select(MapPortDefinition).ToList(),
-            Parameters = metadata.Parameters.Select(MapParameterDefinition).ToList()
+            Parameters = metadata.Parameters.Select(MapParameterDefinition).ToList(),
+            ParameterConstraints = metadata.ParameterConstraints.ToList(),
+            OutputAvailabilityRules = metadata.OutputAvailabilityRules.ToList()
         };
     }
 
@@ -460,13 +113,13 @@ public class OperatorService : IOperatorService
 
     public Task<IEnumerable<OperatorMetadataDto>> GetLibraryAsync()
     {
-        return Task.FromResult(OperatorMetadataCache.Values.AsEnumerable());
+        return Task.FromResult(_operatorMetadataCache.Values.AsEnumerable());
     }
 
     public Task<OperatorDto?> GetByIdAsync(Guid id)
     {
         // 从元数据缓存中查找
-        var meta = OperatorMetadataCache.Values.FirstOrDefault(m => m.Id == id);
+        var meta = _operatorMetadataCache.Values.FirstOrDefault(m => m.Id == id);
         if (meta == null)
             return Task.FromResult<OperatorDto?>(null);
 
@@ -476,7 +129,7 @@ public class OperatorService : IOperatorService
 
     public Task<OperatorDto?> GetByTypeAsync(OperatorType type)
     {
-        if (!OperatorMetadataCache.TryGetValue(type, out var meta))
+        if (!_operatorMetadataCache.TryGetValue(type, out var meta))
             return Task.FromResult<OperatorDto?>(null);
 
         var dto = MapToDto(meta);
@@ -575,7 +228,7 @@ public class OperatorService : IOperatorService
     {
         var result = new ValidationResultDto { IsValid = true };
 
-        var meta = OperatorMetadataCache.Values.FirstOrDefault(m => m.Id == operatorId);
+        var meta = _operatorMetadataCache.Values.FirstOrDefault(m => m.Id == operatorId);
         if (meta == null)
         {
             result.IsValid = false;
@@ -598,11 +251,16 @@ public class OperatorService : IOperatorService
 
     public Task<IEnumerable<OperatorTypeInfoDto>> GetOperatorTypesAsync()
     {
-        var types = OperatorMetadataCache.Values.Select(m => new OperatorTypeInfoDto
+        var types = _operatorMetadataCache.Values.Select(m => new OperatorTypeInfoDto
         {
             Type = m.Type,
             DisplayName = m.DisplayName,
+            CategoryId = m.CategoryId,
             Category = m.Category,
+            CategoryOrder = m.CategoryOrder,
+            Lifecycle = m.Lifecycle,
+            LifecycleNote = m.LifecycleNote,
+            DefaultHidden = m.DefaultHidden,
             Icon = m.Icon
         });
 
@@ -611,7 +269,7 @@ public class OperatorService : IOperatorService
 
     public Task<OperatorMetadataDto?> GetMetadataAsync(OperatorType type)
     {
-        if (!OperatorMetadataCache.TryGetValue(type, out var meta))
+        if (!_operatorMetadataCache.TryGetValue(type, out var meta))
             return Task.FromResult<OperatorMetadataDto?>(null);
 
         return Task.FromResult<OperatorMetadataDto?>(meta);

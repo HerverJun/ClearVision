@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "矩形检测",
-    Description = "Detects rectangular/quadrilateral objects from contours.",
-    Category = "定位",
+    Description = "根据轮廓检测矩形/四边形目标。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "rectangle",
     Keywords = new[] { "rectangle", "quadrilateral", "box", "locate" }
 )]

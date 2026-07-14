@@ -18,7 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "形态学（旧版）",
     Description = "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
+    Lifecycle = OperatorLifecycle.Legacy,
+    LifecycleNote = "旧版图像形态学兼容节点；新流程使用“形态学操作”或 Region* 系列算子。",
     IconName = "morphology",
     Keywords = new[] { "形态学", "腐蚀", "膨胀", "开运算", "闭运算", "旧版", "Morphology", "Legacy" },
     Tags = new[] { "legacy", "deprecated", "compatibility", "image-only" }

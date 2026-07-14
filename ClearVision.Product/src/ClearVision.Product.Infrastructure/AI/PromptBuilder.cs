@@ -209,6 +209,8 @@ public class PromptBuilder
         5. Every operator except pure source/resource loaders should be connected to the flow. Avoid isolated nodes.
         6. Prefer safe defaults and explain assumptions briefly in explanation.
         7. When asked to use Chinese text, localize only user-visible displayName, explanation, and notes. Never translate operatorType, port names, parameter names, or runtime JSON keys.
+        8. Prefer operators with default_ai_recommendation=true. Never choose Legacy or Deprecated operators for a new flow. Use Reference only when no Stable/Experimental alternative fits, and disclose its lifecycle boundary. Always disclose Experimental lifecycle notes.
+        9. Respect parameter_conditions and output_conditions for the selected mode; do not configure ignored parameters or connect outputs that are unavailable.
         """;
 
     private string GetParameterInferenceGuide() => """
@@ -245,7 +247,10 @@ public class PromptBuilder
     {
         var allMetadata = _operatorFactory
             .GetAllMetadata()
-            .OrderBy(m => m.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Where(metadata => !metadata.DefaultHidden)
+            .OrderByDescending(metadata => OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle))
+            .ThenBy(metadata => OperatorCategoryCatalog.GetOrder(metadata.CategoryId))
+            .ThenBy(metadata => metadata.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         OperatorKnowledgeSlice? slice = null;
@@ -255,7 +260,9 @@ public class PromptBuilder
             relevantMetadata = string.IsNullOrWhiteSpace(userDescription)
                 ? allMetadata
                 : GetRelevantOperators(userDescription)
-                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(meta => OperatorLifecyclePolicy.IsDefaultAiRecommendation(meta.Lifecycle))
+                    .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
+                    .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
         else
@@ -273,7 +280,9 @@ public class PromptBuilder
                 ? allMetadata
                 : allMetadata
                     .Where(meta => slice.PrioritizedOperatorTypes.Contains(meta.Type.ToString(), StringComparer.OrdinalIgnoreCase))
-                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(meta => OperatorLifecyclePolicy.IsDefaultAiRecommendation(meta.Lifecycle))
+                    .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
+                    .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
 
@@ -408,10 +417,19 @@ public class PromptBuilder
                 {
                     operatorType = card.OperatorType,
                     displayName = card.DisplayName,
+                    categoryId = card.CategoryId,
+                    categoryOrder = card.CategoryOrder,
                     category = card.Category,
+                    lifecycle = card.Lifecycle,
+                    lifecycleNote = card.LifecycleNote,
+                    defaultAiRecommendation = card.DefaultAiRecommendation,
+                    requiresLifecycleDisclosure = card.RequiresLifecycleDisclosure,
                     intentTags = card.IntentTags,
                     scenarioTags = card.ScenarioTags,
                     requiredResources = card.RequiredResources,
+                    resourceRequirements = card.ResourceRequirements,
+                    parameterConditions = card.ParameterConditions,
+                    outputConditions = card.OutputConditions,
                     typicalUpstream = card.TypicalUpstream,
                     typicalDownstream = card.TypicalDownstream,
                     antiPatterns = card.AntiPatterns,
@@ -441,7 +459,13 @@ public class PromptBuilder
             {
                 operator_id = m.Type.ToString(),
                 name = m.DisplayName,
-                category = m.Category
+                category_id = m.CategoryId.ToString(),
+                category_order = OperatorCategoryCatalog.GetOrder(m.CategoryId),
+                category = m.Category,
+                lifecycle = m.Lifecycle.ToString(),
+                lifecycle_note = m.LifecycleNote,
+                default_ai_recommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(m.Lifecycle),
+                requires_lifecycle_disclosure = OperatorLifecyclePolicy.RequiresDisclosure(m.Lifecycle)
             });
 
             return JsonSerializer.Serialize(fallbackCatalog, _catalogJsonOptions);
@@ -451,8 +475,15 @@ public class PromptBuilder
         {
             operator_id = m.Type.ToString(),
             name = m.DisplayName,
+            category_id = m.CategoryId.ToString(),
+            category_order = OperatorCategoryCatalog.GetOrder(m.CategoryId),
             category = m.Category,
             description = m.Description,
+            lifecycle = m.Lifecycle.ToString(),
+            lifecycle_note = m.LifecycleNote,
+            default_hidden = m.DefaultHidden,
+            default_ai_recommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(m.Lifecycle),
+            requires_lifecycle_disclosure = OperatorLifecyclePolicy.RequiresDisclosure(m.Lifecycle),
             keywords = m.Keywords ?? Array.Empty<string>(),
             inputs = m.InputPorts.Select(p => new
             {
@@ -478,7 +509,10 @@ public class PromptBuilder
                 min_value = p.MinValue?.ToString(),
                 max_value = p.MaxValue?.ToString(),
                 options = p.Options?.Select(o => new { label = o.Label, value = o.Value })
-            })
+            }),
+            parameter_conditions = m.ParameterConstraints,
+            output_conditions = m.OutputAvailabilityRules,
+            generation_dependencies = m.GenerationDependencies
         });
 
         return JsonSerializer.Serialize(detailedCatalog, _catalogJsonOptions);
@@ -499,14 +533,15 @@ public class PromptBuilder
         {
             var categoryHints = keywords
                 .Select(GetCategoryHint)
-                .Where(hint => !string.IsNullOrWhiteSpace(hint))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(hint => hint.HasValue)
+                .Select(hint => hint!.Value)
+                .Distinct()
                 .ToList();
 
             if (categoryHints.Count > 0)
             {
                 matched.AddRange(allMetadata.Where(metadata =>
-                    categoryHints.Any(hint => ContainsIgnoreCase(metadata.Category, hint!))));
+                    categoryHints.Contains(metadata.CategoryId)));
             }
         }
 
@@ -582,48 +617,67 @@ public class PromptBuilder
         return source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? GetCategoryHint(string keyword)
+    private static OperatorCategoryId? GetCategoryHint(string keyword)
     {
         if (keyword.Contains("measure", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("width", StringComparison.OrdinalIgnoreCase))
         {
-            return "measurement";
+            return OperatorCategoryId.Measurement;
         }
 
         if (keyword.Contains("defect", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("blob", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("ng", StringComparison.OrdinalIgnoreCase))
         {
-            return "defect";
+            return OperatorCategoryId.DefectDetection;
         }
 
         if (keyword.Contains("communication", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("modbus", StringComparison.OrdinalIgnoreCase))
         {
-            return "communication";
+            return OperatorCategoryId.Communication;
         }
 
         if (keyword.Contains("ocr", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("barcode", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("recognition", StringComparison.OrdinalIgnoreCase))
         {
-            return "ocr";
+            return OperatorCategoryId.FeatureExtraction;
         }
 
         if (keyword.Contains("calibration", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("undistort", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("coordinate", StringComparison.OrdinalIgnoreCase))
         {
-            return "calibration";
+            return OperatorCategoryId.CalibrationAndCoordinates;
         }
 
         if (keyword.Contains("template", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("match", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("模板", StringComparison.OrdinalIgnoreCase))
         {
-            return "匹配";
+            return OperatorCategoryId.MatchingAndLocalization;
+        }
+
+        if (keyword.Contains("ai", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("onnx", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("inference", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.AiInference;
+        }
+
+        if (keyword.Contains("segment", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("region", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.SegmentationAndRegion;
+        }
+
+        if (keyword.Contains("pointcloud", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("3d", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.PointCloud3D;
         }
 
         return null;

@@ -70,9 +70,20 @@ public class OperatorMetadata
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
+    /// Stable product category identity declared by the operator class.
+    /// </summary>
+    public OperatorCategoryId CategoryId { get; set; }
+
+    /// <summary>
     /// 类别（用于分组显示）
     /// </summary>
     public string Category { get; set; } = string.Empty;
+
+    public OperatorLifecycle Lifecycle { get; set; } = OperatorLifecycle.Stable;
+
+    public string? LifecycleNote { get; set; }
+
+    public bool DefaultHidden => OperatorLifecyclePolicy.IsHiddenByDefault(Lifecycle);
 
     /// <summary>
     /// 图标名称或路径
@@ -113,6 +124,16 @@ public class OperatorMetadata
     /// 正式 metadata 无法表达的条件、分组、别名和资源约束。
     /// </summary>
     public List<OperatorParameterConstraint> ParameterConstraints { get; set; } = new();
+
+    /// <summary>
+    /// Mode-dependent output guarantees declared on the operator class.
+    /// </summary>
+    public List<OperatorOutputAvailabilityRule> OutputAvailabilityRules { get; set; } = new();
+
+    /// <summary>
+    /// Explicit source dependencies used by deterministic documentation fingerprints.
+    /// </summary>
+    public List<string> GenerationDependencies { get; set; } = new();
 }
 
 /// <summary>

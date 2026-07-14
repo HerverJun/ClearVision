@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "数组索引器",
     Description = "从列表中按索引或条件提取元素",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "index"
 )]
 [InputPort("List", "列表", PortDataType.Any, IsRequired = true)]

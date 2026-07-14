@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "平移旋转标定",
-    Description = "Fits robust 2D rigid or similarity transform from image-to-robot point pairs.",
-    Category = "标定",
+    Description = "从图像-机器人点对鲁棒拟合二维刚性或相似变换。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "calibration",
     Keywords = new[] { "calibration", "translation", "rotation", "svd", "similarity" }
 )]

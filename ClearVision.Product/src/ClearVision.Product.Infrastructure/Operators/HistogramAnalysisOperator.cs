@@ -9,8 +9,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "直方图分析",
-    Description = "Computes histogram and intensity-domain distribution statistics for a selected channel.",
-    Category = "检测",
+    Description = "统计指定通道的直方图及灰度/强度分布指标。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "histogram",
     Keywords = new[] { "histogram", "distribution", "peak", "median" }
 )]

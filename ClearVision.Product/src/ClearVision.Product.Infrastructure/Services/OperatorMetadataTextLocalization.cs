@@ -783,10 +783,6 @@ internal static class OperatorMetadataTextLocalization
     {
         foreach (var metadata in metadataItems)
         {
-            metadata.DisplayName = Localize(metadata.DisplayName);
-            metadata.Description = Localize(metadata.Description);
-            metadata.Category = Localize(metadata.Category);
-
             foreach (var port in metadata.InputPorts)
             {
                 LocalizePort(port);

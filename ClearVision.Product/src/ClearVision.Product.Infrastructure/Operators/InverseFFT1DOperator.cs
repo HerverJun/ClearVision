@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "信号/图像逆傅里叶变换（IFFT）",
     Description = "对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信号。",
-    Category = "Frequency",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "ifft-1d",
     Keywords = new[] { "IFFT", "InverseFFT", "Fourier", "Reconstruction", "Signal", "一维逆FFT", "Inverse FFT 1D" }
 )]

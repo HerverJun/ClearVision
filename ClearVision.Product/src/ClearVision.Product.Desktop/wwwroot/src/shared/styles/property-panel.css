@@ -83,6 +83,17 @@
     font-weight: 500;
 }
 
+.operator-lifecycle-note {
+    margin: 0 0 12px;
+    padding: 9px 10px;
+    border-left: 3px solid #d89b3c;
+    border-radius: var(--radius-sm);
+    background: rgba(216, 155, 60, 0.08);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
 .form-group {
     margin-bottom: 10px;
 }

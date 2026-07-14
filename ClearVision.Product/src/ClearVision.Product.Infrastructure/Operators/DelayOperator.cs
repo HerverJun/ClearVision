@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "延时",
     Description = "等待指定时间后继续执行，常用于通信前等待下位机就绪",
-    Category = "流程控制",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "timer",
     Keywords = new[] { "延时", "等待", "暂停", "定时", "休眠", "Delay", "Wait", "Sleep", "Timer" }
 )]

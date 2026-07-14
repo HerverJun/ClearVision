@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "数值比较",
     Description = "比较两个数值的大小关系，输出布尔判定结果与差值",
-    Category = "逻辑控制",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "compare",
     Keywords = new[] { "比较", "判断", "大于", "小于", "等于", "超限", "阈值判定", "公差", "Compare", "Threshold", "GreaterThan", "LessThan" }
 )]

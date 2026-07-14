@@ -31,7 +31,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "HTTP 请求",
     Description = "调用外部 REST API",
-    Category = "通信",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "http"
 )]
 [InputPort("Body", "请求体", PortDataType.String, IsRequired = false)]

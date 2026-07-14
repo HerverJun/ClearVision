@@ -21,7 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像采集",
     Description = "从文件或相机采集图像",
-    Category = "采集",
+    CategoryId = OperatorCategoryId.Acquisition,
     IconName = "camera",
     Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" }
 )]

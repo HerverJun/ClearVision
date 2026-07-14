@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "边缘间距缺陷检测",
     Description = "沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。",
-    Category = "AI检测",
+    CategoryId = OperatorCategoryId.DefectDetection,
     IconName = "edge-pair-defect",
     Keywords = new[] { "edge pair", "notch", "bump", "deviation", "边缘对缺陷" },
     Version = "1.0.1"

@@ -12,9 +12,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Frequency Filter",
-    Description = "Applies frequency-domain filters to 1D or 2D complex spectra.",
-    Category = "Frequency",
+    DisplayName = "频域滤波",
+    Description = "对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "frequency-filter",
     Keywords = new[] { "FFT", "Filter", "LowPass", "HighPass", "BandPass", "Frequency" }
 )]

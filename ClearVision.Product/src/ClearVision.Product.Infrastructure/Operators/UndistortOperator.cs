@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Undistort",
-    Description = "Correct lens distortion using calibration data.",
-    Category = "Calibration",
+    DisplayName = "畸变校正",
+    Description = "使用标定数据校正镜头畸变。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "undistort",
     Keywords = new[] { "Undistort", "Distortion", "Calibration" }
 )]

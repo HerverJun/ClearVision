@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "边界填充",
-    Description = "Pads image border using OpenCV border policies.",
-    Category = "图像处理",
+    Description = "使用 OpenCV 边界策略填充图像边缘。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "border",
     Keywords = new[] { "border", "pad", "copy make border" }
 )]

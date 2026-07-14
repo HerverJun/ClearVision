@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "平行线查找",
-    Description = "Finds best pair of near-parallel lines in an image.",
-    Category = "定位",
+    Description = "在图像中查找最佳近似平行线对。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "parallel",
     Keywords = new[] { "parallel", "dual edge", "rails" }
 )]

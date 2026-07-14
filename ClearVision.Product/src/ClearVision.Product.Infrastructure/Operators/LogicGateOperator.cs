@@ -9,7 +9,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "逻辑门",
     Description = "布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)",
-    Category = "通用",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "logic"
 )]
 [InputPort("InputA", "输入 A", PortDataType.Boolean, IsRequired = true)]

@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "边线交点",
-    Description = "Computes line intersection and angle between two lines.",
-    Category = "定位",
+    Description = "计算两条直线的交点和夹角。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "intersection",
     Keywords = new[] { "intersection", "cross point", "line angle" }
 )]

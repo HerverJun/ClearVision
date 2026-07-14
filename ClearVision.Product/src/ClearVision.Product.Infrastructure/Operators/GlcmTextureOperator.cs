@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "GLCM Texture Features",
-    Description = "Compute Gray-Level Co-occurrence Matrix (GLCM) texture features.",
-    Category = "Texture",
+    DisplayName = "GLCM纹理特征",
+    Description = "计算灰度共生矩阵（GLCM）纹理特征。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "texture",
     Keywords = new[] { "Texture", "GLCM", "Contrast", "Correlation", "Energy", "Entropy" },
     Version = "1.0.1"

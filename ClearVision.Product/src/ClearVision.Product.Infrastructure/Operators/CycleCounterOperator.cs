@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "循环计数器",
     Description = "获取当前循环次数和统计信息",
-    Category = "变量",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "cycle"
 )]
 [OutputPort("CycleCount", "当前次数", PortDataType.Integer)]

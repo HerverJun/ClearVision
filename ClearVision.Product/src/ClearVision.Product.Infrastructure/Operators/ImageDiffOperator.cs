@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像差异率分析",
     Description = "计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "diff",
     Keywords = new[] { "image diff", "difference rate", "absolute difference", "图像对比" },
     Version = "1.0.1"

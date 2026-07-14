@@ -28,7 +28,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "字符串格式化",
     Description = "按模板生成字符串",
-    Category = "通用",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "text"
 )]
 [InputPort("Arg1", "参数 1", PortDataType.Any, IsRequired = false)]
