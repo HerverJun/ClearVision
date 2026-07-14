@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -56,19 +56,35 @@
 |------|------|------|------|------|------|------|------|
 | - | - | - | - | - | - | - | - |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U, CV_32F | CV_8U, CV_32F | 1, 3 | Bilateral shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Bilateral | `Restricted` | CV_8U, CV_32F | 1, 3 | None | Preserve input depth/channels. | Preserve native numeric domain. | Effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`9582471509EBDB069423271B6C8228A1F214649EF4CBC2F941218A9B9B9246B2`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`5B62306CB98599FD6D64C42374CC66EC819C74D630EB93B243C7260764A92F9E`
+- `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
+- `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
+| `DiameterApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `DiameterRequested` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `FilterMode` | `String` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `SigmaColorApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `SigmaSpaceApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -82,7 +98,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -96,4 +112,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

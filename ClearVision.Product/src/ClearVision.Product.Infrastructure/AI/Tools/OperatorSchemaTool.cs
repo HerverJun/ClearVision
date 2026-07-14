@@ -106,7 +106,8 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
                 }).ToList()
             }).ToList(),
             parameterConditions = schema.ParameterConstraints,
-            outputConditions = schema.OutputAvailabilityRules
+            outputConditions = schema.OutputAvailabilityRules,
+            imageInputContracts = schema.ImageInputContracts
         }));
     }
 }

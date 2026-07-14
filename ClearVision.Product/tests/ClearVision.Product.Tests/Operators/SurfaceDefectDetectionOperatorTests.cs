@@ -224,7 +224,9 @@ public class SurfaceDefectDetectionOperatorTests
         var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("Unsupported image channel count", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("IMAGE_CHANNELS_UNSUPPORTED:", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("OperatorType=SurfaceDefectDetection", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("InputMatType=CV_8UC2", result.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -97,6 +97,16 @@
 | `Y1` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
 | `Y2` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U | CV_8U | 1, 3, 4 | Stage 2 conservative baseline: retain evidenced legacy 8U paths; reject higher depths until operator-specific evidence is added. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - | - | - | - |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
@@ -111,7 +121,7 @@
 | `UncertaintyDeg` | ALL(MeasureType == ThreePointAngle) | `MEASUREMENT_ANGLE_UNCERTAINTY_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`ABE05241039CC9A8EAA13B19334372A86791357EFD454FF1803BD6C94952D1AF`
+- 组合指纹 (Generation Fingerprint)：`5FA762C12CBEF41CC1438EF95D4F1F47AA36755FB69B11213BB284F3B49A5489`
 - `type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper`
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -147,4 +157,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

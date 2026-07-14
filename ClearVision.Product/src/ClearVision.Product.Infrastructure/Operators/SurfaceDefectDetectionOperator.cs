@@ -16,8 +16,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "surface-defect",
     Keywords = new[] { "surface defect", "scratch", "stain", "traditional detection" },
     Tags = new[] { "experimental", "industrial-remediation", "surface-defect" },
-    Version = "2.0.0"
+    Version = "2.0.1"
 )]
+[OperatorImageContractProvider(typeof(SurfaceDefectDetectionImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Reference", "Reference", PortDataType.Image, IsRequired = false)]
 [OutputPort("Image", "Image", PortDataType.Image)]

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
 | 分类顺序 (CategoryOrder) | 4 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -44,7 +44,7 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `Channel` | 通道 | `enum` | Gray | Gray/灰度；R；G；B | Yes | - |
-| `BinCount` | 分箱数量 | `int` | 256 | [2, 1024] | Yes | - |
+| `BinCount` | 分箱数量 | `int` | 256 | [2, 256] | Yes | 8U 原生域的离散直方图箱数。 |
 | `RoiX` | ROIX | `int` | 0 | >= 0 | Yes | - |
 | `RoiY` | ROIY | `int` | 0 | >= 0 | Yes | - |
 | `RoiW` | ROI宽 | `int` | 0 | >= 0 | Yes | - |
@@ -77,14 +77,25 @@
 |------|------|------|------|------|------|------|------|
 | - | - | - | - | - | - | - | - |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U | CV_8U | 1, 3, 4 | 8U-only native histogram domain for Stage 2; non-8U inputs are rejected before statistics are computed. | C3 BGR/C4 BGRA may convert to C1 Gray, or a B/G/R channel is selected without depth scaling. | Histogram visualization is fixed CV_8UC3; statistics remain in the 0..255 intensity domain. | Fixed [0,256) histogram range with BinCount 2..256 and explicit BinWidth=256/BinCount. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Channel=B/G/R | `Restricted` | CV_8U | 3, 4 | Select native byte channel. | CV_8UC3 chart. | 0..255 intensity units. | - | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=Gray | `Restricted` | CV_8U | 1, 3, 4 | C3/C4 -> Gray. | CV_8UC3 chart. | 0..255 intensity units. | - | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`758C84C0893C528A01DFCA41619E621683A7FC645788E887609F8B5799E5E592`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`4F306397586E3994667C271C7774E60D0849FE3D52AAEBF48081F3DD49A20F01`
+- `type:ClearVision.Product.Infrastructure.Operators.HistogramImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -93,11 +104,16 @@
 | `Confidence` | `Float` | 源码输出字典初始化中可见字段。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `HistogramMass` | `Any` | 源码输出字典初始化中可见字段。 |
+| `HistogramRangeMax` | `Float` | 源码输出字典初始化中可见字段。 |
+| `HistogramRangeMin` | `Float` | 源码输出字典初始化中可见字段。 |
 | `ModeCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `OutputMatType` | `String` | 源码输出字典初始化中可见字段。 |
+| `RangePolicy` | `Any` | 源码输出字典初始化中可见字段。 |
 | `SampleCount` | `Integer` | 源码输出字典初始化中可见字段。 |
 | `StatusCode` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StatusMessage` | `String` | 源码输出字典初始化中可见字段。 |
 | `UncertaintyPx` | `Any` | 源码输出字典初始化中可见字段。 |
+| `ValueUnit` | `String` | 源码输出字典初始化中可见字段。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -111,7 +127,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -125,4 +141,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -49,7 +49,8 @@ public static class CoreTypeAdapters
             Keywords = source.Keywords?.ToArray() ?? [],
             InputPorts = source.InputPorts.Select(ToModel).Cast<IOperatorPort>().ToArray(),
             OutputPorts = source.OutputPorts.Select(ToModel).Cast<IOperatorPort>().ToArray(),
-            Parameters = source.Parameters.Select(ToModel).Cast<IOperatorParameter>().ToArray()
+            Parameters = source.Parameters.Select(ToModel).Cast<IOperatorParameter>().ToArray(),
+            ImageInputContracts = source.ImageInputContracts.ToArray()
         };
     }
 

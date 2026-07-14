@@ -180,8 +180,14 @@ public class OperatorMetadataScanner
             GenerationDependencies = operatorClrType
                 .GetCustomAttributes<OperatorGenerationDependencyAttribute>(inherit: false)
                 .Select(ResolveGenerationDependency)
+                .Concat(operatorClrType
+                    .GetCustomAttributes<OperatorImageContractProviderAttribute>(inherit: false)
+                    .Select(attribute => $"type:{attribute.ProviderType.FullName}"))
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.Ordinal)
+                .ToList(),
+            ImageInputContracts = OperatorImageContractResolver
+                .Resolve(operatorClrType, operatorType)
                 .ToList()
         };
 

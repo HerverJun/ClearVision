@@ -210,7 +210,10 @@ public class LaplacianSharpenOperatorTests
         var result = await _operator.ExecuteAsync(CreateOperator(), TestHelpers.CreateImageInputs(input));
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Be("Supported image depths are CV_8U, CV_16U and CV_32F");
+        result.ErrorMessage.Should().StartWith("IMAGE_DEPTH_UNSUPPORTED:");
+        result.ErrorMessage.Should().Contain("OperatorType=LaplacianSharpen")
+            .And.Contain($"InputMatType=CV_{caseId}")
+            .And.Contain("Supported=CV_8UC1,CV_8UC3,CV_16UC1,CV_16UC3,CV_32FC1,CV_32FC3");
     }
 
     [Fact]
@@ -229,7 +232,7 @@ public class LaplacianSharpenOperatorTests
             .Scan()
             .Single(item => item.Type == OperatorType.LaplacianSharpen);
 
-        metadata.Version.Should().Be("1.0.2");
+        metadata.Version.Should().Be("1.0.3");
         metadata.Parameters.Should().NotContain(parameter => parameter.Name == "Delta");
         metadata.Parameters.Single(parameter => parameter.Name == "KernelSize")
             .Description.Should().Contain("偶数").And.Contain("下一奇数");

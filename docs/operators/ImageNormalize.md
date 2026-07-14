@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |
-| 版本 (Version) | `1.0.2` |
+| 版本 (Version) | `1.0.3` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -77,6 +77,18 @@
 | `ColorMode` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `IMAGE_NORMALIZE_COLOR_MODE` |
 | `Method` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `IMAGE_NORMALIZE_METHOD` |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U, CV_16U, CV_32F, CV_64F | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Mode-dependent business normalization contract retained from Stage 1. | MinMax and Histogram may intentionally change the numeric domain; ZScore widens to CV_32F. | MinMax preserves admitted depth; ZScore outputs CV_32F; Histogram outputs CV_8U. | Explicit business-semantic normalization; data-dependent MinMax is allowed only inside this operator. | ModeSpecific | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Histogram | `Converted` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Explicit histogram-normalization business mode. | CV_8U. | 8-bit equalization domain. | - | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E1_SOURCE_AUDIT` |
+| `Image` | MinMax | `Native` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Explicit normalization. | Preserve input depth. | Explicit target range. | - | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` |
+| `Image` | ZScore | `Converted` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Value-preserving conversion to CV_32F before z-score. | CV_32F. | Mean 0 / population sigma 1 when non-degenerate. | - | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
@@ -88,8 +100,8 @@
 | `SigmaDegenerate` | - | `IMAGE_NORMALIZE_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`D369FB9E53E717E5A806E256B74FA23755962EADB9E65E3E9BC1A8CAD752EBFF`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`B08321CB29B34FC589460041FABA0F3729F7E61365FEC2FEE0CA1923B8EF13B4`
+- `type:ClearVision.Product.Infrastructure.Operators.ImageNormalizeImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -125,4 +137,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.3 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

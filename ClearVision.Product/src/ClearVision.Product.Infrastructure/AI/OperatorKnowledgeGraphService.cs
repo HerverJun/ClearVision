@@ -149,6 +149,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 }).ToList(),
                 ParameterConditions = item.ParameterConstraints.ToList(),
                 OutputConditions = item.OutputAvailabilityRules.ToList(),
+                ImageInputContracts = item.ImageInputContracts.ToList(),
                 ResourceRequirements = resourceRequirements,
                 GenerationDependencies = item.GenerationDependencies.ToList(),
                 RequiredResources = requiredResources,

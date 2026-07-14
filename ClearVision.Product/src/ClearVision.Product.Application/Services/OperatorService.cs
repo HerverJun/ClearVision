@@ -75,7 +75,8 @@ public class OperatorService : IOperatorService
             Outputs = metadata.OutputPorts.Select(MapPortDefinition).ToList(),
             Parameters = metadata.Parameters.Select(MapParameterDefinition).ToList(),
             ParameterConstraints = metadata.ParameterConstraints.ToList(),
-            OutputAvailabilityRules = metadata.OutputAvailabilityRules.ToList()
+            OutputAvailabilityRules = metadata.OutputAvailabilityRules.ToList(),
+            ImageInputContracts = metadata.ImageInputContracts.ToList()
         };
     }
 

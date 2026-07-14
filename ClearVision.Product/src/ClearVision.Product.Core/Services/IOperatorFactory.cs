@@ -134,6 +134,11 @@ public class OperatorMetadata
     /// Explicit source dependencies used by deterministic documentation fingerprints.
     /// </summary>
     public List<string> GenerationDependencies { get; set; } = new();
+
+    /// <summary>
+    /// Authoritative image depth/channel/dynamic-range contracts for Image input ports.
+    /// </summary>
+    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
 }
 
 /// <summary>

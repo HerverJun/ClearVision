@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.2.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -76,6 +76,19 @@
 | `SigmaX` | metadata; - | visible: -; hidden: ALL(FilterMode != Gaussian) | enabled: -; disabled: ALL(FilterMode != Gaussian) | ALL(FilterMode != Gaussian) | - | - | `FILTERING_SIGMA_ONLY_FOR_GAUSSIAN` |
 | `SigmaY` | metadata; - | visible: -; hidden: ALL(FilterMode != Gaussian) | enabled: -; disabled: ALL(FilterMode != Gaussian) | ALL(FilterMode != Gaussian) | - | - | `FILTERING_SIGMA_ONLY_FOR_GAUSSIAN` |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Unified FilterMode selects the shared Gaussian/Mean/Median/Bilateral admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Bilateral | `Restricted` | CV_8U, CV_32F | 1, 3 | None | Preserve input depth/channels. | Preserve native numeric domain. | Effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Gaussian | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel 1..31; effective kernel is odd; border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Mean | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel 1..63; even kernels remain even; border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel=1 identity for listed depths; effective kernel 3/5 admits 8U/16U/16S/32F; >=7 admits 8U only. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
@@ -84,7 +97,8 @@
 | `Image` | - | `FILTERING_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`FB53FB9D91642BCAA3D7ECB8E4D7392BDF7C76B4AF14936F0E38C0F79C48DF58`
+- 组合指纹 (Generation Fingerprint)：`14ECC78272A0467DE8861F7C250ABE7E83A3E6BF8B11E2E7FD4616E98B2555D0`
+- `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -112,7 +126,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -126,4 +140,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

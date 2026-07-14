@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-14 20:53:26 +08:00`
+> 生成时间 / Generated At: `2026-07-15 01:10:44 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -22,7 +22,7 @@
 | `OutputAndAuxiliary` | 输出与辅助 | 5 | 3.2% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.3**
+- 平均分 / Average: **95.4**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
@@ -39,12 +39,12 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AffineTransform` | 仿射变换 | `Stable` | 1 | 2 | 9 | 100 (A) | `1.0.0` | 该算子用于使用三点或旋转-缩放-平移模式执行二维仿射变换。运行时从声明输入端口读取数… | [AffineTransform](./AffineTransform.md) |
-| `OperatorType.BilateralFilter` | 双边滤波 | `Stable` | 1 | 1 | 3 | 100 (A) | `1.0.0` | 该算子用于边缘保留的平滑滤波。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [BilateralFilter](./BilateralFilter.md) |
+| `OperatorType.BilateralFilter` | 双边滤波 | `Stable` | 1 | 1 | 3 | 100 (A) | `1.1.0` | 该算子用于边缘保留的平滑滤波。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [BilateralFilter](./BilateralFilter.md) |
 | `OperatorType.ClaheEnhancement` | CLAHE增强 | `Stable` | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。运行时从声… | [ClaheEnhancement](./ClaheEnhancement.md) |
 | `OperatorType.ColorConversion` | 颜色空间转换 | `Stable` | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子用于BGR/GRAY/HSV/Lab/YUV等颜色空间转换。运行时从声明输入端… | [ColorConversion](./ColorConversion.md) |
 | `OperatorType.CopyMakeBorder` | 边界填充 | `Stable` | 1 | 1 | 6 | 94 (A) | `1.0.0` | 该算子用于使用 OpenCV 边界策略填充图像边缘。运行时从声明输入端口读取数据，按… | [CopyMakeBorder](./CopyMakeBorder.md) |
 | `OperatorType.FFT1D` | 信号/图像傅里叶变换（FFT） | `Stable` | 2 | 4 | 0 | 89 (A) | `1.0.0` | 该算子用于对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、… | [FFT1D](./FFT1D.md) |
-| `OperatorType.Filtering` | 滤波 | `Stable` | 1 | 3 | 8 | 100 (A) | `1.1.0` | Unified spatial smoothing filters (OpenCV) | [Filtering](./Filtering.md) |
+| `OperatorType.Filtering` | 滤波 | `Stable` | 1 | 3 | 8 | 100 (A) | `1.2.0` | Unified spatial smoothing filters (OpenCV) | [Filtering](./Filtering.md) |
 | `OperatorType.FrameAveraging` | 帧平均 | `Stable` | 1 | 2 | 2 | 94 (A) | `1.0.0` | 该算子用于对多帧输入取平均以降低时域噪声。运行时从声明输入端口读取数据，按参数表解析… | [FrameAveraging](./FrameAveraging.md) |
 | `OperatorType.FrequencyFilter` | 频域滤波 | `Stable` | 5 | 3 | 0 | 81 (B) | `1.0.0` | 该算子用于对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。运行时从声明… | [FrequencyFilter](./FrequencyFilter.md) |
 | `OperatorType.HistogramEqualization` | 直方图均衡化 | `Stable` | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于支持全局直方图均衡与 CLAHE，用于增强图像对比度。运行时从声明输入端口… | [HistogramEqualization](./HistogramEqualization.md) |
@@ -52,16 +52,16 @@
 | `OperatorType.ImageBlend` | 图像融合 | `Stable` | 2 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageBlend](./ImageBlend.md) |
 | `OperatorType.ImageCompose` | 图像组合 | `Stable` | 4 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于通过拼接、网格或通道合并方式组合多张图像。运行时从声明输入端口读取数据，按… | [ImageCompose](./ImageCompose.md) |
 | `OperatorType.ImageCrop` | 图像裁剪 | `Stable` | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于ROI区域提取。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [ImageCrop](./ImageCrop.md) |
-| `OperatorType.ImageNormalize` | 图像归一化 | `Stable` | 1 | 6 | 4 | 100 (A) | `1.0.2` | MinMax range normalization / floating ZScore standardization / histogram equalization | [ImageNormalize](./ImageNormalize.md) |
+| `OperatorType.ImageNormalize` | 图像归一化 | `Stable` | 1 | 6 | 4 | 100 (A) | `1.0.3` | MinMax range normalization / floating ZScore standardization / histogram equalization | [ImageNormalize](./ImageNormalize.md) |
 | `OperatorType.ImageResize` | 图像缩放 | `Stable` | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于调整图像尺寸。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageResize](./ImageResize.md) |
 | `OperatorType.ImageRotate` | 图像旋转 | `Stable` | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于任意角度旋转。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageRotate](./ImageRotate.md) |
 | `OperatorType.ImageStitching` | 图像拼接 | `Stable` | 2 | 2 | 3 | 94 (A) | `1.0.0` | 该算子用于将两张图像拼接成更大的全景式输出。运行时从声明输入端口读取数据，按参数表解… | [ImageStitching](./ImageStitching.md) |
 | `OperatorType.ImageSubtract` | 图像减法 | `Stable` | 2 | 4 | 1 | 89 (A) | `1.0.0` | 该算子用于计算两张图像的相减结果或绝对差值。运行时从声明输入端口读取数据，按参数表解… | [ImageSubtract](./ImageSubtract.md) |
 | `OperatorType.ImageTiling` | 图像切片 | `Stable` | 1 | 3 | 4 | 94 (A) | `1.0.0` | 该算子用于将图像切分为可选重叠的分块区域。运行时从声明输入端口读取数据，按参数表解析… | [ImageTiling](./ImageTiling.md) |
 | `OperatorType.InverseFFT1D` | 信号/图像逆傅里叶变换（IFFT） | `Stable` | 2 | 4 | 0 | 89 (A) | `1.0.0` | 该算子用于对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信… | [InverseFFT1D](./InverseFFT1D.md) |
-| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `Stable` | 1 | 6 | 3 | 96 (A) | `1.0.2` | Signed Laplacian sharpening | [LaplacianSharpen](./LaplacianSharpen.md) |
-| `OperatorType.MeanFilter` | 均值滤波 | `Stable` | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子用于使用均值（方框）滤波平滑图像噪声。运行时从声明输入端口读取数据，按参数表解… | [MeanFilter](./MeanFilter.md) |
-| `OperatorType.MedianBlur` | 中值滤波 | `Stable` | 1 | 1 | 1 | 94 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
+| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `Stable` | 1 | 6 | 3 | 96 (A) | `1.0.3` | Signed Laplacian sharpening | [LaplacianSharpen](./LaplacianSharpen.md) |
+| `OperatorType.MeanFilter` | 均值滤波 | `Stable` | 1 | 1 | 2 | 100 (A) | `1.1.0` | 该算子用于使用均值（方框）滤波平滑图像噪声。运行时从声明输入端口读取数据，按参数表解… | [MeanFilter](./MeanFilter.md) |
+| `OperatorType.MedianBlur` | 中值滤波 | `Stable` | 1 | 1 | 1 | 100 (A) | `1.1.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
 | `OperatorType.PerspectiveTransform` | 透视变换 | `Stable` | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./PerspectiveTransform.md) |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | `Stable` | 2 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于将环形图像区域展开为矩形视图。运行时从声明输入端口读取数据，按参数表解析配… | [PolarUnwrap](./PolarUnwrap.md) |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | `Stable` | 1 | 3 | 10 | 100 (A) | `1.0.0` | 该算子用于按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。运行时… | [RoiManager](./RoiManager.md) |
@@ -86,7 +86,7 @@
 | `OperatorType.RegionOpening` | 区域开运算 | `Stable` | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology opening | [RegionOpening](./RegionOpening.md) |
 | `OperatorType.RegionSkeleton` | 区域骨架化 | `Stable` | 2 | 5 | 2 | 90 (A) | `1.0.2` | Zhang-Suen thinning | [RegionSkeleton](./RegionSkeleton.md) |
 | `OperatorType.RegionUnion` | 区域并集 | `Stable` | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length region union | [RegionUnion](./RegionUnion.md) |
-| `OperatorType.Thresholding` | 全局阈值处理 | `Stable` | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/T… | [Thresholding](./Thresholding.md) |
+| `OperatorType.Thresholding` | 全局阈值处理 | `Stable` | 1 | 1 | 4 | 96 (A) | `1.1.0` | 该算子用于执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/T… | [Thresholding](./Thresholding.md) |
 
 ### 特征提取 / `FeatureExtraction` (13)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -98,11 +98,11 @@
 | `OperatorType.CornerDetection` | 角点检测 | `Stable` | 1 | 3 | 5 | 94 (A) | `1.0.0` | 该算子用于使用 Harris 或 Shi-Tomasi 检测角点。运行时从声明输入端… | [CornerDetection](./CornerDetection.md) |
 | `OperatorType.EdgeDetection` | 边缘检测 | `Stable` | 1 | 2 | 14 | 100 (A) | `1.0.0` | 该算子用于使用 Canny 进行边缘检测，并可选自动阈值。运行时从声明输入端口读取数… | [EdgeDetection](./EdgeDetection.md) |
 | `OperatorType.GlcmTexture` | GLCM纹理特征 | `Stable` | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
-| `OperatorType.HistogramAnalysis` | 直方图分析 | `Stable` | 1 | 11 | 6 | 94 (A) | `1.0.0` | 该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按… | [HistogramAnalysis](./HistogramAnalysis.md) |
+| `OperatorType.HistogramAnalysis` | 直方图分析 | `Stable` | 1 | 11 | 6 | 96 (A) | `1.1.0` | 该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按… | [HistogramAnalysis](./HistogramAnalysis.md) |
 | `OperatorType.ImageDiff` | 图像差异率分析 | `Stable` | 2 | 2 | 0 | 89 (A) | `1.0.1` | 该算子用于计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。运行时从声明输入端… | [ImageDiff](./ImageDiff.md) |
 | `OperatorType.LawsTextureFilter` | Laws纹理滤波 | `Stable` | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./LawsTextureFilter.md) |
 | `OperatorType.PixelStatistics` | 像素统计 | `Stable` | 2 | 6 | 5 | 96 (A) | `1.0.0` | 该算子用于计算 ROI 或掩码区域内的像素级统计信息。运行时从声明输入端口读取数据，… | [PixelStatistics](./PixelStatistics.md) |
-| `OperatorType.SharpnessEvaluation` | 清晰度评估 | `Stable` | 1 | 3 | 8 | 96 (A) | `1.0.0` | 该算子用于评估图像的对焦清晰度。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [SharpnessEvaluation](./SharpnessEvaluation.md) |
+| `OperatorType.SharpnessEvaluation` | 清晰度评估 | `Stable` | 1 | 3 | 8 | 96 (A) | `1.1.0` | 该算子用于评估图像的对焦清晰度。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [SharpnessEvaluation](./SharpnessEvaluation.md) |
 | `OperatorType.SubpixelEdgeDetection` | 亚像素边缘 | `Reference` | 1 | 2 | 5 | 94 (A) | `1.0.0` | 该算子用于非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明… | [SubpixelEdgeDetection](./SubpixelEdgeDetection.md) |
 
 ### 匹配与定位 / `MatchingAndLocalization` (17)
@@ -132,7 +132,7 @@
 | `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | `Experimental` | 4 | 13 | 13 | 100 (A) | `1.0.1` | 该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按… | [DetectionSequenceJudge](./DetectionSequenceJudge.md) |
 | `OperatorType.DualModalVoting` | 双模态投票 | `Stable` | 2 | 3 | 6 | 84 (B) | `1.0.0` | 该算子用于融合深度学习与传统视觉检测结果，输出最终判定。运行时从声明输入端口读取数据… | [DualModalVoting](./DualModalVoting.md) |
 | `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | `Stable` | 3 | 4 | 4 | 96 (A) | `1.0.1` | 该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行… | [EdgePairDefect](./EdgePairDefect.md) |
-| `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | `Experimental` | 2 | 8 | 24 | 100 (A) | `2.0.0` | 该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读… | [SurfaceDefectDetection](./SurfaceDefectDetection.md) |
+| `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | `Experimental` | 2 | 8 | 24 | 100 (A) | `2.0.1` | 该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读… | [SurfaceDefectDetection](./SurfaceDefectDetection.md) |
 
 ### 测量 / `Measurement` (17)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |

@@ -658,16 +658,14 @@ public class ThresholdOperatorTests
     }
 
     [Fact]
-    public void ValidateParameters_WithNegativeThreshold_ShouldReturnInvalid()
+    public void ValidateParameters_WithFiniteNegativeThreshold_ShouldDeferToRuntimeDepthValidation()
     {
         var op = CreateTestOperator();
-        op.AddParameter(TestHelpers.CreateParameter(
-            "Threshold", "Threshold", "double", -10.0, 0.0, 255.0, true));
+        op.AddParameter(TestHelpers.CreateParameter("Threshold", -10.0, "double"));
 
         var result = _operator.ValidateParameters(op);
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain("Threshold must be between 0 and 255.");
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]

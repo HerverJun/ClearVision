@@ -512,6 +512,7 @@ public class PromptBuilder
             }),
             parameter_conditions = m.ParameterConstraints,
             output_conditions = m.OutputAvailabilityRules,
+            image_input_contracts = m.ImageInputContracts,
             generation_dependencies = m.GenerationDependencies
         });
 

@@ -88,13 +88,23 @@
 | `ModelId` | metadata; ALL(Mode == inference) | visible: -; hidden: - | enabled: -; disabled: - | - | feature_bank | - | `ANOMALY_FEATURE_BANK_SOURCE_REQUIRED` |
 | `SaveFeatureBankPath` | optional; - | visible: -; hidden: ALL(Mode == inference) | enabled: -; disabled: ALL(Mode == inference) | ALL(Mode == inference) | feature_bank | - | `ANOMALY_FEATURE_BANK_SAVE_ONLY_FOR_TRAINING` |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Unknown` |  |  | 1, 3, 4 | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `Unknown` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - | - | - | - |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`9FA2E91555A805FC461DB320E66E7359B1FBFA59D1F4E7E18A61DBDC317C9808`
+- 组合指纹 (Generation Fingerprint)：`5A6B78FA263F632E4538A7C3B091814BAA935F41C21ABEA96E701EAAB17D92C5`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -144,4 +154,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

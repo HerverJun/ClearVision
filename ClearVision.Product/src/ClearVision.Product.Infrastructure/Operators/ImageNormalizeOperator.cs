@@ -16,8 +16,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "normalize",
     Keywords = new[] { "normalize", "minmax", "zscore", "standard score", "equalize" },
-    Version = "1.0.2"
+    Version = "1.0.3"
 )]
+[OperatorImageContractProvider(typeof(ImageNormalizeImageContractProvider))]
 [OperatorParameterRule("Method", ReasonCode = "IMAGE_NORMALIZE_METHOD")]
 [OperatorParameterRule("Alpha", DisabledWhenAll = new[] { "Method!=MinMax" }, HiddenWhenAll = new[] { "Method!=MinMax" }, IgnoredWhenAll = new[] { "Method!=MinMax" }, ReasonCode = "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX")]
 [OperatorParameterRule("Beta", DisabledWhenAll = new[] { "Method!=MinMax" }, HiddenWhenAll = new[] { "Method!=MinMax" }, IgnoredWhenAll = new[] { "Method!=MinMax" }, ReasonCode = "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX")]

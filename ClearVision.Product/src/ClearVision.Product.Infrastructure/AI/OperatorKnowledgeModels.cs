@@ -56,6 +56,7 @@ public sealed class OperatorKnowledgeCard
     public List<OperatorKnowledgeParameter> Parameters { get; set; } = new();
     public List<OperatorParameterConstraint> ParameterConditions { get; set; } = new();
     public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
+    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
     public List<OperatorKnowledgeResourceRequirement> ResourceRequirements { get; set; } = new();
     public List<string> GenerationDependencies { get; set; } = new();
     public string GenerationFingerprint { get; set; } = string.Empty;

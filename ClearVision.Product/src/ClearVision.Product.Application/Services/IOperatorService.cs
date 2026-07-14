@@ -86,6 +86,7 @@ public class OperatorMetadataDto
     public List<ParameterDefinitionDto> Parameters { get; set; } = new();
     public List<OperatorParameterConstraint> ParameterConstraints { get; set; } = new();
     public List<OperatorOutputAvailabilityRule> OutputAvailabilityRules { get; set; } = new();
+    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
 }
 
 /// <summary>

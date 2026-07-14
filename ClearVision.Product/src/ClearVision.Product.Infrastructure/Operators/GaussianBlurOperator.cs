@@ -20,8 +20,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
     Keywords = new[] { "gaussian", "mean", "box", "median", "bilateral", "blur", "filter", "denoise", "滤波" },
-    Version = "1.1.0"
+    Version = "1.2.0"
 )]
+[OperatorImageContractProvider(typeof(SpatialFilterImageContractProvider))]
 [OperatorParameterRule("FilterMode", ReasonCode = "FILTERING_MODE")]
 [OperatorParameterRule("KernelSize", DisabledWhenAll = new[] { "FilterMode==Bilateral" }, HiddenWhenAll = new[] { "FilterMode==Bilateral" }, IgnoredWhenAll = new[] { "FilterMode==Bilateral" }, ReasonCode = "FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL")]
 [OperatorParameterRule("SigmaX", DisabledWhenAll = new[] { "FilterMode!=Gaussian" }, HiddenWhenAll = new[] { "FilterMode!=Gaussian" }, IgnoredWhenAll = new[] { "FilterMode!=Gaussian" }, ReasonCode = "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN")]
@@ -122,11 +123,16 @@ public class GaussianBlurOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
 
+        if (!SpatialFilterKernel.TryValidateInput(src, settings, OperatorType.Filtering, out validationError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(validationError));
+        }
+
         var dst = new Mat();
         SpatialFilterAppliedSettings applied;
         try
         {
-            applied = SpatialFilterKernel.Apply(src, dst, settings);
+            applied = SpatialFilterKernel.Apply(src, dst, settings, OperatorType.Filtering);
         }
         catch
         {

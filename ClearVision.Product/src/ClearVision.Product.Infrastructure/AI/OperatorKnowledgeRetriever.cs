@@ -216,6 +216,7 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
                 }).ToList(),
                 ParameterConditions = item.ParameterConstraints.ToList(),
                 OutputConditions = item.OutputAvailabilityRules.ToList(),
+                ImageInputContracts = item.ImageInputContracts.ToList(),
                 ResourceRequirements = item.ParameterConstraints
                     .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
                     .Select(constraint => new OperatorKnowledgeResourceRequirement

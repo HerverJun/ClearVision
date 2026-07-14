@@ -20,7 +20,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "sharpen",
     Keywords = new[] { "laplacian", "sharpen", "signed response", "edge enhancement" },
-    Version = "1.0.2"
+    Version = "1.0.3"
 )]
 [OperatorParameterRule("KernelSize", ReasonCode = "LAPLACIAN_KERNEL_SIZE")]
 [OperatorParameterRule("Scale", ReasonCode = "LAPLACIAN_SCALE")]
@@ -31,6 +31,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorOutputRule("SharpenStrength", ReasonCode = "LAPLACIAN_SHARPEN_OUTPUT")]
 [OperatorOutputRule("OutputMatType", ReasonCode = "LAPLACIAN_SHARPEN_OUTPUT")]
 [OperatorOutputRule("ColorPolicy", ReasonCode = "LAPLACIAN_SHARPEN_OUTPUT")]
+[OperatorImageContractProvider(typeof(LaplacianSharpenImageContractProvider))]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "锐化图像", PortDataType.Image)]
 [OutputPort("KernelSize", "实际核大小", PortDataType.Integer)]

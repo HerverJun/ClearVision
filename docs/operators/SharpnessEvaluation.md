@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
 | 分类顺序 (CategoryOrder) | 4 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -63,7 +63,7 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Score` | 分数 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `IsSharp` | Is Sharp | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `IsSharp` | Is Sharp | `Boolean` | 仅 DecisionReady=true 时产生。 |
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
@@ -72,14 +72,27 @@
 |------|------|------|------|------|------|------|------|
 | - | - | - | - | - | - | - | - |
 
+## 图像输入域合同 / Image Input Domain Contracts
+| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+|------|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | `Restricted` | CV_8U, CV_16U, CV_32F | CV_8U, CV_16U, CV_32F | 1, 3, 4 | Native-value score computation for 8U/16U/32F; depth-specific decision calibration is separate from score support. | Color -> Gray only; internal widening is value-preserving and is not a dynamic-range conversion. | Passthrough preserves input type; None omits Image; overlay policy is mode/depth restricted. | Scores use the admitted input's native numeric domain. PerMethodDefault thresholds are 8U-only. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` | `2.0` |
+
+### 模式限制 / Mode Restrictions
+| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Brenner | `Restricted` | CV_8U, CV_16U, CV_32F | 1, 3, 4 | C3 BGR/C4 BGRA -> Gray without depth scaling; score computation widens values without changing their numeric domain. | Passthrough preserves input type; None omits Image; FullOverlay is restricted for uncalibrated float ranges. | Score scales quadratically with the native intensity domain. | PerMethodDefault thresholds are calibrated for CV_8U only; high-depth default decisions are not ready. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Laplacian | `Restricted` | CV_8U, CV_16U, CV_32F | 1, 3, 4 | C3 BGR/C4 BGRA -> Gray without depth scaling; score computation widens values without changing their numeric domain. | Passthrough preserves input type; None omits Image; FullOverlay is restricted for uncalibrated float ranges. | Score scales quadratically with the native intensity domain. | PerMethodDefault thresholds are calibrated for CV_8U only; high-depth default decisions are not ready. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | SMD | `Restricted` | CV_8U, CV_16U, CV_32F | 1, 3, 4 | C3 BGR/C4 BGRA -> Gray without depth scaling; score computation widens values without changing their numeric domain. | Passthrough preserves input type; None omits Image; FullOverlay is restricted for uncalibrated float ranges. | Score scales linearly with the native intensity domain. | PerMethodDefault thresholds are calibrated for CV_8U only; high-depth default decisions are not ready. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Tenengrad | `Restricted` | CV_8U, CV_16U, CV_32F | 1, 3, 4 | C3 BGR/C4 BGRA -> Gray without depth scaling; score computation widens values without changing their numeric domain. | Passthrough preserves input type; None omits Image; FullOverlay is restricted for uncalibrated float ranges. | Score scales quadratically with the native intensity domain. | PerMethodDefault thresholds are calibrated for CV_8U only; high-depth default decisions are not ready. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
 |------|------|------|
-| - | - | - |
+| `Image` | ALL(OutputImagePolicy != None) | `SHARPNESS_IMAGE_POLICY` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`335D1F6100C966E0954590BF42E5AED1D2721F06EA465A29930C37C004E69BA9`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`E5C4023E00FB074C2B599D34C688AF10A05722C2729D477B9EB874BC78A43C36`
+- `type:ClearVision.Product.Infrastructure.Operators.SharpnessImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -89,14 +102,16 @@
 | `DecisionReady` | `Any` | 源码输出字典初始化中可见字段。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `Laplacian` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `MarginToThreshold` | `Any` | 源码输出字典初始化中可见字段。 |
-| `NormalizedScore` | `Float` | 源码输出字典初始化中可见字段。 |
+| `MarginToThreshold` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `NormalizedScore` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `SMD` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `ScoreStdDev` | `Float` | 源码输出字典初始化中可见字段。 |
 | `ScoreStdError` | `Float` | 源码输出字典初始化中可见字段。 |
+| `ScoreUnit` | `Float` | 源码输出字典初始化中可见字段。 |
 | `StatusCode` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StatusMessage` | `String` | 源码输出字典初始化中可见字段。 |
 | `Tenengrad` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ThresholdCalibration` | `Float` | 源码输出字典初始化中可见字段。 |
 | `ThresholdUsed` | `Any` | 源码输出字典初始化中可见字段。 |
 | `TileCount` | `Integer` | 源码输出字典初始化中可见字段。 |
 | `UncertaintyPx` | `Any` | 源码输出字典初始化中可见字段。 |
@@ -113,7 +128,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 7 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -127,4 +142,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

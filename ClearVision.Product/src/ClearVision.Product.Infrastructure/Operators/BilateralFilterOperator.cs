@@ -19,8 +19,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "边缘保留的平滑滤波",
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
-    Keywords = new[] { "双边", "滤波", "边缘保留", "平滑", "纹理", "Bilateral", "Edge-preserving" }
+    Keywords = new[] { "双边", "滤波", "边缘保留", "平滑", "纹理", "Bilateral", "Edge-preserving" },
+    Version = "1.1.0"
 )]
+[OperatorImageContractProvider(typeof(SpatialFilterImageContractProvider))]
+[OperatorGenerationDependency(typeof(SpatialFilterKernel))]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "图像", PortDataType.Image)]
 [OperatorParam("Diameter", "直径", "int", DefaultValue = 9, Min = 1, Max = 25)]
@@ -54,15 +57,23 @@ public class BilateralFilterOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
 
+        var settings = new SpatialFilterSettings(
+            SpatialFilterMode.Bilateral,
+            BorderType: 4,
+            Diameter: diameter,
+            SigmaColor: sigmaColor,
+            SigmaSpace: sigmaSpace);
+        if (!SpatialFilterKernel.TryValidate(settings, out var validationError) ||
+            !SpatialFilterKernel.TryValidateInput(src, settings, OperatorType.BilateralFilter, out validationError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(validationError));
+        }
+
         var dst = MatPool.Shared.Rent(src.Width, src.Height, src.Type());
+        SpatialFilterAppliedSettings applied;
         try
         {
-            SpatialFilterKernel.Apply(src, dst, new SpatialFilterSettings(
-                SpatialFilterMode.Bilateral,
-                BorderType: 4,
-                Diameter: diameter,
-                SigmaColor: sigmaColor,
-                SigmaSpace: sigmaSpace));
+            applied = SpatialFilterKernel.Apply(src, dst, settings, OperatorType.BilateralFilter);
         }
         catch
         {
@@ -71,7 +82,14 @@ public class BilateralFilterOperator : OperatorBase
         }
 
         // P0: 使用ImageWrapper实现零拷贝输出
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst, new Dictionary<string, object>
+        {
+            ["FilterMode"] = applied.Mode.ToString(),
+            ["DiameterRequested"] = diameter,
+            ["DiameterApplied"] = applied.Diameter,
+            ["SigmaColorApplied"] = applied.SigmaColor,
+            ["SigmaSpaceApplied"] = applied.SigmaSpace
+        })));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -80,18 +98,14 @@ public class BilateralFilterOperator : OperatorBase
         var sigmaColor = GetDoubleParam(@operator, "SigmaColor", 75.0);
         var sigmaSpace = GetDoubleParam(@operator, "SigmaSpace", 75.0);
 
-        if (diameter < 1 || diameter > 25)
-        {
-            return ValidationResult.Invalid("直径必须在 1-25 之间");
-        }
-        if (sigmaColor < 1 || sigmaColor > 255)
-        {
-            return ValidationResult.Invalid("色彩Sigma必须在 1-255 之间");
-        }
-        if (sigmaSpace < 1 || sigmaSpace > 255)
-        {
-            return ValidationResult.Invalid("空间Sigma必须在 1-255 之间");
-        }
-        return ValidationResult.Valid();
+        var settings = new SpatialFilterSettings(
+            SpatialFilterMode.Bilateral,
+            BorderType: 4,
+            Diameter: diameter,
+            SigmaColor: sigmaColor,
+            SigmaSpace: sigmaSpace);
+        return SpatialFilterKernel.TryValidate(settings, out var error)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid(error);
     }
 }

@@ -58,13 +58,17 @@ var operators = candidates
     .ToList();
 var catalogFingerprint = ComputeCatalogFingerprint(operators);
 var generatedAt = ResolveGeneratedAt(Path.Combine(docsRoot, "catalog.json"), catalogFingerprint);
+var operatorChangelogDates = ResolveOperatorChangelogDates(
+    Path.Combine(docsRoot, "version-history.json"),
+    operators,
+    generatedAt);
 var (generated, skipped) = GenerateOperatorDocuments(
     candidates,
     docsRoot,
     overwrite,
     onlyOperators,
     qualityContext,
-    generatedAt);
+    operatorChangelogDates);
 
 GenerateCatalogJson(operators, docsRoot, generatedAt, catalogFingerprint);
 GenerateCatalogMarkdown(operators, docsRoot, "./", generatedAt);
@@ -100,7 +104,7 @@ static (int generated, int skipped) GenerateOperatorDocuments(
     bool overwrite,
     IReadOnlySet<string> onlyOperators,
     QualityContext qualityContext,
-    DateTimeOffset generatedAt)
+    IReadOnlyDictionary<OperatorType, DateTimeOffset> operatorChangelogDates)
 {
     var generated = 0;
     var skipped = 0;
@@ -122,7 +126,8 @@ static (int generated, int skipped) GenerateOperatorDocuments(
             continue;
         }
 
-        File.WriteAllText(filePath, BuildDocument(item, qualityContext, generatedAt), new UTF8Encoding(false));
+        var changelogDate = operatorChangelogDates[item.OperatorType];
+        File.WriteAllText(filePath, BuildDocument(item, qualityContext, changelogDate), new UTF8Encoding(false));
         generated++;
     }
 
@@ -250,6 +255,39 @@ static DateTimeOffset ResolveGeneratedAt(string catalogPath, string generationFi
     }
 
     return DateTimeOffset.Now;
+}
+
+static IReadOnlyDictionary<OperatorType, DateTimeOffset> ResolveOperatorChangelogDates(
+    string historyPath,
+    IReadOnlyList<CatalogOperator> operators,
+    DateTimeOffset fallback)
+{
+    var historyById = LoadVersionHistory(historyPath).Operators
+        .Where(item => !string.IsNullOrWhiteSpace(item.Id))
+        .ToDictionary(item => item.Id, item => item, StringComparer.Ordinal);
+    var dates = new Dictionary<OperatorType, DateTimeOffset>();
+
+    foreach (var op in operators)
+    {
+        var recordedAt = historyById.TryGetValue(op.Id, out var entry)
+            ? entry.Records.FirstOrDefault(record =>
+                string.Equals(record.Version, op.Version, StringComparison.Ordinal) &&
+                string.Equals(record.SourceHash, op.GenerationFingerprint, StringComparison.Ordinal) &&
+                string.Equals(
+                    record.FingerprintVersion,
+                    OperatorGenerationFingerprintBuilder.SchemeVersion,
+                    StringComparison.Ordinal))?.RecordedAt
+            : null;
+        dates[Enum.Parse<OperatorType>(op.Id)] = DateTimeOffset.TryParse(
+            recordedAt,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    return dates;
 }
 
 static void GenerateCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, string docsRoot, string docLinkPrefix, DateTimeOffset generatedAt)
@@ -497,7 +535,7 @@ static OperatorType? ResolveOperatorType(Type operatorType)
 static string BuildDocument(
     OperatorDocModel item,
     QualityContext qualityContext,
-    DateTimeOffset generatedAt)
+    DateTimeOffset changelogDate)
 {
     var sb = new StringBuilder();
     var metadata = item.Metadata;
@@ -623,6 +661,41 @@ static string BuildDocument(
         }
     }
 
+    if (metadata.ImageInputContracts.Count > 0)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## 图像输入域合同 / Image Input Domain Contracts");
+        sb.AppendLine("| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |");
+        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|------|------|");
+        foreach (var contract in metadata.ImageInputContracts.OrderBy(item => item.InputPort, StringComparer.Ordinal))
+        {
+            sb.AppendLine(
+                $"| `{contract.InputPort}` | `{contract.Status}` | {EscapeCell(string.Join(", ", contract.SupportedDepths))} | {EscapeCell(string.Join(", ", contract.NativeDepths))} | {EscapeCell(string.Join(", ", contract.SupportedChannels))} | {EscapeCell(contract.InputDepthPolicy)} | {EscapeCell(contract.ImplicitConversionPolicy)} | {EscapeCell(contract.OutputDepthPolicy)} | {EscapeCell(contract.DynamicRangePolicy)} | {EscapeCell(contract.NonFinitePolicy)} | `{contract.FailureCode}` | `{contract.EvidenceLevel}` | `{contract.ContractVersion}` |");
+        }
+
+        var restrictions = metadata.ImageInputContracts
+            .SelectMany(contract => contract.ModeRestrictions.Select(rule => (contract.InputPort, Rule: rule)))
+            .ToList();
+        sb.AppendLine();
+        sb.AppendLine("### 模式限制 / Mode Restrictions");
+        sb.AppendLine("| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |");
+        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|");
+        if (restrictions.Count == 0)
+        {
+            sb.AppendLine("| - | - | - | - | - | - | - | - | - | - | - |");
+        }
+        else
+        {
+            foreach (var (inputPort, rule) in restrictions
+                         .OrderBy(item => item.InputPort, StringComparer.Ordinal)
+                         .ThenBy(item => item.Rule.Mode, StringComparer.Ordinal))
+            {
+                sb.AppendLine(
+                    $"| `{inputPort}` | {EscapeCell(rule.Mode)} | `{rule.Status}` | {EscapeCell(string.Join(", ", rule.SupportedDepths))} | {EscapeCell(string.Join(", ", rule.SupportedChannels))} | {EscapeCell(rule.ConversionPolicy)} | {EscapeCell(rule.OutputDepthPolicy)} | {EscapeCell(rule.DynamicRangePolicy)} | {EscapeCell(Fallback(rule.Condition, "-"))} | `{rule.FailureCode}` | `{rule.EvidenceLevel}` |");
+            }
+        }
+    }
+
     sb.AppendLine();
     sb.AppendLine("### 输出条件 / Output Conditions");
     sb.AppendLine("| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |");
@@ -711,7 +784,7 @@ static string BuildDocument(
     sb.AppendLine("## 变更记录 / Changelog");
     sb.AppendLine("| 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |");
     sb.AppendLine("|------|------|----------|");
-    sb.AppendLine($"| {NormalizeSemVersion(metadata.Version)} | {generatedAt:yyyy-MM-dd} | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |");
+    sb.AppendLine($"| {NormalizeSemVersion(metadata.Version)} | {changelogDate:yyyy-MM-dd} | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |");
 
     return sb.ToString();
 }
@@ -1496,6 +1569,9 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         OutputConditions = metadata.OutputAvailabilityRules
             .OrderBy(rule => rule.Output, StringComparer.Ordinal)
             .ThenBy(rule => rule.ReasonCode, StringComparer.Ordinal)
+            .ToList(),
+        ImageInputContracts = metadata.ImageInputContracts
+            .OrderBy(contract => contract.InputPort, StringComparer.Ordinal)
             .ToList(),
         ResourceRequirements = metadata.ParameterConstraints
             .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
@@ -2365,6 +2441,8 @@ internal sealed class CatalogOperator
     public List<OperatorParameterConstraint> ParameterConditions { get; set; } = new();
 
     public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
+
+    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
 
     public List<CatalogResourceRequirement> ResourceRequirements { get; set; } = new();
 

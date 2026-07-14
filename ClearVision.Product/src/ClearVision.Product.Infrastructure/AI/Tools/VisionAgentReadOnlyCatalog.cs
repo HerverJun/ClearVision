@@ -58,6 +58,7 @@ internal static class VisionAgentReadOnlyCatalog
                     parameter.Description)).ToList(),
                 item.ParameterConstraints,
                 item.OutputAvailabilityRules,
+                item.ImageInputContracts,
                 item.Metadata),
             StringComparer.OrdinalIgnoreCase);
 
@@ -144,6 +145,7 @@ internal sealed record OperatorSchemaItem(
     IReadOnlyList<OperatorParameterItem> Parameters,
     IReadOnlyList<OperatorParameterConstraint> ParameterConstraints,
     IReadOnlyList<OperatorOutputAvailabilityRule> OutputAvailabilityRules,
+    IReadOnlyList<ImageInputContract> ImageInputContracts,
     OperatorMetadata Metadata);
 
 internal sealed record OperatorParameterItem(

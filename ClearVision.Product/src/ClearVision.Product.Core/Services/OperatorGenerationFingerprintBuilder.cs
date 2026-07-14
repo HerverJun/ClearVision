@@ -114,16 +114,126 @@ public static class OperatorGenerationFingerprintBuilder
                         AvailableWhen = NormalizeConditionSet(rule.AvailableWhen),
                         rule.ReasonCode
                     }),
+                ImageInputContracts = metadata.ImageInputContracts
+                    .OrderBy(item => item.InputPort, StringComparer.Ordinal)
+                    .Select(contract => new
+                    {
+                        contract.InputPort,
+                        contract.Status,
+                        SupportedDepths = NormalizeSet(contract.SupportedDepths),
+                        SupportedChannels = contract.SupportedChannels.OrderBy(value => value),
+                        NativeDepths = NormalizeSet(contract.NativeDepths),
+                        contract.InputDepthPolicy,
+                        contract.ImplicitConversionPolicy,
+                        contract.OutputDepthPolicy,
+                        contract.DynamicRangePolicy,
+                        ModeRestrictions = contract.ModeRestrictions
+                            .OrderBy(item => item.Mode, StringComparer.Ordinal)
+                            .ThenBy(item => item.Condition, StringComparer.Ordinal)
+                            .Select(item => new
+                            {
+                                item.Mode,
+                                item.Status,
+                                SupportedDepths = NormalizeSet(item.SupportedDepths),
+                                SupportedChannels = item.SupportedChannels.OrderBy(value => value),
+                                item.ConversionPolicy,
+                                item.OutputDepthPolicy,
+                                item.DynamicRangePolicy,
+                                item.FailureCode,
+                                item.EvidenceLevel,
+                                item.Condition
+                            }),
+                        contract.NonFinitePolicy,
+                        contract.FailureCode,
+                        contract.ContractVersion,
+                        contract.EvidenceLevel
+                    }),
                 GenerationDependencies = declaredDependencies
             },
             OperatorSource = NormalizeText(operatorSource ?? string.Empty),
             DependencySources = resolvedDependencies
         };
 
-        var canonical = JsonSerializer.Serialize(snapshot, CanonicalJson);
+        var canonical = JsonSerializer.Serialize(
+            metadata.ImageInputContracts.Count == 0
+                ? BuildLegacySnapshot(metadata, operatorSource ?? string.Empty, declaredDependencies, resolvedDependencies)
+                : snapshot,
+            CanonicalJson);
         var bytes = Encoding.UTF8.GetBytes(canonical);
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
+
+    private static object BuildLegacySnapshot(
+        OperatorMetadata metadata,
+        string operatorSource,
+        IReadOnlyList<string> declaredDependencies,
+        IReadOnlyList<object> resolvedDependencies) => new
+        {
+            SchemeVersion,
+            Metadata = new
+            {
+                Type = metadata.Type.ToString(),
+                NumericType = (int)metadata.Type,
+                metadata.DisplayName,
+                metadata.Description,
+                CategoryId = metadata.CategoryId.ToString(),
+                metadata.Category,
+                Lifecycle = metadata.Lifecycle.ToString(),
+                metadata.LifecycleNote,
+                metadata.IconName,
+                Keywords = NormalizeSet(metadata.Keywords),
+                Tags = NormalizeSet(metadata.Tags),
+                metadata.Version,
+                Inputs = metadata.InputPorts.Select(port => new
+                {
+                    port.Name,
+                    port.DisplayName,
+                    DataType = port.DataType.ToString(),
+                    port.IsRequired,
+                    port.Description
+                }),
+                Outputs = metadata.OutputPorts.Select(port => new
+                {
+                    port.Name,
+                    port.DisplayName,
+                    DataType = port.DataType.ToString(),
+                    port.IsRequired,
+                    port.Description
+                }),
+                Parameters = metadata.Parameters.Select(parameter => new
+                {
+                    parameter.Name,
+                    parameter.DisplayName,
+                    parameter.Description,
+                    parameter.DataType,
+                    DefaultValue = NormalizeValue(parameter.DefaultValue),
+                    MinValue = NormalizeValue(parameter.MinValue),
+                    MaxValue = NormalizeValue(parameter.MaxValue),
+                    parameter.IsRequired,
+                    Options = parameter.Options?.Select(option => new
+                    {
+                        option.Value,
+                        option.Label
+                    })
+                }),
+                ParameterConditions = metadata.ParameterConstraints
+                    .OrderBy(item => item.Parameter, StringComparer.Ordinal)
+                    .ThenBy(item => item.ReasonCode, StringComparer.Ordinal)
+                    .Select(NormalizeConstraint),
+                OutputConditions = metadata.OutputAvailabilityRules
+                    .OrderBy(item => item.Output, StringComparer.Ordinal)
+                    .ThenBy(item => item.ReasonCode, StringComparer.Ordinal)
+                    .Select(rule => new
+                    {
+                        rule.Output,
+                        AvailableWhen = NormalizeConditionSet(rule.AvailableWhen),
+                        rule.ReasonCode
+                    }),
+                GenerationDependencies = declaredDependencies
+            },
+            OperatorSource = NormalizeText(operatorSource ?? string.Empty),
+            DependencySources = resolvedDependencies
+        };
 
     private static object NormalizeConstraint(OperatorParameterConstraint constraint) => new
     {

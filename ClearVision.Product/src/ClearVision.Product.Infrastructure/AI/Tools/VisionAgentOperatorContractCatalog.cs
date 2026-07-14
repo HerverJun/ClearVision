@@ -91,6 +91,7 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
             metadata.Parameters.Select(ToParameter).ToList(),
             metadata.ParameterConstraints.ToList(),
             metadata.OutputAvailabilityRules.ToList(),
+            metadata.ImageInputContracts.ToList(),
             (metadata.Keywords ?? Array.Empty<string>())
                 .Where(keyword => !string.IsNullOrWhiteSpace(keyword))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -151,6 +152,7 @@ internal sealed record VisionAgentOperatorContract(
     IReadOnlyList<VisionAgentParameterContract> Parameters,
     IReadOnlyList<OperatorParameterConstraint> ParameterConstraints,
     IReadOnlyList<OperatorOutputAvailabilityRule> OutputAvailabilityRules,
+    IReadOnlyList<ImageInputContract> ImageInputContracts,
     IReadOnlyList<string> Keywords,
     IReadOnlyList<string> Tags,
     OperatorMetadata Metadata);

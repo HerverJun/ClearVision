@@ -141,6 +141,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             dto.Parameters.Select(item => item.Name).Should().Equal(metadata.Parameters.Select(item => item.Name));
             dto.ParameterConstraints.Should().BeEquivalentTo(metadata.ParameterConstraints);
             dto.OutputAvailabilityRules.Should().BeEquivalentTo(metadata.OutputAvailabilityRules);
+            dto.ImageInputContracts.Should().BeEquivalentTo(metadata.ImageInputContracts);
 
             var ai = aiContracts[type];
             ai.DisplayName.Should().Be(metadata.DisplayName, type.ToString());
@@ -160,6 +161,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             ai.Parameters.Select(item => item.Name).Should().Equal(metadata.Parameters.Select(item => item.Name));
             ai.ParameterConstraints.Should().BeEquivalentTo(metadata.ParameterConstraints);
             ai.OutputAvailabilityRules.Should().BeEquivalentTo(metadata.OutputAvailabilityRules);
+            ai.ImageInputContracts.Should().BeEquivalentTo(metadata.ImageInputContracts);
 
             var schema = VisionAgentReadOnlyCatalog.Schemas[type.ToString()];
             schema.Metadata.Type.Should().Be(metadata.Type);
@@ -170,6 +172,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             schema.Parameters.Select(item => item.Name).Should().Equal(metadata.Parameters.Select(item => item.Name));
             schema.ParameterConstraints.Should().BeEquivalentTo(metadata.ParameterConstraints);
             schema.OutputAvailabilityRules.Should().BeEquivalentTo(metadata.OutputAvailabilityRules);
+            schema.ImageInputContracts.Should().BeEquivalentTo(metadata.ImageInputContracts);
         }
     }
 
@@ -463,14 +466,14 @@ public sealed class OperatorProductMetadataGovernanceTests
     }
 
     [Theory]
-    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel", OperatorType.Filtering)]
-    [InlineData("type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper", OperatorType.Measurement)]
-    [InlineData("type:ClearVision.Product.Infrastructure.Operators.DeepLearningTaskResolver", OperatorType.DeepLearning)]
-    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator", OperatorType.DeepLearning)]
-    [InlineData("type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver", OperatorType.DeepLearning)]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel", "Filtering,MedianBlur,BilateralFilter,MeanFilter")]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper", "Measurement")]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.DeepLearningTaskResolver", "DeepLearning")]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator", "DeepLearning")]
+    [InlineData("type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver", "DeepLearning")]
     public void SharedDependencyChange_ShouldOnlyAffectExplicitlyDependentOperatorFingerprints(
         string dependencyId,
-        OperatorType expectedOperator)
+        string expectedOperators)
     {
         var metadata = new OperatorFactory().GetAllMetadata().OrderBy(item => item.Type).ToList();
         var dependencySources = metadata
@@ -501,7 +504,8 @@ public sealed class OperatorProductMetadataGovernanceTests
             .Select(item => item.Type)
             .ToList();
 
-        explicitlyDependentOperators.Should().Equal(expectedOperator);
+        explicitlyDependentOperators.Should().Equal(
+            expectedOperators.Split(',').Select(Enum.Parse<OperatorType>));
         changedOperators.Should().Equal(explicitlyDependentOperators);
     }
 
@@ -579,6 +583,7 @@ public sealed class OperatorProductMetadataGovernanceTests
                     .Should().Equal(metadata.Parameters.Select(parameter => parameter.Name), path);
                 item.GetProperty("parameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
                 item.GetProperty("outputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
+                item.GetProperty("imageInputContracts").GetArrayLength().Should().Be(metadata.ImageInputContracts.Count, path);
                 item.GetProperty("generationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
                 item.GetProperty("generationFingerprint").GetString().Should().NotBeNullOrWhiteSpace(path);
             }
@@ -642,6 +647,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             card.GetProperty("DefaultHidden").GetBoolean().Should().Be(metadata.DefaultHidden, path);
             card.GetProperty("ParameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
             card.GetProperty("OutputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
+            card.GetProperty("ImageInputContracts").GetArrayLength().Should().Be(metadata.ImageInputContracts.Count, path);
             card.GetProperty("GenerationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
             card.GetProperty("GenerationFingerprint").GetString().Should().Be(expectedFingerprints[operatorType], path);
         }

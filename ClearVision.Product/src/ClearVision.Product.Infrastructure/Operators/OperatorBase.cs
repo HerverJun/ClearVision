@@ -94,6 +94,19 @@ public abstract class OperatorBase : IOperatorExecutor
             // Check cancellation before executing core logic.
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!ImageInputRuntimeContractEvaluator.TryValidate(
+                    GetType(),
+                    OperatorType,
+                    @operator,
+                    inputs,
+                    out var imageContractError))
+            {
+                stopwatch.Stop();
+                var failure = OperatorExecutionOutput.Failure(imageContractError);
+                failure.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
+                return failure;
+            }
+
             // 执行核心逻辑
             var result = await ExecuteCoreAsync(@operator, inputs, cancellationToken);
             stopwatch.Stop();
@@ -123,6 +136,17 @@ public abstract class OperatorBase : IOperatorExecutor
                 "[{OperatorType}] 执行被取消, 算子ID={OperatorId}, 耗时={ElapsedMs}ms",
                 OperatorType, @operator.Id, stopwatch.ElapsedMilliseconds);
             throw;
+        }
+        catch (OpenCVException ex)
+        {
+            stopwatch.Stop();
+            Logger.LogError(ex,
+                "[{OperatorType}] OpenCV execution failure, 算子ID={OperatorId}, 耗时={ElapsedMs}ms",
+                OperatorType, @operator.Id, stopwatch.ElapsedMilliseconds);
+
+            return OperatorExecutionOutput.Failure(
+                $"IMAGE_RUNTIME_FAILURE: OperatorType={OperatorType}; ExceptionType={ex.GetType().Name}; " +
+                "Diagnostic=OpenCV rejected an input combination that was not admitted by the product contract.");
         }
         catch (Exception ex)
         {
