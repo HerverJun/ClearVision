@@ -10,6 +10,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Services;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class InspectionResultBackgroundServiceConcurrencyCollection
+{
+    public const string Name = "Inspection result background service concurrency";
+}
+
+[Collection(InspectionResultBackgroundServiceConcurrencyCollection.Name)]
 public sealed class InspectionResultBackgroundServiceTests
 {
     [Fact]
