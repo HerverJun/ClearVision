@@ -51,7 +51,7 @@ public class CoreOperatorContractTests
     }
 
     [Fact]
-    public async Task MeanFilterOperator_WithEvenKernel_ForcesOddBlurKernel()
+    public async Task MeanFilterOperator_WithEvenKernel_PreservesEvenBoxKernel()
     {
         using var source = new Mat(5, 5, MatType.CV_8UC1, Scalar.Black);
         source.Set(2, 2, 255);
@@ -69,7 +69,7 @@ public class CoreOperatorContractTests
         var output = result.OutputData!;
         using var outputImage = Assert.IsType<ImageWrapper>(output["Image"]);
         var center = outputImage.GetMat().At<byte>(2, 2);
-        Assert.InRange(center, 27, 29);
+        Assert.Equal(64, center);
     }
 
     [Theory]

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-14T15:07:23.3198726\u002B08:00",
+  "generatedAt": "2026-07-14T19:47:48.6428823\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -5755,6 +5755,12 @@
           "sourceHash": "0D788CB2E0E5DE7D7E952AFDA3BEB84969BA2AE93F67BC21D868CAEAF430C0A3",
           "fingerprintVersion": "operator-runtime-metadata-v2",
           "recordedAt": "2026-07-14T15:07:23.3198726\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "48E61F15938AC60A50512A10475A28AB7621D37629DBB0668FA5729510467E85",
+          "fingerprintVersion": "operator-runtime-metadata-v2",
+          "recordedAt": "2026-07-14T19:30:44.4677421\u002B08:00"
         }
       ]
     },
@@ -6376,6 +6382,12 @@
           "sourceHash": "8FE92DA154052AD1C9C52C482946198BF981A5C45B66ED6BB7531CDD6B875127",
           "fingerprintVersion": "operator-runtime-metadata-v2",
           "recordedAt": "2026-07-14T15:07:23.3198726\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "013E6A13462C4C1E4D05778410E39159323F3AFF3C7F43B19CD45B9265AB7B7D",
+          "fingerprintVersion": "operator-runtime-metadata-v2",
+          "recordedAt": "2026-07-14T19:47:48.6428823\u002B08:00"
         }
       ]
     },

@@ -23,7 +23,7 @@ namespace ClearVision.Product.Tests.Services;
 
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "5B3C32A9AE36014FF5B402488C7F80D2B40B65B8D6A52F19DDAA37BB3D3C9A8A";
+    private const string ExpectedIdentityHash = "BBAC47F5DF83110BDE52DDA64C01F7335377D9DFCEB17D2B78A8A77F5262A14F";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =

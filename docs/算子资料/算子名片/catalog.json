@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-14T15:07:23.3198726+08:00",
-  "generationFingerprint": "E15A33BC71B3DF17E556E2D2520B43ACC83EE430A9D3E6E5861A3E7D67D5C3DE",
+  "generatedAt": "2026-07-14T19:47:48.6428823+08:00",
+  "generationFingerprint": "2E8800589719796D9B540D62C4D86BBF5460AB1DBF5F1DAF77F1273647D20E16",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -2895,7 +2895,7 @@
       "id": "ImageNormalize",
       "type": 202,
       "displayName": "图像归一化",
-      "description": "归一化像素分布，以提升下游处理稳定性。",
+      "description": "MinMax 映射像素范围；ZScore 返回均值约 0、总体标准差约 1 的浮点标准分。",
       "categoryId": "ImagePreprocessing",
       "categoryOrder": 2,
       "category": "图像预处理",
@@ -2904,20 +2904,21 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "equalize",
         "minmax",
         "normalize",
+        "standard score",
         "zscore"
       ],
       "tags": [
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子用于归一化像素分布，以提升下游处理稳定性。运行时从声明输入端口读取数据，按参数…",
+      "algorithm": "MinMax range normalization / floating ZScore standardization / histogram equalization",
       "inputPorts": [
         {
           "name": "Image",
@@ -2932,6 +2933,36 @@
           "displayName": "Image",
           "dataType": "Image",
           "isRequired": false
+        },
+        {
+          "name": "Method",
+          "displayName": "实际归一化方法",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "ColorMode",
+          "displayName": "实际颜色模式",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "Channels",
+          "displayName": "输出通道数",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "OutputMatType",
+          "displayName": "输出 Mat 类型",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "SigmaDegenerate",
+          "displayName": "标准差退化",
+          "dataType": "Boolean",
+          "isRequired": false
         }
       ],
       "parameters": [
@@ -2939,7 +2970,7 @@
           "name": "Method",
           "displayName": "方法",
           "dataType": "enum",
-          "description": "",
+          "description": "MinMax 按目标范围映射；ZScore 返回浮点标准分；Histogram 执行 8 位直方图均衡。",
           "defaultValue": "MinMax",
           "min": null,
           "max": null,
@@ -2963,10 +2994,10 @@
           "name": "Alpha",
           "displayName": "Alpha",
           "dataType": "double",
-          "description": "",
+          "description": "仅用于 MinMax 的目标下界。",
           "defaultValue": "0",
-          "min": null,
-          "max": null,
+          "min": "-10000",
+          "max": "10000",
           "isRequired": true,
           "options": null
         },
@@ -2974,10 +3005,10 @@
           "name": "Beta",
           "displayName": "Beta系数",
           "dataType": "double",
-          "description": "",
+          "description": "仅用于 MinMax 的目标上界。",
           "defaultValue": "255",
-          "min": null,
-          "max": null,
+          "min": "-10000",
+          "max": "10000",
           "isRequired": true,
           "options": null
         },
@@ -2985,7 +3016,7 @@
           "name": "ColorMode",
           "displayName": "Color Mode",
           "dataType": "enum",
-          "description": "",
+          "description": "PerChannel 独立处理三个颜色通道；彩色 ZScore 不支持 LumaOnly，需显式选择 PerChannel。",
           "defaultValue": "LumaOnly",
           "min": null,
           "max": null,
@@ -3002,19 +3033,173 @@
           ]
         }
       ],
-      "parameterConditions": [],
-      "outputConditions": [],
+      "parameterConditions": [
+        {
+          "parameter": "Alpha",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Beta",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Method",
+                "comparison": "not-equals",
+                "value": "MinMax"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "ColorMode",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "IMAGE_NORMALIZE_COLOR_MODE",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Method",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "IMAGE_NORMALIZE_METHOD",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        }
+      ],
+      "outputConditions": [
+        {
+          "output": "Channels",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        },
+        {
+          "output": "ColorMode",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        },
+        {
+          "output": "Image",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        },
+        {
+          "output": "Method",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        },
+        {
+          "output": "OutputMatType",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        },
+        {
+          "output": "SigmaDegenerate",
+          "availableWhen": null,
+          "reasonCode": "IMAGE_NORMALIZE_OUTPUT"
+        }
+      ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "0D788CB2E0E5DE7D7E952AFDA3BEB84969BA2AE93F67BC21D868CAEAF430C0A3",
+      "generationFingerprint": "48E61F15938AC60A50512A10475A28AB7621D37629DBB0668FA5729510467E85",
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ImageNormalize.md"
     },
@@ -3703,7 +3888,7 @@
       "id": "LaplacianSharpen",
       "type": 74,
       "displayName": "拉普拉斯锐化",
-      "description": "基于拉普拉斯算子的边缘增强",
+      "description": "在浮点域保留拉普拉斯响应符号，并按 dst = src - strength × laplacian 锐化。",
       "categoryId": "ImagePreprocessing",
       "categoryOrder": 2,
       "category": "图像预处理",
@@ -3712,15 +3897,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
-      "version": "1.0.0",
-      "keywords": [],
+      "version": "1.0.2",
+      "keywords": [
+        "edge enhancement",
+        "laplacian",
+        "sharpen",
+        "signed response"
+      ],
       "tags": [
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子用于基于拉普拉斯算子的边缘增强。运行时从声明输入端口读取数据，按参数表解析配置…",
+      "algorithm": "Signed Laplacian sharpening",
       "inputPorts": [
         {
           "name": "Image",
@@ -3735,6 +3925,36 @@
           "displayName": "锐化图像",
           "dataType": "Image",
           "isRequired": false
+        },
+        {
+          "name": "KernelSize",
+          "displayName": "实际核大小",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "Scale",
+          "displayName": "实际拉普拉斯缩放",
+          "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "SharpenStrength",
+          "displayName": "实际锐化强度",
+          "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "OutputMatType",
+          "displayName": "输出 Mat 类型",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "ColorPolicy",
+          "displayName": "彩色图策略",
+          "dataType": "String",
+          "isRequired": false
         }
       ],
       "parameters": [
@@ -3742,7 +3962,7 @@
           "name": "KernelSize",
           "displayName": "核大小",
           "dataType": "int",
-          "description": "必须是奇数",
+          "description": "范围 1-7；偶数按兼容规则向上规范化为下一奇数，并在输出元数据返回实际值。",
           "defaultValue": "3",
           "min": "1",
           "max": "7",
@@ -3753,7 +3973,7 @@
           "name": "Scale",
           "displayName": "缩放因子",
           "dataType": "double",
-          "description": "",
+          "description": "缩放有符号 Laplacian 响应。",
           "defaultValue": "1",
           "min": "0.1",
           "max": "10",
@@ -3764,7 +3984,7 @@
           "name": "SharpenStrength",
           "displayName": "锐化强度",
           "dataType": "double",
-          "description": "",
+          "description": "公式 dst = src - SharpenStrength × laplacian；0 为严格恒等。",
           "defaultValue": "1",
           "min": "0",
           "max": "5",
@@ -3772,19 +3992,102 @@
           "options": null
         }
       ],
-      "parameterConditions": [],
-      "outputConditions": [],
+      "parameterConditions": [
+        {
+          "parameter": "KernelSize",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "LAPLACIAN_KERNEL_SIZE",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Scale",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "LAPLACIAN_SCALE",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "SharpenStrength",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_STRENGTH",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        }
+      ],
+      "outputConditions": [
+        {
+          "output": "ColorPolicy",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        },
+        {
+          "output": "Image",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        },
+        {
+          "output": "KernelSize",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        },
+        {
+          "output": "OutputMatType",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        },
+        {
+          "output": "Scale",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        },
+        {
+          "output": "SharpenStrength",
+          "availableWhen": null,
+          "reasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+        }
+      ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "8FE92DA154052AD1C9C52C482946198BF981A5C45B66ED6BB7531CDD6B875127",
+      "generationFingerprint": "013E6A13462C4C1E4D05778410E39159323F3AFF3C7F43B19CD45B9265AB7B7D",
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/LaplacianSharpen.md"
     },

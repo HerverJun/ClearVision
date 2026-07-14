@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-14 15:07:23 +08:00`
+> 生成时间 / Generated At: `2026-07-14 19:47:48 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -21,14 +21,14 @@
 | `OperatorType.ImageBlend` | 图像融合 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageCompose` | 图像组合 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageCrop` | 图像裁剪 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
-| `OperatorType.ImageNormalize` | 图像归一化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
+| `OperatorType.ImageNormalize` | 图像归一化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.1` |
 | `OperatorType.ImageResize` | 图像缩放 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageRotate` | 图像旋转 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageStitching` | 图像拼接 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageSubtract` | 图像减法 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.ImageTiling` | 图像切片 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.InverseFFT1D` | 信号/图像逆傅里叶变换（IFFT） | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
-| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
+| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.2` |
 | `OperatorType.MeanFilter` | 均值滤波 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.MedianBlur` | 中值滤波 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.PerspectiveTransform` | 透视变换 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
@@ -1286,6 +1286,7 @@
 ### OperatorType.ImageNormalize / 图像归一化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-07-14T19:30:44.4677421+08:00` | `48E61F15938A` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `0D788CB2E0E5` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `7FEB76F136A6` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -1418,6 +1419,7 @@
 ### OperatorType.LaplacianSharpen / 拉普拉斯锐化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-07-14T19:47:48.6428823+08:00` | `013E6A13462C` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `8FE92DA15405` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `34AD327F6589` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |

@@ -15331,6 +15331,7 @@
       "normalize",
       "minmax",
       "zscore",
+      "standard score",
       "equalize"
     ],
     "IntentTags": [
@@ -15355,6 +15356,41 @@
         "DataType": "Image",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "Method",
+        "DisplayName": "\u5B9E\u9645\u5F52\u4E00\u5316\u65B9\u6CD5",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "ColorMode",
+        "DisplayName": "\u5B9E\u9645\u989C\u8272\u6A21\u5F0F",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Channels",
+        "DisplayName": "\u8F93\u51FA\u901A\u9053\u6570",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "OutputMatType",
+        "DisplayName": "\u8F93\u51FA Mat \u7C7B\u578B",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "SigmaDegenerate",
+        "DisplayName": "\u6807\u51C6\u5DEE\u9000\u5316",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -15362,7 +15398,7 @@
         "Name": "Method",
         "DisplayName": "\u65B9\u6CD5",
         "DataType": "enum",
-        "Description": "",
+        "Description": "MinMax \u6309\u76EE\u6807\u8303\u56F4\u6620\u5C04\uFF1BZScore \u8FD4\u56DE\u6D6E\u70B9\u6807\u51C6\u5206\uFF1BHistogram \u6267\u884C 8 \u4F4D\u76F4\u65B9\u56FE\u5747\u8861\u3002",
         "DefaultValue": "MinMax",
         "MinValue": null,
         "MaxValue": null,
@@ -15377,10 +15413,10 @@
         "Name": "Alpha",
         "DisplayName": "Alpha",
         "DataType": "double",
-        "Description": "",
+        "Description": "\u4EC5\u7528\u4E8E MinMax \u7684\u76EE\u6807\u4E0B\u754C\u3002",
         "DefaultValue": "0",
-        "MinValue": null,
-        "MaxValue": null,
+        "MinValue": "-10000",
+        "MaxValue": "10000",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -15388,10 +15424,10 @@
         "Name": "Beta",
         "DisplayName": "Beta\u7CFB\u6570",
         "DataType": "double",
-        "Description": "",
+        "Description": "\u4EC5\u7528\u4E8E MinMax \u7684\u76EE\u6807\u4E0A\u754C\u3002",
         "DefaultValue": "255",
-        "MinValue": null,
-        "MaxValue": null,
+        "MinValue": "-10000",
+        "MaxValue": "10000",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -15399,7 +15435,7 @@
         "Name": "ColorMode",
         "DisplayName": "Color Mode",
         "DataType": "enum",
-        "Description": "",
+        "Description": "PerChannel \u72EC\u7ACB\u5904\u7406\u4E09\u4E2A\u989C\u8272\u901A\u9053\uFF1B\u5F69\u8272 ZScore \u4E0D\u652F\u6301 LumaOnly\uFF0C\u9700\u663E\u5F0F\u9009\u62E9 PerChannel\u3002",
         "DefaultValue": "LumaOnly",
         "MinValue": null,
         "MaxValue": null,
@@ -15410,11 +15446,165 @@
         ]
       }
     ],
-    "ParameterConditions": [],
-    "OutputConditions": [],
+    "ParameterConditions": [
+      {
+        "Parameter": "Method",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "IMAGE_NORMALIZE_METHOD",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Alpha",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Beta",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "IMAGE_NORMALIZE_RANGE_ONLY_FOR_MINMAX",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Method",
+              "Comparison": "not-equals",
+              "Value": "MinMax"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "ColorMode",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "IMAGE_NORMALIZE_COLOR_MODE",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      }
+    ],
+    "OutputConditions": [
+      {
+        "Output": "Image",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      },
+      {
+        "Output": "Method",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      },
+      {
+        "Output": "ColorMode",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      },
+      {
+        "Output": "Channels",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      },
+      {
+        "Output": "OutputMatType",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      },
+      {
+        "Output": "SigmaDegenerate",
+        "AvailableWhen": null,
+        "ReasonCode": "IMAGE_NORMALIZE_OUTPUT"
+      }
+    ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "0D788CB2E0E5DE7D7E952AFDA3BEB84969BA2AE93F67BC21D868CAEAF430C0A3",
+    "GenerationFingerprint": "48E61F15938AC60A50512A10475A28AB7621D37629DBB0668FA5729510467E85",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -16508,7 +16698,11 @@
     "RequiresLifecycleDisclosure": false,
     "Aliases": [
       "\u62C9\u666E\u62C9\u65AF\u9510\u5316",
-      "LaplacianSharpen"
+      "LaplacianSharpen",
+      "laplacian",
+      "sharpen",
+      "signed response",
+      "edge enhancement"
     ],
     "IntentTags": [
       "preprocess"
@@ -16532,6 +16726,41 @@
         "DataType": "Image",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "KernelSize",
+        "DisplayName": "\u5B9E\u9645\u6838\u5927\u5C0F",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Scale",
+        "DisplayName": "\u5B9E\u9645\u62C9\u666E\u62C9\u65AF\u7F29\u653E",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "SharpenStrength",
+        "DisplayName": "\u5B9E\u9645\u9510\u5316\u5F3A\u5EA6",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "OutputMatType",
+        "DisplayName": "\u8F93\u51FA Mat \u7C7B\u578B",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "ColorPolicy",
+        "DisplayName": "\u5F69\u8272\u56FE\u7B56\u7565",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -16539,7 +16768,7 @@
         "Name": "KernelSize",
         "DisplayName": "\u6838\u5927\u5C0F",
         "DataType": "int",
-        "Description": "\u5FC5\u987B\u662F\u5947\u6570",
+        "Description": "\u8303\u56F4 1-7\uFF1B\u5076\u6570\u6309\u517C\u5BB9\u89C4\u5219\u5411\u4E0A\u89C4\u8303\u5316\u4E3A\u4E0B\u4E00\u5947\u6570\uFF0C\u5E76\u5728\u8F93\u51FA\u5143\u6570\u636E\u8FD4\u56DE\u5B9E\u9645\u503C\u3002",
         "DefaultValue": "3",
         "MinValue": "1",
         "MaxValue": "7",
@@ -16550,7 +16779,7 @@
         "Name": "Scale",
         "DisplayName": "\u7F29\u653E\u56E0\u5B50",
         "DataType": "double",
-        "Description": "",
+        "Description": "\u7F29\u653E\u6709\u7B26\u53F7 Laplacian \u54CD\u5E94\u3002",
         "DefaultValue": "1",
         "MinValue": "0.1",
         "MaxValue": "10",
@@ -16561,7 +16790,7 @@
         "Name": "SharpenStrength",
         "DisplayName": "\u9510\u5316\u5F3A\u5EA6",
         "DataType": "double",
-        "Description": "",
+        "Description": "\u516C\u5F0F dst = src - SharpenStrength \u00D7 laplacian\uFF1B0 \u4E3A\u4E25\u683C\u6052\u7B49\u3002",
         "DefaultValue": "1",
         "MinValue": "0",
         "MaxValue": "5",
@@ -16569,11 +16798,94 @@
         "AllowedValues": []
       }
     ],
-    "ParameterConditions": [],
-    "OutputConditions": [],
+    "ParameterConditions": [
+      {
+        "Parameter": "KernelSize",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "LAPLACIAN_KERNEL_SIZE",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Scale",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "LAPLACIAN_SCALE",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "SharpenStrength",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_STRENGTH",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      }
+    ],
+    "OutputConditions": [
+      {
+        "Output": "Image",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      },
+      {
+        "Output": "KernelSize",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      },
+      {
+        "Output": "Scale",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      },
+      {
+        "Output": "SharpenStrength",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      },
+      {
+        "Output": "OutputMatType",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      },
+      {
+        "Output": "ColorPolicy",
+        "AvailableWhen": null,
+        "ReasonCode": "LAPLACIAN_SHARPEN_OUTPUT"
+      }
+    ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "8FE92DA154052AD1C9C52C482946198BF981A5C45B66ED6BB7531CDD6B875127",
+    "GenerationFingerprint": "013E6A13462C4C1E4D05778410E39159323F3AFF3C7F43B19CD45B9265AB7B7D",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],

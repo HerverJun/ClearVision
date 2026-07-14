@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-14 15:07:23 +08:00`
+> 生成时间 / Generated At: `2026-07-14 19:47:48 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -52,14 +52,14 @@
 | `OperatorType.ImageBlend` | 图像融合 | `Stable` | 2 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageBlend](./ImageBlend.md) |
 | `OperatorType.ImageCompose` | 图像组合 | `Stable` | 4 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于通过拼接、网格或通道合并方式组合多张图像。运行时从声明输入端口读取数据，按… | [ImageCompose](./ImageCompose.md) |
 | `OperatorType.ImageCrop` | 图像裁剪 | `Stable` | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于ROI区域提取。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [ImageCrop](./ImageCrop.md) |
-| `OperatorType.ImageNormalize` | 图像归一化 | `Stable` | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于归一化像素分布，以提升下游处理稳定性。运行时从声明输入端口读取数据，按参数… | [ImageNormalize](./ImageNormalize.md) |
+| `OperatorType.ImageNormalize` | 图像归一化 | `Stable` | 1 | 6 | 4 | 96 (A) | `1.0.1` | MinMax range normalization / floating ZScore standardization / histogram equalization | [ImageNormalize](./ImageNormalize.md) |
 | `OperatorType.ImageResize` | 图像缩放 | `Stable` | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于调整图像尺寸。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageResize](./ImageResize.md) |
 | `OperatorType.ImageRotate` | 图像旋转 | `Stable` | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于任意角度旋转。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageRotate](./ImageRotate.md) |
 | `OperatorType.ImageStitching` | 图像拼接 | `Stable` | 2 | 2 | 3 | 94 (A) | `1.0.0` | 该算子用于将两张图像拼接成更大的全景式输出。运行时从声明输入端口读取数据，按参数表解… | [ImageStitching](./ImageStitching.md) |
 | `OperatorType.ImageSubtract` | 图像减法 | `Stable` | 2 | 4 | 1 | 89 (A) | `1.0.0` | 该算子用于计算两张图像的相减结果或绝对差值。运行时从声明输入端口读取数据，按参数表解… | [ImageSubtract](./ImageSubtract.md) |
 | `OperatorType.ImageTiling` | 图像切片 | `Stable` | 1 | 3 | 4 | 94 (A) | `1.0.0` | 该算子用于将图像切分为可选重叠的分块区域。运行时从声明输入端口读取数据，按参数表解析… | [ImageTiling](./ImageTiling.md) |
 | `OperatorType.InverseFFT1D` | 信号/图像逆傅里叶变换（IFFT） | `Stable` | 2 | 4 | 0 | 89 (A) | `1.0.0` | 该算子用于对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信… | [InverseFFT1D](./InverseFFT1D.md) |
-| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `Stable` | 1 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于基于拉普拉斯算子的边缘增强。运行时从声明输入端口读取数据，按参数表解析配置… | [LaplacianSharpen](./LaplacianSharpen.md) |
+| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | `Stable` | 1 | 6 | 3 | 96 (A) | `1.0.2` | Signed Laplacian sharpening | [LaplacianSharpen](./LaplacianSharpen.md) |
 | `OperatorType.MeanFilter` | 均值滤波 | `Stable` | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子用于使用均值（方框）滤波平滑图像噪声。运行时从声明输入端口读取数据，按参数表解… | [MeanFilter](./MeanFilter.md) |
 | `OperatorType.MedianBlur` | 中值滤波 | `Stable` | 1 | 1 | 1 | 94 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
 | `OperatorType.PerspectiveTransform` | 透视变换 | `Stable` | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./PerspectiveTransform.md) |
