@@ -22,6 +22,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "semantic segmentation", "segmentation", "onnx", "mask", "语义分割" },
     Version = "1.0.0"
 )]
+[OperatorParameterRule("ModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "semantic-segmentation-model-source", MutuallyExclusiveGroup = "semantic-segmentation-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelId", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "semantic-segmentation-model-source", MutuallyExclusiveGroup = "semantic-segmentation-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelCatalogPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAny = new[] { "ModelId:empty", "ModelPath:not-empty" },
+    ResourceKind = OperatorResourceKind.ModelCatalog, ReasonCode = "SEMANTIC_SEGMENTATION_CATALOG_REQUIRES_MODEL_ID")]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("SegmentationMap", "Segmentation Map", PortDataType.Image)]
 [OutputPort("ColoredMap", "Colored Map", PortDataType.Image)]

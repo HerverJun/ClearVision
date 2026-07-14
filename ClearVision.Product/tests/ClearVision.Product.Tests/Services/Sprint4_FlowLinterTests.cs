@@ -86,6 +86,51 @@ public class Sprint4_FlowLinterTests
         Assert.Throws<InvalidOperationException>(() => flow.AddConnection(conn));
     }
 
+    [Fact]
+    public void FlowLinter_Struct_006_UnavailableModeOutput_ReturnsErrorUsingHistoricalDefault()
+    {
+        var factory = new OperatorFactory();
+        var source = factory.CreateOperator(OperatorType.Measurement, "Measurement", 0, 0);
+        source.Parameters.RemoveAll(parameter => parameter.Name.Equals("MeasureType", StringComparison.OrdinalIgnoreCase));
+        var anglePort = source.OutputPorts.Single(port => port.Name == "Angle");
+
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultOutput, 100, 0);
+        target.LoadInputPort(Guid.NewGuid(), "Input", PortDataType.Any, true);
+
+        var flow = new OperatorFlow("ModeOutputFlow");
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, anglePort.Id, target.Id, target.InputPorts.Single().Id));
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().Contain(issue =>
+            issue.Code == "STRUCT_006" &&
+            issue.OperatorId == source.Id &&
+            issue.Message.Contains("Angle", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FlowLinter_Struct_006_AvailableModeOutput_DoesNotReturnError()
+    {
+        var factory = new OperatorFactory();
+        var source = factory.CreateOperator(OperatorType.Measurement, "Measurement", 0, 0);
+        source.UpdateParameter("MeasureType", "ThreePointAngle");
+        var anglePort = source.OutputPorts.Single(port => port.Name == "Angle");
+
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultOutput, 100, 0);
+        target.LoadInputPort(Guid.NewGuid(), "Input", PortDataType.Any, true);
+
+        var flow = new OperatorFlow("ModeOutputFlow");
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, anglePort.Id, target.Id, target.InputPorts.Single().Id));
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().NotContain(issue => issue.Code == "STRUCT_006");
+    }
+
     #endregion
 
     #region 第二层：语义安全

@@ -78,6 +78,41 @@ public class OperatorServiceTests
     }
 
     [Fact]
+    public async Task ValidateParametersAsync_CameraSource_ShouldIgnoreFileOnlyRequirement()
+    {
+        var sut = CreateSut();
+        var metadata = await sut.GetMetadataAsync(OperatorType.ImageAcquisition);
+
+        var result = await sut.ValidateParametersAsync(metadata!.Id, new Dictionary<string, object>
+        {
+            ["SourceType"] = "Camera",
+            ["CameraId"] = "camera-fixture",
+            ["FilePath"] = string.Empty
+        });
+
+        result.IsValid.Should().BeTrue(string.Join(Environment.NewLine, result.Errors));
+        result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateParametersAsync_FileSourceWithoutPath_ShouldExposeSharedRuleReason()
+    {
+        var sut = CreateSut();
+        var metadata = await sut.GetMetadataAsync(OperatorType.ImageAcquisition);
+
+        var result = await sut.ValidateParametersAsync(metadata!.Id, new Dictionary<string, object>
+        {
+            ["SourceType"] = "File",
+            ["FilePath"] = string.Empty,
+            ["CameraId"] = string.Empty
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(error =>
+            error.Contains("IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenParameterIsInvalid_ShouldLogWarningAndContinue()
     {
         var repository = Substitute.For<IOperatorRepository>();

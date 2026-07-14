@@ -513,60 +513,12 @@ public sealed class RuntimePackageExporter
         var order = 10;
         foreach (var op in flow.Operators)
         {
-            if (op.Type != OperatorType.DeepLearning || !MayResolveToObjectDetection(op))
-            {
-                continue;
-            }
-
-            var confidence = FindParameter(op, "Confidence");
-            if (confidence == null)
-            {
-                continue;
-            }
-
-            var defaultValue = TryReadDouble(confidence.Value, out var value)
-                ? value
-                : (TryReadDouble(confidence.DefaultValue, out var fallback) ? fallback : 0.5d);
-            var min = TryReadDouble(confidence.MinValue, out var minValue) ? minValue : 0.0d;
-            var max = TryReadDouble(confidence.MaxValue, out var maxValue) ? maxValue : 1.0d;
-            var displayName = !string.IsNullOrWhiteSpace(confidence.DisplayName)
-                ? confidence.DisplayName.Trim()
-                : (!string.IsNullOrWhiteSpace(op.Name) ? $"{op.Name.Trim()}置信度" : "检测置信度");
-
-            schema.Parameters.Add(new RuntimeParameterDefinition
-            {
-                Id = BuildParameterId(op.Id, confidence.Name),
-                OperatorId = op.Id,
-                OperatorName = op.Name,
-                OperatorType = op.Type.ToString(),
-                ParameterName = confidence.Name,
-                DisplayName = displayName,
-                Description = string.IsNullOrWhiteSpace(confidence.Description)
-                    ? "低于该置信度的检测结果不参与判定。"
-                    : confidence.Description,
-                GroupName = "现场参数",
-                ValueType = RuntimeParameterValueType.Number,
-                UiKind = RuntimeParameterUiKind.NumericInput,
-                DefaultValue = JsonSerializer.SerializeToElement(defaultValue, RuntimeJson.SerializerOptions),
-                Min = min,
-                Max = max,
-                Step = 0.01d,
-                SiteTunable = true,
-                RequiresEngineerMode = true,
-                ApplyMode = RuntimeParameterApplyMode.NextRun,
-                Order = order
-            });
-            order += 10;
-        }
-
-        foreach (var op in flow.Operators)
-        {
             if (!op.IsEnabled)
             {
                 continue;
             }
 
-            var disabledParameters = ResolveDisabledRuntimeParameters(op);
+            var inactiveParameters = ResolveInactiveRuntimeParameters(op);
 
             foreach (var parameter in op.Parameters)
             {
@@ -579,7 +531,7 @@ public sealed class RuntimePackageExporter
                 if (!TryBuildRuntimeParameterDefinition(
                         op,
                         parameter,
-                        disabledParameters,
+                        inactiveParameters,
                         order,
                         out var definition))
                 {
@@ -597,12 +549,12 @@ public sealed class RuntimePackageExporter
     private static bool TryBuildRuntimeParameterDefinition(
         OperatorDto op,
         ParameterDto parameter,
-        IReadOnlySet<string> disabledParameters,
+        IReadOnlySet<string> inactiveParameters,
         int order,
         out RuntimeParameterDefinition definition)
     {
         definition = null!;
-        if (!ShouldExposeRuntimeParameter(op, parameter, disabledParameters))
+        if (!ShouldExposeRuntimeParameter(op, parameter, inactiveParameters))
         {
             return false;
         }
@@ -648,10 +600,10 @@ public sealed class RuntimePackageExporter
     private static bool ShouldExposeRuntimeParameter(
         OperatorDto op,
         ParameterDto parameter,
-        IReadOnlySet<string> disabledParameters)
+        IReadOnlySet<string> inactiveParameters)
     {
         if (!op.IsEnabled ||
-            disabledParameters.Contains(parameter.Name) ||
+            inactiveParameters.Contains(parameter.Name) ||
             string.IsNullOrWhiteSpace(parameter.Name) ||
             LooksLikeFileParameter(parameter) ||
             LooksLikeSecretParameter(parameter) ||
@@ -677,7 +629,7 @@ public sealed class RuntimePackageExporter
                LooksLikeByteThresholdParameter(parameter.Name);
     }
 
-    private IReadOnlySet<string> ResolveDisabledRuntimeParameters(OperatorDto op)
+    private IReadOnlySet<string> ResolveInactiveRuntimeParameters(OperatorDto op)
     {
         var metadata = _operatorFactory.GetMetadata(op.Type);
         if (metadata == null || metadata.ParameterConstraints.Count == 0)
@@ -692,8 +644,9 @@ public sealed class RuntimePackageExporter
                 group => group.First().Value,
                 StringComparer.OrdinalIgnoreCase);
 
-        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
-            .Where(state => state.EffectiveDisabled)
+        var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values, explicitNames)
+            .Where(state => state.EffectiveDisabled || state.EffectiveIgnored)
             .Select(state => state.Constraint.Parameter)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
@@ -807,7 +760,7 @@ public sealed class RuntimePackageExporter
             ?? throw new RuntimePackageException("Unable to clone flow for runtime packaging.");
     }
 
-    private static async Task<IReadOnlyList<RuntimeBundledAsset>> BundleFlowResourcesAsync(
+    private async Task<IReadOnlyList<RuntimeBundledAsset>> BundleFlowResourcesAsync(
         OperatorFlowDto flow,
         string packageRoot,
         CancellationToken cancellationToken)
@@ -817,13 +770,15 @@ public sealed class RuntimePackageExporter
 
         foreach (var op in flow.Operators)
         {
+            var inactiveParameters = ResolveInactiveRuntimeParameters(op);
             var originalDeepLearningModelPath = op.Type == OperatorType.DeepLearning
                 ? NormalizeScalar(FindParameter(op, "ModelPath")?.Value)
                 : null;
 
             foreach (var parameter in op.Parameters)
             {
-                if (!LooksLikeFileParameter(parameter))
+                if (inactiveParameters.Contains(parameter.Name) ||
+                    !LooksLikeFileParameter(parameter))
                 {
                     continue;
                 }
@@ -881,7 +836,7 @@ public sealed class RuntimePackageExporter
         }
     }
 
-    private static async Task BundleDeepLearningAutoLabelsAsync(
+    private async Task BundleDeepLearningAutoLabelsAsync(
         string packageRoot,
         OperatorDto op,
         string? originalModelPath,
@@ -894,7 +849,7 @@ public sealed class RuntimePackageExporter
             return;
         }
 
-        if (!MayResolveToObjectDetection(op))
+        if (!IsOutputAvailableForCurrentMode(op, "DetectionList"))
         {
             return;
         }
@@ -954,13 +909,24 @@ public sealed class RuntimePackageExporter
         }
     }
 
-    private static bool MayResolveToObjectDetection(OperatorDto op)
+    private bool IsOutputAvailableForCurrentMode(OperatorDto op, string outputName)
     {
-        var taskType = NormalizeScalar(FindParameter(op, "TaskType")?.Value);
-        return string.IsNullOrWhiteSpace(taskType) ||
-               taskType.Equals("ObjectDetection", StringComparison.OrdinalIgnoreCase) ||
-               taskType.Equals("Detection", StringComparison.OrdinalIgnoreCase) ||
-               taskType.Equals("Auto", StringComparison.OrdinalIgnoreCase);
+        var metadata = _operatorFactory.GetMetadata(op.Type);
+        if (metadata == null)
+        {
+            return false;
+        }
+
+        var values = op.Parameters
+            .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Value,
+                StringComparer.OrdinalIgnoreCase);
+        var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return OperatorOutputAvailabilityEvaluator.ResolveStates(metadata, values, explicitNames)
+            .FirstOrDefault(state => state.Output.Equals(outputName, StringComparison.OrdinalIgnoreCase))?
+            .IsAvailable == true;
     }
 
     private static async Task<RuntimeBundledAsset> BundleResourceAsync(
@@ -1099,6 +1065,35 @@ public sealed class RuntimePackageExporter
         var dtoOperatorsById = flow.Operators.ToDictionary(op => op.Id);
         foreach (var op in entityFlow.Operators)
         {
+            var metadata = _operatorFactory.GetMetadata(op.Type);
+            if (metadata != null)
+            {
+                var values = op.Parameters
+                    .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First().GetValue(),
+                        StringComparer.OrdinalIgnoreCase);
+                var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var connectedTargetPortIds = entityFlow.Connections
+                    .Where(connection => connection.TargetOperatorId == op.Id)
+                    .Select(connection => connection.TargetPortId)
+                    .ToHashSet();
+                var runtimeInputPorts = op.InputPorts
+                    .Where(port => connectedTargetPortIds.Contains(port.Id))
+                    .Select(port => port.Name)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var violation in OperatorParameterConstraintEvaluator.Validate(
+                             metadata,
+                             values,
+                             explicitNames,
+                             requireExplicitResourceConfiguration: true,
+                             satisfiedInputPorts: runtimeInputPorts))
+                {
+                    errors.Add($"{op.Name}: {violation.ReasonCode} ({string.Join(", ", violation.ParameterNames)})");
+                }
+            }
+
             if (_executorsByType.TryGetValue(op.Type, out var executor))
             {
                 var validation = executor.ValidateParameters(op);
@@ -1164,13 +1159,15 @@ public sealed class RuntimePackageExporter
             .ToList();
     }
 
-    private static IEnumerable<string> FindMissingResources(OperatorFlowDto flow)
+    private IEnumerable<string> FindMissingResources(OperatorFlowDto flow)
     {
         foreach (var op in flow.Operators)
         {
+            var inactiveParameters = ResolveInactiveRuntimeParameters(op);
             foreach (var parameter in op.Parameters)
             {
-                if (!LooksLikeFileParameter(parameter))
+                if (inactiveParameters.Contains(parameter.Name) ||
+                    !LooksLikeFileParameter(parameter))
                 {
                     continue;
                 }

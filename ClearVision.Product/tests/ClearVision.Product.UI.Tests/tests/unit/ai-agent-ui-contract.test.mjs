@@ -9590,33 +9590,35 @@ test('parameter rules cover TemplateMatching template and ROI dependencies', asy
     getParameterEffectiveState,
     shouldIncludePendingParameter
   } = await loadParameterRules();
-  const missingTemplate = {
+  const missingRoi = withCanonicalConstraints({
     type: 'TemplateMatching',
     parameters: [
-      { name: 'TemplatePath', value: '' },
-      { name: 'TemplateId', value: '' },
       { name: 'UseRoi', value: true },
       { name: 'RoiWidth', value: '' },
-      { name: 'RoiHeight', value: '' }
+      { name: 'RoiHeight', value: '' },
+      { name: 'EnablePoseSearch', value: false },
+      { name: 'AngleExtent', value: 0 }
     ]
-  };
-  const configuredTemplate = {
+  });
+  const fixedPose = withCanonicalConstraints({
     type: 'TemplateMatching',
     parameters: {
-      TemplateId: 'tmpl-fixture',
       UseRoi: false,
-      EnablePoseSearch: false
+      RoiWidth: 0,
+      RoiHeight: 0,
+      EnablePoseSearch: false,
+      AngleExtent: 0
     }
-  };
+  });
 
-  assert.equal(getParameterEffectiveState(configuredTemplate, 'TemplatePath').effectiveDisabled, true);
-  assert.equal(getParameterEffectiveState(configuredTemplate, 'RoiWidth').effectiveDisabled, true);
-  assert.equal(shouldIncludePendingParameter(configuredTemplate, 'TemplatePath'), false);
-  assert.equal(
-    collectEffectiveRequiredParameterErrors(missingTemplate, missingTemplate.parameters)
-      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('TemplatePath')),
-    true
-  );
+  assert.equal(getParameterEffectiveState(fixedPose, 'RoiWidth').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(fixedPose, 'AngleExtent').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(fixedPose, 'RoiWidth'), false);
+  assert.equal(shouldIncludePendingParameter(fixedPose, 'AngleExtent'), false);
+
+  const errors = collectEffectiveRequiredParameterErrors(missingRoi, missingRoi.parameters);
+  assert.equal(errors.some(error => error.kind === 'required' && error.name === 'RoiWidth'), true);
+  assert.equal(errors.some(error => error.kind === 'required' && error.name === 'RoiHeight'), true);
 });
 
 test('parameter rules cover DeepLearning model source and NMS dependencies', async () => {
@@ -9629,7 +9631,7 @@ test('parameter rules cover DeepLearning model source and NMS dependencies', asy
     type: 'DeepLearning',
     parameters: {
       ModelId: 'wire-sequence-model',
-      UseGpu: false,
+      ExecutionProvider: 'CPU',
       OutputFormat: 'EndToEndNms',
       EnableInternalNms: true
     }

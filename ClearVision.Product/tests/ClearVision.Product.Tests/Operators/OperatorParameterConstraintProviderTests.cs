@@ -11,24 +11,29 @@ public sealed class OperatorParameterConstraintProviderTests
     private readonly OperatorFactory _factory = new();
 
     [Fact]
-    public void Provider_ShouldExposeMigratedParameterRuleFamiliesOnly()
+    public void DeclaredMetadata_ShouldExposeMigratedParameterRuleFamiliesWithoutProviderTable()
     {
-        var provider = OperatorParameterConstraintProvider.Instance;
+        foreach (var operatorType in new[]
+                 {
+                     OperatorType.ImageAcquisition,
+                     OperatorType.Filtering,
+                     OperatorType.Measurement,
+                     OperatorType.DeepLearning,
+                     OperatorType.EdgeDetection,
+                     OperatorType.ResultOutput,
+                     OperatorType.BlobAnalysis,
+                     OperatorType.ImageSave,
+                     OperatorType.TextSave,
+                     OperatorType.MitsubishiMcCommunication,
+                     OperatorType.TcpCommunication
+                 })
+        {
+            _factory.GetMetadata(operatorType)!.ParameterConstraints.Should().NotBeEmpty(operatorType.ToString());
+        }
 
-        provider.GetConstraints(OperatorType.ImageAcquisition).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.Filtering).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.Measurement).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.DeepLearning).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.EdgeDetection).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.ResultOutput).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.BlobAnalysis).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.ImageSave).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TextSave).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.MitsubishiMcCommunication).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TcpCommunication).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TemplateMatching).Should().BeEmpty();
-        provider.GetConstraints(OperatorType.HttpRequest).Should().BeEmpty();
-        provider.GetConstraints(OperatorType.MqttPublish).Should().BeEmpty();
+        typeof(OperatorMetadata).Assembly
+            .GetType("ClearVision.Product.Core.Services.OperatorParameterConstraintProvider")
+            .Should().BeNull("parameter rules now come from operator declarations instead of a provider table");
 
         typeof(OperatorParameterConstraint).GetProperties().Select(property => property.Name).Should().Contain(
         [
@@ -36,6 +41,9 @@ public sealed class OperatorParameterConstraintProviderTests
             nameof(OperatorParameterConstraint.RequiredWhen),
             nameof(OperatorParameterConstraint.EnabledWhen),
             nameof(OperatorParameterConstraint.DisabledWhen),
+            nameof(OperatorParameterConstraint.VisibleWhen),
+            nameof(OperatorParameterConstraint.HiddenWhen),
+            nameof(OperatorParameterConstraint.IgnoredWhen),
             nameof(OperatorParameterConstraint.AtLeastOneGroup),
             nameof(OperatorParameterConstraint.MutuallyExclusiveGroup),
             nameof(OperatorParameterConstraint.AliasFor),
@@ -204,6 +212,39 @@ public sealed class OperatorParameterConstraintProviderTests
                     ["B"] = "stale-disabled-value"
                 })
             .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ImageAcquisition_RuntimeImageInput_ShouldSatisfyDeclaredSourceResource()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.ImageAcquisition)!;
+        var satisfiedInputPorts = new HashSet<string>(["Image"], StringComparer.OrdinalIgnoreCase);
+
+        var fileViolations = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["SourceType"] = "File",
+                ["FilePath"] = string.Empty
+            },
+            requireExplicitResourceConfiguration: true,
+            satisfiedInputPorts: satisfiedInputPorts);
+
+        fileViolations.Should().BeEmpty();
+        metadata.ParameterConstraints.Single(rule => rule.Parameter == "FilePath")
+            .SatisfiedByInputPorts.Should().Contain("Image");
+
+        var cameraViolations = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["SourceType"] = "Camera",
+                ["CameraId"] = string.Empty
+            },
+            requireExplicitResourceConfiguration: true,
+            satisfiedInputPorts: satisfiedInputPorts);
+
+        cameraViolations.Should().BeEmpty();
     }
 
     [Fact]

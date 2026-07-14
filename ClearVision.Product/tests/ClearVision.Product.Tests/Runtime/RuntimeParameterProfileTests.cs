@@ -52,28 +52,20 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "runtime-parameters";
+            project.Flow!.Operators.Insert(
+                0,
+                RuntimeParameterTestData.CreateDeepLearningOperator(
+                    operatorId,
+                    "线序检测",
+                    modelPath,
+                    confidence: 0.62d));
 
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
                 TargetRootDirectory = root,
-                Project = new ProjectDto
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "runtime-parameters",
-                    Flow = new OperatorFlowDto
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "main",
-                        Operators =
-                        [
-                            RuntimeParameterTestData.CreateDeepLearningOperator(
-                                operatorId,
-                                "线序检测",
-                                modelPath,
-                                confidence: 0.62d)
-                        ]
-                    }
-                }
+                Project = project
             });
 
             export.Manifest.FieldExtensions.RuntimeParameters.Should().Be("field/runtime-parameters.json");
@@ -187,47 +179,40 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "runtime-parameters-conflict";
+            project.Flow!.Operators.Insert(0, deepLearning);
+            project.GlobalVariables = new ProjectGlobalVariableSchema
+            {
+                Variables =
+                [
+                    new ProjectGlobalVariableDefinition
+                    {
+                        Id = variableId,
+                        Name = "dl.confidence",
+                        DisplayName = "dl.confidence",
+                        ValueType = ProjectGlobalVariableValueType.Double,
+                        InitialValue = JsonSerializer.SerializeToElement(0.5d)
+                    }
+                ],
+                TargetBindings =
+                [
+                    new ProjectGlobalVariableTargetBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableId,
+                        OperatorId = operatorId,
+                        ParameterId = confidenceParameter.Id,
+                        OperatorName = deepLearning.Name,
+                        ParameterName = confidenceParameter.Name
+                    }
+                ]
+            };
 
             var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
             {
                 TargetRootDirectory = root,
-                Project = new ProjectDto
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "runtime-parameters-conflict",
-                    Flow = new OperatorFlowDto
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "main",
-                        Operators = [deepLearning]
-                    },
-                    GlobalVariables = new ProjectGlobalVariableSchema
-                    {
-                        Variables =
-                        [
-                            new ProjectGlobalVariableDefinition
-                            {
-                                Id = variableId,
-                                Name = "dl.confidence",
-                                DisplayName = "dl.confidence",
-                                ValueType = ProjectGlobalVariableValueType.Double,
-                                InitialValue = JsonSerializer.SerializeToElement(0.5d)
-                            }
-                        ],
-                        TargetBindings =
-                        [
-                            new ProjectGlobalVariableTargetBinding
-                            {
-                                Id = Guid.NewGuid(),
-                                VariableId = variableId,
-                                OperatorId = operatorId,
-                                ParameterId = confidenceParameter.Id,
-                                OperatorName = deepLearning.Name,
-                                ParameterName = confidenceParameter.Name
-                            }
-                        ]
-                    }
-                }
+                Project = project
             });
 
             await act.Should().ThrowAsync<RuntimePackageException>()
@@ -250,64 +235,58 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "traditional-runtime-parameters";
+            project.Flow!.Operators.InsertRange(
+                0,
+                [
+                    new OperatorDto
+                    {
+                        Id = templateOperatorId,
+                        Name = "TemplateMatch",
+                        Type = OperatorType.TemplateMatching,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "threshold",
+                                DisplayName = "Match threshold",
+                                DataType = "double",
+                                Value = 0.82d,
+                                DefaultValue = 0.8d,
+                                MinValue = 0.0d,
+                                MaxValue = 1.0d,
+                                IsRequired = true
+                            }
+                        ]
+                    },
+                    new OperatorDto
+                    {
+                        Id = blobOperatorId,
+                        Name = "BlobFilter",
+                        Type = OperatorType.BlobAnalysis,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "maxArea",
+                                DisplayName = "Max area",
+                                DataType = "int",
+                                Value = 100_000,
+                                DefaultValue = 100_000,
+                                MinValue = 0,
+                                IsRequired = true
+                            }
+                        ]
+                    }
+                ]);
 
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
                 TargetRootDirectory = root,
-                Project = new ProjectDto
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "traditional-runtime-parameters",
-                    Flow = new OperatorFlowDto
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "main",
-                        Operators =
-                        [
-                            new OperatorDto
-                            {
-                                Id = templateOperatorId,
-                                Name = "TemplateMatch",
-                                Type = OperatorType.TemplateMatching,
-                                Parameters =
-                                [
-                                    new ParameterDto
-                                    {
-                                        Id = Guid.NewGuid(),
-                                        Name = "threshold",
-                                        DisplayName = "Match threshold",
-                                        DataType = "double",
-                                        Value = 0.82d,
-                                        DefaultValue = 0.8d,
-                                        MinValue = 0.0d,
-                                        MaxValue = 1.0d,
-                                        IsRequired = true
-                                    }
-                                ]
-                            },
-                            new OperatorDto
-                            {
-                                Id = blobOperatorId,
-                                Name = "BlobFilter",
-                                Type = OperatorType.BlobAnalysis,
-                                Parameters =
-                                [
-                                    new ParameterDto
-                                    {
-                                        Id = Guid.NewGuid(),
-                                        Name = "maxArea",
-                                        DisplayName = "Max area",
-                                        DataType = "int",
-                                        Value = 100_000,
-                                        DefaultValue = 100_000,
-                                        MinValue = 0,
-                                        IsRequired = true
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                }
+                Project = project
             });
 
             var schema = JsonSerializer.Deserialize<RuntimeParameterSchema>(

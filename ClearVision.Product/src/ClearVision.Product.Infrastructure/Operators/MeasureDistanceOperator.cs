@@ -16,6 +16,23 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "测量", "距离", "点线", "线线", "夹角", "三点角度", "Measure", "Distance", "Angle" },
     Version = "1.1.0"
 )]
+[OperatorParameterRule("MeasureType", ReasonCode = "MEASUREMENT_TYPE")]
+[OperatorParameterRule("X1", DisabledWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, HiddenWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, IgnoredWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE")]
+[OperatorParameterRule("Y1", DisabledWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, HiddenWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, IgnoredWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE")]
+[OperatorParameterRule("X2", DisabledWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, HiddenWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, IgnoredWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE")]
+[OperatorParameterRule("Y2", DisabledWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, HiddenWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, IgnoredWhenAny = new[] { "MeasureType==PointToLine", "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE")]
+[OperatorParameterRule("DistanceModel", DisabledWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==ThreePointAngle" }, HiddenWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==ThreePointAngle" }, IgnoredWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_DISTANCE_MODEL_ONLY_FOR_LINE_DISTANCE")]
+[OperatorParameterRule("ParallelThreshold", DisabledWhenAll = new[] { "MeasureType!=LineToLine" }, HiddenWhenAll = new[] { "MeasureType!=LineToLine" }, IgnoredWhenAll = new[] { "MeasureType!=LineToLine" }, ReasonCode = "MEASUREMENT_PARALLEL_THRESHOLD_ONLY_FOR_LINE_TO_LINE")]
+[OperatorParameterRule("AngleUnit", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "MeasureType!=ThreePointAngle" }, HiddenWhenAll = new[] { "MeasureType!=ThreePointAngle" }, IgnoredWhenAll = new[] { "MeasureType!=ThreePointAngle" }, ReasonCode = "MEASUREMENT_ANGLE_UNIT_ONLY_FOR_ANGLE")]
+[OperatorOutputRule("Distance", AvailableWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==PointToLine", "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_DISTANCE_OUTPUT")]
+[OperatorOutputRule("DeltaX", AvailableWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==PointToLine" }, ReasonCode = "MEASUREMENT_DELTA_OUTPUT")]
+[OperatorOutputRule("DeltaY", AvailableWhenAny = new[] { "MeasureType==PointToPoint", "MeasureType==Horizontal", "MeasureType==Vertical", "MeasureType==PointToLine" }, ReasonCode = "MEASUREMENT_DELTA_OUTPUT")]
+[OperatorOutputRule("Angle", AvailableWhenAny = new[] { "MeasureType==LineToLine", "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_ANGLE_OUTPUT")]
+[OperatorOutputRule("FootPoint", AvailableWhenAll = new[] { "MeasureType==PointToLine" }, ReasonCode = "MEASUREMENT_FOOT_POINT_OUTPUT")]
+[OperatorOutputRule("Intersection", AvailableWhenAll = new[] { "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_INTERSECTION_OUTPUT")]
+[OperatorOutputRule("HasIntersection", AvailableWhenAll = new[] { "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_INTERSECTION_OUTPUT")]
+[OperatorOutputRule("IsParallel", AvailableWhenAll = new[] { "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_PARALLEL_OUTPUT")]
+[OperatorOutputRule("UncertaintyDeg", AvailableWhenAll = new[] { "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_ANGLE_UNCERTAINTY_OUTPUT")]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = false)]
 [InputPort("PointA", "点A/待测点", PortDataType.Point, IsRequired = false)]
 [InputPort("PointB", "点B/角度顶点", PortDataType.Point, IsRequired = false)]
@@ -182,7 +199,8 @@ public class MeasureDistanceOperator : OperatorBase
             pointB,
             MeasurementGeometryHelper.EstimatePointSigma(pointB));
 
-        var output = CreateCommonOutput(measureType, distance, "Pixel", distance, angle: 0.0, uncertainty);
+        var output = CreateCommonOutput(measureType, distance, "Pixel", uncertainty);
+        output["Distance"] = distance;
         output["X1"] = pointA.X;
         output["Y1"] = pointA.Y;
         output["X2"] = resolvedEnd.X;
@@ -237,7 +255,8 @@ public class MeasureDistanceOperator : OperatorBase
             MeasurementGeometryHelper.EstimateLineSigma(line),
             segmentModel);
 
-        var output = CreateCommonOutput("PointToLine", distance, "Pixel", distance, 0.0, uncertainty);
+        var output = CreateCommonOutput("PointToLine", distance, "Pixel", uncertainty);
+        output["Distance"] = distance;
         output["DistanceModel"] = distanceModel.ToString();
         output["FootPoint"] = footPoint;
         output["FootPointX"] = footPoint.X;
@@ -291,7 +310,9 @@ public class MeasureDistanceOperator : OperatorBase
             segmentModel,
             parallelThreshold);
 
-        var output = CreateCommonOutput("LineToLine", distance, "Pixel", distance, angle, uncertainty);
+        var output = CreateCommonOutput("LineToLine", distance, "Pixel", uncertainty);
+        output["Distance"] = distance;
+        output["Angle"] = angle;
         output["DistanceModel"] = distanceModel.ToString();
         output["Intersection"] = hasIntersection ? intersection : MeasurementGeometryHelper.NoIntersection;
         output["HasIntersection"] = hasIntersection;
@@ -333,18 +354,11 @@ public class MeasureDistanceOperator : OperatorBase
             pointC,
             pointCSigmaPx);
         var averageInputSigmaPx = (pointASigmaPx + vertexSigmaPx + pointCSigmaPx) / 3.0;
-        var output = CreateCommonOutput(
-            "ThreePointAngle",
-            value,
-            unit,
-            distance: 0.0,
-            angle: value,
-            uncertainty: averageInputSigmaPx);
+        var output = CreateCommonOutput("ThreePointAngle", value, unit, averageInputSigmaPx);
+        output["Angle"] = value;
         output["Confidence"] = ComputeAngleConfidence(uncertaintyDeg);
         output["UncertaintyDeg"] = uncertaintyDeg;
         output["Vertex"] = vertex;
-        output["DeltaX"] = 0.0;
-        output["DeltaY"] = 0.0;
         return SuccessWithOptionalImage(inputs, output, image =>
         {
             Cv2.Line(image, ToCvPoint(pointA), ToCvPoint(vertex), new Scalar(0, 255, 255), 2);
@@ -356,8 +370,6 @@ public class MeasureDistanceOperator : OperatorBase
         string measurementType,
         double value,
         string unit,
-        double distance,
-        double angle,
         double uncertainty)
     {
         return new Dictionary<string, object>
@@ -365,8 +377,6 @@ public class MeasureDistanceOperator : OperatorBase
             ["MeasurementType"] = measurementType,
             ["Value"] = value,
             ["Unit"] = unit,
-            ["Distance"] = distance,
-            ["Angle"] = angle,
             ["StatusCode"] = "OK",
             ["StatusMessage"] = "Success",
             ["Confidence"] = ComputeConfidence(uncertainty),

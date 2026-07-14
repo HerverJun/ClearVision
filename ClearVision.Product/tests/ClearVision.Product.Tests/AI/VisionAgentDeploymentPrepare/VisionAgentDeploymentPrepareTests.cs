@@ -136,7 +136,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
-        missingParameters.Should().Contain(["CameraId", "TemplatePath"]);
+        missingParameters.Should().Contain(["CameraId", "Template"]);
         payload.GetProperty("manualConfirmationRequired").GetBoolean().Should().BeTrue();
     }
 
@@ -285,7 +285,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .Should()
-            .Contain(["CameraId", "TemplatePath"]);
+            .Contain(["CameraId", "Template"]);
         Codes(payload, "warnings").Should().Contain("target_station_missing");
         Codes(payload, "blockingIssues").Should().NotContain("target_station_missing");
     }
@@ -530,13 +530,13 @@ public sealed class VisionAgentDeploymentPrepareTests
                     ["SourceType"] = "Camera",
                     ["CameraBindingId"] = "cam_1"
                 }),
-                Operator("op_plc", "PlcResultOutput"),
+                Operator("op_plc", "MitsubishiMcCommunication"),
                 Operator("op_out", "ResultOutput")
             },
             connections = new object[]
             {
-                Connection("op_cam", "Image", "op_plc", "Input"),
-                Connection("op_plc", "Result", "op_out", "Data")
+                Connection("op_cam", "Image", "op_plc", "Data"),
+                Connection("op_plc", "Response", "op_out", "Data")
             }
         };
     }
@@ -576,7 +576,7 @@ public sealed class VisionAgentDeploymentPrepareTests
                     ["SourceType"] = "Camera",
                     ["CameraBindingId"] = "cam_1"
                 }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" }),
+                Operator("op_match", "TemplateMatching"),
                 Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["OutputChannelId"] = "result_bus" })
             },
             connections = new object[]
@@ -636,7 +636,7 @@ public sealed class VisionAgentDeploymentPrepareTests
         return
         [
             ManualConfirmation("camera_binding", "op_cam", "CameraBindingId"),
-            ManualConfirmation("template_artifact", "op_match", "TemplatePath")
+            ManualConfirmation("template_artifact", "op_match", "Template")
         ];
     }
 

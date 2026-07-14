@@ -146,30 +146,12 @@ public sealed class ParameterMappingService
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var metadata = new OperatorMetadata
-        {
-            DisplayName = schema.DisplayName,
-            Category = schema.Category,
-            Description = schema.Description,
-            Parameters = schema.Parameters.Select(parameter => new ParameterDefinition
-            {
-                Name = parameter.Name,
-                DisplayName = parameter.DisplayName,
-                DataType = parameter.DataType,
-                IsRequired = parameter.IsRequired,
-                DefaultValue = parameter.DefaultValue,
-                MinValue = parameter.MinValue,
-                MaxValue = parameter.MaxValue,
-                Description = parameter.Description
-            }).ToList(),
-            ParameterConstraints = schema.ParameterConstraints.ToList()
-        };
         var values = mappings.ToDictionary(
             mapping => mapping.ParameterName,
             mapping => (object?)mapping.ValueSummary,
             StringComparer.OrdinalIgnoreCase);
 
-        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
+        return OperatorParameterConstraintEvaluator.ResolveStates(schema.Metadata, values)
             .Where(state => state.EffectiveDisabled)
             .Select(state => state.Constraint.Parameter)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

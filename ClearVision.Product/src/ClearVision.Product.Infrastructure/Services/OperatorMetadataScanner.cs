@@ -168,6 +168,20 @@ public class OperatorMetadataScanner
                     IsRequired = attr.IsRequired,
                     Options = BuildOptions(attr.Options)
                 })
+                .ToList(),
+            ParameterConstraints = operatorClrType
+                .GetCustomAttributes<OperatorParameterRuleAttribute>(inherit: false)
+                .Select(BuildParameterConstraint)
+                .ToList(),
+            OutputAvailabilityRules = operatorClrType
+                .GetCustomAttributes<OperatorOutputRuleAttribute>(inherit: false)
+                .Select(BuildOutputRule)
+                .ToList(),
+            GenerationDependencies = operatorClrType
+                .GetCustomAttributes<OperatorGenerationDependencyAttribute>(inherit: false)
+                .Select(ResolveGenerationDependency)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.Ordinal)
                 .ToList()
         };
 
@@ -239,5 +253,132 @@ public class OperatorMetadataScanner
         }
 
         return result.Count == 0 ? null : result;
+    }
+
+    private static OperatorParameterConstraint BuildParameterConstraint(OperatorParameterRuleAttribute attribute)
+    {
+        return new OperatorParameterConstraint(
+            attribute.Parameter,
+            attribute.RequiredPolicy switch
+            {
+                OperatorParameterRequiredPolicy.Required => OperatorParameterRequiredPolicies.Required,
+                OperatorParameterRequiredPolicy.Optional => OperatorParameterRequiredPolicies.Optional,
+                _ => OperatorParameterRequiredPolicies.Metadata
+            },
+            BuildConditionSet(attribute.RequiredWhenAll, attribute.RequiredWhenAny),
+            BuildConditionSet(attribute.EnabledWhenAll, attribute.EnabledWhenAny),
+            BuildConditionSet(attribute.DisabledWhenAll, attribute.DisabledWhenAny),
+            attribute.AtLeastOneGroup,
+            attribute.MutuallyExclusiveGroup,
+            attribute.AliasFor,
+            attribute.Deprecated,
+            ResolveResourceKind(attribute.ResourceKind),
+            attribute.ReasonCode,
+            BuildConditionSet(attribute.VisibleWhenAll, attribute.VisibleWhenAny),
+            BuildConditionSet(attribute.HiddenWhenAll, attribute.HiddenWhenAny),
+            BuildConditionSet(attribute.IgnoredWhenAll, attribute.IgnoredWhenAny),
+            attribute.SatisfiedByInputPorts?
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray());
+    }
+
+    private static OperatorOutputAvailabilityRule BuildOutputRule(OperatorOutputRuleAttribute attribute)
+    {
+        return new OperatorOutputAvailabilityRule(
+            attribute.Output,
+            BuildConditionSet(attribute.AvailableWhenAll, attribute.AvailableWhenAny),
+            attribute.ReasonCode);
+    }
+
+    private static OperatorParameterConditionSet? BuildConditionSet(string[]? all, string[]? any)
+    {
+        var allConditions = ParseConditions(all);
+        var anyConditions = ParseConditions(any);
+        return allConditions.Count == 0 && anyConditions.Count == 0
+            ? null
+            : new OperatorParameterConditionSet(
+                allConditions.Count == 0 ? null : allConditions,
+                anyConditions.Count == 0 ? null : anyConditions);
+    }
+
+    private static IReadOnlyList<OperatorParameterCondition> ParseConditions(string[]? expressions)
+    {
+        if (expressions is null || expressions.Length == 0)
+        {
+            return [];
+        }
+
+        return expressions.Select(ParseCondition).ToArray();
+    }
+
+    private static OperatorParameterCondition ParseCondition(string expression)
+    {
+        var value = expression?.Trim() ?? string.Empty;
+        if (value.EndsWith(":not-empty", StringComparison.OrdinalIgnoreCase))
+        {
+            return new OperatorParameterCondition(
+                value[..^":not-empty".Length].Trim(),
+                OperatorParameterConditionComparisons.NotEmpty);
+        }
+
+        if (value.EndsWith(":empty", StringComparison.OrdinalIgnoreCase))
+        {
+            return new OperatorParameterCondition(
+                value[..^":empty".Length].Trim(),
+                OperatorParameterConditionComparisons.Empty);
+        }
+
+        var comparisonIndex = value.IndexOf("!=", StringComparison.Ordinal);
+        var comparison = OperatorParameterConditionComparisons.NotEquals;
+        var separatorLength = 2;
+        if (comparisonIndex < 0)
+        {
+            comparisonIndex = value.IndexOf("==", StringComparison.Ordinal);
+            comparison = OperatorParameterConditionComparisons.Equal;
+        }
+
+        if (comparisonIndex <= 0)
+        {
+            throw new InvalidOperationException($"Invalid operator condition expression '{expression}'.");
+        }
+
+        var parameter = value[..comparisonIndex].Trim();
+        var rawExpected = value[(comparisonIndex + separatorLength)..].Trim();
+        object expected = bool.TryParse(rawExpected, out var boolean)
+            ? boolean
+            : rawExpected;
+        return new OperatorParameterCondition(parameter, comparison, expected);
+    }
+
+    private static string? ResolveResourceKind(OperatorResourceKind resourceKind) => resourceKind switch
+    {
+        OperatorResourceKind.None => null,
+        OperatorResourceKind.ImageFile => "image_file",
+        OperatorResourceKind.CameraBinding => "camera_binding",
+        OperatorResourceKind.TemplateResource => "template_resource",
+        OperatorResourceKind.ModelResource => "model_resource",
+        OperatorResourceKind.ModelCatalog => "model_catalog",
+        OperatorResourceKind.ModelLabels => "model_labels",
+        OperatorResourceKind.FeatureBank => "feature_bank",
+        OperatorResourceKind.OutputFile => "output_file",
+        OperatorResourceKind.PlcEndpoint => "plc_endpoint",
+        OperatorResourceKind.PlcAddress => "plc_address",
+        OperatorResourceKind.TcpProfile => "tcp_profile",
+        OperatorResourceKind.NetworkEndpoint => "network_endpoint",
+        _ => throw new ArgumentOutOfRangeException(nameof(resourceKind), resourceKind, null)
+    };
+
+    private static string ResolveGenerationDependency(OperatorGenerationDependencyAttribute attribute)
+    {
+        if (attribute.DependencyType is not null)
+        {
+            return $"type:{attribute.DependencyType.FullName}";
+        }
+
+        return string.IsNullOrWhiteSpace(attribute.SourcePath)
+            ? string.Empty
+            : $"source:{attribute.SourcePath.Trim().Replace('\\', '/')}";
     }
 }

@@ -341,6 +341,67 @@ public sealed class OperatorProductMetadataGovernanceTests
     }
 
     [Fact]
+    public void EveryConditionContract_ShouldReferenceExistingParametersPortsAndOutputs()
+    {
+        var metadata = new OperatorFactory().GetAllMetadata().ToList();
+
+        foreach (var item in metadata)
+        {
+            var parameterNames = item.Parameters.Select(parameter => parameter.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var inputNames = item.InputPorts.Select(port => port.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var outputNames = item.OutputPorts.Select(port => port.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var constraint in item.ParameterConstraints)
+            {
+                if (string.IsNullOrWhiteSpace(constraint.AliasFor))
+                {
+                    parameterNames.Should().Contain(constraint.Parameter, item.Type.ToString());
+                }
+                else
+                {
+                    parameterNames.Should().Contain(
+                        constraint.AliasFor,
+                        $"{item.Type}:{constraint.Parameter} must alias a real canonical parameter");
+                }
+
+                foreach (var condition in EnumerateConditions(constraint.RequiredWhen)
+                             .Concat(EnumerateConditions(constraint.EnabledWhen))
+                             .Concat(EnumerateConditions(constraint.DisabledWhen))
+                             .Concat(EnumerateConditions(constraint.VisibleWhen))
+                             .Concat(EnumerateConditions(constraint.HiddenWhen))
+                             .Concat(EnumerateConditions(constraint.IgnoredWhen)))
+                {
+                    parameterNames.Should().Contain(condition.Parameter, $"{item.Type}:{constraint.Parameter}");
+                }
+
+                foreach (var inputPort in constraint.SatisfiedByInputPorts ?? [])
+                {
+                    inputNames.Should().Contain(inputPort, $"{item.Type}:{constraint.Parameter}");
+                }
+            }
+
+            foreach (var rule in item.OutputAvailabilityRules)
+            {
+                outputNames.Should().Contain(rule.Output, item.Type.ToString());
+                foreach (var condition in EnumerateConditions(rule.AvailableWhen))
+                {
+                    parameterNames.Should().Contain(condition.Parameter, $"{item.Type}:{rule.Output}");
+                }
+            }
+        }
+
+        foreach (var type in new[] { OperatorType.Filtering, OperatorType.Measurement, OperatorType.DeepLearning })
+        {
+            var item = metadata.Single(metadata => metadata.Type == type);
+            item.ParameterConstraints.Should().NotBeEmpty(type.ToString());
+            item.OutputAvailabilityRules.Should().NotBeEmpty(type.ToString());
+        }
+    }
+
+    [Fact]
     public void OperatorIdentitySnapshot_ShouldRemainStable()
     {
         var metadata = new OperatorFactory().GetAllMetadata().OrderBy(item => item.Type).ToList();

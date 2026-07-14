@@ -19,6 +19,31 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Version = "1.0.0",
     Tags = new[] { "experimental", "industrial-remediation", "anomaly-detection" }
 )]
+[OperatorParameterRule("FeatureBankPath", RequiredWhenAll = new[] { "Mode==inference" },
+    AtLeastOneGroup = "anomaly-feature-bank-source", MutuallyExclusiveGroup = "anomaly-feature-bank-source",
+    ResourceKind = OperatorResourceKind.FeatureBank, ReasonCode = "ANOMALY_FEATURE_BANK_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelId", RequiredWhenAll = new[] { "Mode==inference" },
+    AtLeastOneGroup = "anomaly-feature-bank-source", MutuallyExclusiveGroup = "anomaly-feature-bank-source",
+    ResourceKind = OperatorResourceKind.FeatureBank, ReasonCode = "ANOMALY_FEATURE_BANK_SOURCE_REQUIRED")]
+[OperatorParameterRule("SaveFeatureBankPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAll = new[] { "Mode==inference" }, HiddenWhenAll = new[] { "Mode==inference" },
+    IgnoredWhenAll = new[] { "Mode==inference" }, ResourceKind = OperatorResourceKind.FeatureBank,
+    ReasonCode = "ANOMALY_FEATURE_BANK_SAVE_ONLY_FOR_TRAINING")]
+[OperatorParameterRule("ModelCatalogPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAll = new[] { "ModelId:empty", "EmbeddingModelId:empty" },
+    ResourceKind = OperatorResourceKind.ModelCatalog, ReasonCode = "ANOMALY_CATALOG_REQUIRES_RESOURCE_ID")]
+[OperatorParameterRule("EmbeddingModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    RequiredWhenAll = new[] { "Mode==train", "FeatureExtractorId==onnx_embedding" },
+    AtLeastOneGroup = "anomaly-training-embedding-model-source", MutuallyExclusiveGroup = "anomaly-training-embedding-model-source",
+    DisabledWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, HiddenWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" },
+    IgnoredWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, ResourceKind = OperatorResourceKind.ModelResource,
+    ReasonCode = "ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED")]
+[OperatorParameterRule("EmbeddingModelId", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    RequiredWhenAll = new[] { "Mode==train", "FeatureExtractorId==onnx_embedding" },
+    AtLeastOneGroup = "anomaly-training-embedding-model-source", MutuallyExclusiveGroup = "anomaly-training-embedding-model-source",
+    DisabledWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, HiddenWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" },
+    IgnoredWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, ResourceKind = OperatorResourceKind.ModelResource,
+    ReasonCode = "ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED")]
 [AlgorithmInfo(
     Name = "Simplified PatchCore",
     CoreApi = "OpenCvSharp + memory-bank nearest-neighbor",

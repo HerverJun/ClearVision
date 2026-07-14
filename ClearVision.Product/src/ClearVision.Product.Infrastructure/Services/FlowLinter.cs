@@ -207,6 +207,48 @@ public class FlowLinter
                 };
             }
         }
+
+        // STRUCT_006: 当前模式下不可用的输出不得继续连线
+        foreach (var conn in flow.Connections)
+        {
+            var sourceOp = flow.Operators.FirstOrDefault(op => op.Id == conn.SourceOperatorId);
+            var sourcePort = sourceOp?.OutputPorts.FirstOrDefault(port => port.Id == conn.SourcePortId);
+            if (sourceOp == null || sourcePort == null)
+            {
+                continue;
+            }
+
+            var metadata = ConstraintMetadataFactory.Value.GetMetadata(sourceOp.Type);
+            if (metadata == null || metadata.OutputAvailabilityRules.Count == 0)
+            {
+                continue;
+            }
+
+            var values = sourceOp.Parameters
+                .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Value,
+                    StringComparer.OrdinalIgnoreCase);
+            var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var outputState = OperatorOutputAvailabilityEvaluator
+                .ResolveStates(metadata, values, explicitNames)
+                .FirstOrDefault(state => state.Output.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase));
+            if (outputState?.IsAvailable != false)
+            {
+                continue;
+            }
+
+            yield return new LintIssue
+            {
+                Code = "STRUCT_006",
+                Severity = LintSeverity.Error,
+                OperatorId = sourceOp.Id,
+                OperatorName = sourceOp.Name,
+                Message = $"算子 [{sourceOp.Name}] 的输出 [{sourcePort.Name}] 在当前模式下不可用。",
+                Suggestion = "切换到会生成该输出的模式，或将连线改接到当前模式保证可用的输出端口。"
+            };
+        }
         foreach (var calibOp in flow.Operators.Where(op => RequiresAcceptedCalibrationBundle(op.Type)))
         {
             if (!HasCalibrationDataUpstream(flow, calibOp, out var upstreamCalibrationSource) ||

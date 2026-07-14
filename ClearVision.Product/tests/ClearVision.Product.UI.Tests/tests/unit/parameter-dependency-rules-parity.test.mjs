@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   collectEffectiveRequiredParameterErrors,
+  getOperatorOutputAvailabilityStates,
+  getOutputAvailabilityState,
   getOperatorParameterValue,
   getParameterEffectiveState,
   isEmptyParameterValue,
@@ -142,4 +144,84 @@ test('groups ignore stale values held by conditionally disabled parameters', () 
 
   operator.parameters[1].value = 'active-value';
   assert.deepEqual(collectEffectiveRequiredParameterErrors(operator), []);
+});
+
+test('visible hidden and ignored conditions produce reusable effective states', () => {
+  const operator = {
+    type: 'ModeAware',
+    parameterConstraints: [
+      {
+        parameter: 'AdvancedValue',
+        requiredPolicy: 'required',
+        visibleWhen: { all: [{ parameter: 'Mode', comparison: 'equals', value: 'Advanced' }] },
+        ignoredWhen: { all: [{ parameter: 'Mode', comparison: 'not-equals', value: 'Advanced' }] }
+      }
+    ],
+    parameters: [
+      { name: 'Mode', value: 'Basic', defaultValue: 'Basic' },
+      { name: 'AdvancedValue', value: '', defaultValue: '' }
+    ]
+  };
+
+  const basic = getParameterEffectiveState(operator, 'AdvancedValue');
+  assert.equal(basic.effectiveVisible, false);
+  assert.equal(basic.effectiveIgnored, true);
+  assert.equal(basic.effectiveDisabled, true);
+  assert.equal(basic.effectiveRequired, false);
+  assert.deepEqual(collectEffectiveRequiredParameterErrors(operator), []);
+
+  operator.parameters[0].value = 'Advanced';
+  const advanced = getParameterEffectiveState(operator, 'AdvancedValue');
+  assert.equal(advanced.effectiveVisible, true);
+  assert.equal(advanced.effectiveIgnored, false);
+  assert.equal(advanced.effectiveDisabled, false);
+  assert.equal(advanced.effectiveRequired, true);
+  assert.equal(collectEffectiveRequiredParameterErrors(operator).length, 1);
+});
+
+test('output availability uses metadata defaults for old flows and defaults unruled outputs to guaranteed', () => {
+  const operator = {
+    type: 'Measurement',
+    parameters: [
+      { name: 'MeasureType', defaultValue: 'PointToPoint' }
+    ],
+    outputPorts: [
+      { name: 'Distance' },
+      { name: 'Angle' },
+      { name: 'Image' }
+    ],
+    outputAvailabilityRules: [
+      {
+        output: 'Distance',
+        availableWhen: {
+          any: [
+            { parameter: 'MeasureType', comparison: 'equals', value: 'PointToPoint' },
+            { parameter: 'MeasureType', comparison: 'equals', value: 'PointToLine' }
+          ]
+        },
+        reasonCode: 'MEASUREMENT_DISTANCE_OUTPUT'
+      },
+      {
+        output: 'Angle',
+        availableWhen: {
+          any: [
+            { parameter: 'MeasureType', comparison: 'equals', value: 'LineToLine' },
+            { parameter: 'MeasureType', comparison: 'equals', value: 'ThreePointAngle' }
+          ]
+        },
+        reasonCode: 'MEASUREMENT_ANGLE_OUTPUT'
+      }
+    ]
+  };
+
+  const oldFlowStates = getOperatorOutputAvailabilityStates(operator);
+  assert.equal(oldFlowStates.get('distance').isAvailable, true);
+  assert.equal(oldFlowStates.get('angle').isAvailable, false);
+  assert.equal(oldFlowStates.get('image').isAvailable, true);
+  assert.equal(oldFlowStates.get('image').isGuaranteed, true);
+  assert.equal(oldFlowStates.get('image').reasonCode, 'OUTPUT_ALWAYS_AVAILABLE');
+
+  operator.parameters[0].value = 'ThreePointAngle';
+  assert.equal(getOutputAvailabilityState(operator, 'Distance').isAvailable, false);
+  assert.equal(getOutputAvailabilityState(operator, 'Angle').isAvailable, true);
 });

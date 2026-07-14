@@ -226,6 +226,7 @@ public class OperatorService : IOperatorService
 
     public Task<ValidationResultDto> ValidateParametersAsync(Guid operatorId, Dictionary<string, object> parameters)
     {
+        ArgumentNullException.ThrowIfNull(parameters);
         var result = new ValidationResultDto { IsValid = true };
 
         var meta = _operatorMetadataCache.Values.FirstOrDefault(m => m.Id == operatorId);
@@ -236,14 +237,60 @@ public class OperatorService : IOperatorService
             return Task.FromResult(result);
         }
 
-        // 验证必填参数
-        foreach (var param in meta.Parameters.Where(p => p.IsRequired))
+        if (!Enum.TryParse<OperatorType>(meta.Type, out var operatorType) ||
+            _operatorFactory.GetMetadata(operatorType) is not { } factoryMetadata)
         {
-            if (!parameters.ContainsKey(param.Name) || parameters[param.Name] == null)
+            result.IsValid = false;
+            result.Errors.Add("算子元数据不存在");
+            return Task.FromResult(result);
+        }
+
+        var values = parameters
+            .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => (object?)group.Last().Value,
+                StringComparer.OrdinalIgnoreCase);
+        var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(
+            factoryMetadata,
+            values,
+            explicitNames);
+
+        foreach (var violation in OperatorParameterConstraintEvaluator.Validate(
+                     factoryMetadata,
+                     values,
+                     explicitNames))
+        {
+            result.IsValid = false;
+            var displayNames = violation.ParameterNames
+                .Select(name => factoryMetadata.Parameters
+                    .FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?
+                    .DisplayName ?? name)
+                .ToArray();
+            var message = violation.Code switch
             {
-                result.IsValid = false;
-                result.Errors.Add($"必填参数 '{param.DisplayName}' 未提供");
+                "at-least-one" => $"至少需要提供一个参数：{string.Join("、", displayNames)}",
+                "mutually-exclusive" => $"参数不能同时提供：{string.Join("、", displayNames)}",
+                _ => $"必填参数 '{displayNames.FirstOrDefault() ?? violation.ParameterNames.FirstOrDefault()}' 未提供"
+            };
+            result.Errors.Add($"{message} [{violation.ReasonCode}]");
+        }
+
+        var conditionallyGoverned = factoryMetadata.ParameterConstraints
+            .Select(constraint => constraint.Parameter)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var parameter in factoryMetadata.Parameters.Where(parameter =>
+                     parameter.IsRequired && !conditionallyGoverned.Contains(parameter.Name)))
+        {
+            canonicalization.EffectiveValues.TryGetValue(parameter.Name, out var value);
+            if (!OperatorParameterConstraintEvaluator.IsMissing(value))
+            {
+                continue;
             }
+
+            result.IsValid = false;
+            result.Errors.Add($"必填参数 '{parameter.DisplayName}' 未提供");
         }
 
         return Task.FromResult(result);

@@ -24,6 +24,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "输出", "结果", "结束", "呈现", "记录", "Output", "Result", "Display" },
     Version = "1.0.1"
 )]
+[OperatorParameterRule("SaveToFile", ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "RESULT_OUTPUT_OPTIONAL_INTERNAL_FILE_WRITE")]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = false)]
 [InputPort("Result", "结果", PortDataType.Any, IsRequired = false)]
 [InputPort("Text", "文本", PortDataType.String, IsRequired = false)]

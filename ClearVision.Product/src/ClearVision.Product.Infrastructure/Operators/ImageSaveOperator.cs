@@ -33,6 +33,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "save"
 )]
+[OperatorParameterRule("Directory", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "IMAGE_SAVE_DIRECTORY_REQUIRED")]
+[OperatorParameterRule("FileNameTemplate", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "IMAGE_SAVE_FILE_NAME_REQUIRED")]
+[OperatorParameterRule("Quality", ReasonCode = "IMAGE_SAVE_QUALITY")]
+[OperatorParameterRule("FolderPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "Directory", Deprecated = true, ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "IMAGE_SAVE_DIRECTORY_LEGACY_ALIAS")]
+[OperatorParameterRule("FileName", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "FileNameTemplate", Deprecated = true, ReasonCode = "IMAGE_SAVE_FILE_NAME_LEGACY_ALIAS")]
+[OperatorParameterRule("JpegQuality", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "Quality", Deprecated = true, ReasonCode = "IMAGE_SAVE_QUALITY_LEGACY_ALIAS")]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("FilePath", "保存路径", PortDataType.String)]
 [OutputPort("IsSuccess", "是否成功", PortDataType.Boolean)]

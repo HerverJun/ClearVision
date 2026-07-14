@@ -50,7 +50,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
 
@@ -94,7 +95,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
 
@@ -147,7 +149,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
 
@@ -190,13 +193,15 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         try
         {
             var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
 
-            result.Success.Should().BeTrue();
+            result.Success.Should().BeTrue(
+                $"error={result.ErrorMessage}; missing={string.Join(" | ", result.MissingResources.Select(item => $"{item.ResourceKey}:{item.Description}"))}");
             result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
         }
         finally
@@ -244,7 +249,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         try
         {
@@ -299,13 +305,15 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         try
         {
             var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
 
-            result.Success.Should().BeTrue();
+            result.Success.Should().BeTrue(
+                $"error={result.ErrorMessage}; missing={string.Join(" | ", result.MissingResources.Select(item => $"{item.ResourceKey}:{item.Description}"))}");
             result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.ModelPath");
             result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
         }
@@ -356,7 +364,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         try
         {
@@ -405,7 +414,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         try
         {
@@ -420,6 +430,83 @@ public class FlowNodePreviewServiceTests
             File.Delete(modelPath);
             File.Delete(catalogPath);
         }
+    }
+
+    [Fact]
+    public async Task PreviewWithMetricsAsync_AnomalyInferenceWithoutFeatureBank_ShouldReportDeclaredResource()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var target = new Operator("Anomaly", OperatorType.AnomalyDetection, 0, 0);
+        target.AddParameter(new Parameter(Guid.NewGuid(), "Mode", "Mode", string.Empty, "enum", "inference"));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "FeatureBankPath", "FeatureBankPath", string.Empty, "file", string.Empty));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelId", "ModelId", string.Empty, "string", string.Empty));
+        var flow = new OperatorFlow("anomaly-missing-feature-bank");
+        flow.AddOperator(target);
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
+
+        var result = await service.PreviewWithMetricsAsync(flow, target.Id, CreatePreviewImageBytes());
+
+        result.Success.Should().BeFalse();
+        result.MissingResources.Should().ContainSingle(item =>
+            item.ResourceKey == "AnomalyDetection.FeatureBankPath" &&
+            item.ResourceType == "FeatureBank");
+        result.DiagnosticCodes.Should().Contain("missing_feature_bank");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
+            Arg.Any<DebugOptions>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PreviewWithMetricsAsync_CannyMode_ShouldIgnoreStaleMissingEdgeModelPath()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var target = new Operator("Edges", OperatorType.EdgeDetection, 0, 0);
+        target.AddParameter(new Parameter(Guid.NewGuid(), "Method", "Method", string.Empty, "enum", "Canny"));
+        target.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "EdgeModelPath",
+            "EdgeModelPath",
+            string.Empty,
+            "file",
+            Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.onnx")));
+        var flow = new OperatorFlow("canny-ignores-stale-model");
+        flow.AddOperator(target);
+
+        flowExecution.ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowDebugExecutionResult
+            {
+                IsSuccess = true,
+                DebugSessionId = Guid.NewGuid(),
+                IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                {
+                    [target.Id] = new() { ["Image"] = CreatePreviewImageBytes() }
+                }
+            }));
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
+
+        var result = await service.PreviewWithMetricsAsync(flow, target.Id, CreatePreviewImageBytes());
+
+        result.Success.Should().BeTrue();
+        result.MissingResources.Should().NotContain(item => item.ResourceKey == "EdgeDetection.EdgeModelPath");
+        result.DiagnosticCodes.Should().NotContain("missing_model");
     }
 
     [Fact]
@@ -456,7 +543,8 @@ public class FlowNodePreviewServiceTests
         var service = new FlowNodePreviewService(
             NullLogger<FlowNodePreviewService>.Instance,
             flowExecution,
-            Substitute.For<IPreviewMetricsAnalyzer>());
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
 
         var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
 

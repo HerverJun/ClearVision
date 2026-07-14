@@ -102,6 +102,14 @@
     opacity: 0.72;
 }
 
+.form-group.is-rule-ignored {
+    opacity: 0.58;
+}
+
+.form-group.is-rule-disabled .color-preview-box {
+    pointer-events: none;
+}
+
 .form-group.is-rule-disabled.hidden {
     display: none;
 }
@@ -404,6 +412,21 @@
     gap: 8px;
     min-width: 0;
     font-size: var(--font-size-xs);
+}
+
+.property-port-row.is-output-unavailable {
+    opacity: 0.58;
+}
+
+.property-output-state {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.property-port-row.is-output-unavailable .property-output-state {
+    color: #d89b3c;
 }
 
 .property-port-direction {

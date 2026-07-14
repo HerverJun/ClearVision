@@ -13,25 +13,21 @@ namespace ClearVision.Product.Infrastructure.Services;
 
 public sealed class FlowNodePreviewService : IFlowNodePreviewService
 {
-    private static readonly string[] DeepLearningCatalogTypes =
-    [
-        "detection", "object_detection", "deep_learning", "yolo",
-        "classification", "image_classification", "classifier",
-        "segmentation", "semantic_segmentation"
-    ];
-
     private readonly ILogger<FlowNodePreviewService> _logger;
     private readonly IFlowExecutionService _flowExecution;
     private readonly IPreviewMetricsAnalyzer _metricsAnalyzer;
+    private readonly IOperatorFactory _operatorFactory;
 
     public FlowNodePreviewService(
         ILogger<FlowNodePreviewService> logger,
         IFlowExecutionService flowExecution,
-        IPreviewMetricsAnalyzer metricsAnalyzer)
+        IPreviewMetricsAnalyzer metricsAnalyzer,
+        IOperatorFactory operatorFactory)
     {
         _logger = logger;
         _flowExecution = flowExecution;
         _metricsAnalyzer = metricsAnalyzer;
+        _operatorFactory = operatorFactory;
     }
 
     public async Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
@@ -61,14 +57,15 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             };
         }
 
-        var missingResources = CollectMissingResources(flow, targetNodeId);
+        var missingResources = CollectMissingResources(flow, targetNodeId, inputImage);
         if (missingResources.Count > 0)
         {
             return new FlowNodePreviewWithMetricsResult
             {
                 Success = false,
                 TargetNodeId = targetNodeId,
-                ErrorMessage = "线序预览缺少必要资源，无法继续执行。",
+                ErrorMessage = "预览缺少必要资源或参数配置：" +
+                               string.Join("；", missingResources.Select(item => item.Description)),
                 MissingResources = missingResources,
                 DiagnosticCodes = missingResources
                     .Select(item => item.DiagnosticCode)
@@ -184,93 +181,329 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
         };
     }
 
-    private static List<PreviewMissingResource> CollectMissingResources(OperatorFlow flow, Guid targetNodeId)
+    private List<PreviewMissingResource> CollectMissingResources(
+        OperatorFlow flow,
+        Guid targetNodeId,
+        byte[]? externalInputImage)
     {
         var relevantOperators = CollectRelevantOperators(flow, targetNodeId);
         var missing = new List<PreviewMissingResource>();
+        var externalImageCanSatisfyAcquisition = externalInputImage is { Length: > 0 } &&
+                                                 ShouldUseExternalInputImage(flow, targetNodeId);
 
-        foreach (var op in relevantOperators.Where(item => item.Type == OperatorType.DeepLearning))
+        foreach (var op in relevantOperators)
         {
-            var explicitModelPath = GetStringParam(op, "ModelPath");
-            var modelId = GetStringParam(op, "ModelId");
-            var modelCatalogPath = GetStringParam(op, "ModelCatalogPath");
-            var resolvedModelPath = explicitModelPath;
-            ModelCatalogEntry? catalogEntry = null;
-            var modelResolutionError = string.Empty;
-            if (string.IsNullOrWhiteSpace(resolvedModelPath) && !string.IsNullOrWhiteSpace(modelId))
+            var metadata = _operatorFactory.GetMetadata(op.Type);
+            if (metadata == null)
             {
-                try
-                {
-                    resolvedModelPath = ModelCatalog.ResolveExplicitOrCatalogPath(
-                        null,
-                        modelId,
-                        modelCatalogPath,
-                        DeepLearningCatalogTypes,
-                        out catalogEntry);
-                }
-                catch (Exception ex)
-                {
-                    modelResolutionError = ex.Message;
-                }
+                continue;
             }
 
-            var modelPath = resolvedModelPath;
+            var values = op.Parameters
+                .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().GetValue(),
+                    StringComparer.OrdinalIgnoreCase);
+            var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var canonicalization = OperatorParameterConstraintEvaluator.Canonicalize(metadata, values, explicitNames);
+            var states = OperatorParameterConstraintEvaluator.ResolveStates(metadata, values, explicitNames);
+            IReadOnlySet<string>? satisfiedInputPorts = externalImageCanSatisfyAcquisition
+                ? new HashSet<string>(["Image"], StringComparer.OrdinalIgnoreCase)
+                : null;
 
-            if ((string.IsNullOrWhiteSpace(explicitModelPath) && string.IsNullOrWhiteSpace(modelId)) ||
-                !string.IsNullOrWhiteSpace(modelResolutionError) ||
-                !PathExists(resolvedModelPath))
+            foreach (var violation in OperatorParameterConstraintEvaluator.Validate(
+                         metadata,
+                         values,
+                         explicitNames,
+                         satisfiedInputPorts: satisfiedInputPorts))
             {
-                missing.Add(new PreviewMissingResource
-                {
-                    ResourceType = "Model",
-                    ResourceKey = "DeepLearning.ModelPath",
-                    Description = string.IsNullOrWhiteSpace(modelPath)
-                        ? "缺少模型文件路径"
-                        : $"模型文件不存在：{modelPath}",
-                    DiagnosticCode = "missing_model"
-                });
+                missing.Add(CreateConstraintIssue(op, violation));
             }
 
-            if (RequiresDetectionLabels(op, catalogEntry?.Type))
+            foreach (var state in states.Where(state =>
+                         !state.EffectiveDisabled &&
+                         !state.EffectiveIgnored &&
+                         !string.IsNullOrWhiteSpace(state.Constraint.ResourceKind)))
             {
-                var labelsPath = GetStringParam(op, "LabelsPath", "LabelFile");
-                var targetClasses = GetStringParam(op, "TargetClasses");
-                if (!DeepLearningLabelResolver.AreLabelsResolvable(labelsPath, modelPath, targetClasses, out _))
+                if (OperatorParameterConstraintEvaluator.IsSatisfiedByInputPort(
+                        state.Constraint,
+                        satisfiedInputPorts))
                 {
-                    missing.Add(new PreviewMissingResource
-                    {
-                        ResourceType = "Label",
-                        ResourceKey = "DeepLearning.LabelsPath",
-                        Description = string.IsNullOrWhiteSpace(labelsPath)
-                            ? "缺少可用的标签文件，且未找到可匹配目标类别的内置标签"
-                            : $"标签文件不存在，且未找到可匹配目标类别的内置标签：{labelsPath}",
-                        DiagnosticCode = "missing_labels"
-                    });
+                    continue;
                 }
+
+                ValidateConfiguredResource(
+                    op,
+                    metadata,
+                    state,
+                    canonicalization.EffectiveValues,
+                    missing);
             }
         }
 
         return missing
-            .GroupBy(item => item.ResourceKey, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(
+                item => $"{item.ResourceKey}|{item.DiagnosticCode}",
+                StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList();
     }
 
-    private static bool RequiresDetectionLabels(Operator op, string? catalogType)
+    private static PreviewMissingResource CreateConstraintIssue(
+        Operator op,
+        OperatorParameterConstraintViolation violation)
     {
-        if (!DeepLearningTaskResolver.TryParse(GetStringParam(op, "TaskType"), out var requestedTask))
+        IReadOnlyList<string> parameterNames = violation.ParameterNames.Count == 0
+            ? ["configuration"]
+            : violation.ParameterNames;
+        var firstParameter = parameterNames[0];
+        var description = violation.Code switch
+        {
+            "at-least-one" => $"至少需要配置以下一项：{string.Join("、", parameterNames)}",
+            "mutually-exclusive" => $"以下参数不能同时配置：{string.Join("、", parameterNames)}",
+            _ => $"缺少当前模式必需的参数：{firstParameter}"
+        };
+
+        return new PreviewMissingResource
+        {
+            ResourceType = ResolveResourceType(violation.ResourceKind),
+            ResourceKey = $"{op.Type}.{firstParameter}",
+            Description = description,
+            DiagnosticCode = violation.Code == "mutually-exclusive"
+                ? "conflicting_resource_configuration"
+                : ResolveDiagnosticCode(violation.ResourceKind)
+        };
+    }
+
+    private static void ValidateConfiguredResource(
+        Operator op,
+        OperatorMetadata metadata,
+        OperatorParameterConstraintState state,
+        IReadOnlyDictionary<string, object?> effectiveValues,
+        List<PreviewMissingResource> missing)
+    {
+        var parameterName = state.Constraint.Parameter;
+        effectiveValues.TryGetValue(parameterName, out var rawValue);
+        var value = rawValue?.ToString()?.Trim() ?? string.Empty;
+        var resourceKind = state.Constraint.ResourceKind;
+
+        if (string.Equals(resourceKind, "model_labels", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateModelLabels(op, parameterName, effectiveValues, missing);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(value) || OperatorParameterValueSemantics.IsPendingSentinel(value))
+        {
+            return;
+        }
+
+        if (string.Equals(resourceKind, "image_file", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(resourceKind, "model_catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!FileExists(value))
+            {
+                var description = string.Equals(resourceKind, "image_file", StringComparison.OrdinalIgnoreCase)
+                    ? $"图像文件不存在：{value}"
+                    : $"模型目录文件不存在：{value}";
+                missing.Add(CreateMissingResource(op, parameterName, resourceKind, description));
+            }
+
+            return;
+        }
+
+        if (string.Equals(resourceKind, "model_resource", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateCatalogBackedFile(op, parameterName, value, effectiveValues, resourceKind, missing);
+            return;
+        }
+
+        if (string.Equals(resourceKind, "feature_bank", StringComparison.OrdinalIgnoreCase))
+        {
+            if (parameterName.StartsWith("Save", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ValidateCatalogBackedFile(op, parameterName, value, effectiveValues, resourceKind, missing);
+        }
+    }
+
+    private static void ValidateCatalogBackedFile(
+        Operator op,
+        string parameterName,
+        string value,
+        IReadOnlyDictionary<string, object?> effectiveValues,
+        string? resourceKind,
+        List<PreviewMissingResource> missing)
+    {
+        if (parameterName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+        {
+            var catalogPath = GetEffectiveString(effectiveValues, "ModelCatalogPath");
+            if (!ModelCatalog.TryResolve(value, catalogPath, null, out var resolved, out var error) ||
+                resolved == null ||
+                !FileExists(resolved.ArtifactPath))
+            {
+                missing.Add(CreateMissingResource(
+                    op,
+                    parameterName,
+                    resourceKind,
+                    error ?? $"目录资源不存在：{value}"));
+            }
+
+            return;
+        }
+
+        if (!FileExists(value))
+        {
+            missing.Add(CreateMissingResource(op, parameterName, resourceKind, $"文件不存在：{value}"));
+        }
+    }
+
+    private static void ValidateModelLabels(
+        Operator op,
+        string parameterName,
+        IReadOnlyDictionary<string, object?> effectiveValues,
+        List<PreviewMissingResource> missing)
+    {
+        var taskType = GetEffectiveString(effectiveValues, "TaskType");
+        if (!DeepLearningTaskResolver.TryParse(taskType, out var requestedTask))
+        {
+            return;
+        }
+
+        var modelPath = ResolveModelPath(effectiveValues, out var catalogEntry);
+        var requiresLabels = requestedTask == DeepLearningTaskType.ObjectDetection ||
+                             (requestedTask == DeepLearningTaskType.Auto &&
+                              DeepLearningTaskResolver.TryResolveCatalogType(catalogEntry?.Type, out var catalogTask) &&
+                              catalogTask == DeepLearningTaskType.ObjectDetection);
+        if (!requiresLabels)
+        {
+            return;
+        }
+
+        var labelsPath = GetEffectiveString(effectiveValues, parameterName);
+        var targetClasses = GetEffectiveString(effectiveValues, "TargetClasses");
+        if (DeepLearningLabelResolver.AreLabelsResolvable(labelsPath, modelPath, targetClasses, out _))
+        {
+            return;
+        }
+
+        missing.Add(CreateMissingResource(
+            op,
+            parameterName,
+            "model_labels",
+            string.IsNullOrWhiteSpace(labelsPath)
+                ? "缺少可用的标签文件，且模型或内置资源未提供可解析标签。"
+                : $"标签文件不可用，且模型或内置资源未提供可解析标签：{labelsPath}"));
+    }
+
+    private static string ResolveModelPath(
+        IReadOnlyDictionary<string, object?> effectiveValues,
+        out ModelCatalogEntry? catalogEntry)
+    {
+        catalogEntry = null;
+        var explicitPath = GetEffectiveString(effectiveValues, "ModelPath");
+        if (!string.IsNullOrWhiteSpace(explicitPath))
+        {
+            return explicitPath;
+        }
+
+        var modelId = GetEffectiveString(effectiveValues, "ModelId");
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return ModelCatalog.ResolveExplicitOrCatalogPath(
+                null,
+                modelId,
+                GetEffectiveString(effectiveValues, "ModelCatalogPath"),
+                null,
+                out catalogEntry);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static PreviewMissingResource CreateMissingResource(
+        Operator op,
+        string parameterName,
+        string? resourceKind,
+        string description)
+    {
+        return new PreviewMissingResource
+        {
+            ResourceType = ResolveResourceType(resourceKind),
+            ResourceKey = $"{op.Type}.{parameterName}",
+            Description = description,
+            DiagnosticCode = ResolveDiagnosticCode(resourceKind)
+        };
+    }
+
+    private static string ResolveResourceType(string? resourceKind) => resourceKind switch
+    {
+        "image_file" => "ImageFile",
+        "camera_binding" => "Camera",
+        "template_resource" => "Template",
+        "model_resource" => "Model",
+        "model_catalog" => "ModelCatalog",
+        "model_labels" => "Label",
+        "feature_bank" => "FeatureBank",
+        "output_file" => "OutputFile",
+        "plc_endpoint" => "PlcEndpoint",
+        "plc_address" => "PlcAddress",
+        "tcp_profile" => "TcpProfile",
+        "network_endpoint" => "NetworkEndpoint",
+        _ => "Parameter"
+    };
+
+    private static string ResolveDiagnosticCode(string? resourceKind) => resourceKind switch
+    {
+        "image_file" => "missing_image_file",
+        "camera_binding" => "missing_camera_binding",
+        "template_resource" => "missing_template",
+        "model_resource" => "missing_model",
+        "model_catalog" => "missing_model_catalog",
+        "model_labels" => "missing_labels",
+        "feature_bank" => "missing_feature_bank",
+        "output_file" => "missing_output_path",
+        "plc_endpoint" => "missing_plc_endpoint",
+        "plc_address" => "missing_plc_address",
+        "tcp_profile" => "missing_tcp_profile",
+        "network_endpoint" => "missing_network_endpoint",
+        _ => "missing_parameter"
+    };
+
+    private static string GetEffectiveString(
+        IReadOnlyDictionary<string, object?> effectiveValues,
+        string parameterName)
+    {
+        return effectiveValues.TryGetValue(parameterName, out var value)
+            ? value?.ToString()?.Trim() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static bool FileExists(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
         {
             return false;
         }
 
-        if (requestedTask == DeepLearningTaskType.ObjectDetection)
+        try
         {
-            return true;
+            return File.Exists(Path.GetFullPath(path));
         }
-
-        return requestedTask == DeepLearningTaskType.Auto &&
-               DeepLearningTaskResolver.TryResolveCatalogType(catalogType, out var catalogTask) &&
-               catalogTask == DeepLearningTaskType.ObjectDetection;
+        catch
+        {
+            return false;
+        }
     }
 
     private static FlowNodePreviewWithMetricsResult BuildFailureResult(
@@ -386,26 +619,6 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
     private static bool ShouldUseExternalInputImage(OperatorFlow flow, Guid targetNodeId)
     {
         return ImageAcquisitionFlowAnalyzer.ShouldPassExternalInputImageToPreview(flow, targetNodeId);
-    }
-
-    private static bool PathExists(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            var normalized = Path.IsPathRooted(path)
-                ? path
-                : Path.GetFullPath(path);
-            return File.Exists(normalized);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static string GetStringParam(Operator op, params string[] names)

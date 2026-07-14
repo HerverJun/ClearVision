@@ -235,12 +235,19 @@ public class RuntimePackageExporterValidationTests
     }
 
     [Fact]
-    public async Task ExportAsync_ShouldAllowRuntimeSuppliedImageWhenFileModeHasNoFilePath()
+    public async Task ExportAsync_FileModeWithoutPathOrConnectedInput_ShouldReject()
     {
         var root = CreateTempDirectory();
         try
         {
             var exporter = CreateExporter();
+            var acquisition = CreateOperatorDto(
+                "Image acquisition",
+                OperatorType.ImageAcquisition,
+                CreateParameter("SourceType", "enum", "File"),
+                CreateParameter("FilePath", "file", string.Empty),
+                CreateParameter("CameraId", "cameraBinding", string.Empty));
+            acquisition.InputPorts.Add(CreatePort(Guid.NewGuid(), "Image", PortDirection.Input, PortDataType.Image));
             var project = new ProjectDto
             {
                 Id = Guid.NewGuid(),
@@ -249,26 +256,82 @@ public class RuntimePackageExporterValidationTests
                 {
                     Id = Guid.NewGuid(),
                     Name = "main",
-                    Operators =
+                    Operators = [acquisition]
+                }
+            };
+
+            var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExportAsync_FileModeWithConnectedImageInput_ShouldAllowMissingPath()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var imagePath = Path.Combine(root, "source.png");
+            await File.WriteAllBytesAsync(imagePath, [1, 2, 3, 4]);
+            var source = CreateOperatorDto(
+                "Configured image source",
+                OperatorType.ImageAcquisition,
+                CreateParameter("SourceType", "enum", "File"),
+                CreateParameter("FilePath", "file", imagePath),
+                CreateParameter("CameraId", "cameraBinding", string.Empty));
+            var sourcePort = CreatePort(Guid.NewGuid(), "Image", PortDirection.Output, PortDataType.Image);
+            source.OutputPorts.Add(sourcePort);
+
+            var target = CreateOperatorDto(
+                "Runtime-fed image acquisition",
+                OperatorType.ImageAcquisition,
+                CreateParameter("SourceType", "enum", "File"),
+                CreateParameter("FilePath", "file", string.Empty),
+                CreateParameter("CameraId", "cameraBinding", string.Empty));
+            var targetPort = CreatePort(Guid.NewGuid(), "Image", PortDirection.Input, PortDataType.Image);
+            target.InputPorts.Add(targetPort);
+
+            var project = new ProjectDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "connected-runtime-input",
+                Flow = new OperatorFlowDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "main",
+                    Operators = [source, target],
+                    Connections =
                     [
-                        CreateOperatorDto(
-                            "Image acquisition",
-                            OperatorType.ImageAcquisition,
-                            CreateParameter("SourceType", "enum", "File"),
-                            CreateParameter("FilePath", "file", string.Empty),
-                            CreateParameter("CameraId", "cameraBinding", string.Empty))
+                        new OperatorConnectionDto
+                        {
+                            Id = Guid.NewGuid(),
+                            SourceOperatorId = source.Id,
+                            SourcePortId = sourcePort.Id,
+                            TargetOperatorId = target.Id,
+                            TargetPortId = targetPort.Id
+                        }
                     ]
                 }
             };
 
-            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            var export = await CreateExporter().ExportAsync(new RuntimePackageExportRequest
             {
                 Project = project,
                 TargetRootDirectory = root
             });
 
             export.Manifest.PendingParameters.Should().BeEmpty();
-            export.Manifest.MissingResources.Should().BeEmpty();
             Directory.Exists(export.PackageRootPath).Should().BeTrue();
         }
         finally

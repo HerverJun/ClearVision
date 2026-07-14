@@ -505,7 +505,8 @@ export class PropertyPanelCapabilityAdapter {
             inputPorts: node.inputs || metadata.inputPorts || metadata.InputPorts || [],
             outputPorts: node.outputs || metadata.outputPorts || metadata.OutputPorts || [],
             parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || []),
-            parameterConstraints: metadata.parameterConstraints || metadata.ParameterConstraints || []
+            parameterConstraints: metadata.parameterConstraints || metadata.ParameterConstraints || [],
+            outputAvailabilityRules: metadata.outputAvailabilityRules || metadata.OutputAvailabilityRules || []
         };
     }
 

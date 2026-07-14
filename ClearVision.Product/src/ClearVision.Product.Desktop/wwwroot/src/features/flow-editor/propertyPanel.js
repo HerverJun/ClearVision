@@ -19,6 +19,7 @@ import {
 import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
 import {
     collectEffectiveRequiredParameterErrors,
+    getOperatorOutputAvailabilityStates,
     getParameterEffectiveState,
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
@@ -288,6 +289,11 @@ class PropertyPanel {
                     operator.ParameterConstraints ||
                     metadata.parameterConstraints ||
                     metadata.ParameterConstraints ||
+                    [],
+                outputAvailabilityRules: operator.outputAvailabilityRules ||
+                    operator.OutputAvailabilityRules ||
+                    metadata.outputAvailabilityRules ||
+                    metadata.OutputAvailabilityRules ||
                     []
             }
             : operator;
@@ -440,6 +446,7 @@ class PropertyPanel {
                 ${this.currentOperator.lifecycle && this.currentOperator.lifecycle !== 'Stable'
                     ? `<div class="operator-lifecycle-note">${this.escapeHtml(this.currentOperator.lifecycleNote || this.currentOperator.LifecycleNote || '该算子具有非稳定生命周期状态，使用前请确认能力边界。')}</div>`
                     : ''}
+                ${this.renderOutputAvailabilitySummary(this.currentOperator)}
         `;
 
         if (parametersForRender.length === 0) {
@@ -631,7 +638,7 @@ class PropertyPanel {
                     <h5>输入 / 输出</h5>
                     <div class="property-port-list">
                         ${this.renderLibraryPorts(inputPorts, inputType, '输入')}
-                        ${this.renderLibraryPorts(outputPorts, outputType, '输出')}
+                        ${this.renderLibraryPorts(outputPorts, outputType, '输出', operator)}
                     </div>
                 </section>
 
@@ -654,7 +661,73 @@ class PropertyPanel {
         return fallback;
     }
 
-    renderLibraryPorts(ports, fallbackType, label) {
+    renderOutputAvailabilitySummary(operator) {
+        const rules = operator?.outputAvailabilityRules || operator?.OutputAvailabilityRules || [];
+        if (!Array.isArray(rules) || rules.length === 0) {
+            return '';
+        }
+
+        const outputPorts = Array.isArray(operator?.outputPorts)
+            ? operator.outputPorts
+            : (Array.isArray(operator?.OutputPorts)
+                ? operator.OutputPorts
+                : (Array.isArray(operator?.outputs) ? operator.outputs : []));
+        const states = getOperatorOutputAvailabilityStates(operator, outputPorts);
+        const conditionalStates = Array.from(states.values()).filter(state => state.rule);
+        if (conditionalStates.length === 0) {
+            return '';
+        }
+
+        return `
+            <section class="property-summary-section property-output-availability" data-output-availability-summary="true">
+                <h5>当前模式输出</h5>
+                <div class="property-port-list">
+                    ${conditionalStates.map(state => {
+                        const port = outputPorts.find(item => normalizeParameterName(item?.name || item?.Name) === normalizeParameterName(state.outputName));
+                        const displayName = port?.displayName || port?.DisplayName || state.outputName;
+                        return `
+                            <div class="property-port-row ${state.isAvailable ? 'is-output-available' : 'is-output-unavailable'}"
+                                 data-output-name="${this.escapeAttribute(state.outputName)}"
+                                 data-output-available="${state.isAvailable ? 'true' : 'false'}">
+                                <span class="property-port-direction">输出</span>
+                                <span class="property-port-name">${this.escapeHtml(displayName)}</span>
+                                <span class="property-output-state">${state.isAvailable ? '可用' : '当前模式不可用'}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `;
+    }
+
+    syncOutputAvailabilitySummary(values = null) {
+        if (!this.currentOperator) {
+            return;
+        }
+
+        const outputPorts = Array.isArray(this.currentOperator.outputPorts)
+            ? this.currentOperator.outputPorts
+            : (Array.isArray(this.currentOperator.OutputPorts)
+                ? this.currentOperator.OutputPorts
+                : (Array.isArray(this.currentOperator.outputs) ? this.currentOperator.outputs : []));
+        const states = getOperatorOutputAvailabilityStates(this.currentOperator, outputPorts, { values });
+        this.container?.querySelectorAll('[data-output-name]').forEach(row => {
+            const state = states.get(normalizeParameterName(row.dataset.outputName));
+            if (!state) {
+                return;
+            }
+
+            row.classList.toggle('is-output-available', state.isAvailable);
+            row.classList.toggle('is-output-unavailable', !state.isAvailable);
+            row.setAttribute('data-output-available', state.isAvailable ? 'true' : 'false');
+            const label = row.querySelector('.property-output-state');
+            if (label) {
+                label.textContent = state.isAvailable ? '可用' : '当前模式不可用';
+            }
+        });
+    }
+
+    renderLibraryPorts(ports, fallbackType, label, operator = null) {
         if (!Array.isArray(ports) || ports.length === 0) {
             return `
                 <div class="property-port-row">
@@ -668,12 +741,17 @@ class PropertyPanel {
             const name = port.displayName || port.DisplayName || port.name || port.Name || '未命名';
             const dataType = port.dataType || port.DataType || port.type || port.Type || 'Any';
             const required = label === '输入' && Boolean(port.isRequired ?? port.IsRequired);
+            const outputState = label === '输出' && operator
+                ? getOperatorOutputAvailabilityStates(operator, ports).get(normalizeParameterName(port.name || port.Name))
+                : null;
+            const unavailable = outputState?.isAvailable === false;
 
             return `
-                <div class="property-port-row">
+                <div class="property-port-row ${unavailable ? 'is-output-unavailable' : ''}"
+                     ${outputState ? `data-output-available="${outputState.isAvailable ? 'true' : 'false'}"` : ''}>
                     <span class="property-port-direction">${this.escapeHtml(label)}</span>
                     <span class="property-port-name">${this.escapeHtml(name)}${required ? ' *' : ''}</span>
-                    <span class="property-port-type">${this.escapeHtml(dataType)}</span>
+                    <span class="property-port-type">${unavailable ? '当前模式不可用' : this.escapeHtml(dataType)}</span>
                 </div>
             `;
         }).join('');
@@ -905,6 +983,7 @@ class PropertyPanel {
         let inputHtml = '';
         const effectiveState = this.getParameterRuleState(param);
         const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
+        const disabledAttributes = effectiveState.effectiveDisabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
         const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
             ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
             : '';
@@ -924,7 +1003,8 @@ class PropertyPanel {
                            ${max !== undefined ? `max="${max}"` : ''}
                            step="${dataType === 'int' ? 1 : 0.1}"
                            class="form-input"
-                           data-type="${dataType}">
+                           data-type="${dataType}"
+                           ${disabledAttributes}>
                 `;
                 break;
                 
@@ -935,7 +1015,8 @@ class PropertyPanel {
                            name="${name}" 
                            value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}"
                            class="form-input"
-                           data-type="string">
+                           data-type="string"
+                           ${disabledAttributes}>
                 `;
                 break;
                 
@@ -948,7 +1029,8 @@ class PropertyPanel {
                                id="param-${name}" 
                                name="${name}" 
                                ${checked}
-                               data-type="boolean">
+                               data-type="boolean"
+                               ${disabledAttributes}>
                         <span class="slider"></span>
                     </label>
                 `;
@@ -959,9 +1041,10 @@ class PropertyPanel {
                 const options = param.options || [];
                 inputHtml = `
                     <select id="param-${name}" 
-                            name="${name}" 
-                            class="form-select"
-                            data-type="enum">
+                             name="${name}"
+                             class="form-select"
+                             data-type="enum"
+                             ${disabledAttributes}>
                         ${options.map(opt => {
                             const label = typeof opt === 'string' ? opt : (opt.label || opt.Label || 'undefined');
                             const val = typeof opt === 'string' ? opt : (opt.value ?? opt.Value);
@@ -983,15 +1066,16 @@ class PropertyPanel {
                            name="${name}" 
                            value="${value !== undefined ? value : defaultValue || '#000000'}"
                            class="form-color"
-                           data-type="color">
+                           data-type="color"
+                           ${disabledAttributes}>
                 `;
                 break;
                 
             case 'file':
                 inputHtml = `
                     <div class="file-picker-wrapper">
-                        <input type="text" id="param-${name}" name="${name}" value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}" class="form-input" readonly data-type="file">
-                        <button type="button" class="btn btn-sm btn-secondary btn-pick-file" data-param="${name}">...</button>
+                        <input type="text" id="param-${name}" name="${name}" value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}" class="form-input" readonly data-type="file" ${disabledAttributes}>
+                        <button type="button" class="btn btn-sm btn-secondary btn-pick-file" data-param="${name}" ${disabledAttributes}>...</button>
                     </div>
                 `;
                 break;
@@ -1005,9 +1089,10 @@ class PropertyPanel {
                     <select id="param-${name}"
                             name="${name}"
                             class="form-select"
-                            data-type="string"
-                            data-camera-binding-select="true"
-                            data-current-value="${selectedCameraId}">
+                             data-type="string"
+                             data-camera-binding-select="true"
+                             data-current-value="${selectedCameraId}"
+                             ${disabledAttributes}>
                         <option value="">-- 请选择相机 --</option>
                         ${hasBindings
                             ? bindings.map(b => `
@@ -1029,12 +1114,18 @@ class PropertyPanel {
                            name="${name}" 
                            value="${this.escapeAttribute(value !== undefined ? value : defaultValue || '')}"
                            class="form-input"
-                           data-type="${dataType}">
+                           data-type="${dataType}"
+                           ${disabledAttributes}>
                 `;
         }
 
         return `
-            <div class="form-group ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
+            <div class="form-group ${effectiveState.effectiveVisible ? '' : 'hidden'} ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''} ${effectiveState.effectiveIgnored ? 'is-rule-ignored' : ''}"
+                 data-parameter-name="${this.escapeAttribute(name)}"
+                 data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}"
+                 data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}"
+                 data-effective-visible="${effectiveState.effectiveVisible ? 'true' : 'false'}"
+                 data-effective-ignored="${effectiveState.effectiveIgnored ? 'true' : 'false'}">
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
@@ -1054,6 +1145,7 @@ class PropertyPanel {
         
         const effectiveState = this.getParameterRuleState(param);
         const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
+        const disabledAttributes = effectiveState.effectiveDisabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
         const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
             ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
             : '';
@@ -1081,6 +1173,7 @@ class PropertyPanel {
                                step="${stepValue}"
                                class="form-input number-input"
                                data-type="${dataType}"
+                               ${disabledAttributes}
                                ${readonly ? 'readonly aria-readonly="true"' : ''}>
                         ${shouldRenderSlider ? `
                             <input type="range" 
@@ -1090,7 +1183,7 @@ class PropertyPanel {
                                    max="${max}" 
                                    step="${stepValue}"
                                    value="${currentValue}"
-                                   ${readonly ? 'disabled aria-disabled="true"' : ''}>
+                                   ${(readonly || effectiveState.effectiveDisabled) ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'}>
                         ` : ''}
                     </div>
                 `;
@@ -1105,8 +1198,9 @@ class PropertyPanel {
                                name="${name}" 
                                value="${currentValue || '#000000'}"
                                class="form-color-hidden"
-                               data-type="color">
-                        <div class="color-preview-box" onclick="document.getElementById('param-${name}').click()" style="background-color: ${currentValue || '#000000'}">
+                               data-type="color"
+                               ${disabledAttributes}>
+                        <div class="color-preview-box" aria-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}" tabindex="${effectiveState.effectiveDisabled ? '-1' : '0'}" onclick="document.getElementById('param-${name}').click()" style="background-color: ${currentValue || '#000000'}">
                             <span class="color-value">${currentValue || '#000000'}</span>
                         </div>
                     </div>
@@ -1119,7 +1213,12 @@ class PropertyPanel {
         }
         
         return `
-            <div class="form-group param-enhanced ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''} ${readonly ? 'is-readonly' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
+            <div class="form-group param-enhanced ${effectiveState.effectiveVisible ? '' : 'hidden'} ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''} ${effectiveState.effectiveIgnored ? 'is-rule-ignored' : ''} ${readonly ? 'is-readonly' : ''}"
+                 data-parameter-name="${this.escapeAttribute(name)}"
+                 data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}"
+                 data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}"
+                 data-effective-visible="${effectiveState.effectiveVisible ? 'true' : 'false'}"
+                 data-effective-ignored="${effectiveState.effectiveIgnored ? 'true' : 'false'}">
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
@@ -1347,6 +1446,7 @@ class PropertyPanel {
                 return;
             }
 
+            this.syncParameterRuleControls();
             this._notifyValueChanged();
         };
 
@@ -1417,7 +1517,7 @@ class PropertyPanel {
             });
         });
 
-        this.syncImageAcquisitionSourceControls();
+        this.syncParameterRuleControls();
         this.applyGlobalVariableInputState();
         this.loadCameraBindingsForSelects(true);
     }
@@ -1554,21 +1654,23 @@ class PropertyPanel {
             .find(input => normalizedNames.includes(String(input.name || '').toLowerCase())) || null;
     }
 
-    syncImageAcquisitionSourceControls(options = {}) {
-        if (this.currentOperator?.type !== 'ImageAcquisition') {
+    syncParameterRuleControls(options = {}) {
+        if (!this.currentOperator) {
             return;
         }
 
+        const form = document.getElementById('property-form');
+        if (!form) {
+            return;
+        }
+
+        const values = this.collectFormRuleValues(form);
         const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
-        if (!sourceTypeInput) {
-            return;
-        }
-
-        const values = this.collectFormRuleValues();
-        const isCameraMode = this.normalizeSourceTypeValue(sourceTypeInput.value) === 'camera';
-        const controlledInputs = ['FilePath', 'CameraId', 'CameraBindingId']
-            .map(name => this.findParamInput(name))
-            .filter(Boolean)
+        const isCameraMode = this.currentOperator?.type === 'ImageAcquisition' &&
+            sourceTypeInput &&
+            this.normalizeSourceTypeValue(sourceTypeInput.value) === 'camera';
+        const controlledInputs = Array.from(form.querySelectorAll('input[name], select[name]'))
+            .filter(input => input.type !== 'range')
             .filter((input, index, all) => all.indexOf(input) === index);
 
         controlledInputs.forEach(input => {
@@ -1576,12 +1678,12 @@ class PropertyPanel {
             const state = this.getParameterRuleState(param || input.name, this.currentOperator, values);
             const group = input.closest('.form-group');
             const pickerButton = group?.querySelector('.btn-pick-file');
+            const colorPreview = group?.querySelector('.color-preview-box');
             const label = group?.querySelector('.form-label');
             const requiredMark = label?.querySelector('.required');
 
             if (
                 isCameraMode &&
-                state.effectiveDisabled &&
                 input.name.toLowerCase() === 'filepath' &&
                 options.clearFilePathWhenCamera !== false &&
                 input.value
@@ -1593,12 +1695,25 @@ class PropertyPanel {
             input.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
             if (pickerButton) {
                 pickerButton.disabled = state.effectiveDisabled;
+                pickerButton.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+            }
+            group?.querySelectorAll('.param-slider').forEach(slider => {
+                const disabled = state.effectiveDisabled || group.classList.contains('is-readonly');
+                slider.disabled = disabled;
+                slider.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            });
+            if (colorPreview) {
+                colorPreview.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+                colorPreview.setAttribute('tabindex', state.effectiveDisabled ? '-1' : '0');
             }
 
-            group?.classList.toggle('hidden', state.effectiveDisabled);
+            group?.classList.toggle('hidden', !state.effectiveVisible);
             group?.classList.toggle('is-rule-disabled', state.effectiveDisabled);
+            group?.classList.toggle('is-rule-ignored', state.effectiveIgnored);
             group?.setAttribute('data-effective-disabled', state.effectiveDisabled ? 'true' : 'false');
             group?.setAttribute('data-effective-required', state.effectiveRequired ? 'true' : 'false');
+            group?.setAttribute('data-effective-visible', state.effectiveVisible ? 'true' : 'false');
+            group?.setAttribute('data-effective-ignored', state.effectiveIgnored ? 'true' : 'false');
 
             if (label && state.effectiveRequired && !requiredMark) {
                 label.insertAdjacentHTML('beforeend', ' <span class="required">*</span>');
@@ -1606,6 +1721,11 @@ class PropertyPanel {
                 requiredMark.remove();
             }
         });
+        this.syncOutputAvailabilitySummary(values);
+    }
+
+    syncImageAcquisitionSourceControls(options = {}) {
+        this.syncParameterRuleControls(options);
     }
 
     normalizeImageAcquisitionValues(values) {
@@ -1749,7 +1869,7 @@ class PropertyPanel {
         inputs.forEach(input => {
             const param = this.getParameterByName(input.name);
             const state = this.getParameterRuleState(param || input.name, this.currentOperator, ruleValues);
-            if (state.effectiveDisabled) {
+            if (state.effectiveDisabled || state.effectiveIgnored) {
                 return;
             }
 
@@ -1848,7 +1968,7 @@ class PropertyPanel {
             const value = getParameterEffectiveValue(param);
             const state = this.getParameterRuleState(param, operator);
 
-            if (state.effectiveDisabled) {
+            if (state.effectiveDisabled || state.effectiveIgnored) {
                 return;
             }
 

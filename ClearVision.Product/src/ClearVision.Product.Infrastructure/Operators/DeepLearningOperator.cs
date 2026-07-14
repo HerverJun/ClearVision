@@ -71,6 +71,64 @@ public enum DetectionOutputFormat
     Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "图像分类", "语义分割", "ONNX", "YOLO", "Deep learning" },
     Version = "1.1.0"
 )]
+[OperatorParameterRule("TaskType", ReasonCode = "DEEP_LEARNING_TASK_TYPE")]
+[OperatorParameterRule("ModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "deep-learning-model-source", MutuallyExclusiveGroup = "deep-learning-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "DEEP_LEARNING_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelId", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "deep-learning-model-source", MutuallyExclusiveGroup = "deep-learning-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "DEEP_LEARNING_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelCatalogPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAny = new[] { "ModelId:empty", "ModelPath:not-empty" },
+    ResourceKind = OperatorResourceKind.ModelCatalog, ReasonCode = "DEEP_LEARNING_CATALOG_REQUIRES_MODEL_ID")]
+[OperatorParameterRule("LabelsPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAll = new[] { "TaskType==SemanticSegmentation" }, HiddenWhenAll = new[] { "TaskType==SemanticSegmentation" },
+    IgnoredWhenAll = new[] { "TaskType==SemanticSegmentation" }, ResourceKind = OperatorResourceKind.ModelLabels,
+    ReasonCode = "DEEP_LEARNING_LABELS_FOR_DETECTION_OR_CLASSIFICATION")]
+[OperatorParameterRule("Confidence", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_CONFIDENCE_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("ModelVersion", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_YOLO_VERSION_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("InputSize", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_DETECTION_INPUT_SIZE_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("TargetClasses", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_TARGET_CLASSES_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("GpuDeviceId", DisabledWhenAll = new[] { "ExecutionProvider==CPU" }, ReasonCode = "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU")]
+[OperatorParameterRule("UseGpu", DisabledWhenAny = new[] { "ExecutionProvider==CPU", "ExecutionProvider==CUDA" }, ReasonCode = "DEEP_LEARNING_USE_GPU_ONLY_FOR_AUTO_PROVIDER")]
+[OperatorParameterRule("EnableInternalNms", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation", "OutputFormat==EndToEndNms" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS")]
+[OperatorParameterRule("NmsIouThreshold",
+    RequiredWhenAll = new[] { "OutputFormat==RawYolo", "EnableInternalNms==true" },
+    RequiredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==Auto" },
+    DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation", "OutputFormat==EndToEndNms", "EnableInternalNms==false" },
+    HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation", "OutputFormat==EndToEndNms", "EnableInternalNms==false" },
+    IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation", "OutputFormat==EndToEndNms", "EnableInternalNms==false" },
+    ReasonCode = "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS")]
+[OperatorParameterRule("OutputFormat", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_OUTPUT_FORMAT_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("DetectionMode", DisabledWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ImageClassification", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_DETECTION_MODE_ONLY_FOR_DETECTION")]
+[OperatorParameterRule("TopK", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_TOP_K_ONLY_FOR_CLASSIFICATION")]
+[OperatorParameterRule("ClassificationInputSize", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_CLASSIFICATION")]
+[OperatorParameterRule("ClassificationScoreMode", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SCORE_MODE_ONLY_FOR_CLASSIFICATION")]
+[OperatorParameterRule("ClassNames", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, DisabledWhenAll = new[] { "TaskType==ObjectDetection" }, HiddenWhenAll = new[] { "TaskType==ObjectDetection" }, IgnoredWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_CLASS_NAMES_FOR_CLASSIFICATION_OR_SEGMENTATION")]
+[OperatorParameterRule("SegmentationInputSize", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_SEGMENTATION")]
+[OperatorParameterRule("NumClasses", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASS_COUNT_ONLY_FOR_SEGMENTATION")]
+[OperatorParameterRule("MaxClassMasks", DisabledWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, HiddenWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, IgnoredWhenAny = new[] { "TaskType==ObjectDetection", "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASS_MASKS_ONLY_FOR_SEGMENTATION")]
+[OperatorParameterRule("ExecutionProvider", ReasonCode = "DEEP_LEARNING_EXECUTION_PROVIDER")]
+[OperatorParameterRule("ScaleToUnitRange", DisabledWhenAll = new[] { "TaskType==ObjectDetection" }, HiddenWhenAll = new[] { "TaskType==ObjectDetection" }, IgnoredWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION")]
+[OperatorParameterRule("ChannelOrder", DisabledWhenAll = new[] { "TaskType==ObjectDetection" }, HiddenWhenAll = new[] { "TaskType==ObjectDetection" }, IgnoredWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION")]
+[OperatorParameterRule("Mean", DisabledWhenAll = new[] { "TaskType==ObjectDetection" }, HiddenWhenAll = new[] { "TaskType==ObjectDetection" }, IgnoredWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION")]
+[OperatorParameterRule("Std", DisabledWhenAll = new[] { "TaskType==ObjectDetection" }, HiddenWhenAll = new[] { "TaskType==ObjectDetection" }, IgnoredWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION")]
+[OperatorOutputRule("DetectionList", AvailableWhenAll = new[] { "TaskType==ObjectDetection" }, ReasonCode = "DEEP_LEARNING_DETECTION_OUTPUT")]
+[OperatorOutputRule("Defects", AvailableWhenAll = new[] { "TaskType==ObjectDetection", "DetectionMode==Defect" }, ReasonCode = "DEEP_LEARNING_DEFECT_OUTPUT")]
+[OperatorOutputRule("DefectCount", AvailableWhenAll = new[] { "TaskType==ObjectDetection", "DetectionMode==Defect" }, ReasonCode = "DEEP_LEARNING_DEFECT_OUTPUT")]
+[OperatorOutputRule("Objects", AvailableWhenAll = new[] { "TaskType==ObjectDetection", "DetectionMode==Object" }, ReasonCode = "DEEP_LEARNING_OBJECT_OUTPUT")]
+[OperatorOutputRule("ObjectCount", AvailableWhenAll = new[] { "TaskType==ObjectDetection", "DetectionMode==Object" }, ReasonCode = "DEEP_LEARNING_OBJECT_OUTPUT")]
+[OperatorOutputRule("TopClassLabel", AvailableWhenAll = new[] { "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASSIFICATION_OUTPUT")]
+[OperatorOutputRule("TopClassConfidence", AvailableWhenAll = new[] { "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASSIFICATION_OUTPUT")]
+[OperatorOutputRule("ClassificationTopK", AvailableWhenAll = new[] { "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASSIFICATION_OUTPUT")]
+[OperatorOutputRule("ClassificationResult", AvailableWhenAll = new[] { "TaskType==ImageClassification" }, ReasonCode = "DEEP_LEARNING_CLASSIFICATION_OUTPUT")]
+[OperatorOutputRule("SegmentationMap", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("ColoredMap", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("ClassMasks", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("ClassCount", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("ClassMaskCount", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("OmittedClassMaskCount", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
+[OperatorOutputRule("PresentClasses", AvailableWhenAll = new[] { "TaskType==SemanticSegmentation" }, ReasonCode = "DEEP_LEARNING_SEGMENTATION_OUTPUT")]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
 [OutputPort("OriginalImage", "原始图像", PortDataType.Image)]
@@ -548,18 +606,6 @@ public class DeepLearningOperator : OperatorBase
         }
 
         var detectionList = new DetectionList(outputDetections);
-        var topDetection = outputDetections
-            .OrderByDescending(detection => detection.Confidence)
-            .FirstOrDefault();
-        var topClassLabel = topDetection?.Label ?? string.Empty;
-        var topClassConfidence = topDetection?.Confidence ?? 0.0;
-        var classificationResult = new
-        {
-            Label = topClassLabel,
-            Confidence = topClassConfidence,
-            CandidateCount = outputDetections.Count
-        };
-
         // 输出原始图像（不带任何绘制），供下游节点重新绘制
         var originalImage = src.Clone();
 
@@ -579,13 +625,6 @@ public class DeepLearningOperator : OperatorBase
             { "PostprocessDiagnostics", postprocessResult.Diagnostics.ToPayload() },
             { "VisualizationDetectionCount", visualizationDetections.Count },
             { "DetectionList", detectionList },
-            { "Objects", isObjectMode ? detectionList : new DetectionList() },
-            { "ObjectCount", isObjectMode ? detections.Count : 0 },
-            { "TopClassLabel", topClassLabel },
-            { "TopClassConfidence", topClassConfidence },
-            { "ClassificationResult", classificationResult },
-            { "Defects", isObjectMode ? new DetectionList() : detectionList },
-            { "DefectCount", isObjectMode ? 0 : detections.Count },
             { "OriginalImage", new ImageWrapper(originalImage) },
             { "LabelSource", labelContract.ResolvedLabelSource },
             { "ResolvedLabels", labelContract.ResolvedLabels },
@@ -598,6 +637,16 @@ public class DeepLearningOperator : OperatorBase
             { "ModelSource", modelTarget.Source },
             { "ModelProvenance", modelTarget.ToProvenancePayload() }
         };
+        if (isObjectMode)
+        {
+            additionalData["Objects"] = detectionList;
+            additionalData["ObjectCount"] = detections.Count;
+        }
+        else
+        {
+            additionalData["Defects"] = detectionList;
+            additionalData["DefectCount"] = detections.Count;
+        }
 
         Logger.LogInformation("[DeepLearning] 执行完毕. 检测总数: {Count}, 过滤后输出: {DefectCount}", detections.Count, detections.Count);
 
@@ -706,7 +755,6 @@ public class DeepLearningOperator : OperatorBase
             var outputImage = source.Clone();
             DrawClassificationResult(outputImage, postprocess.TopPrediction);
             var originalImage = source.Clone();
-            var emptyDetections = new DetectionList();
             var classificationTopK = postprocess.Predictions
                 .Select(prediction => new Dictionary<string, object>
                 {
@@ -727,11 +775,6 @@ public class DeepLearningOperator : OperatorBase
             var output = new Dictionary<string, object>
             {
                 ["OriginalImage"] = new ImageWrapper(originalImage),
-                ["DetectionList"] = emptyDetections,
-                ["Objects"] = new DetectionList(),
-                ["ObjectCount"] = 0,
-                ["Defects"] = new DetectionList(),
-                ["DefectCount"] = 0,
                 ["TopClassLabel"] = postprocess.TopPrediction.Label,
                 ["TopClassConfidence"] = postprocess.TopPrediction.Confidence,
                 ["ClassificationTopK"] = classificationTopK,
@@ -798,15 +841,6 @@ public class DeepLearningOperator : OperatorBase
         }
 
         output["OriginalImage"] = new ImageWrapper(source.Clone());
-        output["DetectionList"] = new DetectionList();
-        output["Objects"] = new DetectionList();
-        output["ObjectCount"] = 0;
-        output["Defects"] = new DetectionList();
-        output["DefectCount"] = 0;
-        output["TopClassLabel"] = string.Empty;
-        output["TopClassConfidence"] = 0.0;
-        output["ClassificationTopK"] = Array.Empty<object>();
-        output["ClassificationResult"] = new Dictionary<string, object>();
         output["OutputFormat"] = "SemanticSegmentation";
         output["PostprocessDiagnostics"] = new Dictionary<string, object>
         {

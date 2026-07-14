@@ -44,6 +44,7 @@ public sealed class VisionAgentParameterRuleParityTests
             "ImageAcquisition",
             "Filtering",
             "Measurement",
+            "TemplateMatching",
             "DeepLearning",
             "EdgeDetection",
             "ResultOutput",
@@ -55,7 +56,6 @@ public sealed class VisionAgentParameterRuleParityTests
         };
 
         spec.OperatorConstraints.Keys.Should().BeEquivalentTo(migratedOperators);
-        spec.OperatorConstraints.Should().NotContainKey("TemplateMatching");
         foreach (var operatorType in migratedOperators)
         {
             catalog.TryGet(operatorType, out var contract).Should().BeTrue(operatorType);

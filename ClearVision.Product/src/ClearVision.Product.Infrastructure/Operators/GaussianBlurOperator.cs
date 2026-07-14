@@ -22,6 +22,17 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "gaussian", "mean", "box", "median", "bilateral", "blur", "filter", "denoise", "滤波" },
     Version = "1.1.0"
 )]
+[OperatorParameterRule("FilterMode", ReasonCode = "FILTERING_MODE")]
+[OperatorParameterRule("KernelSize", DisabledWhenAll = new[] { "FilterMode==Bilateral" }, HiddenWhenAll = new[] { "FilterMode==Bilateral" }, IgnoredWhenAll = new[] { "FilterMode==Bilateral" }, ReasonCode = "FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL")]
+[OperatorParameterRule("SigmaX", DisabledWhenAll = new[] { "FilterMode!=Gaussian" }, HiddenWhenAll = new[] { "FilterMode!=Gaussian" }, IgnoredWhenAll = new[] { "FilterMode!=Gaussian" }, ReasonCode = "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN")]
+[OperatorParameterRule("SigmaY", DisabledWhenAll = new[] { "FilterMode!=Gaussian" }, HiddenWhenAll = new[] { "FilterMode!=Gaussian" }, IgnoredWhenAll = new[] { "FilterMode!=Gaussian" }, ReasonCode = "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN")]
+[OperatorParameterRule("BorderType", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode==Median" }, HiddenWhenAll = new[] { "FilterMode==Median" }, IgnoredWhenAll = new[] { "FilterMode==Median" }, ReasonCode = "FILTERING_BORDER_NOT_USED_BY_MEDIAN")]
+[OperatorParameterRule("Diameter", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorParameterRule("SigmaColor", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorParameterRule("SigmaSpace", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorOutputRule("Image", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorOutputRule("FilterMode", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorOutputRule("FilterDiagnostics", ReasonCode = "FILTERING_OUTPUT")]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("FilterMode", "实际滤波模式", PortDataType.String)]

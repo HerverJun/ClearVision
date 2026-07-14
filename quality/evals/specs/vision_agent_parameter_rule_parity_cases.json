@@ -167,7 +167,7 @@
       },
       {
         "parameter": "BorderType",
-        "requiredPolicy": "metadata",
+        "requiredPolicy": "required",
         "disabledWhen": {
           "all": [
             {
@@ -181,7 +181,7 @@
       },
       {
         "parameter": "Diameter",
-        "requiredPolicy": "metadata",
+        "requiredPolicy": "required",
         "disabledWhen": {
           "all": [
             {
@@ -195,7 +195,7 @@
       },
       {
         "parameter": "SigmaColor",
-        "requiredPolicy": "metadata",
+        "requiredPolicy": "required",
         "disabledWhen": {
           "all": [
             {
@@ -209,7 +209,7 @@
       },
       {
         "parameter": "SigmaSpace",
-        "requiredPolicy": "metadata",
+        "requiredPolicy": "required",
         "disabledWhen": {
           "all": [
             {
@@ -369,7 +369,7 @@
       },
       {
         "parameter": "AngleUnit",
-        "requiredPolicy": "metadata",
+        "requiredPolicy": "required",
         "disabledWhen": {
           "all": [
             {
@@ -380,6 +380,271 @@
           ]
         },
         "reasonCode": "MEASUREMENT_ANGLE_UNIT_ONLY_FOR_ANGLE"
+      }
+    ],
+    "TemplateMatching": [
+      {
+        "parameter": "RoiX",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiY",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiWidth",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiHeight",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "OriginX",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "not-equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_CUSTOM_ORIGIN"
+      },
+      {
+        "parameter": "OriginY",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "not-equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_CUSTOM_ORIGIN"
+      },
+      {
+        "parameter": "AngleStart",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "AngleExtent",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "AngleStep",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleMin",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleMax",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleStep",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "PyramidLevels",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
       }
     ],
     "DeepLearning": [
@@ -2120,15 +2385,18 @@
     {
       "caseId": "template_matching_requires_runtime_template_input",
       "operatorType": "TemplateMatching",
-      "parameters": {},
+      "parameters": {
+        "UseRoi": false,
+        "EnablePoseSearch": false
+      },
       "uiStates": {
-        "TemplatePath": {
-          "effectiveRequired": true,
-          "effectiveDisabled": false
+        "RoiWidth": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
         },
-        "TemplateId": {
-          "effectiveRequired": true,
-          "effectiveDisabled": false
+        "AngleExtent": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
         }
       },
       "flowValidationMissingParameters": [
@@ -2139,23 +2407,34 @@
       ]
     },
     {
-      "caseId": "template_matching_legacy_metadata_accepts_template_id",
+      "caseId": "template_matching_roi_requires_dimensions",
       "operatorType": "TemplateMatching",
       "parameters": {
-        "TemplateId": "mock-template-catalog-item"
+        "UseRoi": true,
+        "RoiWidth": "",
+        "RoiHeight": "",
+        "EnablePoseSearch": false
       },
       "uiStates": {
-        "TemplatePath": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "TemplateId": {
+        "RoiWidth": {
           "effectiveRequired": true,
           "effectiveDisabled": false
+        },
+        "RoiHeight": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "AngleExtent": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
         }
       },
-      "flowValidationMissingParameters": [],
-      "deploymentPrecheckMissingParameters": []
+      "flowValidationMissingParameters": [
+        "Template"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "Template"
+      ]
     },
     {
       "caseId": "deep_learning_requires_model_path_or_id",

@@ -21,6 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "save-text",
     Keywords = new[] { "save text", "export csv", "log", "json export" }
 )]
+[OperatorParameterRule("FilePath", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "TEXT_SAVE_FILE_PATH_REQUIRED")]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [InputPort("Text", "Text", PortDataType.String, IsRequired = false)]
 [OutputPort("FilePath", "File Path", PortDataType.String)]

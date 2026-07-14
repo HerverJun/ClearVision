@@ -1,83 +1,3 @@
-export const OPERATOR_PARAMETER_RULES = Object.freeze({
-    TemplateMatching: Object.freeze({
-        parameters: Object.freeze({
-            TemplatePath: Object.freeze({
-                required: true,
-                disabledWhen: Object.freeze({ parameter: 'TemplateId', notEmpty: true }),
-                disabledReason: 'Template path is disabled when TemplateId is selected.',
-                mutuallyExclusiveGroup: 'template-source',
-                atLeastOneOf: Object.freeze(['TemplatePath', 'TemplateId']),
-                atLeastOneMessage: 'TemplateMatching requires TemplatePath or TemplateId.'
-            }),
-            TemplateId: Object.freeze({
-                required: true,
-                disabledWhen: Object.freeze({ parameter: 'TemplatePath', notEmpty: true }),
-                disabledReason: 'TemplateId is disabled when TemplatePath is selected.',
-                mutuallyExclusiveGroup: 'template-source',
-                atLeastOneOf: Object.freeze(['TemplatePath', 'TemplateId']),
-                atLeastOneMessage: 'TemplateMatching requires TemplatePath or TemplateId.'
-            }),
-            RoiX: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
-                disabledReason: 'ROI X is disabled when UseRoi is false.'
-            }),
-            RoiY: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
-                disabledReason: 'ROI Y is disabled when UseRoi is false.'
-            }),
-            RoiWidth: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'UseRoi', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
-                disabledReason: 'ROI width is disabled when UseRoi is false.'
-            }),
-            RoiHeight: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'UseRoi', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
-                disabledReason: 'ROI height is disabled when UseRoi is false.'
-            }),
-            OriginX: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'OriginMode', equals: 'Custom' }),
-                disabledWhen: Object.freeze({ parameter: 'OriginMode', notEquals: 'Custom' }),
-                disabledReason: 'Origin X is only editable when OriginMode is Custom.'
-            }),
-            OriginY: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'OriginMode', equals: 'Custom' }),
-                disabledWhen: Object.freeze({ parameter: 'OriginMode', notEquals: 'Custom' }),
-                disabledReason: 'Origin Y is only editable when OriginMode is Custom.'
-            }),
-            AngleStart: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Angle search is disabled when EnablePoseSearch is false.'
-            }),
-            AngleExtent: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Angle extent is disabled when EnablePoseSearch is false.'
-            }),
-            AngleStep: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Angle step is disabled when EnablePoseSearch is false.'
-            }),
-            ScaleMin: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Scale search is disabled when EnablePoseSearch is false.'
-            }),
-            ScaleMax: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Scale search is disabled when EnablePoseSearch is false.'
-            }),
-            ScaleStep: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
-                disabledReason: 'Scale step is disabled when EnablePoseSearch is false.'
-            })
-        })
-    })
-});
-
 export function normalizeParameterName(name) {
     return String(name || '').trim().toLowerCase();
 }
@@ -248,8 +168,32 @@ function getParameterRuleConditionalDisabled(operator, parameterName, rule, valu
         (rule?.enabledWhen && !evaluateCondition(rule.enabledWhen, operator, values)) ||
         (rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values)) ||
         evaluateAnyCondition(rule?.disabledWhenAny, operator, values) ||
-        evaluateAllConditions(rule?.disabledWhenAll, operator, values)
+        evaluateAllConditions(rule?.disabledWhenAll, operator, values) ||
+        getParameterRuleConditionalIgnored(operator, rule, values)
     );
+}
+
+function getOperatorOutputRules(operator) {
+    const rules = operator?.outputAvailabilityRules ?? operator?.OutputAvailabilityRules ?? [];
+    return Array.isArray(rules) ? rules : [];
+}
+
+function getParameterRuleConditionalIgnored(operator, rule, values = null) {
+    return Boolean(
+        (rule?.ignoredWhen && evaluateCondition(rule.ignoredWhen, operator, values)) ||
+        evaluateAnyCondition(rule?.ignoredWhenAny, operator, values) ||
+        evaluateAllConditions(rule?.ignoredWhenAll, operator, values)
+    );
+}
+
+function getParameterRuleEffectiveVisible(operator, rule, values = null) {
+    const visible = !rule?.visibleWhen || evaluateCondition(rule.visibleWhen, operator, values);
+    const hidden = Boolean(
+        (rule?.hiddenWhen && evaluateCondition(rule.hiddenWhen, operator, values)) ||
+        evaluateAnyCondition(rule?.hiddenWhenAny, operator, values) ||
+        evaluateAllConditions(rule?.hiddenWhenAll, operator, values)
+    );
+    return visible && !hidden;
 }
 
 function getActiveConstraintGroupNames(operator, propertyName, groupName, values = null) {
@@ -262,6 +206,7 @@ function getActiveConstraintGroupNames(operator, propertyName, groupName, values
 
 function hasConfiguredMutuallyExclusivePeer(operator, parameterName, groupName, values = null) {
     if (!groupName) return false;
+    if (!isEmptyParameterValue(getOperatorParameterValueDirect(operator, parameterName, values))) return false;
     const normalizedName = normalizeParameterName(parameterName);
     return getActiveConstraintGroupNames(operator, 'mutuallyExclusiveGroup', groupName, values)
         .some(peerName =>
@@ -343,8 +288,6 @@ export function getOperatorParameterValue(operator, parameterName, values = null
 }
 
 export function getOperatorParameterRule(operatorOrType, parameterName) {
-    const operatorType = normalizeOperatorType(operatorOrType);
-    const normalizedName = normalizeParameterName(parameterName);
     const constraint = typeof operatorOrType === 'object'
         ? findOperatorConstraint(operatorOrType, parameterName)
         : null;
@@ -353,6 +296,9 @@ export function getOperatorParameterRule(operatorOrType, parameterName) {
         const requiredWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'requiredWhen', 'RequiredWhen'));
         const enabledWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'enabledWhen', 'EnabledWhen'));
         const disabledWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'disabledWhen', 'DisabledWhen'));
+        const visibleWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'visibleWhen', 'VisibleWhen'));
+        const hiddenWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'hiddenWhen', 'HiddenWhen'));
+        const ignoredWhen = normalizeServerConditionSet(getConstraintValue(constraint, 'ignoredWhen', 'IgnoredWhen'));
         const atLeastOneGroup = getConstraintValue(constraint, 'atLeastOneGroup', 'AtLeastOneGroup');
         const mutuallyExclusiveGroup = getConstraintValue(constraint, 'mutuallyExclusiveGroup', 'MutuallyExclusiveGroup');
         return {
@@ -360,9 +306,13 @@ export function getOperatorParameterRule(operatorOrType, parameterName) {
             requiredWhen,
             enabledWhen,
             disabledWhen,
+            visibleWhen,
+            hiddenWhen,
+            ignoredWhen,
             atLeastOneGroup,
             atLeastOneOf: getConstraintGroupNames(operatorOrType, 'atLeastOneGroup', atLeastOneGroup),
             mutuallyExclusiveGroup,
+            mutuallyExclusiveWith: getConstraintGroupNames(operatorOrType, 'mutuallyExclusiveGroup', mutuallyExclusiveGroup),
             aliasFor: getConstraintValue(constraint, 'aliasFor', 'AliasFor'),
             deprecated: Boolean(getConstraintValue(constraint, 'deprecated', 'Deprecated')),
             resourceKind: getConstraintValue(constraint, 'resourceKind', 'ResourceKind'),
@@ -370,9 +320,7 @@ export function getOperatorParameterRule(operatorOrType, parameterName) {
         };
     }
 
-    const rules = OPERATOR_PARAMETER_RULES[operatorType]?.parameters || {};
-    return Object.entries(rules)
-        .find(([name]) => normalizeParameterName(name) === normalizedName)?.[1] || null;
+    return null;
 }
 
 function evaluateCondition(condition, operator, values) {
@@ -451,6 +399,8 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
     const rawRequired = typeof paramOrName === 'string'
         ? false
         : isParameterRawRequired(paramOrName);
+    const effectiveIgnored = getParameterRuleConditionalIgnored(operator, rule, values);
+    const effectiveVisible = getParameterRuleEffectiveVisible(operator, rule, values);
     const effectiveDisabled = Boolean(
         getParameterRuleConditionalDisabled(operator, parameterName, rule, values) ||
         hasConfiguredMutuallyExclusivePeer(
@@ -500,6 +450,8 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
         rawRequired,
         effectiveRequired,
         effectiveDisabled,
+        effectiveVisible,
+        effectiveIgnored,
         disabledReason: effectiveDisabled ? (rule?.disabledReason || '') : '',
         rule: rule || null
     };
@@ -520,9 +472,69 @@ export function getOperatorParameterStates(operator, params = null, options = {}
     }));
 }
 
+function getOutputRawName(outputOrName) {
+    return typeof outputOrName === 'string'
+        ? outputOrName.trim()
+        : String(outputOrName?.name ?? outputOrName?.Name ?? outputOrName?.output ?? outputOrName?.Output ?? '').trim();
+}
+
+function findOperatorOutputRule(operator, outputName) {
+    const normalizedName = normalizeParameterName(outputName);
+    return getOperatorOutputRules(operator).find(rule =>
+        normalizeParameterName(getConstraintValue(rule, 'output', 'Output')) === normalizedName) || null;
+}
+
+export function getOutputAvailabilityState(operator, outputOrName, options = {}) {
+    const outputName = getOutputRawName(outputOrName);
+    const rawRule = findOperatorOutputRule(operator, outputName);
+    if (!rawRule) {
+        return {
+            outputName,
+            isAvailable: true,
+            isGuaranteed: true,
+            reasonCode: 'OUTPUT_ALWAYS_AVAILABLE',
+            rule: null
+        };
+    }
+
+    const availableWhen = normalizeServerConditionSet(
+        getConstraintValue(rawRule, 'availableWhen', 'AvailableWhen')
+    );
+    const isAvailable = !availableWhen || evaluateCondition(availableWhen, operator, options.values || null);
+    return {
+        outputName,
+        isAvailable,
+        isGuaranteed: isAvailable,
+        reasonCode: String(getConstraintValue(rawRule, 'reasonCode', 'ReasonCode') || 'OUTPUT_CONDITION_NOT_MET'),
+        rule: {
+            ...rawRule,
+            availableWhen
+        }
+    };
+}
+
+export function getOperatorOutputAvailabilityStates(operator, outputs = null, options = {}) {
+    const outputPorts = Array.isArray(outputs)
+        ? outputs
+        : Array.isArray(operator?.outputPorts)
+            ? operator.outputPorts
+        : Array.isArray(operator?.OutputPorts)
+                ? operator.OutputPorts
+                : Array.isArray(operator?.outputs)
+                    ? operator.outputs
+                    : Array.isArray(operator?.Outputs)
+                        ? operator.Outputs
+                        : [];
+
+    return new Map(outputPorts.map(output => {
+        const state = getOutputAvailabilityState(operator, output, options);
+        return [normalizeParameterName(state.outputName), state];
+    }));
+}
+
 export function shouldIncludePendingParameter(operator, parameterName, options = {}) {
     const state = getParameterEffectiveState(operator, parameterName, options);
-    return !state.effectiveDisabled && !state.rule?.aliasFor;
+    return !state.effectiveDisabled && !state.effectiveIgnored && !state.rule?.aliasFor;
 }
 
 export function collectEffectiveRequiredParameterErrors(operator, params = null, options = {}) {
@@ -543,7 +555,7 @@ export function collectEffectiveRequiredParameterErrors(operator, params = null,
         }
 
         const state = getParameterEffectiveState(operator, param, options);
-        if (state.effectiveDisabled || !state.effectiveRequired) {
+        if (state.effectiveDisabled || state.effectiveIgnored || !state.effectiveRequired) {
             return;
         }
 
