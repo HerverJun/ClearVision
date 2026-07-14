@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `SubpixelEdgeDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.SubpixelEdgeDetection` |
+| 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
+| 分类顺序 (CategoryOrder) | 4 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `experimental`, `non-industrial-reference`, `subpixel-edge`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 参考 `Reference` |
+| 生命周期说明 (Lifecycle Note) | 非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级精度验证。 |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | No |
+| AI 必须披露状态 (Requires Disclosure) | Yes |
+| 标签 (Tags) | `experimental`, `non-industrial-reference`, `subpixel-edge`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Reference`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -39,11 +45,11 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `LowThreshold` | Low Threshold | `double` | 50 | [0, 255] | Yes | - |
-| `HighThreshold` | High Threshold | `double` | 150 | [0, 255] | Yes | - |
-| `Sigma` | Gaussian Sigma | `double` | 1 | [0.1, 10] | Yes | - |
-| `Method` | Method | `enum` | GradientInterp | Steger/Steger；GradientInterp/GradientInterp；GaussianFit/GaussianFit | Yes | - |
-| `EdgeThreshold` | Steger Edge Threshold | `double` | 10 | [0, 1000] | Yes | - |
+| `LowThreshold` | 低阈值 | `double` | 50 | [0, 255] | Yes | - |
+| `HighThreshold` | 高阈值 | `double` | 150 | [0, 255] | Yes | - |
+| `Sigma` | 高斯Sigma | `double` | 1 | [0.1, 10] | Yes | - |
+| `Method` | 方法 | `enum` | GradientInterp | Steger；GradientInterp；GaussianFit | Yes | - |
+| `EdgeThreshold` | Steger边缘阈值 | `double` | 10 | [0, 1000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -56,6 +62,21 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `Edges` | Edge Points | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`23070B2BE296B1F9628A5B1E26309F6F4D234554D54B96E70270782AF33B2555`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -101,4 +122,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

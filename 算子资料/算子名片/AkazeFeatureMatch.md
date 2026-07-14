@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `AkazeFeatureMatchOperator` |
 | 枚举值 (Enum) | `OperatorType.AkazeFeatureMatch` |
-| 分类 (Category) | 匹配定位 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用 AKAZE 局部特征与单应性校验进行模板定位，适合纹理目标的稳健匹配。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,12 +47,12 @@
 | `EnableSymmetryTest` | 对称测试 | `bool` | true | - | Yes | - |
 | `MaxFeatures` | 最大特征点 | `int` | 500 | [100, 2000] | Yes | - |
 | `EnableCandidateProfile` | Enable Candidate Profile | `bool` | false | - | Yes | - |
-| `CandidateProfile` | Candidate Profile | `enum` | default | default/Default；default_v3/AKAZE default_v3 | Yes | - |
-| `MatchRatio` | Match Ratio (Lowe's) | `double` | 0.75 | [0.5, 0.95] | Yes | - |
-| `RansacThreshold` | RANSAC Threshold (px) | `double` | 5 | [0.5, 10] | Yes | - |
-| `MinInlierRatio` | Min Inlier Ratio | `double` | 0.25 | [0.1, 1] | Yes | - |
+| `CandidateProfile` | Candidate Profile | `enum` | default | default/默认；default_v3/AKAZE default_v3 | Yes | - |
+| `MatchRatio` | 匹配比率（Lowe） | `double` | 0.75 | [0.5, 0.95] | Yes | - |
+| `RansacThreshold` | RANSAC阈值（px） | `double` | 5 | [0.5, 10] | Yes | - |
+| `MinInlierRatio` | 最小内点比例 | `double` | 0.25 | [0.1, 1] | Yes | - |
 | `AllowCenterOnlyProjection` | Allow Center-Only Projection | `bool` | false | - | Yes | - |
-| `OriginMode` | Origin Mode | `enum` | Center | Center/Center；TopLeft/TopLeft；Custom/Custom | Yes | - |
+| `OriginMode` | Origin Mode | `enum` | Center | Center；TopLeft；Custom/自定义 | Yes | - |
 | `OriginX` | Origin X | `double` | 0 | - | Yes | - |
 | `OriginY` | Origin Y | `double` | 0 | - | Yes | - |
 
@@ -73,6 +79,21 @@
 | `ProjectedCenterInside` | Projected Center Inside | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `Corners` | Projected Corners | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `HomographyFailureReason` | Homography Failure Reason | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`F7FC8BB252D9E8E4513A10DC155E5EEBEF5491FD205329E7051B177F6984832B`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -117,4 +138,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

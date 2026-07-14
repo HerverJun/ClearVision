@@ -58,6 +58,7 @@ public sealed class OperatorKnowledgeCard
     public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
     public List<OperatorKnowledgeResourceRequirement> ResourceRequirements { get; set; } = new();
     public List<string> GenerationDependencies { get; set; } = new();
+    public string GenerationFingerprint { get; set; } = string.Empty;
     public List<string> RequiredResources { get; set; } = new();
     public List<string> TypicalUpstream { get; set; } = new();
     public List<string> TypicalDownstream { get; set; } = new();
@@ -86,9 +87,10 @@ public sealed class OperatorKnowledgeEdge
 
 public sealed class OperatorKnowledgeGraph
 {
-    public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-graph.v2";
+    public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-graph.v3";
     public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
     public string Source { get; set; } = "OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest";
+    public string GenerationFingerprint { get; set; } = string.Empty;
     public List<OperatorKnowledgeCard> Cards { get; set; } = new();
     public List<OperatorKnowledgeEdge> Edges { get; set; } = new();
 }

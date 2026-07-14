@@ -5,14 +5,20 @@
 |------|------|
 | 类名 (Class) | `CycleCounterOperator` |
 | 枚举值 (Enum) | `OperatorType.CycleCounter` |
-| 分类 (Category) | 变量 |
+| 分类 ID (CategoryId) | `FlowControl` |
+| 分类 (Category) | 流程控制 |
+| 分类顺序 (CategoryOrder) | 12 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FlowControl`, `分类显示:流程控制`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
-处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
+该类算子主要对上游值、集合或流程状态做判断、转换、聚合或路由，不直接改写图像像素。
 
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
@@ -48,6 +54,21 @@
 | `RemainingCycles` | 剩余次数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Progress` | 进度(%) | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`A2754CE732F531508FBFA22FE61DC2AA7EC6396ADEDF0BC70412AE83981B5001`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
 
@@ -65,7 +86,7 @@
 - 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
+- 适合 (Suitable)：需要对上游结果做判断、转换、聚合、计数、延时或流程路由的场景。
 - 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
@@ -74,4 +95,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

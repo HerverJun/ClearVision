@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `ConditionalBranchOperator` |
 | 枚举值 (Enum) | `OperatorType.ConditionalBranch` |
+| 分类 ID (CategoryId) | `FlowControl` |
 | 分类 (Category) | 流程控制 |
+| 分类顺序 (CategoryOrder) | 12 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FlowControl`, `分类显示:流程控制`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 OK/NG 判定路由。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -35,32 +41,47 @@
 |--------|------|------|--------|------|------|------|
 | `Condition` | 条件 | `enum` | GreaterThan | GreaterThan/大于；GreaterThanOrEqual/大于等于；LessThan/小于；LessThanOrEqual/小于等于；Equal/等于；NotEqual/不等于；InRange/范围内；Between/介于；NotInRange/范围外；InList/列表内；NotInList/列表外；Contains/包含；StartsWith/开头是；EndsWith/结尾是；Matches/正则匹配；IsTrue/为真/OK；IsFalse/为假/NG；IsEmpty/为空；IsNotEmpty/非空 | Yes | - |
 | `CompareValue` | 比较值 | `string` | 0 | - | Yes | - |
-| `CompareListDelimiter` | Compare List Delimiter | `string` | , | - | Yes | 列表条件使用的主分隔符。 |
-| `CompareListDelimiters` | Additional Compare List Delimiters | `string` | "" | - | Yes | 列表条件使用的附加分隔符，多个值用 \| 分隔。 |
+| `CompareListDelimiter` | 比较列表分隔符 | `string` | , | - | Yes | 列表条件使用的主分隔符。 |
+| `CompareListDelimiters` | 附加比较列表分隔符 | `string` | "" | - | Yes | 列表条件使用的附加分隔符，多个值用 \| 分隔。 |
 | `FieldName` | 字段名 | `string` | "" | - | Yes | - |
-| `CompareFieldName` | Compare Field Name | `string` | "" | - | Yes | 从 Compare 输入或当前 Value 中读取比较值的字段路径。 |
-| `FailOnMissingField` | Fail On Missing Field | `bool` | false | - | Yes | 启用后，FieldName 字段缺失时执行失败。 |
-| `FailOnEvaluationError` | Fail On Evaluation Error | `bool` | false | - | Yes | 启用后，条件计算错误时执行失败。 |
-| `NumericTolerance` | Numeric Tolerance | `double` | 0 | >= 0 | Yes | 数值比较允许的绝对误差。 |
-| `IgnoreCase` | Ignore Case | `bool` | false | - | Yes | 启用后，字符串比较和正则匹配忽略大小写。 |
-| `RangeMin` | Range Min | `double` | 0 | - | Yes | 范围判断的默认下限。 |
-| `RangeMax` | Range Max | `double` | 1 | - | Yes | 范围判断的默认上限。 |
+| `CompareFieldName` | 比较字段名 | `string` | "" | - | Yes | 从 Compare 输入或当前 Value 中读取比较值的字段路径。 |
+| `FailOnMissingField` | 字段缺失时失败 | `bool` | false | - | Yes | 启用后，FieldName 字段缺失时执行失败。 |
+| `FailOnEvaluationError` | 判定错误时失败 | `bool` | false | - | Yes | 启用后，条件计算错误时执行失败。 |
+| `NumericTolerance` | 数值容差 | `double` | 0 | >= 0 | Yes | 数值比较允许的绝对误差。 |
+| `IgnoreCase` | 忽略大小写 | `bool` | false | - | Yes | 启用后，字符串比较和正则匹配忽略大小写。 |
+| `RangeMin` | 范围下限 | `double` | 0 | - | Yes | 范围判断的默认下限。 |
+| `RangeMax` | 范围上限 | `double` | 1 | - | Yes | 范围判断的默认上限。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Value` | 判断值 | `Any` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `Compare` | Compare Value | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Compare` | 比较值 | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `True` | True分支 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `False` | False分支 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `EvaluationSuccess` | Evaluation Success | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `EvaluationError` | Evaluation Error | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ActualSource` | Actual Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `EvaluationSuccess` | 判定成功 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `EvaluationError` | 判定错误 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ActualSource` | 实际值来源 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`ACE45EF2B7687552341D4549780571B23D1032D1076FDF856369668F8C9ADFBE`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -95,4 +116,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

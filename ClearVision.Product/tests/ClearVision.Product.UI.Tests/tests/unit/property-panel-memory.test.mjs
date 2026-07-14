@@ -226,9 +226,18 @@ class PropertyPanelFakeInput {
     this.dataset = dataset;
     this.parentElement = null;
     this.listeners = new Map();
+    this.attributes = new Map();
     this.classList = {
       contains: className => classes.includes(className)
     };
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
   }
 
   addEventListener(type, listener) {

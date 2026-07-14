@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `VariableWriteOperator` |
 | 枚举值 (Enum) | `OperatorType.VariableWrite` |
-| 分类 (Category) | 变量 |
+| 分类 ID (CategoryId) | `DataProcessing` |
+| 分类 (Category) | 数据处理 |
+| 分类顺序 (CategoryOrder) | 11 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:DataProcessing`, `分类显示:数据处理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于写入单次运行变量或项目全局变量。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,12 +47,12 @@
 | `DataType` | 数据类型 | `enum` | String | String/字符串；Int/整数；Double/浮点数；Bool/布尔值；Object/对象 | Yes | - |
 | `UseInputValue` | 使用输入值 | `bool` | true | - | Yes | 优先使用上游输入值，否则使用静态值 |
 | `StaticValue` | 静态值 | `string` | 0 | - | Yes | 没有上游输入时使用的值 |
-| `ConversionMode` | Conversion Mode | `enum` | Exact | Exact/Exact；Round/Round；Floor/Floor；Ceiling/Ceiling；Truncate/Truncate | Yes | - |
-| `Expression` | Expression | `string` | "" | - | Yes | Optional controlled expression evaluated before Project variable write. Use value for the raw input. |
-| `InputFieldName` | Input Field Name | `string` | "" | - | Yes | Optional upstream field path such as ParsedFields.score. |
-| `RequireInputStatus` | Require Input Status | `bool` | false | - | Yes | When enabled, write only if the configured upstream status field is true/OK/PASS/1. |
-| `InputStatusFieldName` | Input Status Field Name | `string` | Status | - | Yes | Optional upstream status field path such as Status or ResponseAccepted. |
-| `FailOnInputStatusFalse` | Fail On Input Status False | `bool` | false | - | Yes | Return failure instead of a skipped write when the upstream status is false or missing. |
+| `ConversionMode` | 转换模式 | `enum` | Exact | Exact/精确转换；Round/四舍五入；Floor/向下取整；Ceiling/向上取整；Truncate/截断 | Yes | - |
+| `Expression` | 表达式 | `string` | "" | - | Yes | 项目变量写入前可选执行的受控表达式；使用 value 表示原始输入值。 |
+| `InputFieldName` | 输入字段名 | `string` | "" | - | Yes | 可选上游字段路径，例如 ParsedFields.score。 |
+| `RequireInputStatus` | 要求输入状态 | `bool` | false | - | Yes | 启用后，仅当配置的上游状态字段为 true、OK、PASS 或 1 时写入。 |
+| `InputStatusFieldName` | 输入状态字段名 | `string` | Status | - | Yes | 可选上游状态字段路径，例如 Status 或 ResponseAccepted。 |
+| `FailOnInputStatusFalse` | 输入状态为否时失败 | `bool` | false | - | Yes | 上游状态为 false 或缺失时返回失败，而不是仅跳过写入。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -60,14 +66,29 @@
 | `VariableName` | 变量名 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Value` | 写入的值 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `CycleCount` | 循环计数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `VariableId` | Variable Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ValueType` | Value Type | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `Version` | Version | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `UpdatedAtUtc` | Updated At UTC | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `UpdatedBy` | Updated By | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `WriteSkipped` | Write Skipped | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `SkipReason` | Skip Reason | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `InputStatusValue` | Input Status Value | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `VariableId` | 变量ID | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ValueType` | 值类型 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `Version` | 版本 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `UpdatedAtUtc` | 更新时间(UTC) | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `UpdatedBy` | 更新来源 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `WriteSkipped` | 已跳过写入 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `SkipReason` | 跳过原因 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `InputStatusValue` | 输入状态值 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`803372859ACF95235385DDA48BF85759FE419E6150FC3E0CC2BEF862134AFE2F`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -95,4 +116,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

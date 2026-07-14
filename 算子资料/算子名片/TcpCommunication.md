@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `TcpCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.TcpCommunication` |
+| 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
+| 分类顺序 (CategoryOrder) | 13 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Communication`, `分类显示:通信`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,37 +47,37 @@
 | `SendData` | 发送数据 | `string` | "" | - | Yes | - |
 | `UseFixedSendData` | 固定发送数据 | `bool` | false | - | Yes | - |
 | `PayloadTemplate` | 报文模板 | `string` | "" | - | Yes | - |
-| `DecodeEscapeSequences` | Decode Escape Sequences | `bool` | false | - | Yes | 启用后解析发送报文、分隔符和匹配条件中的 \r、\n、\xHH 等转义序列。 |
+| `DecodeEscapeSequences` | 解码转义序列 | `bool` | false | - | Yes | 启用后解析发送报文、分隔符和匹配条件中的 \r、\n、\xHH 等转义序列。 |
 | `WaitResponse` | 等待响应 | `bool` | true | - | Yes | - |
 | `ResponseTimeoutMs` | 响应超时(ms) | `int` | 5000 | [100, 600000] | Yes | - |
 | `Timeout` | 超时(ms) | `int` | 5000 | [100, 600000] | Yes | - |
-| `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII/ASCII；GBK/GBK；HEX/HEX | Yes | - |
-| `FailOnUnresolvedPayloadPlaceholder` | Fail On Unresolved Payload Placeholder | `bool` | true | - | Yes | 启用后，请求报文模板中存在未解析占位符时执行失败。 |
-| `FailOnParseError` | Fail On Parse Error | `bool` | false | - | Yes | 启用后，响应解析失败时执行失败。 |
-| `FailOnUnexpectedResponse` | Fail On Unexpected Response | `bool` | false | - | Yes | 启用后，响应未满足期望或命中拒绝条件时执行失败。 |
-| `ResponseParseMode` | Response Parse Mode | `enum` | None | None/None；JsonPath/JSON path；KeyValue/Key-value；Regex/Regex；Delimited/Delimited；FixedWidth/Fixed width | Yes | 选择响应解析方式：不解析、JSON路径、键值对、正则、分隔符或固定宽度。 |
-| `ResponseFieldName` | Response Field Name | `string` | "" | - | Yes | 单字段解析目标，例如 JSONPath 或解析字段名。 |
-| `ResponseFieldNames` | Response Field Names | `string` | "" | - | Yes | 多字段解析名称列表，通常用逗号分隔。 |
-| `RequiredResponseFields` | Required Response Fields | `string` | "" | - | Yes | 必需响应字段列表，缺失时记录 MissingResponseFields。 |
-| `ResponseFieldWidths` | Response Field Widths | `string` | "" | - | Yes | 固定宽度解析时每个字段的字符宽度列表。 |
-| `ResponseRegexPattern` | Response Regex Pattern | `string` | "" | - | Yes | 正则解析或正则匹配使用的表达式。 |
-| `ResponseRegexIgnoreCase` | Response Regex Ignore Case | `bool` | false | - | Yes | 启用后，响应正则解析忽略大小写。 |
-| `ResponseKeyValuePairDelimiter` | Response Key-Value Pair Delimiter | `string` | ; | - | Yes | 键值对响应中不同键值对之间的主分隔符。 |
-| `ResponseKeyValuePairDelimiters` | Additional Key-Value Pair Delimiters | `string` | "" | - | Yes | 键值对响应的附加分隔符，多个值用 \| 分隔。 |
-| `ResponseKeyValueSeparator` | Response Key-Value Separator | `string` | = | - | Yes | 键和值之间的主分隔符。 |
-| `ResponseKeyValueSeparators` | Additional Key-Value Separators | `string` | "" | - | Yes | 键和值之间的附加分隔符，多个值用 \| 分隔。 |
-| `ResponseDelimiter` | Response Delimiter | `string` | , | - | Yes | 分隔符解析时使用的主分隔符。 |
-| `ResponseDelimiters` | Additional Response Delimiters | `string` | "" | - | Yes | 分隔符解析时使用的附加分隔符，多个值用 \| 分隔。 |
-| `ResponseIndex` | Response Index | `int` | 0 | [0, 4096] | Yes | 分隔符解析时选取的字段索引，从 0 开始。 |
-| `TrimResponseBeforeParse` | Trim Response Before Parse | `bool` | false | - | Yes | 解析前先裁剪响应两端空白字符。 |
-| `ResponseStartMarker` | Response Start Marker | `string` | "" | - | Yes | 响应帧起始标记，配置后仅截取标记后的内容。 |
-| `ResponseEndMarker` | Response End Marker | `string` | "" | - | Yes | 响应帧结束标记，配置后仅截取标记前的内容。 |
-| `FailOnMissingResponseFrame` | Fail On Missing Response Frame | `bool` | false | - | Yes | 启用后，响应未找到配置的起止标记时执行失败。 |
-| `ExpectedResponse` | Expected Response | `string` | "" | - | Yes | 期望响应内容；配置后用于判断响应是否通过。 |
-| `RejectedResponse` | Rejected Response | `string` | "" | - | Yes | 拒绝响应内容；命中后 ResponseAccepted 为 false。 |
-| `ResponseMatchMode` | Response Match Mode | `enum` | Contains | Contains/Contains；Equals/Equals；StartsWith/Starts with；EndsWith/Ends with；Regex/Regex | Yes | 响应判断方式：包含、等于、开头、结尾或正则。 |
-| `ResponseMatchIgnoreCase` | Response Match Ignore Case | `bool` | false | - | Yes | 启用后，期望/拒绝响应匹配忽略大小写。 |
-| `ResponseMatchSource` | Response Match Source | `enum` | Response | Response/Raw response；NormalizedResponse/Normalized response；ParsedValue/Parsed value | Yes | 选择响应判断的数据来源：原始响应、归一化响应或解析值。 |
+| `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII；GBK；HEX | Yes | - |
+| `FailOnUnresolvedPayloadPlaceholder` | 报文占位符未解析时失败 | `bool` | true | - | Yes | 启用后，请求报文模板中存在未解析占位符时执行失败。 |
+| `FailOnParseError` | 解析错误时失败 | `bool` | false | - | Yes | 启用后，响应解析失败时执行失败。 |
+| `FailOnUnexpectedResponse` | 非预期响应时失败 | `bool` | false | - | Yes | 启用后，响应未满足期望或命中拒绝条件时执行失败。 |
+| `ResponseParseMode` | 响应解析模式 | `enum` | None | None/无；JsonPath/JSON路径；KeyValue/键值对解析；Regex/正则；Delimited/分隔符解析；FixedWidth/固定宽度解析 | Yes | 选择响应解析方式：不解析、JSON路径、键值对、正则、分隔符或固定宽度。 |
+| `ResponseFieldName` | 响应字段名 | `string` | "" | - | Yes | 单字段解析目标，例如 JSONPath 或解析字段名。 |
+| `ResponseFieldNames` | 响应字段名列表 | `string` | "" | - | Yes | 多字段解析名称列表，通常用逗号分隔。 |
+| `RequiredResponseFields` | 必需响应字段 | `string` | "" | - | Yes | 必需响应字段列表，缺失时记录 MissingResponseFields。 |
+| `ResponseFieldWidths` | 响应字段宽度 | `string` | "" | - | Yes | 固定宽度解析时每个字段的字符宽度列表。 |
+| `ResponseRegexPattern` | 响应正则表达式 | `string` | "" | - | Yes | 正则解析或正则匹配使用的表达式。 |
+| `ResponseRegexIgnoreCase` | 响应正则忽略大小写 | `bool` | false | - | Yes | 启用后，响应正则解析忽略大小写。 |
+| `ResponseKeyValuePairDelimiter` | 响应键值对分隔符 | `string` | ; | - | Yes | 键值对响应中不同键值对之间的主分隔符。 |
+| `ResponseKeyValuePairDelimiters` | 附加键值对分隔符 | `string` | "" | - | Yes | 键值对响应的附加分隔符，多个值用 \| 分隔。 |
+| `ResponseKeyValueSeparator` | 响应键值分隔符 | `string` | = | - | Yes | 键和值之间的主分隔符。 |
+| `ResponseKeyValueSeparators` | 附加键值分隔符 | `string` | "" | - | Yes | 键和值之间的附加分隔符，多个值用 \| 分隔。 |
+| `ResponseDelimiter` | 响应分隔符 | `string` | , | - | Yes | 分隔符解析时使用的主分隔符。 |
+| `ResponseDelimiters` | 附加响应分隔符 | `string` | "" | - | Yes | 分隔符解析时使用的附加分隔符，多个值用 \| 分隔。 |
+| `ResponseIndex` | 响应字段索引 | `int` | 0 | [0, 4096] | Yes | 分隔符解析时选取的字段索引，从 0 开始。 |
+| `TrimResponseBeforeParse` | 解析前裁剪响应 | `bool` | false | - | Yes | 解析前先裁剪响应两端空白字符。 |
+| `ResponseStartMarker` | 响应起始标记 | `string` | "" | - | Yes | 响应帧起始标记，配置后仅截取标记后的内容。 |
+| `ResponseEndMarker` | 响应结束标记 | `string` | "" | - | Yes | 响应帧结束标记，配置后仅截取标记前的内容。 |
+| `FailOnMissingResponseFrame` | 缺失响应帧时失败 | `bool` | false | - | Yes | 启用后，响应未找到配置的起止标记时执行失败。 |
+| `ExpectedResponse` | 期望响应 | `string` | "" | - | Yes | 期望响应内容；配置后用于判断响应是否通过。 |
+| `RejectedResponse` | 拒绝响应 | `string` | "" | - | Yes | 拒绝响应内容；命中后 ResponseAccepted 为 false。 |
+| `ResponseMatchMode` | 响应匹配模式 | `enum` | Contains | Contains/包含；Equals/等于；StartsWith/开头匹配；EndsWith/结尾匹配；Regex/正则 | Yes | 响应判断方式：包含、等于、开头、结尾或正则。 |
+| `ResponseMatchIgnoreCase` | 响应匹配忽略大小写 | `bool` | false | - | Yes | 启用后，期望/拒绝响应匹配忽略大小写。 |
+| `ResponseMatchSource` | 响应匹配来源 | `enum` | Response | Response/原始响应；NormalizedResponse/归一化响应；ParsedValue/解析值 | Yes | 选择响应判断的数据来源：原始响应、归一化响应或解析值。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -84,16 +90,63 @@
 |------|------|------|------|
 | `Response` | 响应 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Status` | 状态 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `NormalizedResponse` | Normalized Response | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `RequestPayload` | Request Payload | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ParseSuccess` | Parse Success | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `ParsedValue` | Parsed Value | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ParsedFields` | Parsed Fields | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ParseError` | Parse Error | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `MissingResponseFields` | Missing Response Fields | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ResponseAccepted` | Response Accepted | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `ResponseMatchError` | Response Match Error | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ResponseMatchValue` | Response Match Value | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `NormalizedResponse` | 归一化响应 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `RequestPayload` | 请求报文 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ParseSuccess` | 解析成功 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `ParsedValue` | 解析值 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ParsedFields` | 解析字段 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ParseError` | 解析错误 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `MissingResponseFields` | 缺失响应字段 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ResponseAccepted` | 响应通过 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `ResponseMatchError` | 响应匹配错误 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResponseMatchValue` | 响应匹配值 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `Encoding` | metadata; - | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE` |
+| `ExpectedResponse` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING` |
+| `FailOnMissingResponseFrame` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING` |
+| `FailOnParseError` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING` |
+| `FailOnUnexpectedResponse` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING` |
+| `IpAddress` | metadata; ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client) | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | network_endpoint | - | `TCP_LEGACY_CLIENT_HOST_REQUIRED` |
+| `Mode` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ALL(ProfileId is not empty) | - | - | - | `TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED` |
+| `Port` | metadata; ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client) | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_PORT_REQUIRED` |
+| `ProfileId` | optional; ANY(UseGlobalProfile == true \|\| Mode == Server) | visible: -; hidden: - | enabled: -; disabled: - | - | tcp_profile | - | `TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE` |
+| `RejectedResponse` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING` |
+| `RequiredResponseFields` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING` |
+| `ResponseDelimiter` | metadata; ALL(WaitResponse == true && ResponseParseMode == Delimited) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Delimited); disabled: - | - | - | - | `TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE` |
+| `ResponseDelimiters` | metadata; ALL(WaitResponse == true && ResponseParseMode == Delimited) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Delimited); disabled: - | - | - | - | `TCP_DELIMITERS_ONLY_FOR_DELIMITED_PARSE` |
+| `ResponseEndMarker` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING` |
+| `ResponseFieldName` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode != None); disabled: - | - | - | - | `TCP_RESPONSE_FIELD_ONLY_WHEN_PARSING` |
+| `ResponseFieldNames` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); ANY(ResponseParseMode == Delimited \|\| ResponseParseMode == FixedWidth); disabled: - | - | - | - | `TCP_RESPONSE_FIELD_NAMES_ONLY_FOR_POSITIONAL_PARSE` |
+| `ResponseFieldWidths` | metadata; ALL(WaitResponse == true && ResponseParseMode == FixedWidth) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == FixedWidth); disabled: - | - | - | - | `TCP_FIXED_WIDTHS_REQUIRED_FOR_FIXED_WIDTH_PARSE` |
+| `ResponseIndex` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); ANY(ResponseParseMode == Delimited \|\| ResponseParseMode == FixedWidth); disabled: - | - | - | - | `TCP_RESPONSE_INDEX_ONLY_FOR_POSITIONAL_PARSE` |
+| `ResponseKeyValuePairDelimiter` | metadata; ALL(WaitResponse == true && ResponseParseMode == KeyValue) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == KeyValue); disabled: - | - | - | - | `TCP_KEY_VALUE_PAIR_DELIMITER_ONLY_FOR_KEY_VALUE_PARSE` |
+| `ResponseKeyValuePairDelimiters` | metadata; ALL(WaitResponse == true && ResponseParseMode == KeyValue) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == KeyValue); disabled: - | - | - | - | `TCP_KEY_VALUE_PAIR_DELIMITERS_ONLY_FOR_KEY_VALUE_PARSE` |
+| `ResponseKeyValueSeparator` | metadata; ALL(WaitResponse == true && ResponseParseMode == KeyValue) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == KeyValue); disabled: - | - | - | - | `TCP_KEY_VALUE_SEPARATOR_ONLY_FOR_KEY_VALUE_PARSE` |
+| `ResponseKeyValueSeparators` | metadata; ALL(WaitResponse == true && ResponseParseMode == KeyValue) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == KeyValue); disabled: - | - | - | - | `TCP_KEY_VALUE_SEPARATORS_ONLY_FOR_KEY_VALUE_PARSE` |
+| `ResponseMatchIgnoreCase` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING` |
+| `ResponseMatchMode` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING` |
+| `ResponseMatchSource` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING` |
+| `ResponseParseMode` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_PARSE_ONLY_WHEN_WAITING` |
+| `ResponseRegexIgnoreCase` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Regex); disabled: - | - | - | - | `TCP_REGEX_OPTIONS_ONLY_FOR_REGEX_PARSE` |
+| `ResponseRegexPattern` | metadata; ALL(WaitResponse == true && ResponseParseMode == Regex) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Regex); disabled: - | - | - | - | `TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE` |
+| `ResponseStartMarker` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING` |
+| `ResponseTimeoutMs` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING` |
+| `Timeout` | metadata; - | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE` |
+| `TrimResponseBeforeParse` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING` |
+| `UseFixedSendData` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ALL(PayloadTemplate is not empty) | - | - | - | `TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`EE7310E9731A7EAB3B10E80D16F8D3D80E321D6FD8FEAF6A23E0D688BC3CEF16`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -125,4 +178,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `EdgePairDefectOperator` |
 | 枚举值 (Enum) | `OperatorType.EdgePairDefect` |
-| 分类 (Category) | AI检测 |
+| 分类 ID (CategoryId) | `DefectDetection` |
+| 分类 (Category) | 缺陷检测 |
+| 分类顺序 (CategoryOrder) | 6 |
 | 版本 (Version) | `1.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,10 +46,10 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ExpectedWidth` | Expected Width | `double` | 20 | [0, 100000] | Yes | - |
-| `Tolerance` | Tolerance | `double` | 2 | [0, 100000] | Yes | - |
-| `NumSamples` | Sample Count | `int` | 100 | [5, 5000] | Yes | - |
-| `EdgeMethod` | Edge Method | `enum` | Canny | Canny/Canny；Sobel/Sobel | Yes | - |
+| `ExpectedWidth` | 期望宽度 | `double` | 20 | [0, 100000] | Yes | - |
+| `Tolerance` | 容差 | `double` | 2 | [0, 100000] | Yes | - |
+| `NumSamples` | 采样数 | `int` | 100 | [5, 5000] | Yes | - |
+| `EdgeMethod` | 边缘方法 | `enum` | Canny | Canny；Sobel | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -60,6 +66,21 @@
 | `DefectCount` | Defect Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MaxDeviation` | Max Deviation | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Deviations` | Deviations | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`396A9FF1EA5B9EB6245BA61AD5018835632170D79FDBC42ADCEFA2241A2B0F5D`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -92,4 +113,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

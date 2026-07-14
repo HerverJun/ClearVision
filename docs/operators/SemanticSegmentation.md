@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `SemanticSegmentationOperator` |
 | 枚举值 (Enum) | `OperatorType.SemanticSegmentation` |
-| 分类 (Category) | AI检测 |
+| 分类 ID (CategoryId) | `AiInference` |
+| 分类 (Category) | AI推理 |
+| 分类顺序 (CategoryOrder) | 9 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:AiInference`, `分类显示:AI推理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,18 +46,18 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ModelId` | Model Id | `string` | "" | - | Yes | - |
-| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
-| `ModelPath` | Model Path | `file` | "" | - | Yes | - |
-| `InputSize` | Input Size | `string` | 512,512 | - | Yes | Width,Height |
-| `NumClasses` | Num Classes | `int` | 21 | [2, 4096] | Yes | - |
-| `ClassNames` | Class Names | `string` | "" | - | Yes | JSON array or comma-separated names |
-| `MaxClassMasks` | Max Class Masks | `int` | 32 | [0, 4096] | Yes | Limits generated per-class mask images; 0 disables per-class masks. |
-| `ExecutionProvider` | Execution Provider | `enum` | cpu | cpu/CPU；cuda/CUDA | Yes | - |
-| `ScaleToUnitRange` | Scale To Unit Range | `bool` | true | - | Yes | - |
-| `ChannelOrder` | Channel Order | `enum` | RGB | RGB/RGB；BGR/BGR | Yes | - |
-| `Mean` | Mean | `string` | 0,0,0 | - | Yes | - |
-| `Std` | Std | `string` | 1,1,1 | - | Yes | - |
+| `ModelId` | 模型ID | `string` | "" | - | Yes | - |
+| `ModelCatalogPath` | 模型目录路径 | `file` | "" | - | Yes | - |
+| `ModelPath` | 模型路径 | `file` | "" | - | Yes | - |
+| `InputSize` | 输入尺寸 | `string` | 512,512 | - | Yes | 宽度,高度 |
+| `NumClasses` | 类别数量 | `int` | 21 | [2, 4096] | Yes | - |
+| `ClassNames` | 类别名称 | `string` | "" | - | Yes | JSON 数组或逗号分隔的名称列表 |
+| `MaxClassMasks` | 最大类别掩码数 | `int` | 32 | [0, 4096] | Yes | 限制生成的类别掩码图像数量；填 0 表示不生成类别掩码。 |
+| `ExecutionProvider` | 执行后端 | `enum` | cpu | cpu/CPU；cuda/CUDA | Yes | - |
+| `ScaleToUnitRange` | 缩放到单位区间 | `bool` | true | - | Yes | - |
+| `ChannelOrder` | 通道顺序 | `enum` | RGB | RGB；BGR | Yes | - |
+| `Mean` | 均值 | `string` | 0,0,0 | - | Yes | - |
+| `Std` | 标准差 | `string` | 1,1,1 | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -62,18 +68,35 @@
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `SegmentationMap` | Segmentation Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `ColoredMap` | Colored Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `ClassMasks` | Class Masks | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ClassCount` | Class Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `ClassMaskCount` | Class Mask Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `OmittedClassMaskCount` | Omitted Class Mask Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `PresentClasses` | Present Classes | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ModelSource` | Model Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ModelProvenance` | Model Provenance | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `SegmentationMap` | 分割图 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ColoredMap` | 着色结果图 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ClassMasks` | 类别掩码 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ClassCount` | 类别数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ClassMaskCount` | 类别掩码数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `OmittedClassMaskCount` | 省略类别掩码数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `PresentClasses` | 存在类别 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ResolvedModelPath` | 解析后的模型路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelId` | 解析后的模型ID | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelCatalogPath` | 解析后的模型目录路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelSource` | 模型来源 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelProvenance` | 模型来源信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `ModelCatalogPath` | optional; - | visible: -; hidden: - | enabled: -; disabled: ANY(ModelId is empty \|\| ModelPath is not empty) | - | model_catalog | - | `SEMANTIC_SEGMENTATION_CATALOG_REQUIRES_MODEL_ID` |
+| `ModelId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | model_resource | - | `SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED` |
+| `ModelPath` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | model_resource | - | `SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`EAEF2C1892542378AD0DC2AEC15CF0B7D2E5E796D831B49E238E94E9E2323382`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -107,4 +130,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

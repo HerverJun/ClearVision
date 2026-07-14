@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `TemplateMatchOperator` |
 | 枚举值 (Enum) | `OperatorType.TemplateMatching` |
-| 分类 (Category) | 匹配定位 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.2.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的 NMS 去重。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,16 +46,16 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Method` | 匹配方法 | `enum` | CCoeffNormed | CCoeffNormed/CCoeffNormed；SqDiff/SqDiff；SqDiffNormed/SqDiffNormed；CCorr/CCorr；CCorrNormed/CCorrNormed；CCoeff/CCoeff | Yes | - |
-| `Domain` | 匹配域 | `enum` | Gray | Gray/Gray；Edge/Edge；Gradient/Gradient | Yes | - |
+| `Method` | 匹配方法 | `enum` | CCoeffNormed | CCoeffNormed；SqDiff；SqDiffNormed；CCorr；CCorrNormed；CCoeff | Yes | - |
+| `Domain` | 匹配域 | `enum` | Gray | Gray/灰度；Edge；Gradient/梯度 | Yes | - |
 | `Threshold` | 匹配分数阈值 | `double` | 0.8 | [0, 1] | Yes | - |
 | `MaxMatches` | 最大匹配数 | `int` | 1 | [1, 100] | Yes | - |
 | `UseRoi` | 使用 ROI | `bool` | false | - | Yes | - |
-| `RoiX` | ROI X | `int` | 0 | >= 0 | Yes | - |
-| `RoiY` | ROI Y | `int` | 0 | >= 0 | Yes | - |
-| `RoiWidth` | ROI Width | `int` | 0 | >= 0 | Yes | - |
-| `RoiHeight` | ROI Height | `int` | 0 | >= 0 | Yes | - |
-| `OriginMode` | Origin Mode | `enum` | Center | Center/Center；TopLeft/TopLeft；Custom/Custom | Yes | - |
+| `RoiX` | ROIX | `int` | 0 | >= 0 | Yes | - |
+| `RoiY` | ROIY | `int` | 0 | >= 0 | Yes | - |
+| `RoiWidth` | ROI宽度 | `int` | 0 | >= 0 | Yes | - |
+| `RoiHeight` | ROI高度 | `int` | 0 | >= 0 | Yes | - |
+| `OriginMode` | Origin Mode | `enum` | Center | Center；TopLeft；Custom/自定义 | Yes | - |
 | `OriginX` | Origin X | `double` | 0 | - | Yes | - |
 | `OriginY` | Origin Y | `double` | 0 | - | Yes | - |
 | `EnablePoseSearch` | 启用姿态搜索 | `bool` | false | - | Yes | - |
@@ -85,6 +91,33 @@
 | `IsMatch` | 是否匹配 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `Matches` | 匹配列表 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `MatchCount` | 匹配数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `AngleExtent` | metadata; ALL(EnablePoseSearch == true) | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `AngleStart` | metadata; - | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `AngleStep` | metadata; ALL(EnablePoseSearch == true) | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `OriginX` | metadata; ALL(OriginMode == Custom) | visible: -; hidden: ALL(OriginMode != Custom) | enabled: -; disabled: ALL(OriginMode != Custom) | ALL(OriginMode != Custom) | - | - | `TEMPLATE_MATCHING_CUSTOM_ORIGIN` |
+| `OriginY` | metadata; ALL(OriginMode == Custom) | visible: -; hidden: ALL(OriginMode != Custom) | enabled: -; disabled: ALL(OriginMode != Custom) | ALL(OriginMode != Custom) | - | - | `TEMPLATE_MATCHING_CUSTOM_ORIGIN` |
+| `PyramidLevels` | metadata; - | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `RoiHeight` | metadata; ALL(UseRoi == true) | visible: -; hidden: ALL(UseRoi == false) | enabled: -; disabled: ALL(UseRoi == false) | ALL(UseRoi == false) | - | - | `TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED` |
+| `RoiWidth` | metadata; ALL(UseRoi == true) | visible: -; hidden: ALL(UseRoi == false) | enabled: -; disabled: ALL(UseRoi == false) | ALL(UseRoi == false) | - | - | `TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED` |
+| `RoiX` | metadata; - | visible: -; hidden: ALL(UseRoi == false) | enabled: -; disabled: ALL(UseRoi == false) | ALL(UseRoi == false) | - | - | `TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED` |
+| `RoiY` | metadata; - | visible: -; hidden: ALL(UseRoi == false) | enabled: -; disabled: ALL(UseRoi == false) | ALL(UseRoi == false) | - | - | `TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED` |
+| `ScaleMax` | metadata; ALL(EnablePoseSearch == true) | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `ScaleMin` | metadata; ALL(EnablePoseSearch == true) | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+| `ScaleStep` | metadata; ALL(EnablePoseSearch == true) | visible: -; hidden: ALL(EnablePoseSearch == false) | enabled: -; disabled: ALL(EnablePoseSearch == false) | ALL(EnablePoseSearch == false) | - | - | `TEMPLATE_MATCHING_POSE_SEARCH` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`0FB6EFF97C2890E8ACA97E3EF08668AF293F8EAD52A2F463DFF6E5F68FDA45A5`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -127,4 +160,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.2.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.2.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

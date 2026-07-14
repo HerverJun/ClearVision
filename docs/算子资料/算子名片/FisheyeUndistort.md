@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `FisheyeUndistortOperator` |
 | 枚举值 (Enum) | `OperatorType.FisheyeUndistort` |
-| 分类 (Category) | 标定 |
+| 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
+| 分类 (Category) | 标定与坐标 |
+| 分类顺序 (CategoryOrder) | 8 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:CalibrationAndCoordinates`, `分类显示:标定与坐标`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -33,10 +39,10 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `UseLut` | Use LUT Acceleration | `bool` | true | - | Yes | - |
-| `LutCacheSize` | LUT Cache Size | `int` | 10 | [1, 100] | Yes | - |
-| `Balance` | Balance | `double` | 0 | [0, 1] | Yes | - |
-| `NewImageSizeFactor` | New Image Size Factor | `double` | 1 | [0.1, 2] | Yes | - |
+| `UseLut` | 使用LUT加速 | `bool` | true | - | Yes | - |
+| `LutCacheSize` | LUT缓存大小 | `int` | 10 | [1, 100] | Yes | - |
+| `Balance` | 平衡系数 | `double` | 0 | [0, 1] | Yes | - |
+| `NewImageSizeFactor` | 新图像尺寸系数 | `double` | 1 | [0.1, 2] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -50,6 +56,21 @@
 |------|------|------|------|
 | `Image` | Undistorted Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `UndistortedImage` | Undistorted Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`ADCAA919220A202F72CC8FCCB16D4F0C5E4C2012F13583C9ADD8869241CCAA65`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -91,4 +112,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

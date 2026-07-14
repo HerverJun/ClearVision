@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `FrameChangeTriggerOperator` |
 | 枚举值 (Enum) | `OperatorType.FrameChangeTrigger` |
-| 分类 (Category) | 逻辑工具 |
+| 分类 ID (CategoryId) | `FlowControl` |
+| 分类 (Category) | 流程控制 |
+| 分类顺序 (CategoryOrder) | 12 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FlowControl`, `分类显示:流程控制`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -47,7 +53,7 @@
 | `RoiH` | 检测区域高度 | `int` | 0 | >= 0 | Yes | 到料检测 ROI 高度；0 表示从 Y 到图像下边界。 |
 | `BlurSize` | 降噪模糊核 | `int` | 0 | [0, 15] | Yes | 0 表示关闭；开启时必须为 3 到 15 的奇数。 |
 | `MorphOpenSize` | 开运算核 | `int` | 0 | [0, 15] | Yes | 0 表示关闭；开启时必须为 3 到 15 的奇数，用于去除孤立噪声。 |
-| `NormalizeMode` | 亮度归一化 | `enum` | None | None；MeanShift；PercentileClip | Yes | None、MeanShift 或 PercentileClip。 |
+| `NormalizeMode` | 亮度归一化 | `enum` | None | None/无；MeanShift；PercentileClip | Yes | None、MeanShift 或 PercentileClip。 |
 | `ReferenceUpdateMode` | 参考帧更新 | `enum` | PreviousFrame | PreviousFrame；StableBackground；ExponentialMovingAverage | Yes | PreviousFrame、StableBackground 或 ExponentialMovingAverage。 |
 | `ReferenceUpdateAlpha` | 参考更新系数 | `double` | 0.05 | [0, 1] | Yes | 仅 ExponentialMovingAverage 使用，范围 0 到 1。 |
 | `AdaptivePixelThreshold` | 自适应像素阈值 | `bool` | false | - | Yes | 默认关闭；低对比 evidence profile 可显式启用。 |
@@ -74,6 +80,21 @@
 | `CooldownRemainingMs` | 剩余冷却时间(ms) | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `EffectivePixelThreshold` | 有效像素差阈值 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `EffectiveMinChangeRatio` | 有效最小变化比例 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`D3195C906FDB2C640894268237714074D014E9B4270BED0C9813F3F3D05B01CB`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -113,4 +134,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

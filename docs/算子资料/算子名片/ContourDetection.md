@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `FindContoursOperator` |
 | 枚举值 (Enum) | `OperatorType.ContourDetection` |
+| 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
+| 分类顺序 (CategoryOrder) | 4 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -45,9 +51,9 @@
 | `MaxArea` | 最大面积 | `int` | 100000 | - | Yes | - |
 | `Threshold` | 二值化阈值 | `double` | 127 | - | Yes | - |
 | `MaxValue` | 二值化最大值 | `double` | 255 | - | Yes | - |
-| `ThresholdType` | 阈值类型 | `enum` | Binary | Binary/Binary；BinaryInv/Binary Inv | Yes | - |
+| `ThresholdType` | 阈值类型 | `enum` | Binary | Binary/二值；BinaryInv/二值反转 | Yes | - |
 | `DrawContours` | 绘制轮廓 | `bool` | true | - | Yes | - |
-| `ThresholdMode` | Threshold Mode | `enum` | Manual | Manual/Manual；Otsu/Otsu；AdaptiveMean/Adaptive mean；AdaptiveGaussian/Adaptive gaussian；InputBinary/Input binary | Yes | - |
+| `ThresholdMode` | 阈值模式 | `enum` | Manual | Manual/手动；Otsu/大津法；AdaptiveMean/Adaptive mean；AdaptiveGaussian/Adaptive gaussian；InputBinary/Input binary | Yes | - |
 | `AdaptiveBlockSize` | Adaptive Block Size | `int` | 31 | [3, 301] | Yes | - |
 | `AdaptiveC` | Adaptive C | `double` | 2 | [-255, 255] | Yes | - |
 
@@ -63,6 +69,21 @@
 | `Image` | 结果图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `Contours` | 轮廓数据 | `Contour` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `ContourCount` | 轮廓数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`6DE3F087082E32BA5CCEBF4090998CAAA85836DC0D059A5BB48C11556E24A028`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -108,4 +129,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `PointCorrectionOperator` |
 | 枚举值 (Enum) | `OperatorType.PointCorrection` |
-| 分类 (Category) | 数据处理 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.0.4` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:定位`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 PixelSize 输出 mm 前需确认标定尺度。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -33,9 +39,9 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `CorrectionMode` | Correction Mode | `enum` | TranslationOnly | TranslationOnly/TranslationOnly；TranslationRotation/TranslationRotation | Yes | - |
-| `OutputUnit` | Output Unit | `enum` | Pixel | Pixel/Pixel；mm/mm | Yes | - |
-| `PixelSize` | Pixel Size | `double` | 1 | [1E-09, 1000000] | Yes | - |
+| `CorrectionMode` | 校正模式 | `enum` | TranslationOnly | TranslationOnly/仅平移；TranslationRotation/平移+旋转 | Yes | - |
+| `OutputUnit` | 输出单位 | `enum` | Pixel | Pixel/像素；mm | Yes | - |
+| `PixelSize` | 像素尺寸 | `double` | 1 | [1E-09, 1000000] | Yes | - |
 | `MaxAllowedDistance` | Max Allowed Distance | `double` | 0 | [0, 1000000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
@@ -45,7 +51,7 @@
 | `DetectedPoint` | Detected Point | `Point` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 | `DetectedAngle` | Detected Angle | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 | `ReferencePoint` | Reference Point | `Point` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `ReferenceAngle` | Reference Angle | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `ReferenceAngle` | 参考角度 | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
@@ -55,6 +61,21 @@
 | `CorrectionAngle` | Correction Angle | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `TransformMatrix` | Transform Matrix | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `TransformUnit` | Transform Unit | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`6D2D29704E5A0F25542D595814E8BB0BAF66FA8DCFC82F90DF5E9ED306F1DE50`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -83,4 +104,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.4 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.4 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

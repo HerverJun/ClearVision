@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `BlobDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.BlobAnalysis` |
-| 分类 (Category) | 特征提取 |
+| 分类 ID (CategoryId) | `SegmentationAndRegion` |
+| 分类 (Category) | 分割与区域 |
+| 分类顺序 (CategoryOrder) | 3 |
 | 版本 (Version) | `1.2.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:SegmentationAndRegion`, `分类显示:分割与区域`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -63,16 +69,37 @@
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 二值图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `SourceImage` | 参考图像 | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Image` | 二值图像 | `Image` | Yes | 用于连通域分析的二值图或可自动阈值化的灰度图。 |
+| `SourceImage` | 参考图像 | `Image` | No | 可选，仅作为标注结果的参考底图，不替代主 Image 输入。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | 标记图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `Blobs` | Blob结果列表 | `BlobList` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `BlobFeatures` | Blob详细特征 | `BlobFeatureList` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `BlobCount` | Blob数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Image` | 标记图像 | `Image` | 绘制 Blob 边界与中心点的可视化图像。 |
+| `Blobs` | Blob结果列表 | `BlobList` | 兼容旧流程端口名的 Blob 结果字典列表，包含边界框、中心、面积及常用度量；不是 Contour 或 Region。 |
+| `BlobFeatures` | Blob详细特征 | `BlobFeatureList` | 稳定输出的 Blob 详细特征列表：关闭详细特征时为空列表；开启时 Area、Circularity、CenterX 等旧字段保留在条目顶层，并提供 Features 嵌套别名。不是轮廓或像素区域。 |
+| `BlobCount` | Blob数量 | `Integer` | 通过面积、形状与可选特征过滤后的 Blob 数量。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `FeatureFilter` | optional; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `BLOB_FEATURE_FILTER_OPTIONAL` |
+| `HueHigh` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+| `HueLow` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+| `SatHigh` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+| `SatLow` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+| `ValHigh` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+| `ValLow` | metadata; - | visible: -; hidden: ALL(EnableColorFilter == false) | enabled: -; disabled: ALL(EnableColorFilter == false) | ALL(EnableColorFilter == false) | - | - | `BLOB_HSV_ONLY_WITH_COLOR_FILTER` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`493209900B6901BF21CBB454A8D0C359AEBBF958A70AE3FD53AC386DD2BB926A`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -124,4 +151,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.2.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.2.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

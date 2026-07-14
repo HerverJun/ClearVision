@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `CannyEdgeOperator` |
 | 枚举值 (Enum) | `OperatorType.EdgeDetection` |
+| 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
+| 分类顺序 (CategoryOrder) | 4 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用 Canny 进行边缘检测，并可选自动阈值。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,19 +46,19 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Method` | Method | `enum` | Canny | Canny/Canny；OnnxEdge/ONNX Edge | Yes | - |
-| `Threshold1` | Low Threshold | `double` | 50 | [0, 255] | Yes | - |
-| `Threshold2` | High Threshold | `double` | 150 | [0, 255] | Yes | - |
-| `AutoThreshold` | Auto Threshold | `bool` | false | - | Yes | - |
-| `AutoThresholdSigma` | Auto Threshold Sigma | `double` | 0.33 | [0.01, 1] | Yes | - |
+| `Method` | 方法 | `enum` | Canny | Canny；OnnxEdge/ONNX Edge | Yes | - |
+| `Threshold1` | 低阈值 | `double` | 50 | [0, 255] | Yes | - |
+| `Threshold2` | 高阈值 | `double` | 150 | [0, 255] | Yes | - |
+| `AutoThreshold` | 自动阈值 | `bool` | false | - | Yes | - |
+| `AutoThresholdSigma` | 自动阈值Sigma | `double` | 0.33 | [0.01, 1] | Yes | - |
 | `AutoThresholdStrategy` | Auto Threshold Strategy | `enum` | MedianIntensity | MedianIntensity/Median Intensity；GradientPercentile/Gradient Percentile；RecallGuardPercentile/Recall Guard Percentile；OtsuGradient/Otsu Gradient | Yes | - |
-| `EnableGaussianBlur` | Enable Gaussian Blur | `bool` | true | - | Yes | - |
-| `GaussianKernelSize` | Gaussian Kernel Size | `int` | 5 | [3, 15] | Yes | - |
-| `ApertureSize` | Sobel Aperture Size | `enum` | 3 | 3/3；5/5；7/7 | Yes | - |
+| `EnableGaussianBlur` | 启用高斯模糊 | `bool` | true | - | Yes | - |
+| `GaussianKernelSize` | 高斯核大小 | `int` | 5 | [3, 15] | Yes | - |
+| `ApertureSize` | Sobel孔径大小 | `enum` | 3 | 3；5；7 | Yes | - |
 | `L2Gradient` | L2 梯度 | `bool` | false | - | Yes | 使用 L2 范数计算梯度幅值，更精确但稍慢 |
 | `EdgeModelPath` | Edge Model Path | `file` | "" | - | No | - |
 | `EdgeModelId` | Edge Model Id | `string` | "" | - | No | - |
-| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | No | - |
+| `ModelCatalogPath` | 模型目录路径 | `file` | "" | - | No | - |
 | `EdgeBinarizationThreshold` | Edge Binarization Threshold | `double` | 0.5 | [0, 1] | No | - |
 
 ## 输入/输出端口 / Input/Output Ports
@@ -66,6 +72,24 @@
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `Edges` | Edges | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `EdgeBinarizationThreshold` | optional; - | visible: -; hidden: ALL(Method != OnnxEdge) | enabled: -; disabled: ALL(Method != OnnxEdge) | ALL(Method != OnnxEdge) | - | - | `EDGE_BINARIZATION_ONLY_FOR_ONNX` |
+| `EdgeModelId` | optional; ALL(Method == OnnxEdge) | visible: -; hidden: ALL(Method != OnnxEdge) | enabled: -; disabled: ALL(Method != OnnxEdge) | ALL(Method != OnnxEdge) | model_resource | - | `EDGE_ONNX_MODEL_SOURCE_REQUIRED` |
+| `EdgeModelPath` | optional; ALL(Method == OnnxEdge) | visible: -; hidden: ALL(Method != OnnxEdge) | enabled: -; disabled: ALL(Method != OnnxEdge) | ALL(Method != OnnxEdge) | model_resource | - | `EDGE_ONNX_MODEL_SOURCE_REQUIRED` |
+| `ModelCatalogPath` | optional; - | visible: -; hidden: - | enabled: -; disabled: ANY(Method != OnnxEdge \|\| EdgeModelId is empty \|\| EdgeModelPath is not empty) | - | model_catalog | - | `EDGE_MODEL_CATALOG_REQUIRES_MODEL_ID` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`B08931DAA048D88D6DFC00763E1943F192A2765C3D8C107DE3F9AB55D1EBAF12`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -108,4 +132,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `CircleMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.CircleMeasurement` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.1.2` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -61,7 +67,7 @@
 | `MinValidCalipers` | V2 最小有效卡尺 | `int` | 24 | [3, 720] | Yes | - |
 | `MinCoverageRatio` | V2 最小覆盖率 | `double` | 0.35 | [0, 1] | Yes | - |
 | `MinAngularCoverageDegrees` | V2 最小角覆盖 | `double` | 180 | [0, 360] | Yes | - |
-| `OutlierMode` | V2 离群模式 | `enum` | Mad | None/关闭；Mad/MAD；Huber/Huber | Yes | - |
+| `OutlierMode` | V2 离群模式 | `enum` | Mad | None/关闭；Mad/MAD；Huber | Yes | - |
 | `OutlierThreshold` | V2 离群阈值 | `double` | 3.5 | [0.1, 20] | Yes | - |
 | `MaxOutlierIterations` | V2 最大离群迭代 | `int` | 3 | [0, 20] | Yes | - |
 | `MaxResidualRmse` | V2 最大残差 RMSE | `double` | 2 | [0.01, 128] | Yes | - |
@@ -88,6 +94,21 @@
 | `OutlierPoints` | V2 离群点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `CaliperDiagnostics` | V2 诊断 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `CaliperProfileEvidence` | V2 profile evidence | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`19A167616B19FD7E2370C7FBCD2CF2915C0FBA33CA02944ED9F3AE39EE11D9C6`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -135,4 +156,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.2 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.2 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

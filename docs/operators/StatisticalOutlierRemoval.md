@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `StatisticalOutlierRemovalOperator` |
 | 枚举值 (Enum) | `OperatorType.StatisticalOutlierRemoval` |
-| 分类 (Category) | 3D |
+| 分类 ID (CategoryId) | `PointCloud3D` |
+| 分类 (Category) | 3D点云 |
+| 分类顺序 (CategoryOrder) | 10 |
 | 版本 (Version) | `1.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:PointCloud3D`, `分类显示:3D点云`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对点云执行统计离群点去除（SOR），输出过滤点云、保留点数和移除点数。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -30,8 +36,8 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `MeanK` | MeanK | `int` | 50 | [1, 500] | Yes | - |
-| `StddevMul` | StddevMul | `double` | 1 | [0, 10] | Yes | - |
+| `MeanK` | 均值邻域K | `int` | 50 | [1, 500] | Yes | - |
+| `StddevMul` | 标准差倍数 | `double` | 1 | [0, 10] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -45,6 +51,21 @@
 | `PointCloud` | Point Cloud | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `PointCount` | Point Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `RemovedCount` | Removed Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`B24ACC6EB806DF26585DBDD20D1BB7EABBA06E63A54E2E60FF8ACA16E0171762`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -73,4 +94,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

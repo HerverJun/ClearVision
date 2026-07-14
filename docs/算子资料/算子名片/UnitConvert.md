@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `UnitConvertOperator` |
 | 枚举值 (Enum) | `OperatorType.UnitConvert` |
+| 分类 ID (CategoryId) | `DataProcessing` |
 | 分类 (Category) | 数据处理 |
+| 分类顺序 (CategoryOrder) | 11 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:DataProcessing`, `分类显示:数据处理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于在像素、mm、um 和英寸之间进行数值换算。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -29,23 +35,38 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `FromUnit` | From Unit | `enum` | Pixel | Pixel/Pixel；mm/mm；um/um；inch/inch | Yes | - |
-| `ToUnit` | To Unit | `enum` | mm | Pixel/Pixel；mm/mm；um/um；inch/inch | Yes | - |
-| `Scale` | Scale | `double` | 1 | [1E-09, 1000000] | Yes | - |
-| `UseCalibration` | Use Calibration | `bool` | false | - | Yes | - |
+| `FromUnit` | 源单位 | `enum` | Pixel | Pixel/像素；mm；um；inch | Yes | - |
+| `ToUnit` | 目标单位 | `enum` | mm | Pixel/像素；mm；um；inch | Yes | - |
+| `Scale` | 缩放 | `double` | 1 | [1E-09, 1000000] | Yes | - |
+| `UseCalibration` | 使用标定 | `bool` | false | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Value` | Value | `Float` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `PixelSize` | Pixel Size | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `PixelSize` | 像素尺寸 | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Result` | Result | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Unit` | Unit | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`DEAF0E82CACF51A84A3136C3141B1388C687C73368AE852BFD794A9666A27095`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -77,4 +98,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `DeepLearningOperator` |
 | 枚举值 (Enum) | `OperatorType.DeepLearning` |
-| 分类 (Category) | AI检测 |
+| 分类 ID (CategoryId) | `AiInference` |
+| 分类 (Category) | AI推理 |
+| 分类顺序 (CategoryOrder) | 9 |
 | 版本 (Version) | `1.1.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:AiInference`, `分类显示:AI推理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -43,14 +49,14 @@
 | `TaskType` | 任务类型 | `enum` | ObjectDetection | ObjectDetection/目标检测；ImageClassification/图像分类；SemanticSegmentation/语义分割；Auto/可靠自动识别 | Yes | 默认 ObjectDetection 保持旧流程；Auto 仅在模型目录类型或输出形状能唯一判定时生效。 |
 | `ModelPath` | 模型路径 | `file` | "" | - | Yes | - |
 | `Confidence` | 置信度阈值 | `double` | 0.5 | [0, 1] | Yes | - |
-| `ModelVersion` | YOLO版本 | `enum` | Auto | Auto/自动检测；YOLOv5/YOLOv5；YOLOv6/YOLOv6；YOLOv8/YOLOv8；YOLOv11/YOLOv11 | Yes | - |
+| `ModelVersion` | YOLO版本 | `enum` | Auto | Auto/自动检测；YOLOv5；YOLOv6；YOLOv8；YOLOv11 | Yes | - |
 | `InputSize` | 输入尺寸 | `int` | 640 | [320, 1280] | Yes | - |
 | `UseGpu` | 使用GPU | `bool` | true | - | Yes | - |
 | `GpuDeviceId` | GPU设备ID | `int` | 0 | [0, 15] | Yes | - |
 | `TargetClasses` | 目标类别 | `string` | "" | - | Yes | 检测目标类别（逗号分隔，如 person,car），为空则检测所有类别 |
 | `LabelsPath` | 标签文件路径 | `file` | "" | - | Yes | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
 | `EnableInternalNms` | 启用内部NMS | `bool` | true | - | Yes | 仅用于 RawYolo 输出的后处理开关；OutputFormat=EndToEndNms 时信任 ONNX 模型内部候选框抑制/NMS，平台侧不再额外拆出 BoxNms。 |
-| `NmsIouThreshold` | NMS IoU Threshold | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
+| `NmsIouThreshold` | NMS IoU阈值 | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
 | `OutputFormat` | 输出格式 | `enum` | Auto | Auto/自动识别；RawYolo/原始 YOLO；EndToEndNms/端到端 NMS | Yes | Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。 |
 | `DetectionMode` | 检测模式 | `enum` | Defect | Defect/缺陷检测；Object/目标检测 | Yes | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
 | `TopK` | 分类 Top-K | `int` | 5 | [1, 100] | Yes | - |
@@ -60,13 +66,13 @@
 | `SegmentationInputSize` | 分割输入尺寸 | `string` | Auto | - | Yes | Auto 使用模型目录或 ONNX 静态输入尺寸；也可填写 Width,Height。 |
 | `NumClasses` | 分割类别数 | `int` | 21 | [2, 4096] | Yes | - |
 | `MaxClassMasks` | 最大类别掩码数 | `int` | 32 | [0, 4096] | Yes | - |
-| `ExecutionProvider` | 执行后端 | `enum` | Auto | Auto/跟随 UseGpu；CPU/CPU；CUDA/CUDA 优先并允许 CPU 回退 | Yes | - |
+| `ExecutionProvider` | 执行后端 | `enum` | Auto | Auto/跟随 UseGpu；CPU；CUDA/CUDA 优先并允许 CPU 回退 | Yes | - |
 | `ScaleToUnitRange` | 缩放到 0-1 | `bool` | true | - | Yes | - |
-| `ChannelOrder` | 通道顺序 | `enum` | RGB | RGB/RGB；BGR/BGR | Yes | - |
+| `ChannelOrder` | 通道顺序 | `enum` | RGB | RGB；BGR | Yes | - |
 | `Mean` | 归一化均值 | `string` | 0,0,0 | - | Yes | - |
 | `Std` | 归一化标准差 | `string` | 1,1,1 | - | Yes | - |
-| `ModelId` | Model Id | `string` | "" | - | Yes | - |
-| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
+| `ModelId` | 模型ID | `string` | "" | - | Yes | - |
+| `ModelCatalogPath` | 模型目录路径 | `file` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -101,13 +107,71 @@
 | `ClassMaskCount` | 类别掩码数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `OmittedClassMaskCount` | 未输出类别掩码数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `PresentClasses` | 出现类别 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ModelSource` | Model Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `ModelProvenance` | Model Provenance | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ResolvedModelPath` | 解析后的模型路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelId` | 解析后的模型ID | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelCatalogPath` | 解析后的模型目录路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelSource` | 模型来源 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelProvenance` | 模型来源信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `PostprocessDiagnostics` | Postprocess Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `OutputFormat` | Output Format | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `ChannelOrder` | metadata; - | visible: -; hidden: ALL(TaskType == ObjectDetection) | enabled: -; disabled: ALL(TaskType == ObjectDetection) | ALL(TaskType == ObjectDetection) | - | - | `DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION` |
+| `ClassNames` | optional; - | visible: -; hidden: ALL(TaskType == ObjectDetection) | enabled: -; disabled: ALL(TaskType == ObjectDetection) | ALL(TaskType == ObjectDetection) | - | - | `DEEP_LEARNING_CLASS_NAMES_FOR_CLASSIFICATION_OR_SEGMENTATION` |
+| `ClassificationInputSize` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_CLASSIFICATION` |
+| `ClassificationScoreMode` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_SCORE_MODE_ONLY_FOR_CLASSIFICATION` |
+| `Confidence` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_CONFIDENCE_ONLY_FOR_DETECTION` |
+| `DetectionMode` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_DETECTION_MODE_ONLY_FOR_DETECTION` |
+| `EnableInternalNms` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation \|\| OutputFormat == EndToEndNms) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS` |
+| `ExecutionProvider` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `DEEP_LEARNING_EXECUTION_PROVIDER` |
+| `GpuDeviceId` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ALL(ExecutionProvider == CPU) | - | - | - | `DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU` |
+| `InputSize` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_DETECTION_INPUT_SIZE_ONLY_FOR_DETECTION` |
+| `LabelsPath` | optional; - | visible: -; hidden: ALL(TaskType == SemanticSegmentation) | enabled: -; disabled: ALL(TaskType == SemanticSegmentation) | ALL(TaskType == SemanticSegmentation) | model_labels | - | `DEEP_LEARNING_LABELS_FOR_DETECTION_OR_CLASSIFICATION` |
+| `MaxClassMasks` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | - | - | `DEEP_LEARNING_CLASS_MASKS_ONLY_FOR_SEGMENTATION` |
+| `Mean` | metadata; - | visible: -; hidden: ALL(TaskType == ObjectDetection) | enabled: -; disabled: ALL(TaskType == ObjectDetection) | ALL(TaskType == ObjectDetection) | - | - | `DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION` |
+| `ModelCatalogPath` | optional; - | visible: -; hidden: - | enabled: -; disabled: ANY(ModelId is empty \|\| ModelPath is not empty) | - | model_catalog | - | `DEEP_LEARNING_CATALOG_REQUIRES_MODEL_ID` |
+| `ModelId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | model_resource | - | `DEEP_LEARNING_MODEL_SOURCE_REQUIRED` |
+| `ModelPath` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | model_resource | - | `DEEP_LEARNING_MODEL_SOURCE_REQUIRED` |
+| `ModelVersion` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_YOLO_VERSION_ONLY_FOR_DETECTION` |
+| `NmsIouThreshold` | metadata; ALL(OutputFormat == RawYolo && EnableInternalNms == true); ANY(TaskType == ObjectDetection \|\| TaskType == Auto) | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation \|\| OutputFormat == EndToEndNms \|\| EnableInternalNms == false) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation \|\| OutputFormat == EndToEndNms \|\| EnableInternalNms == false) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation \|\| OutputFormat == EndToEndNms \|\| EnableInternalNms == false) | - | - | `DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS` |
+| `NumClasses` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | - | - | `DEEP_LEARNING_CLASS_COUNT_ONLY_FOR_SEGMENTATION` |
+| `OutputFormat` | metadata; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_OUTPUT_FORMAT_ONLY_FOR_DETECTION` |
+| `ScaleToUnitRange` | metadata; - | visible: -; hidden: ALL(TaskType == ObjectDetection) | enabled: -; disabled: ALL(TaskType == ObjectDetection) | ALL(TaskType == ObjectDetection) | - | - | `DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION` |
+| `SegmentationInputSize` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | ANY(TaskType == ObjectDetection \|\| TaskType == ImageClassification) | - | - | `DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_SEGMENTATION` |
+| `Std` | metadata; - | visible: -; hidden: ALL(TaskType == ObjectDetection) | enabled: -; disabled: ALL(TaskType == ObjectDetection) | ALL(TaskType == ObjectDetection) | - | - | `DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION` |
+| `TargetClasses` | optional; - | visible: -; hidden: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ImageClassification \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_TARGET_CLASSES_ONLY_FOR_DETECTION` |
+| `TaskType` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `DEEP_LEARNING_TASK_TYPE` |
+| `TopK` | metadata; - | visible: -; hidden: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | enabled: -; disabled: ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | ANY(TaskType == ObjectDetection \|\| TaskType == SemanticSegmentation) | - | - | `DEEP_LEARNING_TOP_K_ONLY_FOR_CLASSIFICATION` |
+| `UseGpu` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ANY(ExecutionProvider == CPU \|\| ExecutionProvider == CUDA) | - | - | - | `DEEP_LEARNING_USE_GPU_ONLY_FOR_AUTO_PROVIDER` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| `ClassCount` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `ClassMaskCount` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `ClassMasks` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `ClassificationResult` | ALL(TaskType == ImageClassification) | `DEEP_LEARNING_CLASSIFICATION_OUTPUT` |
+| `ClassificationTopK` | ALL(TaskType == ImageClassification) | `DEEP_LEARNING_CLASSIFICATION_OUTPUT` |
+| `ColoredMap` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `DefectCount` | ALL(TaskType == ObjectDetection && DetectionMode == Defect) | `DEEP_LEARNING_DEFECT_OUTPUT` |
+| `Defects` | ALL(TaskType == ObjectDetection && DetectionMode == Defect) | `DEEP_LEARNING_DEFECT_OUTPUT` |
+| `DetectionList` | ALL(TaskType == ObjectDetection) | `DEEP_LEARNING_DETECTION_OUTPUT` |
+| `ObjectCount` | ALL(TaskType == ObjectDetection && DetectionMode == Object) | `DEEP_LEARNING_OBJECT_OUTPUT` |
+| `Objects` | ALL(TaskType == ObjectDetection && DetectionMode == Object) | `DEEP_LEARNING_OBJECT_OUTPUT` |
+| `OmittedClassMaskCount` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `PresentClasses` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `SegmentationMap` | ALL(TaskType == SemanticSegmentation) | `DEEP_LEARNING_SEGMENTATION_OUTPUT` |
+| `TopClassConfidence` | ALL(TaskType == ImageClassification) | `DEEP_LEARNING_CLASSIFICATION_OUTPUT` |
+| `TopClassLabel` | ALL(TaskType == ImageClassification) | `DEEP_LEARNING_CLASSIFICATION_OUTPUT` |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`6629D61042D158CEBEAE7C63CB1B44D02FE15227960C539F0EC0F911D2A7AD38`
+- `type:ClearVision.Product.Infrastructure.Operators.DeepLearningTaskResolver`
+- `type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator`
+- `type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -168,4 +232,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

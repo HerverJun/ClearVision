@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `ResultOutputOperator` |
 | 枚举值 (Enum) | `OperatorType.ResultOutput` |
-| 分类 (Category) | 输出 |
+| 分类 ID (CategoryId) | `OutputAndAuxiliary` |
+| 分类 (Category) | 输出与辅助 |
+| 分类顺序 (CategoryOrder) | 14 |
 | 版本 (Version) | `1.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:OutputAndAuxiliary`, `分类显示:输出与辅助`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -36,7 +42,7 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Format` | 输出格式 | `enum` | JSON | JSON/JSON；CSV/CSV；Text/Text | Yes | - |
+| `Format` | 输出格式 | `enum` | JSON | JSON；CSV；Text/文本 | Yes | - |
 | `SaveToFile` | 保存到文件 | `bool` | false | - | Yes | - |
 | `MaxFormattedCollectionItems` | Max formatted collection items | `int` | 256 | [1, 10000] | Yes | - |
 
@@ -58,6 +64,21 @@
 | `Text` | 文本 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Data` | 数据 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `FilePath` | 文件路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `SaveToFile` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | output_file | - | `RESULT_OUTPUT_OPTIONAL_INTERNAL_FILE_WRITE` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`6655F87B33D941F64D43CDEB6DE41B7810466A39411BF147F6F9FAC95BDF2250`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -92,4 +113,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

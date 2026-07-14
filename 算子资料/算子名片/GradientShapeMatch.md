@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `GradientShapeMatchOperator` |
 | 枚举值 (Enum) | `OperatorType.GradientShapeMatch` |
-| 分类 (Category) | 匹配定位 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.1.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于基于梯度方向特征的形状匹配，支持可选 ROI 搜索。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -50,10 +56,10 @@
 | `MagnitudeThreshold` | 梯度阈值 | `int` | 30 | [0, 255] | Yes | - |
 | `EnableCache` | 启用缓存 | `bool` | true | - | Yes | - |
 | `UseRoi` | 使用 ROI | `bool` | false | - | Yes | - |
-| `RoiX` | ROI X | `int` | 0 | [0, 100000] | Yes | - |
-| `RoiY` | ROI Y | `int` | 0 | [0, 100000] | Yes | - |
-| `RoiWidth` | ROI Width | `int` | 0 | [0, 100000] | Yes | - |
-| `RoiHeight` | ROI Height | `int` | 0 | [0, 100000] | Yes | - |
+| `RoiX` | ROIX | `int` | 0 | [0, 100000] | Yes | - |
+| `RoiY` | ROIY | `int` | 0 | [0, 100000] | Yes | - |
+| `RoiWidth` | ROI宽度 | `int` | 0 | [0, 100000] | Yes | - |
+| `RoiHeight` | ROI高度 | `int` | 0 | [0, 100000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -71,6 +77,21 @@
 | `IsMatch` | 是否匹配 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `Score` | 匹配分数 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Matches` | 匹配列表 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`B4DEA1FBF77C30944BA4C65E2AF6DB7D4778DF76BF5B28860024A0B0F57E8DFB`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -120,4 +141,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

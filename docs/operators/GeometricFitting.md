@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `GeometricFittingOperator` |
 | 枚举值 (Enum) | `OperatorType.GeometricFitting` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据轮廓点拟合直线、圆或椭圆。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,14 +46,14 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `FitType` | Fit Type | `enum` | Circle | Line/Line；Circle/Circle；Ellipse/Ellipse | Yes | - |
-| `Threshold` | Binary Threshold | `double` | 127 | [0, 255] | Yes | - |
-| `MinArea` | Min Contour Area | `int` | 100 | >= 0 | Yes | - |
-| `MinPoints` | Min Points | `int` | 5 | [3, 10000] | Yes | - |
-| `ContourSelection` | Contour Selection | `enum` | BestResidual | LargestContour/Largest Contour；BestResidual/Best Residual | Yes | - |
-| `RobustMethod` | Robust Method | `enum` | LeastSquares | LeastSquares/LeastSquares；Ransac/Ransac | Yes | - |
-| `RansacIterations` | Ransac Iterations | `int` | 200 | [10, 5000] | Yes | - |
-| `RansacInlierThreshold` | Ransac Inlier Threshold | `double` | 2 | [0.1, 100] | Yes | - |
+| `FitType` | 拟合类型 | `enum` | Circle | Line/直线；Circle/圆；Ellipse/椭圆 | Yes | - |
+| `Threshold` | 二值阈值 | `double` | 127 | [0, 255] | Yes | - |
+| `MinArea` | 最小轮廓面积 | `int` | 100 | >= 0 | Yes | - |
+| `MinPoints` | 最小点数 | `int` | 5 | [3, 10000] | Yes | - |
+| `ContourSelection` | 轮廓选择 | `enum` | BestResidual | LargestContour/最大轮廓；BestResidual/Best Residual | Yes | - |
+| `RobustMethod` | 鲁棒方法 | `enum` | LeastSquares | LeastSquares/最小二乘；Ransac | Yes | - |
+| `RansacIterations` | RANSAC迭代次数 | `int` | 200 | [10, 5000] | Yes | - |
+| `RansacInlierThreshold` | RANSAC内点阈值 | `double` | 2 | [0.1, 100] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -60,6 +66,21 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `FitResult` | Fit Result | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`11CDBDDB6504DE6556EEEF5A76DCDEA24DBE94EA548097A320081334E4172D17`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -124,4 +145,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

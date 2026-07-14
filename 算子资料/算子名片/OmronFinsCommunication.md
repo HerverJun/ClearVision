@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `OmronFinsCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.OmronFinsCommunication` |
+| 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
+| 分类顺序 (CategoryOrder) | 13 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Communication`, `分类显示:通信`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -55,6 +61,30 @@
 | `Response` | 响应 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Status` | 状态 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `Address` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_address | - | `OMRON_PLC_ADDRESS_REQUIRED` |
+| `IpAddress` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | plc_endpoint | - | `OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `Length` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `OMRON_READ_LENGTH_ONLY_FOR_READ` |
+| `PollingCondition` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_CONDITION_ONLY_WHEN_WAITING` |
+| `PollingInterval` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_INTERVAL_ONLY_WHEN_WAITING` |
+| `PollingMode` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `OMRON_POLLING_ONLY_FOR_READ` |
+| `PollingTimeout` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_TIMEOUT_ONLY_WHEN_WAITING` |
+| `PollingValue` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_VALUE_ONLY_WHEN_WAITING` |
+| `Port` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `WriteValue` | optional; - | visible: -; hidden: ALL(Operation != Write) | enabled: ALL(Operation == Write); disabled: - | ALL(Operation != Write) | - | - | `OMRON_WRITE_VALUE_ONLY_FOR_WRITE` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`636ED45E60676562F4571C76E52DDB0CF6DC4E3BB464227445B0C6D1B9D7A99F`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
 
@@ -81,4 +111,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

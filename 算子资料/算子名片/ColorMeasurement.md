@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `ColorMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.ColorMeasurement` |
-| 分类 (Category) | 颜色处理 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `2.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,21 +47,21 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `MeasurementMode` | Measurement Mode | `enum` | LabDeltaE | LabDeltaE/Lab DeltaE；HsvStats/HSV Stats | Yes | - |
-| `DeltaEMethod` | DeltaE Method | `enum` | CIEDE2000 | CIE76/CIE76；CIEDE2000/CIEDE2000 | Yes | - |
-| `RoiX` | ROI X | `int` | 0 | - | Yes | - |
-| `RoiY` | ROI Y | `int` | 0 | - | Yes | - |
-| `RoiW` | ROI W | `int` | 0 | - | Yes | - |
-| `RoiH` | ROI H | `int` | 0 | - | Yes | - |
-| `RefL` | Ref L | `double` | 0 | - | Yes | - |
-| `RefA` | Ref A | `double` | 0 | - | Yes | - |
-| `RefB` | Ref B | `double` | 0 | - | Yes | - |
+| `DeltaEMethod` | DeltaE方法 | `enum` | CIEDE2000 | CIE76；CIEDE2000 | Yes | - |
+| `RoiX` | ROIX | `int` | 0 | - | Yes | - |
+| `RoiY` | ROIY | `int` | 0 | - | Yes | - |
+| `RoiW` | ROI宽 | `int` | 0 | - | Yes | - |
+| `RoiH` | ROI高 | `int` | 0 | - | Yes | - |
+| `RefL` | 参考L | `double` | 0 | - | Yes | - |
+| `RefA` | 参考A | `double` | 0 | - | Yes | - |
+| `RefB` | 参考B | `double` | 0 | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `ReferenceColor` | Reference Color | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `ReferenceColor` | 参考颜色 | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
@@ -68,6 +74,21 @@
 | `ValueMean` | Value Mean | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `HueValid` | Hue Valid | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`126CB81CBAFB8CF7C5E66F78B55E5B4739F5F3FE1D8BE8B645B410BCB7B84A3F`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -112,4 +133,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 2.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

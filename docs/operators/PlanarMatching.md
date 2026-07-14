@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `PlanarMatchingOperator` |
 | 枚举值 (Enum) | `OperatorType.PlanarMatching` |
-| 分类 (Category) | 匹配定位 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.1.3` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于基于局部特征匹配和单应性验证定位纹理平面目标，输出投影角点、评分与诊断。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -42,26 +48,26 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `TemplatePath` | Template Image Path | `file` | "" | - | Yes | - |
-| `DetectorType` | Feature Detector | `enum` | ORB | ORB/ORB；AKAZE/AKAZE；BRISK/BRISK | Yes | - |
-| `MaxFeatures` | Max Features | `int` | 1000 | [100, 5000] | Yes | - |
-| `ScaleFactor` | Scale Factor | `double` | 1.2 | [1.01, 2] | Yes | - |
-| `NLevels` | Pyramid Levels | `int` | 8 | [1, 16] | Yes | - |
-| `MatchRatio` | Match Ratio (Lowe's) | `double` | 0.75 | [0.5, 0.95] | Yes | - |
-| `RansacThreshold` | RANSAC Threshold (px) | `double` | 3 | [0.5, 10] | Yes | - |
-| `MinMatchCount` | Min Match Count | `int` | 10 | [4, 100] | Yes | - |
-| `MinInliers` | Min Inliers | `int` | 8 | [4, 100] | Yes | - |
-| `MinInlierRatio` | Min Inlier Ratio | `double` | 0.25 | [0.1, 1] | Yes | - |
-| `ScoreThreshold` | Score Threshold | `double` | 0.5 | [0, 1] | Yes | - |
+| `TemplatePath` | 模板图像路径 | `file` | "" | - | Yes | - |
+| `DetectorType` | 特征检测器 | `enum` | ORB | ORB；AKAZE；BRISK | Yes | - |
+| `MaxFeatures` | 最大特征数 | `int` | 1000 | [100, 5000] | Yes | - |
+| `ScaleFactor` | 缩放因子 | `double` | 1.2 | [1.01, 2] | Yes | - |
+| `NLevels` | 金字塔层级 | `int` | 8 | [1, 16] | Yes | - |
+| `MatchRatio` | 匹配比率（Lowe） | `double` | 0.75 | [0.5, 0.95] | Yes | - |
+| `RansacThreshold` | RANSAC阈值（px） | `double` | 3 | [0.5, 10] | Yes | - |
+| `MinMatchCount` | 最小匹配数量 | `int` | 10 | [4, 100] | Yes | - |
+| `MinInliers` | 最小内点数 | `int` | 8 | [4, 100] | Yes | - |
+| `MinInlierRatio` | 最小内点比例 | `double` | 0.25 | [0.1, 1] | Yes | - |
+| `ScoreThreshold` | 分数阈值 | `double` | 0.5 | [0, 1] | Yes | - |
 | `AllowCenterOnlyProjection` | Allow Center-Only Projection | `bool` | false | - | Yes | - |
-| `UseRoi` | Use ROI | `bool` | false | - | Yes | - |
-| `RoiX` | ROI X | `int` | 0 | - | Yes | - |
-| `RoiY` | ROI Y | `int` | 0 | - | Yes | - |
-| `RoiWidth` | ROI Width | `int` | 0 | - | Yes | - |
-| `RoiHeight` | ROI Height | `int` | 0 | - | Yes | - |
-| `EnableMultiScale` | Enable Multi-Scale | `bool` | true | - | Yes | - |
+| `UseRoi` | 使用ROI | `bool` | false | - | Yes | - |
+| `RoiX` | ROIX | `int` | 0 | - | Yes | - |
+| `RoiY` | ROIY | `int` | 0 | - | Yes | - |
+| `RoiWidth` | ROI宽度 | `int` | 0 | - | Yes | - |
+| `RoiHeight` | ROI高度 | `int` | 0 | - | Yes | - |
+| `EnableMultiScale` | 启用多尺度 | `bool` | true | - | Yes | - |
 | `ScaleRange` | Scale Range (±) | `double` | 0.2 | [0, 1] | Yes | - |
-| `EnableEarlyExit` | Enable Early Exit | `bool` | false | - | Yes | - |
+| `EnableEarlyExit` | 启用提前退出 | `bool` | false | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -75,9 +81,9 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `IsMatch` | Is Match | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
-| `Score` | Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Score` | 分数 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MatchCount` | Match Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Method` | Method | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `Method` | 方法 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `FailureReason` | Failure Reason | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `CandidateScore` | Candidate Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `InlierCount` | Inlier Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
@@ -92,6 +98,21 @@
 | `MatchResult` | Match Result | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `Homography` | Homography Matrix | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `Corners` | Detected Corners | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`7FDE7A98936E805F1EDAB5DD387CB97FBEDE60673D3272910D5464B928D4AF3E`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -141,4 +162,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.3 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.3 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

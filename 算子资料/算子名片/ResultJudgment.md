@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `ResultJudgmentOperator` |
 | 枚举值 (Enum) | `OperatorType.ResultJudgment` |
+| 分类 ID (CategoryId) | `FlowControl` |
 | 分类 (Category) | 流程控制 |
+| 分类顺序 (CategoryOrder) | 12 |
 | 版本 (Version) | `1.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:流程`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:FlowControl`, `分类显示:流程控制`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -32,11 +38,11 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `FieldName` | Field Name | `string` | Value | - | Yes | - |
-| `Condition` | Condition | `enum` | Equal | Equal/Equal；NotEqual/Not Equal；GreaterThan/Greater Than；LessThan/Less Than；GreaterOrEqual/Greater Or Equal；LessOrEqual/Less Or Equal；Range/Range | Yes | - |
+| `Condition` | Condition | `enum` | Equal | Equal；NotEqual/Not Equal；GreaterThan/Greater Than；LessThan/Less Than；GreaterOrEqual/Greater Or Equal；LessOrEqual/Less Or Equal；Range | Yes | - |
 | `ExpectValue` | Expected Value | `string` | 1 | - | Yes | - |
 | `ExpectValueMin` | Expected Min | `string` | "" | - | Yes | - |
 | `ExpectValueMax` | Expected Max | `string` | "" | - | Yes | - |
-| `MinConfidence` | Min Confidence | `double` | 0 | [0, 1] | Yes | - |
+| `MinConfidence` | 最小置信度 | `double` | 0 | [0, 1] | Yes | - |
 | `NumericAbsTolerance` | Numeric Absolute Tolerance | `double` | 0.0001 | [0, 1000000] | Yes | - |
 | `NumericRelTolerance` | Numeric Relative Tolerance | `double` | 1E-06 | [0, 1] | Yes | - |
 
@@ -45,7 +51,7 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Value` | Value | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
-| `Confidence` | Confidence | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `Confidence` | 置信度 | `Float` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
@@ -55,6 +61,21 @@
 | `ConditionResult` | Condition Result | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `JudgmentValue` | Judgment Value | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Details` | Details | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`7333F779253445A60AE8E15A9A9E2A76D962FE2A568320FA96C2C102CC4CCDEF`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -85,4 +106,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `SurfaceDefectDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.SurfaceDefectDetection` |
-| 分类 (Category) | AI检测 |
+| 分类 ID (CategoryId) | `DefectDetection` |
+| 分类 (Category) | 缺陷检测 |
+| 分类顺序 (CategoryOrder) | 6 |
 | 版本 (Version) | `2.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `experimental`, `industrial-remediation`, `surface-defect`, `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 实验 `Experimental` |
+| 生命周期说明 (Lifecycle Note) | 基于梯度、参考差分和局部对比度的传统缺陷候选，需要现场样本调参与误检验证。 |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | Yes |
+| 标签 (Tags) | `experimental`, `industrial-remediation`, `surface-defect`, `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Experimental`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,19 +47,19 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Method` | Method | `enum` | GradientMagnitude | GradientMagnitude/GradientMagnitude；ReferenceDiff/ReferenceDiff；LocalContrast/LocalContrast | Yes | - |
-| `Threshold` | Threshold | `double` | 35 | [0, 255] | Yes | - |
-| `MinArea` | Min Area | `int` | 20 | [0, 10000000] | Yes | - |
-| `MaxArea` | Max Area | `int` | 1000000 | [0, 10000000] | Yes | - |
-| `MorphCleanSize` | Morph Clean Size | `int` | 3 | [1, 301] | Yes | - |
-| `MorphMode` | Morph Mode | `enum` | OpenClose | None/None；OpenClose/Open then close；CloseOpen/Close then open；CloseOnly/Close only | Yes | - |
-| `AlignmentMode` | Alignment Mode | `enum` | PhaseCorrelation | None/None；PhaseCorrelation/PhaseCorrelation | Yes | - |
-| `NormalizationMode` | Normalization Mode | `enum` | LocalMean | None/None；LocalMean/LocalMean；ClaheLocalMean/CLAHE + LocalMean | Yes | - |
-| `ThresholdMode` | Threshold Mode | `enum` | Auto | Auto/Auto；Manual/Manual；Otsu/Otsu；ReferenceStats/ReferenceStats | Yes | - |
-| `BackgroundKernelSize` | Background Kernel Size | `int` | 31 | [3, 301] | Yes | - |
+| `Method` | 方法 | `enum` | GradientMagnitude | GradientMagnitude/梯度幅值；ReferenceDiff/参考差分；LocalContrast/局部对比度 | Yes | - |
+| `Threshold` | 阈值 | `double` | 35 | [0, 255] | Yes | - |
+| `MinArea` | 最小面积 | `int` | 20 | [0, 10000000] | Yes | - |
+| `MaxArea` | 最大面积 | `int` | 1000000 | [0, 10000000] | Yes | - |
+| `MorphCleanSize` | 形态清理尺寸 | `int` | 3 | [1, 301] | Yes | - |
+| `MorphMode` | Morph Mode | `enum` | OpenClose | None/无；OpenClose/Open then close；CloseOpen/Close then open；CloseOnly/Close only | Yes | - |
+| `AlignmentMode` | 配准模式 | `enum` | PhaseCorrelation | None/无；PhaseCorrelation/相位相关 | Yes | - |
+| `NormalizationMode` | 归一化模式 | `enum` | LocalMean | None/无；LocalMean/局部均值；ClaheLocalMean/CLAHE + LocalMean | Yes | - |
+| `ThresholdMode` | 阈值模式 | `enum` | Auto | Auto/自动；Manual/手动；Otsu/大津法；ReferenceStats/参考统计 | Yes | - |
+| `BackgroundKernelSize` | 背景核大小 | `int` | 31 | [3, 301] | Yes | - |
 | `ClaheClipLimit` | CLAHE Clip Limit | `double` | 2 | [0.1, 40] | Yes | - |
 | `ClaheTileGridSize` | CLAHE Tile Grid Size | `int` | 8 | [2, 64] | Yes | - |
-| `ReferenceStatsSigma` | Reference Stats Sigma | `double` | 2.5 | [0.1, 10] | Yes | - |
+| `ReferenceStatsSigma` | 参考统计 Sigma | `double` | 2.5 | [0.1, 10] | Yes | - |
 | `RobustReferenceStats` | Robust Reference Stats | `bool` | false | - | Yes | - |
 | `ResponseNormalizeMode` | Response Normalize Mode | `enum` | RawClamp | RawClamp/Raw clamp；MinMax/Min/max；PercentileClip/Percentile clip | Yes | - |
 | `ComponentFilterMode` | Component Filter Mode | `enum` | AreaOnly | AreaOnly/Area only；ResponseStats/Response statistics；ShapeAndResponseStats/Shape and response statistics | Yes | - |
@@ -64,7 +70,7 @@
 | `CompactNoiseFillRatioMin` | Compact Noise Fill Ratio Min | `double` | 0 | [0, 1] | Yes | - |
 | `MinLocalResponseProminence` | Min Local Response Prominence | `double` | 0 | [0, 255] | Yes | - |
 | `EnableCandidateProfile` | Enable Candidate Profile | `bool` | false | - | Yes | - |
-| `CandidateProfile` | Candidate Profile | `enum` | default | default/Default；taxonomy_v2/Surface taxonomy v2 | Yes | - |
+| `CandidateProfile` | Candidate Profile | `enum` | default | default/默认；taxonomy_v2/Surface taxonomy v2 | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -78,12 +84,27 @@
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `DefectMask` | Defect Mask | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `ResponseImage` | Response Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ResponseImage` | 响应图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `DefectCount` | Defect Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `DefectArea` | Defect Area | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `AlignmentScore` | Alignment Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `RejectedReason` | Rejected Reason | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `Diagnostics` | Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `AlignmentScore` | 配准得分 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `RejectedReason` | 剔除原因 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `Diagnostics` | 诊断信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`9719B597A678A30706DF15051FC658548C504AC010350015131D84D9F4FB3D00`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -135,4 +156,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 2.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -33,6 +33,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorOutputRule("Image", ReasonCode = "FILTERING_OUTPUT")]
 [OperatorOutputRule("FilterMode", ReasonCode = "FILTERING_OUTPUT")]
 [OperatorOutputRule("FilterDiagnostics", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorGenerationDependency(typeof(SpatialFilterKernel))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("FilterMode", "实际滤波模式", PortDataType.String)]

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `CaliperToolOperator` |
 | 枚举值 (Enum) | `OperatorType.CaliperTool` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,15 +46,15 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Direction` | Direction | `enum` | Horizontal | Horizontal/Horizontal；Vertical/Vertical；Custom/Custom | Yes | - |
-| `Angle` | Angle | `double` | 0 | [-180, 180] | Yes | - |
-| `Polarity` | Polarity | `enum` | Both | DarkToLight/DarkToLight；LightToDark/LightToDark；Both/Both | Yes | - |
-| `EdgeThreshold` | Edge Threshold | `double` | 18 | [1, 255] | Yes | - |
-| `ExpectedCount` | Expected Count | `int` | 1 | [1, 100] | Yes | - |
-| `MeasureMode` | Measure Mode | `enum` | edge_pairs | edge_pairs/edge_pairs | Yes | - |
-| `PairDirection` | Pair Direction | `enum` | any | positive_to_negative/positive_to_negative；negative_to_positive/negative_to_positive；any/any | Yes | - |
-| `SubpixelAccuracy` | Subpixel Accuracy | `bool` | false | - | Yes | - |
-| `SubPixelMode` | Sub Pixel Mode | `enum` | gradient_centroid | gradient_centroid/gradient_centroid；gradient_moment/gradient_moment；zernike/zernike (legacy alias) | Yes | - |
+| `Direction` | 方向 | `enum` | Horizontal | Horizontal/水平；Vertical/垂直；Custom/自定义 | Yes | - |
+| `Angle` | 角度 | `double` | 0 | [-180, 180] | Yes | - |
+| `Polarity` | 极性 | `enum` | Both | DarkToLight/暗到亮；LightToDark/亮到暗；Both/双向 | Yes | - |
+| `EdgeThreshold` | 边缘阈值 | `double` | 18 | [1, 255] | Yes | - |
+| `ExpectedCount` | 期望数量 | `int` | 1 | [1, 100] | Yes | - |
+| `MeasureMode` | 测量模式 | `enum` | edge_pairs | edge_pairs/边缘对 | Yes | - |
+| `PairDirection` | 配对方向 | `enum` | any | positive_to_negative/正到负；negative_to_positive/负到正；any/任意 | Yes | - |
+| `SubpixelAccuracy` | 亚像素精度 | `bool` | false | - | Yes | - |
+| `SubPixelMode` | 亚像素模式 | `enum` | gradient_centroid | gradient_centroid；gradient_moment；zernike/zernike (legacy alias) | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -61,12 +67,27 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `Width` | Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Width` | 宽度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `EdgePairs` | Edge Pairs | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `PairCount` | Pair Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `PairDistances` | Pair Distances | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `AverageDistance` | Average Distance | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `DistanceStdDev` | Distance StdDev | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`AC1D3782EBB97B0CFB17242C369B16F364D59AF0604F65130C1CC339E7FCD129`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -106,4 +127,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

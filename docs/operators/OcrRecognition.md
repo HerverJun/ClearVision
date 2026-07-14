@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `OcrRecognitionOperator` |
 | 枚举值 (Enum) | `OperatorType.OcrRecognition` |
-| 分类 (Category) | 识别 |
+| 分类 ID (CategoryId) | `AiInference` |
+| 分类 (Category) | AI推理 |
+| 分类顺序 (CategoryOrder) | 9 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:AiInference`, `分类显示:AI推理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于识别图像中的文本内容。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -45,6 +51,21 @@
 | `Text` | 识别文本 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `IsSuccess` | 成功 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`11654593C6E3E9A4493AC22D3F8A4D5C79BC0C9A99EA69DCC2ABD4AE23DA90AA`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
 
@@ -75,4 +96,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

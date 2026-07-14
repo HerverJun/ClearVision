@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `FisheyeCalibrationOperator` |
 | 枚举值 (Enum) | `OperatorType.FisheyeCalibration` |
-| 分类 (Category) | 标定 |
+| 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
+| 分类 (Category) | 标定与坐标 |
+| 分类顺序 (CategoryOrder) | 8 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:CalibrationAndCoordinates`, `分类显示:标定与坐标`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,15 +46,15 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `PatternType` | Pattern Type | `enum` | Chessboard | Chessboard/Chessboard；CircleGrid/CircleGrid | Yes | - |
-| `BoardWidth` | Board Width | `int` | 9 | [2, 30] | Yes | - |
-| `BoardHeight` | Board Height | `int` | 6 | [2, 30] | Yes | - |
-| `SquareSize` | Square Size(mm) | `double` | 25 | [0.1, 1000] | Yes | - |
-| `Mode` | Mode | `enum` | SingleImage | SingleImage/SingleImage；FolderCalibration/FolderCalibration | Yes | - |
-| `ImageFolder` | Image Folder | `string` | "" | - | Yes | - |
-| `CalibrationOutputPath` | Calibration Output Path | `string` | fisheye_calibration_result.json | - | Yes | - |
-| `RecomputeExtrinsic` | Recompute Extrinsic | `bool` | true | - | Yes | - |
-| `CheckConditions` | Check Conditions | `bool` | true | - | Yes | - |
+| `PatternType` | 标定板类型 | `enum` | Chessboard | Chessboard/棋盘格；CircleGrid/圆点阵 | Yes | - |
+| `BoardWidth` | 标定板宽度 | `int` | 9 | [2, 30] | Yes | - |
+| `BoardHeight` | 标定板高度 | `int` | 6 | [2, 30] | Yes | - |
+| `SquareSize` | 方格尺寸（mm） | `double` | 25 | [0.1, 1000] | Yes | - |
+| `Mode` | 模式 | `enum` | SingleImage | SingleImage/单图像；FolderCalibration/目录标定 | Yes | - |
+| `ImageFolder` | 图像文件夹 | `string` | "" | - | Yes | - |
+| `CalibrationOutputPath` | 标定输出路径 | `string` | fisheye_calibration_result.json | - | Yes | - |
+| `RecomputeExtrinsic` | 重新计算外参 | `bool` | true | - | Yes | - |
+| `CheckConditions` | 检查条件 | `bool` | true | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -61,6 +67,21 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `CalibrationData` | Calibration Data | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`01534C65905CF046379ED8388DA7D68634A5635F99E097F357B335E6DCB7CA84`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -104,4 +125,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `WidthMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.WidthMeasurement` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于测量平行边缘或直线之间的宽度。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,10 +46,10 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `MeasureMode` | Measure Mode | `enum` | AutoEdge | AutoEdge/AutoEdge；ManualLines/ManualLines | Yes | - |
-| `SampleCount` | Sample Count | `int` | 24 | [10, 256] | Yes | - |
-| `Direction` | Direction | `enum` | Perpendicular | Perpendicular/Perpendicular；Custom/Custom | Yes | - |
-| `CustomAngle` | Custom Angle | `double` | 0 | [-180, 180] | Yes | - |
+| `MeasureMode` | 测量模式 | `enum` | AutoEdge | AutoEdge/自动边缘；ManualLines/手动线 | Yes | - |
+| `SampleCount` | 采样数 | `int` | 24 | [10, 256] | Yes | - |
+| `Direction` | 方向 | `enum` | Perpendicular | Perpendicular/垂直；Custom/自定义 | Yes | - |
+| `CustomAngle` | 自定义角度 | `double` | 0 | [-180, 180] | Yes | - |
 | `RobustMode` | Robust Mode | `bool` | true | - | Yes | - |
 | `OutlierSigmaK` | Outlier Sigma K | `double` | 3 | [0.5, 10] | Yes | - |
 | `MinValidSamples` | Min Valid Samples | `int` | 0 | [0, 256] | Yes | - |
@@ -61,13 +67,28 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `Width` | Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Width` | 宽度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MeanWidth` | Mean Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MinWidth` | Min Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MaxWidth` | Max Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `P95Width` | P95 Width | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `StdDev` | StdDev | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `ValidSampleRate` | Valid Sample Rate | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`2CFAC4D8CEE83A7748302687261BC991C71DD634624602A343AD92CEAC5A0DF3`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -108,4 +129,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

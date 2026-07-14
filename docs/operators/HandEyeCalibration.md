@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `HandEyeCalibrationOperator` |
 | 枚举值 (Enum) | `OperatorType.HandEyeCalibration` |
-| 分类 (Category) | 标定 |
+| 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
+| 分类 (Category) | 标定与坐标 |
+| 分类顺序 (CategoryOrder) | 8 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:CalibrationAndCoordinates`, `分类显示:标定与坐标`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据机器人位姿和标定板位姿求解手眼或简化眼在手外标定。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -33,10 +39,10 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `CalibrationType` | Calibration Type | `enum` | eye_in_hand | eye_in_hand/Eye In Hand；eye_to_hand/Eye To Hand | Yes | - |
-| `Method` | Method | `enum` | TSAI | TSAI/Tsai；PARK/Park；HORAUD/Horaud；ANDREFF/Andreff；DANIILIDIS/Daniilidis | Yes | - |
-| `CameraMatrix` | Camera Matrix | `string` | "" | - | Yes | - |
-| `DistortionCoeffs` | Distortion Coeffs | `string` | "" | - | Yes | - |
+| `CalibrationType` | 标定类型 | `enum` | eye_in_hand | eye_in_hand/手眼；eye_to_hand/眼到手 | Yes | - |
+| `Method` | 方法 | `enum` | TSAI | TSAI/Tsai；PARK/Park；HORAUD/Horaud；ANDREFF/Andreff；DANIILIDIS/Daniilidis | Yes | - |
+| `CameraMatrix` | 相机矩阵 | `string` | "" | - | Yes | - |
+| `DistortionCoeffs` | 畸变系数 | `string` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -55,6 +61,21 @@
 | `HtmlReport` | HTML Report | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Suggestions` | Suggestions | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `SuggestedValidationPoses` | Suggested Validation Poses | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`CB4D33407E47D93FBA7918B42B5F24CC74F5B1E536970E14E5889ACEF0C8D7E6`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -83,4 +104,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

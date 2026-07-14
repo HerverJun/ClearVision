@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `AdaptiveThresholdOperator` |
 | 枚举值 (Enum) | `OperatorType.AdaptiveThreshold` |
-| 分类 (Category) | 预处理 |
+| 分类 ID (CategoryId) | `SegmentationAndRegion` |
+| 分类 (Category) | 分割与区域 |
+| 分类顺序 (CategoryOrder) | 3 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:SegmentationAndRegion`, `分类显示:分割与区域`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -30,9 +36,9 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `MaxValue` | Max Value | `double` | 255 | [0, 255] | Yes | - |
-| `AdaptiveMethod` | Adaptive Method | `enum` | Gaussian | Gaussian/Gaussian；Mean/Mean | Yes | - |
-| `ThresholdType` | Threshold Type | `enum` | Binary | Binary/Binary；BinaryInv/Binary Inv | Yes | - |
-| `BlockSize` | Block Size | `int` | 11 | [3, 51] | Yes | - |
+| `AdaptiveMethod` | Adaptive Method | `enum` | Gaussian | Gaussian；Mean/均值 | Yes | - |
+| `ThresholdType` | Threshold Type | `enum` | Binary | Binary/二值；BinaryInv/二值反转 | Yes | - |
+| `BlockSize` | 块大小 | `int` | 11 | [3, 51] | Yes | - |
 | `C` | C | `double` | 2 | [-100, 100] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
@@ -45,6 +51,21 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`A7B6230D18563B91A72A77577B9AFB7F319F36C74D5978C07F073050C4DEFEF9`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -78,4 +99,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

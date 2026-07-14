@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `MinEnclosingGeometryOperator` |
 | 枚举值 (Enum) | `OperatorType.MinEnclosingGeometry` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于计算最小包围几何（圆、矩形、三角形），并支持基于 RANSAC 的鲁棒圆弧拟合。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -41,16 +47,16 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Operation` | Operation | `enum` | SmallestCircle | SmallestCircle/Smallest Enclosing Circle；MinAreaRect/Minimum Area Rectangle；MinAreaTriangle/Minimum Area Triangle；ConvexHull/Convex Hull；FitArc/Fit Arc (RANSAC)；FitCircleRobust/Fit Circle (Robust)；FitEllipseDirect/Fit Ellipse (Direct) | Yes | - |
-| `Threshold` | Binary Threshold | `double` | 127 | [0, 255] | Yes | - |
-| `MinArea` | Min Contour Area | `int` | 100 | >= 0 | Yes | - |
-| `ContourSelection` | Contour Selection | `enum` | LargestContour | LargestContour/Largest Contour；AllContours/All Contours；FirstContour/First Contour | Yes | - |
-| `RansacIterations` | RANSAC Iterations | `int` | 500 | [10, 5000] | Yes | - |
-| `RansacInlierThreshold` | RANSAC Inlier Threshold (px) | `double` | 2 | [0.1, 50] | Yes | - |
-| `MinArcAngle` | Min Arc Angle (degrees) | `double` | 30 | [5, 350] | Yes | - |
-| `MaxArcAngle` | Max Arc Angle (degrees) | `double` | 330 | [10, 360] | Yes | - |
-| `OutlierRatio` | Expected Outlier Ratio | `double` | 0.3 | [0, 0.9] | Yes | - |
-| `CheckConditionNumber` | Check Condition Number | `bool` | true | - | Yes | - |
+| `Operation` | 操作 | `enum` | SmallestCircle | SmallestCircle/最小包围圆；MinAreaRect/最小面积矩形；MinAreaTriangle/最小面积三角形；ConvexHull/凸包；FitArc/圆弧拟合（RANSAC）；FitCircleRobust/圆拟合（稳健）；FitEllipseDirect/椭圆拟合（直接法） | Yes | - |
+| `Threshold` | 二值阈值 | `double` | 127 | [0, 255] | Yes | - |
+| `MinArea` | 最小轮廓面积 | `int` | 100 | >= 0 | Yes | - |
+| `ContourSelection` | 轮廓选择 | `enum` | LargestContour | LargestContour/最大轮廓；AllContours/全部轮廓；FirstContour/第一条轮廓 | Yes | - |
+| `RansacIterations` | RANSAC迭代次数 | `int` | 500 | [10, 5000] | Yes | - |
+| `RansacInlierThreshold` | RANSAC内点阈值（px） | `double` | 2 | [0.1, 50] | Yes | - |
+| `MinArcAngle` | 最小圆弧角（度） | `double` | 30 | [5, 350] | Yes | - |
+| `MaxArcAngle` | 最大圆弧角（度） | `double` | 330 | [10, 360] | Yes | - |
+| `OutlierRatio` | 期望离群比例 | `double` | 0.3 | [0, 0.9] | Yes | - |
+| `CheckConditionNumber` | 检查条件数 | `bool` | true | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -63,6 +69,21 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `GeometryResult` | Geometry Result | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`20BAD126AE7F30F86AD728D05DF798CA87C9D1FAB701ED95D5079665D26D0DB4`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -135,4 +156,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

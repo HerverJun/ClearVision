@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `GaussianBlurOperator` |
 | 枚举值 (Enum) | `OperatorType.Filtering` |
-| 分类 (Category) | 预处理 |
+| 分类 ID (CategoryId) | `ImagePreprocessing` |
+| 分类 (Category) | 图像预处理 |
+| 分类顺序 (CategoryOrder) | 2 |
 | 版本 (Version) | `1.1.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -36,10 +42,10 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `FilterMode` | 滤波模式 | `enum` | Gaussian | Gaussian/高斯滤波；Mean/均值/Box滤波；Median/中值滤波；Bilateral/双边滤波 | Yes | 默认 Gaussian 保持旧流程行为。 |
-| `KernelSize` | Kernel Size | `int` | 5 | [1, 63] | Yes | Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。 |
-| `SigmaX` | Sigma X | `double` | 1 | [0.1, 10] | Yes | - |
-| `SigmaY` | Sigma Y | `double` | 0 | [0, 10] | Yes | - |
-| `BorderType` | Border Type | `enum` | 4 | 0/Constant；1/Replicate；2/Reflect；3/Wrap；4/Default | Yes | - |
+| `KernelSize` | 核大小 | `int` | 5 | [1, 63] | Yes | Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。 |
+| `SigmaX` | X方向Sigma | `double` | 1 | [0.1, 10] | Yes | - |
+| `SigmaY` | Y方向Sigma | `double` | 0 | [0, 10] | Yes | - |
+| `BorderType` | 边界类型 | `enum` | 4 | 0/常量；1/复制；2/反射；3/环绕；4/默认 | Yes | - |
 | `Diameter` | 双边直径 | `int` | 9 | [1, 25] | Yes | - |
 | `SigmaColor` | 双边色彩Sigma | `double` | 75 | [1, 255] | Yes | - |
 | `SigmaSpace` | 双边空间Sigma | `double` | 75 | [1, 255] | Yes | - |
@@ -56,6 +62,30 @@
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `FilterMode` | 实际滤波模式 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `FilterDiagnostics` | 滤波诊断 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `BorderType` | required; - | visible: -; hidden: ALL(FilterMode == Median) | enabled: -; disabled: ALL(FilterMode == Median) | ALL(FilterMode == Median) | - | - | `FILTERING_BORDER_NOT_USED_BY_MEDIAN` |
+| `Diameter` | required; - | visible: -; hidden: ALL(FilterMode != Bilateral) | enabled: -; disabled: ALL(FilterMode != Bilateral) | ALL(FilterMode != Bilateral) | - | - | `FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL` |
+| `FilterMode` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `FILTERING_MODE` |
+| `KernelSize` | metadata; - | visible: -; hidden: ALL(FilterMode == Bilateral) | enabled: -; disabled: ALL(FilterMode == Bilateral) | ALL(FilterMode == Bilateral) | - | - | `FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL` |
+| `SigmaColor` | required; - | visible: -; hidden: ALL(FilterMode != Bilateral) | enabled: -; disabled: ALL(FilterMode != Bilateral) | ALL(FilterMode != Bilateral) | - | - | `FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL` |
+| `SigmaSpace` | required; - | visible: -; hidden: ALL(FilterMode != Bilateral) | enabled: -; disabled: ALL(FilterMode != Bilateral) | ALL(FilterMode != Bilateral) | - | - | `FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL` |
+| `SigmaX` | metadata; - | visible: -; hidden: ALL(FilterMode != Gaussian) | enabled: -; disabled: ALL(FilterMode != Gaussian) | ALL(FilterMode != Gaussian) | - | - | `FILTERING_SIGMA_ONLY_FOR_GAUSSIAN` |
+| `SigmaY` | metadata; - | visible: -; hidden: ALL(FilterMode != Gaussian) | enabled: -; disabled: ALL(FilterMode != Gaussian) | ALL(FilterMode != Gaussian) | - | - | `FILTERING_SIGMA_ONLY_FOR_GAUSSIAN` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| `FilterDiagnostics` | - | `FILTERING_OUTPUT` |
+| `FilterMode` | - | `FILTERING_OUTPUT` |
+| `Image` | - | `FILTERING_OUTPUT` |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`FB53FB9D91642BCAA3D7ECB8E4D7392BDF7C76B4AF14936F0E38C0F79C48DF58`
+- `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -96,4 +126,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

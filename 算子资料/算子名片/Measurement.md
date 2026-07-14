@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `MeasureDistanceOperator` |
 | 枚举值 (Enum) | `OperatorType.Measurement` |
-| 分类 (Category) | 检测 |
+| 分类 ID (CategoryId) | `Measurement` |
+| 分类 (Category) | 测量 |
+| 分类顺序 (CategoryOrder) | 7 |
 | 版本 (Version) | `1.1.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -78,6 +84,36 @@
 | `UncertaintyPx` | 输入几何像素不确定度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `UncertaintyDeg` | 角度不确定度（度） | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `AngleUnit` | required; - | visible: -; hidden: ALL(MeasureType != ThreePointAngle) | enabled: -; disabled: ALL(MeasureType != ThreePointAngle) | ALL(MeasureType != ThreePointAngle) | - | - | `MEASUREMENT_ANGLE_UNIT_ONLY_FOR_ANGLE` |
+| `DistanceModel` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_DISTANCE_MODEL_ONLY_FOR_LINE_DISTANCE` |
+| `MeasureType` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `MEASUREMENT_TYPE` |
+| `ParallelThreshold` | metadata; - | visible: -; hidden: ALL(MeasureType != LineToLine) | enabled: -; disabled: ALL(MeasureType != LineToLine) | ALL(MeasureType != LineToLine) | - | - | `MEASUREMENT_PARALLEL_THRESHOLD_ONLY_FOR_LINE_TO_LINE` |
+| `X1` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
+| `X2` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
+| `Y1` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
+| `Y2` | metadata; - | visible: -; hidden: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | enabled: -; disabled: ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | ANY(MeasureType == PointToLine \|\| MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | - | - | `MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| `Angle` | ANY(MeasureType == LineToLine \|\| MeasureType == ThreePointAngle) | `MEASUREMENT_ANGLE_OUTPUT` |
+| `DeltaX` | ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == PointToLine) | `MEASUREMENT_DELTA_OUTPUT` |
+| `DeltaY` | ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == PointToLine) | `MEASUREMENT_DELTA_OUTPUT` |
+| `Distance` | ANY(MeasureType == PointToPoint \|\| MeasureType == Horizontal \|\| MeasureType == Vertical \|\| MeasureType == PointToLine \|\| MeasureType == LineToLine) | `MEASUREMENT_DISTANCE_OUTPUT` |
+| `FootPoint` | ALL(MeasureType == PointToLine) | `MEASUREMENT_FOOT_POINT_OUTPUT` |
+| `HasIntersection` | ALL(MeasureType == LineToLine) | `MEASUREMENT_INTERSECTION_OUTPUT` |
+| `Intersection` | ALL(MeasureType == LineToLine) | `MEASUREMENT_INTERSECTION_OUTPUT` |
+| `IsParallel` | ALL(MeasureType == LineToLine) | `MEASUREMENT_PARALLEL_OUTPUT` |
+| `UncertaintyDeg` | ALL(MeasureType == ThreePointAngle) | `MEASUREMENT_ANGLE_UNCERTAINTY_OUTPUT` |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`ABE05241039CC9A8EAA13B19334372A86791357EFD454FF1803BD6C94952D1AF`
+- `type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper`
+
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
@@ -111,4 +147,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

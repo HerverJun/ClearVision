@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `AnomalyDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.AnomalyDetection` |
-| 分类 (Category) | AI检测 |
+| 分类 ID (CategoryId) | `AiInference` |
+| 分类 (Category) | AI推理 |
+| 分类顺序 (CategoryOrder) | 9 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `anomaly-detection`, `experimental`, `industrial-remediation`, `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 实验 `Experimental` |
+| 生命周期说明 (Lifecycle Note) | 简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。 |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | Yes |
+| 标签 (Tags) | `anomaly-detection`, `experimental`, `industrial-remediation`, `分类:AiInference`, `分类显示:AI推理`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -35,22 +41,22 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Mode` | Mode | `enum` | inference | inference/Inference；train/Train | Yes | - |
-| `FeatureBankPath` | Feature Bank Path | `file` | "" | - | No | - |
-| `SaveFeatureBankPath` | Save Feature Bank Path | `file` | "" | - | No | - |
-| `ModelId` | Model Id | `string` | "" | - | No | - |
-| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | No | - |
-| `Backbone` | Backbone | `string` | simple_patchcore | - | No | - |
-| `FeatureExtractorId` | Feature Extractor Id | `string` | lab_gradient_stats | - | No | - |
-| `EmbeddingModelId` | Embedding Model Id | `string` | "" | - | No | - |
-| `EmbeddingModelPath` | Embedding Model Path | `file` | "" | - | No | - |
-| `PatchSize` | Patch Size | `int` | 32 | [4, 256] | Yes | - |
-| `PatchStride` | Patch Stride | `int` | 16 | [1, 256] | Yes | - |
-| `CoresetRatio` | Coreset Ratio | `double` | 0.2 | [0.01, 1] | Yes | - |
-| `Threshold` | Threshold | `double` | 0.35 | [0, 1] | Yes | - |
+| `Mode` | 模式 | `enum` | inference | inference/推理；train/训练 | Yes | - |
+| `FeatureBankPath` | 特征库路径 | `file` | "" | - | No | - |
+| `SaveFeatureBankPath` | 保存特征库路径 | `file` | "" | - | No | - |
+| `ModelId` | 模型ID | `string` | "" | - | No | - |
+| `ModelCatalogPath` | 模型目录路径 | `file` | "" | - | No | - |
+| `Backbone` | 主干网络 | `string` | simple_patchcore | - | No | - |
+| `FeatureExtractorId` | 特征提取器 ID | `string` | lab_gradient_stats | - | No | - |
+| `EmbeddingModelId` | 嵌入模型 ID | `string` | "" | - | No | - |
+| `EmbeddingModelPath` | 嵌入模型路径 | `file` | "" | - | No | - |
+| `PatchSize` | 补丁大小 | `int` | 32 | [4, 256] | Yes | - |
+| `PatchStride` | 补丁步长 | `int` | 16 | [1, 256] | Yes | - |
+| `CoresetRatio` | 核心集比例 | `double` | 0.2 | [0.01, 1] | Yes | - |
+| `Threshold` | 阈值 | `double` | 0.35 | [0, 1] | Yes | - |
 | `EnableCandidateProfile` | Enable Candidate Profile | `bool` | false | - | Yes | - |
-| `CandidateProfile` | Candidate Profile | `enum` | default | default/Default；mvtec_lite_v2/MVTec Lite v2 | Yes | - |
-| `CandidateFallbackMode` | Candidate Fallback Mode | `enum` | UseDefault | UseDefault/Use Default；Fail/Fail | Yes | - |
+| `CandidateProfile` | Candidate Profile | `enum` | default | default/默认；mvtec_lite_v2/MVTec Lite v2 | Yes | - |
+| `CandidateFallbackMode` | Candidate Fallback Mode | `enum` | UseDefault | UseDefault/Use Default；Fail/失败 | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -66,10 +72,30 @@
 | `IsAnomaly` | Is Anomaly | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
 | `AnomalyMap` | Anomaly Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `AnomalyMask` | Anomaly Mask | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
-| `FeatureBankPath` | Feature Bank Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `FeatureBankPath` | 特征库路径 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `PatchCount` | Patch Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `ThresholdUsed` | Threshold Used | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Diagnostics` | Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ThresholdUsed` | 实际阈值 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Diagnostics` | 诊断信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `EmbeddingModelId` | required; ALL(Mode == train && FeatureExtractorId == onnx_embedding) | visible: -; hidden: ALL(FeatureExtractorId != onnx_embedding) | enabled: -; disabled: ALL(FeatureExtractorId != onnx_embedding) | ALL(FeatureExtractorId != onnx_embedding) | model_resource | - | `ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED` |
+| `EmbeddingModelPath` | required; ALL(Mode == train && FeatureExtractorId == onnx_embedding) | visible: -; hidden: ALL(FeatureExtractorId != onnx_embedding) | enabled: -; disabled: ALL(FeatureExtractorId != onnx_embedding) | ALL(FeatureExtractorId != onnx_embedding) | model_resource | - | `ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED` |
+| `FeatureBankPath` | metadata; ALL(Mode == inference) | visible: -; hidden: - | enabled: -; disabled: - | - | feature_bank | - | `ANOMALY_FEATURE_BANK_SOURCE_REQUIRED` |
+| `ModelCatalogPath` | optional; - | visible: -; hidden: - | enabled: -; disabled: ALL(ModelId is empty && EmbeddingModelId is empty) | - | model_catalog | - | `ANOMALY_CATALOG_REQUIRES_RESOURCE_ID` |
+| `ModelId` | metadata; ALL(Mode == inference) | visible: -; hidden: - | enabled: -; disabled: - | - | feature_bank | - | `ANOMALY_FEATURE_BANK_SOURCE_REQUIRED` |
+| `SaveFeatureBankPath` | optional; - | visible: -; hidden: ALL(Mode == inference) | enabled: -; disabled: ALL(Mode == inference) | ALL(Mode == inference) | feature_bank | - | `ANOMALY_FEATURE_BANK_SAVE_ONLY_FOR_TRAINING` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`9FA2E91555A805FC461DB320E66E7359B1FBFA59D1F4E7E18A61DBDC317C9808`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -118,4 +144,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -418,10 +418,213 @@ public sealed class OperatorProductMetadataGovernanceTests
         hash.Should().Be(ExpectedIdentityHash);
     }
 
+    [Fact]
+    public void GenerationFingerprint_ShouldReactOnlyToEffectiveMetadataAndDeclaredDependencies()
+    {
+        var metadata = new OperatorMetadata
+        {
+            Type = OperatorType.Comment,
+            DisplayName = "注释",
+            Description = "test",
+            CategoryId = OperatorCategoryId.OutputAndAuxiliary,
+            Category = OperatorCategoryCatalog.GetDisplayName(OperatorCategoryId.OutputAndAuxiliary),
+            Lifecycle = OperatorLifecycle.Stable,
+            GenerationDependencies = ["type:Tests.SharedHelper"]
+        };
+        var dependencies = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["type:Tests.SharedHelper"] = "helper-v1",
+            ["type:Tests.UnrelatedHelper"] = "unrelated-v1"
+        };
+
+        var baseline = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1", dependencies);
+        var sameWithUnrelatedChange = OperatorGenerationFingerprintBuilder.Compute(
+            metadata,
+            "operator-v1",
+            new Dictionary<string, string>(dependencies, StringComparer.Ordinal)
+            {
+                ["type:Tests.UnrelatedHelper"] = "unrelated-v2"
+            });
+        var helperChanged = OperatorGenerationFingerprintBuilder.Compute(
+            metadata,
+            "operator-v1",
+            new Dictionary<string, string>(dependencies, StringComparer.Ordinal)
+            {
+                ["type:Tests.SharedHelper"] = "helper-v2"
+            });
+        var sourceChanged = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v2", dependencies);
+        metadata.DisplayName = "注释节点";
+        var metadataChanged = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1", dependencies);
+
+        sameWithUnrelatedChange.Should().Be(baseline);
+        helperChanged.Should().NotBe(baseline);
+        sourceChanged.Should().NotBe(baseline);
+        metadataChanged.Should().NotBe(baseline);
+    }
+
+    [Theory]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel", OperatorType.Filtering)]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper", OperatorType.Measurement)]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.DeepLearningTaskResolver", OperatorType.DeepLearning)]
+    [InlineData("type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator", OperatorType.DeepLearning)]
+    [InlineData("type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver", OperatorType.DeepLearning)]
+    public void SharedDependencyChange_ShouldOnlyAffectExplicitlyDependentOperatorFingerprints(
+        string dependencyId,
+        OperatorType expectedOperator)
+    {
+        var metadata = new OperatorFactory().GetAllMetadata().OrderBy(item => item.Type).ToList();
+        var dependencySources = metadata
+            .SelectMany(item => item.GenerationDependencies)
+            .Distinct(StringComparer.Ordinal)
+            .ToDictionary(item => item, item => $"source:{item}:v1", StringComparer.Ordinal);
+        var baseline = metadata.ToDictionary(
+            item => item.Type,
+            item => OperatorGenerationFingerprintBuilder.Compute(
+                item,
+                $"operator-source:{item.Type}",
+                dependencySources));
+
+        dependencySources.Should().ContainKey(dependencyId);
+        var changedDependencySources = new Dictionary<string, string>(dependencySources, StringComparer.Ordinal)
+        {
+            [dependencyId] = dependencySources[dependencyId] + "\n// shared helper changed"
+        };
+        var explicitlyDependentOperators = metadata
+            .Where(item => item.GenerationDependencies.Contains(dependencyId, StringComparer.Ordinal))
+            .Select(item => item.Type)
+            .ToList();
+        var changedOperators = metadata
+            .Where(item => OperatorGenerationFingerprintBuilder.Compute(
+                item,
+                $"operator-source:{item.Type}",
+                changedDependencySources) != baseline[item.Type])
+            .Select(item => item.Type)
+            .ToList();
+
+        explicitlyDependentOperators.Should().Equal(expectedOperator);
+        changedOperators.Should().Equal(explicitlyDependentOperators);
+    }
+
+    [Fact]
+    public void GeneratedCatalogsCardsAndKnowledgeGraph_ShouldMatchRuntimeMetadata()
+    {
+        var runtime = new OperatorFactory().GetAllMetadata().ToDictionary(item => item.Type.ToString());
+        Dictionary<string, string>? expectedFingerprints = null;
+        string? expectedCatalogFingerprint = null;
+        var catalogPaths = new[]
+        {
+            Path.Combine(RepoRoot, "docs", "算子资料", "算子目录.json"),
+            Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", "catalog.json"),
+            Path.Combine(RepoRoot, "docs", "operators", "catalog.json"),
+            Path.Combine(RepoRoot, "算子资料", "算子目录.json"),
+            Path.Combine(RepoRoot, "算子资料", "算子名片", "catalog.json")
+        };
+
+        foreach (var path in catalogPaths)
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            root.GetProperty("totalCount").GetInt32().Should().Be(158, path);
+            var catalogFingerprint = root.GetProperty("generationFingerprint").GetString();
+            catalogFingerprint.Should().NotBeNullOrWhiteSpace(path);
+            if (expectedCatalogFingerprint is null)
+            {
+                expectedCatalogFingerprint = catalogFingerprint;
+            }
+            else
+            {
+                catalogFingerprint.Should().Be(expectedCatalogFingerprint, path);
+            }
+            root.GetProperty("categories").EnumerateObject().Should().HaveCount(14, path);
+            var operators = root.GetProperty("operators").EnumerateArray()
+                .ToDictionary(item => item.GetProperty("id").GetString()!, StringComparer.Ordinal);
+            operators.Should().HaveCount(runtime.Count, path);
+            var fingerprints = operators.ToDictionary(
+                item => item.Key,
+                item => item.Value.GetProperty("generationFingerprint").GetString()!,
+                StringComparer.Ordinal);
+            fingerprints.Values.Should().OnlyContain(value => !string.IsNullOrWhiteSpace(value), path);
+            if (expectedFingerprints is null)
+            {
+                expectedFingerprints = fingerprints;
+            }
+            else
+            {
+                fingerprints.Should().BeEquivalentTo(expectedFingerprints, path);
+            }
+
+            foreach (var (operatorType, metadata) in runtime)
+            {
+                var item = operators[operatorType];
+                item.GetProperty("displayName").GetString().Should().Be(metadata.DisplayName, path);
+                item.GetProperty("categoryId").GetString().Should().Be(metadata.CategoryId.ToString(), path);
+                item.GetProperty("categoryOrder").GetInt32().Should().Be(OperatorCategoryCatalog.GetOrder(metadata.CategoryId), path);
+                item.GetProperty("category").GetString().Should().Be(metadata.Category, path);
+                item.GetProperty("lifecycle").GetString().Should().Be(metadata.Lifecycle.ToString(), path);
+                item.GetProperty("defaultHidden").GetBoolean().Should().Be(metadata.DefaultHidden, path);
+                item.GetProperty("defaultAiRecommendation").GetBoolean().Should().Be(
+                    OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle),
+                    path);
+                item.GetProperty("requiresLifecycleDisclosure").GetBoolean().Should().Be(
+                    OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle),
+                    path);
+                item.GetProperty("inputPorts").EnumerateArray()
+                    .Select(port => port.GetProperty("name").GetString())
+                    .Should().Equal(metadata.InputPorts.Select(port => port.Name), path);
+                item.GetProperty("outputPorts").EnumerateArray()
+                    .Select(port => port.GetProperty("name").GetString())
+                    .Should().Equal(metadata.OutputPorts.Select(port => port.Name), path);
+                item.GetProperty("parameters").EnumerateArray()
+                    .Select(parameter => parameter.GetProperty("name").GetString())
+                    .Should().Equal(metadata.Parameters.Select(parameter => parameter.Name), path);
+                item.GetProperty("parameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
+                item.GetProperty("outputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
+                item.GetProperty("generationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
+                item.GetProperty("generationFingerprint").GetString().Should().NotBeNullOrWhiteSpace(path);
+            }
+        }
+
+        AssertKnowledgeCards(
+            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_cards.json"),
+            root => root,
+            runtime,
+            expectedFingerprints!);
+        AssertKnowledgeCards(
+            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"),
+            root => root.GetProperty("Cards"),
+            runtime,
+            expectedFingerprints!);
+
+        using (var graphDocument = JsonDocument.Parse(File.ReadAllText(
+                   Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"))))
+        {
+            graphDocument.RootElement.GetProperty("GenerationFingerprint").GetString()
+                .Should().Be(expectedCatalogFingerprint);
+        }
+
+        foreach (var (operatorType, metadata) in runtime)
+        {
+            foreach (var cardPath in new[]
+                     {
+                         Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", $"{operatorType}.md"),
+                         Path.Combine(RepoRoot, "docs", "operators", $"{operatorType}.md"),
+                         Path.Combine(RepoRoot, "算子资料", "算子名片", $"{operatorType}.md")
+                     })
+            {
+                var content = File.ReadAllText(cardPath);
+                content.Should().StartWith($"# {metadata.DisplayName} / ", cardPath);
+                content.Should().Contain($"| 分类 ID (CategoryId) | `{metadata.CategoryId}` |", cardPath);
+                content.Should().Contain($"`{metadata.Lifecycle}`", cardPath);
+                content.Should().Contain("组合指纹 (Generation Fingerprint)", cardPath);
+            }
+        }
+    }
+
     private static void AssertKnowledgeCards(
         string path,
         Func<JsonElement, JsonElement> selectCards,
-        IReadOnlyDictionary<string, OperatorMetadata> runtime)
+        IReadOnlyDictionary<string, OperatorMetadata> runtime,
+        IReadOnlyDictionary<string, string> expectedFingerprints)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var cards = selectCards(document.RootElement).EnumerateArray()
@@ -440,6 +643,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             card.GetProperty("ParameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
             card.GetProperty("OutputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
             card.GetProperty("GenerationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
+            card.GetProperty("GenerationFingerprint").GetString().Should().Be(expectedFingerprints[operatorType], path);
         }
     }
 

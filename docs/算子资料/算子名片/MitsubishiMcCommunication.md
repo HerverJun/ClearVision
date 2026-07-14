@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `MitsubishiMcCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.MitsubishiMcCommunication` |
+| 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
+| 分类顺序 (CategoryOrder) | 13 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Communication`, `分类显示:通信`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -36,14 +42,14 @@
 | `UseGlobalFallback` | Use Global Fallback | `bool` | false | - | Yes | - |
 | `Address` | PLC Address | `string` | D100 | - | Yes | - |
 | `Length` | Read Length | `int` | 1 | [1, 999] | Yes | - |
-| `DataType` | Data Type | `enum` | Word | Bit/Bit(Bool)；Word/Word(UInt16)；Int16/Int16；DWord/DWord(UInt32)；Int32/Int32；Float/Float；Double/Double | Yes | - |
-| `Operation` | Operation | `enum` | Read | Read/Read；Write/Write | Yes | - |
+| `DataType` | Data Type | `enum` | Word | Bit/Bit(Bool)；Word/Word(UInt16)；Int16；DWord/DWord(UInt32)；Int32；Float/浮点；Double | Yes | - |
+| `Operation` | 操作 | `enum` | Read | Read；Write | Yes | - |
 | `WriteValue` | Write Value | `string` | "" | - | Yes | - |
-| `PollingMode` | Polling Mode | `enum` | None | None/None；WaitForValue/Wait For Value | Yes | Whether to poll while reading. |
-| `PollingCondition` | Polling Condition | `enum` | Equal | Equal/Equal；NotEqual/Not Equal；GreaterThan/Greater Than；LessThan/Less Than；GreaterOrEqual/Greater Or Equal；LessOrEqual/Less Or Equal | Yes | Condition for polling. |
-| `PollingValue` | Polling Value | `string` | 1 | - | Yes | Target value for polling. |
-| `PollingTimeout` | Polling Timeout (ms) | `int` | 30000 | [100, 300000] | Yes | Maximum wait duration in milliseconds. |
-| `PollingInterval` | Polling Interval (ms) | `int` | 50 | [10, 5000] | Yes | Interval between polling reads in milliseconds. |
+| `PollingMode` | Polling Mode | `enum` | None | None/无；WaitForValue/Wait For Value | Yes | 读取时是否启用轮询等待。 |
+| `PollingCondition` | Polling Condition | `enum` | Equal | Equal；NotEqual/Not Equal；GreaterThan/Greater Than；LessThan/Less Than；GreaterOrEqual/Greater Or Equal；LessOrEqual/Less Or Equal | Yes | 轮询等待时用于判断目标值是否满足的条件。 |
+| `PollingValue` | Polling Value | `string` | 1 | - | Yes | 轮询等待时要匹配的目标值。 |
+| `PollingTimeout` | Polling Timeout (ms) | `int` | 30000 | [100, 300000] | Yes | 轮询等待的最大持续时间（毫秒）。 |
+| `PollingInterval` | Polling Interval (ms) | `int` | 50 | [10, 5000] | Yes | 轮询读取之间的时间间隔（毫秒）。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -56,6 +62,30 @@
 |------|------|------|------|
 | `Response` | Response | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Status` | Status | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| `Address` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_address | - | `MITSUBISHI_PLC_ADDRESS_REQUIRED` |
+| `IpAddress` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | plc_endpoint | - | `MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `Length` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `MITSUBISHI_READ_LENGTH_ONLY_FOR_READ` |
+| `PollingCondition` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_CONDITION_ONLY_WHEN_WAITING` |
+| `PollingInterval` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_INTERVAL_ONLY_WHEN_WAITING` |
+| `PollingMode` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `MITSUBISHI_POLLING_ONLY_FOR_READ` |
+| `PollingTimeout` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_TIMEOUT_ONLY_WHEN_WAITING` |
+| `PollingValue` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_VALUE_ONLY_WHEN_WAITING` |
+| `Port` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `WriteValue` | optional; - | visible: -; hidden: ALL(Operation != Write) | enabled: ALL(Operation == Write); disabled: - | ALL(Operation != Write) | - | - | `MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE` |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`A392A906BB0040C501FD4CD50108F7061A13E33205E8540DAF11E93393950E5E`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -88,4 +118,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

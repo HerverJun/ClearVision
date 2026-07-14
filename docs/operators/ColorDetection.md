@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `ColorDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.ColorDetection` |
-| 分类 (Category) | 颜色处理 |
+| 分类 ID (CategoryId) | `FeatureExtraction` |
+| 分类 (Category) | 特征提取 |
+| 分类顺序 (CategoryOrder) | 4 |
 | 版本 (Version) | `2.0.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `color-inspection`, `experimental`, `industrial-remediation`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 实验 `Experimental` |
+| 生命周期说明 (Lifecycle Note) | 颜色检查多模式仍处于工业化验证阶段，阈值和白平衡策略需按现场样本确认。 |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | Yes |
+| 标签 (Tags) | `color-inspection`, `experimental`, `industrial-remediation`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Experimental`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -40,7 +46,7 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ColorSpace` | 颜色空间 | `enum` | HSV | HSV/HSV；Lab/Lab | Yes | - |
+| `ColorSpace` | 颜色空间 | `enum` | HSV | HSV；Lab | Yes | - |
 | `AnalysisMode` | 分析模式 | `enum` | Average | Average/Legacy Average；Dominant/Legacy Dominant；Range/Legacy Range；HsvInspection/HSV Inspection；LabDeltaE/Lab DeltaE | Yes | - |
 | `HueLow` | H下限 | `int` | 0 | [0, 180] | Yes | - |
 | `HueHigh` | H上限 | `int` | 180 | [0, 180] | Yes | - |
@@ -49,22 +55,22 @@
 | `ValLow` | V下限 | `int` | 50 | [0, 255] | Yes | - |
 | `ValHigh` | V上限 | `int` | 255 | [0, 255] | Yes | - |
 | `DominantK` | 主色数量K | `int` | 3 | [1, 10] | Yes | - |
-| `DeltaEMethod` | DeltaE Method | `enum` | CIEDE2000 | CIE76/CIE76；CIEDE2000/CIEDE2000 | Yes | - |
-| `RefL` | Ref L | `double` | 0 | - | Yes | - |
-| `RefA` | Ref A | `double` | 0 | - | Yes | - |
-| `RefB` | Ref B | `double` | 0 | - | Yes | - |
-| `RoiX` | ROI X | `int` | 0 | - | Yes | - |
-| `RoiY` | ROI Y | `int` | 0 | - | Yes | - |
-| `RoiW` | ROI W | `int` | 0 | - | Yes | - |
-| `RoiH` | ROI H | `int` | 0 | - | Yes | - |
-| `WhiteBalanceTolerance` | White Balance Tolerance | `double` | 12 | [0, 255] | Yes | - |
+| `DeltaEMethod` | DeltaE方法 | `enum` | CIEDE2000 | CIE76；CIEDE2000 | Yes | - |
+| `RefL` | 参考L | `double` | 0 | - | Yes | - |
+| `RefA` | 参考A | `double` | 0 | - | Yes | - |
+| `RefB` | 参考B | `double` | 0 | - | Yes | - |
+| `RoiX` | ROIX | `int` | 0 | - | Yes | - |
+| `RoiY` | ROIY | `int` | 0 | - | Yes | - |
+| `RoiW` | ROI宽 | `int` | 0 | - | Yes | - |
+| `RoiH` | ROI高 | `int` | 0 | - | Yes | - |
+| `WhiteBalanceTolerance` | 白平衡容差 | `double` | 12 | [0, 255] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
 | `Image` | 输入图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
-| `ReferenceColor` | Reference Color | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `ReferenceColor` | 参考颜色 | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
@@ -74,11 +80,26 @@
 | `AnalysisMode` | 分析模式 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `ColorSpace` | 颜色空间 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `DeltaE` | DeltaE | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Coverage` | Coverage | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `WhiteBalanceStatus` | White Balance Status | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
-| `MeanColor` | Mean Color | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `DominantColors` | Dominant Colors | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
-| `Diagnostics` | Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Coverage` | 覆盖率 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `WhiteBalanceStatus` | 白平衡状态 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `MeanColor` | 平均颜色 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `DominantColors` | 主颜色 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Diagnostics` | 诊断信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`282E0EEEE8353B05E892B9FA984173CF3DCD0621452078502D34F9318D605619`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -132,4 +153,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 2.0.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

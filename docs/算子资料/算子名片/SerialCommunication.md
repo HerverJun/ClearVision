@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `SerialCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.SerialCommunication` |
+| 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
+| 分类顺序 (CategoryOrder) | 13 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:Communication`, `分类显示:通信`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -35,12 +41,12 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `PortName` | 串口号 | `string` | COM1 | - | Yes | - |
-| `BaudRate` | 波特率 | `enum` | 9600 | 9600/9600；19200/19200；38400/38400；57600/57600；115200/115200 | Yes | - |
+| `BaudRate` | 波特率 | `enum` | 9600 | 9600；19200；38400；57600；115200 | Yes | - |
 | `DataBits` | 数据位 | `int` | 8 | [5, 8] | Yes | - |
 | `StopBits` | 停止位 | `enum` | One | One/1；OnePointFive/1.5；Two/2 | Yes | - |
 | `Parity` | 校验位 | `enum` | None | None/无；Odd/奇校验；Even/偶校验 | Yes | - |
 | `SendData` | 发送内容 | `string` | "" | - | Yes | - |
-| `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII/ASCII；HEX/HEX | Yes | - |
+| `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII；HEX | Yes | - |
 | `TimeoutMs` | 超时(毫秒) | `int` | 3000 | [100, 30000] | Yes | - |
 | `ResponseWaitMs` | 响应等待(毫秒) | `int` | 100 | [0, 30000] | Yes | - |
 
@@ -54,6 +60,21 @@
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
 | `Response` | 接收数据 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`53B241AD2E2435FAB993500C5BF935ECB16C7E7AF6469CC7432A5B681126478E`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -87,4 +108,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

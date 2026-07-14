@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `LocalDeformableMatchingOperator` |
 | 枚举值 (Enum) | `OperatorType.LocalDeformableMatching` |
-| 分类 (Category) | 匹配定位 |
+| 分类 ID (CategoryId) | `MatchingAndLocalization` |
+| 分类 (Category) | 匹配与定位 |
+| 分类顺序 (CategoryOrder) | 5 |
 | 版本 (Version) | `1.1.1` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:基于OpenCV` |
+| 生命周期 (Lifecycle) | 实验 `Experimental` |
+| 生命周期说明 (Lifecycle Note) | TPS 局部形变与多候选搜索为实验能力，尚需目标域数据验证鲁棒性和性能。 |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | Yes |
+| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -42,21 +48,21 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `TemplatePath` | Template Image Path | `file` | "" | - | Yes | - |
-| `PyramidLevels` | Pyramid Levels | `int` | 3 | [1, 6] | Yes | - |
+| `TemplatePath` | 模板图像路径 | `file` | "" | - | Yes | - |
+| `PyramidLevels` | 金字塔层级 | `int` | 3 | [1, 6] | Yes | - |
 | `TPSGridSize` | Control Grid Size | `int` | 4 | [2, 8] | Yes | - |
 | `TPSLambda` | MLS Smoothing (Legacy TPSLambda) | `double` | 0.01 | [0.001, 1] | Yes | - |
-| `MaxDeformation` | Max Deformation (px) | `double` | 20 | [5, 100] | Yes | - |
-| `OcclusionThreshold` | Occlusion Threshold | `double` | 0.3 | [0.1, 0.9] | Yes | - |
-| `MinMatchScore` | Min Match Score | `double` | 0.6 | [0, 1] | Yes | - |
-| `EnableFallback` | Enable Fallback to Rigid | `bool` | false | - | Yes | - |
-| `MaxIterations` | Max Refinement Iterations | `int` | 5 | [1, 20] | Yes | - |
-| `ConvergenceThreshold` | Convergence Threshold | `double` | 0.5 | [0.1, 5] | Yes | - |
-| `MaxMatches` | Maximum Matches | `int` | 5 | [1, 20] | Yes | - |
-| `CandidateThreshold` | Candidate Seed Threshold | `double` | 0.65 | [0.1, 1] | Yes | - |
-| `EnableNms` | Enable NMS | `bool` | true | - | Yes | - |
-| `NmsThreshold` | NMS IoU Threshold | `double` | 0.35 | [0, 1] | Yes | - |
-| `ParallelCandidates` | Parallel Candidate Evaluation | `bool` | true | - | Yes | - |
+| `MaxDeformation` | 最大形变（px） | `double` | 20 | [5, 100] | Yes | - |
+| `OcclusionThreshold` | 遮挡阈值 | `double` | 0.3 | [0.1, 0.9] | Yes | - |
+| `MinMatchScore` | 最小匹配分数 | `double` | 0.6 | [0, 1] | Yes | - |
+| `EnableFallback` | 启用刚性回退 | `bool` | false | - | Yes | - |
+| `MaxIterations` | 最大细化迭代次数 | `int` | 5 | [1, 20] | Yes | - |
+| `ConvergenceThreshold` | 收敛阈值 | `double` | 0.5 | [0.1, 5] | Yes | - |
+| `MaxMatches` | 最大匹配数量 | `int` | 5 | [1, 20] | Yes | - |
+| `CandidateThreshold` | 候选种子阈值 | `double` | 0.65 | [0.1, 1] | Yes | - |
+| `EnableNms` | 启用NMS | `bool` | true | - | Yes | - |
+| `NmsThreshold` | NMS IoU阈值 | `double` | 0.35 | [0, 1] | Yes | - |
+| `ParallelCandidates` | 并行候选评估 | `bool` | true | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -74,6 +80,21 @@
 | `MatchCount` | Match Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `DeformationField` | Deformation Field | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `OcclusionMask` | Occlusion Mask | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`0106A4D36DD3DA27617F7B675563E22C0289548AB9ACC09DC82292675E5BC28C`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -131,4 +152,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.1 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.1.1 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

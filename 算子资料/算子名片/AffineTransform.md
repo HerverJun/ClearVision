@@ -5,10 +5,16 @@
 |------|------|
 | 类名 (Class) | `AffineTransformOperator` |
 | 枚举值 (Enum) | `OperatorType.AffineTransform` |
-| 分类 (Category) | 图像处理 |
+| 分类 ID (CategoryId) | `ImagePreprocessing` |
+| 分类 (Category) | 图像预处理 |
+| 分类顺序 (CategoryOrder) | 2 |
 | 版本 (Version) | `1.0.0` |
-| 成熟度 (Maturity) | 稳定 Stable |
-| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
+| 生命周期 (Lifecycle) | 稳定 `Stable` |
+| 生命周期说明 (Lifecycle Note) | - |
+| 默认隐藏 (Default Hidden) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| 标签 (Tags) | `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用三点或旋转-缩放-平移模式执行二维仿射变换。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -34,15 +40,15 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Mode` | Mode | `enum` | RotateScaleTranslate | ThreePoint/ThreePoint；RotateScaleTranslate/RotateScaleTranslate | Yes | - |
-| `SrcPoints` | Source Points | `string` | [[0,0],[100,0],[0,100]] | - | Yes | - |
-| `DstPoints` | Destination Points | `string` | [[0,0],[100,0],[0,100]] | - | Yes | - |
-| `Angle` | Angle | `double` | 0 | [-3600, 3600] | Yes | - |
-| `Scale` | Scale | `double` | 1 | [0.001, 1000] | Yes | - |
-| `TranslateX` | Translate X | `double` | 0 | [-100000, 100000] | Yes | - |
-| `TranslateY` | Translate Y | `double` | 0 | [-100000, 100000] | Yes | - |
-| `OutputWidth` | Output Width | `int` | 0 | [0, 10000] | Yes | - |
-| `OutputHeight` | Output Height | `int` | 0 | [0, 10000] | Yes | - |
+| `Mode` | 模式 | `enum` | RotateScaleTranslate | ThreePoint/三点；RotateScaleTranslate/旋转缩放平移 | Yes | - |
+| `SrcPoints` | 源点集 | `string` | [[0,0],[100,0],[0,100]] | - | Yes | - |
+| `DstPoints` | 目标点集 | `string` | [[0,0],[100,0],[0,100]] | - | Yes | - |
+| `Angle` | 角度 | `double` | 0 | [-3600, 3600] | Yes | - |
+| `Scale` | 缩放 | `double` | 1 | [0.001, 1000] | Yes | - |
+| `TranslateX` | 平移X | `double` | 0 | [-100000, 100000] | Yes | - |
+| `TranslateY` | 平移Y | `double` | 0 | [-100000, 100000] | Yes | - |
+| `OutputWidth` | 输出宽度 | `int` | 0 | [0, 10000] | Yes | - |
+| `OutputHeight` | 输出高度 | `int` | 0 | [0, 10000] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -55,6 +61,21 @@
 |------|------|------|------|
 | `Image` | Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `TransformMatrix` | Transform Matrix | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+## 模式与资源契约 / Mode & Resource Contracts
+### 参数条件 / Parameter Conditions
+| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
+|------|------|------|------|------|------|------|------|
+| - | - | - | - | - | - | - | - |
+
+### 输出条件 / Output Conditions
+| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
+|------|------|------|
+| - | - | - |
+
+## 生成依赖 / Generation Dependencies
+- 组合指纹 (Generation Fingerprint)：`C5FEC924CD6D515A73F5828928F5A07568232454C3E712ACC8EBA02FC68C1F56`
+- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -87,4 +108,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-13 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
+| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

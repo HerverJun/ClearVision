@@ -33,6 +33,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorOutputRule("HasIntersection", AvailableWhenAll = new[] { "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_INTERSECTION_OUTPUT")]
 [OperatorOutputRule("IsParallel", AvailableWhenAll = new[] { "MeasureType==LineToLine" }, ReasonCode = "MEASUREMENT_PARALLEL_OUTPUT")]
 [OperatorOutputRule("UncertaintyDeg", AvailableWhenAll = new[] { "MeasureType==ThreePointAngle" }, ReasonCode = "MEASUREMENT_ANGLE_UNCERTAINTY_OUTPUT")]
+[OperatorGenerationDependency(typeof(MeasurementGeometryHelper))]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = false)]
 [InputPort("PointA", "点A/待测点", PortDataType.Point, IsRequired = false)]
 [InputPort("PointB", "点B/角度顶点", PortDataType.Point, IsRequired = false)]
