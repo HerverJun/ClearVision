@@ -56,7 +56,9 @@ public partial class MainForm : Form
             // 初始化菜单栏（在WebView2初始化之前）
             InitializeMenu();
 
-            await _webView2Host.InitializeAsync();
+            var userDataFolder = Environment.GetEnvironmentVariable(
+                "CV_WEBVIEW2_USER_DATA_FOLDER");
+            await _webView2Host.InitializeAsync(userDataFolder);
 
             // S4-006: 初始化 WebMessage 处理器，挂载到 WebView2
             if (_webView.CoreWebView2 != null)

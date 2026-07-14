@@ -30,7 +30,8 @@ public sealed class StudioUiArchitectureGuardTests
         var project = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj"));
         project.Should().Contain("<StudioUiRoot>");
-        project.Should().Contain("<StudioUiIntermediateDist>");
+        project.Should().Contain("<StudioUiIntermediateDist Condition=");
+        project.Should().Contain("System.IO.Path]::IsPathRooted('$(BaseIntermediateOutputPath)')");
         project.Should().Contain("<SkipStudioUiBuild");
         project.Should().Contain("<SkipStudioUiInstall");
         project.Should().Contain("Name=\"BuildStudioUi\"");
@@ -74,8 +75,6 @@ public sealed class StudioUiArchitectureGuardTests
             "workspaceV2Enabled",
             "frontendV2BasePath",
             "window.__API_BASE_URL__",
-            "new FlowCanvas",
-            "class FlowCanvas",
             "new ImageCanvas",
             "class ImageCanvas",
             "class EventBus",
@@ -95,6 +94,13 @@ public sealed class StudioUiArchitectureGuardTests
             {
                 text.Should().NotContain(token, $"{relativePath} must stay inside the Prompt 2 boundary");
             }
+
+            text.Should().NotMatchRegex(
+                @"\bnew\s+FlowCanvas\s*\(",
+                $"{relativePath} must not construct a second FlowCanvas directly");
+            text.Should().NotMatchRegex(
+                @"\bclass\s+FlowCanvas\b",
+                $"{relativePath} must not define a second FlowCanvas kernel");
         }
 
         var apiTransport = File.ReadAllText(Path.Combine(
@@ -141,6 +147,125 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
+    public void StudioUiCanvasLab_ShouldUseOnlyTheApprovedCanonicalCanvasFacade()
+    {
+        var sourceFiles = GetStudioUiProductionFiles();
+        var canonicalCanvasImports = sourceFiles
+            .Where(file => Regex.IsMatch(
+                File.ReadAllText(file),
+                "\\bfrom\\s+['\"]@clearvision/canonical-flow-canvas['\"]",
+                RegexOptions.CultureInvariant))
+            .Select(StudioUiRelativePath)
+            .ToList();
+        var canonicalInteractionImports = sourceFiles
+            .Where(file => Regex.IsMatch(
+                File.ReadAllText(file),
+                "\\bfrom\\s+['\"]@clearvision/canonical-flow-interaction['\"]",
+                RegexOptions.CultureInvariant))
+            .Select(StudioUiRelativePath)
+            .ToList();
+
+        canonicalCanvasImports.Should().Equal("src/labs/canvas/canonicalFlowCanvas.ts");
+        canonicalInteractionImports.Should().Equal("src/labs/canvas/canonicalFlowCanvas.ts");
+
+        var canvasIntegration = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "labs", "canvas", "canonicalFlowCanvas.ts"));
+        canvasIntegration.Should().Contain("createHostedFlowCanvasAdapter");
+        canvasIntegration.Should().Contain("FlowEditorInteraction");
+        canvasIntegration.Should().NotContain("new FlowCanvas");
+        canvasIntegration.Should().NotContain("class FlowCanvas");
+
+        var canvasOwner = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "labs", "canvas", "canvasLabOwner.ts"));
+        canvasOwner.Should().Contain("reportCanvasOwnerCountForDiagnostics(1)");
+        canvasOwner.Should().Contain("reportCanvasOwnerCountForDiagnostics(0)");
+
+        var vite = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "vite.config.ts"));
+        vite.Should().Contain("'@clearvision/canonical-flow-canvas': canonicalFlowCanvasAdapter");
+        vite.Should().Contain("'@clearvision/canonical-flow-interaction': canonicalFlowEditorInteraction");
+        vite.Should().Contain("'flowCanvasAdapter.js'");
+        vite.Should().Contain("'flowEditorInteraction.js'");
+
+        var vitest = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "vitest.config.ts"));
+        vitest.Should().Contain("'@clearvision/canonical-flow-canvas'");
+        vitest.Should().Contain("'@clearvision/canonical-flow-interaction'");
+        vitest.Should().Contain("'flowCanvasAdapter.js'");
+        vitest.Should().Contain("'flowEditorInteraction.js'");
+
+        var duplicateCanvasImplementations = Directory.EnumerateFiles(
+                Path.Combine(RepoPath(StudioUiRoot), "src"),
+                "*.*",
+                SearchOption.AllDirectories)
+            .Where(path =>
+                Path.GetFileName(path).Equals("flowCanvas.js", StringComparison.OrdinalIgnoreCase) ||
+                Path.GetFileName(path).Equals("flowCanvasAdapter.js", StringComparison.OrdinalIgnoreCase))
+            .Select(StudioUiRelativePath)
+            .ToList();
+        duplicateCanvasImplementations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DesktopWebView2EvidenceIsolation_ShouldReuseTheExistingHostAndRunner()
+    {
+        var program = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"));
+        program.Should().Contain("CV_DESKTOP_HTTP_PORT");
+        program.Should().Contain("CV_DESKTOP_LOG_PATH");
+        program.Should().Contain("Requested Desktop HTTP port");
+        program.Should().Contain("FindAvailablePort(MinWebPort, MaxWebPort)");
+
+        var mainForm = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Desktop/MainForm.cs"));
+        mainForm.Should().Contain("CV_WEBVIEW2_USER_DATA_FOLDER");
+        mainForm.Should().Contain("InitializeAsync(userDataFolder)");
+
+        var conversationStore = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/ConversationalFlowService.cs"));
+        conversationStore.Should().Contain("CV_CONVERSATION_STORE_ROOT");
+
+        var agentRunStore = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AgentRun/AgentRunEventStore.cs"));
+        agentRunStore.Should().Contain("CV_AGENT_RUN_EVENT_STORE");
+
+        var runner = File.ReadAllText(RepoPath("scripts/run-ai-webview2-release-smoke.ps1"));
+        foreach (var token in new[]
+                 {
+                     "DesktopExecutablePath",
+                     "NodeSmokePath",
+                     "NodeExecutablePath",
+                     "SingleRun",
+                     "SanitizeDesktopPath",
+                     "CV_DESKTOP_HTTP_PORT",
+                     "CV_WEBVIEW2_USER_DATA_FOLDER",
+                     "CV_CONVERSATION_STORE_ROOT",
+                     "CV_AGENT_RUN_EVENT_STORE",
+                     "CV_DESKTOP_LOG_PATH",
+                     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                     "Remove-RepositoryTemporaryDirectory",
+                     "-WindowStyle Hidden"
+                 })
+        {
+            runner.Should().Contain(token);
+        }
+
+        runner.Should().Contain("tests/e2e/ai-webview2-release-smoke.cjs");
+        runner.Should().NotContain("powershell.exe -File");
+
+        var evidenceWrapper = File.ReadAllText(RepoPath(
+            "scripts/studio-ui-next/Invoke-StudioUiWebView2Evidence.ps1"));
+        evidenceWrapper.Should().Contain("scripts/run-ai-webview2-release-smoke.ps1");
+        evidenceWrapper.Should().NotContain("Start-Process");
+
+        var matrix = File.ReadAllText(RepoPath(
+            "scripts/studio-ui-next/Invoke-StudioUiWebView2Matrix.ps1"));
+        matrix.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
+        matrix.Should().Contain("Invoke-StudioUiCanvasPerformanceEvidence.ps1");
+        matrix.Should().Contain("scripts/dotnet.ps1");
+        matrix.Should().Contain("--artifacts-path");
+        matrix.Should().NotContain("Start-Process");
+    }
+
+    [Fact]
     public void DesktopStartupDefaultsAndDpiAuthority_ShouldRemainExplicit()
     {
         var settingsPath = RepoPath(
@@ -174,7 +299,10 @@ public sealed class StudioUiArchitectureGuardTests
 
         var program = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"));
+        program.Should().Contain("ApplicationConfiguration.Initialize();");
         program.Should().NotContain("SetHighDpiMode");
+        program.Should().NotContain("Application.EnableVisualStyles");
+        program.Should().NotContain("Application.SetCompatibleTextRenderingDefault");
 
         var manifest = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/app.manifest"));

@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -888,24 +889,50 @@ public sealed class ProjectGlobalVariableEndpointsTests
             },
             ProjectAssetJson.Options);
 
-    private static string CreateResultOnlyFlowJson() =>
-        SerializeFlow(
+    private static string CreateResultOnlyFlowJson()
+    {
+        var decisionOperatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
+        return SerializeFlow(
             new OperatorFlowDto
             {
                 Id = Guid.NewGuid(),
                 Name = "main",
+                DecisionConfiguration = new DecisionConfiguration
+                {
+                    FinalDecisionBinding = new FinalDecisionBinding
+                    {
+                        SourceOperatorId = decisionOperatorId,
+                        SourceOutputPortId = decisionPortId,
+                        SourceOutputName = "Result",
+                        DataType = DecisionValueType.Boolean,
+                        Rule = DecisionInterpretationRule.Boolean,
+                        TrueMeansOk = true
+                    }
+                },
                 Operators =
                 [
                     new OperatorDto
                     {
-                        Id = Guid.NewGuid(),
-                        Name = "ResultOutput",
-                        Type = OperatorType.ResultOutput,
+                        Id = decisionOperatorId,
+                        Name = "DecisionComparator",
+                        Type = OperatorType.Comparator,
                         X = 0,
-                        Y = 0
+                        Y = 0,
+                        OutputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = decisionPortId,
+                                Name = "Result",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.Boolean
+                            }
+                        ]
                     }
                 ]
             });
+    }
 
     private static string SerializeFlow(OperatorFlowDto flow) =>
         JsonSerializer.Serialize(flow, new JsonSerializerOptions

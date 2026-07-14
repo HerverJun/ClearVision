@@ -1,0 +1,395 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet(
+        "legacy",
+        "studio-diagnostics",
+        "studio-design",
+        "studio-canvas",
+        "missing-assets")]
+    [string]$Expectation,
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Debug",
+    [ValidateSet("debug", "publish", "missing-assets")]
+    [string]$RuntimeKind = "debug",
+    [string]$DesktopExecutablePath,
+    [string]$NodeExecutablePath,
+    [string]$NodeScenarioPath,
+    [string]$RunName,
+    [string]$Route,
+    [string]$EvidenceDirectory,
+    [string]$RuntimeDirectory,
+    [int]$WebPort = 5100,
+    [int]$CdpPort = 9423,
+    [double]$Scale = 1.0,
+    [int]$WindowWidth = 1600,
+    [int]$WindowHeight = 1000,
+    [switch]$SanitizeDesktopPath,
+    [switch]$DeepCanvas,
+    [switch]$NoBuild
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
+$sharedRunner = Join-Path $repoRoot "scripts/run-ai-webview2-release-smoke.ps1"
+$uiTests = Join-Path $repoRoot "ClearVision.Product/tests/ClearVision.Product.UI.Tests"
+$defaultScenario = Join-Path $uiTests "tests/e2e/studio-ui-next/studio-ui-webview2-smoke.cjs"
+$scenario = if ([string]::IsNullOrWhiteSpace($NodeScenarioPath)) {
+    $defaultScenario
+} else {
+    [System.IO.Path]::GetFullPath($NodeScenarioPath)
+}
+$nodeExe = if ([string]::IsNullOrWhiteSpace($NodeExecutablePath)) {
+    (Get-Command node.exe -ErrorAction Stop).Source
+} else {
+    [System.IO.Path]::GetFullPath($NodeExecutablePath)
+}
+$desktopExe = if ([string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
+    Join-Path $repoRoot (
+        "ClearVision.Product/src/ClearVision.Product.Desktop/bin/" +
+        "$Configuration/net8.0-windows/win-x64/ClearVision.Product.Desktop.exe")
+} else {
+    [System.IO.Path]::GetFullPath($DesktopExecutablePath)
+}
+
+function ConvertTo-SafeRunName {
+    param([string]$Value)
+
+    $safe = $Value -replace '[^A-Za-z0-9_.-]+', '-'
+    $safe = $safe.Trim('-')
+    if ([string]::IsNullOrWhiteSpace($safe)) {
+        throw "RunName must contain at least one safe filename character."
+    }
+    return $safe
+}
+
+if ([string]::IsNullOrWhiteSpace($RunName)) {
+    $RunName = "{0}-{1}" -f $Expectation, [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
+}
+$RunName = ConvertTo-SafeRunName -Value $RunName
+
+if ($WebPort -lt 1 -or $WebPort -gt 65535) {
+    throw "WebPort must be between 1 and 65535."
+}
+if ($CdpPort -lt 1 -or $CdpPort -gt 65535) {
+    throw "CdpPort must be between 1 and 65535."
+}
+if ($WebPort -eq $CdpPort) {
+    throw "WebPort and CdpPort must be different."
+}
+if ($Scale -le 0) {
+    throw "Scale must be greater than zero."
+}
+if (-not (Test-Path -LiteralPath $sharedRunner -PathType Leaf)) {
+    throw "The shared WebView2 runner was not found: $sharedRunner"
+}
+if (-not (Test-Path -LiteralPath $scenario -PathType Leaf)) {
+    throw "The WebView2 Node scenario was not found: $scenario"
+}
+if (-not (Test-Path -LiteralPath $nodeExe -PathType Leaf)) {
+    throw "The absolute Node driver was not found: $nodeExe"
+}
+
+$defaultEvidenceDirectory = ".tmp/studio-ui-next/f01/$RunName/evidence"
+$relativeEvidence = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
+    $defaultEvidenceDirectory
+} else {
+    $EvidenceDirectory.Replace('\', '/')
+}
+if ([System.IO.Path]::IsPathRooted($relativeEvidence)) {
+    throw "EvidenceDirectory must be repository-relative because the shared runner resolves it from repoRoot."
+}
+
+$evidencePath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $relativeEvidence))
+$allowedEvidenceRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot ".tmp/studio-ui-next"))
+$allowedEvidencePrefix = $allowedEvidenceRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+if (-not $evidencePath.StartsWith(
+    $allowedEvidencePrefix,
+    [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "EvidenceDirectory must remain under .tmp/studio-ui-next."
+}
+$cleanupPath = Join-Path $evidencePath "studio-ui-webview2-$RunName-cleanup.json"
+if ($cleanupPath.Length -gt 240) {
+    throw (
+        "The cleanup evidence path is too long for Windows PowerShell compatibility " +
+        "($($cleanupPath.Length) characters; maximum 240). Use a shorter RunName or EvidenceDirectory.")
+}
+if (Test-Path -LiteralPath $evidencePath) {
+    throw "Evidence directory already exists; use a unique RunName: $evidencePath"
+}
+
+$runRoot = Split-Path -Parent $evidencePath
+$runtimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeDirectory)) {
+    Join-Path $runRoot "runtime"
+} else {
+    [System.IO.Path]::GetFullPath($RuntimeDirectory)
+}
+$runtimeParent = [System.IO.Path]::GetFullPath((Split-Path -Parent $runtimeRoot))
+$runtimeVolumeRoot = [System.IO.Path]::GetPathRoot($runtimeParent)
+if ([string]::Equals(
+    $runtimeParent.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar),
+    $runtimeVolumeRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar),
+    [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "RuntimeDirectory must be nested below a dedicated temporary parent."
+}
+if (Test-Path -LiteralPath $runtimeRoot) {
+    throw "RuntimeDirectory already exists; use an isolated path: $runtimeRoot"
+}
+$runtimePrefix = $runtimeParent.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+if (-not $runtimeRoot.StartsWith(
+    $runtimePrefix,
+    [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "RuntimeDirectory must be a child of its dedicated temporary parent."
+}
+$hostLogs = Join-Path $runRoot "host-logs"
+$webView2UserData = Join-Path $runtimeRoot "webview2"
+$conversationStore = Join-Path $runtimeRoot "conversation"
+$agentRunStore = Join-Path $runtimeRoot "agent-runs"
+$databasePath = Join-Path $runtimeRoot "database/vision.db"
+New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
+
+$studioUiEnabled = $Expectation -ne "legacy"
+$resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
+    $Route
+} elseif ($Expectation -eq "studio-design") {
+    "/labs/design"
+} elseif ($Expectation -eq "studio-canvas") {
+    "/labs/canvas"
+} else {
+    "/diagnostics"
+}
+
+$customEnvironment = [ordered]@{
+    "Studio__StudioUiEnabled" = if ($studioUiEnabled) { "true" } else { "false" }
+    "CV_STUDIO_UI_EXPECTATION" = $Expectation
+    "CV_STUDIO_UI_ROUTE" = $resolvedRoute
+    "CV_STUDIO_UI_DESKTOP_EXECUTABLE" = $desktopExe
+    "CV_STUDIO_UI_RUN_NAME" = $RunName
+    "CV_STUDIO_UI_RUNTIME_KIND" = $RuntimeKind
+    "CV_STUDIO_UI_CONFIGURATION" = $Configuration
+    "CV_STUDIO_UI_SANITIZED_PATH" = if ($SanitizeDesktopPath) { "true" } else { "false" }
+    "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
+    "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
+}
+$previousEnvironment = @{}
+foreach ($entry in $customEnvironment.GetEnumerator()) {
+    $previousEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key, "Process")
+}
+$runnerManagedEnvironmentNames = @(
+    "Database__Path",
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "CV_DESKTOP_HTTP_PORT",
+    "CV_WEBVIEW2_USER_DATA_FOLDER",
+    "CV_CONVERSATION_STORE_ROOT",
+    "CV_AGENT_RUN_EVENT_STORE",
+    "CV_DESKTOP_LOG_PATH",
+    "CV_CDP_PORT",
+    "CV_WEB_PORT",
+    "CV_DPI_SCALE",
+    "CV_SMOKE_PHASE",
+    "CV_SMOKE_TOKEN",
+    "CV_SMOKE_USER",
+    "CV_EVIDENCE_DIR",
+    "PATH"
+)
+$runnerPreviousEnvironment = @{}
+foreach ($name in $runnerManagedEnvironmentNames) {
+    $runnerPreviousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+}
+
+function Restore-CustomEnvironment {
+    foreach ($entry in $customEnvironment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable(
+            $entry.Key,
+            $previousEnvironment[$entry.Key],
+            "Process")
+    }
+}
+
+function Test-EnvironmentRestored {
+    foreach ($entry in $customEnvironment.GetEnumerator()) {
+        $current = [Environment]::GetEnvironmentVariable($entry.Key, "Process")
+        $expected = $previousEnvironment[$entry.Key]
+        if (-not [string]::Equals(
+            [string]$current,
+            [string]$expected,
+            [System.StringComparison]::Ordinal)) {
+            return $false
+        }
+    }
+    foreach ($name in $runnerManagedEnvironmentNames) {
+        $current = [Environment]::GetEnvironmentVariable($name, "Process")
+        $expected = $runnerPreviousEnvironment[$name]
+        if (-not [string]::Equals(
+            [string]$current,
+            [string]$expected,
+            [System.StringComparison]::Ordinal)) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-MatchingDesktopProcesses {
+    $expected = [System.IO.Path]::GetFullPath($desktopExe)
+    return @(Get-CimInstance Win32_Process -Filter "Name = 'ClearVision.Product.Desktop.exe'" |
+        Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_.ExecutablePath) -and
+            [string]::Equals(
+                [System.IO.Path]::GetFullPath($_.ExecutablePath),
+                $expected,
+                [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        ForEach-Object {
+            [pscustomobject]@{
+                processId = [int]$_.ProcessId
+                parentProcessId = [int]$_.ParentProcessId
+                executablePath = [string]$_.ExecutablePath
+                commandLine = [string]$_.CommandLine
+            }
+        })
+}
+
+$runnerParameters = @{
+    Configuration = $Configuration
+    EvidenceDirectory = $relativeEvidence
+    DesktopExecutablePath = $desktopExe
+    NodeSmokePath = $scenario
+    NodeExecutablePath = $nodeExe
+    WebPort = $WebPort
+    CdpPort = $CdpPort
+    Scale = $Scale
+    Phase = $Expectation
+    RunName = $RunName
+    HostLogDirectory = $hostLogs
+    WebView2UserDataDirectory = $webView2UserData
+    ConversationStoreRoot = $conversationStore
+    AgentRunStoreRoot = $agentRunStore
+    RuntimeCleanupRoot = $runtimeRoot
+    DatabasePath = $databasePath
+    WindowWidth = $WindowWidth
+    WindowHeight = $WindowHeight
+    SingleRun = $true
+}
+if ($SanitizeDesktopPath) {
+    $runnerParameters["SanitizeDesktopPath"] = $true
+}
+if ($NoBuild) {
+    $runnerParameters["NoBuild"] = $true
+}
+
+$runnerSucceeded = $false
+$runnerError = $null
+$startedAtUtc = [DateTime]::UtcNow
+
+try {
+    foreach ($entry in $customEnvironment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, [string]$entry.Value, "Process")
+    }
+
+    & $sharedRunner @runnerParameters
+    $runnerSucceeded = $true
+} catch {
+    $runnerError = $_
+} finally {
+    Restore-CustomEnvironment
+}
+
+$databaseArtifacts = @(
+    $databasePath,
+    ($databasePath + "-shm"),
+    ($databasePath + "-wal")
+)
+$matchingProcesses = @(Get-MatchingDesktopProcesses)
+$webView2UserDataRemoved = -not (Test-Path -LiteralPath $webView2UserData)
+$conversationStoreRemoved = -not (Test-Path -LiteralPath $conversationStore)
+$agentRunStoreRemoved = -not (Test-Path -LiteralPath $agentRunStore)
+$databaseArtifactsRemoved = -not ($databaseArtifacts | Where-Object {
+    Test-Path -LiteralPath $_
+})
+$runtimeRootRemovalError = $null
+if ($webView2UserDataRemoved -and
+    $conversationStoreRemoved -and
+    $agentRunStoreRemoved -and
+    $databaseArtifactsRemoved -and
+    (Test-Path -LiteralPath $runtimeRoot)) {
+    try {
+        Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
+    } catch {
+        $runtimeRootRemovalError = $_.Exception.Message
+    }
+}
+$runtimeRootRemoved = -not (Test-Path -LiteralPath $runtimeRoot)
+$cleanup = [pscustomobject]@{
+    schemaVersion = 1
+    runName = $RunName
+    expectation = $Expectation
+    startedAtUtc = $startedAtUtc.ToString("O")
+    capturedAtUtc = [DateTime]::UtcNow.ToString("O")
+    runnerSucceeded = $runnerSucceeded
+    runnerError = if ($runnerError) { [string]$runnerError.Exception.Message } else { $null }
+    studioUiEnabled = $studioUiEnabled
+    sanitizedDesktopPath = [bool]$SanitizeDesktopPath
+    externalNodeDriver = [pscustomobject]@{
+        executablePath = $nodeExe
+        isAbsolute = [System.IO.Path]::IsPathRooted($nodeExe)
+        isInsideDesktopProcessTree = $false
+    }
+    retainedEvidence = Test-Path -LiteralPath $evidencePath -PathType Container
+    retainedHostLogs = Test-Path -LiteralPath $hostLogs -PathType Container
+    processCleanup = [pscustomobject]@{
+        passed = $matchingProcesses.Count -eq 0
+        remaining = $matchingProcesses
+    }
+    runtimeCleanup = [pscustomobject]@{
+        root = $runtimeRoot
+        webView2UserDataRemoved = $webView2UserDataRemoved
+        conversationStoreRemoved = $conversationStoreRemoved
+        agentRunStoreRemoved = $agentRunStoreRemoved
+        databaseArtifactsRemoved = $databaseArtifactsRemoved
+        runtimeRootRemoved = $runtimeRootRemoved
+        removalError = $runtimeRootRemovalError
+    }
+    environmentRestored = Test-EnvironmentRestored
+}
+$cleanupPassed = $cleanup.processCleanup.passed -and
+    $cleanup.runtimeCleanup.webView2UserDataRemoved -and
+    $cleanup.runtimeCleanup.conversationStoreRemoved -and
+    $cleanup.runtimeCleanup.agentRunStoreRemoved -and
+    $cleanup.runtimeCleanup.databaseArtifactsRemoved -and
+    $cleanup.runtimeCleanup.runtimeRootRemoved -and
+    $cleanup.environmentRestored
+$cleanup | Add-Member -NotePropertyName passed -NotePropertyValue $cleanupPassed
+
+New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
+[System.IO.File]::WriteAllText(
+    $cleanupPath,
+    (($cleanup | ConvertTo-Json -Depth 8) + [Environment]::NewLine),
+    [System.Text.UTF8Encoding]::new($false))
+
+if ($runnerError) {
+    throw $runnerError
+}
+if (-not $cleanupPassed) {
+    throw "WebView2 evidence run succeeded but cleanup verification failed. See $cleanupPath"
+}
+
+[pscustomobject]@{
+    Succeeded = $true
+    RunName = $RunName
+    Expectation = $Expectation
+    EvidenceDirectory = $evidencePath
+    CleanupEvidence = $cleanupPath
+    CompletedAtUtc = [DateTime]::UtcNow.ToString("O")
+} | ConvertTo-Json -Depth 4

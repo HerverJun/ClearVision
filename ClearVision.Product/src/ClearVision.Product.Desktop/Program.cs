@@ -41,6 +41,8 @@ static class Program
 {
     private const int MinWebPort = 5000;
     private const int MaxWebPort = 5010;
+    private const string DesktopHttpPortEnvironmentVariable = "CV_DESKTOP_HTTP_PORT";
+    private const string DesktopLogPathEnvironmentVariable = "CV_DESKTOP_LOG_PATH";
     private static IHost? _host;
     private static int _webPort = 0;
     private static IReadOnlyList<Mutex> _singleInstanceLeases = Array.Empty<Mutex>();
@@ -53,6 +55,8 @@ static class Program
     [STAThread]
     static void Main()
     {
+        ApplicationConfiguration.Initialize();
+
         AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
         {
             var assemblyName = new AssemblyName(args.Name).Name;
@@ -103,13 +107,10 @@ static class Program
 
             StartWebServer();
 
-            System.Windows.Forms.Application.EnableVisualStyles();
-            System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.Console()
-                .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
+                .WriteTo.File(ResolveDesktopLogPath(), rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
             if (_host == null)
@@ -578,14 +579,45 @@ static class Program
 
     public static int GetWebPort() => _webPort;
 
-    private static int ResolveWebPort(StationIngressOptions options)
+    internal static int ResolveWebPort(
+        StationIngressOptions options,
+        string? requestedPort = null,
+        Func<int, bool>? isPortAvailable = null)
     {
         if (options.Enabled && options.Port > 0)
         {
             return options.Port;
         }
 
+        requestedPort ??= Environment.GetEnvironmentVariable(DesktopHttpPortEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(requestedPort))
+        {
+            if (!int.TryParse(requestedPort.Trim(), out var exactPort) ||
+                exactPort is < 1 or > 65535)
+            {
+                throw new InvalidOperationException(
+                    $"{DesktopHttpPortEnvironmentVariable} must be an integer between 1 and 65535.");
+            }
+
+            var availabilityProbe = isPortAvailable ?? IsPortAvailable;
+            if (!availabilityProbe(exactPort))
+            {
+                throw new InvalidOperationException(
+                    $"Requested Desktop HTTP port {exactPort} is not available.");
+            }
+
+            return exactPort;
+        }
+
         return FindAvailablePort(MinWebPort, MaxWebPort);
+    }
+
+    internal static string ResolveDesktopLogPath(string? configuredPath = null)
+    {
+        configuredPath ??= Environment.GetEnvironmentVariable(DesktopLogPathEnvironmentVariable);
+        return string.IsNullOrWhiteSpace(configuredPath)
+            ? Path.Combine("logs", "log.txt")
+            : Path.GetFullPath(configuredPath.Trim());
     }
 
     private static StationIngressListenMode ResolveStationIngressListenMode(StationIngressOptions options)

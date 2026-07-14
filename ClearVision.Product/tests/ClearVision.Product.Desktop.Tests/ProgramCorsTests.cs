@@ -1,5 +1,6 @@
 using System.Net;
 using ClearVision.Product.Desktop;
+using ClearVision.Product.Desktop.Station;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,6 +13,69 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class ProgramCorsTests
 {
+    [Fact]
+    public void ResolveWebPort_ShouldHonorAnExactAvailableTestPort()
+    {
+        var port = Program.ResolveWebPort(
+            new StationIngressOptions(),
+            requestedPort: "54123",
+            isPortAvailable: candidate => candidate == 54123);
+
+        port.Should().Be(54123);
+    }
+
+    [Fact]
+    public void ResolveWebPort_ShouldKeepStationIngressPortAuthoritative()
+    {
+        var port = Program.ResolveWebPort(
+            new StationIngressOptions
+            {
+                Enabled = true,
+                Port = 55123
+            },
+            requestedPort: "54123",
+            isPortAvailable: _ => false);
+
+        port.Should().Be(55123);
+    }
+
+    [Fact]
+    public void ResolveWebPort_ShouldFailClosedWhenTheExactTestPortIsUnavailable()
+    {
+        var action = () => Program.ResolveWebPort(
+            new StationIngressOptions(),
+            requestedPort: "54123",
+            isPortAvailable: _ => false);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*54123*not available*");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("65536")]
+    [InlineData("not-a-port")]
+    public void ResolveWebPort_ShouldRejectInvalidExactTestPorts(string requestedPort)
+    {
+        var action = () => Program.ResolveWebPort(
+            new StationIngressOptions(),
+            requestedPort,
+            _ => true);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*between 1 and 65535*");
+    }
+
+    [Fact]
+    public void ResolveDesktopLogPath_ShouldNormalizeAnExplicitEvidencePath()
+    {
+        var relativePath = Path.Combine(".tmp", "studio-ui-next", "f01", "desktop.log");
+
+        var resolved = Program.ResolveDesktopLogPath(relativePath);
+
+        resolved.Should().Be(Path.GetFullPath(relativePath));
+    }
+
     [Theory]
     [InlineData("http://app.local", 5000, true)]
     [InlineData("http://localhost:5000", 5000, true)]

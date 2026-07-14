@@ -87,7 +87,8 @@
 
   <PropertyGroup>
     <StudioUiRoot>$(MSBuildThisFileDirectory)StudioUI\</StudioUiRoot>
-    <StudioUiIntermediateDist>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\StudioUI\dist</StudioUiIntermediateDist>
+    <StudioUiIntermediateDist Condition="$([System.IO.Path]::IsPathRooted('$(BaseIntermediateOutputPath)')) == 'true'">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\StudioUI\dist</StudioUiIntermediateDist>
+    <StudioUiIntermediateDist Condition="$([System.IO.Path]::IsPathRooted('$(BaseIntermediateOutputPath)')) != 'true'">$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\StudioUI\dist</StudioUiIntermediateDist>
     <StudioUiNodeModulesLock>$(StudioUiRoot)node_modules\.package-lock.json</StudioUiNodeModulesLock>
     <SkipStudioUiBuild Condition="'$(SkipStudioUiBuild)' == ''">false</SkipStudioUiBuild>
     <SkipStudioUiInstall Condition="'$(SkipStudioUiInstall)' == ''">false</SkipStudioUiInstall>

@@ -266,6 +266,7 @@ internal sealed class ConversationStore
 
 public class ConversationalFlowService : IConversationalFlowService
 {
+    public const string StorageRootEnvironmentVariable = "CV_CONVERSATION_STORE_ROOT";
     private const int MaxHistory = 20;
     private const int MaxPromptHistory = 5;
     private const int MaxPersistedSessions = 200;
@@ -323,10 +324,13 @@ public class ConversationalFlowService : IConversationalFlowService
         LoadSessionsFromStore();
     }
 
-    public static string ResolveStorageRootPath(string? storageRootPath = null) =>
-        Path.GetFullPath(string.IsNullOrWhiteSpace(storageRootPath)
+    public static string ResolveStorageRootPath(string? storageRootPath = null)
+    {
+        storageRootPath ??= Environment.GetEnvironmentVariable(StorageRootEnvironmentVariable);
+        return Path.GetFullPath(string.IsNullOrWhiteSpace(storageRootPath)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
             : storageRootPath.Trim());
+    }
 
     public static string ResolveStoragePath(string? storageRootPath = null) =>
         Path.Combine(ResolveStorageRootPath(storageRootPath), "conversation_sessions.json");

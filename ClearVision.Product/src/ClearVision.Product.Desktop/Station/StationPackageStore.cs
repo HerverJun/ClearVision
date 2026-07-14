@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Data;
@@ -307,46 +308,41 @@ public sealed class StationPackageStore
 
     private static OperatorFlowDto CreateSmokeFlow(string packageId)
     {
+        var decisionOperatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         return new OperatorFlowDto
         {
             Id = Guid.NewGuid(),
             Name = $"Station deploy smoke {packageId}",
+            DecisionConfiguration = new DecisionConfiguration
+            {
+                FinalDecisionBinding = new FinalDecisionBinding
+                {
+                    SourceOperatorId = decisionOperatorId,
+                    SourceOutputPortId = decisionPortId,
+                    SourceOutputName = "IsOk",
+                    DataType = DecisionValueType.Boolean,
+                    Rule = DecisionInterpretationRule.Boolean,
+                    TrueMeansOk = true
+                }
+            },
             Operators =
             [
                 new OperatorDto
                 {
-                    Id = Guid.NewGuid(),
-                    Name = "DeploymentSmokeResult",
-                    Type = OperatorType.ResultOutput,
+                    Id = decisionOperatorId,
+                    Name = "DeploymentSmokeDecision",
+                    Type = OperatorType.ResultJudgment,
                     X = 0,
                     Y = 0,
-                    Parameters =
+                    OutputPorts =
                     [
-                        new ParameterDto
+                        new PortDto
                         {
-                            Id = Guid.NewGuid(),
-                            Name = "Format",
-                            DisplayName = "Format",
-                            DataType = "enum",
-                            DefaultValue = "JSON",
-                            Value = "JSON",
-                            IsRequired = false,
-                            Options =
-                            [
-                                new ClearVision.Product.Core.ValueObjects.ParameterOption { Label = "JSON", Value = "JSON" },
-                                new ClearVision.Product.Core.ValueObjects.ParameterOption { Label = "CSV", Value = "CSV" },
-                                new ClearVision.Product.Core.ValueObjects.ParameterOption { Label = "Text", Value = "Text" }
-                            ]
-                        },
-                        new ParameterDto
-                        {
-                            Id = Guid.NewGuid(),
-                            Name = "SaveToFile",
-                            DisplayName = "SaveToFile",
-                            DataType = "bool",
-                            DefaultValue = false,
-                            Value = false,
-                            IsRequired = false
+                            Id = decisionPortId,
+                            Name = "IsOk",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Boolean
                         }
                     ]
                 }

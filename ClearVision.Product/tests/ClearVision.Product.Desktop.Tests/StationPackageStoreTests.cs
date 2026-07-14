@@ -1,9 +1,10 @@
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Infrastructure.Data;
@@ -197,28 +198,52 @@ public sealed class StationPackageStoreTests
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "field"));
 
+        var decisionOperatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         var flow = new OperatorFlowDto
         {
             Id = Guid.NewGuid(),
             Name = "Import test runtime flow",
+            DecisionConfiguration = new DecisionConfiguration
+            {
+                FinalDecisionBinding = new FinalDecisionBinding
+                {
+                    SourceOperatorId = decisionOperatorId,
+                    SourceOutputPortId = decisionPortId,
+                    SourceOutputName = "IsOk",
+                    DataType = DecisionValueType.Boolean,
+                    Rule = DecisionInterpretationRule.Boolean,
+                    TrueMeansOk = true
+                }
+            },
             Operators =
             [
                 new OperatorDto
                 {
-                    Id = Guid.NewGuid(),
-                    Name = "Result",
-                    Type = OperatorType.ResultOutput,
+                    Id = decisionOperatorId,
+                    Name = "Decision",
+                    Type = OperatorType.ResultJudgment,
                     X = 0,
                     Y = 0,
                     InputPorts = [],
-                    OutputPorts = [],
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = decisionPortId,
+                            Name = "IsOk",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Boolean
+                        }
+                    ],
                     Parameters = []
                 }
             ],
             Connections = []
         };
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, JsonOptions);
-        var flowHash = $"sha256:{Convert.ToHexString(SHA256.HashData(flowBytes)).ToLowerInvariant()}";
+        var flowEntity = flow.ToEntity();
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flowEntity);
         var manifest = new RuntimePackageManifest
         {
             PackageId = packageId,
@@ -229,6 +254,8 @@ public sealed class StationPackageStoreTests
             CreatedBy = "ClearVision Studio",
             EntryFlow = "flow.json",
             FlowHash = flowHash,
+            DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                flowEntity.DecisionConfiguration),
             OperatorCatalogVersion = "unit-test",
             ExportAllowed = true,
             FieldExtensions = new RuntimeFieldExtensions

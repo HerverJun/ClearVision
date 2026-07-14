@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime;
@@ -177,6 +178,7 @@ public sealed class StationPackageDeploymentServiceTests
         try
         {
             var operatorId = Guid.NewGuid();
+            var decisionPortId = Guid.NewGuid();
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
@@ -191,6 +193,18 @@ public sealed class StationPackageDeploymentServiceTests
                     {
                         Id = Guid.NewGuid(),
                         Name = "main",
+                        DecisionConfiguration = new DecisionConfiguration
+                        {
+                            FinalDecisionBinding = new FinalDecisionBinding
+                            {
+                                SourceOperatorId = operatorId,
+                                SourceOutputPortId = decisionPortId,
+                                SourceOutputName = "IsMatch",
+                                DataType = DecisionValueType.Boolean,
+                                Rule = DecisionInterpretationRule.Boolean,
+                                TrueMeansOk = true
+                            }
+                        },
                         Operators =
                         [
                             new OperatorDto
@@ -198,6 +212,16 @@ public sealed class StationPackageDeploymentServiceTests
                                 Id = operatorId,
                                 Name = "TemplateMatch",
                                 Type = OperatorType.TemplateMatching,
+                                OutputPorts =
+                                [
+                                    new PortDto
+                                    {
+                                        Id = decisionPortId,
+                                        Name = "IsMatch",
+                                        Direction = PortDirection.Output,
+                                        DataType = PortDataType.Boolean
+                                    }
+                                ],
                                 Parameters =
                                 [
                                     new ParameterDto
@@ -341,6 +365,8 @@ public sealed class StationPackageDeploymentServiceTests
     {
         var revision = 3;
         var payload = CreateCalibrationPayload(bundleId);
+        var decisionOperatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
         return new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -350,13 +376,35 @@ public sealed class StationPackageDeploymentServiceTests
             {
                 Id = Guid.NewGuid(),
                 Name = "asset-load-flow",
+                DecisionConfiguration = new DecisionConfiguration
+                {
+                    FinalDecisionBinding = new FinalDecisionBinding
+                    {
+                        SourceOperatorId = decisionOperatorId,
+                        SourceOutputPortId = decisionPortId,
+                        SourceOutputName = "IsOk",
+                        DataType = DecisionValueType.Boolean,
+                        Rule = DecisionInterpretationRule.Boolean,
+                        TrueMeansOk = true
+                    }
+                },
                 Operators =
                 [
                     new OperatorDto
                     {
-                        Id = Guid.NewGuid(),
-                        Name = "Result",
-                        Type = OperatorType.ResultOutput
+                        Id = decisionOperatorId,
+                        Name = "Decision",
+                        Type = OperatorType.ResultJudgment,
+                        OutputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = decisionPortId,
+                                Name = "IsOk",
+                                Direction = PortDirection.Output,
+                                DataType = PortDataType.Boolean
+                            }
+                        ]
                     }
                 ]
             },

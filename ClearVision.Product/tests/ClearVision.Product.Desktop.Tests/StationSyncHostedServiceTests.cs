@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Cameras;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
@@ -623,6 +624,26 @@ public sealed class StationSyncHostedServiceTests
         string projectName,
         params OperatorDto[] operators)
     {
+        var decisionOperatorId = Guid.NewGuid();
+        var decisionPortId = Guid.NewGuid();
+        var packagedOperators = operators.ToList();
+        packagedOperators.Add(new OperatorDto
+        {
+            Id = decisionOperatorId,
+            Name = "Station test decision",
+            Type = OperatorType.ResultJudgment,
+            OutputPorts =
+            [
+                new PortDto
+                {
+                    Id = decisionPortId,
+                    Name = "IsOk",
+                    Direction = PortDirection.Output,
+                    DataType = PortDataType.Boolean
+                }
+            ],
+            ExecutionStatus = OperatorExecutionStatus.NotExecuted
+        });
         var exporter = new RuntimePackageExporter(
             new OperatorFactory(),
             NullLogger<RuntimePackageExporter>.Instance);
@@ -638,7 +659,19 @@ public sealed class StationSyncHostedServiceTests
                 {
                     Id = Guid.NewGuid(),
                     Name = "main",
-                    Operators = operators.ToList()
+                    DecisionConfiguration = new DecisionConfiguration
+                    {
+                        FinalDecisionBinding = new FinalDecisionBinding
+                        {
+                            SourceOperatorId = decisionOperatorId,
+                            SourceOutputPortId = decisionPortId,
+                            SourceOutputName = "IsOk",
+                            DataType = DecisionValueType.Boolean,
+                            Rule = DecisionInterpretationRule.Boolean,
+                            TrueMeansOk = true
+                        }
+                    },
+                    Operators = packagedOperators
                 }
             }
         });

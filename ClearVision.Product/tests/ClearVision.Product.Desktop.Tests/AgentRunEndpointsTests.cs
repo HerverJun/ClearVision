@@ -195,10 +195,23 @@ public sealed class AgentRunEndpointsTests
             .OnlyContain(question => question.GetProperty("options").EnumerateArray()
                 .Any(option =>
                     option.GetProperty("recommended").GetBoolean() &&
-                    option.GetProperty("value").GetString()!.EndsWith("_pending", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(option.GetProperty("value").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
+        var sequenceQuestion = wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Single(question => question.GetProperty("id").GetString() == "sequence_rule");
+        sequenceQuestion.GetProperty("options").EnumerateArray()
+            .Single(option => option.GetProperty("recommended").GetBoolean())
+            .GetProperty("value").GetString()
+            .Should().Be("left_to_right");
+        wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Where(question => question.GetProperty("id").GetString() != "sequence_rule")
+            .Should()
+            .OnlyContain(question => question.GetProperty("options").EnumerateArray()
+                .Any(option =>
+                    option.GetProperty("recommended").GetBoolean() &&
+                    option.GetProperty("value").GetString()!.EndsWith("_pending", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact(DisplayName = "POST Agent plan primary persistence failure returns 503 before planner executes")]
