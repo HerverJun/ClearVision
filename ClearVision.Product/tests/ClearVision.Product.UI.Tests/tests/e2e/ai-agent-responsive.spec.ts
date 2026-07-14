@@ -233,6 +233,7 @@ async function mockAgentPlanAndApplyReadyBuild(page: Page): Promise<void> {
         planHash: request.planHash,
         requirementMode: request.requirementMode || 'strict',
         answerRevision: request.answerRevision || 0,
+        resourceRevision: request.resourceRevision || 0,
         buildReadiness: {
           canBuild: true,
           blockers: [],
@@ -1250,6 +1251,43 @@ test('Plan pending recommendation records defer without becoming an effective an
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
+  await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
+    const request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        planId: request.planId,
+        planHash: request.planHash,
+        requirementMode: request.requirementMode || 'strict',
+        answerRevision: request.answerRevision || 0,
+        resourceRevision: request.resourceRevision || 0,
+        acceptedAnswers: [],
+        deferredQuestionIds: ['image_source'],
+        buildReadiness: {
+          canBuild: false,
+          blockers: [{
+            id: 'hard_requirement:image_source',
+            category: 'hard_requirement',
+            field: 'image_source',
+            questionId: 'image_source',
+            blocksBuild: true,
+            resolutionMode: 'answer_question',
+            publicLabel: 'Image source pending',
+          }],
+          resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+          remainingFields: ['image_source'],
+          primaryMessage: 'Image source pending',
+          contractVersion: 'v2',
+        },
+        pendingConfirmationCount: 1,
+        resourcePendingCount: 0,
+        hardBlockerCount: 1,
+        contractValid: true,
+        metadataOnly: true,
+      }),
+    });
+  });
   await bootAuthenticatedApp(page);
 
   await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
@@ -1365,8 +1403,8 @@ test('Plan pending recommendation records defer without becoming an effective an
   });
 
   const pending = page.locator('input[data-ai-plan-option="true"][value="camera_pending"]');
-  await pending.check();
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('建议暂缓');
+  await pending.click();
+  await expect(page.locator('[data-ai-hook="clarification-deferred"]')).toContainText('稍后确认');
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
@@ -1560,7 +1598,8 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-plan-workspace')).toContainText('推荐方案');
   await expect(page.locator('#ai-plan-workspace')).toContainText('关键问题');
   await expect(page.locator('#ai-plan-workspace')).toContainText('风险与工程详情');
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('前端不会创建替代答案入口');
+  await expect(page.locator('[data-ai-hook="clarification-contract-gap"]'))
+    .toContainText('系统不会用资源项或前端临时问卷代替');
   await expect(page.locator('[data-workspace-view-mode="plan"]')).toContainText('方案');
   await expect(page.locator('[data-workspace-view-mode="build"]')).toContainText('构建与验证');
   await expect(page.locator('[data-workspace-view-mode="build"]')).toBeDisabled();
@@ -1570,7 +1609,8 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-agent-workspace-overview')).not.toContainText('可构建：否');
   await expect(page.locator('.ai-agent-overview-card')).toHaveClass(/is-warning/);
   await expect(page.locator('.ai-agent-overview-card')).not.toHaveClass(/is-danger/);
-  await expect(page.locator('[data-ai-hook="task-blockers"]')).toContainText('2 项阻断');
+  await expect(page.locator('[data-ai-hook="task-blockers"]')).toBeHidden();
+  await expect(page.locator('[data-ai-hook="task-blockers"]')).toHaveText('');
   const visibleRawSnippets = await page.evaluate(() => {
     const root = document.querySelector('#ai-plan-workspace');
     const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];

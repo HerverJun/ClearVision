@@ -42,10 +42,19 @@ function createBuildPayload(scenario: BuildScenario) {
     : [];
   const missingResources = scenario === 'resources' || scenario === 'mixed'
     ? [{
+        canonicalId: 'resource:v1|model_resource|threshold#1|modelpath',
         resourceType: 'model_resource',
+        resourceName: '表面缺陷检测模型',
         resourceKey: 'op_threshold.ModelPath',
         operatorId: 'op_threshold',
+        operatorKey: 'Threshold#1',
+        operatorType: 'Threshold',
+        operatorIndex: 0,
         parameterName: 'ModelPath',
+        blockingScope: 'deploy_run',
+        draftPolicy: 'draft_allowed',
+        resolutionTarget: 'picker:model',
+        source: 'build_result',
         description: '验证前需要绑定缺陷检测模型资源。',
       }]
     : [];
@@ -161,6 +170,35 @@ async function openAi(page: Page, options: { width: number; height: number; them
     body: '{}',
   }));
   await mockBaseApis(page, theme);
+  await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
+    const request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        planId: request.planId,
+        planHash: request.planHash,
+        requirementMode: request.requirementMode || 'strict',
+        answerRevision: request.answerRevision || 0,
+        resourceRevision: request.resourceRevision || 0,
+        acceptedAnswers: [],
+        deferredQuestionIds: [],
+        buildReadiness: {
+          canBuild: true,
+          blockers: [],
+          resolvedFields: ['inspection_object', 'task_type', 'image_source', 'output_target'],
+          remainingFields: [],
+          primaryMessage: '构建条件已满足。',
+          contractVersion: 'v2',
+        },
+        pendingConfirmationCount: 0,
+        resourcePendingCount: 0,
+        hardBlockerCount: 0,
+        contractValid: true,
+        metadataOnly: true,
+      }),
+    });
+  });
   const authReady = page.waitForResponse(response => response.url().includes('/api/auth/me') && response.ok());
   await bootAuthenticatedApp(page);
   await authReady;
@@ -278,6 +316,22 @@ async function focusBuildSection(page: Page, selector: string): Promise<void> {
   }, selector);
 }
 
+async function pickModelResource(page: Page, value: string): Promise<void> {
+  const picker = page.locator('#ai-build-resources-section [data-resource-action="pick_model_resource"]').first();
+  await expect(picker).toBeVisible();
+  await picker.click();
+  await page.evaluate(filePath => {
+    (window as any).mockWebViewResponse({
+      messageType: 'FilePickedEvent',
+      payload: {
+        parameterName: 'aiPendingParameterFile',
+        filePath,
+        isCancelled: false,
+      },
+    });
+  }, value);
+}
+
 test('Build ready uses one primary action and keeps internal diagnostics collapsed', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768, theme: 'light' });
   await seedBuild(page, 'ready');
@@ -326,15 +380,14 @@ test('resource workspace reuses the existing binding action and updates canonica
   await openAi(page, { width: 1366, height: 768, theme: 'light' });
   await seedBuild(page, 'resources');
 
-  const resourceInput = page.locator('[data-resource-input="true"]').first();
   const resourceMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '待补资源' });
   const nextStep = page.locator('#ai-build-status-summary .ai-build-v2-next strong');
   await expect(resourceMetric.locator('dd')).toHaveText('1');
   await expect(page.locator('#ai-build-action-queue')).toContainText('1 项资源待绑定');
   await expect(nextStep).toContainText('先绑定 1 项具体资源');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
-  await resourceInput.fill('model-resource:surface-v2');
-  await page.locator('[data-resource-action="bind_model_resource"]').click();
+  await expect(page.locator('[data-resource-input="true"]')).toHaveCount(0);
+  await pickModelResource(page, 'model-resource:surface-v2');
   await expect(resourceMetric.locator('dd')).toHaveText('0');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('资源待绑定');
   await expect(page.locator('#ai-build-action-queue')).toContainText('当前没有需要处理的阻断');
@@ -353,7 +406,6 @@ test('mixed ordinary and resource parameters stay partitioned through confirmati
   const resourceSection = page.locator('#ai-build-resources-section');
   const thresholdInput = parameterSection.locator('[data-draft-input="true"][data-draft-parameter-name="Threshold"]');
   const modelParameterInput = parameterSection.locator('[data-draft-input="true"][data-draft-parameter-name="ModelPath"]');
-  const modelResourceInput = resourceSection.locator('[data-resource-input="true"]');
   const parameterMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '待补参数' });
   const resourceMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '待补资源' });
   const nextStep = page.locator('#ai-build-status-summary .ai-build-v2-next strong');
@@ -364,7 +416,8 @@ test('mixed ordinary and resource parameters stay partitioned through confirmati
   await expect(resourceSection).not.toContainText('Threshold');
   await expect(thresholdInput).toHaveCount(1);
   await expect(modelParameterInput).toHaveCount(0);
-  await expect(modelResourceInput).toHaveCount(1);
+  await expect(resourceSection.locator('[data-resource-input="true"]')).toHaveCount(0);
+  await expect(resourceSection.locator('[data-resource-action="pick_model_resource"]')).toHaveCount(1);
   await expect(parameterMetric.locator('dd')).toHaveText('1');
   await expect(resourceMetric.locator('dd')).toHaveText('1');
 
@@ -379,8 +432,7 @@ test('mixed ordinary and resource parameters stay partitioned through confirmati
   await expect(page.locator('#ai-build-action-queue')).toContainText('1 项资源待绑定');
   await expect(nextStep).toContainText('先绑定 1 项具体资源');
 
-  await modelResourceInput.fill('model-resource:mixed-v1');
-  await resourceSection.locator('[data-resource-action="bind_model_resource"]').click();
+  await pickModelResource(page, 'model-resource:mixed-v1');
 
   await expect(resourceMetric.locator('dd')).toHaveText('0');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('资源待绑定');
@@ -389,7 +441,7 @@ test('mixed ordinary and resource parameters stay partitioned through confirmati
   await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 已准备完成');
   await expect(page.locator('#ai-btn-apply')).toBeEnabled();
   await expect(parameterSection.locator('[data-draft-input="true"]')).toHaveCount(1);
-  await expect(resourceSection.locator('[data-resource-action="bind_model_resource"]')).toHaveCount(0);
+  await expect(resourceSection.locator('[data-resource-action="pick_model_resource"]')).toHaveCount(0);
 });
 
 test('Apply Preview remains the existing modal and can be reached by keyboard', async ({ page }) => {
@@ -577,8 +629,8 @@ for (const viewport of [
     await openAi(page, { width: viewport.width, height: viewport.height, theme: 'dark' });
     await seedBuild(page, 'resources');
     await expectNoHorizontalOverflow(page);
-    await expect(page.locator('[data-resource-input="true"]').first()).toBeEditable();
-    await expect(page.locator('[data-resource-action="bind_model_resource"]').first()).toBeVisible();
+    await expect(page.locator('#ai-build-resources-section [data-resource-action="pick_model_resource"]').first()).toBeVisible();
+    await expect(page.locator('[data-resource-input="true"]')).toHaveCount(0);
     await expect(page.locator('#ai-btn-apply')).toBeVisible();
     await expect(page.locator('#ai-view')).toHaveScreenshot(`build-${viewport.name}-dark-${viewport.width}.png`);
   });

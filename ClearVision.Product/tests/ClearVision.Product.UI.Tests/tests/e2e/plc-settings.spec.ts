@@ -289,7 +289,7 @@ async function expectLayoutHealthy(
       bodyOverflow: Math.ceil(document.body.scrollWidth - window.innerWidth),
       rootOverflow: root ? Math.ceil(root.scrollWidth - root.clientWidth) : 0,
       panelOverflow: panel ? Math.ceil(panel.scrollWidth - panel.clientWidth) : 0,
-      hasMojibake: /�|鍔|閰|绔|鏄犲|涓夎|淇濆|娴嬭瘯|濡\?/.test(text),
+      hasMojibake: /\uFFFD|\u9354|\u95B0|\u7ED4|\u93C4\u72B2|\u6D93\u590E|\u6DC7\u6FC6|\u5A34\u5B2D\u762F|\u6FE1\?/.test(text),
       actionOverlapsLastRow,
       saveButtonInViewport: Boolean(saveRect && saveRect.top >= 0 && saveRect.bottom <= window.innerHeight && saveRect.left >= 0 && saveRect.right <= window.innerWidth),
       resetButtonInViewport: Boolean(resetRect && resetRect.top >= 0 && resetRect.bottom <= window.innerHeight && resetRect.left >= 0 && resetRect.right <= window.innerWidth),
@@ -423,8 +423,8 @@ test('PLC communication settings payloads, errors, connection test states, and r
   await page.locator('tr.plc-mapping-row').nth(0).locator('[data-field="address"]').fill('DM100');
   await page.locator('#btn-save-plc').click();
   await expect.poll(() => state.plcPuts.length).toBeGreaterThanOrEqual(2);
-  await expect.poll(() => state.settingsPuts.length).toBeGreaterThanOrEqual(1);
   await expect(page.locator('.cv-toast', { hasText: 'PLC 配置已保存' }).last()).toBeVisible();
+  expect(state.settingsPuts).toHaveLength(0);
   await capture(page, 'i-save-success.png', { requireActionBarVisible: true });
 
   await page.locator('#cfg-plcIpAddress').fill('10.99.99.99');

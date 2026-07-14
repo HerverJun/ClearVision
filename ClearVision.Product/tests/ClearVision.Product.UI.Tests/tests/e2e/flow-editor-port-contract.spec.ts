@@ -42,6 +42,15 @@ const IMAGE_ACQUISITION = {
 };
 
 async function stubOperatorLibrary(page: Page) {
+  await page.route('**/api/inspection/decision-configuration/validate', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      isValid: false,
+      issues: [{ code: 'DECISION_BINDING_REQUIRED', message: 'A final decision binding is required.' }],
+      eligibleOutputs: [],
+    }),
+  }));
   await page.route('**/api/operators/library', async route => {
     await route.fulfill({
       status: 200,
@@ -254,4 +263,3 @@ test.describe('Flow Editor port contract (library → canvas → serialize)', ()
     expect(consoleErrors).toEqual([]);
   });
 });
-

@@ -678,31 +678,17 @@ test('confirmed clarification collapses into a low-emphasis light summary', asyn
   await seedPlan(page, { questions: 'single' });
   await page.evaluate(question => {
     const panel = (window as any).aiPanel;
+    const answer = {
+      questionId: question.id,
+      field: question.field,
+      value: 'industrial_camera',
+      origin: 'explicit_user_selection',
+    };
     panel._dispatchAgentWorkspaceEvent({
       type: 'workspace/answers-confirmed',
-      payload: {
-        answers: [{
-          questionId: question.id,
-          field: question.field,
-          value: 'industrial_camera',
-          origin: 'explicit_user_selection',
-        }],
-      },
+      payload: { answers: [answer] },
     });
-    panel._dispatchAgentWorkspaceEvent({
-      type: 'workspace/readiness-received',
-      payload: {
-        buildReadiness: {
-          canBuild: true,
-          blockers: [],
-          resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'output_target'],
-          remainingFields: [],
-          primaryMessage: '方案信息完整，可以开始构建。',
-          contractVersion: 'v2',
-        },
-      },
-    });
-    panel.pendingVisionPlan.buildReadiness = {
+    const buildReadiness = {
       canBuild: true,
       blockers: [],
       resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'output_target'],
@@ -710,7 +696,24 @@ test('confirmed clarification collapses into a low-emphasis light summary', asyn
       primaryMessage: '方案信息完整，可以开始构建。',
       contractVersion: 'v2',
     };
-    panel.pendingVisionPlan.canBuild = true;
+    const applied = panel._applyPlanReadinessPreviewResult(panel.pendingVisionPlan, {
+      planId: panel.pendingVisionPlan.planId,
+      planHash: panel.pendingVisionPlan.planHash,
+      requirementMode: panel.requirementMode || 'strict',
+      answerRevision: panel.planAnswerRevision,
+      resourceRevision: panel.agentWorkspaceState.resources.revision,
+      acceptedAnswers: [answer],
+      deferredQuestionIds: [],
+      buildReadiness,
+      pendingConfirmationCount: 0,
+      resourcePendingCount: 0,
+      hardBlockerCount: 0,
+      contractValid: true,
+      metadataOnly: true,
+    });
+    if (!applied) {
+      throw new Error('Expected the authoritative readiness preview to match the confirmed plan identity.');
+    }
     panel._renderAgentWorkspaceOverview();
     panel._renderPlanWorkspace(panel.pendingVisionPlan);
   }, imageSourceQuestion);

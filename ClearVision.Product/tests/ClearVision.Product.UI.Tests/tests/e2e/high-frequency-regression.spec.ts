@@ -236,7 +236,7 @@ async function mockResultsApis(page: Page) {
     const stationId = 'station-regression-001';
     const completedAtUtc = '2026-03-20T10:10:00Z';
     const buildStationResultsPage = (status: string | null) => {
-        const items = status === 'Ng'
+        const items = status === 'ng'
             ? [
                 {
                     stationId,
@@ -279,7 +279,7 @@ async function mockResultsApis(page: Page) {
 
         return {
             items,
-            totalCount: status === 'Ng' ? 1 : 10,
+            totalCount: status === 'ng' ? 1 : 10,
             pageIndex: 0,
             pageSize: 12,
         };
@@ -594,7 +594,7 @@ test.describe('High Frequency Regression', () => {
         await page.locator('#calib-btn-close').click();
     });
 
-    test('settings camera regression: save all skips PLC validation when PLC config is unchanged', async ({ page }) => {
+    test('settings camera regression: scoped save skips PLC validation and avoids a full settings overwrite', async ({ page }) => {
         const plcSettingsPuts: any[] = [];
         const cameraBindingPuts: any[] = [];
         const settingsPuts: any[] = [];
@@ -621,11 +621,11 @@ test.describe('High Frequency Regression', () => {
         expect(cameraBindingPuts[0].bindings[0].exposureTimeUs).toBe(16000);
 
         await expect.poll(() => settingsPuts.length).toBe(1);
-        expect(settingsPuts[0].cameras[0].exposureTimeUs).toBe(16000);
+        expect(settingsPuts[0]).toEqual({ saveScope: 'cameras' });
         expect(plcSettingsPuts).toHaveLength(0);
     });
 
-    test('settings plc regression: save all preserves drafts across protocols', async ({ page }) => {
+    test('settings plc regression: scoped save preserves drafts across protocols', async ({ page }) => {
         const plcSettingsPuts: any[] = [];
         const settingsPuts: any[] = [];
 
@@ -658,11 +658,7 @@ test.describe('High Frequency Regression', () => {
         expect(plcSettingsPuts[0].mc.ipAddress).toBe('10.10.10.22');
         expect(plcSettingsPuts[0].mc.port).toBe(5003);
 
-        await expect.poll(() => settingsPuts.length).toBe(1);
-        expect(settingsPuts[0].communication.s7.ipAddress).toBe('10.10.10.11');
-        expect(settingsPuts[0].communication.s7.port).toBe(1102);
-        expect(settingsPuts[0].communication.mc.ipAddress).toBe('10.10.10.22');
-        expect(settingsPuts[0].communication.mc.port).toBe(5003);
+        expect(settingsPuts).toHaveLength(0);
     });
 
     test('continuous run regression: protection guidance is visible before and after continuous run', async ({ page }) => {
@@ -701,7 +697,7 @@ test.describe('High Frequency Regression', () => {
         await expect(page.locator('#sm-result-list')).toContainText('NG');
         await expect(page.locator('#sm-result-list')).toContainText('OK');
 
-        await page.locator('#sm-result-status-filter').selectOption('Ng');
+        await page.locator('#sm-result-status-filter').selectOption('ng');
 
         await expect(page.locator('#sm-results-meta')).toHaveText('1 条记录');
         await expect(page.locator('#sm-result-overview')).toContainText('总计 1');

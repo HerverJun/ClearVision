@@ -395,11 +395,7 @@ export class FlowEditorInteraction {
             }
         };
 
-        const canvasMouseLeaveHandler = () => {
-            if (this.isConnecting) {
-                this.cancelConnection();
-            }
-        };
+        const canvasMouseLeaveHandler = event => this.handleCanvasMouseLeave(event);
         this.canvas.canvas?.addEventListener('mouseleave', canvasMouseLeaveHandler);
         this.cleanup.push(() => {
             this.canvas.canvas?.removeEventListener('mouseleave', canvasMouseLeaveHandler);
@@ -638,6 +634,13 @@ export class FlowEditorInteraction {
 
         const node = this.getNodeAt(x, y);
         this.canvas.canvas.style.cursor = node ? 'grab' : 'default';
+    }
+
+    handleCanvasMouseLeave(event) {
+        const leftButtonHeld = (Number(event?.buttons) & 1) === 1;
+        if (this.isConnecting && !leftButtonHeld) {
+            this.cancelConnection();
+        }
     }
 
     /**

@@ -581,12 +581,19 @@ jobs:
             test_results/agent_engineering_harness/**/*.trx
             test_results/agent_engineering_harness/agent_ui_contract_output.txt
 
-      - name: Run UI Tests
+      - name: Run Legacy UI Tests
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
           npm run test:unit
           npm run test:preview-smoke
           npx playwright test
+
+      - name: Run StudioUI Browser Tests
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
+        env:
+          CV_UI_SCENARIO: studio-ui-next
+          CV_UI_PORT: 5177
+        run: npx playwright test
 
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4

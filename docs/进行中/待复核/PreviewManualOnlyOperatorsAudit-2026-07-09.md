@@ -232,4 +232,3 @@
 - PreviewNode/OperatorPreview admission 参数化测试：全量 AlwaysBlockedSideEffectTypes、`ResultOutput SaveToFile=true/false`、`ImageAcquisition camera/file`。
 - `/api/autotune/flow-node/preview` admission 测试：含上游 `ImageSave`/`HttpRequest`/PLC 节点时必须拒绝或 dry-run。
 - UI/E2E：自动预览 checkbox 开关、camera manual-required、no-image structured preview、恢复第一批算子的自动刷新截图。
-

@@ -40,6 +40,12 @@ process.env.CV_UI_HOST = host;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: isStudioUiNext
+    ? ['**/studio-ui-next/**/*.spec.ts']
+    : ['**/*.spec.ts'],
+  testIgnore: isStudioUiNext
+    ? []
+    : ['**/studio-ui-next/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

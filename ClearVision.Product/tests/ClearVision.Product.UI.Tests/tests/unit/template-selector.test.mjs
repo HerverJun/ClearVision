@@ -810,3 +810,25 @@ test('FlowEditorInteraction enhanced drag advances the canonical flow revision o
   assert.equal(interaction.canvas.draggedNode, null);
   assert.equal(interaction.isDraggingNodes, false);
 });
+
+test('FlowEditorInteraction preserves a dragged connection across mouseleave until the left button is released', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  let canceled = 0;
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.isConnecting = true;
+  interaction.cancelConnection = () => {
+    canceled += 1;
+    interaction.isConnecting = false;
+  };
+
+  interaction.handleCanvasMouseLeave({ buttons: 1 });
+  assert.equal(canceled, 0);
+  assert.equal(interaction.isConnecting, true);
+
+  interaction.handleCanvasMouseLeave({ buttons: 0 });
+  assert.equal(canceled, 1);
+  assert.equal(interaction.isConnecting, false);
+});

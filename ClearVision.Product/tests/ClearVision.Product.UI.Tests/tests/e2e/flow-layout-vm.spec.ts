@@ -160,6 +160,16 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
     });
   });
 
+  await page.route('**/api/inspection/decision-configuration/validate', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      isValid: false,
+      issues: [{ code: 'DECISION_BINDING_REQUIRED', message: 'A final decision binding is required.' }],
+      eligibleOutputs: [],
+    }),
+  }));
+
   await page.route('**/api/operators/library', async route => {
     await route.fulfill({
       status: 200,
@@ -393,6 +403,59 @@ async function getPixelProbeGeometry(page: Page): Promise<PixelProbeGeometry> {
       naturalHeight,
     };
   });
+}
+
+async function stabilizePixelProbeStage(page: Page): Promise<PixelProbeGeometry> {
+  const toastCloseButtons = page.locator('.cv-toast-close');
+  const toastCount = await toastCloseButtons.count();
+  for (let index = toastCount - 1; index >= 0; index -= 1) {
+    await toastCloseButtons.nth(index).click();
+  }
+  await expect(page.locator('.cv-toast')).toHaveCount(0);
+
+  const stage = page.locator('#preview-panel .preview-capability-image-stage');
+  await expect(stage).toBeVisible();
+  await stage.evaluate(element => {
+    const stageElement = element as HTMLElement;
+    stageElement.style.width = '300px';
+    stageElement.style.height = '300px';
+    stageElement.style.minHeight = '0';
+    stageElement.style.maxHeight = 'none';
+  });
+
+  const image = stage.locator('img');
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate(element => ({
+    complete: (element as HTMLImageElement).complete,
+    width: (element as HTMLImageElement).naturalWidth,
+    height: (element as HTMLImageElement).naturalHeight,
+  }))).toEqual({ complete: true, width: 64, height: 48 });
+  await image.scrollIntoViewIfNeeded();
+
+  const geometry = await getPixelProbeGeometry(page);
+  const hitPoint = pointInPixelProbeImage(geometry, 0.5, 0.5);
+  const hitDiagnostic = await page.evaluate(point => {
+    const target = document.elementFromPoint(point.x, point.y);
+    const stageElement = document.querySelector('#preview-panel .preview-capability-image-stage');
+    const imageElement = stageElement?.querySelector('img');
+    const serializeRect = (element: Element | null) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    };
+    return {
+      hitsStage: Boolean(target?.closest?.('#preview-panel .preview-capability-image-stage')),
+      target: target
+        ? `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ''}${target.classList.length ? `.${Array.from(target.classList).join('.')}` : ''}`
+        : null,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      stage: serializeRect(stageElement),
+      image: serializeRect(imageElement),
+      point,
+    };
+  }, hitPoint);
+  expect(hitDiagnostic.hitsStage, JSON.stringify(hitDiagnostic)).toBe(true);
+  return geometry;
 }
 
 function pointInPixelProbeImage(geometry: PixelProbeGeometry, xRatio: number, yRatio: number) {
@@ -854,20 +917,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
       };
     });
 
-    await page.evaluate(() => {
-      const stage = document.querySelector('#preview-panel .preview-capability-image-stage') as HTMLElement | null;
-      if (!stage) {
-        throw new Error('Pixel probe stage is unavailable for fit-mode testing.');
-      }
-
-      stage.style.width = '300px';
-      stage.style.height = '300px';
-      stage.style.minHeight = '0';
-      stage.style.maxHeight = 'none';
-    });
-
-    await image.scrollIntoViewIfNeeded();
-    const fit = await getPixelProbeGeometry(page);
+    const fit = await stabilizePixelProbeStage(page);
     expect(fit.naturalWidth).toBe(64);
     expect(fit.naturalHeight).toBe(48);
     expect(fit.content.top - fit.image.top).toBeGreaterThan(1);
@@ -903,7 +953,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await workbench.locator('[data-preview-action="image-original"]').click();
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'original');
-    const original = await getPixelProbeGeometry(page);
+    const original = await stabilizePixelProbeStage(page);
     const originalPoint = pointInPixelProbeImage(original, 0.25, 0.25);
     await page.mouse.move(originalPoint.x, originalPoint.y);
     await expect(status).toHaveAttribute('data-probe-state', 'pixel');
@@ -911,7 +961,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await workbench.locator('[data-preview-action="image-fit"]').click();
     await expect(workbench.locator('.preview-capability-main-image')).toHaveAttribute('data-image-mode', 'fit');
-    const lockGeometry = await getPixelProbeGeometry(page);
+    const lockGeometry = await stabilizePixelProbeStage(page);
     const lockPoint = pointInPixelProbeImage(lockGeometry, 0.35, 0.35);
     const movedPoint = pointInPixelProbeImage(lockGeometry, 0.7, 0.7);
     await page.mouse.move(lockPoint.x, lockPoint.y);
@@ -961,7 +1011,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await page.evaluate(() => {
       (window as any).__pixelProbeCalls = 0;
     });
-    const switchedGeometry = await getPixelProbeGeometry(page);
+    const switchedGeometry = await stabilizePixelProbeStage(page);
     const switchedPoint = pointInPixelProbeImage(switchedGeometry, 0.5, 0.5);
     await page.mouse.move(switchedPoint.x, switchedPoint.y);
     await expect(status).toHaveAttribute('data-probe-state', 'pixel');
@@ -1104,7 +1154,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await expect(status).toContainText('参数已更新');
   });
 
-  test('shows missing camera prerequisite for camera acquisition without CameraId', async ({ page }, testInfo) => {
+  test('shows the canonical CameraId prerequisite while keeping CameraBindingId as a compatible alias', async ({ page }, testInfo) => {
     await openInputFlyout(page);
     await page.locator('#operator-group-flyout .operator-flyout-item', { hasText: '图像采集' }).click();
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
@@ -1115,12 +1165,12 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     const workbench = page.locator('.preview-workbench-pane');
     const cameraGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraId"]');
     const cameraBindingGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraBindingId"]');
-    const cameraErrors = page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机或相机绑定' });
-    await expect(cameraErrors).toHaveCount(2);
+    const cameraErrors = page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机' });
+    await expect(cameraErrors).toHaveCount(1);
     await expect(cameraGroup).toHaveClass(/invalid/);
-    await expect(cameraBindingGroup).toHaveClass(/invalid/);
+    await expect(cameraBindingGroup).not.toHaveClass(/invalid/);
     await expect(page.locator('.inspector-pane #param-CameraId')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.inspector-pane #param-CameraBindingId')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('.inspector-pane #param-CameraBindingId')).not.toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数校验失败');
     await expect(workbench).toContainText('请先选择相机');
     await expect(workbench).toContainText('缺输入图或采集源');
@@ -1133,8 +1183,10 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await page.locator('.inspector-pane #param-CameraBindingId').fill('line-camera-01');
     await page.locator('.inspector-pane #param-CameraBindingId').blur();
 
-    await expect(page.locator('.inspector-pane .validation-error')).toHaveCount(0);
-    await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数已更新');
+    await expect(cameraErrors).toHaveCount(1);
+    await expect(cameraGroup).toHaveClass(/invalid/);
+    await expect(cameraBindingGroup).not.toHaveClass(/invalid/);
+    await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数校验失败');
     await expect(workbench).toContainText('需手动预览');
     await expect(workbench).not.toContainText('请先选择相机');
     await expect(workbench).not.toContainText('刷新预览');

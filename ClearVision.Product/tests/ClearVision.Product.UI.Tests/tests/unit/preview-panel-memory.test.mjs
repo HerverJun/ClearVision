@@ -1854,7 +1854,7 @@ test('PreviewPanelCapabilityOwner ignores manual preview rejections after a term
   await new Promise(resolve => setTimeout(resolve, 0));
 
   assert.deepEqual(toasts, []);
-  assert.match(harness.container.innerHTML, /预览完成|棰勮瀹屾垚/);
+  assert.match(harness.container.innerHTML, /预览完成|\u68F0\u52EE\uE74D\u7039\u5C7E\u579A/);
 
   owner.dispose();
 });
