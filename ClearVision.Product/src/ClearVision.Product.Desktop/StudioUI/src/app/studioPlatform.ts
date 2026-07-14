@@ -5,10 +5,12 @@ import {
   type ApiTransport
 } from '@/platform/api';
 import {
+  createBrowserHostFake,
   createWebView2HostAdapter,
   type StudioHostAdapter
 } from '@/platform/host';
 import {
+  readBrowserTestStudioStartupConfig,
   readDesktopStudioStartupConfig,
   type StudioStartupConfigV1,
   type StudioStartupWindow
@@ -139,6 +141,49 @@ export function createDesktopStudioPlatform(
     host.dispose();
     throw error;
   }
+}
+
+export function createBrowserTestStudioPlatform(
+  runtimeWindow: DesktopStudioRuntimeWindow
+): StudioPlatform {
+  const startup = readBrowserTestStudioStartupConfig(
+    runtimeWindow.__CLEARVISION_STARTUP__,
+    { pageOrigin: runtimeWindow.location.origin }
+  );
+  const tokenProvider = createSessionTokenProvider(runtimeWindow);
+  const host = createBrowserHostFake();
+
+  try {
+    const api = createApiTransport({
+      apiBaseUrl: startup.apiBaseUrl,
+      expectedOrigin: runtimeWindow.location.origin,
+      tokenProvider
+    });
+
+    return createStudioPlatform({
+      startup,
+      host,
+      api,
+      tokenProvider
+    });
+  } catch (error) {
+    host.dispose();
+    throw error;
+  }
+}
+
+function isExplicitBrowserTestStartup(candidate: unknown): boolean {
+  return typeof candidate === 'object' &&
+    candidate !== null &&
+    Reflect.get(candidate, 'hostKind') === 'browser-test';
+}
+
+export function createRuntimeStudioPlatform(
+  runtimeWindow: DesktopStudioRuntimeWindow = window as unknown as DesktopStudioRuntimeWindow
+): StudioPlatform {
+  return isExplicitBrowserTestStartup(runtimeWindow.__CLEARVISION_STARTUP__)
+    ? createBrowserTestStudioPlatform(runtimeWindow)
+    : createDesktopStudioPlatform(runtimeWindow);
 }
 
 export function useStudioPlatform(): StudioPlatform {

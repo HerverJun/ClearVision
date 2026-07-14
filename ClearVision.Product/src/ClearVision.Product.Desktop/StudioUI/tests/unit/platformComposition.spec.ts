@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createRuntimeStudioPlatform,
   createStudioPlatform,
   StudioPlatformConfigurationError
 } from '@/app/studioPlatform';
@@ -20,6 +21,32 @@ function createApi(apiBaseUrl: string): ApiTransport {
 }
 
 describe('StudioPlatform composition', () => {
+  it('selects the explicit browser-test composition without a WebView2 shim', () => {
+    const platform = createRuntimeStudioPlatform({
+      location: { origin: 'http://127.0.0.1:5177' },
+      sessionStorage: {
+        getItem(key: string) {
+          return key === 'cv_auth_token' ? 'browser-token' : null;
+        }
+      },
+      __CLEARVISION_STARTUP__: {
+        schemaVersion: 1,
+        uiKind: 'studio-ui',
+        hostKind: 'browser-test',
+        apiBaseUrl: 'http://127.0.0.1:5177/api',
+        studioUiBasePath: '/studio/',
+        featureFlags: {}
+      }
+    });
+
+    expect(platform.startup.hostKind).toBe('browser-test');
+    expect(platform.host.kind).toBe('browser-fake');
+    expect(platform.hasToken()).toBe(true);
+
+    platform.dispose();
+    expect(platform.host.getDiagnostics().disposed).toBe(true);
+  });
+
   it('owns the explicit browser-test Host/API pair and disposes it idempotently', () => {
     const startup = readBrowserTestStudioStartupConfig({
       schemaVersion: 1,

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 const noProxyEntries = new Set(
@@ -9,6 +10,34 @@ const noProxyEntries = new Set(
 process.env.NO_PROXY = Array.from(noProxyEntries).join(',');
 process.env.no_proxy = process.env.NO_PROXY;
 
+const scenario = process.env.CV_UI_SCENARIO?.trim() || 'legacy';
+const isStudioUiNext = scenario === 'studio-ui-next';
+const host = '127.0.0.1';
+const defaultPort = isStudioUiNext ? 5177 : 5000;
+const parsedPort = Number.parseInt(process.env.CV_UI_PORT ?? '', 10);
+const port = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
+  ? parsedPort
+  : defaultPort;
+const configuredBaseUrl = process.env.CV_UI_BASE_URL?.trim();
+const origin = configuredBaseUrl
+  ? new URL(configuredBaseUrl).origin
+  : 'http://' + host + ':' + port;
+const readyPath = isStudioUiNext
+  ? '/studio/index.html'
+  : '/index.html';
+const defaultLegacyWebRoot = resolve(
+  __dirname,
+  '../../src/ClearVision.Product.Desktop/wwwroot'
+);
+const webRoot = process.env.CV_UI_WEB_ROOT?.trim() ||
+  (isStudioUiNext ? '' : defaultLegacyWebRoot);
+const serverCommand = isStudioUiNext
+  ? 'node ./tests/support/studio-ui-next-server.cjs'
+  : 'node ./node_modules/http-server/bin/http-server "' + webRoot +
+    '" -p ' + port + ' -a ' + host;
+process.env.CV_UI_PORT = String(port);
+process.env.CV_UI_HOST = host;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -17,7 +46,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://127.0.0.1:5000',
+    baseURL: origin,
     trace: 'on-first-retry',
   },
   projects: [
@@ -26,10 +55,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'node ./node_modules/http-server/bin/http-server ../../src/ClearVision.Product.Desktop/wwwroot -p 5000 -a 127.0.0.1',
-    url: 'http://127.0.0.1:5000/index.html',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer: configuredBaseUrl
+    ? undefined
+    : {
+        command: serverCommand,
+        url: origin + readyPath,
+        reuseExistingServer: !process.env.CI && !isStudioUiNext,
+        timeout: 180 * 1000,
+      },
 });

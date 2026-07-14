@@ -1,7 +1,7 @@
 :root {
-  color: #1f2937;
-  background: #f3f4f6;
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: var(--cv-text-primary);
+  background: var(--cv-surface-app);
+  font-family: var(--cv-font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -19,19 +19,37 @@ body,
 
 body {
   min-width: 320px;
+  background:
+    radial-gradient(circle at 20% -10%, var(--cv-color-brand-soft), transparent 34rem),
+    var(--cv-surface-app);
+  color: var(--cv-text-primary);
 }
 
 a {
-  color: #1d4ed8;
+  color: var(--cv-color-brand-600);
+}
+
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cv-focus-ring-color);
+  outline-offset: 2px;
 }
 
 .foundation-page {
   width: min(760px, calc(100% - 32px));
   margin: 32px auto;
   padding: 24px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--cv-border-default);
+  border-radius: var(--cv-radius-md);
+  background: var(--cv-surface-1);
+  box-shadow: var(--cv-elevation-1);
 }
 
 .foundation-page h1 {
@@ -65,8 +83,19 @@ a {
 .bootstrap-diagnostic pre {
   overflow: auto;
   padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #f9fafb;
+  border: 1px solid var(--cv-border-default);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-2);
   white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

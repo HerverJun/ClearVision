@@ -5,6 +5,7 @@ import App from '@/app/App.vue';
 import { createStudioRouter } from '@/app/router';
 import {
   createDesktopStudioPlatform,
+  createRuntimeStudioPlatform,
   studioPlatformKey,
   type DesktopStudioRuntimeWindow,
   type StudioPlatform
@@ -79,6 +80,17 @@ export async function mountDesktopStudioApp(
   options: MountDesktopStudioAppOptions = {}
 ): Promise<MountedStudioApp> {
   const platform = createDesktopStudioPlatform(options.runtimeWindow);
+  return mountStudioApp(target, {
+    platform,
+    ...(options.router ? { router: options.router } : {})
+  });
+}
+
+export async function mountRuntimeStudioApp(
+  target: string | Element,
+  options: MountDesktopStudioAppOptions = {}
+): Promise<MountedStudioApp> {
+  const platform = createRuntimeStudioPlatform(options.runtimeWindow);
   return mountStudioApp(target, {
     platform,
     ...(options.router ? { router: options.router } : {})
