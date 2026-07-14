@@ -4,12 +4,29 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vitest/config';
 
 const studioUiRoot = fileURLToPath(new URL('.', import.meta.url));
+const desktopRoot = resolve(studioUiRoot, '..');
 
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': resolve(studioUiRoot, 'src')
+      '@': resolve(studioUiRoot, 'src'),
+      '@clearvision/canonical-flow-canvas': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'core',
+        'canvas',
+        'flowCanvasAdapter.js'
+      ),
+      '@clearvision/canonical-flow-interaction': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'features',
+        'flow-editor',
+        'flowEditorInteraction.js'
+      )
     }
   },
   define: {

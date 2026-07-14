@@ -775,3 +775,38 @@ test('FlowEditorInteraction deleteSelectedItems ignores refused node deletion', 
   assert.equal(interaction.history.length, 0);
   assert.deepEqual(selectedPayloads, []);
 });
+
+test('FlowEditorInteraction enhanced drag advances the canonical flow revision once', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  const reasons = [];
+  let saved = 0;
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.isDraggingNodes = true;
+  interaction.dragStartPos = { x: 1, y: 2 };
+  interaction.dragInitialPositions = new Map([['node-a', { x: 10, y: 20 }]]);
+  interaction.hasNodeDragMoved = true;
+  interaction.canvas = {
+    draggedNode: 'node-a',
+    canvas: { style: {} },
+    markFlowStructureChanged(reason) {
+      reasons.push(reason);
+    },
+    notifyViewStateChanged() {},
+    invalidate() {},
+    _markNodesBoundsDirty() {}
+  };
+  interaction.syncCursorToPointer = () => {};
+  interaction.saveState = () => {
+    saved += 1;
+  };
+
+  interaction.endNodeDrag();
+
+  assert.deepEqual(reasons, ['moveNode']);
+  assert.equal(saved, 1);
+  assert.equal(interaction.canvas.draggedNode, null);
+  assert.equal(interaction.isDraggingNodes, false);
+});

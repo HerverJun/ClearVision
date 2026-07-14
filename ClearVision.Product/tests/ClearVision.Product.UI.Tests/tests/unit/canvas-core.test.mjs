@@ -81,6 +81,7 @@ function createMockCanvas() {
 }
 
 function createMockDocument(canvas) {
+  const events = {};
   return {
     getElementById(id) {
       return canvas;
@@ -155,16 +156,30 @@ function createMockDocument(canvas) {
     head: {
       appendChild() {}
     },
-    addEventListener() {},
-    removeEventListener() {}
+    addEventListener(type, fn) {
+      (events[type] ||= []).push(fn);
+    },
+    removeEventListener(type, fn) {
+      if (events[type]) {
+        events[type] = events[type].filter(candidate => candidate !== fn);
+      }
+    },
+    _events: events
   };
 }
 
 function createMockWindow(canvas) {
+  const events = {};
   return {
     devicePixelRatio: 1,
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, fn) {
+      (events[type] ||= []).push(fn);
+    },
+    removeEventListener(type, fn) {
+      if (events[type]) {
+        events[type] = events[type].filter(candidate => candidate !== fn);
+      }
+    },
     requestAnimationFrame(fn) {
       return setTimeout(fn, 16);
     },
@@ -174,7 +189,8 @@ function createMockWindow(canvas) {
     ResizeObserver: class MockResizeObserver {
       observe() {}
       disconnect() {}
-    }
+    },
+    _events: events
   };
 }
 
@@ -1172,6 +1188,32 @@ test('createHostedFlowCanvasAdapter ignores stale dispose from an old hosted ins
   assert.equal(canvas._events.mousedown.length, 1, 'stale dispose must not create a second FlowCanvas');
 
   second.dispose();
+});
+
+test('FlowCanvas destroy cancels deferred menu listeners and global pointer release', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  const documentMock = createMockDocument(canvas);
+  const windowMock = createMockWindow(canvas);
+  global.document = documentMock;
+  global.window = windowMock;
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('Thresholding', 20, 20, {
+    inputs: [{ id: 'in-image', name: 'Image', type: 'Image' }],
+    outputs: [{ id: 'out-image', name: 'Image', type: 'Image' }]
+  });
+  fc.showNodeContextMenu(20, 20, node.id);
+  fc.destroy();
+  fc.destroy();
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(documentMock._events.click?.length ?? 0, 0);
+  assert.equal(windowMock._events.mouseup?.length ?? 0, 0);
 });
 
 // =============================================================================

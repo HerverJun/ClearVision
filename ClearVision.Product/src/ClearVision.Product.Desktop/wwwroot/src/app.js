@@ -68,6 +68,7 @@ import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
 import FlowCanvas from './core/canvas/flowCanvas.js';
 import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteraction.js';
+import TemplateSelector from './features/flow-editor/templateSelector.js';
 import FinalDecisionPanel from './features/flow-editor/finalDecisionPanel.js';
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
@@ -2022,7 +2023,10 @@ async function initializeFlowEditor() {
         }
     };
 
-    flowEditorInteraction = new FlowEditorInteraction(flowCanvas, { projectManager });
+    flowEditorInteraction = new FlowEditorInteraction(flowCanvas, {
+        projectManager,
+        templateSelectorFactory: (canvas, options) => new TemplateSelector(canvas, options)
+    });
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
     finalDecisionPanel = new FinalDecisionPanel(flowCanvas);
     serviceRegistry.register('finalDecisionPanel', finalDecisionPanel);

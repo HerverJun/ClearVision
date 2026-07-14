@@ -141,6 +141,7 @@ class FlowCanvas {
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
         this._mouseUpHandler = this.handleMouseUp.bind(this);
+        this._windowMouseUpHandler = event => this.handleMouseUp(event);
         this._mouseLeaveHandler = () => this.setHoveredPort(null);
         this._wheelHandler = this.handleWheel.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
@@ -151,6 +152,7 @@ class FlowCanvas {
 
         // 绘制调度状态。
         this._animationFrameId = null;
+        this._isDestroyed = false;
         this._dirty = true; // 初始需要绘制
         this._lastFrameTime = 0; // 上一帧时间
         this._isPaused = false;      // 页面隐藏时暂停绘制
@@ -186,6 +188,7 @@ class FlowCanvas {
         // 右键菜单
         this.contextMenu = null;
         this._clickOutsideHandler = this.hideContextMenu.bind(this);
+        this._contextMenuOpenTimer = null;
         this._portTooltip = null;
         this._portTooltipId = `${this.canvas.id || 'flow-canvas'}-port-tooltip`;
         this._baseCanvasAriaLabel = '流程编辑画布';
@@ -234,6 +237,7 @@ class FlowCanvas {
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
         window.addEventListener('keydown', this._keyDownHandler);
+        window.addEventListener('mouseup', this._windowMouseUpHandler);
 
         document.addEventListener('visibilitychange', this._visibilityHandler);
 
@@ -313,6 +317,11 @@ class FlowCanvas {
      * Encoding cleanup: previous comment text was unreadable.
      */
     destroy() {
+        if (this._isDestroyed) {
+            return;
+        }
+
+        this._isDestroyed = true;
         if (this._animationFrameId !== null) {
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
@@ -330,6 +339,7 @@ class FlowCanvas {
         }
 
         window.removeEventListener('keydown', this._keyDownHandler);
+        window.removeEventListener('mouseup', this._windowMouseUpHandler);
         document.removeEventListener('visibilitychange', this._visibilityHandler);
         this._themeObserver?.disconnect?.();
         this._themeObserver = null;
@@ -2691,6 +2701,10 @@ class FlowCanvas {
      * 显示节点右键菜单
      */
     showNodeContextMenu(x, y, nodeId) {
+        if (this._isDestroyed) {
+            return;
+        }
+
         this.hideContextMenu();
 
         const node = this.nodes.get(nodeId);
@@ -2756,12 +2770,19 @@ class FlowCanvas {
         }
 
         // Click outside to close the menu
-        setTimeout(() => {
-            document.addEventListener('click', this._clickOutsideHandler);
+        this._contextMenuOpenTimer = setTimeout(() => {
+            this._contextMenuOpenTimer = null;
+            if (!this._isDestroyed && this.contextMenu === menu) {
+                document.addEventListener('click', this._clickOutsideHandler);
+            }
         }, 0);
     }
 
     hideContextMenu() {
+        if (this._contextMenuOpenTimer !== null) {
+            clearTimeout(this._contextMenuOpenTimer);
+            this._contextMenuOpenTimer = null;
+        }
         if (this.contextMenu) {
             this.contextMenu.remove();
             this.contextMenu = null;

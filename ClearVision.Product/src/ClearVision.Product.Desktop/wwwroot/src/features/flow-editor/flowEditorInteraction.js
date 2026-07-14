@@ -6,12 +6,12 @@
 import { showToast } from '../../shared/components/uiComponents.js';
 import { buildOperatorNodeConfig } from '../../shared/operatorVisuals.js';
 import debugLogger from '../../core/logging/debugLogger.js';
-import TemplateSelector from './templateSelector.js';
 
 export class FlowEditorInteraction {
     constructor(flowCanvas, options = {}) {
         this.canvas = flowCanvas;
         this.projectManager = options.projectManager || null;
+        this.templateSelectorFactory = options.templateSelectorFactory || null;
         this.isConnecting = false;
         this.connectionStart = null;
         this.connectionEnd = null;
@@ -36,6 +36,7 @@ export class FlowEditorInteraction {
         this.cleanup = [];
         this.originalCanvasHandlers = null;
         this.viewStateNotifyRaf = null;
+        this.disposed = false;
 
         this.initialize();
     }
@@ -57,6 +58,13 @@ export class FlowEditorInteraction {
     }
 
     destroy() {
+        if (this.disposed) {
+            return;
+        }
+
+        this.disposed = true;
+        this.resetTransientInteractionAfterRestore();
+
         if (this.viewStateNotifyRaf !== null) {
             cancelAnimationFrame(this.viewStateNotifyRaf);
             this.viewStateNotifyRaf = null;
@@ -95,7 +103,11 @@ export class FlowEditorInteraction {
      * 初始化模板选择器
      */
     initializeTemplateSelector() {
-        this.templateSelector = new TemplateSelector(this.canvas, {
+        if (typeof this.templateSelectorFactory !== 'function') {
+            return;
+        }
+
+        this.templateSelector = this.templateSelectorFactory(this.canvas, {
             onApplied: (payload) => this.handleTemplateApplied(payload)
         });
 
@@ -383,6 +395,16 @@ export class FlowEditorInteraction {
             }
         };
 
+        const canvasMouseLeaveHandler = () => {
+            if (this.isConnecting) {
+                this.cancelConnection();
+            }
+        };
+        this.canvas.canvas?.addEventListener('mouseleave', canvasMouseLeaveHandler);
+        this.cleanup.push(() => {
+            this.canvas.canvas?.removeEventListener('mouseleave', canvasMouseLeaveHandler);
+        });
+
         // 重新绑定事件监听，确保包装后的处理器生效
         if (this.canvas.canvas && this.canvas._mouseDownHandler && this.canvas._mouseMoveHandler && this.canvas._mouseUpHandler) {
             this.canvas.canvas.removeEventListener('mousedown', this.canvas._mouseDownHandler);
@@ -593,6 +615,7 @@ export class FlowEditorInteraction {
         this.canvas.notifyViewStateChanged?.();
 
         if (shouldSave) {
+            this.canvas.markFlowStructureChanged?.('moveNode');
             this.saveState();
         }
     }

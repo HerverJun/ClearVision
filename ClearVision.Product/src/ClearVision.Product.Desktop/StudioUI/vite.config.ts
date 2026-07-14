@@ -6,6 +6,22 @@ import { defineConfig } from 'vite';
 const studioUiBasePath = '/studio/';
 const studioUiRoot = fileURLToPath(new URL('.', import.meta.url));
 const desktopRoot = resolve(studioUiRoot, '..');
+const canonicalFlowCanvasAdapter = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'core',
+  'canvas',
+  'flowCanvasAdapter.js'
+);
+const canonicalFlowEditorInteraction = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'features',
+  'flow-editor',
+  'flowEditorInteraction.js'
+);
 
 function resolveOutputDirectory(): string {
   const injectedOutput = process.env.VITE_OUT_DIR?.trim();
@@ -23,7 +39,9 @@ export default defineConfig(({ mode }) => ({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': resolve(studioUiRoot, 'src')
+      '@': resolve(studioUiRoot, 'src'),
+      '@clearvision/canonical-flow-canvas': canonicalFlowCanvasAdapter,
+      '@clearvision/canonical-flow-interaction': canonicalFlowEditorInteraction
     }
   },
   define: {
