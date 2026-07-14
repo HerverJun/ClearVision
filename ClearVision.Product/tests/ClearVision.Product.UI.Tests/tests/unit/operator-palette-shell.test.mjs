@@ -121,6 +121,61 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
       keywords: ['ROI跟踪']
     },
     {
+      type: 'PositionCorrection',
+      displayName: 'ROI位姿补偿（像素）',
+      keywords: ['位置修正']
+    },
+    {
+      type: 'PointCorrection',
+      displayName: '点位刚性补偿',
+      keywords: ['点位修正']
+    },
+    {
+      type: 'EdgePairDefect',
+      displayName: '边缘间距缺陷检测',
+      keywords: ['边缘对缺陷']
+    },
+    {
+      type: 'StatisticalOutlierRemoval',
+      displayName: '点云统计离群点去除（SOR）',
+      keywords: ['统计滤波']
+    },
+    {
+      type: 'PPFMatch',
+      displayName: 'PPF点云粗匹配',
+      keywords: ['PPF表面匹配']
+    },
+    {
+      type: 'PlanarMatching',
+      displayName: '平面特征匹配',
+      keywords: ['透视匹配', 'Planar Matching']
+    },
+    {
+      type: 'ColorDetection',
+      displayName: '颜色分析',
+      keywords: ['颜色检测']
+    },
+    {
+      type: 'GeometricTolerance',
+      displayName: '二维几何公差判定',
+      keywords: ['几何公差']
+    },
+    {
+      type: 'DetectionSequenceJudge',
+      displayName: '检测顺序判定',
+      keywords: ['线序判定', '序列判定']
+    },
+    {
+      type: 'ImageDiff',
+      displayName: '图像差异率分析',
+      keywords: ['图像对比']
+    },
+    {
+      type: 'RectangleRegion',
+      displayName: '矩形框定义',
+      keywords: ['矩形区域']
+    },
+    {
       type: 'CoordinateTransform',
       displayName: '像素到物理坐标（单点）',
       keywords: ['坐标转换', 'Coordinate Transform']
@@ -158,7 +213,7 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
     {
       type: 'PhaseClosure',
       displayName: '相位解缠绕',
-      keywords: ['Phase Closure']
+      keywords: ['Phase Closure', '相位闭合']
     }
   ];
 
@@ -166,14 +221,29 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
     ['连通域标注', 'BlobLabeling'],
     ['点位对齐', 'PointAlignment'],
     ['ROI跟踪', 'RoiTransform'],
+    ['位置修正', 'PositionCorrection'],
+    ['点位修正', 'PointCorrection'],
+    ['边缘对缺陷', 'EdgePairDefect'],
+    ['统计滤波', 'StatisticalOutlierRemoval'],
+    ['PPF表面匹配', 'PPFMatch'],
+    ['透视匹配', 'PlanarMatching'],
+    ['Planar Matching', 'PlanarMatching'],
+    ['颜色检测', 'ColorDetection'],
+    ['几何公差', 'GeometricTolerance'],
+    ['线序判定', 'DetectionSequenceJudge'],
+    ['序列判定', 'DetectionSequenceJudge'],
+    ['图像对比', 'ImageDiff'],
+    ['矩形区域', 'RectangleRegion'],
     ['坐标转换', 'CoordinateTransform'],
+    ['Coordinate Transform', 'CoordinateTransform'],
     ['ROI管理器', 'RoiManager'],
     ['异常捕获', 'TryCatch'],
     ['Modbus通信', 'ModbusCommunication'],
     ['二值化', 'Thresholding'],
     ['一维FFT', 'FFT1D'],
     ['一维逆FFT', 'InverseFFT1D'],
-    ['Phase Closure', 'PhaseClosure']
+    ['Phase Closure', 'PhaseClosure'],
+    ['相位闭合', 'PhaseClosure']
   ];
 
   for (const [legacyName, expectedType] of expectations) {
