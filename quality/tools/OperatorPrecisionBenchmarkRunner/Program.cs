@@ -222,7 +222,11 @@ internal sealed class OperatorPrecisionBenchmark
             CoresetRatio = 1.0,
             FeatureExtractorId = "onnx_embedding",
             EmbeddingModelId = "identity_2x2",
-            EmbeddingModelPath = modelPath
+            EmbeddingModelPath = modelPath,
+            EmbeddingManifestPath = _options.ManifestPath,
+            EmbeddingModelSha256 = HashBytes(File.ReadAllBytes(modelPath)),
+            PreprocessFingerprint = HashCanonicalJson(_manifest.RootElement.GetProperty("anomaly").GetProperty("preprocess")),
+            EmbeddingPreprocess = CreateBenchmarkPreprocessSpec(_manifest.RootElement.GetProperty("anomaly").GetProperty("preprocess"))
         };
 
         var trainingFeatures = training.Select(item => Extract(item.Image, useOnnx, featureOptions)).ToArray();
@@ -282,7 +286,11 @@ internal sealed class OperatorPrecisionBenchmark
             CoresetRatio = 1.0,
             FeatureExtractorId = "onnx_embedding",
             EmbeddingModelId = "identity_2x2",
-            EmbeddingModelPath = modelPath
+            EmbeddingModelPath = modelPath,
+            EmbeddingManifestPath = _options.ManifestPath,
+            EmbeddingModelSha256 = HashBytes(File.ReadAllBytes(modelPath)),
+            PreprocessFingerprint = fingerprint,
+            EmbeddingPreprocess = CreateBenchmarkPreprocessSpec(anomalyConfig.GetProperty("preprocess"))
         };
         var actual = OnnxPatchEmbeddingExtractor.ExtractEmbedding(image, options);
         using var expectedDocument = JsonDocument.Parse(File.ReadAllBytes(expectedPath));
@@ -533,6 +541,20 @@ internal sealed class OperatorPrecisionBenchmark
     {
         var canonical = JsonSerializer.Serialize(element, new JsonSerializerOptions { WriteIndented = false });
         return HashBytes(Encoding.UTF8.GetBytes(canonical));
+    }
+
+    private static AnomalyEmbeddingPreprocessSpec CreateBenchmarkPreprocessSpec(JsonElement element)
+    {
+        return new AnomalyEmbeddingPreprocessSpec(
+            element.GetProperty("resizeMode").GetString()!,
+            element.GetProperty("interpolation").GetString()!,
+            element.GetProperty("colorOrder").GetString()!,
+            element.GetProperty("scale").GetDouble(),
+            element.GetProperty("mean").EnumerateArray().Select(item => item.GetDouble()).ToArray(),
+            element.GetProperty("std").EnumerateArray().Select(item => item.GetDouble()).ToArray(),
+            element.GetProperty("tensorLayout").GetString()!,
+            element.GetProperty("inputDataType").GetString()!,
+            element.GetProperty("outputNormalization").GetString()!);
     }
 
     private void ValidateManifestHash(string actualSha)

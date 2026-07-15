@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenCvSharp;
@@ -19,6 +21,14 @@ public sealed class SimplePatchCoreOptions
     public string EmbeddingModelId { get; init; } = string.Empty;
 
     public string EmbeddingModelPath { get; init; } = string.Empty;
+
+    public string EmbeddingManifestPath { get; init; } = string.Empty;
+
+    public string EmbeddingModelSha256 { get; init; } = string.Empty;
+
+    public string PreprocessFingerprint { get; init; } = string.Empty;
+
+    public AnomalyEmbeddingPreprocessSpec? EmbeddingPreprocess { get; init; }
 }
 
 public sealed class SimplePatchCoreFeatureBank
@@ -49,6 +59,18 @@ public sealed class SimplePatchCoreFeatureBank
 
     [JsonPropertyName("embedding_model_path")]
     public string EmbeddingModelPath { get; init; } = string.Empty;
+
+    [JsonPropertyName("embedding_manifest_path")]
+    public string EmbeddingManifestPath { get; init; } = string.Empty;
+
+    [JsonPropertyName("embedding_model_sha256")]
+    public string EmbeddingModelSha256 { get; init; } = string.Empty;
+
+    [JsonPropertyName("preprocess_fingerprint")]
+    public string PreprocessFingerprint { get; init; } = string.Empty;
+
+    [JsonPropertyName("feature_bank_identity_sha256")]
+    public string FeatureBankIdentitySha256 { get; init; } = string.Empty;
 
     [JsonPropertyName("training_image_count")]
     public int TrainingImageCount { get; init; }
@@ -96,6 +118,7 @@ public static class SimplePatchCoreDetector
     {
         ArgumentNullException.ThrowIfNull(normalImages);
         ArgumentNullException.ThrowIfNull(options);
+        ValidateOnnxOptions(options);
 
         var allFeatures = new List<float[]>();
         var trainingImageCount = 0;
@@ -120,17 +143,22 @@ public static class SimplePatchCoreDetector
         var mean = distances.Count == 0 ? 0d : distances.Average();
         var variance = distances.Count == 0 ? 0d : distances.Average(x => Math.Pow(x - mean, 2));
 
+        var featureSchemaVersion = GetFeatureSchemaVersion(options);
         return new SimplePatchCoreFeatureBank
         {
             PatchSize = options.PatchSize,
             PatchStride = options.PatchStride,
             FeatureLength = selected[0].Length,
             Features = selected,
-            FeatureSchemaVersion = GetFeatureSchemaVersion(options),
+            FeatureSchemaVersion = featureSchemaVersion,
             Backbone = options.Backbone,
             FeatureExtractorId = options.FeatureExtractorId,
             EmbeddingModelId = options.EmbeddingModelId,
             EmbeddingModelPath = options.EmbeddingModelPath,
+            EmbeddingManifestPath = options.EmbeddingManifestPath,
+            EmbeddingModelSha256 = options.EmbeddingModelSha256,
+            PreprocessFingerprint = options.PreprocessFingerprint,
+            FeatureBankIdentitySha256 = ComputeFeatureBankIdentity(options, featureSchemaVersion),
             TrainingImageCount = trainingImageCount,
             MeanNearestDistance = mean,
             StdNearestDistance = Math.Sqrt(variance)
@@ -162,6 +190,7 @@ public static class SimplePatchCoreDetector
         }
 
         var options = CreateAnalysisOptions(bank, overrideOptions);
+        ValidateFeatureBankIdentity(bank, options);
 
         var patches = ExtractFeatures(image, options);
         if (patches.Count == 0)
@@ -247,8 +276,25 @@ public static class SimplePatchCoreDetector
         }
 
         var json = File.ReadAllText(resolved);
-        return JsonSerializer.Deserialize<SimplePatchCoreFeatureBank>(json, JsonOptions)
+        var bank = JsonSerializer.Deserialize<SimplePatchCoreFeatureBank>(json, JsonOptions)
             ?? throw new InvalidOperationException($"Failed to parse feature bank: {resolved}");
+        if (string.Equals(bank.FeatureExtractorId, "onnx_embedding", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(bank.EmbeddingModelSha256) ||
+                string.IsNullOrWhiteSpace(bank.PreprocessFingerprint) ||
+                string.IsNullOrWhiteSpace(bank.FeatureBankIdentitySha256))
+            {
+                throw new InvalidOperationException("ONNX feature bank identity is incomplete; model SHA, preprocessing fingerprint and bank identity are required.");
+            }
+
+            var expectedIdentity = ComputeFeatureBankIdentity(bank);
+            if (!string.Equals(expectedIdentity, bank.FeatureBankIdentitySha256, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("ONNX feature bank identity fingerprint does not match its serialized metadata.");
+            }
+        }
+
+        return bank;
     }
 
     private static List<PatchFeature> ExtractFeatures(Mat image, SimplePatchCoreOptions options)
@@ -327,7 +373,7 @@ public static class SimplePatchCoreDetector
 
         return extractorId switch
         {
-            "onnx_embedding" => "simple_patchcore:onnx_embedding:v1",
+            "onnx_embedding" => "simple_patchcore:onnx_embedding:v2",
             _ => "simple_patchcore:v3"
         };
     }
@@ -413,8 +459,76 @@ public static class SimplePatchCoreDetector
             Backbone = !string.IsNullOrWhiteSpace(overrideOptions?.Backbone) ? overrideOptions.Backbone : bank.Backbone,
             FeatureExtractorId = !string.IsNullOrWhiteSpace(overrideOptions?.FeatureExtractorId) ? overrideOptions.FeatureExtractorId : bank.FeatureExtractorId,
             EmbeddingModelId = !string.IsNullOrWhiteSpace(overrideOptions?.EmbeddingModelId) ? overrideOptions.EmbeddingModelId : bank.EmbeddingModelId,
-            EmbeddingModelPath = !string.IsNullOrWhiteSpace(overrideOptions?.EmbeddingModelPath) ? overrideOptions.EmbeddingModelPath : bank.EmbeddingModelPath
+            EmbeddingModelPath = !string.IsNullOrWhiteSpace(overrideOptions?.EmbeddingModelPath) ? overrideOptions.EmbeddingModelPath : bank.EmbeddingModelPath,
+            EmbeddingManifestPath = !string.IsNullOrWhiteSpace(overrideOptions?.EmbeddingManifestPath) ? overrideOptions.EmbeddingManifestPath : bank.EmbeddingManifestPath,
+            EmbeddingModelSha256 = !string.IsNullOrWhiteSpace(overrideOptions?.EmbeddingModelSha256) ? overrideOptions.EmbeddingModelSha256 : bank.EmbeddingModelSha256,
+            PreprocessFingerprint = !string.IsNullOrWhiteSpace(overrideOptions?.PreprocessFingerprint) ? overrideOptions.PreprocessFingerprint : bank.PreprocessFingerprint,
+            EmbeddingPreprocess = overrideOptions?.EmbeddingPreprocess
         };
+    }
+
+    private static void ValidateOnnxOptions(SimplePatchCoreOptions options)
+    {
+        if (!string.Equals(options.FeatureExtractorId?.Trim(), "onnx_embedding", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.EmbeddingModelPath) ||
+            string.IsNullOrWhiteSpace(options.EmbeddingManifestPath) ||
+            string.IsNullOrWhiteSpace(options.EmbeddingModelSha256) ||
+            string.IsNullOrWhiteSpace(options.PreprocessFingerprint) ||
+            options.EmbeddingPreprocess == null)
+        {
+            throw new InvalidOperationException("ONNX anomaly options must bind the model path, manifest path, model SHA, preprocessing fingerprint and complete preprocessing specification.");
+        }
+    }
+
+    private static void ValidateFeatureBankIdentity(SimplePatchCoreFeatureBank bank, SimplePatchCoreOptions options)
+    {
+        if (!string.Equals(bank.FeatureExtractorId, "onnx_embedding", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        ValidateOnnxOptions(options);
+        if (!string.Equals(bank.EmbeddingModelSha256, options.EmbeddingModelSha256, StringComparison.Ordinal) ||
+            !string.Equals(bank.PreprocessFingerprint, options.PreprocessFingerprint, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("ONNX feature bank identity does not match the resolved model/preprocessing identity.");
+        }
+    }
+
+    private static string ComputeFeatureBankIdentity(SimplePatchCoreOptions options, string featureSchemaVersion)
+    {
+        return HashIdentity(
+            options.PatchSize,
+            options.PatchStride,
+            featureSchemaVersion,
+            options.Backbone,
+            options.FeatureExtractorId,
+            options.EmbeddingModelId,
+            options.EmbeddingModelSha256,
+            options.PreprocessFingerprint);
+    }
+
+    private static string ComputeFeatureBankIdentity(SimplePatchCoreFeatureBank bank)
+    {
+        return HashIdentity(
+            bank.PatchSize,
+            bank.PatchStride,
+            bank.FeatureSchemaVersion,
+            bank.Backbone,
+            bank.FeatureExtractorId,
+            bank.EmbeddingModelId,
+            bank.EmbeddingModelSha256,
+            bank.PreprocessFingerprint);
+    }
+
+    private static string HashIdentity(params object?[] values)
+    {
+        var json = JsonSerializer.Serialize(values);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
     }
 
     private static List<float[]> SelectCoreset(IReadOnlyList<float[]> features, double ratio)

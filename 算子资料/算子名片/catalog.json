@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T21:48:42.7530282+08:00",
-  "generationFingerprint": "4D00E5ABBA76239610A0219EC7C952EF7C51CF232933007036B6A0988B619165",
+  "generatedAt": "2026-07-15T23:08:03.2424341+08:00",
+  "generationFingerprint": "4BAB09EDF8264030982C2B2E59B2E82DB871D1EBF861BCE0250A72F0023B4DD1",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -25459,7 +25459,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "A4BC37D12A8790F8E01756209E4E550C700B8F8467477886B39BFFB5411C677A",
+      "generationFingerprint": "19F42DCF9E24B8AFCAD21FC6DE39EB6FA972E9F6B87077C817B9F3DFC5621006",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -25995,7 +25995,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "FAE310F1643D0FBF65E653451BDBEE6A000011B02C28367773E84098527099D7",
+      "generationFingerprint": "D4674DF2C9FDE822EAC338F7F68DD3E6B146998CA4BD86E29ABC5E4F2BDD61FE",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -27859,7 +27859,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "482B52D14198906DA69394EE416E58F6EE0BE73F457864D75330B45490431F2C",
+      "generationFingerprint": "8854E9BC6026678980563445D0E8EEC5618770C55D36E73E45266CFCBFF18B90",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -33366,7 +33366,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
       ],
-      "generationFingerprint": "68B18DB0656B6EF186354C2FB9C793E6EFC9D379A7E0AF83CFDE8AEA1295101C",
+      "generationFingerprint": "63FA11AB5F580A7D313B4CDF2FB5A3C181EC7D7794BAF902014428D5C63A6300",
       "quality": {
         "totalScore": 100,
         "level": "A",

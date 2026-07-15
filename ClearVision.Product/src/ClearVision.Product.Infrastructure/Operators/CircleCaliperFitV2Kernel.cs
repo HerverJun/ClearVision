@@ -17,6 +17,13 @@ public enum CircleCaliperFitV2OutlierMode
     Huber = 2
 }
 
+public enum CircleCaliperFitV2RefinementLoss
+{
+    Legacy = 0,
+    Huber = 1,
+    Welsch = 2
+}
+
 public enum CircleCaliperFitV2FailureCode
 {
     None = 0,
@@ -58,6 +65,7 @@ public sealed record CircleCaliperFitV2Request
     public double MinCoverageRatio { get; init; } = 0.35;
     public double MinAngularCoverageDegrees { get; init; } = 180.0;
     public CircleCaliperFitV2OutlierMode OutlierMode { get; init; } = CircleCaliperFitV2OutlierMode.Mad;
+    public CircleCaliperFitV2RefinementLoss RefinementLoss { get; init; } = CircleCaliperFitV2RefinementLoss.Legacy;
     public double OutlierThreshold { get; init; } = 3.5;
     public int MaxOutlierIterations { get; init; } = 3;
     public double MaxResidualRmse { get; init; } = 2.0;
@@ -254,6 +262,7 @@ public static class CircleCaliperFitV2Kernel
 
         if (!Enum.IsDefined(request.EdgePolarity) ||
             !Enum.IsDefined(request.OutlierMode) ||
+            !Enum.IsDefined(request.RefinementLoss) ||
             request.EdgePolarity == CircleCaliperFitV2EdgePolarity.Auto && request.OutlierMode < CircleCaliperFitV2OutlierMode.None)
         {
             return Failure(CircleCaliperFitV2FailureCode.InvalidInput, "Enum inputs are outside the supported contract.", diagnostics: diagnostics);
@@ -453,6 +462,53 @@ public static class CircleCaliperFitV2Kernel
         var outliers = edgePoints
             .Where((_, index) => outlierSet.Contains(index))
             .ToList();
+
+        if (request.RefinementLoss != CircleCaliperFitV2RefinementLoss.Legacy)
+        {
+            var refinementLoss = request.RefinementLoss == CircleCaliperFitV2RefinementLoss.Welsch
+                ? GeometryRefinementLoss.Welsch
+                : GeometryRefinementLoss.Huber;
+            var refinement = GeometryRefinementKernel.RefineCircle(
+                inliers.Select(point => new Point2d(point.X, point.Y)).ToArray(),
+                currentFit.CenterX,
+                currentFit.CenterY,
+                currentFit.Radius,
+                refinementLoss,
+                maxIterations: Math.Max(8, request.MaxOutlierIterations * 6),
+                cancellationToken);
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.loss", $"Orthogonal {request.RefinementLoss} refinement.", (double)request.RefinementLoss));
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.converged", refinement.Converged ? "Orthogonal refinement converged." : "Orthogonal refinement reached its iteration limit.", refinement.Converged ? 1.0 : 0.0));
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.iterations", "Orthogonal refinement iterations.", refinement.Iterations));
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.degenerate", refinement.Degenerate ? "Refinement covariance is degenerate." : "Refinement covariance is finite.", refinement.Degenerate ? 1.0 : 0.0));
+
+            if (!refinement.Success || refinement.Degenerate)
+            {
+                return HypothesisEvaluation.FailWithEvidence(
+                    polarity,
+                    CircleCaliperFitV2FailureCode.DegenerateFit,
+                    $"Orthogonal {request.RefinementLoss} refinement failed: {refinement.FailureReason}",
+                    currentFit,
+                    edgePoints,
+                    inliers,
+                    outliers,
+                    diagnostics,
+                    (double)inliers.Count / request.CaliperCount,
+                    ComputeAngularCoverageDegrees(inliers),
+                    double.NaN,
+                    double.NaN,
+                    inliers.Count > 0 ? MeasurementStatisticsHelper.ComputeMedian(inliers.Select(static point => point.Strength).ToArray()) : double.NaN,
+                    profileEvidence);
+            }
+
+            currentFit = new CircleFit(true, refinement.CenterX, refinement.CenterY, refinement.Radius);
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.residualRmse", "Orthogonal refinement residual RMSE.", refinement.ResidualRmse));
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.robustScale", "Orthogonal refinement robust scale.", refinement.RobustScale));
+            diagnostics.Add(new CircleCaliperFitV2Diagnostic("refinement.covarianceCalibrated", "Covariance is an uncalibrated model estimate; phase-5 coverage benchmark did not approve confidence promotion.", 0.0));
+            for (var covarianceIndex = 0; covarianceIndex < refinement.Covariance.Count; covarianceIndex++)
+            {
+                diagnostics.Add(new CircleCaliperFitV2Diagnostic($"refinement.covariance.{covarianceIndex}", "Flattened [centerX, centerY, radius] covariance entry.", refinement.Covariance[covarianceIndex]));
+            }
+        }
         var (residualRmse, residualMax) = ComputeResidualStats(inliers, currentFit);
         var coverageRatio = (double)inliers.Count / request.CaliperCount;
         var angularCoverage = ComputeAngularCoverageDegrees(inliers);

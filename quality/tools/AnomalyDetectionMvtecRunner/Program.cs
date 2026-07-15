@@ -51,6 +51,9 @@ internal static class MvtecRunner
         var allocationBeforeAll = GC.GetTotalAllocatedBytes(precise: true);
         ValidateCaseIds(index, options);
         var embedding = ResolveEmbeddingModel(options);
+        var embeddingIdentity = embedding.Configured
+            ? AnomalyEmbeddingManifest.LoadAndValidate(options.EmbeddingManifestPath, embedding.Path)
+            : null;
 
         var selectedTestRecords = index.Records
             .Where(item => item.Split == "test")
@@ -85,7 +88,11 @@ internal static class MvtecRunner
                 Backbone = "simple_patchcore",
                 FeatureExtractorId = options.FeatureExtractorId,
                 EmbeddingModelId = embedding.ModelId,
-                EmbeddingModelPath = embedding.Path
+                EmbeddingModelPath = embedding.Path,
+                EmbeddingManifestPath = embeddingIdentity?.ManifestPath ?? string.Empty,
+                EmbeddingModelSha256 = embeddingIdentity?.ModelSha256 ?? string.Empty,
+                PreprocessFingerprint = embeddingIdentity?.PreprocessFingerprint ?? string.Empty,
+                EmbeddingPreprocess = embeddingIdentity?.Preprocess
             };
 
             var trainImages = new List<Mat>(trainRecords.Count);
@@ -506,6 +513,7 @@ internal sealed record RunnerOptions(
     string FeatureExtractorId,
     string EmbeddingModelPath,
     string EmbeddingModelId,
+    string EmbeddingManifestPath,
     string ModelCatalogPath,
     double MinImageAuroc,
     double MinPixelAuroc,
@@ -534,6 +542,7 @@ internal sealed record RunnerOptions(
             FeatureExtractorId: "lab_gradient_stats",
             EmbeddingModelPath: string.Empty,
             EmbeddingModelId: string.Empty,
+            EmbeddingManifestPath: string.Empty,
             ModelCatalogPath: string.Empty,
             MinImageAuroc: 0.5,
             MinPixelAuroc: 0.5,
@@ -579,6 +588,7 @@ internal sealed record RunnerOptions(
                     "--feature-extractor-id" => options with { FeatureExtractorId = NextValue() },
                     "--embedding-model" => options with { EmbeddingModelPath = NextValue() },
                     "--embedding-model-id" => options with { EmbeddingModelId = NextValue() },
+                    "--embedding-manifest" => options with { EmbeddingManifestPath = NextValue() },
                     "--model-catalog" => options with { ModelCatalogPath = NextValue() },
                     "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--min-pixel-auroc" => options with { MinPixelAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
@@ -635,6 +645,8 @@ internal sealed record RunnerOptions(
                                   External ONNX embedding model for FeatureExtractorId=onnx_embedding.
           --embedding-model-id <id>
                                   Model catalog id for FeatureExtractorId=onnx_embedding.
+          --embedding-manifest <path>
+                                  Required manifest with model SHA and complete preprocessing for onnx_embedding.
           --model-catalog <path>  Optional model catalog path for embedding model resolution.
           --min-image-auroc <float>
                                   Overall image AUROC release gate. Default: 0.5.

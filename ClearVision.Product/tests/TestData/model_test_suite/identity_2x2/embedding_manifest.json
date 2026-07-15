@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "2026-07-15.anomaly-embedding-model-manifest.v2",
+  "modelId": "anomaly_embedding_identity_2x2",
+  "modelSha256": "5ee8135365428e700eba8c3eb3cd66b0d6e697f9f5df9d23fcb931655378fc90",
+  "artifactPath": "identity_2x2.onnx",
+  "source": "Repository-generated 2x2 ONNX identity fixture for preprocessing contract tests.",
+  "license": "Repository test fixture; redistribution limited to this repository's license terms.",
+  "inputShape": [1, 3, 2, 2],
+  "outputShape": [1, 3, 2, 2],
+  "preprocess": {
+    "resizeMode": "stretch",
+    "interpolation": "linear",
+    "colorOrder": "RGB",
+    "scale": 0.00392156862745098,
+    "mean": [0.0, 0.0, 0.0],
+    "std": [1.0, 1.0, 1.0],
+    "tensorLayout": "NCHW",
+    "inputDataType": "float32",
+    "outputNormalization": "l2"
+  }
+}

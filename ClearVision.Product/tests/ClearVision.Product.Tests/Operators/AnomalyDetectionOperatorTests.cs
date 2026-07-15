@@ -268,6 +268,7 @@ public sealed class AnomalyDetectionOperatorTests
         var trainOp = CreateTrainOperator(featureBankPath);
         trainOp.AddParameter(TestHelpers.CreateParameter("FeatureExtractorId", "onnx_embedding", "string"));
         trainOp.AddParameter(TestHelpers.CreateParameter("EmbeddingModelPath", embeddingModelPath, "file"));
+        trainOp.AddParameter(TestHelpers.CreateParameter("EmbeddingManifestPath", ResolveEmbeddingManifestPath(), "file"));
         trainOp.AddParameter(TestHelpers.CreateParameter("PatchSize", 16, "int"));
         trainOp.AddParameter(TestHelpers.CreateParameter("PatchStride", 16, "int"));
 
@@ -286,6 +287,7 @@ public sealed class AnomalyDetectionOperatorTests
 
         var inferenceOp = CreateInferenceOperator(featureBankPath);
         inferenceOp.AddParameter(TestHelpers.CreateParameter("FeatureExtractorId", "onnx_embedding", "string"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("EmbeddingManifestPath", ResolveEmbeddingManifestPath(), "file"));
 
         using var defect = CreateUniformImage(new Scalar(90, 90, 90));
         var writable = defect.GetWritableMat();
@@ -312,6 +314,7 @@ public sealed class AnomalyDetectionOperatorTests
         trainOp.AddParameter(TestHelpers.CreateParameter("FeatureExtractorId", "onnx_embedding", "string"));
         trainOp.AddParameter(TestHelpers.CreateParameter("EmbeddingModelId", "anomaly_embedding_identity_2x2", "string"));
         trainOp.AddParameter(TestHelpers.CreateParameter("ModelCatalogPath", ResolveRepoPath("models/model_catalog.json"), "file"));
+        trainOp.AddParameter(TestHelpers.CreateParameter("EmbeddingManifestPath", ResolveEmbeddingManifestPath(), "file"));
         trainOp.AddParameter(TestHelpers.CreateParameter("PatchSize", 16, "int"));
         trainOp.AddParameter(TestHelpers.CreateParameter("PatchStride", 16, "int"));
 
@@ -331,6 +334,7 @@ public sealed class AnomalyDetectionOperatorTests
         inferenceOp.AddParameter(TestHelpers.CreateParameter("FeatureExtractorId", "onnx_embedding", "string"));
         inferenceOp.AddParameter(TestHelpers.CreateParameter("EmbeddingModelId", "anomaly_embedding_identity_2x2", "string"));
         inferenceOp.AddParameter(TestHelpers.CreateParameter("ModelCatalogPath", ResolveRepoPath("models/model_catalog.json"), "file"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("EmbeddingManifestPath", ResolveEmbeddingManifestPath(), "file"));
 
         using var defect = CreateUniformImage(new Scalar(80, 80, 80));
         var writable = defect.GetWritableMat();
@@ -405,6 +409,11 @@ public sealed class AnomalyDetectionOperatorTests
     private static string ResolveEmbeddingModelPath()
     {
         return ResolveRepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/identity_2x2.onnx");
+    }
+
+    private static string ResolveEmbeddingManifestPath()
+    {
+        return ResolveRepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/embedding_manifest.json");
     }
 
     private static string ResolveRepoPath(string relativePath)

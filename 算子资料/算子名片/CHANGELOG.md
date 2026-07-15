@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 21:48:42 +08:00`
+> 生成时间 / Generated At: `2026-07-15 23:08:03 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -259,6 +259,7 @@
 ### OperatorType.AnomalyDetection / 异常检测
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `63FA11AB5F58` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T17:25:56.0119276+08:00` | `68B18DB0656B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `4690F5AC1900` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `9FA2E91555A8` | `operator-runtime-metadata-v2` |
@@ -433,6 +434,7 @@
 ### OperatorType.CaliperTool / 卡尺工具
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `19F42DCF9E24` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `A4BC37D12A87` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `AC1D3782EBB9` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `CAC096F69FC0` | `legacy-source-only` |
@@ -474,6 +476,7 @@
 ### OperatorType.CircleMeasurement / 圆测量
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.2` | `2026-07-15T23:08:03.2424341+08:00` | `D4674DF2C9FD` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.2` | `2026-07-15T11:26:25.6098568+08:00` | `FAE310F1643D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.2` | `2026-07-14T15:07:23.3198726+08:00` | `19A167616B19` | `operator-runtime-metadata-v2` |
 | `1.1.2` | `2026-07-13T15:25:22.2877465+08:00` | `04243D79C2EE` | `legacy-source-only` |
@@ -1531,6 +1534,7 @@
 ### OperatorType.LineMeasurement / 直线测量
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `8854E9BC6026` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `482B52D14198` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `9AE084250AAE` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `1AF5ECC7EB11` | `legacy-source-only` |

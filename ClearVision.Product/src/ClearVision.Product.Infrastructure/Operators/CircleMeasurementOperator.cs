@@ -36,6 +36,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("OutlierPoints", "V2 离群点", PortDataType.PointList)]
 [OutputPort("CaliperDiagnostics", "V2 诊断", PortDataType.Any)]
 [OutputPort("CaliperProfileEvidence", "V2 profile evidence", PortDataType.Any)]
+[OutputPort("MeasurementEvidence", "测量证据", PortDataType.Any)]
 [OperatorParam("Method", "检测方法", "enum", DefaultValue = "HoughCircle", Options = new[] { "HoughCircle|霍夫圆", "FitEllipse|拟合椭圆", "CaliperFitV2|卡尺圆拟合 V2" })]
 [OperatorParam("MinRadius", "最小半径", "int", DefaultValue = 10, Min = 0)]
 [OperatorParam("MaxRadius", "最大半径", "int", DefaultValue = 200, Min = 0)]
@@ -58,6 +59,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("MinCoverageRatio", "V2 最小覆盖率", "double", DefaultValue = 0.35, Min = 0.0, Max = 1.0)]
 [OperatorParam("MinAngularCoverageDegrees", "V2 最小角覆盖", "double", DefaultValue = 180.0, Min = 0.0, Max = 360.0)]
 [OperatorParam("OutlierMode", "V2 离群模式", "enum", DefaultValue = "Mad", Options = new[] { "None|关闭", "Mad|MAD", "Huber|Huber" })]
+[OperatorParam("RefinementLoss", "V2 正交精化损失", "enum", DefaultValue = "Legacy", Options = new[] { "Legacy|兼容路径", "Huber|Huber", "Welsch|Welsch" })]
 [OperatorParam("OutlierThreshold", "V2 离群阈值", "double", DefaultValue = 3.5, Min = 0.1, Max = 20.0)]
 [OperatorParam("MaxOutlierIterations", "V2 最大离群迭代", "int", DefaultValue = 3, Min = 0, Max = 20)]
 [OperatorParam("MaxResidualRmse", "V2 最大残差 RMSE", "double", DefaultValue = 2.0, Min = 0.01, Max = 128.0)]
@@ -216,6 +218,38 @@ public class CircleMeasurementOperator : OperatorBase
                 : (hasFeature ? 0.5 : double.NaN);
         }
 
+        if (hasFeature)
+        {
+            var radius = Convert.ToDouble(additionalData["Radius"]);
+            var sigma = Convert.ToDouble(additionalData["UncertaintyPx"]);
+            var covariance = caliperFitV2Result != null ? ExtractRefinementCovariance(caliperFitV2Result.Diagnostics) : Array.Empty<double>();
+            var refinementLoss = GetStringParam(@operator, "RefinementLoss", "Legacy");
+            var qualityFlags = new List<string> { "HeuristicUncertainty" };
+            if (covariance.Length > 0)
+            {
+                qualityFlags.Add("UncalibratedCovariance");
+            }
+            if (caliperFitV2Result?.OutlierPoints.Count > 0)
+            {
+                qualityFlags.Add("OutliersPresent");
+            }
+            if (refinementLoss.Equals("Legacy", StringComparison.OrdinalIgnoreCase))
+            {
+                qualityFlags.Add("LegacyCompatibility");
+            }
+
+            additionalData["MeasurementEvidence"] = MeasurementEvidenceFactory.Create(
+                @operator,
+                radius,
+                "px",
+                "ImagePixel",
+                sigma,
+                covariance,
+                MeasurementEvidenceProvenance.Heuristic,
+                caliperFitV2Result != null ? $"CaliperFitV2/{refinementLoss}" : normalizedMethod,
+                qualityFlags);
+        }
+
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
     }
 
@@ -260,6 +294,12 @@ public class CircleMeasurementOperator : OperatorBase
                 "OutlierMode",
                 CircleCaliperFitV2OutlierMode.Mad,
                 out CircleCaliperFitV2OutlierMode outlierMode,
+                out failureReason) ||
+            !TryParseEnumParam(
+                @operator,
+                "RefinementLoss",
+                CircleCaliperFitV2RefinementLoss.Legacy,
+                out CircleCaliperFitV2RefinementLoss refinementLoss,
                 out failureReason))
         {
             return false;
@@ -283,6 +323,7 @@ public class CircleMeasurementOperator : OperatorBase
             MinCoverageRatio = GetDoubleParam(@operator, "MinCoverageRatio", 0.35, min: 0.0, max: 1.0),
             MinAngularCoverageDegrees = GetDoubleParam(@operator, "MinAngularCoverageDegrees", 180.0, min: 0.0, max: 360.0),
             OutlierMode = outlierMode,
+            RefinementLoss = refinementLoss,
             OutlierThreshold = GetDoubleParam(@operator, "OutlierThreshold", 3.5, min: 0.1, max: 20.0),
             MaxOutlierIterations = GetIntParam(@operator, "MaxOutlierIterations", 3, min: 0, max: 20),
             MaxResidualRmse = GetDoubleParam(@operator, "MaxResidualRmse", 2.0, min: 0.01, max: 128.0),
@@ -880,7 +921,8 @@ public class CircleMeasurementOperator : OperatorBase
         }
 
         if (!TryParseDefinedEnum(GetStringParam(@operator, "EdgePolarity", "Auto"), out CircleCaliperFitV2EdgePolarity _) ||
-            !TryParseDefinedEnum(GetStringParam(@operator, "OutlierMode", "Mad"), out CircleCaliperFitV2OutlierMode _))
+            !TryParseDefinedEnum(GetStringParam(@operator, "OutlierMode", "Mad"), out CircleCaliperFitV2OutlierMode _) ||
+            !TryParseDefinedEnum(GetStringParam(@operator, "RefinementLoss", "Legacy"), out CircleCaliperFitV2RefinementLoss _))
         {
             return ValidationResult.Invalid("CaliperFitV2 enum parameters are invalid");
         }
@@ -959,5 +1001,14 @@ public class CircleMeasurementOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static double[] ExtractRefinementCovariance(IReadOnlyList<CircleCaliperFitV2Diagnostic> diagnostics)
+    {
+        return diagnostics
+            .Where(diagnostic => diagnostic.Code.StartsWith("refinement.covariance.", StringComparison.Ordinal) && diagnostic.Value.HasValue)
+            .OrderBy(diagnostic => int.TryParse(diagnostic.Code["refinement.covariance.".Length..], out var index) ? index : int.MaxValue)
+            .Select(diagnostic => diagnostic.Value!.Value)
+            .ToArray();
     }
 }

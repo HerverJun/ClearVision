@@ -127,7 +127,7 @@ internal static class OnnxPatchEmbeddingExtractor
         var dimensions = input.Value.Dimensions;
         var inputHeight = ResolveImageDimension(dimensions, 2, options.PatchSize);
         var inputWidth = ResolveImageDimension(dimensions, 3, options.PatchSize);
-        var tensor = PreprocessPatch(patch, inputWidth, inputHeight);
+        var tensor = PreprocessPatch(patch, inputWidth, inputHeight, options);
 
         using var results = session.Run([NamedOnnxValue.CreateFromTensor(input.Key, tensor)]);
         var output = results.First().AsTensor<float>();
@@ -177,7 +177,7 @@ internal static class OnnxPatchEmbeddingExtractor
         for (var start = 0; start < patches.Count; start += maxBatchSize)
         {
             var batchSize = Math.Min(maxBatchSize, patches.Count - start);
-            var tensor = PreprocessPatches(patches, start, batchSize, inputWidth, inputHeight);
+            var tensor = PreprocessPatches(patches, start, batchSize, inputWidth, inputHeight, options);
             using var results = session.Run([NamedOnnxValue.CreateFromTensor(input.Key, tensor)]);
             var output = results.First().AsTensor<float>();
             foreach (var embedding in SplitAndNormalizeEmbeddings(output, batchSize))
@@ -300,14 +300,15 @@ internal static class OnnxPatchEmbeddingExtractor
         }
     }
 
-    private static DenseTensor<float> PreprocessPatch(Mat patch, int inputWidth, int inputHeight)
+    private static DenseTensor<float> PreprocessPatch(Mat patch, int inputWidth, int inputHeight, SimplePatchCoreOptions options)
     {
+        var preprocess = RequirePreprocess(options);
         using var prepared = EnsureThreeChannel(patch);
         using var resized = new Mat();
-        Cv2.Resize(prepared, resized, new Size(inputWidth, inputHeight), 0, 0, InterpolationFlags.Linear);
+        Cv2.Resize(prepared, resized, new Size(inputWidth, inputHeight), 0, 0, ResolveInterpolation(preprocess.Interpolation));
 
         using var floatImage = new Mat();
-        resized.ConvertTo(floatImage, MatType.CV_32FC3, 1.0 / 255.0);
+        resized.ConvertTo(floatImage, MatType.CV_32FC3, preprocess.Scale);
 
         var tensor = new DenseTensor<float>([1, 3, inputHeight, inputWidth]);
         var indexer = floatImage.GetGenericIndexer<Vec3f>();
@@ -316,9 +317,7 @@ internal static class OnnxPatchEmbeddingExtractor
             for (var x = 0; x < inputWidth; x++)
             {
                 var pixel = indexer[y, x];
-                tensor[0, 0, y, x] = pixel.Item2;
-                tensor[0, 1, y, x] = pixel.Item1;
-                tensor[0, 2, y, x] = pixel.Item0;
+                WritePixel(tensor, 0, y, x, pixel, preprocess);
             }
         }
 
@@ -330,18 +329,20 @@ internal static class OnnxPatchEmbeddingExtractor
         int start,
         int batchSize,
         int inputWidth,
-        int inputHeight)
+        int inputHeight,
+        SimplePatchCoreOptions options)
     {
+        var preprocess = RequirePreprocess(options);
         var tensor = new DenseTensor<float>([batchSize, 3, inputHeight, inputWidth]);
 
         for (var batchIndex = 0; batchIndex < batchSize; batchIndex++)
         {
             using var prepared = EnsureThreeChannel(patches[start + batchIndex]);
             using var resized = new Mat();
-            Cv2.Resize(prepared, resized, new Size(inputWidth, inputHeight), 0, 0, InterpolationFlags.Linear);
+            Cv2.Resize(prepared, resized, new Size(inputWidth, inputHeight), 0, 0, ResolveInterpolation(preprocess.Interpolation));
 
             using var floatImage = new Mat();
-            resized.ConvertTo(floatImage, MatType.CV_32FC3, 1.0 / 255.0);
+            resized.ConvertTo(floatImage, MatType.CV_32FC3, preprocess.Scale);
 
             var indexer = floatImage.GetGenericIndexer<Vec3f>();
             for (var y = 0; y < inputHeight; y++)
@@ -349,14 +350,46 @@ internal static class OnnxPatchEmbeddingExtractor
                 for (var x = 0; x < inputWidth; x++)
                 {
                     var pixel = indexer[y, x];
-                    tensor[batchIndex, 0, y, x] = pixel.Item2;
-                    tensor[batchIndex, 1, y, x] = pixel.Item1;
-                    tensor[batchIndex, 2, y, x] = pixel.Item0;
+                    WritePixel(tensor, batchIndex, y, x, pixel, preprocess);
                 }
             }
         }
 
         return tensor;
+    }
+
+    private static AnomalyEmbeddingPreprocessSpec RequirePreprocess(SimplePatchCoreOptions options)
+    {
+        return options.EmbeddingPreprocess
+            ?? throw new InvalidOperationException("Manifest-declared ONNX preprocessing is required; no implicit ImageNet or RGB/0-1 default is permitted.");
+    }
+
+    private static InterpolationFlags ResolveInterpolation(string interpolation)
+    {
+        return interpolation.Trim().ToLowerInvariant() switch
+        {
+            "area" => InterpolationFlags.Area,
+            "cubic" => InterpolationFlags.Cubic,
+            "nearest" => InterpolationFlags.Nearest,
+            _ => InterpolationFlags.Linear
+        };
+    }
+
+    private static void WritePixel(
+        DenseTensor<float> tensor,
+        int batchIndex,
+        int y,
+        int x,
+        Vec3f pixel,
+        AnomalyEmbeddingPreprocessSpec preprocess)
+    {
+        var channels = preprocess.ColorOrder.Equals("RGB", StringComparison.OrdinalIgnoreCase)
+            ? new[] { pixel.Item2, pixel.Item1, pixel.Item0 }
+            : new[] { pixel.Item0, pixel.Item1, pixel.Item2 };
+        for (var channel = 0; channel < 3; channel++)
+        {
+            tensor[batchIndex, channel, y, x] = (float)((channels[channel] - preprocess.Mean[channel]) / preprocess.Std[channel]);
+        }
     }
 
     private static Mat EnsureThreeChannel(Mat source)

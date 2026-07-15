@@ -21,10 +21,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("Length", "长度", PortDataType.Float)]
 [OutputPort("Line", "直线数据", PortDataType.LineData)]
 [OutputPort("LineCount", "直线数量", PortDataType.Integer)]
+[OutputPort("MeasurementEvidence", "测量证据", PortDataType.Any)]
 [OperatorParam("Method", "检测方法", "enum", DefaultValue = "ProbabilisticHough", Options = new[] { "HoughLines|霍夫直线", "ProbabilisticHough|概率霍夫直线", "FitLine|拟合直线" })]
 [OperatorParam("Threshold", "累加阈值", "int", DefaultValue = 100, Min = 1)]
 [OperatorParam("MinLength", "最小长度", "double", DefaultValue = 50.0, Min = 0.0)]
 [OperatorParam("MaxGap", "最大间隙", "double", DefaultValue = 10.0, Min = 0.0)]
+[OperatorParam("FitLoss", "拟合损失", "enum", DefaultValue = "L2", Options = new[] { "L2|L2 兼容", "Huber|Huber", "Welsch|Welsch" })]
 public class LineMeasurementOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.LineMeasurement;
@@ -52,6 +54,11 @@ public class LineMeasurementOperator : OperatorBase
         var threshold = GetIntParam(@operator, "Threshold", 100, min: 1);
         var minLength = GetDoubleParam(@operator, "MinLength", 50.0, min: 0);
         var maxGap = GetDoubleParam(@operator, "MaxGap", 10.0, min: 0);
+        var fitLoss = ResolveFitLoss(GetStringParam(@operator, "FitLoss", "L2"));
+        if (fitLoss == null)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("FitLoss must be L2, Huber or Welsch"));
+        }
 
         var src = imageWrapper.GetMat();
         if (src.Empty())
@@ -75,9 +82,9 @@ public class LineMeasurementOperator : OperatorBase
 
         var lineResults = (method switch
         {
-            "HoughLines" => DetectHoughLines(gray, edges, resultImage, src.Width, src.Height, threshold),
-            "ProbabilisticHough" => DetectProbabilisticHough(gray, edges, resultImage, threshold, minLength, maxGap),
-            "FitLine" => DetectFitLine(gray, edges, resultImage, src.Width, src.Height, threshold, minLength, maxGap),
+            "HoughLines" => DetectHoughLines(gray, edges, resultImage, src.Width, src.Height, threshold, fitLoss.Value),
+            "ProbabilisticHough" => DetectProbabilisticHough(gray, edges, resultImage, threshold, minLength, maxGap, fitLoss.Value),
+            "FitLine" => DetectFitLine(gray, edges, resultImage, src.Width, src.Height, threshold, minLength, maxGap, fitLoss.Value),
             _ => new List<LineMeasurementResult>()
         })
         .OrderBy(result => double.IsFinite(result.ResidualMean) ? result.ResidualMean : double.PositiveInfinity)
@@ -86,7 +93,9 @@ public class LineMeasurementOperator : OperatorBase
 
         if (lineResults.Count == 0)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("No valid line found"));
+            return Task.FromResult(OperatorExecutionOutput.Failure(fitLoss == GeometryRefinementLoss.L2
+                ? "No valid line found"
+                : $"FitLoss {fitLoss} failed to produce a non-degenerate refined line; no legacy fallback was used."));
         }
 
         var firstLine = lineResults[0];
@@ -99,6 +108,7 @@ public class LineMeasurementOperator : OperatorBase
             { "ResidualMean", firstLine.ResidualMean },
             { "ResidualMax", firstLine.ResidualMax },
             { "Method", method },
+            { "FitLoss", fitLoss.Value.ToString() },
             { "Lines", lineResults.Select(BuildLinePayload).ToList() },
             { "StatusCode", "OK" },
             { "StatusMessage", "Success" },
@@ -111,6 +121,36 @@ public class LineMeasurementOperator : OperatorBase
             additionalData[kvp.Key] = kvp.Value;
         }
 
+        var sigmaAngle = firstLine.Diagnostics.TryGetValue("SigmaAngleDegrees", out var sigmaValue)
+            ? Convert.ToDouble(sigmaValue)
+            : double.NaN;
+        var covariance = firstLine.Diagnostics.TryGetValue("Covariance", out var covarianceValue) && covarianceValue is IReadOnlyList<double> covarianceValues
+            ? covarianceValues
+            : Array.Empty<double>();
+        var evidenceFlags = new List<string> { "HeuristicUncertainty" };
+        if (covariance.Count > 0)
+        {
+            evidenceFlags.Add("UncalibratedCovariance");
+        }
+        if (firstLine.Diagnostics.TryGetValue("OutlierCount", out var outlierValue) && Convert.ToInt32(outlierValue) > 0)
+        {
+            evidenceFlags.Add("OutliersPresent");
+        }
+        if (fitLoss == GeometryRefinementLoss.L2)
+        {
+            evidenceFlags.Add("LegacyCompatibility");
+        }
+        additionalData["MeasurementEvidence"] = MeasurementEvidenceFactory.Create(
+            @operator,
+            firstLine.Angle,
+            "deg",
+            "ImagePixel",
+            double.IsFinite(sigmaAngle) ? sigmaAngle : firstLine.ResidualMean,
+            covariance,
+            MeasurementEvidenceProvenance.Heuristic,
+            $"{method}/{fitLoss}",
+            evidenceFlags);
+
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
     }
 
@@ -120,10 +160,16 @@ public class LineMeasurementOperator : OperatorBase
         var threshold = GetIntParam(@operator, "Threshold", 100);
         var minLength = GetDoubleParam(@operator, "MinLength", 50.0);
         var maxGap = GetDoubleParam(@operator, "MaxGap", 10.0);
+        var fitLoss = ResolveFitLoss(GetStringParam(@operator, "FitLoss", "L2"));
 
         if (method == null)
         {
             return ValidationResult.Invalid("检测方法必须是 HoughLines、ProbabilisticHough 或 FitLine");
+        }
+
+        if (fitLoss == null)
+        {
+            return ValidationResult.Invalid("FitLoss must be L2, Huber or Welsch");
         }
 
         if (threshold < 1)
@@ -156,7 +202,18 @@ public class LineMeasurementOperator : OperatorBase
         };
     }
 
-    private static List<LineMeasurementResult> DetectHoughLines(Mat gray, Mat edges, Mat resultImage, int width, int height, int threshold)
+    private static GeometryRefinementLoss? ResolveFitLoss(string? raw)
+    {
+        return raw?.Trim().ToLowerInvariant() switch
+        {
+            "l2" => GeometryRefinementLoss.L2,
+            "huber" => GeometryRefinementLoss.Huber,
+            "welsch" => GeometryRefinementLoss.Welsch,
+            _ => null
+        };
+    }
+
+    private static List<LineMeasurementResult> DetectHoughLines(Mat gray, Mat edges, Mat resultImage, int width, int height, int threshold, GeometryRefinementLoss fitLoss)
     {
         var results = new List<LineMeasurementResult>();
         var lines = Cv2.HoughLines(edges, 1, Math.PI / 180, threshold);
@@ -185,10 +242,14 @@ public class LineMeasurementOperator : OperatorBase
                 { "Theta", line.Theta }
             };
 
-            if (TryRefineLineUsingCaliper(gray, imageSpan, out var caliperLine, out residualMean, out residualMax, out var refinedPointCount))
+            if (TryRefineLineUsingCaliper(gray, imageSpan, fitLoss, out var caliperLine, out residualMean, out residualMax, out var refinementDiagnostics))
             {
                 refinedLine = caliperLine;
-                diagnostics["RefinedPointCount"] = refinedPointCount;
+                foreach (var item in refinementDiagnostics) diagnostics[item.Key] = item.Value;
+            }
+            else if (fitLoss != GeometryRefinementLoss.L2)
+            {
+                continue;
             }
 
             var angleDegrees = MeasurementGeometryHelper.NormalizeLineDirectionDegrees(refinedLine.Angle);
@@ -204,7 +265,7 @@ public class LineMeasurementOperator : OperatorBase
         return results;
     }
 
-    private static List<LineMeasurementResult> DetectProbabilisticHough(Mat gray, Mat edges, Mat resultImage, int threshold, double minLength, double maxGap)
+    private static List<LineMeasurementResult> DetectProbabilisticHough(Mat gray, Mat edges, Mat resultImage, int threshold, double minLength, double maxGap, GeometryRefinementLoss fitLoss)
     {
         var results = new List<LineMeasurementResult>();
         var lines = Cv2.HoughLinesP(edges, 1, Math.PI / 180, threshold, minLength, maxGap);
@@ -224,10 +285,14 @@ public class LineMeasurementOperator : OperatorBase
             double residualMean = double.NaN;
             double residualMax = double.NaN;
             var diagnostics = new Dictionary<string, object>();
-            if (TryRefineLineUsingCaliper(gray, lineData, out var caliperLine, out residualMean, out residualMax, out var refinedPointCount))
+            if (TryRefineLineUsingCaliper(gray, lineData, fitLoss, out var caliperLine, out residualMean, out residualMax, out var refinementDiagnostics))
             {
                 refinedLine = caliperLine;
-                diagnostics["RefinedPointCount"] = refinedPointCount;
+                foreach (var item in refinementDiagnostics) diagnostics[item.Key] = item.Value;
+            }
+            else if (fitLoss != GeometryRefinementLoss.L2)
+            {
+                continue;
             }
 
             results.Add(new LineMeasurementResult(
@@ -242,7 +307,7 @@ public class LineMeasurementOperator : OperatorBase
         return results;
     }
 
-    private static List<LineMeasurementResult> DetectFitLine(Mat gray, Mat edges, Mat resultImage, int width, int height, int threshold, double minLength, double maxGap)
+    private static List<LineMeasurementResult> DetectFitLine(Mat gray, Mat edges, Mat resultImage, int width, int height, int threshold, double minLength, double maxGap, GeometryRefinementLoss fitLoss)
     {
         var seedSegments = Cv2.HoughLinesP(edges, 1, Math.PI / 180, Math.Max(40, threshold / 2), minLength, Math.Max(maxGap, 8.0));
         if (seedSegments != null && seedSegments.Length > 0)
@@ -254,7 +319,7 @@ public class LineMeasurementOperator : OperatorBase
 
             foreach (var candidate in candidates)
             {
-                if (!TryRefineLineUsingCaliper(gray, candidate, out var refinedLine, out var residualMean, out var residualMax, out var refinedPointCount))
+                if (!TryRefineLineUsingCaliper(gray, candidate, fitLoss, out var refinedLine, out var residualMean, out var residualMax, out var refinementDiagnostics))
                 {
                     continue;
                 }
@@ -276,10 +341,7 @@ public class LineMeasurementOperator : OperatorBase
                         refinedLine.Length,
                         residualMean,
                         residualMax,
-                        new Dictionary<string, object>
-                        {
-                            { "FitPointCount", refinedPointCount }
-                        })
+                        refinementDiagnostics)
                 };
             }
         }
@@ -290,11 +352,42 @@ public class LineMeasurementOperator : OperatorBase
             return new List<LineMeasurementResult>();
         }
 
-        var lineParams = Cv2.FitLine(points.ToArray(), DistanceTypes.L2, 0, 0.01, 0.01);
-        var vx = lineParams.Vx;
-        var vy = lineParams.Vy;
-        var x0 = lineParams.X1;
-        var y0 = lineParams.Y1;
+        double vx;
+        double vy;
+        double x0;
+        double y0;
+        Dictionary<string, object> fitDiagnostics;
+        if (fitLoss == GeometryRefinementLoss.L2)
+        {
+            var lineParams = Cv2.FitLine(points.ToArray(), DistanceTypes.L2, 0, 0.01, 0.01);
+            vx = lineParams.Vx;
+            vy = lineParams.Vy;
+            x0 = lineParams.X1;
+            y0 = lineParams.Y1;
+            fitDiagnostics = new Dictionary<string, object>
+            {
+                ["FitPointCount"] = points.Count,
+                ["SeedAlgorithm"] = "AllCannyEdges",
+                ["RefineAlgorithm"] = "Cv2.FitLine/L2",
+                ["FitLoss"] = "L2"
+            };
+        }
+        else
+        {
+            var refinement = GeometryRefinementKernel.RefineLine(
+                points.Select(point => new Point2d(point.X, point.Y)).ToArray(),
+                fitLoss);
+            if (!refinement.Success || refinement.Degenerate)
+            {
+                return new List<LineMeasurementResult>();
+            }
+
+            vx = refinement.DirectionX;
+            vy = refinement.DirectionY;
+            x0 = refinement.CenterX;
+            y0 = refinement.CenterY;
+            fitDiagnostics = BuildRefinementDiagnostics(points.Count, fitLoss, refinement, "AllCannyEdges");
+        }
 
         if (!TryCreateImageSpanFromDirection(vx, vy, x0, y0, width, height, out var lineData))
         {
@@ -324,25 +417,27 @@ public class LineMeasurementOperator : OperatorBase
                 lineData.Length,
                 meanResidual,
                 maxResidual,
-                new Dictionary<string, object>
-                {
-                    { "FitPointCount", points.Count }
-                })
+                fitDiagnostics)
         };
     }
 
     private static bool TryRefineLineUsingCaliper(
         Mat gray,
         LineData seedLine,
+        GeometryRefinementLoss fitLoss,
         out LineData refinedLine,
         out double residualMean,
         out double residualMax,
-        out int refinedPointCount)
+        out Dictionary<string, object> diagnostics)
     {
         refinedLine = seedLine;
         residualMean = double.NaN;
         residualMax = double.NaN;
-        refinedPointCount = 0;
+        diagnostics = new Dictionary<string, object>
+        {
+            ["SeedAlgorithm"] = "HoughSegment",
+            ["FitLoss"] = fitLoss.ToString()
+        };
 
         var length = seedLine.Length;
         if (length < 12)
@@ -385,9 +480,40 @@ public class LineMeasurementOperator : OperatorBase
             return false;
         }
 
-        refinedPointCount = refinedCenters.Count;
-        var lineParams = Cv2.FitLine(refinedCenters.ToArray(), DistanceTypes.L2, 0, 0.01, 0.01);
-        if (!TryCreateImageSpanFromDirection(lineParams.Vx, lineParams.Vy, lineParams.X1, lineParams.Y1, gray.Width, gray.Height, out refinedLine))
+        double vx;
+        double vy;
+        double x0;
+        double y0;
+        if (fitLoss == GeometryRefinementLoss.L2)
+        {
+            var lineParams = Cv2.FitLine(refinedCenters.ToArray(), DistanceTypes.L2, 0, 0.01, 0.01);
+            vx = lineParams.Vx;
+            vy = lineParams.Vy;
+            x0 = lineParams.X1;
+            y0 = lineParams.Y1;
+            diagnostics["RefineAlgorithm"] = "Cv2.FitLine/L2";
+            diagnostics["RefinedPointCount"] = refinedCenters.Count;
+            diagnostics["OutlierCount"] = 0;
+        }
+        else
+        {
+            var refinement = GeometryRefinementKernel.RefineLine(
+                refinedCenters.Select(point => new Point2d(point.X, point.Y)).ToArray(),
+                fitLoss);
+            if (!refinement.Success || refinement.Degenerate)
+            {
+                diagnostics["RefineFailure"] = refinement.FailureReason;
+                return false;
+            }
+
+            vx = refinement.DirectionX;
+            vy = refinement.DirectionY;
+            x0 = refinement.CenterX;
+            y0 = refinement.CenterY;
+            diagnostics = BuildRefinementDiagnostics(refinedCenters.Count, fitLoss, refinement, "HoughSegment");
+        }
+
+        if (!TryCreateImageSpanFromDirection(vx, vy, x0, y0, gray.Width, gray.Height, out refinedLine))
         {
             return false;
         }
@@ -398,7 +524,34 @@ public class LineMeasurementOperator : OperatorBase
             .ToList();
         residualMean = residuals.Average();
         residualMax = residuals.Max();
+        diagnostics["ResidualMean"] = residualMean;
+        diagnostics["ResidualMax"] = residualMax;
         return true;
+    }
+
+    private static Dictionary<string, object> BuildRefinementDiagnostics(
+        int pointCount,
+        GeometryRefinementLoss fitLoss,
+        LineGeometryRefinementResult refinement,
+        string seedAlgorithm)
+    {
+        return new Dictionary<string, object>
+        {
+            ["FitPointCount"] = pointCount,
+            ["SeedAlgorithm"] = seedAlgorithm,
+            ["RefineAlgorithm"] = $"OrthogonalIRLS/{fitLoss}",
+            ["FitLoss"] = fitLoss.ToString(),
+            ["RefineConverged"] = refinement.Converged,
+            ["RefineIterations"] = refinement.Iterations,
+            ["ResidualRmse"] = refinement.ResidualRmse,
+            ["ResidualMax"] = refinement.ResidualMax,
+            ["RobustScale"] = refinement.RobustScale,
+            ["OutlierCount"] = refinement.Weights.Count(weight => weight < 0.25),
+            ["SigmaAngleDegrees"] = refinement.SigmaAngleDegrees,
+            ["SigmaOffsetPx"] = refinement.SigmaOffset,
+            ["Covariance"] = refinement.Covariance,
+            ["CovarianceCalibrated"] = false
+        };
     }
 
     private static List<Point2f> CollectEdgePoints(Mat edges)

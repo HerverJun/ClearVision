@@ -45,6 +45,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisabledWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, HiddenWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" },
     IgnoredWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, ResourceKind = OperatorResourceKind.ModelResource,
     ReasonCode = "ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED")]
+[OperatorParameterRule("EmbeddingManifestPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    RequiredWhenAll = new[] { "FeatureExtractorId==onnx_embedding" },
+    DisabledWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, HiddenWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" },
+    IgnoredWhenAll = new[] { "FeatureExtractorId!=onnx_embedding" }, ResourceKind = OperatorResourceKind.ModelResource,
+    ReasonCode = "ANOMALY_EMBEDDING_MANIFEST_REQUIRED")]
 [AlgorithmInfo(
     Name = "Simplified PatchCore",
     CoreApi = "OpenCvSharp + memory-bank nearest-neighbor",
@@ -71,6 +76,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("FeatureExtractorId", "Feature Extractor Id", "string", DefaultValue = "lab_gradient_stats", IsRequired = false)]
 [OperatorParam("EmbeddingModelId", "Embedding Model Id", "string", DefaultValue = "", IsRequired = false)]
 [OperatorParam("EmbeddingModelPath", "Embedding Model Path", "file", DefaultValue = "", IsRequired = false)]
+[OperatorParam("EmbeddingManifestPath", "Embedding Manifest Path", "file", DefaultValue = "", IsRequired = false)]
 [OperatorParam("PatchSize", "Patch Size", "int", DefaultValue = 32, Min = 4, Max = 256)]
 [OperatorParam("PatchStride", "Patch Stride", "int", DefaultValue = 16, Min = 1, Max = 256)]
 [OperatorParam("CoresetRatio", "Coreset Ratio", "double", DefaultValue = 0.2, Min = 0.01, Max = 1.0)]
@@ -152,11 +158,24 @@ public sealed class AnomalyDetectionOperator : OperatorBase
 
             if (!string.IsNullOrWhiteSpace(embeddingTarget.Path))
             {
+                AnomalyEmbeddingManifestIdentity embeddingIdentity;
+                try
+                {
+                    embeddingIdentity = ResolveEmbeddingIdentity(@operator, null, embeddingTarget.Path);
+                }
+                catch (Exception ex)
+                {
+                    return OperatorExecutionOutput.Failure($"Embedding manifest validation failed: {ex.Message}");
+                }
                 options = CloneOptions(
                     options,
                     featureExtractorId: "onnx_embedding",
                     embeddingModelId: embeddingTarget.ModelId,
-                    embeddingModelPath: embeddingTarget.Path);
+                    embeddingModelPath: embeddingTarget.Path,
+                    embeddingManifestPath: embeddingIdentity.ManifestPath,
+                    embeddingModelSha256: embeddingIdentity.ModelSha256,
+                    preprocessFingerprint: embeddingIdentity.PreprocessFingerprint,
+                    embeddingPreprocess: embeddingIdentity.Preprocess);
             }
 
             SimplePatchCoreFeatureBank bank;
@@ -263,6 +282,33 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             return OperatorExecutionOutput.Failure("Embedding model is required for ONNX anomaly inference.");
         }
 
+        if (RequiresOnnxEmbedding(inferenceOptions.FeatureExtractorId))
+        {
+            AnomalyEmbeddingManifestIdentity embeddingIdentity;
+            try
+            {
+                embeddingIdentity = ResolveEmbeddingIdentity(@operator, loadedBank, resolvedEmbeddingTarget.Path);
+            }
+            catch (Exception ex)
+            {
+                return OperatorExecutionOutput.Failure($"Embedding manifest validation failed: {ex.Message}");
+            }
+
+            if (!string.Equals(loadedBank.EmbeddingModelSha256, embeddingIdentity.ModelSha256, StringComparison.Ordinal) ||
+                !string.Equals(loadedBank.PreprocessFingerprint, embeddingIdentity.PreprocessFingerprint, StringComparison.Ordinal))
+            {
+                return OperatorExecutionOutput.Failure("Feature bank model/preprocessing identity mismatch; inference failed closed.");
+            }
+
+            inferenceOptions = CloneOptions(
+                inferenceOptions,
+                embeddingModelPath: resolvedEmbeddingTarget.Path,
+                embeddingManifestPath: embeddingIdentity.ManifestPath,
+                embeddingModelSha256: embeddingIdentity.ModelSha256,
+                preprocessFingerprint: embeddingIdentity.PreprocessFingerprint,
+                embeddingPreprocess: embeddingIdentity.Preprocess);
+        }
+
         try
         {
             var result = await RunCpuBoundWork(
@@ -333,7 +379,8 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         {
             try
             {
-                _ = ResolveEmbeddingModelTarget(@operator, null, featureExtractorId);
+                var target = ResolveEmbeddingModelTarget(@operator, null, featureExtractorId);
+                _ = ResolveEmbeddingIdentity(@operator, null, target.Path);
             }
             catch (Exception ex)
             {
@@ -350,7 +397,8 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             {
                 try
                 {
-                    _ = ResolveEmbeddingModelTarget(@operator, null, featureExtractorId);
+                    var target = ResolveEmbeddingModelTarget(@operator, null, featureExtractorId);
+                    _ = ResolveEmbeddingIdentity(@operator, null, target.Path);
                 }
                 catch (Exception ex)
                 {
@@ -384,6 +432,10 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             ["FeatureSchemaVersion"] = bank.FeatureSchemaVersion,
             ["EmbeddingModelId"] = bank.EmbeddingModelId,
             ["EmbeddingModelPath"] = bank.EmbeddingModelPath,
+            ["EmbeddingManifestPath"] = bank.EmbeddingManifestPath,
+            ["EmbeddingModelSha256"] = bank.EmbeddingModelSha256,
+            ["PreprocessFingerprint"] = bank.PreprocessFingerprint,
+            ["FeatureBankIdentitySha256"] = bank.FeatureBankIdentitySha256,
             ["ResolvedEmbeddingPath"] = embeddingTarget.Path,
             ["EmbeddingSource"] = embeddingTarget.Source,
             ["TrainingImageCount"] = bank.TrainingImageCount,
@@ -477,6 +529,18 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         }
 
         return EmbeddingModelResolution.Empty;
+    }
+
+    private static AnomalyEmbeddingManifestIdentity ResolveEmbeddingIdentity(
+        Operator @operator,
+        SimplePatchCoreFeatureBank? bank,
+        string modelPath)
+    {
+        var configuredManifest = TryGetConfiguredStringParam(@operator, "EmbeddingManifestPath");
+        var manifestPath = !string.IsNullOrWhiteSpace(configuredManifest)
+            ? configuredManifest
+            : bank?.EmbeddingManifestPath;
+        return AnomalyEmbeddingManifest.LoadAndValidate(manifestPath ?? string.Empty, modelPath);
     }
 
     private EmbeddingModelResolution ResolveInferenceEmbeddingModelTarget(Operator @operator, SimplePatchCoreFeatureBank bank)
@@ -748,7 +812,11 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         string? backbone = null,
         string? featureExtractorId = null,
         string? embeddingModelId = null,
-        string? embeddingModelPath = null)
+        string? embeddingModelPath = null,
+        string? embeddingManifestPath = null,
+        string? embeddingModelSha256 = null,
+        string? preprocessFingerprint = null,
+        AnomalyEmbeddingPreprocessSpec? embeddingPreprocess = null)
     {
         return new SimplePatchCoreOptions
         {
@@ -758,7 +826,11 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             Backbone = backbone ?? source.Backbone,
             FeatureExtractorId = featureExtractorId ?? source.FeatureExtractorId,
             EmbeddingModelId = embeddingModelId ?? source.EmbeddingModelId,
-            EmbeddingModelPath = embeddingModelPath ?? source.EmbeddingModelPath
+            EmbeddingModelPath = embeddingModelPath ?? source.EmbeddingModelPath,
+            EmbeddingManifestPath = embeddingManifestPath ?? source.EmbeddingManifestPath,
+            EmbeddingModelSha256 = embeddingModelSha256 ?? source.EmbeddingModelSha256,
+            PreprocessFingerprint = preprocessFingerprint ?? source.PreprocessFingerprint,
+            EmbeddingPreprocess = embeddingPreprocess ?? source.EmbeddingPreprocess
         };
     }
 }
