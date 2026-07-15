@@ -431,7 +431,7 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     var englishName = className.EndsWith("Operator", StringComparison.Ordinal)
         ? className[..^"Operator".Length]
         : className;
-    var category = NormalizeCategory(item.Meta.Category);
+    var category = OperatorCategoryCatalog.GetDisplayName(item.Meta.CategoryId);
     var facts = AnalyzeOperatorSource(item, qualityContext);
     var tags = BuildOperatorTags(item);
 
@@ -1315,7 +1315,7 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         Type = (int)item.OperatorType.Value,
         DisplayName = item.Meta.DisplayName,
         Description = item.Meta.Description,
-        Category = NormalizeCategory(item.Meta.Category),
+        Category = OperatorCategoryCatalog.GetDisplayName(item.Meta.CategoryId),
         Version = NormalizeSemVersion(item.Meta.Version),
         Tags = BuildOperatorTags(item),
         Algorithm = ResolveCatalogAlgorithm(item, qualityContext),
