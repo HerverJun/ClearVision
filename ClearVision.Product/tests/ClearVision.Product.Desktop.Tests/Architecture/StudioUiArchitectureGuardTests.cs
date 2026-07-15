@@ -351,6 +351,11 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: 'overview'");
         router.Should().Contain("path: 'projects'");
         router.Should().Contain("path: 'projects/:id'");
+        router.Should().Contain("path: 'operators'");
+        router.Should().Contain("path: 'operators/:operatorType'");
+        router.Should().Contain("path: 'stations'");
+        router.Should().Contain("path: 'stations/:stationId'");
+        router.Should().Contain("path: 'results'");
         router.Should().Contain("path: 'diagnostics'");
         router.Should().Contain("path: 'about'");
         router.Should().Contain("path: ':pathMatch(.*)*'");
@@ -358,12 +363,14 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: 'design'");
         router.Should().Contain("path: 'canvas'");
         router.Should().NotContain("/inspection");
-        router.Should().NotContain("/results");
         router.Should().NotContain("/settings");
         router.Should().NotContain("/ai");
 
         navigation.Should().Contain("to: '/overview'");
         navigation.Should().Contain("to: '/projects'");
+        navigation.Should().Contain("to: '/operators'");
+        navigation.Should().Contain("to: '/stations'");
+        navigation.Should().Contain("to: '/results'");
         navigation.Should().Contain("to: '/diagnostics'");
         navigation.Should().Contain("to: '/about'");
         navigation.Should().NotContain("/labs");

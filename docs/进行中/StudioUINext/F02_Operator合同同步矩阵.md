@@ -1,10 +1,10 @@
 # F02 Operator 合同同步矩阵
 
-> 状态：只读审计结论，尚未执行合同同步
+> 状态：Goal 1 审计已由 Goal 2 identity-only scoped gate 关闭
 >
 > 适用分支：`studio-ui-next`
 >
-> 审计目标：仅识别 F02 Operator Catalog 所需的权威 metadata；禁止夹带算法、Runtime、AI、Legacy UI 或生成文档变更
+> 审计目标：仅识别 F02 Operator Catalog 所需的权威 metadata；禁止夹带算法、Runtime、AI、Legacy UI 或稳定线生成文档快照
 
 ## 1. Git 基线与审计来源
 
@@ -26,7 +26,30 @@ SOURCE_REF=origin/codex初稿
 - 稳定线最终有 20 个算子包含 parameter rules、6 个包含 output rules、97 个包含 image input contracts。
 - Initial 的生成 catalog blob 为 657,185 bytes，稳定线为 1,455,133 bytes。该数值只证明生成文档体积变化，不能代替 `/api/operators/library` 的真实 HTTP payload 基线。
 
-## 2. 当前门禁结论
+## 2. Goal 2 scoped gate 结论
+
+```text
+F02_OPERATOR_GATE_AUDIT_SHA=4958ecab5873160d96b8c34efcf5f488257ea4df
+F02_OPERATOR_CONTRACT_SHA=52e4687e925a8f9a4f90df3ab47746795790043a
+OPERATOR_IDENTITY_METADATA_SYNC=PASS
+OPERATOR_CONTRACT_GATE=PASS
+F02_OPERATOR_CONTRACT_SCOPE=CATALOG_IDENTITY_AND_CURRENT_BRANCH_RUNTIME_METADATA
+STABLE_LINE_FULL_OPERATOR_CONTRACT_SYNC=DEFERRED
+OPERATOR_SIDE_EFFECT_METADATA=NOT_AVAILABLE
+OPERATOR_READINESS_METADATA=NOT_AVAILABLE
+```
+
+Goal 2 仅同步 `DisplayName / Description / CategoryId / Lifecycle / LifecycleNote / DefaultHidden /
+IconName / Keywords / Tags`。158 个 Operator 文件去除 `[OperatorMeta]` block 后与 Goal 2 入口
+`a23022be48c1e580198a41912c72ad0bbed753fd` 完全一致；DeepLearning、GaussianBlur、MeasureDistance
+等稳定线 Version、conditional output rules、image-depth contracts、算法、Runtime、AI 与 Legacy 行为未同步。
+
+Gate 验证事实：Catalog 总数 158、类型/显示名唯一、14 个 CategoryId 唯一且分布固定；默认 endpoint 157、
+`includeCompatibility=true` 158；types/library/detail 对齐；scanner/runtime 的当前 input/output ports 与
+parameters shape 一致。仓库 pre-commit 只基于当前分支 authority 刷新生成索引，未复制稳定线生成快照，
+不得据此宣称完整稳定线 Operator 合同一致。
+
+## 2.1 Goal 1 审计时结论
 
 ```text
 OPERATOR_CONTRACT_GATE=BLOCKED

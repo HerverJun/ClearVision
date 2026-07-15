@@ -10,8 +10,13 @@ import InternalLabLayout from '@/app/layouts/InternalLabLayout.vue';
 import NotFoundPage from '@/app/pages/NotFoundPage.vue';
 import AboutPage from '@/capabilities/about/AboutPage.vue';
 import OverviewPage from '@/capabilities/overview/OverviewPage.vue';
+import OperatorDetailPage from '@/capabilities/operators-read/OperatorDetailPage.vue';
+import OperatorsPage from '@/capabilities/operators-read/OperatorsPage.vue';
 import ProjectDetailPage from '@/capabilities/projects-read/ProjectDetailPage.vue';
 import ProjectsPage from '@/capabilities/projects-read/ProjectsPage.vue';
+import ResultsPage from '@/capabilities/results-read/ResultsPage.vue';
+import StationDetailPage from '@/capabilities/stations-read/StationDetailPage.vue';
+import StationsPage from '@/capabilities/stations-read/StationsPage.vue';
 import CanvasLabPlaceholder from '@/labs/canvas/CanvasLabPlaceholder.vue';
 import DesignLabPlaceholder from '@/labs/design/DesignLabPlaceholder.vue';
 import DiagnosticsPage from '@/platform/diagnostics/DiagnosticsPage.vue';
@@ -40,6 +45,36 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
         name: 'project-detail',
         component: ProjectDetailPage,
         meta: { title: '工程详情', breadcrumb: '工程详情', requiresSession: true }
+      },
+      {
+        path: 'operators',
+        name: 'operators',
+        component: OperatorsPage,
+        meta: { title: '算子库', breadcrumb: '算子库', requiresSession: true }
+      },
+      {
+        path: 'operators/:operatorType',
+        name: 'operator-detail',
+        component: OperatorDetailPage,
+        meta: { title: '算子详情', breadcrumb: '算子详情', requiresSession: true }
+      },
+      {
+        path: 'stations',
+        name: 'stations',
+        component: StationsPage,
+        meta: { title: '工作站', breadcrumb: '工作站', requiresSession: true }
+      },
+      {
+        path: 'stations/:stationId',
+        name: 'station-detail',
+        component: StationDetailPage,
+        meta: { title: '工作站详情', breadcrumb: '工作站详情', requiresSession: true }
+      },
+      {
+        path: 'results',
+        name: 'results',
+        component: ResultsPage,
+        meta: { title: '检测结果', breadcrumb: '检测结果', requiresSession: true }
       },
       {
         path: 'diagnostics',

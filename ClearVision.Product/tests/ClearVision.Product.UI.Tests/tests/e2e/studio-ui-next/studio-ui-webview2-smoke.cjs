@@ -228,9 +228,14 @@ async function verifyDiagnosticsPage(page) {
 
 async function verifyProductPage(page, route, runtimeErrors) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
-  const selector = route.startsWith('/projects')
-    ? '[data-capability="projects-read"]'
-    : '[data-capability="overview"]';
+  const selectors = [
+    ['/projects', '[data-capability="projects-read"]'],
+    ['/operators', '[data-capability="operators-read"]'],
+    ['/stations', '[data-capability="stations-read"]'],
+    ['/results', '[data-capability="results-read"]']
+  ];
+  const selector = selectors.find(([prefix]) => route.startsWith(prefix))?.[1]
+    || '[data-capability="overview"]';
   await page.waitForSelector(selector, { state: 'visible', timeout: 30_000 });
   await page.waitForLoadState('networkidle');
   await page.waitForFunction(() => {
@@ -261,7 +266,13 @@ async function verifyProductPage(page, route, runtimeErrors) {
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
   assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
-  assert(projection.formalNavigation.includes('/overview') && projection.formalNavigation.includes('/projects'),
+  assert([
+    '/overview',
+    '/projects',
+    '/operators',
+    '/stations',
+    '/results'
+  ].every(routePath => projection.formalNavigation.includes(routePath)),
     'Formal product navigation is incomplete.');
   assert(projection.density === 'compact', 'Formal product did not default to compact density.');
   assert(projection.horizontalOverflow <= 1, 'Formal product route has global horizontal overflow.');

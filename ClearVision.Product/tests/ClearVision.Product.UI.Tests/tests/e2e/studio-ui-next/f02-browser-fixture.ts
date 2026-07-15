@@ -1,11 +1,17 @@
 import type { Page, Request, Route } from '@playwright/test';
 
 export const f02BrowserFixture = Object.freeze({
-  schemaVersion: 'f02-browser.v1',
-  sourceSha: 'f6d4d98a53914bac088cd62cda261b2c08a11670',
+  schemaVersion: 'f02-browser.v2',
+  endpoint: 'response-specific-read-endpoint',
+  sourceSha: 'a23022be48c1e580198a41912c72ad0bbed753fd',
   dataSource: 'BROWSER_FIXTURE',
-  authSource: 'HARNESS_SEEDED_SESSION'
+  authSource: 'HARNESS_SEEDED_SESSION',
+  DATA_SOURCE: 'BROWSER_FIXTURE',
+  AUTH_SOURCE: 'HARNESS_SEEDED_SESSION'
 });
+
+export const f02OperatorPerformanceFixtureCount = 200;
+export const f02ResultsPerformanceFixtureCount = 500;
 
 export interface F02MethodAuditEntry {
   readonly method: string;
@@ -40,14 +46,18 @@ export async function fulfillF02Json(
   route: Route,
   status: number,
   body: unknown,
-  scenarioSchema: string
+  scenarioSchema: string,
+  sourceSha = f02BrowserFixture.sourceSha
 ): Promise<void> {
+  const requestUrl = new URL(route.request().url());
+  const endpoint = `${route.request().method()} ${requestUrl.pathname}`;
   await route.fulfill({
     status,
     contentType: 'application/json',
     headers: {
       'x-clearvision-fixture-schema': scenarioSchema,
-      'x-clearvision-fixture-source-sha': f02BrowserFixture.sourceSha,
+      'x-clearvision-fixture-endpoint': endpoint,
+      'x-clearvision-fixture-source-sha': sourceSha,
       'x-clearvision-data-source': f02BrowserFixture.dataSource,
       'x-clearvision-auth-source': f02BrowserFixture.authSource
     },
