@@ -90,6 +90,8 @@
              Link="Services\OcrEngineProvider.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\GpuAvailabilityChecker.cs"
              Link="Services\GpuAvailabilityChecker.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\TcpDeviceManager.cs"
+             Link="Services\TcpDeviceManager.cs" />
   </ItemGroup>
 
   <ItemGroup>
