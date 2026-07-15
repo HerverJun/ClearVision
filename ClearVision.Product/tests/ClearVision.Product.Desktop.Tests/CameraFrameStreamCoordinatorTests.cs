@@ -48,11 +48,15 @@ public class CameraFrameStreamCoordinatorTests
         await frameCallback!(firstFrame);
 
         var acquireTask = sut.AcquireFrameAsync(binding.Id);
-        await Task.Delay(100);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(5),
+            $"AcquireFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
         acquireTask.IsCompleted.Should().BeFalse();
 
+        await Task.Delay(100);
         await frameCallback(secondFrame);
-        var frame = await acquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+        var frame = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
 
         frame.ImageData.Should().Equal(secondFrame);
 
