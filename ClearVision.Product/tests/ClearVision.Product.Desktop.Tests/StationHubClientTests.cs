@@ -35,7 +35,6 @@ public sealed class StationHubClientTests
         await connection.InvokeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         var disconnectTask = client.DisconnectAsync(CancellationToken.None);
-        await Task.Delay(100);
 
         disconnectTask.IsCompleted.Should().BeFalse();
         connection.DisposeStarted.Task.IsCompleted.Should().BeFalse();

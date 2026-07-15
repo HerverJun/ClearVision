@@ -8,6 +8,8 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class SerialPhotoelectricTriggerInputServiceTests
 {
+    private static readonly TimeSpan TestCompletionTimeout = TimeSpan.FromSeconds(2);
+
     [Fact]
     public async Task WaitForSerialPhotoelectricAsync_ShouldConsumeSerialComPendingSignal()
     {
@@ -48,11 +50,16 @@ public class SerialPhotoelectricTriggerInputServiceTests
                 5000,
                 IgnoreWhileBusy: false));
 
-        await Task.Delay(50);
+        sut.GetDiagnostics().PendingWaiterCount.Should().Be(
+            1,
+            "the COM3 waiter must be registered before the matching signal is published");
         waitTask.IsCompleted.Should().BeFalse();
 
         PublishBlockSignal(sut, "COM3");
-        var triggerEvent = await waitTask;
+        var triggerEvent = await WaitForTriggerAsync(
+            sut,
+            waitTask,
+            nameof(WaitForSerialPhotoelectricAsync_ShouldNotMatchDifferentComPort));
 
         triggerEvent.DeviceId.Should().Be("COM3");
     }
@@ -75,11 +82,16 @@ public class SerialPhotoelectricTriggerInputServiceTests
                 5000,
                 IgnoreWhileBusy: true));
 
-        await Task.Delay(50);
+        sut.GetDiagnostics().PendingWaiterCount.Should().Be(
+            1,
+            "busy protection must ignore the pending signal and register a fresh waiter");
         waitTask.IsCompleted.Should().BeFalse();
 
         PublishBlockSignal(sut, "COM3");
-        var triggerEvent = await waitTask;
+        var triggerEvent = await WaitForTriggerAsync(
+            sut,
+            waitTask,
+            nameof(WaitForSerialPhotoelectricAsync_ShouldIgnorePendingSignalWhenBusyProtectionEnabled));
 
         triggerEvent.DeviceId.Should().Be("COM3");
         triggerEvent.Source.Should().Be("SerialPhotoelectric");
@@ -107,6 +119,27 @@ public class SerialPhotoelectricTriggerInputServiceTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         method.Should().NotBeNull();
         method!.Invoke(service, new object[] { portName });
+    }
+
+    private static async Task<TriggerInputEvent> WaitForTriggerAsync(
+        SerialPhotoelectricTriggerInputService service,
+        Task<TriggerInputEvent> waitTask,
+        string testName)
+    {
+        try
+        {
+            return await waitTask.WaitAsync(TestCompletionTimeout);
+        }
+        catch (TimeoutException ex)
+        {
+            var diagnostics = service.GetDiagnostics();
+            throw new TimeoutException(
+                $"{testName} did not receive the published serial trigger within {TestCompletionTimeout}. " +
+                $"WaitTaskStatus={waitTask.Status}; PendingWaiterCount={diagnostics.PendingWaiterCount}; " +
+                $"IsAvailable={diagnostics.IsAvailable}; ListenerType={diagnostics.ListenerType}; " +
+                $"LastDeviceId={diagnostics.LastDeviceId ?? "<none>"}; LastError={diagnostics.LastError ?? "<none>"}.",
+                ex);
+        }
     }
 
     private static object CreatePortListener(Action<string> publish)
