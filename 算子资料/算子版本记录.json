@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T01:10:44.3982770\u002B08:00",
+  "generatedAt": "2026-07-15T11:26:25.6098568\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -70,9 +70,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "47B947C34F5796B52864A891EF541A6C404699AFF0AEE5A5800C5FCBF99E0C07",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "FF75218065374CD71798E0BA8365EFB92B794220120812709C51CD87E98223B6",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -157,9 +157,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "C5CD7A32737DD213D5BA161E34BB6D9465E2D58DF61F92ECC043ADECAF03CBD2",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "4888FB5B00DE5FF2EA7146C273BD31C545C4434B052D8FD011D73D7F5B701E05",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -355,9 +355,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "CDE77CABD274A804155AB63D3178F0307BF470B87064BA7A814A607380D7D77B",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "81A958291FEA9DF861AC2F4562C8D920DD581A73D79D500735080ED9CD49F561",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -454,9 +454,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "4F7B26A8CA11EBE2C754013913CF04BDE2BE41357EB4800D3CF5524AA1457605",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "21FF978562E87C61B6B34C7F8BEDF33E9009A1F57A771EFAD853704130F5FA75",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -559,9 +559,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "5A6B78FA263F632E4538A7C3B091814BAA935F41C21ABEA96E701EAAB17D92C5",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "4690F5AC1900175F5F82ABA57CDA324CA232AB799A45593913067D35E9C4ABB1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -652,9 +652,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "DDB763CE43105049EE65DE1FCD216FD1EC179E02B8DCD505C6B14596B4DD0623",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "AFD3C81A2B7C6DC0E4F9B7EB581A9B99142236861AB43BECFBF4545E8B8B86FE",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -790,9 +790,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "5B62306CB98599FD6D64C42374CC66EC819C74D630EB93B243C7260764A92F9E",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "7659FA8D8DD6EFA25AB113D4150B2A5DA94E565ABBDAD8866EC09A5A3C56988B",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -823,9 +823,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "97F57631B8376335AF03FC388FE010C1851776AAA96B4404B5D4A0BEC7996DAB",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "8E9649AADED7F9F1505E43DF410BC2E88E01DE365C4A11055FCB8B8B1A946BE2",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -970,9 +970,9 @@
         },
         {
           "version": "1.2.1",
-          "sourceHash": "D3E7DFA521863E001286763A8D8E1F60272101DC5799F6C5A90689B46280E565",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "896918CF9B07260F53FF2B19704EB5445C688CD7682AA9F2BADAA9AD1010962D",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1075,9 +1075,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "7AC88F4120D371D28F98060EA150697C4533D457228A732BAB4650749CC0F26A",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "FE849935D52A45C263D03B072708204D98C225C948B01BAC06AB9D5D17B35156",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1168,9 +1168,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "0EB7BD7EFB9DD60EBA30063E8E3A343E2B799B61B3AA338C56C3B3465DCF0E8E",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "94FB73CD440D15E6F80FF67AED0138DCBDD5A4DAEA30068143942F54AF75CF91",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1261,9 +1261,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "6513143D5CB38A9BFFD00DAA4B83FB41848EE0289A64E759D956F2CAD54DDD99",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "79F956B20D31992C433603B495614A76B7039DD2348EB97CCC3AEF1AE26E6585",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1459,9 +1459,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "66EB9022D0A840F791F59A9BC00728079854A30ECA8C85DC6A01338CDF658E88",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A4BC37D12A8790F8E01756209E4E550C700B8F8467477886B39BFFB5411C677A",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1552,9 +1552,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "807B68989ABD5D9B592BD57321D642C57C3862A6B34BD003EA61A83559593E85",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C4EF240DCDB5763491CF77CCC9CBFBD6DB0FDEB671EA2C4E671031E3038E2CD8",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1681,9 +1681,9 @@
         },
         {
           "version": "1.1.2",
-          "sourceHash": "A95D965E1B4184BE4D413BEE6F0DC4A6D416475ED443254B4DCDCDE29E514F29",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "FAE310F1643D0FBF65E653451BDBEE6A000011B02C28367773E84098527099D7",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1762,9 +1762,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "1A502DC879355A563D5AFCD1E06F5B8AB84ACF37B6E609A840692BF59A880AB3",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "8FE0EEE5EDF16DE9AF8F05EEBEEBCE29F91AEDA990E0718BD979E7F9FCEB151F",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1843,9 +1843,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "ABF6FC412AEAAA560886674DC3232D2A3F7F67CD5560E106477AAF840BAAD538",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "7D711DD769875E54453FCE741A0F0A5BE153412FDBAE72613E0BFA9CE705B85C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -1900,9 +1900,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "607EBDCE854223195C16186EBDA914E8AFA7D22217A7B4D24E6C76B650007A5F",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "2FE4E29B3E3B65FC35391517EB336AC39F29CE15F1593452BB9E81CBE717E9C4",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2017,9 +2017,9 @@
         },
         {
           "version": "2.0.1",
-          "sourceHash": "A13C3C3319D58AEE9A3AAEEB7CE10C2A552BC0A2C6C7A25F4D3F8A7966B74CAA",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "0E04626E9216D72BA031E1E6536C26D20634C1F1BADF4A3127DB79719873750E",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2140,9 +2140,9 @@
         },
         {
           "version": "2.0.0",
-          "sourceHash": "0748552E09F9AB852079110B4FC127AA1EF112A0988E9A5BDBF0FEB1BF8A37D3",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C2E255FDE8642355411954D20AA3024D103FA13175B2885C9747E971C828C162",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2410,9 +2410,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "718F655171618F7036EA02A06427A4F9E010ACA95A1BCFD348880527B17EFA7D",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "8415835802F23A150C74ED407529EF52549071668BB602F6E5D93B10090EB1D0",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2560,9 +2560,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "7BC5E6309D153780D19ABB82D2CCC13E5DA6712816271F3AE0A7BB32CD7327FF",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "4936B3B59F92D316F6DBE9CB44367A35E2D0BDAEDED1B3A240F53F8B301AF03C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2641,9 +2641,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "75656710142014DD6D501DA0451050396A434E7A4917E829488DBF8D3E209774",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A42A7A6B0B58C0793438F4673EF7B45959F62251804A7E9BE7D9DA86E24350BB",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2722,9 +2722,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "0D8270923C96CBD026E29FB7AEF86234765D2D1CEB5A2A89C93DDF580D5DFDD8",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "9E8042AFC582813F25B669C102AE9B88E11D3059B7D004271788499779EC0F84",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -2803,9 +2803,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "6888A64B6BF97B8DB149799FB9B703ED72980936AB0EB5DDA4EB69BB4FC9B93C",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "186EBA4B1F5E58E54A1FF3301DDF725AA843B55642C575FA6B8BDED3A041A924",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -3166,9 +3166,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "512DE463875157991E552F0F6734A596F57D9F7CD8ACE9C4F116E9B38C93FE2F",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C438192588112353D92F31927FBA32A49E0955DACE787A203ACBDC3B7523F42B",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -3409,9 +3409,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "96FC49BBF2F0A115C6EE6C317F08595A2122145E51946B9A35D2C728D8B2034D",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "3F1534F8BA3D43425CAC37B4D5CEC54FF0E7EDF2028BDF1FDEEEA6D19A90CBE3",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -3601,9 +3601,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "425D78C6F6B916F442BE5C4D730CA87D0537FE985ACCA22254F22EC85685C8E1",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "6B83C5AE650DB69B98D664B49BF98A60209AAF388A96EF1CEFAC6AE663EDC20B",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -3793,9 +3793,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "BCB0B9F283A992A67B4F7FD0E86E797FCBA347D649CF00BB88F1E321B7665E04",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "F562034673B407D01639433C946E3D6D45139A5CBC6074553567811FD913DFC5",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4012,9 +4012,9 @@
         },
         {
           "version": "1.2.0",
-          "sourceHash": "14ECC78272A0467DE8861F7C250ABE7E83A3E6BF8B11E2E7FD4616E98B2555D0",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "DC2DDAD5E61261B2949E1A3856F0BE29C5D2FBFFBE9DAF8FBE5BC1CB7316AB23",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4087,9 +4087,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "86F5DF82DA7BC7639DC86C70D6E85636A6EF7615B5E21F10BEFA02DB7947B45A",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "147BA40A3D44704B0CD81A7C7EC27780A68E86C161C5AD682FFF1EDDB9C6BC99",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4180,9 +4180,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "AD24198B210775D37ED91842238EB23690328813F15F7AD19AD083716DDFF794",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C1CD23B2ABC0ADC9E4583CAE66243585CA12AC92053A1414325ABFCC2BDAF9CF",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4360,9 +4360,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "F45B42147D5BF273E431AB25A02F23089EB7E54C08D67E47AFE2D9D19FC35995",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "E3A544B34FB8905D343641E85039E91B740CC9C360DA2EA6335B2DA19573330E",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4411,9 +4411,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "CD69E83E49C90C934F77C55956269005FE803C5CAC56559B690B0BEB0518030A",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "8B9104464950DF51722C25599B7357D485F4F08C52A7FC3FE41DD205C88A8B01",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4573,9 +4573,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "FB293DB5A88E161574000706F21E5C70B534F389F53CBC5816E914A77A793A80",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "DF0DA993EE66D2A4C67723EAD4F9403C8DC601FC82A8ED867716D3096AA16710",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4789,9 +4789,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "2553A57B9B3D1F5C7E0C7685C93976771E62435801EB10F107CF6A8D80FB09B5",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "B460CD780BA28D006122CBEB9B5118DF1DEBFAF7AA1A0782F111113741E51D15",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4918,9 +4918,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "7DA4162B5EA4878D7F12B19406451C565F35B8F8B3BDE3465EA714E5FE81BBD4",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "818495EA9C4B17CB17AD464C165AE16C68C8AC232AD87FDD59DED58FED591FA1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -4993,9 +4993,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "E0BB8F2A6D253C83DA7D8BF200904D04ED1DA6C0DDC0C2C627AACD3DAEFCB5B0",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "1A1A4D0DA3C2CCB07578CB4FD293C7AD4B9A22F5820C67068B28EB3862535E18",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5104,9 +5104,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "69FEE36E859E4ACBE82483EEB6EB6D759C93F6B3B9CBACF6C4034FDC1435B3C5",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "1733B12CC72F5E7C7F3A0B3E64410D147542DF1D85A5776483CACCC1EE36B08B",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5371,9 +5371,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "4F306397586E3994667C271C7774E60D0849FE3D52AAEBF48081F3DD49A20F01",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "E30614EC00BBCC3BD545D1BCD3ED227766801F9641A43647F1C12D992326F334",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5446,9 +5446,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "672C2C4E7689F7667FDEFB747C3583FB4727C1DEAF07C05F5B9C245E7B98C597",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "58C571870EA498C0AFD3E6600A38CD232B871A105FC81BBE5AE46C654D813954",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5644,9 +5644,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "E8BE8281A6F3F481929D5E6B06EF13914F687F5AAC00924AF12DB389F3D8F178",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A71333E3777265EDC5D7B98D0A62BCC14C84A9A92E8D0C9622D9595EE48EAA8C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5707,9 +5707,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "989DD01CE6AE4A3B2A49F395ADA6B7A5047B0D1CE3D44B10324F08E81F155307",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "F5F9DF63BB57BA70C42AB64BEF9AA6D13B98E32557C3F0BB022F028498F0DBA9",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5758,9 +5758,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "5587D54ECF31C4E34AE87E2622941DB566A5D52E4FD70B673D45A58313A975CF",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "64DC1EE1FA525BD856FE3047B5B35149695D04100529A15205D2E48FBB89C9EA",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5839,9 +5839,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "3373BA58D339EB88118FAA13DCEABE0A02F0F49581EBF2E32BDB6610DB3AB5F2",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "1FDE0B669EC38092A0B5BCA4161456EBA280AEA94CE86A3A52DBE401ECA7757A",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5890,9 +5890,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "D233FEDAB55F287E7BDA2E8A178F95F83FE80B46E701C0CFCB5B416BA8CC79A6",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "47402FEBCC97861438AC0CF53E7DCFB7EFEBE598C9CE593F8B2190F0098DE66E",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -5953,9 +5953,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "7106FD002218EBF717FCA5CAA1FC21DDDF421355AE1C51860AEC2EE6C338E81D",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "33FBFBD54D70A4F042F43324E4A070DBE8812D8AEE24C2D1999F7AFD858BC0A2",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6052,9 +6052,9 @@
         },
         {
           "version": "1.0.3",
-          "sourceHash": "B08321CB29B34FC589460041FABA0F3729F7E61365FEC2FEE0CA1923B8EF13B4",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "F76410BF26206E59C4061C01FD677C18040D65346BF2FBE3412604C891E63ACD",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6103,9 +6103,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "4798D1DBD54502B59187CFFABFAFF69B1CE5BCC6E53B083E4D2DEA32C8A6AF68",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "226A0498FC6B034DC78A8902B96020D0EE70F68C0E13C937FE518F62C8552B87",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6154,9 +6154,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "C20D28781FD3D63738C1BD6FBC4EEF2913EA83720BC3479B9901107D5FD35787",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C4AF5D397F39E5BBD3F767EC158F998AC429E20C8C9C03767EBD4BB87F28FC30",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6253,9 +6253,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "C932EBEE14A7490ECC46A15429AC43ADA696F4CB335CC9640374F5AD90C0BA7F",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "1AC3405B713EF371C26CA697D3AB83C84503B103488B92331F0E327F0BAB1DE5",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6346,9 +6346,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "86E25BE854353D46DFC07ECAC07700443A2429F9A39A775D1EC5F44C5F94806A",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A51B1D1AD26FA79086E4F714B938AEC82CACA68A9B5D7323757D56EE36F92D8F",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6427,9 +6427,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "5D41C1A7A57C8101FFE3EEBA73A1BB8815A70FA27A7E371BD4D2A12E07736C38",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "9794085B1D726C0D42FFC4C8E0324684A5E91667E67BF7AB26A7570E139D472F",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6508,9 +6508,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "0BCBF8F6F038120EE8B13516288F3E7FBD05793F1F63D0E96EEFCD34604FE5AA",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "D96F87D16F84EB69B93D652ACBBC8766B2743F912F95249442C707B35DDF49A7",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6721,9 +6721,9 @@
         },
         {
           "version": "1.0.3",
-          "sourceHash": "7892744A4E30F8201F525BFDAD1B0EBD89456C15459EB0868784F8E81DB4EAE1",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "3B9A71B0CB2175491916E0AB3FC86E9AFC3308EF44C34777961343BD7968A84F",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6796,9 +6796,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "63FCFD25E4EB49ABDAB11B2AFEB29674C5093A5E3E081C66E884D0EE8E0D4153",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "F78650EEAF36226DEE42966C37D74A14308AD622BE4F9258142D02A1600BD1DC",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -6976,9 +6976,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "957123480CC226784217F8BBAEF4958B2056851DF09A82FDBF8171114526D4F4",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "482B52D14198906DA69394EE416E58F6EE0BE73F457864D75330B45490431F2C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7087,9 +7087,9 @@
         },
         {
           "version": "1.1.1",
-          "sourceHash": "72DB6782694F56418A2518122A05C07D31269396A6F8080D224F830F4F9E4971",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "520C64505DB2FFA953E7D838F17C3E0F20D20185D488C600953F9D8421C8CBFF",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7300,9 +7300,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "B7E42F1E5F1A6F292634A4BEDC11D014E0F0BD944EDECAEA359A928BCF8F569B",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "C28DDAA64F11A2BC8E56CCBF1D382AC2F5F056C322EABCA5A5D36A545531A871",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7405,9 +7405,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "5FA762C12CBEF41CC1438EF95D4F1F47AA36755FB69B11213BB284F3B49A5489",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "636C65F419283A5408BC375DDDA88251AE3BF6185D8082F8ABD9392CC4BCE209",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7462,9 +7462,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "4BFABE60E22379620ED8B7B300E54BFC77DBA9C5B35D49CB70B106BE96B3FFCE",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "A6FD5F7191FE55448FC594E97221997250E02766A3E1637852F746D5DD102EF0",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7537,9 +7537,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "6FBBED3A1C85D2E7D4B669A6A566FFEA1F60ABF6A2606E0177F05C001A7A7768",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "5B1D43A4379040CE39667F5AD29137B4432AF2B34E6A0E8C2F9CBBEDB59C92A4",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7840,9 +7840,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "DAE71DC39D44F906136F0470BEF38A1A5B3545CD500A8A2BF94DE3B81FE8B9C7",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "749575BD09E18010C45912DD55DD9460DEEAC420F5A6A1F2C2C3B21D301D29FA",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -7933,9 +7933,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "4D024825C74F5DBDCC1341E7922713FD768B1B0783709E431BB8A23A640B1F2C",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "8BCC72D1E70D90D67E112547E44B347D1131F19A00B1D73A35AA461D6260F391",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8119,9 +8119,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "A3B0DA9E26A787FCF4CC65F09E05D6D53C24F25F94C0096D34D95E263C8737E6",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "5AA2FA9BB23C2793C51EE3DC6C16709DE45DD641D4EEA00611E2DEA891283D18",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8170,9 +8170,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "24A675671E7E5232C0A684A170F85677032BD535C8FC9CF01A16A7BE89EA622B",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "53D8EEF9DD4323AF3D845E1630C251935717551869BFE175D949BC6E368C9940",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8374,9 +8374,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "B9B07A74ACC702FD50362ABC351E79DC0AA83F8F80D0C6FC0D8AADBDBF4FCC68",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "7DE1535831EAC487A960D464749A37D5945DA5C2BC1BED1C66FFACFA13F073B1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8599,9 +8599,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "2C2B31310F7ACF4536ED3A0122543166D53994EE1ED340E030A5FD6B47ADC8D2",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A1AD663C8E00D926A5A48051BB0C91BFEEE9D65075FF9CC518E4AC885786A97D",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8686,9 +8686,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "BA62C1C1109A00CD1B282059559EC329E20972BFDC0100E8111FE77175052014",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "2B877F2C6FDE1161F474CB72C67B8E96F4C6BC09369F2C2BD26B87D1EEB99738",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8785,9 +8785,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "7D27B7609B8EF08F3522D2D518FE878C3F3E8F27378578957F75AF6BCD69D060",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "800C7AA92FF056A912B274431F3CB224F19BBCBCDF12CA5410F20B4AB3BC4649",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -8914,9 +8914,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "761D088A41934946A9F303096EAA6594DD5515CE0709881EF940A5878A053453",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "A0DE399710B0F6D459399664794EE68518FA2473AC4951A7A5379C414883E2EA",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -9031,9 +9031,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "42777AB2638A030AECEDDC3F59A9254ED42370EFB696D347BA345FCF076201E9",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "33D735CF78CAAF7B3DDE04EBC87924D518AC52A7D10A540D2BA0D07946E0D9C0",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -9154,9 +9154,9 @@
         },
         {
           "version": "1.1.3",
-          "sourceHash": "F3C398395411891D4D120FB608C159DB214989A1E5D63F2B0B9108873D507681",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "3C07D1FA48076A0F74C25FC655BECFAE5341A9E47AA407C04B45F2D074B0BDC8",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -9619,9 +9619,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "9636F56B2462A4C3685B9DC89883DF6922850858310E65276B4DACF1699C54B1",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "9E7C1802E2AB4941E2BCB232057F2ED714BC5AEF376C6694D26AB353B259BA0E",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -9811,9 +9811,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "BA4D83852C9B659B6511D8BA68C085A8306B8BA61622B40FB3BF4C909F90D65B",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "E45766A3B443EEF67F850EF888D9DAB04D242E15BC03B668EC0C20B7DCB082B1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -9898,9 +9898,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "84B4AD86CF9247F1A5349FBADF25AD6F73103F5F3337FC04EBA81FE0E8552279",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "086E5FB139C6DFA7DA205E778CC8698C894CDD6672AB7FA5CF8B09CC80DAB029",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10054,9 +10054,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "412743442A56A08D1BD1F899AA67F3B97ECCC4EACDE443F1B67350F6C59F9E75",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "5D312E5A2967045BFEC131A6A8267B8EB180EC7D5157D544477A8D54CE72A537",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10192,9 +10192,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "C5B3E3149A19C0F2DF1001C910A4FA84707FD70C8C0D2E3F4F0EA0D7FE6D6643",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "E66B115CC6468DE86DCB617A9809FB6F86B6A6CB02827956584DC87AEE5974E1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10303,9 +10303,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "F84A0DD35ED94BD05B4BED46478FCFFB12D3D308B5B0FB66B69E9E2CBFD31EDA",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "ED7BA8434610266C5FA8278802918F5CA7B7BEFDF07F172E3600079ECCBDF309",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10489,9 +10489,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "80B397972F0829263C6F66B2894F49E62989E9C13A2BFC5108BCEEF06A2E920F",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "F31025EB47D0D5491DED93D5784F2391AD415CCDCA8C24F1BD62A0630BDD735E",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10588,9 +10588,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "C4E1C7B1598B54EE017E946ADB5D00201D202AF59942AD858B72AF513E3C4CF2",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "22190DF1942BBE6A61B9B17F8A39A885C3FA7CD1038ED52AB17128454C35B61F",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10786,9 +10786,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "FC2759F23665AC2E83E995836C4E66BF0CA9244E16730D7DF418BF95132E4F63",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "64768EB2EC896243B77D089B743B14F09E259B25D2FA7984936A03379E1C9879",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -10897,9 +10897,9 @@
         },
         {
           "version": "1.0.2",
-          "sourceHash": "9FF9B2B106119B4A258D3C2CDBF4C1736D5EC55FEECDDAA01111DF23E46B25D3",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "DBAE8FC2DA3DAFA502712695198B187C62CBD4C51EE0AB096C62D1735A48CAD2",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11206,9 +11206,9 @@
         },
         {
           "version": "1.0.1",
-          "sourceHash": "B5381B1560F9F0A41CBBDBCF69339FB8D320A427E03F733EA130FA614CAFA3F0",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "0B158C24D2FFDD41D1EC343609E1F4FF10D6A344C2EC70F464D69E88CC4C9D15",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11293,9 +11293,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "F8E2DC41E90BCD23140C347405886B87AC0CBB32CBCB6D0316D22451475795AD",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "1E5FEA43F5BB1B3AA48320BCA821ED90DD47399EA3D551A49043F450AD128693",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11548,9 +11548,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "BFFC56319912E37DF20C196A3EE0D739FAC3D19F30A9577773695841E09659D7",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "55C1A04F54B1D0E1516441CE3924C246C807FFE2103E3DC188F4FBD80BDC8CEB",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11728,9 +11728,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "1A5F62C4FBC6A3EA3CE440C29822870D299E8F252DE014F917DD637E4F3B2C84",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "BF63DFD419DFEE681C25426A0C2384437B39C898A98BD9D562764D5B68EA1E6C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11851,9 +11851,9 @@
         },
         {
           "version": "1.2.0",
-          "sourceHash": "0F27F512147D56661FD1771067041867D5F14C804F7516889FE73EA7A486A10E",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "2CA30374003AAB69D27E9A9A84B400767B38A88086321899701BA56D68618EB1",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -11950,9 +11950,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "E5C4023E00FB074C2B599D34C688AF10A05722C2729D477B9EB874BC78A43C36",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "94B51F326C988D3838012F712843B4B8A00517245CA4911848EB1CF29DED1B5C",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -12274,9 +12274,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "48939AA395374456F1AD45F544A964461E5096020EDAF14F3C0AC69FC90CE46F",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "4B95BFC3A92A8F7406A1DA318C63AFD76C25CF27DE8F1FCA3C66031E0FBDA9AE",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -12448,9 +12448,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "3C64224E1EBD9FD42F9E13FB8816C6686F721E3F84570A9C2DB8ACD62707141D",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "C6115E1C6466CEF07DA424F23D85C36DEF99D61FB970A33E90583653F6D23761",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -12559,9 +12559,9 @@
         },
         {
           "version": "2.0.1",
-          "sourceHash": "E4848359FC01B6E4B1398483A7DF4CE596FCF80B8B5099EAF9565C6A3895D088",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "D1DE15020EF335BF7A6142FB71121B76A2761A9BFAD30C363C9E076C73347FBE",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -12769,9 +12769,9 @@
         },
         {
           "version": "1.2.0",
-          "sourceHash": "4EBEE58AE46EE77F163500CDA8D9397455CD78538B687B5E8D2448C2E2A166B8",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "0D64DE48699914570EFCA22DF364504365782D74140DE4F2BA66C6E3CE20C4EE",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -12937,9 +12937,9 @@
         },
         {
           "version": "1.1.0",
-          "sourceHash": "ECB906B9B239D379B2937FF5D330F2A0C40166DD97251C1B5EBA1742808EDFBA",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T01:10:44.3982770\u002B08:00"
+          "sourceHash": "E0109AFA718CA6057AD4A80D655FA5F1779DE9F6DE054F32B1727FABE06215B3",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -13123,9 +13123,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "E101F0CA8599E11F181BB991239E4F6A71334EE36E79ECDF2B7335356C25BEDF",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "E854175C98D2FD2B4C916089FFE6E925AE7A7A25A0AE0CDAC7A79681CC33C9A7",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -13519,9 +13519,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "C20719DEC93FA688EDD9774106D8CA7012614B3457F465614BD72D351F4C5B6D",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "ACE830793818CD03349655F0319C1CC12B43BC0F9254A06DB3C73BCDE813F273",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     },
@@ -14071,9 +14071,9 @@
         },
         {
           "version": "1.0.0",
-          "sourceHash": "3C312D31DDFF5A660847710C706878E53535E66A40077CF5037C0AD058F93343",
-          "fingerprintVersion": "operator-runtime-metadata-v2",
-          "recordedAt": "2026-07-15T00:40:06.5702447\u002B08:00"
+          "sourceHash": "0A08E53EE19114735FAFDFFE3DD8C8B6223F4EB1FA447D757C09508B6063C9AD",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
         }
       ]
     }

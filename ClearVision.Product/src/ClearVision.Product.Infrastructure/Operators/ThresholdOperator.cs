@@ -52,7 +52,12 @@ public class ThresholdOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid."));
         }
 
-        if (!TryResolveThresholdType(typeValue, useOtsu, out var thresholdType, out var thresholdError))
+        if (!ImageInputRuntimeContractEvaluator.TryResolveThresholdType(
+                typeValue,
+                useOtsu,
+                out var thresholdType,
+                out _,
+                out var thresholdError))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure(thresholdError));
         }
@@ -117,70 +122,17 @@ public class ThresholdOperator : OperatorBase
 
         var typeValue = GetIntParam(@operator, "Type", 0);
         var useOtsu = GetBoolParam(@operator, "UseOtsu", false);
-        if (!TryResolveThresholdType(typeValue, useOtsu, out _, out var thresholdError))
+        if (!ImageInputRuntimeContractEvaluator.TryResolveThresholdType(
+                typeValue,
+                useOtsu,
+                out _,
+                out _,
+                out var thresholdError))
         {
             return ValidationResult.Invalid(thresholdError);
         }
 
         return ValidationResult.Valid();
-    }
-
-    private static bool TryResolveThresholdType(
-        int typeValue,
-        bool useOtsu,
-        out ThresholdTypes thresholdType,
-        out string error)
-    {
-        const int automaticMask = (int)(ThresholdTypes.Otsu | ThresholdTypes.Triangle);
-
-        thresholdType = ThresholdTypes.Binary;
-        error = string.Empty;
-
-        var explicitAutomatic = typeValue & automaticMask;
-        if (explicitAutomatic == automaticMask)
-        {
-            error = "Threshold type cannot combine Otsu and Triangle.";
-            return false;
-        }
-
-        if (useOtsu && explicitAutomatic == (int)ThresholdTypes.Triangle)
-        {
-            error = "UseOtsu cannot be combined with Triangle threshold type.";
-            return false;
-        }
-
-        var baseType = typeValue & ~automaticMask;
-        if (baseType is not 0
-            and not (int)ThresholdTypes.BinaryInv
-            and not (int)ThresholdTypes.Trunc
-            and not (int)ThresholdTypes.Tozero
-            and not (int)ThresholdTypes.TozeroInv)
-        {
-            error = $"Unsupported threshold type value: {typeValue}.";
-            return false;
-        }
-
-        var automaticType = explicitAutomatic;
-        if (useOtsu)
-        {
-            automaticType |= (int)ThresholdTypes.Otsu;
-        }
-
-        if (automaticType == automaticMask)
-        {
-            error = "Threshold type cannot combine Otsu and Triangle.";
-            return false;
-        }
-
-        if (automaticType != 0 &&
-            baseType is not (int)ThresholdTypes.Binary and not (int)ThresholdTypes.BinaryInv)
-        {
-            error = "Otsu and Triangle require Binary or BinaryInv as the base threshold type.";
-            return false;
-        }
-
-        thresholdType = (ThresholdTypes)(baseType | automaticType);
-        return true;
     }
 
     private static bool TryValidateImageContract(
@@ -200,42 +152,6 @@ public class ThresholdOperator : OperatorBase
             : (thresholdType & ThresholdTypes.Triangle) == ThresholdTypes.Triangle
                 ? "Triangle"
                 : "Fixed";
-
-        if (src.Channels() > 1 && !ThresholdImageContractProvider.SupportsColorConversion(depth))
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_MODE_DEPTH_UNSUPPORTED",
-                OperatorType.Thresholding,
-                contract,
-                src,
-                mode,
-                "BGR/BGRA to Gray supports CV_8U, CV_16U, and CV_32F only.");
-            return false;
-        }
-
-        if (mode == "Otsu" && depth != MatType.CV_8U && depth != MatType.CV_16U)
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_MODE_DEPTH_UNSUPPORTED",
-                OperatorType.Thresholding,
-                contract,
-                src,
-                mode,
-                "Otsu supports CV_8U and CV_16U only for the installed runtime contract.");
-            return false;
-        }
-
-        if (mode == "Triangle" && depth != MatType.CV_8U)
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_MODE_DEPTH_UNSUPPORTED",
-                OperatorType.Thresholding,
-                contract,
-                src,
-                mode,
-                "Triangle supports CV_8U only for the installed runtime contract.");
-            return false;
-        }
 
         if (!IsValueInDepthDomain(threshold, depth) || !IsValueInDepthDomain(maxValue, depth))
         {

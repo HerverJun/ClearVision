@@ -1,227 +1,261 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "clearvision/operator_knowledge_schema.v1.json",
+  "$id": "clearvision/operator_knowledge_schema.v2.json",
   "title": "ClearVision Operator Knowledge Card",
   "type": "object",
   "required": [
-    "operatorType",
-    "displayName",
-    "category",
-    "aliases",
-    "intentTags",
-    "scenarioTags",
-    "inputs",
-    "outputs",
-    "parameters",
-    "requiredResources",
-    "typicalUpstream",
-    "typicalDownstream",
-    "antiPatterns",
-    "knownLimitations",
-    "evidence"
+    "SchemaVersion",
+    "OperatorType",
+    "DisplayName",
+    "CategoryId",
+    "CategoryOrder",
+    "Category",
+    "Lifecycle",
+    "DefaultAiRecommendation",
+    "RequiresLifecycleDisclosure",
+    "Inputs",
+    "Outputs",
+    "Parameters",
+    "ImageInputContracts",
+    "KnownLimitations",
+    "Evidence"
   ],
   "properties": {
-    "operatorType": {
+    "SchemaVersion": {
+      "const": "2026-07.operator-knowledge-card.v2"
+    },
+    "OperatorType": {
       "type": "string",
       "minLength": 1
     },
-    "displayName": {
+    "DisplayName": {
       "type": "string",
       "minLength": 1
     },
-    "category": {
+    "CategoryId": {
       "type": "string",
       "minLength": 1
     },
-    "aliases": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "CategoryOrder": {
+      "type": "integer",
+      "minimum": 0
     },
-    "intentTags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "Category": {
+      "type": "string",
+      "minLength": 1
     },
-    "scenarioTags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "Lifecycle": {
+      "type": "string"
     },
-    "inputs": {
+    "LifecycleNote": {
+      "type": ["string", "null"]
+    },
+    "DefaultHidden": {
+      "type": "boolean"
+    },
+    "DefaultAiRecommendation": {
+      "type": "boolean"
+    },
+    "RequiresLifecycleDisclosure": {
+      "type": "boolean"
+    },
+    "Aliases": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "IntentTags": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "ScenarioTags": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "Inputs": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/portDefinition"
       }
     },
-    "outputs": {
+    "Outputs": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/portDefinition"
       }
     },
-    "parameters": {
+    "Parameters": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/parameterDefinition"
       }
     },
-    "requiredResources": {
+    "ParameterConditions": {
+      "type": "array"
+    },
+    "OutputConditions": {
+      "type": "array"
+    },
+    "ImageInputContracts": {
       "type": "array",
       "items": {
-        "type": "string"
+        "$ref": "#/$defs/imageContractPresentation"
       }
     },
-    "typicalUpstream": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "ResourceRequirements": {
+      "type": "array"
     },
-    "typicalDownstream": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "GenerationDependencies": {
+      "$ref": "#/$defs/stringArray"
     },
-    "antiPatterns": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "GenerationFingerprint": {
+      "type": "string"
     },
-    "knownLimitations": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "RequiredResources": {
+      "$ref": "#/$defs/stringArray"
     },
-    "evidence": {
+    "TypicalUpstream": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "TypicalDownstream": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "AntiPatterns": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "KnownLimitations": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "Evidence": {
       "$ref": "#/$defs/evidenceDefinition"
     }
   },
   "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "portDefinition": {
       "type": "object",
-      "required": [
-        "name",
-        "displayName",
-        "dataType",
-        "isRequired"
-      ],
+      "required": ["Name", "DisplayName", "DataType", "IsRequired"],
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "dataType": {
-          "type": "string"
-        },
-        "isRequired": {
-          "type": "boolean"
-        },
-        "description": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
+        "Name": { "type": "string" },
+        "DisplayName": { "type": "string" },
+        "DataType": { "type": "string" },
+        "IsRequired": { "type": "boolean" },
+        "Description": { "type": ["string", "null"] }
       }
     },
     "parameterDefinition": {
       "type": "object",
+      "required": ["Name", "DisplayName", "DataType", "IsRequired", "AllowedValues"],
+      "properties": {
+        "Name": { "type": "string" },
+        "DisplayName": { "type": "string" },
+        "DataType": { "type": "string" },
+        "Description": { "type": ["string", "null"] },
+        "DefaultValue": { "type": ["string", "null"] },
+        "MinValue": { "type": ["string", "null"] },
+        "MaxValue": { "type": ["string", "null"] },
+        "IsRequired": { "type": "boolean" },
+        "AllowedValues": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "imageContractPresentation": {
+      "type": "object",
       "required": [
-        "name",
-        "displayName",
-        "dataType",
-        "isRequired",
-        "allowedValues"
+        "InputPort",
+        "ContractVersion",
+        "AllowedVariantCount",
+        "VerifiedSupportVariantCount",
+        "VerifiedConversionVariantCount",
+        "LegacyCompatibilityVariantCount",
+        "VerifiedRejectionVariantCount",
+        "UnknownVariantCount",
+        "HasProductionSupport",
+        "CompatibilityOnly",
+        "EvidenceSummary",
+        "ExactVariantGroups"
       ],
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "dataType": {
-          "type": "string"
-        },
-        "description": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "defaultValue": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "minValue": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "maxValue": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "isRequired": {
-          "type": "boolean"
-        },
-        "allowedValues": {
+        "InputPort": { "type": "string" },
+        "ContractVersion": { "const": "2.1" },
+        "AllowedVariantCount": { "type": "integer", "minimum": 0 },
+        "VerifiedSupportVariantCount": { "type": "integer", "minimum": 0 },
+        "VerifiedConversionVariantCount": { "type": "integer", "minimum": 0 },
+        "LegacyCompatibilityVariantCount": { "type": "integer", "minimum": 0 },
+        "VerifiedRejectionVariantCount": { "type": "integer", "minimum": 0 },
+        "UnknownVariantCount": { "type": "integer", "minimum": 0 },
+        "HasProductionSupport": { "type": "boolean" },
+        "CompatibilityOnly": { "type": "boolean" },
+        "EvidenceSummary": { "type": "string" },
+        "ExactVariantGroups": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "$ref": "#/$defs/imageContractVariantGroup" }
         }
+      }
+    },
+    "imageContractVariantGroup": {
+      "type": "object",
+      "required": [
+        "Mode",
+        "Condition",
+        "Admission",
+        "Verification",
+        "ExactInputTypes",
+        "ConversionPolicy",
+        "OutputDepthPolicy",
+        "DynamicRangePolicy",
+        "InputValuePolicy",
+        "FailureCode",
+        "EvidenceLevel"
+      ],
+      "properties": {
+        "Mode": { "type": "string" },
+        "Condition": { "type": "string" },
+        "Admission": { "enum": ["Allowed", "Rejected", "Unknown"] },
+        "Verification": {
+          "enum": [
+            "VerifiedSupport",
+            "VerifiedConversion",
+            "LegacyCompatibilityAllowance",
+            "VerifiedRejection",
+            "Unknown"
+          ]
+        },
+        "ExactInputTypes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^CV_.+C[1-9][0-9]*$" }
+        },
+        "ConversionPolicy": { "type": "string" },
+        "OutputDepthPolicy": { "type": "string" },
+        "DynamicRangePolicy": { "type": "string" },
+        "InputValuePolicy": {
+          "enum": ["Any", "RejectNonFinite", "RequireFiniteFloat32Representable"]
+        },
+        "FailureCode": { "type": "string" },
+        "EvidenceLevel": { "type": "string" }
       }
     },
     "evidenceDefinition": {
       "type": "object",
       "required": [
-        "contract",
-        "golden",
-        "dataset",
-        "fieldReplay",
-        "precisionClaim",
-        "industrialStatus"
+        "Contract",
+        "Golden",
+        "Dataset",
+        "FieldReplay",
+        "PrecisionClaim",
+        "IndustrialStatus"
       ],
       "properties": {
-        "contract": {
-          "type": "string"
-        },
-        "golden": {
-          "type": "string"
-        },
-        "dataset": {
-          "type": "string"
-        },
-        "fieldReplay": {
-          "type": "string"
-        },
-        "precisionClaim": {
-          "type": "string"
-        },
-        "industrialStatus": {
-          "type": "string"
-        },
-        "qScore": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
+        "Contract": { "type": "string" },
+        "Golden": { "type": "string" },
+        "Dataset": { "type": "string" },
+        "FieldReplay": { "type": "string" },
+        "PrecisionClaim": { "type": "string" },
+        "IndustrialStatus": { "type": "string" },
+        "QScore": { "type": ["string", "null"] }
       }
     }
   }

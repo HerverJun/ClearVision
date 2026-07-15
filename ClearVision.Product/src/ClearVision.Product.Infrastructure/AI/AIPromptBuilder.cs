@@ -6,6 +6,7 @@
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -34,7 +35,9 @@ public class AIPromptBuilder
         foreach (var metadata in new OperatorFactory()
                      .GetAllMetadata()
                      .Where(item => !item.DefaultHidden)
-                     .OrderByDescending(item => OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle))
+                     .OrderByDescending(item => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                         item.Lifecycle,
+                         item.ImageInputContracts))
                      .ThenBy(item => OperatorCategoryCatalog.GetOrder(item.CategoryId))
                      .ThenBy(item => item.DisplayName, StringComparer.Ordinal))
         {
@@ -52,8 +55,15 @@ public class AIPromptBuilder
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .ToArray()))
                 .ToArray();
-            var lifecycleNote = OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle)
-                ? $"生命周期={metadata.Lifecycle}。{metadata.LifecycleNote}".Trim()
+            var contractSummary = ImageContractPresentationBuilder.Summarize(metadata.ImageInputContracts);
+            var lifecycleNote = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                metadata.Lifecycle,
+                metadata.ImageInputContracts)
+                ? string.Join(" ", new[]
+                {
+                    $"生命周期={metadata.Lifecycle}。{metadata.LifecycleNote}".Trim(),
+                    contractSummary.ContractCount > 0 ? contractSummary.EvidenceSummary : string.Empty
+                }.Where(item => !string.IsNullOrWhiteSpace(item)))
                 : string.Empty;
 
             _operators.Add(new PromptOperatorInfo(

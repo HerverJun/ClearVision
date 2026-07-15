@@ -68,14 +68,18 @@
 | `SharpenStrength` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `LAPLACIAN_SHARPEN_STRENGTH` |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_16U, CV_32F | CV_8U, CV_16U, CV_32F | 1, 3 | Stage 1 native-value Laplacian sharpening contract. | Color -> Gray for derivative computation; result is restored in the source numeric domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` | `2.0` |
+| `Image` | Allowed:6, Rejected:2, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F | CV_8U, CV_16U, CV_32F | 1, 3 | Stage 1 native-value Laplacian sharpening contract. | Color -> Gray for derivative computation; result is restored in the source numeric domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| - | - | - | - | - | - | - | - | - | - | - |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Default | CV_8UC1, CV_16UC1 | Stage 1 native-value Laplacian sharpening path. | `Allowed` | `VerifiedSupport` | Color -> Gray for derivative computation; restore result in source domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+| `Image` | Default | CV_32FC1 | Stage 1 native-value Laplacian sharpening path. | `Allowed` | `VerifiedSupport` | Color -> Gray for derivative computation; restore result in source domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+| `Image` | Default | CV_8UC3, CV_16UC3 | Stage 1 native-value Laplacian sharpening path. | `Allowed` | `VerifiedConversion` | Color -> Gray for derivative computation; restore result in source domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+| `Image` | Default | CV_32FC3 | Stage 1 native-value Laplacian sharpening path. | `Allowed` | `VerifiedConversion` | Color -> Gray for derivative computation; restore result in source domain. | Preserve source depth and channel count. | No MinMax conversion; native-domain Laplacian response. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+| `Image` | Default | CV_64FC1, CV_64FC3 | The Stage 1 Laplacian contract intentionally excludes CV_64F. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -88,7 +92,7 @@
 | `SharpenStrength` | - | `LAPLACIAN_SHARPEN_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`7892744A4E30F8201F525BFDAD1B0EBD89456C15459EB0868784F8E81DB4EAE1`
+- 组合指纹 (Generation Fingerprint)：`3B9A71B0CB2175491916E0AB3FC86E9AFC3308EF44C34777961343BD7968A84F`
 - `type:ClearVision.Product.Infrastructure.Operators.LaplacianSharpenImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

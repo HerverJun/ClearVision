@@ -139,6 +139,13 @@ public class OperatorMetadata
     /// Authoritative image depth/channel/dynamic-range contracts for Image input ports.
     /// </summary>
     public List<ImageInputContract> ImageInputContracts { get; set; } = new();
+
+    /// <summary>
+    /// Compact exact-combination projection for UI and other presentation surfaces.
+    /// Runtime admission continues to use <see cref="ImageInputContracts"/> variants.
+    /// </summary>
+    public IReadOnlyList<ImageInputContractPresentation> ImageInputContractPresentations =>
+        ImageContractPresentationBuilder.Build(ImageInputContracts);
 }
 
 /// <summary>

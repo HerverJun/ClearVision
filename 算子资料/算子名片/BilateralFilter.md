@@ -57,14 +57,17 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_32F | CV_8U, CV_32F | 1, 3 | Bilateral shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+| `Image` | Allowed:4, Rejected:11, Unknown:0 | Verified production support is present. | CV_8U, CV_32F | CV_8U, CV_32F | 1, 3 | Bilateral shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Bilateral | `Restricted` | CV_8U, CV_32F | 1, 3 | None | Preserve input depth/channels. | Preserve native numeric domain. | Effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Bilateral | CV_8UC1, CV_8UC3 | Diameter 1..25; effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_32FC1, CV_32FC3 | Diameter 1..25; effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_8UC4, CV_32FC4 | The installed bilateral path admits C1/C3 only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed bilateral path admits CV_8U/CV_32F only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -72,7 +75,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`5B62306CB98599FD6D64C42374CC66EC819C74D630EB93B243C7260764A92F9E`
+- 组合指纹 (Generation Fingerprint)：`7659FA8D8DD6EFA25AB113D4150B2A5DA94E565ABBDAD8866EC09A5A3C56988B`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 

@@ -105,13 +105,6 @@ public class ImageNormalizeOperator : OperatorBase
             }
             else if (src.Channels() == 3)
             {
-                if (method.Equals("ZScore", StringComparison.OrdinalIgnoreCase) &&
-                    colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase))
-                {
-                    return Task.FromResult(OperatorExecutionOutput.Failure(
-                        "ZScore with ColorMode=LumaOnly is not supported for 3-channel images; use ColorMode=PerChannel."));
-                }
-
                 normalization = colorMode.Equals("PerChannel", StringComparison.OrdinalIgnoreCase)
                     ? ApplyPerChannel(src, channel => NormalizeSingleChannel(channel, method, alpha, beta))
                     : colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase)

@@ -12,7 +12,7 @@
 | 生命周期 (Lifecycle) | 实验 `Experimental` |
 | 生命周期说明 (Lifecycle Note) | TPS 局部形变与多候选搜索为实验能力，尚需目标域数据验证鲁棒性和性能。 |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
 | 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
@@ -88,15 +88,16 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Unknown` |  |  | 1, 3, 4 | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `Unknown` | `2.0` |
-| `Template` | `Unknown` |  |  | 1, 3, 4 | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `Unknown` | `2.0` |
+| `Image` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Template` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| - | - | - | - | - | - | - | - | - | - | - |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Template` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -104,7 +105,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`72DB6782694F56418A2518122A05C07D31269396A6F8080D224F830F4F9E4971`
+- 组合指纹 (Generation Fingerprint)：`520C64505DB2FFA953E7D838F17C3E0F20D20185D488C600953F9D8421C8CBFF`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs

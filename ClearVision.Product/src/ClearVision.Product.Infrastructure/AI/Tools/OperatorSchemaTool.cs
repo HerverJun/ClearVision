@@ -32,7 +32,11 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
           "type": "object",
           "required": ["operatorType"],
           "properties": {
-            "operatorType": { "type": "string" }
+            "operatorType": { "type": "string" },
+            "imageMode": {
+              "type": "string",
+              "description": "Optional exact image mode returned by the mode index. When set, returns its full condition and policies."
+            }
           }
         }
         """);
@@ -44,6 +48,7 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operatorType = ReadString(arguments, "operatorType");
+        var imageMode = ReadString(arguments, "imageMode");
         if (string.IsNullOrWhiteSpace(operatorType))
         {
             return Task.FromResult(VisionAgentToolResult.Fail(
@@ -57,6 +62,30 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
                 "unknown_operator_type",
                 $"Operator type '{operatorType}' is not in the ClearVision operator contract catalog.",
                 new { operatorType }));
+        }
+
+        var imageContracts = string.IsNullOrWhiteSpace(imageMode)
+            ? (object)ImageContractPresentationBuilder.BuildModeIndex(schema.ImageInputContracts)
+            : ImageContractPresentationBuilder.BuildModeDetails(schema.ImageInputContracts, imageMode);
+
+        if (!string.IsNullOrWhiteSpace(imageMode) &&
+            imageContracts is IReadOnlyCollection<ImageInputContractCompactPresentation> details &&
+            details.Count == 0)
+        {
+            return Task.FromResult(VisionAgentToolResult.Fail(
+                "unknown_image_mode",
+                $"Image mode '{imageMode}' does not uniquely match the operator contract.",
+                new
+                {
+                    operatorType = schema.OperatorType,
+                    imageMode,
+                    availableModes = schema.ImageInputContracts
+                        .SelectMany(contract => contract.Presentation.ExactVariantGroups)
+                        .Select(group => group.Mode)
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal)
+                        .ToArray()
+                }));
         }
 
         return Task.FromResult(VisionAgentToolResult.Ok(new
@@ -107,7 +136,9 @@ public sealed class OperatorSchemaTool : VisionAgentToolBase
             }).ToList(),
             parameterConditions = schema.ParameterConstraints,
             outputConditions = schema.OutputAvailabilityRules,
-            imageInputContracts = schema.ImageInputContracts
+            imageContractView = string.IsNullOrWhiteSpace(imageMode) ? "mode-index" : "mode-detail",
+            imageMode,
+            imageInputContracts = imageContracts
         }));
     }
 }

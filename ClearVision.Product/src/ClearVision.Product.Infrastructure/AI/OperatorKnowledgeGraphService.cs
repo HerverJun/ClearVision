@@ -113,8 +113,12 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 Lifecycle = item.Lifecycle.ToString(),
                 LifecycleNote = item.LifecycleNote,
                 DefaultHidden = item.DefaultHidden,
-                DefaultAiRecommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle),
-                RequiresLifecycleDisclosure = OperatorLifecyclePolicy.RequiresDisclosure(item.Lifecycle),
+                DefaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    item.Lifecycle,
+                    item.ImageInputContracts),
+                RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    item.Lifecycle,
+                    item.ImageInputContracts),
                 Aliases = aliases,
                 IntentTags = BuildIntentTags(item),
                 ScenarioTags = BuildScenarioTags(item),
@@ -150,6 +154,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 ParameterConditions = item.ParameterConstraints.ToList(),
                 OutputConditions = item.OutputAvailabilityRules.ToList(),
                 ImageInputContracts = item.ImageInputContracts.ToList(),
+                ImageInputContractPresentations = item.ImageInputContractPresentations.ToList(),
                 ResourceRequirements = resourceRequirements,
                 GenerationDependencies = item.GenerationDependencies.ToList(),
                 RequiredResources = requiredResources,
@@ -490,6 +495,25 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
             limitations.Add(string.IsNullOrWhiteSpace(metadata.LifecycleNote)
                 ? $"生命周期状态：{metadata.Lifecycle}"
                 : $"生命周期状态：{metadata.Lifecycle}；{metadata.LifecycleNote}");
+        }
+
+        var imageContract = ImageContractPresentationBuilder.Summarize(metadata.ImageInputContracts);
+        if (imageContract.CompatibilityOnly)
+        {
+            limitations.Add(ImageContractPresentationBuilder.LegacyCompatibilityNotice);
+        }
+        else if (imageContract.LegacyCompatibilityVariantCount > 0)
+        {
+            limitations.Add(
+                $"{ImageContractPresentationBuilder.LegacyCompatibilityNotice}; " +
+                "only variants explicitly marked VerifiedSupport or VerifiedConversion count as production support.");
+        }
+
+        if (imageContract.ContractCount > 0 &&
+            !imageContract.HasProductionSupport &&
+            imageContract.LegacyCompatibilityVariantCount == 0)
+        {
+            limitations.Add("Image input contract is Unknown; no verified executable support is registered.");
         }
 
         if (evidence.IndustrialStatus.Contains("未完成现场工业验证", StringComparison.OrdinalIgnoreCase))

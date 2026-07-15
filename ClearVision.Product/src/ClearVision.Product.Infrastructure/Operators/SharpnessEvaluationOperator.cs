@@ -84,15 +84,6 @@ public class SharpnessEvaluationOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("OutputImagePolicy must be FullOverlay, Passthrough, or None"));
         }
 
-        if (src.Depth() == MatType.CV_32F && outputImagePolicy == "FullOverlay")
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure(BuildFailure(
-                "IMAGE_DYNAMIC_RANGE_UNDEFINED",
-                src,
-                method,
-                "FullOverlay is not defined for uncalibrated CV_32F ranges; use Passthrough or None.")));
-        }
-
         var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
         using var roiSource = new Mat(src, roi);
         using var convertedRoiGray = new Mat();

@@ -55,14 +55,20 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Median shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+| `Image` | Allowed:27, Rejected:18, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Median shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Median | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel=1 identity for listed depths; effective kernel 3/5 admits 8U/16U/16S/32F; >=7 admits 8U only. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Median:Identity | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4 | Effective kernel equals 1 and behaves as identity. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Identity | CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | Effective kernel equals 1 and behaves as identity. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4 | Effective kernel is 3 or 5. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_32FC1, CV_32FC3, CV_32FC4 | Effective kernel is 3 or 5. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_16SC1, CV_16SC3, CV_16SC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed median kernel 3/5 path admits only 8U/16U/32F. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel7Plus | CV_8UC1, CV_8UC3, CV_8UC4 | Effective kernel is >=7 and <=31. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel7Plus | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed median kernels >=7 path admits CV_8U only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -70,7 +76,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`4BFABE60E22379620ED8B7B300E54BFC77DBA9C5B35D49CB70B106BE96B3FFCE`
+- 组合指纹 (Generation Fingerprint)：`A6FD5F7191FE55448FC594E97221997250E02766A3E1637852F746D5DD102EF0`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 

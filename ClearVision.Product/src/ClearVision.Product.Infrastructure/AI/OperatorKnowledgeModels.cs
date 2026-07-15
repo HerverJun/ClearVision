@@ -38,6 +38,7 @@ public sealed class OperatorKnowledgeEvidence
 
 public sealed class OperatorKnowledgeCard
 {
+    public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-card.v2";
     public string OperatorType { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string CategoryId { get; set; } = string.Empty;
@@ -56,7 +57,11 @@ public sealed class OperatorKnowledgeCard
     public List<OperatorKnowledgeParameter> Parameters { get; set; } = new();
     public List<OperatorParameterConstraint> ParameterConditions { get; set; } = new();
     public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
+    [JsonIgnore]
     public List<ImageInputContract> ImageInputContracts { get; set; } = new();
+
+    [JsonPropertyName("ImageInputContracts")]
+    public List<ImageInputContractPresentation> ImageInputContractPresentations { get; set; } = new();
     public List<OperatorKnowledgeResourceRequirement> ResourceRequirements { get; set; } = new();
     public List<string> GenerationDependencies { get; set; } = new();
     public string GenerationFingerprint { get; set; } = string.Empty;
@@ -88,7 +93,7 @@ public sealed class OperatorKnowledgeEdge
 
 public sealed class OperatorKnowledgeGraph
 {
-    public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-graph.v3";
+    public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-graph.v4";
     public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
     public string Source { get; set; } = "OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest";
     public string GenerationFingerprint { get; set; } = string.Empty;

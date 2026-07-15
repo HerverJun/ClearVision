@@ -66,6 +66,28 @@ public sealed class SpatialFilterRuntimeParityTests
         dedicatedResult.ErrorMessage.Should().NotContainEquivalentOf("OpenCV");
     }
 
+    [Fact]
+    public async Task Median16S_ShouldRejectBeforeOpenCvAndAdvertiseOnlyRealKernelFiveCombinations()
+    {
+        using var source = CreateMat("CV_16S", 1);
+        var unified = new GaussianBlurOperator(NullLogger<GaussianBlurOperator>.Instance);
+
+        var result = await unified.ExecuteAsync(
+            CreateOperator(
+                OperatorType.Filtering,
+                ("FilterMode", "Median"),
+                ("KernelSize", 5)),
+            CreateImageInputs(source));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("IMAGE_MODE_DEPTH_UNSUPPORTED");
+        result.ErrorMessage.Should().Contain("Mode=Median:Kernel3Or5");
+        var supported = result.ErrorMessage!.Split("Supported=", 2)[1].Split(';', 2)[0];
+        supported.Should().NotContain("CV_16SC1");
+        result.ErrorMessage.Should().NotContainEquivalentOf("OpenCV");
+        result.ErrorMessage.Should().NotContainEquivalentOf("Assertion");
+    }
+
     private static OperatorBase CreateDedicated(OperatorType type) => type switch
     {
         OperatorType.MeanFilter => new MeanFilterOperator(NullLogger<MeanFilterOperator>.Instance),

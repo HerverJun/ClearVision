@@ -148,6 +148,7 @@ public class ImageNormalizeOperatorTests
     [InlineData("8UC1")]
     [InlineData("16UC1")]
     [InlineData("32FC1")]
+    [InlineData("64FC1")]
     public async Task ExecuteAsync_ZScore_ShouldSupportDeclaredSingleChannelInputDepths(string caseId)
     {
         var sut = CreateSut();
@@ -170,6 +171,7 @@ public class ImageNormalizeOperatorTests
     [InlineData("8UC1")]
     [InlineData("16UC1")]
     [InlineData("32FC1")]
+    [InlineData("64FC1")]
     public async Task ExecuteAsync_ZScoreConstantImage_ShouldReturnFiniteFloatingZeros(string caseId)
     {
         var sut = CreateSut();
@@ -212,7 +214,10 @@ public class ImageNormalizeOperatorTests
 
         Assert.False(result.IsSuccess);
         Assert.Null(result.OutputData);
-        Assert.Equal("IMAGE_NORMALIZE_NONFINITE_INPUT: input contains NaN or Infinity.", result.ErrorMessage);
+        Assert.StartsWith("IMAGE_NORMALIZE_NONFINITE_INPUT", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Mode=ZScore:Gray", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Input contains NaN or Infinity", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCV", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -233,13 +238,17 @@ public class ImageNormalizeOperatorTests
 
         Assert.False(result.IsSuccess);
         Assert.Null(result.OutputData);
-        Assert.Equal("IMAGE_NORMALIZE_NONFINITE_INPUT: input contains NaN or Infinity.", result.ErrorMessage);
+        Assert.StartsWith("IMAGE_NORMALIZE_NONFINITE_INPUT", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Mode=ZScore:PerChannel", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Input contains NaN or Infinity", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCV", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
     [InlineData("8UC3")]
     [InlineData("16UC3")]
     [InlineData("32FC3")]
+    [InlineData("64FC3")]
     public async Task ExecuteAsync_ZScorePerChannel_ShouldStandardizeEachColorChannel(string caseId)
     {
         var sut = CreateSut();
@@ -293,9 +302,10 @@ public class ImageNormalizeOperatorTests
         var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(
-            "ZScore with ColorMode=LumaOnly is not supported for 3-channel images; use ColorMode=PerChannel.",
-            result.ErrorMessage);
+        Assert.StartsWith("IMAGE_MODE_UNSUPPORTED", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Mode=ZScore:LumaOnly", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("Verification=VerifiedRejection", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCV", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -320,6 +330,84 @@ public class ImageNormalizeOperatorTests
         var pixel = outputMat.At<Vec3w>(30, 40);
         Assert.False(pixel.Item0 == pixel.Item1 && pixel.Item1 == pixel.Item2);
         Assert.Equal("LumaOnly", result.OutputData["ColorMode"]);
+    }
+
+    [Theory]
+    [InlineData("MinMax")]
+    [InlineData("Histogram")]
+    public async Task ExecuteAsync_64FColorLumaOnly_ShouldRejectBeforeOpenCv(string method)
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", method },
+            { "ColorMode", "LumaOnly" }
+        });
+        using var image = CreateColorZScoreProbe("64FC3");
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_MODE_DEPTH_UNSUPPORTED", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCV", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Assertion", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("MinMax", "CV_64FC1")]
+    [InlineData("ZScore", "CV_32FC1")]
+    [InlineData("Histogram", "CV_8UC1")]
+    public async Task ExecuteAsync_64FGrayMatrix_ShouldMatchDeclaredOutput(string method, string outputType)
+    {
+        var sut = CreateSut();
+        using var image = CreateSingleChannelProbe("64FC1");
+
+        var result = await sut.ExecuteAsync(
+            CreateOperator(new Dictionary<string, object> { { "Method", method } }),
+            TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(outputType, output.GetMat().Type().ToString());
+    }
+
+    [Theory]
+    [InlineData("MinMax", "CV_64FC3")]
+    [InlineData("ZScore", "CV_32FC3")]
+    [InlineData("Histogram", "CV_8UC3")]
+    public async Task ExecuteAsync_64FColorPerChannelMatrix_ShouldMatchDeclaredOutput(string method, string outputType)
+    {
+        var sut = CreateSut();
+        using var image = CreateColorZScoreProbe("64FC3");
+
+        var result = await sut.ExecuteAsync(
+            CreateOperator(new Dictionary<string, object>
+            {
+                { "Method", method },
+                { "ColorMode", "PerChannel" }
+            }),
+            TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(outputType, output.GetMat().Type().ToString());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ZScore64FOutsideFloatRange_ShouldFailBeforeConversion()
+    {
+        var sut = CreateSut();
+        using var mat = new Mat(2, 2, MatType.CV_64FC1, Scalar.All(double.MaxValue / 2.0));
+        using var image = new ImageWrapper(mat.Clone());
+
+        var result = await sut.ExecuteAsync(
+            CreateOperator(new Dictionary<string, object> { { "Method", "ZScore" } }),
+            TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_NORMALIZE_NONFINITE_INPUT", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("outside the representable CV_32F range", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCV", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -396,6 +484,7 @@ public class ImageNormalizeOperatorTests
             "8UC1" => new Mat(2, 4, MatType.CV_8UC1),
             "16UC1" => new Mat(2, 4, MatType.CV_16UC1),
             "32FC1" => new Mat(2, 4, MatType.CV_32FC1),
+            "64FC1" => new Mat(2, 4, MatType.CV_64FC1),
             _ => throw new ArgumentOutOfRangeException(nameof(caseId), caseId, null)
         };
 
@@ -414,6 +503,9 @@ public class ImageNormalizeOperatorTests
                 case "32FC1":
                     mat.Set(y, x, (float)(values[index] / 37.0 - 3.0));
                     break;
+                case "64FC1":
+                    mat.Set(y, x, values[index] / 37.0 - 3.0);
+                    break;
             }
         }
 
@@ -427,6 +519,7 @@ public class ImageNormalizeOperatorTests
             "8UC1" => new Mat(5, 7, MatType.CV_8UC1, Scalar.All(37)),
             "16UC1" => new Mat(5, 7, MatType.CV_16UC1, Scalar.All(12345)),
             "32FC1" => new Mat(5, 7, MatType.CV_32FC1, Scalar.All(2.5)),
+            "64FC1" => new Mat(5, 7, MatType.CV_64FC1, Scalar.All(2.5)),
             _ => throw new ArgumentOutOfRangeException(nameof(caseId), caseId, null)
         };
         return new ImageWrapper(mat);
@@ -439,6 +532,7 @@ public class ImageNormalizeOperatorTests
             "8UC3" => new Mat(4, 5, MatType.CV_8UC3),
             "16UC3" => new Mat(4, 5, MatType.CV_16UC3),
             "32FC3" => new Mat(4, 5, MatType.CV_32FC3),
+            "64FC3" => new Mat(4, 5, MatType.CV_64FC3),
             _ => throw new ArgumentOutOfRangeException(nameof(caseId), caseId, null)
         };
 
@@ -466,6 +560,12 @@ public class ImageNormalizeOperatorTests
                             -2.0f + index * 0.25f,
                             1.0f + index * 0.75f,
                             8.0f - index * 0.4f));
+                        break;
+                    case "64FC3":
+                        mat.Set(y, x, new Vec3d(
+                            -2.0 + index * 0.25,
+                            1.0 + index * 0.75,
+                            8.0 - index * 0.4));
                         break;
                 }
             }

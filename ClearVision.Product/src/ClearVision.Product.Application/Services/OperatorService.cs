@@ -76,7 +76,8 @@ public class OperatorService : IOperatorService
             Parameters = metadata.Parameters.Select(MapParameterDefinition).ToList(),
             ParameterConstraints = metadata.ParameterConstraints.ToList(),
             OutputAvailabilityRules = metadata.OutputAvailabilityRules.ToList(),
-            ImageInputContracts = metadata.ImageInputContracts.ToList()
+            ImageInputContracts = metadata.ImageInputContracts.ToList(),
+            ImageInputContractPresentations = metadata.ImageInputContractPresentations.ToList()
         };
     }
 

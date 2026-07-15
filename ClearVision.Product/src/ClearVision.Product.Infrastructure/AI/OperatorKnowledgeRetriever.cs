@@ -140,6 +140,12 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
         foreach (var core in CoreTypes.Select(type => type.ToString()))
             prioritizedTypes.Add(core);
 
+        // Scenario/template membership is an explicit user-intent signal. Keep those
+        // operators in the slice even when their image contract is compatibility-only;
+        // the card still carries DefaultAiRecommendation=false and the evidence warning.
+        foreach (var templateOperator in templateMappedOperators)
+            prioritizedTypes.Add(templateOperator);
+
         if (ShouldPreferModelEmbeddedNms(matchedScenarioKeys, normalizedText))
             prioritizedTypes.Remove(OperatorType.BoxNms.ToString());
 
@@ -161,7 +167,9 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
     {
         var metadata = _operatorFactory.GetAllMetadata()
             .Where(item => !item.DefaultHidden)
-            .OrderByDescending(item => OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle))
+            .OrderByDescending(item => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                item.Lifecycle,
+                item.ImageInputContracts))
             .ThenBy(item => OperatorCategoryCatalog.GetOrder(item.CategoryId))
             .ThenBy(item => item.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -184,8 +192,12 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
                 Lifecycle = item.Lifecycle.ToString(),
                 LifecycleNote = item.LifecycleNote,
                 DefaultHidden = item.DefaultHidden,
-                DefaultAiRecommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(item.Lifecycle),
-                RequiresLifecycleDisclosure = OperatorLifecyclePolicy.RequiresDisclosure(item.Lifecycle),
+                DefaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    item.Lifecycle,
+                    item.ImageInputContracts),
+                RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    item.Lifecycle,
+                    item.ImageInputContracts),
                 Aliases = [item.DisplayName, item.Type.ToString()],
                 Inputs = item.InputPorts.Select(port => new OperatorKnowledgePort
                 {
@@ -217,6 +229,7 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
                 ParameterConditions = item.ParameterConstraints.ToList(),
                 OutputConditions = item.OutputAvailabilityRules.ToList(),
                 ImageInputContracts = item.ImageInputContracts.ToList(),
+                ImageInputContractPresentations = item.ImageInputContractPresentations.ToList(),
                 ResourceRequirements = item.ParameterConstraints
                     .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
                     .Select(constraint => new OperatorKnowledgeResourceRequirement

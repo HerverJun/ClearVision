@@ -59,16 +59,24 @@
 | `UseOtsu` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `THRESHOLD_USE_OTSU_COMPATIBILITY_ALIAS` |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Fixed modes accept native C1 values for 8U/16U/16S/32F/64F. C3/C4 are explicitly converted to gray only for 8U/16U/32F. | C3 BGR or C4 BGRA -> C1 Gray without depth scaling; no implicit depth conversion. | C1 output preserving the admitted gray input depth. | Threshold and ActualThreshold use the input pixel numeric domain; MaxValue uses the output numeric domain. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+| `Image` | Allowed:20, Rejected:25, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Runtime admission is selected from the exact Type/UseOtsu + Depth + Channels variant. | Color conversion only for explicitly listed variants; no implicit depth conversion. | C1 output preserving the admitted gray depth. | Native numeric domain; no implicit MinMax conversion. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Fixed:Binary/BinaryInv/Trunc/ToZero/ToZeroInv | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Color conversion only; C1 is native. | Preserve admitted input depth; output C1. | Native numeric domain. | C3/C4 exclude CV_16S and CV_64F because OpenCV gray conversion does not admit those depths. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
-| `Image` | Otsu | `Restricted` | CV_8U, CV_16U | 1, 3, 4 | Color -> Gray; UseOtsu is a compatibility alias for the Otsu flag. | Preserve admitted input depth; output C1. | ActualThreshold uses the native 8U or 16U input domain. | Only Binary and BinaryInv base modes. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
-| `Image` | Triangle | `Restricted` | CV_8U | 1, 3, 4 | Color -> Gray. | CV_8UC1. | 8-bit input domain. | Only Binary and BinaryInv base modes. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Fixed | CV_16SC3, CV_16SC4, CV_64FC3, CV_64FC4 | The installed gray-conversion path does not admit these depth/channel combinations. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Fixed | CV_8UC1, CV_16UC1, CV_16SC1 | Type is Binary/BinaryInv/Trunc/ToZero/ToZeroInv and UseOtsu=false. | `Allowed` | `VerifiedSupport` | None | Preserve admitted input depth; output C1. | Threshold, MaxValue, and ActualThreshold use the native input numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Fixed | CV_32FC1, CV_64FC1 | Type is Binary/BinaryInv/Trunc/ToZero/ToZeroInv and UseOtsu=false. | `Allowed` | `VerifiedSupport` | None | Preserve admitted input depth; output C1. | Threshold, MaxValue, and ActualThreshold use the native input numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Fixed | CV_8UC3, CV_8UC4, CV_16UC3, CV_16UC4 | Type is a fixed mode; BGR/BGRA conversion is available only for 8U/16U/32F. | `Allowed` | `VerifiedConversion` | BGR/BGRA -> Gray without depth scaling. | Preserve admitted input depth; output C1. | Threshold, MaxValue, and ActualThreshold use the native input numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Fixed | CV_32FC3, CV_32FC4 | Type is a fixed mode; BGR/BGRA conversion is available only for 8U/16U/32F. | `Allowed` | `VerifiedConversion` | BGR/BGRA -> Gray without depth scaling. | Preserve admitted input depth; output C1. | Threshold, MaxValue, and ActualThreshold use the native input numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Otsu | CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | Otsu is verified only for CV_8U and CV_16U. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Otsu | CV_8UC1, CV_16UC1 | Otsu or UseOtsu with Binary/BinaryInv base mode. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray without depth scaling; C1 is native. | Preserve admitted input depth; output C1. | ActualThreshold uses the native 8U or 16U domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Otsu | CV_8UC3, CV_8UC4, CV_16UC3, CV_16UC4 | Otsu or UseOtsu with Binary/BinaryInv base mode. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray without depth scaling; C1 is native. | Preserve admitted input depth; output C1. | ActualThreshold uses the native 8U or 16U domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Triangle | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | Triangle is verified only for CV_8U. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Triangle | CV_8UC1 | Triangle with Binary/BinaryInv base mode. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray; C1 is native. | CV_8UC1. | 8-bit input domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Triangle | CV_8UC3, CV_8UC4 | Triangle with Binary/BinaryInv base mode. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray; C1 is native. | CV_8UC1. | 8-bit input domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -76,7 +84,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`ECB906B9B239D379B2937FF5D330F2A0C40166DD97251C1B5EBA1742808EDFBA`
+- 组合指纹 (Generation Fingerprint)：`E0109AFA718CA6057AD4A80D655FA5F1779DE9F6DE054F32B1727FABE06215B3`
 - `type:ClearVision.Product.Infrastructure.Operators.ThresholdImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

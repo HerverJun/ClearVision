@@ -73,6 +73,24 @@ public sealed class ThresholdDepthContractTests
         result.OutputData["ColorConversion"].Should().Be(channels == 4 ? "BGRA_TO_GRAY" : "BGR_TO_GRAY");
     }
 
+    [Fact]
+    public async Task FixedThreshold_64FColorFailure_ShouldNotAdvertiseNonexistentCombination()
+    {
+        using var source = CreateTwoTone("CV_64F", 3);
+        var executor = new ThresholdOperator(NullLogger<ThresholdOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(
+            CreateOperator(("Threshold", 0.5), ("MaxValue", 1.0), ("Type", 0)),
+            CreateImageInputs(source));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("IMAGE_MODE_DEPTH_UNSUPPORTED");
+        var supported = result.ErrorMessage!.Split("Supported=", 2)[1].Split(';', 2)[0];
+        supported.Should().Contain("CV_64FC1");
+        supported.Should().NotContain("CV_64FC3");
+        result.ErrorMessage.Should().NotContainEquivalentOf("OpenCV");
+    }
+
     [Theory]
     [InlineData("Otsu", "CV_8U", true)]
     [InlineData("Otsu", "CV_16U", true)]

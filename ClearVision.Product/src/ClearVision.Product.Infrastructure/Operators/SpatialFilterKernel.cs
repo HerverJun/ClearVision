@@ -35,7 +35,8 @@ internal sealed record SpatialFilterAppliedSettings(
 internal static class SpatialFilterKernel
 {
     private static readonly string[] AllDepths = ["CV_8U", "CV_16U", "CV_16S", "CV_32F", "CV_64F"];
-    private static readonly string[] MedianDepths = ["CV_8U", "CV_16U", "CV_16S", "CV_32F", "CV_64F"];
+    private static readonly string[] MedianIdentityDepths = ["CV_8U", "CV_16U", "CV_16S", "CV_32F", "CV_64F"];
+    private static readonly string[] MedianSmallKernelDepths = ["CV_8U", "CV_16U", "CV_32F"];
     private static readonly string[] BilateralDepths = ["CV_8U", "CV_32F"];
 
     public static ImageInputContract CreateImageInputContract(OperatorType operatorType, string inputPort)
@@ -47,24 +48,16 @@ internal static class SpatialFilterKernel
             OperatorType.BilateralFilter => SpatialFilterMode.Bilateral,
             _ => (SpatialFilterMode?)null
         };
-        var supportedDepths = mode switch
-        {
-            SpatialFilterMode.Bilateral => BilateralDepths,
-            _ => AllDepths
-        };
-        var supportedChannels = mode == SpatialFilterMode.Bilateral ? new[] { 1, 3 } : new[] { 1, 3, 4 };
-        var restrictions = new List<ImageModeRestriction>
-        {
-            BuildModeRestriction(SpatialFilterMode.Gaussian),
-            BuildModeRestriction(SpatialFilterMode.Mean),
-            BuildModeRestriction(SpatialFilterMode.Median),
-            BuildModeRestriction(SpatialFilterMode.Bilateral)
-        };
-
+        var variants = BuildVariants();
         if (mode.HasValue)
         {
-            restrictions = restrictions.Where(item => item.Mode == mode.Value.ToString()).ToList();
+            variants = variants
+                .Where(item => item.Mode.StartsWith(mode.Value.ToString(), StringComparison.Ordinal))
+                .ToList();
         }
+        var allowed = variants.Where(item => item.Admission == ImageContractAdmission.Allowed).ToArray();
+        var supportedDepths = allowed.Select(item => item.Depth).Distinct(StringComparer.Ordinal).ToArray();
+        var supportedChannels = allowed.Select(item => item.Channels).Distinct().ToArray();
 
         return new ImageInputContract(
             inputPort,
@@ -77,14 +70,10 @@ internal static class SpatialFilterKernel
             "None",
             "Preserve input depth and channel count.",
             "Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected.",
-            restrictions,
+            variants,
             "RejectNaNAndInfinity",
             "IMAGE_DEPTH_UNSUPPORTED",
-            OperatorImageContractResolver.ContractVersion,
-            mode is SpatialFilterMode.Gaussian or SpatialFilterMode.Mean
-                ? ImageContractStatus.Native
-                : ImageContractStatus.Restricted,
-            "E2_EXECUTABLE_PROBE");
+            OperatorImageContractResolver.ContractVersion);
     }
 
     public static bool TryParseMode(string? raw, out SpatialFilterMode mode)
@@ -192,68 +181,12 @@ internal static class SpatialFilterKernel
         ArgumentNullException.ThrowIfNull(source);
 
         var contract = CreateImageInputContract(operatorType, "Image");
-        var depth = ImageInputRuntimeContractEvaluator.ToDepthName(source.Depth());
-        var channels = source.Channels();
-        if (channels is not 1 and not 3 and not 4)
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_CHANNELS_UNSUPPORTED",
-                operatorType,
-                contract,
-                source,
-                settings.Mode.ToString(),
-                $"Channels={channels} is not admitted by the shared spatial-filter kernel.");
-            return false;
-        }
-
-        var depthSupported = settings.Mode switch
-        {
-            SpatialFilterMode.Gaussian or SpatialFilterMode.Mean => AllDepths.Contains(depth, StringComparer.Ordinal),
-            SpatialFilterMode.Median => IsMedianDepthSupported(depth, NormalizeOddKernelSize(settings.KernelSize)),
-            SpatialFilterMode.Bilateral => BilateralDepths.Contains(depth, StringComparer.Ordinal),
-            _ => false
-        };
-        if (!depthSupported)
-        {
-            var failureCode = settings.Mode == SpatialFilterMode.Bilateral
-                ? "IMAGE_DEPTH_UNSUPPORTED"
-                : "IMAGE_MODE_DEPTH_UNSUPPORTED";
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                failureCode,
-                operatorType,
-                contract,
-                source,
-                settings.Mode.ToString(),
-                $"EffectiveKernel={NormalizeOddKernelSize(settings.KernelSize)}; Diameter={NormalizeBilateralDiameter(settings.Diameter)}.");
-            return false;
-        }
-
-        if (settings.Mode == SpatialFilterMode.Bilateral && channels == 4)
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_CHANNELS_UNSUPPORTED",
-                operatorType,
-                contract,
-                source,
-                settings.Mode.ToString(),
-                "BilateralFilter supports C1/C3 only.");
-            return false;
-        }
-
-        if ((source.Depth() == MatType.CV_32F || source.Depth() == MatType.CV_64F) &&
-            !Cv2.CheckRange(source, quiet: true))
-        {
-            error = ImageInputRuntimeContractEvaluator.FormatFailure(
-                "IMAGE_NONFINITE_INPUT",
-                operatorType,
-                contract,
-                source,
-                settings.Mode.ToString(),
-                "Input contains NaN or Infinity.");
-            return false;
-        }
-
-        return true;
+        return ImageInputRuntimeContractEvaluator.TryValidateResolvedMode(
+            operatorType,
+            contract,
+            source,
+            ResolveContractMode(settings),
+            out error);
     }
 
     public static SpatialFilterAppliedSettings Apply(
@@ -332,56 +265,87 @@ internal static class SpatialFilterKernel
             settings.SigmaSpace);
     }
 
-    private static int NormalizeOddKernelSize(int value)
+    internal static int NormalizeOddKernelSize(int value)
     {
         return value % 2 == 0 ? value + 1 : value;
     }
 
-    private static int NormalizeBilateralDiameter(int value)
+    internal static int NormalizeBilateralDiameter(int value)
     {
         return Math.Max(3, ((value / 2) * 2) + 1);
     }
 
-    private static bool IsMedianDepthSupported(string depth, int effectiveKernel)
+    internal static string ResolveContractMode(SpatialFilterSettings settings)
     {
+        if (settings.Mode != SpatialFilterMode.Median)
+        {
+            return settings.Mode.ToString();
+        }
+
+        var effectiveKernel = NormalizeOddKernelSize(settings.KernelSize);
         if (effectiveKernel <= 1)
         {
-            return MedianDepths.Contains(depth, StringComparer.Ordinal);
+            return "Median:Identity";
         }
 
-        if (effectiveKernel <= 5)
-        {
-            return depth is "CV_8U" or "CV_16U" or "CV_16S" or "CV_32F";
-        }
-
-        return depth == "CV_8U";
+        return effectiveKernel <= 5 ? "Median:Kernel3Or5" : "Median:Kernel7Plus";
     }
 
-    private static ImageModeRestriction BuildModeRestriction(SpatialFilterMode mode)
+    private static List<ImageContractVariant> BuildVariants()
     {
-        return mode switch
-        {
-            SpatialFilterMode.Gaussian => new ImageModeRestriction(
-                "Gaussian", ImageContractStatus.Native, AllDepths, [1, 3, 4], "None",
-                "Preserve input depth/channels.", "Preserve native numeric domain.",
-                "IMAGE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE",
-                "Kernel 1..31; effective kernel is odd; border 0/1/2/4."),
-            SpatialFilterMode.Mean => new ImageModeRestriction(
-                "Mean", ImageContractStatus.Native, AllDepths, [1, 3, 4], "None",
-                "Preserve input depth/channels.", "Preserve native numeric domain.",
-                "IMAGE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE",
-                "Kernel 1..63; even kernels remain even; border 0/1/2/4."),
-            SpatialFilterMode.Median => new ImageModeRestriction(
-                "Median", ImageContractStatus.Restricted, MedianDepths, [1, 3, 4], "None",
-                "Preserve input depth/channels.", "Preserve native numeric domain.",
-                "IMAGE_MODE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE",
-                "Kernel=1 identity for listed depths; effective kernel 3/5 admits 8U/16U/16S/32F; >=7 admits 8U only."),
-            SpatialFilterMode.Bilateral => new ImageModeRestriction(
-                "Bilateral", ImageContractStatus.Restricted, BilateralDepths, [1, 3], "None",
-                "Preserve input depth/channels.", "Preserve native numeric domain.",
-                "IMAGE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE",
-                "Effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4."),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
-        };
+        var variants = new List<ImageContractVariant>();
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Gaussian", AllDepths, [1, 3, 4],
+            "KernelSize 1..31; effective kernel is odd; border 0/1/2/4.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Mean", AllDepths, [1, 3, 4],
+            "KernelSize 1..63; even kernels remain even; border 0/1/2/4.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Median:Identity", MedianIdentityDepths, [1, 3, 4],
+            "Effective kernel equals 1 and behaves as identity.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Median:Kernel3Or5", MedianSmallKernelDepths, [1, 3, 4],
+            "Effective kernel is 3 or 5.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Rejected(
+            "Median:Kernel3Or5", ["CV_16S", "CV_64F"], [1, 3, 4],
+            "The installed median kernel 3/5 path admits only 8U/16U/32F.",
+            "IMAGE_MODE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Median:Kernel7Plus", ["CV_8U"], [1, 3, 4],
+            "Effective kernel is >=7 and <=31.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Rejected(
+            "Median:Kernel7Plus", ["CV_16U", "CV_16S", "CV_32F", "CV_64F"], [1, 3, 4],
+            "The installed median kernels >=7 path admits CV_8U only.",
+            "IMAGE_MODE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Allowed(
+            "Bilateral", BilateralDepths, [1, 3],
+            "Diameter 1..25; effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4.",
+            (_, _) => ImageContractVerification.VerifiedSupport,
+            "None", "Preserve input depth/channels.", "Preserve native numeric domain.",
+            "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Rejected(
+            "Bilateral", BilateralDepths, [4],
+            "The installed bilateral path admits C1/C3 only.",
+            "IMAGE_CHANNELS_UNSUPPORTED", "E2_EXECUTABLE_PROBE"));
+        variants.AddRange(ImageContractVariantFactory.Rejected(
+            "Bilateral", ["CV_16U", "CV_16S", "CV_64F"], [1, 3, 4],
+            "The installed bilateral path admits CV_8U/CV_32F only.",
+            "IMAGE_DEPTH_UNSUPPORTED", "E2_EXECUTABLE_PROBE"));
+        return variants;
     }
 }

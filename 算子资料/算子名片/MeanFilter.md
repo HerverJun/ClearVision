@@ -56,14 +56,15 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Mean shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+| `Image` | Allowed:15, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Mean shared-kernel admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Mean | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel 1..63; even kernels remain even; border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Mean | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4 | KernelSize 1..63; even kernels remain even; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Mean | CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | KernelSize 1..63; even kernels remain even; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -71,7 +72,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`B7E42F1E5F1A6F292634A4BEDC11D014E0F0BD944EDECAEA359A928BCF8F569B`
+- 组合指纹 (Generation Fingerprint)：`C28DDAA64F11A2BC8E56CCBF1D382AC2F5F056C322EABCA5A5D36A545531A871`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 

@@ -248,7 +248,9 @@ public class PromptBuilder
         var allMetadata = _operatorFactory
             .GetAllMetadata()
             .Where(metadata => !metadata.DefaultHidden)
-            .OrderByDescending(metadata => OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle))
+            .OrderByDescending(metadata => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                metadata.Lifecycle,
+                metadata.ImageInputContracts))
             .ThenBy(metadata => OperatorCategoryCatalog.GetOrder(metadata.CategoryId))
             .ThenBy(metadata => metadata.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -260,7 +262,9 @@ public class PromptBuilder
             relevantMetadata = string.IsNullOrWhiteSpace(userDescription)
                 ? allMetadata
                 : GetRelevantOperators(userDescription)
-                    .OrderByDescending(meta => OperatorLifecyclePolicy.IsDefaultAiRecommendation(meta.Lifecycle))
+                    .OrderByDescending(meta => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                        meta.Lifecycle,
+                        meta.ImageInputContracts))
                     .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
                     .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -280,7 +284,9 @@ public class PromptBuilder
                 ? allMetadata
                 : allMetadata
                     .Where(meta => slice.PrioritizedOperatorTypes.Contains(meta.Type.ToString(), StringComparer.OrdinalIgnoreCase))
-                    .OrderByDescending(meta => OperatorLifecyclePolicy.IsDefaultAiRecommendation(meta.Lifecycle))
+                    .OrderByDescending(meta => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                        meta.Lifecycle,
+                        meta.ImageInputContracts))
                     .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
                     .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -430,6 +436,9 @@ public class PromptBuilder
                     resourceRequirements = card.ResourceRequirements,
                     parameterConditions = card.ParameterConditions,
                     outputConditions = card.OutputConditions,
+                    imageInputContracts = card.ImageInputContracts.Count > 0
+                        ? ImageContractPresentationBuilder.BuildModeIndex(card.ImageInputContracts)
+                        : ImageContractPresentationBuilder.BuildModeIndex(card.ImageInputContractPresentations),
                     typicalUpstream = card.TypicalUpstream,
                     typicalDownstream = card.TypicalDownstream,
                     antiPatterns = card.AntiPatterns,
@@ -464,8 +473,13 @@ public class PromptBuilder
                 category = m.Category,
                 lifecycle = m.Lifecycle.ToString(),
                 lifecycle_note = m.LifecycleNote,
-                default_ai_recommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(m.Lifecycle),
-                requires_lifecycle_disclosure = OperatorLifecyclePolicy.RequiresDisclosure(m.Lifecycle)
+                default_ai_recommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    m.Lifecycle,
+                    m.ImageInputContracts),
+                requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    m.Lifecycle,
+                    m.ImageInputContracts),
+                image_contract = ImageContractPresentationBuilder.Summarize(m.ImageInputContracts)
             });
 
             return JsonSerializer.Serialize(fallbackCatalog, _catalogJsonOptions);
@@ -482,8 +496,12 @@ public class PromptBuilder
             lifecycle = m.Lifecycle.ToString(),
             lifecycle_note = m.LifecycleNote,
             default_hidden = m.DefaultHidden,
-            default_ai_recommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(m.Lifecycle),
-            requires_lifecycle_disclosure = OperatorLifecyclePolicy.RequiresDisclosure(m.Lifecycle),
+            default_ai_recommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                m.Lifecycle,
+                m.ImageInputContracts),
+            requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                m.Lifecycle,
+                m.ImageInputContracts),
             keywords = m.Keywords ?? Array.Empty<string>(),
             inputs = m.InputPorts.Select(p => new
             {
@@ -512,7 +530,7 @@ public class PromptBuilder
             }),
             parameter_conditions = m.ParameterConstraints,
             output_conditions = m.OutputAvailabilityRules,
-            image_input_contracts = m.ImageInputContracts,
+            image_input_contracts = ImageContractPresentationBuilder.BuildModeIndex(m.ImageInputContracts),
             generation_dependencies = m.GenerationDependencies
         });
 

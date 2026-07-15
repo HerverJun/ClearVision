@@ -65,23 +65,28 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
 
         var results = operators
             .Take(topN)
-            .Select(item => new
+            .Select(item =>
             {
-                operatorType = item.OperatorType,
-                displayName = item.DisplayName,
-                categoryId = item.CategoryId.ToString(),
-                categoryOrder = item.CategoryOrder,
-                category = item.Category,
-                lifecycle = item.Lifecycle.ToString(),
-                lifecycleNote = item.LifecycleNote,
-                defaultHidden = item.DefaultHidden,
-                defaultAiRecommendation = item.DefaultAiRecommendation,
-                requiresLifecycleDisclosure = item.RequiresLifecycleDisclosure,
-                summary = item.Description,
-                keywords = item.Keywords,
-                inputPortCount = item.InputPorts.Count,
-                outputPortCount = item.OutputPorts.Count,
-                parameterCount = item.Parameters.Count
+                var imageContract = ImageContractPresentationBuilder.Summarize(item.ImageInputContracts);
+                return new
+                {
+                    operatorType = item.OperatorType,
+                    displayName = item.DisplayName,
+                    categoryId = item.CategoryId.ToString(),
+                    categoryOrder = item.CategoryOrder,
+                    category = item.Category,
+                    lifecycle = item.Lifecycle.ToString(),
+                    lifecycleNote = item.LifecycleNote,
+                    defaultHidden = item.DefaultHidden,
+                    defaultAiRecommendation = item.DefaultAiRecommendation,
+                    requiresLifecycleDisclosure = item.RequiresLifecycleDisclosure,
+                    summary = item.Description,
+                    keywords = item.Keywords,
+                    inputPortCount = item.InputPorts.Count,
+                    outputPortCount = item.OutputPorts.Count,
+                    parameterCount = item.Parameters.Count,
+                    imageContract = imageContract.ContractCount == 0 ? null : imageContract
+                };
             })
             .ToList();
 

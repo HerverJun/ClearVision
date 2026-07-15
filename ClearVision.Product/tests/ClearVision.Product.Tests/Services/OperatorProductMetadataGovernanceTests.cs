@@ -142,6 +142,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             dto.ParameterConstraints.Should().BeEquivalentTo(metadata.ParameterConstraints);
             dto.OutputAvailabilityRules.Should().BeEquivalentTo(metadata.OutputAvailabilityRules);
             dto.ImageInputContracts.Should().BeEquivalentTo(metadata.ImageInputContracts);
+            dto.ImageInputContractPresentations.Should().BeEquivalentTo(metadata.ImageInputContractPresentations);
 
             var ai = aiContracts[type];
             ai.DisplayName.Should().Be(metadata.DisplayName, type.ToString());
@@ -151,10 +152,14 @@ public sealed class OperatorProductMetadataGovernanceTests
             ai.Lifecycle.Should().Be(metadata.Lifecycle, type.ToString());
             ai.DefaultHidden.Should().Be(metadata.DefaultHidden, type.ToString());
             ai.DefaultAiRecommendation.Should().Be(
-                OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle),
+                ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    metadata.Lifecycle,
+                    metadata.ImageInputContracts),
                 type.ToString());
             ai.RequiresLifecycleDisclosure.Should().Be(
-                OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle),
+                ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    metadata.Lifecycle,
+                    metadata.ImageInputContracts),
                 type.ToString());
             ai.InputPorts.Select(item => item.Name).Should().Equal(metadata.InputPorts.Select(item => item.Name));
             ai.OutputPorts.Select(item => item.Name).Should().Equal(metadata.OutputPorts.Select(item => item.Name));
@@ -269,6 +274,28 @@ public sealed class OperatorProductMetadataGovernanceTests
             .Single(item => item.GetProperty("operatorType").GetString() == nameof(OperatorType.SubpixelEdgeDetection));
         reference.GetProperty("defaultAiRecommendation").GetBoolean().Should().BeFalse();
         reference.GetProperty("requiresLifecycleDisclosure").GetBoolean().Should().BeTrue();
+
+        var compatibilityOnlyMetadata = metadata.Values
+            .First(item => ImageContractPresentationBuilder.Summarize(item.ImageInputContracts).CompatibilityOnly);
+        var compatibilityOnlyResult = await tool.ExecuteAsync(
+            new VisionAgentToolContext(),
+            JsonSerializer.SerializeToElement(new
+            {
+                keyword = compatibilityOnlyMetadata.Type.ToString(),
+                topN = 50
+            }),
+            CancellationToken.None);
+        var compatibilityOnlyPayload = JsonSerializer.SerializeToElement(compatibilityOnlyResult.Data);
+        var compatibilityOnly = compatibilityOnlyPayload.GetProperty("operators")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("operatorType").GetString() == compatibilityOnlyMetadata.Type.ToString());
+        compatibilityOnly.GetProperty("defaultAiRecommendation").GetBoolean().Should().BeFalse();
+        compatibilityOnly.GetProperty("requiresLifecycleDisclosure").GetBoolean().Should().BeTrue();
+        var imageContractSummary = compatibilityOnly.GetProperty("imageContract");
+        imageContractSummary.GetProperty("CompatibilityOnly").GetBoolean().Should().BeTrue();
+        imageContractSummary.GetProperty("HasProductionSupport").GetBoolean().Should().BeFalse();
+        imageContractSummary.GetProperty("EvidenceSummary").GetString()
+            .Should().Be(ImageContractPresentationBuilder.LegacyCompatibilityNotice);
 
 #pragma warning disable CS0618
         var compatibilityPrompt = new AIPromptBuilder()
@@ -465,6 +492,127 @@ public sealed class OperatorProductMetadataGovernanceTests
         metadataChanged.Should().NotBe(baseline);
     }
 
+    [Fact]
+    public void GenerationFingerprint_ShouldReactToExactImageCombinationAndVerificationChanges()
+    {
+        var contract = new ImageInputContract(
+            "Image",
+            ["CV_64F"],
+            [1],
+            ["CV_64F"],
+            "Exact input contract",
+            "None",
+            "Preserve",
+            "Preserve",
+            [
+                new ImageContractVariant(
+                    "Fixed",
+                    "CV_64F",
+                    1,
+                    "Fixed threshold",
+                    ImageContractAdmission.Allowed,
+                    ImageContractVerification.VerifiedSupport,
+                    "None",
+                    "Preserve",
+                    "Preserve",
+                    ImageContractInputValuePolicy.Any,
+                    "IMAGE_DEPTH_UNSUPPORTED",
+                    "E2_STAGE2_RUNTIME")
+            ],
+            "RejectNonFinite",
+            "IMAGE_DEPTH_UNSUPPORTED",
+            OperatorImageContractResolver.ContractVersion);
+        var metadata = new OperatorMetadata
+        {
+            Type = OperatorType.Comment,
+            DisplayName = "fingerprint-image-contract",
+            Description = "test",
+            CategoryId = OperatorCategoryId.OutputAndAuxiliary,
+            Category = OperatorCategoryCatalog.GetDisplayName(OperatorCategoryId.OutputAndAuxiliary),
+            Lifecycle = OperatorLifecycle.Stable,
+            ImageInputContracts = [contract]
+        };
+
+        var baseline = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1");
+        metadata.ImageInputContracts =
+        [
+            contract with
+            {
+                SupportedChannels = [3],
+                Variants = [contract.Variants.Single() with { Channels = 3 }]
+            }
+        ];
+        var combinationChanged = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1");
+        metadata.ImageInputContracts =
+        [
+            contract with
+            {
+                Variants =
+                [
+                    contract.Variants.Single() with
+                    {
+                        Admission = ImageContractAdmission.Rejected,
+                        Verification = ImageContractVerification.VerifiedRejection
+                    }
+                ]
+            }
+        ];
+        var verificationChanged = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1");
+        metadata.ImageInputContracts =
+        [
+            contract with
+            {
+                Variants = [contract.Variants.Single() with { Condition = "Different condition" }]
+            }
+        ];
+        var conditionChanged = OperatorGenerationFingerprintBuilder.Compute(metadata, "operator-v1");
+
+        combinationChanged.Should().NotBe(baseline);
+        verificationChanged.Should().NotBe(baseline);
+        conditionChanged.Should().NotBe(baseline);
+        combinationChanged.Should().NotBe(verificationChanged);
+    }
+
+    [Fact]
+    public async Task OperatorSchemaTool_ShouldReturnCompactCompleteExactImageContract()
+    {
+        var result = await new OperatorSchemaTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            JsonSerializer.SerializeToElement(new { operatorType = nameof(OperatorType.SharpnessEvaluation) }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        var json = JsonSerializer.Serialize(result.Data);
+        json.Length.Should().BeLessThanOrEqualTo(new VisionAgentToolContext().MaxToolResultChars);
+        json.Should().Contain("\"ModeGroups\"");
+        json.Should().Contain("\"Modes\"");
+        json.Should().Contain("\"Cases\"");
+        json.Should().Contain("\"Inputs\"");
+        json.Should().NotContain("\"Depth\"");
+        json.Should().NotContain("\"Channels\"");
+        json.Should().Contain("VerifiedSupport");
+        json.Should().Contain("VerifiedRejection");
+
+        var detailResult = await new OperatorSchemaTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            JsonSerializer.SerializeToElement(new
+            {
+                operatorType = nameof(OperatorType.SharpnessEvaluation),
+                imageMode = "Laplacian:PerMethodDefault:FullOverlay"
+            }),
+            CancellationToken.None);
+        detailResult.Success.Should().BeTrue(detailResult.ErrorMessage);
+        var detailJson = JsonSerializer.Serialize(detailResult.Data);
+        detailJson.Length.Should().BeLessThanOrEqualTo(new VisionAgentToolContext().MaxToolResultChars);
+        detailJson.Should().Contain("\"Variants\"");
+        detailJson.Should().Contain("\"When\"");
+        detailJson.Should().Contain("\"Convert\"");
+        detailJson.Should().Contain("\"Output\"");
+        detailJson.Should().Contain("\"Range\"");
+        detailJson.Should().Contain("\"Failure\"");
+        detailJson.Should().Contain("\"Evidence\"");
+    }
+
     [Theory]
     [InlineData("type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel", "Filtering,MedianBlur,BilateralFilter,MeanFilter")]
     [InlineData("type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper", "Measurement")]
@@ -567,10 +715,14 @@ public sealed class OperatorProductMetadataGovernanceTests
                 item.GetProperty("lifecycle").GetString().Should().Be(metadata.Lifecycle.ToString(), path);
                 item.GetProperty("defaultHidden").GetBoolean().Should().Be(metadata.DefaultHidden, path);
                 item.GetProperty("defaultAiRecommendation").GetBoolean().Should().Be(
-                    OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle),
+                    ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                        metadata.Lifecycle,
+                        metadata.ImageInputContracts),
                     path);
                 item.GetProperty("requiresLifecycleDisclosure").GetBoolean().Should().Be(
-                    OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle),
+                    ImageContractPresentationBuilder.RequiresAiDisclosure(
+                        metadata.Lifecycle,
+                        metadata.ImageInputContracts),
                     path);
                 item.GetProperty("inputPorts").EnumerateArray()
                     .Select(port => port.GetProperty("name").GetString())
@@ -583,7 +735,10 @@ public sealed class OperatorProductMetadataGovernanceTests
                     .Should().Equal(metadata.Parameters.Select(parameter => parameter.Name), path);
                 item.GetProperty("parameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
                 item.GetProperty("outputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
-                item.GetProperty("imageInputContracts").GetArrayLength().Should().Be(metadata.ImageInputContracts.Count, path);
+                AssertImageContractPresentations(
+                    item.GetProperty("imageInputContracts"),
+                    metadata.ImageInputContractPresentations,
+                    path);
                 item.GetProperty("generationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
                 item.GetProperty("generationFingerprint").GetString().Should().NotBeNullOrWhiteSpace(path);
             }
@@ -603,8 +758,22 @@ public sealed class OperatorProductMetadataGovernanceTests
         using (var graphDocument = JsonDocument.Parse(File.ReadAllText(
                    Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"))))
         {
+            graphDocument.RootElement.GetProperty("SchemaVersion").GetString()
+                .Should().Be("2026-07.operator-knowledge-graph.v4");
             graphDocument.RootElement.GetProperty("GenerationFingerprint").GetString()
                 .Should().Be(expectedCatalogFingerprint);
+        }
+
+        using (var schemaDocument = JsonDocument.Parse(File.ReadAllText(
+                   Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_schema.json"))))
+        {
+            var schema = schemaDocument.RootElement;
+            schema.GetProperty("$id").GetString().Should().Be("clearvision/operator_knowledge_schema.v2.json");
+            schema.GetProperty("properties").TryGetProperty("ImageInputContracts", out _).Should().BeTrue();
+            schema.GetProperty("$defs").GetProperty("imageContractPresentation")
+                .GetProperty("properties").TryGetProperty("ExactVariantGroups", out _).Should().BeTrue();
+            schema.GetProperty("$defs").GetProperty("imageContractVariantGroup")
+                .GetProperty("properties").TryGetProperty("Verification", out _).Should().BeTrue();
         }
 
         foreach (var (operatorType, metadata) in runtime)
@@ -645,12 +814,38 @@ public sealed class OperatorProductMetadataGovernanceTests
             card.GetProperty("Category").GetString().Should().Be(metadata.Category, path);
             card.GetProperty("Lifecycle").GetString().Should().Be(metadata.Lifecycle.ToString(), path);
             card.GetProperty("DefaultHidden").GetBoolean().Should().Be(metadata.DefaultHidden, path);
+            card.GetProperty("SchemaVersion").GetString().Should().Be("2026-07.operator-knowledge-card.v2", path);
+            card.GetProperty("DefaultAiRecommendation").GetBoolean().Should().Be(
+                ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    metadata.Lifecycle,
+                    metadata.ImageInputContracts),
+                path);
+            card.GetProperty("RequiresLifecycleDisclosure").GetBoolean().Should().Be(
+                ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    metadata.Lifecycle,
+                    metadata.ImageInputContracts),
+                path);
             card.GetProperty("ParameterConditions").GetArrayLength().Should().Be(metadata.ParameterConstraints.Count, path);
             card.GetProperty("OutputConditions").GetArrayLength().Should().Be(metadata.OutputAvailabilityRules.Count, path);
-            card.GetProperty("ImageInputContracts").GetArrayLength().Should().Be(metadata.ImageInputContracts.Count, path);
+            AssertImageContractPresentations(
+                card.GetProperty("ImageInputContracts"),
+                metadata.ImageInputContractPresentations,
+                path);
             card.GetProperty("GenerationDependencies").GetArrayLength().Should().Be(metadata.GenerationDependencies.Count, path);
             card.GetProperty("GenerationFingerprint").GetString().Should().Be(expectedFingerprints[operatorType], path);
         }
+    }
+
+    private static void AssertImageContractPresentations(
+        JsonElement generated,
+        IReadOnlyList<ImageInputContractPresentation> runtime,
+        string path)
+    {
+        var deserialized = JsonSerializer.Deserialize<List<ImageInputContractPresentation>>(
+            generated.GetRawText(),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        deserialized.Should().NotBeNull(path);
+        deserialized.Should().BeEquivalentTo(runtime, path);
     }
 
     private static IReadOnlyList<string> GetOperatorTypes(VisionAgentToolResult result)

@@ -11,7 +11,7 @@ public sealed class SpatialFilterDepthContractTests
     [InlineData("Gaussian", "CV_64F", 4, 3, true, null)]
     [InlineData("Mean", "CV_16S", 3, 4, true, null)]
     [InlineData("Median", "CV_16U", 4, 5, true, null)]
-    [InlineData("Median", "CV_16S", 1, 5, true, null)]
+    [InlineData("Median", "CV_16S", 1, 5, false, "IMAGE_MODE_DEPTH_UNSUPPORTED")]
     [InlineData("Median", "CV_32F", 3, 7, false, "IMAGE_MODE_DEPTH_UNSUPPORTED")]
     [InlineData("Median", "CV_64F", 1, 1, true, null)]
     [InlineData("Median", "CV_64F", 1, 3, false, "IMAGE_MODE_DEPTH_UNSUPPORTED")]

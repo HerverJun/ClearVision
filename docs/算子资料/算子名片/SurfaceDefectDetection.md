@@ -98,16 +98,18 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U | CV_8U | 1, 3, 4 | 8U C1/C3/C4 execution retained for GradientMagnitude, LocalContrast, and ReferenceDiff paths covered by operator and package tests. | C3 BGR/C4 BGRA -> C1 Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and response images remain in the 8-bit domain. | Thresholds and response diagnostics use the legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` | `2.0` |
-| `Reference` | `Restricted` | CV_8U | CV_8U | 1, 3, 4 | Optional 8U reference image admitted for ReferenceDiff paths covered by operator tests. | C3 BGR/C4 BGRA -> C1 Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and response images remain in the 8-bit domain. | Thresholds and response diagnostics use the legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` | `2.0` |
+| `Image` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | 8U C1/C3/C4 execution for the verified defect modes. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Reference` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | Optional 8U reference image for ReferenceDiff. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | GradientMagnitude/LocalContrast/ReferenceDiff | `Restricted` | CV_8U | 1, 3, 4 | Color -> Gray only; no depth conversion. | CV_8U outputs. | Legacy 8-bit intensity domain. | - | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
-| `Reference` | Method=ReferenceDiff | `Restricted` | CV_8U | 1, 3, 4 | Color -> Gray only; no depth conversion. | CV_8U outputs. | Legacy 8-bit intensity domain. | Reference input is only consumed by ReferenceDiff. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Default | CV_8UC1 | GradientMagnitude/LocalContrast/ReferenceDiff legacy 8U paths. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Image` | Default | CV_8UC3, CV_8UC4 | GradientMagnitude/LocalContrast/ReferenceDiff legacy 8U paths. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Reference` | Default | CV_8UC1 | Reference is consumed only by ReferenceDiff. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Reference` | Default | CV_8UC3, CV_8UC4 | Reference is consumed only by ReferenceDiff. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -115,7 +117,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`E4848359FC01B6E4B1398483A7DF4CE596FCF80B8B5099EAF9565C6A3895D088`
+- 组合指纹 (Generation Fingerprint)：`D1DE15020EF335BF7A6142FB71121B76A2761A9BFAD30C363C9E076C73347FBE`
 - `type:ClearVision.Product.Infrastructure.Operators.SurfaceDefectDetectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

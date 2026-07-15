@@ -562,8 +562,8 @@ static string BuildDocument(
     sb.AppendLine($"| 生命周期 (Lifecycle) | {GetLifecycleDisplayName(metadata.Lifecycle)} `{metadata.Lifecycle}` |");
     sb.AppendLine($"| 生命周期说明 (Lifecycle Note) | {EscapeCell(Fallback(metadata.LifecycleNote, "-"))} |");
     sb.AppendLine($"| 默认隐藏 (Default Hidden) | {BoolToMark(metadata.DefaultHidden)} |");
-    sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle))} |");
-    sb.AppendLine($"| AI 必须披露状态 (Requires Disclosure) | {BoolToMark(OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle))} |");
+    sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(ImageContractPresentationBuilder.IsDefaultAiRecommendation(metadata.Lifecycle, metadata.ImageInputContracts))} |");
+    sb.AppendLine($"| AI 必须披露状态 (Requires Disclosure) | {BoolToMark(ImageContractPresentationBuilder.RequiresAiDisclosure(metadata.Lifecycle, metadata.ImageInputContracts))} |");
     sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
 
     sb.AppendLine();
@@ -665,33 +665,40 @@ static string BuildDocument(
     {
         sb.AppendLine();
         sb.AppendLine("## 图像输入域合同 / Image Input Domain Contracts");
-        sb.AppendLine("| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |");
+        sb.AppendLine("| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |");
         sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|------|------|");
         foreach (var contract in metadata.ImageInputContracts.OrderBy(item => item.InputPort, StringComparer.Ordinal))
         {
+            var presentation = contract.Presentation;
+            var admissionSummary = $"Allowed:{presentation.AllowedVariantCount}, " +
+                                   $"Rejected:{presentation.VerifiedRejectionVariantCount}, " +
+                                   $"Unknown:{presentation.UnknownVariantCount}";
+            var verificationSummary = presentation.EvidenceSummary;
             sb.AppendLine(
-                $"| `{contract.InputPort}` | `{contract.Status}` | {EscapeCell(string.Join(", ", contract.SupportedDepths))} | {EscapeCell(string.Join(", ", contract.NativeDepths))} | {EscapeCell(string.Join(", ", contract.SupportedChannels))} | {EscapeCell(contract.InputDepthPolicy)} | {EscapeCell(contract.ImplicitConversionPolicy)} | {EscapeCell(contract.OutputDepthPolicy)} | {EscapeCell(contract.DynamicRangePolicy)} | {EscapeCell(contract.NonFinitePolicy)} | `{contract.FailureCode}` | `{contract.EvidenceLevel}` | `{contract.ContractVersion}` |");
+                $"| `{contract.InputPort}` | {EscapeCell(admissionSummary)} | {EscapeCell(verificationSummary)} | {EscapeCell(string.Join(", ", contract.SupportedDepths))} | {EscapeCell(string.Join(", ", contract.NativeDepths))} | {EscapeCell(string.Join(", ", contract.SupportedChannels))} | {EscapeCell(contract.InputDepthPolicy)} | {EscapeCell(contract.ImplicitConversionPolicy)} | {EscapeCell(contract.OutputDepthPolicy)} | {EscapeCell(contract.DynamicRangePolicy)} | {EscapeCell(contract.NonFinitePolicy)} | `{contract.FailureCode}` | `{contract.ContractVersion}` |");
         }
 
-        var restrictions = metadata.ImageInputContracts
-            .SelectMany(contract => contract.ModeRestrictions.Select(rule => (contract.InputPort, Rule: rule)))
+        var variants = metadata.ImageInputContracts
+            .SelectMany(contract => contract.Presentation.ExactVariantGroups
+                .Select(variant => (contract.InputPort, Variant: variant)))
             .ToList();
         sb.AppendLine();
-        sb.AppendLine("### 模式限制 / Mode Restrictions");
-        sb.AppendLine("| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |");
-        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|");
-        if (restrictions.Count == 0)
+        sb.AppendLine("### 精确运行变体 / Exact Runtime Variants");
+        sb.AppendLine("| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |");
+        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|------|");
+        if (variants.Count == 0)
         {
-            sb.AppendLine("| - | - | - | - | - | - | - | - | - | - | - |");
+            sb.AppendLine("| - | - | - | - | - | - | - | - | - | - | - | - |");
         }
         else
         {
-            foreach (var (inputPort, rule) in restrictions
+            foreach (var (inputPort, variant) in variants
                          .OrderBy(item => item.InputPort, StringComparer.Ordinal)
-                         .ThenBy(item => item.Rule.Mode, StringComparer.Ordinal))
+                         .ThenBy(item => item.Variant.Mode, StringComparer.Ordinal)
+                         .ThenBy(item => item.Variant.Condition, StringComparer.Ordinal))
             {
                 sb.AppendLine(
-                    $"| `{inputPort}` | {EscapeCell(rule.Mode)} | `{rule.Status}` | {EscapeCell(string.Join(", ", rule.SupportedDepths))} | {EscapeCell(string.Join(", ", rule.SupportedChannels))} | {EscapeCell(rule.ConversionPolicy)} | {EscapeCell(rule.OutputDepthPolicy)} | {EscapeCell(rule.DynamicRangePolicy)} | {EscapeCell(Fallback(rule.Condition, "-"))} | `{rule.FailureCode}` | `{rule.EvidenceLevel}` |");
+                    $"| `{inputPort}` | {EscapeCell(variant.Mode)} | {EscapeCell(string.Join(", ", variant.ExactInputTypes))} | {EscapeCell(variant.Condition)} | `{variant.Admission}` | `{variant.Verification}` | {EscapeCell(variant.ConversionPolicy)} | {EscapeCell(variant.OutputDepthPolicy)} | {EscapeCell(variant.DynamicRangePolicy)} | `{variant.InputValuePolicy}` | `{variant.FailureCode}` | `{variant.EvidenceLevel}` |");
             }
         }
     }
@@ -1549,8 +1556,12 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         Lifecycle = metadata.Lifecycle.ToString(),
         LifecycleNote = metadata.LifecycleNote,
         DefaultHidden = metadata.DefaultHidden,
-        DefaultAiRecommendation = OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle),
-        RequiresLifecycleDisclosure = OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle),
+        DefaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts),
+        RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts),
         Version = NormalizeSemVersion(metadata.Version),
         Keywords = (metadata.Keywords ?? Array.Empty<string>())
             .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -1572,6 +1583,7 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
             .ToList(),
         ImageInputContracts = metadata.ImageInputContracts
             .OrderBy(contract => contract.InputPort, StringComparer.Ordinal)
+            .Select(ImageContractPresentationBuilder.Build)
             .ToList(),
         ResourceRequirements = metadata.ParameterConstraints
             .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
@@ -1708,6 +1720,8 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
     foreach (var op in operators)
     {
         var sourceHash = op.GenerationFingerprint;
+        var fingerprintVersion = OperatorGenerationFingerprintBuilder.GetHistorySchemeVersion(
+            op.ImageInputContracts.Count > 0);
         if (!historyById.TryGetValue(op.Id, out var historyEntry))
         {
             historyEntry = new OperatorVersionHistoryEntry
@@ -1743,7 +1757,7 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
             {
                 Version = op.Version,
                 SourceHash = sourceHash,
-                FingerprintVersion = OperatorGenerationFingerprintBuilder.SchemeVersion,
+                FingerprintVersion = fingerprintVersion,
                 RecordedAt = recordedAt
             });
             continue;
@@ -1751,29 +1765,38 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
 
         var fingerprintSchemeChanged = !string.Equals(
             latest.FingerprintVersion,
-            OperatorGenerationFingerprintBuilder.SchemeVersion,
+            fingerprintVersion,
             StringComparison.Ordinal);
         var sourceChanged = !string.Equals(latest.SourceHash, sourceHash, StringComparison.Ordinal);
         var versionChanged = !string.Equals(latest.Version, op.Version, StringComparison.Ordinal);
 
-        if (sourceChanged && !versionChanged && !fingerprintSchemeChanged)
+        if (fingerprintSchemeChanged && !versionChanged)
         {
-            violations.Add(new VersionBumpViolation
-            {
-                OperatorId = op.Id,
-                CurrentVersion = op.Version
-            });
+            latest.SourceHash = sourceHash;
+            latest.FingerprintVersion = fingerprintVersion;
+            latest.RecordedAt = recordedAt;
         }
-
-        if (sourceChanged || versionChanged || fingerprintSchemeChanged)
+        else
         {
-            historyEntry.Records.Add(new OperatorVersionRecord
+            if (sourceChanged && !versionChanged)
             {
-                Version = op.Version,
-                SourceHash = sourceHash,
-                FingerprintVersion = OperatorGenerationFingerprintBuilder.SchemeVersion,
-                RecordedAt = recordedAt
-            });
+                violations.Add(new VersionBumpViolation
+                {
+                    OperatorId = op.Id,
+                    CurrentVersion = op.Version
+                });
+            }
+
+            if (sourceChanged || versionChanged || fingerprintSchemeChanged)
+            {
+                historyEntry.Records.Add(new OperatorVersionRecord
+                {
+                    Version = op.Version,
+                    SourceHash = sourceHash,
+                    FingerprintVersion = fingerprintVersion,
+                    RecordedAt = recordedAt
+                });
+            }
         }
     }
 
@@ -2442,7 +2465,7 @@ internal sealed class CatalogOperator
 
     public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
 
-    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
+    public List<ImageInputContractPresentation> ImageInputContracts { get; set; } = new();
 
     public List<CatalogResourceRequirement> ResourceRequirements { get; set; } = new();
 

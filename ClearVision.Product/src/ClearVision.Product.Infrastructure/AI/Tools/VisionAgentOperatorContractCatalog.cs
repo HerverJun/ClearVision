@@ -74,6 +74,12 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
 
     private static VisionAgentOperatorContract ToContract(OperatorMetadata metadata)
     {
+        var defaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts);
+        var requiresDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts);
         return new VisionAgentOperatorContract(
             metadata.Type.ToString(),
             metadata.DisplayName,
@@ -84,8 +90,8 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
             metadata.Lifecycle,
             metadata.LifecycleNote ?? string.Empty,
             metadata.DefaultHidden,
-            OperatorLifecyclePolicy.IsDefaultAiRecommendation(metadata.Lifecycle),
-            OperatorLifecyclePolicy.RequiresDisclosure(metadata.Lifecycle),
+            defaultAiRecommendation,
+            requiresDisclosure,
             metadata.InputPorts.Select(ToPort).ToList(),
             metadata.OutputPorts.Select(ToPort).ToList(),
             metadata.Parameters.Select(ToParameter).ToList(),

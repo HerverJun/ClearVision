@@ -14,6 +14,10 @@ namespace ClearVision.Product.Core.Services;
 public static class OperatorGenerationFingerprintBuilder
 {
     public const string SchemeVersion = "operator-runtime-metadata-v2";
+    public const string ImageContractHistorySchemeVersion = "operator-runtime-metadata-v2:image-contract-v2.1";
+
+    public static string GetHistorySchemeVersion(bool hasImageInputContracts) =>
+        hasImageInputContracts ? ImageContractHistorySchemeVersion : SchemeVersion;
 
     private static readonly JsonSerializerOptions CanonicalJson = new()
     {
@@ -119,7 +123,6 @@ public static class OperatorGenerationFingerprintBuilder
                     .Select(contract => new
                     {
                         contract.InputPort,
-                        contract.Status,
                         SupportedDepths = NormalizeSet(contract.SupportedDepths),
                         SupportedChannels = contract.SupportedChannels.OrderBy(value => value),
                         NativeDepths = NormalizeSet(contract.NativeDepths),
@@ -127,26 +130,28 @@ public static class OperatorGenerationFingerprintBuilder
                         contract.ImplicitConversionPolicy,
                         contract.OutputDepthPolicy,
                         contract.DynamicRangePolicy,
-                        ModeRestrictions = contract.ModeRestrictions
+                        Variants = contract.Variants
                             .OrderBy(item => item.Mode, StringComparer.Ordinal)
-                            .ThenBy(item => item.Condition, StringComparer.Ordinal)
+                            .ThenBy(item => item.Depth, StringComparer.Ordinal)
+                            .ThenBy(item => item.Channels)
                             .Select(item => new
                             {
                                 item.Mode,
-                                item.Status,
-                                SupportedDepths = NormalizeSet(item.SupportedDepths),
-                                SupportedChannels = item.SupportedChannels.OrderBy(value => value),
+                                item.Depth,
+                                item.Channels,
+                                item.Condition,
+                                item.Admission,
+                                item.Verification,
                                 item.ConversionPolicy,
                                 item.OutputDepthPolicy,
                                 item.DynamicRangePolicy,
+                                item.InputValuePolicy,
                                 item.FailureCode,
-                                item.EvidenceLevel,
-                                item.Condition
+                                item.EvidenceLevel
                             }),
                         contract.NonFinitePolicy,
                         contract.FailureCode,
-                        contract.ContractVersion,
-                        contract.EvidenceLevel
+                        contract.ContractVersion
                     }),
                 GenerationDependencies = declaredDependencies
             },

@@ -7,11 +7,63 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
+using ImageContractAdmission = ClearVision.Product.Core.Services.ImageContractAdmission;
+using ImageContractStatus = ClearVision.Product.Core.Services.ImageContractStatus;
+using ImageContractVerification = ClearVision.Product.Core.Services.ImageContractVerification;
+using ImageInputContract = ClearVision.Product.Core.Services.ImageInputContract;
+using OperatorImageContractResolver = ClearVision.Product.Core.Services.OperatorImageContractResolver;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
 public class CoreOperatorContractTests
 {
+    [Fact]
+    public void ImageContractPresentation_PreservesExactPairsEvidenceAndLegacyApi()
+    {
+        var contract = new ThresholdImageContractProvider()
+            .GetContracts(OperatorType.Thresholding, ["Image"], OperatorLifecycle.Stable)
+            .Single();
+        var presentation = contract.Presentation;
+        var fixedAllowed = presentation.ExactVariantGroups
+            .Where(group => group.Mode == "Fixed" && group.Admission == ImageContractAdmission.Allowed)
+            .SelectMany(group => group.ExactInputTypes)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains("CV_64FC1", fixedAllowed);
+        Assert.DoesNotContain("CV_64FC3", fixedAllowed);
+        Assert.Contains(presentation.ExactVariantGroups, group =>
+            group.Mode == "Fixed" &&
+            group.Verification == ImageContractVerification.VerifiedRejection &&
+            group.ExactInputTypes.Contains("CV_64FC3", StringComparer.Ordinal));
+
+        var json = JsonSerializer.Serialize(contract);
+        Assert.Contains("\"Admission\":\"Allowed\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"Verification\":\"VerifiedSupport\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Presentation\"", json, StringComparison.Ordinal);
+        Assert.Contains("CV_64FC1", JsonSerializer.Serialize(contract.Presentation), StringComparison.Ordinal);
+
+#pragma warning disable CS0618
+        var legacy = new ImageInputContract(
+            "Image",
+            ["CV_8U"],
+            [1],
+            ["CV_8U"],
+            "Legacy",
+            "None",
+            "Preserve",
+            "8-bit",
+            [],
+            "NotApplicable",
+            "IMAGE_DEPTH_UNSUPPORTED",
+            OperatorImageContractResolver.ContractVersion,
+            ImageContractStatus.Restricted,
+            "E0_SOURCE_AUDIT");
+        Assert.Equal(ImageContractStatus.Restricted, legacy.Status);
+#pragma warning restore CS0618
+        Assert.True(legacy.Presentation.CompatibilityOnly);
+        Assert.False(legacy.Presentation.HasProductionSupport);
+    }
+
     [Fact]
     public void OperatorExecutionOutputAdapter_ShouldPreserveShortCircuitContract()
     {

@@ -72,11 +72,6 @@ public class HistogramAnalysisOperator : OperatorBase
         }
 
         using var roiMat = new Mat(src, roi);
-        if (roiMat.Channels() == 1 && !channelName.Equals("Gray", StringComparison.OrdinalIgnoreCase))
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure(BuildChannelFailure(src, channelName)));
-        }
-
         using var channelMat = ExtractChannel(roiMat, channelName);
         Cv2.MeanStdDev(channelMat, out var mean, out var stddev);
 

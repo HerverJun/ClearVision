@@ -78,16 +78,34 @@
 | `Method` | metadata; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `IMAGE_NORMALIZE_METHOD` |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_16U, CV_32F, CV_64F | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Mode-dependent business normalization contract retained from Stage 1. | MinMax and Histogram may intentionally change the numeric domain; ZScore widens to CV_32F. | MinMax preserves admitted depth; ZScore outputs CV_32F; Histogram outputs CV_8U. | Explicit business-semantic normalization; data-dependent MinMax is allowed only inside this operator. | ModeSpecific | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` | `2.0` |
+| `Image` | Allowed:30, Rejected:6, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F, CV_64F | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Admission is exact for Method + effective ColorMode + Depth + Channels. | Only explicitly listed normalization conversions are allowed. | MinMax preserves depth; ZScore outputs CV_32F; Histogram outputs CV_8U. | Explicit business-semantic normalization; no generic implicit MinMax conversion. | ModeSpecific | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Histogram | `Converted` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Explicit histogram-normalization business mode. | CV_8U. | 8-bit equalization domain. | - | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E1_SOURCE_AUDIT` |
-| `Image` | MinMax | `Native` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Explicit normalization. | Preserve input depth. | Explicit target range. | - | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_STAGE1_REGRESSION` |
-| `Image` | ZScore | `Converted` | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Value-preserving conversion to CV_32F before z-score. | CV_32F. | Mean 0 / population sigma 1 when non-degenerate. | - | `IMAGE_NONFINITE_INPUT` | `E2_STAGE1_REGRESSION` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Histogram:Gray | CV_8UC1, CV_16UC1 | C1 input in the explicit histogram-normalization business mode. | `Allowed` | `VerifiedConversion` | Explicit conversion to the 8-bit equalization domain. | CV_8U. | 8-bit equalization domain. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:Gray | CV_32FC1, CV_64FC1 | C1 input in the explicit histogram-normalization business mode. | `Allowed` | `VerifiedConversion` | Explicit conversion to the 8-bit equalization domain. | CV_8U. | 8-bit equalization domain. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:LumaOnly | CV_8UC3, CV_16UC3 | BGR->YUV luma equalization with explicit 8-bit fallback when required. | `Allowed` | `VerifiedConversion` | BGR->YUV, explicit 8-bit luma equalization, YUV->BGR. | CV_8UC3 when luma conversion requires the explicit byte domain. | 8-bit equalization domain. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:LumaOnly | CV_32FC3 | BGR->YUV luma equalization with explicit 8-bit fallback when required. | `Allowed` | `VerifiedConversion` | BGR->YUV, explicit 8-bit luma equalization, YUV->BGR. | CV_8UC3 when luma conversion requires the explicit byte domain. | 8-bit equalization domain. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:LumaOnly | CV_64FC3 | The installed BGR<->YUV conversion path does not admit CV_64F. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:PerChannel | CV_8UC3, CV_16UC3 | Each channel is explicitly converted to and equalized in CV_8U. | `Allowed` | `VerifiedConversion` | Split, explicit 8-bit histogram normalization, merge. | CV_8UC3. | Per-channel 8-bit equalization domain. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | Histogram:PerChannel | CV_32FC3, CV_64FC3 | Each channel is explicitly converted to and equalized in CV_8U. | `Allowed` | `VerifiedConversion` | Split, explicit 8-bit histogram normalization, merge. | CV_8UC3. | Per-channel 8-bit equalization domain. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:Gray | CV_8UC1, CV_16UC1 | C1 input; ColorMode is validated but has no channel-selection effect. | `Allowed` | `VerifiedSupport` | Explicit MinMax normalization. | Preserve input depth. | Explicit Alpha/Beta target range. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:Gray | CV_32FC1, CV_64FC1 | C1 input; ColorMode is validated but has no channel-selection effect. | `Allowed` | `VerifiedSupport` | Explicit MinMax normalization. | Preserve input depth. | Explicit Alpha/Beta target range. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:LumaOnly | CV_8UC3, CV_16UC3 | BGR->YUV luma normalization; CvtColor supports 8U/16U/32F. | `Allowed` | `VerifiedConversion` | BGR->YUV, normalize Y, YUV->BGR. | Preserve input depth and C3. | Luma Alpha/Beta target range. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:LumaOnly | CV_32FC3 | BGR->YUV luma normalization; CvtColor supports 8U/16U/32F. | `Allowed` | `VerifiedConversion` | BGR->YUV, normalize Y, YUV->BGR. | Preserve input depth and C3. | Luma Alpha/Beta target range. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:LumaOnly | CV_64FC3 | The installed BGR<->YUV conversion path does not admit CV_64F. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:PerChannel | CV_8UC3, CV_16UC3 | Each channel is normalized independently. | `Allowed` | `VerifiedSupport` | Split/normalize/merge without depth conversion. | Preserve input depth and C3. | Per-channel Alpha/Beta target range. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | MinMax:PerChannel | CV_32FC3, CV_64FC3 | Each channel is normalized independently. | `Allowed` | `VerifiedSupport` | Split/normalize/merge without depth conversion. | Preserve input depth and C3. | Per-channel Alpha/Beta target range. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:Gray | CV_8UC1, CV_16UC1 | C1 input; finite values must be representable after the explicit CV_32F narrowing. | `Allowed` | `VerifiedConversion` | Explicit conversion to CV_32F before z-score. | CV_32F. | Mean 0 / population sigma 1 when non-degenerate. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:Gray | CV_32FC1 | C1 input; finite values must be representable after the explicit CV_32F narrowing. | `Allowed` | `VerifiedConversion` | Explicit conversion to CV_32F before z-score. | CV_32F. | Mean 0 / population sigma 1 when non-degenerate. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:Gray | CV_64FC1 | C1 input; finite values must be representable after the explicit CV_32F narrowing. | `Allowed` | `VerifiedConversion` | Explicit conversion to CV_32F before z-score. | CV_32F. | Mean 0 / population sigma 1 when non-degenerate. | `RequireFiniteFloat32Representable` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:LumaOnly | CV_8UC3, CV_16UC3, CV_32FC3, CV_64FC3 | Color ZScore requires ColorMode=PerChannel. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_UNSUPPORTED` | `E2_STAGE1_REGRESSION` |
+| `Image` | ZScore:PerChannel | CV_8UC3, CV_16UC3 | Each channel is narrowed to CV_32F and standardized independently. | `Allowed` | `VerifiedConversion` | Split, explicit CV_32F conversion, z-score, merge. | CV_32FC3. | Per-channel mean 0 / population sigma 1 when non-degenerate. | `Any` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:PerChannel | CV_32FC3 | Each channel is narrowed to CV_32F and standardized independently. | `Allowed` | `VerifiedConversion` | Split, explicit CV_32F conversion, z-score, merge. | CV_32FC3. | Per-channel mean 0 / population sigma 1 when non-degenerate. | `RejectNonFinite` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
+| `Image` | ZScore:PerChannel | CV_64FC3 | Each channel is narrowed to CV_32F and standardized independently. | `Allowed` | `VerifiedConversion` | Split, explicit CV_32F conversion, z-score, merge. | CV_32FC3. | Per-channel mean 0 / population sigma 1 when non-degenerate. | `RequireFiniteFloat32Representable` | `IMAGE_NORMALIZE_NONFINITE_INPUT` | `E2_STAGE2_CLOSURE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -100,7 +118,7 @@
 | `SigmaDegenerate` | - | `IMAGE_NORMALIZE_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`B08321CB29B34FC589460041FABA0F3729F7E61365FEC2FEE0CA1923B8EF13B4`
+- 组合指纹 (Generation Fingerprint)：`F76410BF26206E59C4061C01FD677C18040D65346BF2FBE3412604C891E63ACD`
 - `type:ClearVision.Product.Infrastructure.Operators.ImageNormalizeImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -120,7 +138,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 6 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：MinMax for bounded display or downstream range contracts

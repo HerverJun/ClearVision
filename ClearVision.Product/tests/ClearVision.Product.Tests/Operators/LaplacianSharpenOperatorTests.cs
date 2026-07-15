@@ -212,8 +212,10 @@ public class LaplacianSharpenOperatorTests
         result.IsSuccess.Should().BeFalse();
         result.ErrorMessage.Should().StartWith("IMAGE_DEPTH_UNSUPPORTED:");
         result.ErrorMessage.Should().Contain("OperatorType=LaplacianSharpen")
-            .And.Contain($"InputMatType=CV_{caseId}")
-            .And.Contain("Supported=CV_8UC1,CV_8UC3,CV_16UC1,CV_16UC3,CV_32FC1,CV_32FC3");
+            .And.Contain($"InputMatType=CV_{caseId}");
+        var supported = result.ErrorMessage!.Split("Supported=", 2)[1].Split(';', 2)[0].Split(',');
+        supported.Should().BeEquivalentTo(
+            "CV_8UC1", "CV_8UC3", "CV_16UC1", "CV_16UC3", "CV_32FC1", "CV_32FC3");
     }
 
     [Fact]

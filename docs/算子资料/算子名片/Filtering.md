@@ -77,17 +77,28 @@
 | `SigmaY` | metadata; - | visible: -; hidden: ALL(FilterMode != Gaussian) | enabled: -; disabled: ALL(FilterMode != Gaussian) | ALL(FilterMode != Gaussian) | - | - | `FILTERING_SIGMA_ONLY_FOR_GAUSSIAN` |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Unified FilterMode selects the shared Gaussian/Mean/Median/Bilateral admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` | `2.0` |
+| `Image` | Allowed:61, Rejected:29, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | Unified FilterMode selects the shared Gaussian/Mean/Median/Bilateral admission matrix. | None | Preserve input depth and channel count. | Preserve native numeric domain; floating inputs containing NaN/Infinity are rejected. | RejectNaNAndInfinity | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Bilateral | `Restricted` | CV_8U, CV_32F | 1, 3 | None | Preserve input depth/channels. | Preserve native numeric domain. | Effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
-| `Image` | Gaussian | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel 1..31; effective kernel is odd; border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
-| `Image` | Mean | `Native` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel 1..63; even kernels remain even; border 0/1/2/4. | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
-| `Image` | Median | `Restricted` | CV_8U, CV_16U, CV_16S, CV_32F, CV_64F | 1, 3, 4 | None | Preserve input depth/channels. | Preserve native numeric domain. | Kernel=1 identity for listed depths; effective kernel 3/5 admits 8U/16U/16S/32F; >=7 admits 8U only. | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Bilateral | CV_8UC1, CV_8UC3 | Diameter 1..25; effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_32FC1, CV_32FC3 | Diameter 1..25; effective diameter=max(3,2*floor(d/2)+1); border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_8UC4, CV_32FC4 | The installed bilateral path admits C1/C3 only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Bilateral | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed bilateral path admits CV_8U/CV_32F only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Gaussian | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4 | KernelSize 1..31; effective kernel is odd; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Gaussian | CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | KernelSize 1..31; effective kernel is odd; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Mean | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4 | KernelSize 1..63; even kernels remain even; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Mean | CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | KernelSize 1..63; even kernels remain even; border 0/1/2/4. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Identity | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4 | Effective kernel equals 1 and behaves as identity. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Identity | CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | Effective kernel equals 1 and behaves as identity. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_8UC1, CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4 | Effective kernel is 3 or 5. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_32FC1, CV_32FC3, CV_32FC4 | Effective kernel is 3 or 5. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel3Or5 | CV_16SC1, CV_16SC3, CV_16SC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed median kernel 3/5 path admits only 8U/16U/32F. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel7Plus | CV_8UC1, CV_8UC3, CV_8UC4 | Effective kernel is >=7 and <=31. | `Allowed` | `VerifiedSupport` | None | Preserve input depth/channels. | Preserve native numeric domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Median:Kernel7Plus | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | The installed median kernels >=7 path admits CV_8U only. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_MODE_DEPTH_UNSUPPORTED` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -97,7 +108,7 @@
 | `Image` | - | `FILTERING_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`14ECC78272A0467DE8861F7C250ABE7E83A3E6BF8B11E2E7FD4616E98B2555D0`
+- 组合指纹 (Generation Fingerprint)：`DC2DDAD5E61261B2949E1A3856F0BE29C5D2FBFFBE9DAF8FBE5BC1CB7316AB23`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider`
 - `type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel`
 

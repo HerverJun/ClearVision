@@ -78,15 +78,25 @@
 | - | - | - | - | - | - | - | - |
 
 ## 图像输入域合同 / Image Input Domain Contracts
-| 输入端口 | 状态 | 支持位深 | 原生位深 | 支持通道 | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 失败码 | 证据 | 版本 |
+| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | `Restricted` | CV_8U | CV_8U | 1, 3, 4 | 8U-only native histogram domain for Stage 2; non-8U inputs are rejected before statistics are computed. | C3 BGR/C4 BGRA may convert to C1 Gray, or a B/G/R channel is selected without depth scaling. | Histogram visualization is fixed CV_8UC3; statistics remain in the 0..255 intensity domain. | Fixed [0,256) histogram range with BinCount 2..256 and explicit BinWidth=256/BinCount. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` | `2.0` |
+| `Image` | Allowed:9, Rejected:51, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | 8U-only histogram domain selected by the exact Channel + Depth + Channels variant. | Gray conversion or native channel selection only; no depth scaling. | CV_8UC3 histogram chart. | Fixed [0,256) histogram range with BinCount 2..256. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
-### 模式限制 / Mode Restrictions
-| 输入端口 | 模式 | 状态 | 位深 | 通道 | 转换 | 输出 | 动态范围 | 条件 | 失败码 | 证据 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Channel=B/G/R | `Restricted` | CV_8U | 3, 4 | Select native byte channel. | CV_8UC3 chart. | 0..255 intensity units. | - | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
-| `Image` | Channel=Gray | `Restricted` | CV_8U | 1, 3, 4 | C3/C4 -> Gray. | CV_8UC3 chart. | 0..255 intensity units. | - | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+### 精确运行变体 / Exact Runtime Variants
+| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
+|------|------|------|------|------|------|------|------|------|------|------|------|
+| `Image` | Channel=B | CV_8UC1 | A named B/G/R channel is unavailable on C1 input. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=B | CV_8UC3, CV_8UC4 | Channel=B selects the corresponding native byte channel. | `Allowed` | `VerifiedSupport` | Select channel without depth scaling. | CV_8UC3 histogram chart. | Fixed [0,256) intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=B | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | HistogramAnalysis is intentionally restricted to the verified 8-bit domain. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
+| `Image` | Channel=G | CV_8UC1 | A named B/G/R channel is unavailable on C1 input. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=G | CV_8UC3, CV_8UC4 | Channel=G selects the corresponding native byte channel. | `Allowed` | `VerifiedSupport` | Select channel without depth scaling. | CV_8UC3 histogram chart. | Fixed [0,256) intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=G | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | HistogramAnalysis is intentionally restricted to the verified 8-bit domain. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
+| `Image` | Channel=Gray | CV_8UC1 | Channel=Gray. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray; C1 is native. | CV_8UC3 histogram chart. | Fixed [0,256) intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=Gray | CV_8UC3, CV_8UC4 | Channel=Gray. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray; C1 is native. | CV_8UC3 histogram chart. | Fixed [0,256) intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=Gray | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | HistogramAnalysis is intentionally restricted to the verified 8-bit domain. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
+| `Image` | Channel=R | CV_8UC1 | A named B/G/R channel is unavailable on C1 input. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=R | CV_8UC3, CV_8UC4 | Channel=R selects the corresponding native byte channel. | `Allowed` | `VerifiedSupport` | Select channel without depth scaling. | CV_8UC3 histogram chart. | Fixed [0,256) intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Channel=R | CV_16UC1, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC3, CV_16SC4, CV_32FC1, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC3, CV_64FC4 | HistogramAnalysis is intentionally restricted to the verified 8-bit domain. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E2_STAGE2_CLOSURE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -94,7 +104,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`4F306397586E3994667C271C7774E60D0849FE3D52AAEBF48081F3DD49A20F01`
+- 组合指纹 (Generation Fingerprint)：`E30614EC00BBCC3BD545D1BCD3ED227766801F9641A43647F1C12D992326F334`
 - `type:ClearVision.Product.Infrastructure.Operators.HistogramImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -127,7 +137,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
