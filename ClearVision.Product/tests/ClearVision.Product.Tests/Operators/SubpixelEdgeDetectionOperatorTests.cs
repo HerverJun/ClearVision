@@ -93,7 +93,7 @@ public class SubpixelEdgeDetectionOperatorTests
         var metadata = typeof(SubpixelEdgeDetectionOperator).GetCustomAttribute<OperatorMetaAttribute>();
 
         metadata.Should().NotBeNull();
-        metadata!.Description.Should().Contain("Non-industrial reference");
+        metadata!.Description.Should().Contain("非工业定型").And.Contain("参考实现");
         metadata.Tags.Should().Contain("non-industrial-reference");
         metadata.Tags.Should().NotContain("industrial-remediation");
     }
