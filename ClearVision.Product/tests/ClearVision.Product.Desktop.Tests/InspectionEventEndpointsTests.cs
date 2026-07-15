@@ -72,14 +72,7 @@ public class InspectionEventEndpointsTests
         var sessionId = Guid.NewGuid();
 
         await host.Coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
-        if (status == RuntimeStatus.Stopped)
-        {
-            host.Coordinator.MarkAsStopped(projectId, sessionId);
-        }
-        else
-        {
-            host.Coordinator.MarkAsFaulted(projectId, sessionId, "boom");
-        }
+        host.Coordinator.UpdateSessionStatus(projectId, sessionId, status);
 
         using var response = await host.Client.GetAsync($"/api/inspection/realtime/{projectId}/state");
         var state = await ReadJsonObjectAsync(response);
