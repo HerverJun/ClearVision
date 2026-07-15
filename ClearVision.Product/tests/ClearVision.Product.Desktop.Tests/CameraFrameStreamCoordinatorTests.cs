@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Infrastructure.Cameras;
@@ -51,7 +52,7 @@ public class CameraFrameStreamCoordinatorTests
         acquireTask.IsCompleted.Should().BeFalse();
 
         await frameCallback(secondFrame);
-        var frame = await acquireTask;
+        var frame = await acquireTask.WaitAsync(TimeSpan.FromSeconds(1));
 
         frame.ImageData.Should().Equal(secondFrame);
 
@@ -79,7 +80,10 @@ public class CameraFrameStreamCoordinatorTests
         var previewSession = await sut.StartPreviewSessionAsync(binding.Id);
 
         var waitTask = sut.WaitForPreviewFrameAsync(previewSession.SessionId);
-        await Task.Delay(100);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(1),
+            $"WaitForPreviewFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
         waitTask.IsCompleted.Should().BeFalse();
 
         await sut.StopPreviewSessionAsync(previewSession.SessionId);
@@ -187,7 +191,10 @@ public class CameraFrameStreamCoordinatorTests
 
         isAcquiring = true;
         var secondAcquireTask = sut.AcquireFrameAsync(binding.Id);
-        await Task.Delay(50);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(1),
+            $"AcquireFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
 
         var frameBytes = CreatePngBytes(new Scalar(64, 128, 192));
         await frameCallback!(frameBytes);
@@ -241,7 +248,10 @@ public class CameraFrameStreamCoordinatorTests
         sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
 
         var secondAcquireTask = sut.AcquireFrameAsync(binding.Id);
-        await Task.Delay(50);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(1),
+            $"AcquireFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
 
         var frameBytes = CreatePngBytes(new Scalar(8, 16, 32));
         await frameCallback!(frameBytes);
@@ -274,7 +284,10 @@ public class CameraFrameStreamCoordinatorTests
 
         await using var sut = new CameraFrameStreamCoordinator(cameraManager, NullLogger<CameraFrameStreamCoordinator>.Instance);
         var acquireTask = sut.AcquireFrameAsync(binding.Id);
-        await Task.Delay(50);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(1),
+            $"AcquireFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
 
         var frameBytes = CreatePngBytes(new Scalar(32, 64, 96));
         await frameCallback!(frameBytes);
@@ -318,7 +331,10 @@ public class CameraFrameStreamCoordinatorTests
             TimeSpan.FromMilliseconds(20),
             TimeSpan.FromMilliseconds(20));
         var acquireTask = sut.AcquireFrameAsync(binding.Id);
-        await Task.Delay(50);
+        await WaitUntilAsync(
+            () => sut.SnapshotStreamUsage(binding.Id).PendingFrameWaiters > 0,
+            TimeSpan.FromSeconds(1),
+            $"AcquireFrameAsync did not register a pending frame waiter for binding '{binding.Id}'.");
 
         var frameBytes = CreatePngBytes(new Scalar(96, 32, 64));
         await frameCallback!(frameBytes);
@@ -332,6 +348,32 @@ public class CameraFrameStreamCoordinatorTests
 
         sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
         await camera.Received(1).StopContinuousAcquisitionAsync();
+    }
+
+    private static async Task WaitUntilAsync(
+        Func<bool> condition,
+        TimeSpan timeout,
+        string failureMessage)
+    {
+        var pollInterval = TimeSpan.FromMilliseconds(5);
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            if (condition())
+            {
+                await Task.Delay(pollInterval);
+                if (condition())
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            await Task.Delay(pollInterval);
+        }
+
+        Assert.True(condition(), $"{failureMessage} Timed out after {timeout}.");
     }
 
     private static byte[] CreatePngBytes(Scalar color)
